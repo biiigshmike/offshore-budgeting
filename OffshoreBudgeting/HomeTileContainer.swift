@@ -13,6 +13,7 @@ struct HomeTileContainer<Content: View>: View {
     let subtitle: String
     let accent: Color
     let showsChevron: Bool
+    let headerTrailing: AnyView?
     @ViewBuilder var content: Content
 
     init(
@@ -20,12 +21,14 @@ struct HomeTileContainer<Content: View>: View {
         subtitle: String,
         accent: Color = .blue,
         showsChevron: Bool = true,
+        headerTrailing: AnyView? = nil,
         @ViewBuilder content: () -> Content
     ) {
         self.title = title
         self.subtitle = subtitle
         self.accent = accent
         self.showsChevron = showsChevron
+        self.headerTrailing = headerTrailing
         self.content = content()
     }
 
@@ -35,8 +38,7 @@ struct HomeTileContainer<Content: View>: View {
                 header
                 content
             }
-
-            Spacer(minLength: 0)
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             if showsChevron {
                 Image(systemName: "chevron.right")
@@ -55,14 +57,22 @@ struct HomeTileContainer<Content: View>: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(.headline.weight(.semibold))
-                .foregroundStyle(accent)
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(accent)
 
-            Text(subtitle)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                Text(subtitle)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 0)
+
+            if let headerTrailing {
+                headerTrailing
+            }
         }
     }
 }

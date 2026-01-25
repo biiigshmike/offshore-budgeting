@@ -102,10 +102,9 @@ struct EditIncomeView: View {
         } message: {
             Text("When Repeat is set, you must also set an End Date (and it cannot be before the start date).")
         }
-        .confirmationDialog(
+        .alert(
             "Apply changes to…",
-            isPresented: $showingSeriesApplyDialog,
-            titleVisibility: .visible
+            isPresented: $showingSeriesApplyDialog
         ) {
             Button("Just This Income") { applyJustThis() }
             Button("This and Future") { applyThisAndFuture() }

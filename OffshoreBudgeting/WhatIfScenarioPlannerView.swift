@@ -6,8 +6,30 @@
 //
 
 import SwiftUI
+import CoreText
+
+#if canImport(UIKit)
+import UIKit
+#endif
 
 struct WhatIfScenarioPlannerView: View {
+    
+    // MARK: - Export sheet routing
+
+    private enum ExportSheetRoute: Identifiable {
+        case options
+        case share
+
+        var id: String {
+            switch self {
+            case .options: return "options"
+            case .share: return "share"
+            }
+        }
+    }
+
+    @State private var exportSheetRoute: ExportSheetRoute? = nil
+
 
     let workspace: Workspace
     let categories: [Category]
@@ -16,6 +38,12 @@ struct WhatIfScenarioPlannerView: View {
     let variableExpenses: [VariableExpense]
     let startDate: Date
     let endDate: Date
+
+    /// If provided, the planner will open with this scenario selected.
+    /// Used by Home inline previews to jump straight into a pinned scenario.
+    let initialScenarioID: UUID?
+    
+    @State private var pinnedRefreshTick: Int = 0
 
     // Baseline = “Actual” values per category for this range
     @State private var baselineByCategoryID: [UUID: Double] = [:]
@@ -51,13 +79,10 @@ struct WhatIfScenarioPlannerView: View {
         WhatIfScenarioStore(workspaceID: workspace.id)
     }
 
-    private var pinnedScenarioID: UUID? {
-        store.loadPinnedGlobalScenarioID()
-    }
-
     private var isPinnedSelection: Bool {
+        _ = pinnedRefreshTick
         guard let selectedScenarioID else { return false }
-        return pinnedScenarioID == selectedScenarioID
+        return store.isGlobalScenarioPinned(selectedScenarioID)
     }
 
     // MARK: - Derived (baseline totals)
@@ -143,18 +168,22 @@ struct WhatIfScenarioPlannerView: View {
     }
 
     private var exportCSV: String {
-        var rows: [String] = ["Category,Scenario,Actual,Delta"]
-        rows.append("Scenario \(savingsLabel),\(savingsValueMagnitude),\(actualSavings),\(scenarioSavings - actualSavings)")
+        var rows: [String] = ["Category Name,Amount"]
 
         for c in categories {
-            let actual = baselineByCategoryID[c.id, default: 0]
-            let planned = scenarioByCategoryID[c.id, default: 0]
-            let delta = planned - actual
-            rows.append("\"\(c.name)\",\(planned),\(actual),\(delta)")
+            let amount = scenarioByCategoryID[c.id, default: 0]
+            rows.append("\"\(c.name)\",\(amount)")
         }
 
+        rows.append("\"Savings/Remaining\",\(scenarioSavings)")
         return rows.joined(separator: "\n")
     }
+
+    // MARK: - Export UI state
+
+    @State private var showExportSheet: Bool = false
+    @State private var shareItems: [Any] = []
+    @State private var showExportOptions: Bool = false
 
     // MARK: - Donut slices
 
@@ -240,6 +269,9 @@ struct WhatIfScenarioPlannerView: View {
                 }
             }
         }
+        .onReceive(pinnedChangePublisher) { _ in
+            pinnedRefreshTick += 1
+        }
         .listStyle(.insetGrouped)
         .navigationTitle("What If?")
         .navigationBarTitleDisplayMode(.inline)
@@ -300,7 +332,7 @@ struct WhatIfScenarioPlannerView: View {
         } message: {
             Text("Make a copy of the current scenario.")
         }
-        .confirmationDialog("Delete this scenario?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
+        .alert("Delete this scenario?", isPresented: $showDeleteConfirm) {
             Button("Delete Scenario", role: .destructive) { deleteScenario() }
             Button("Cancel", role: .cancel) {}
         } message: {
@@ -351,20 +383,71 @@ struct WhatIfScenarioPlannerView: View {
 
             Spacer(minLength: 0)
 
-            ShareLink(item: exportText) {
+            Button {
+                exportSheetRoute = .options
+            } label: {
                 Image(systemName: "square.and.arrow.up")
                     .font(.system(size: 14, weight: .semibold))
             }
-            .accessibilityLabel("Share scenario summary")
-
-            ShareLink(item: exportCSV) {
-                Image(systemName: "tablecells")
-                    .font(.system(size: 14, weight: .semibold))
-            }
-            .accessibilityLabel("Share scenario CSV")
+            .accessibilityLabel("Export")
         }
         .padding(.vertical, 4)
+        .sheet(item: $exportSheetRoute) { route in
+            switch route {
+            case .options:
+                ExportOptionsSheet(
+                    onSelect: { format in
+                        // Close options first, then open share.
+                        exportSheetRoute = nil
+                        exportAndShare(format)
+                        exportSheetRoute = .share
+                    }
+                )
+
+            case .share:
+                ShareSheet(items: shareItems)
+            }
+        }
     }
+
+    private struct ExportOptionsSheet: View {
+        let onSelect: (ExportFormat) -> Void
+        @Environment(\.dismiss) private var dismiss
+
+        var body: some View {
+            NavigationStack {
+                List {
+                    Section {
+                        Button("Export as CSV") {
+                            dismiss()
+                            onSelect(.csv)
+                        }
+
+                        Button("Export as PDF") {
+                            dismiss()
+                            onSelect(.pdf)
+                        }
+
+                        Button("Export as Text") {
+                            dismiss()
+                            onSelect(.txt)
+                        }
+                    } header: {
+                        Text("Choose a file format.")
+                    }
+                }
+                .navigationTitle("Export")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Close") { dismiss() }
+                    }
+                }
+            }
+            .presentationDetents([.medium])
+        }
+    }
+
 
     private var scenarioMenu: some View {
         Menu {
@@ -387,13 +470,13 @@ struct WhatIfScenarioPlannerView: View {
             if let selectedScenarioID {
                 if isPinnedSelection {
                     Button {
-                        store.setPinnedGlobalScenarioID(nil)
+                        store.setGlobalScenarioPinned(selectedScenarioID, isPinned: false)
                     } label: {
                         Label("Unpin from Home", systemImage: "pin.slash")
                     }
                 } else {
                     Button {
-                        store.setPinnedGlobalScenarioID(selectedScenarioID)
+                        store.setGlobalScenarioPinned(selectedScenarioID, isPinned: true)
                     } label: {
                         Label("Pin to Home", systemImage: "pin")
                     }
@@ -459,7 +542,8 @@ struct WhatIfScenarioPlannerView: View {
         }
 
         let restored = store.loadSelectedGlobalScenarioID()
-        let chosen = restored ?? scenarios.sorted { $0.lastAccessed > $1.lastAccessed }.first?.id
+        let candidate = initialScenarioID ?? restored
+        let chosen = candidate ?? scenarios.sorted { $0.lastAccessed > $1.lastAccessed }.first?.id
 
         selectedScenarioID = chosen
 
@@ -471,6 +555,121 @@ struct WhatIfScenarioPlannerView: View {
         }
 
         didLoad = true
+    }
+
+    // MARK: - Export helpers
+
+    private enum ExportFormat {
+        case csv
+        case pdf
+        case txt
+
+        var fileExtension: String {
+            switch self {
+            case .csv: return "csv"
+            case .pdf: return "pdf"
+            case .txt: return "txt"
+            }
+        }
+    }
+
+    private func exportAndShare(_ format: ExportFormat) {
+        let fileName = sanitizedFileName("WhatIf_\(workspace.name)_\(selectedScenarioName)")
+
+        switch format {
+        case .csv:
+            guard let url = writeTempFile(data: Data(exportCSV.utf8), fileName: fileName, ext: format.fileExtension) else { return }
+            presentShareSheet([url])
+
+        case .txt:
+            guard let url = writeTempFile(data: Data(exportText.utf8), fileName: fileName, ext: format.fileExtension) else { return }
+            presentShareSheet([url])
+
+        case .pdf:
+            guard let data = buildTextOnlyPDFData() else { return }
+            guard let url = writeTempFile(data: data, fileName: fileName, ext: format.fileExtension) else { return }
+            presentShareSheet([url])
+        }
+    }
+
+    private func presentShareSheet(_ items: [Any]) {
+        shareItems = items
+        showExportSheet = true
+    }
+
+    private func sanitizedFileName(_ raw: String) -> String {
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_ "))
+        let cleaned = raw.unicodeScalars.map { allowed.contains($0) ? Character($0) : "_" }
+        return String(cleaned).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func writeTempFile(data: Data, fileName: String, ext: String) -> URL? {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent(fileName)
+            .appendingPathExtension(ext)
+
+        do {
+            try data.write(to: url, options: [.atomic])
+            return url
+        } catch {
+            return nil
+        }
+    }
+
+    private func buildTextOnlyPDFData() -> Data? {
+        #if canImport(UIKit)
+        let pageRect = CGRect(x: 0, y: 0, width: 612, height: 792) // US Letter @ 72 dpi
+        let renderer = UIGraphicsPDFRenderer(bounds: pageRect)
+
+        let bodyText = buildPDFText()
+        let data = renderer.pdfData { ctx in
+            ctx.beginPage()
+
+            let margin: CGFloat = 36
+            let rect = CGRect(x: margin, y: margin, width: pageRect.width - (margin * 2), height: pageRect.height - (margin * 2))
+            let attrs: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: 12),
+                .foregroundColor: UIColor.label
+            ]
+
+            let attributed = NSAttributedString(string: bodyText, attributes: attrs)
+            let framesetter = CTFramesetterCreateWithAttributedString(attributed)
+            let path = CGPath(rect: rect, transform: nil)
+            let frame = CTFramesetterCreateFrame(framesetter, CFRangeMake(0, attributed.length), path, nil)
+            let context = ctx.cgContext
+            context.saveGState()
+            context.translateBy(x: 0, y: pageRect.height)
+            context.scaleBy(x: 1, y: -1)
+            CTFrameDraw(frame, context)
+            context.restoreGState()
+        }
+
+        return data
+        #else
+        return nil
+        #endif
+    }
+
+    private func buildPDFText() -> String {
+        var lines: [String] = []
+        lines.append("What If? • \(workspace.name)")
+        lines.append(subtitleText)
+        lines.append("Scenario: \(selectedScenarioName)")
+        lines.append("Generated: \(Date().formatted(date: .abbreviated, time: .shortened))")
+        lines.append("")
+        lines.append("Scenario \(savingsLabel): \(CurrencyFormatter.string(from: savingsValueMagnitude))")
+        lines.append("Actual Savings: \(CurrencyFormatter.string(from: actualSavings))")
+        lines.append("")
+        lines.append("Categories")
+
+        for c in categories {
+            let amount = scenarioByCategoryID[c.id, default: 0]
+            lines.append("• \(c.name): \(CurrencyFormatter.string(from: amount))")
+        }
+
+        lines.append("")
+        lines.append("Savings/Remaining: \(CurrencyFormatter.string(from: scenarioSavings))")
+        return lines.joined(separator: "\n")
     }
 
     private func loadScenarioIntoUI(id: UUID) {
@@ -661,12 +860,31 @@ struct WhatIfScenarioPlannerView: View {
         guard value.isFinite else { return 0 }
         return value
     }
+    
+    private var pinnedChangePublisher: NotificationCenter.Publisher {
+        NotificationCenter.default.publisher(
+            for: WhatIfScenarioStore.pinnedGlobalScenariosDidChangeName(workspaceID: workspace.id)
+        )
+    }
+
 }
 
 #if canImport(UIKit)
 private extension View {
     func hideKeyboard() {
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+    }
+}
+
+private struct ShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {
+        // No-op
     }
 }
 #endif

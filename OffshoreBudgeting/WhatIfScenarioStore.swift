@@ -8,6 +8,14 @@
 import Foundation
 
 struct WhatIfScenarioStore {
+    
+    // MARK: - Notifications
+
+    /// Posted whenever pinned global scenario IDs change for a workspace.
+    /// Views can observe this to refresh UI without requiring an app restart.
+    static func pinnedGlobalScenariosDidChangeName(workspaceID: UUID) -> Notification.Name {
+        Notification.Name("whatIfPinnedGlobalScenariosDidChange_\(workspaceID.uuidString)")
+    }
 
     // MARK: - Config
 
@@ -234,6 +242,10 @@ struct WhatIfScenarioStore {
         "home_whatIfGlobalScenarioPinned_\(workspaceID.uuidString)"
     }
 
+    private func globalPinnedListKey() -> String {
+        "home_whatIfGlobalScenarioPinnedList_\(workspaceID.uuidString)"
+    }
+
     private func globalPayloadKey(scenarioID: UUID) -> String {
         "home_whatIfGlobalScenario_\(workspaceID.uuidString)_\(scenarioID.uuidString)"
     }
@@ -254,17 +266,56 @@ struct WhatIfScenarioStore {
         bumpGlobalLastAccessed(scenarioID: scenarioID)
     }
 
-    func loadPinnedGlobalScenarioID() -> UUID? {
-        guard let raw = UserDefaults.standard.string(forKey: globalPinnedKey()) else { return nil }
-        return UUID(uuidString: raw)
+    // MARK: - Pinned scenarios (GLOBAL)
+
+    /// New behavior: multiple pinned scenarios.
+    /// Migration: if the legacy single pinned ID exists, convert it into a 1-item array.
+    func loadPinnedGlobalScenarioIDs() -> [UUID] {
+        if let data = UserDefaults.standard.data(forKey: globalPinnedListKey()),
+           let raw = try? JSONDecoder().decode([String].self, from: data)
+        {
+            return raw.compactMap { UUID(uuidString: $0) }
+        }
+
+        // Migration path (legacy string)
+        if let legacy = UserDefaults.standard.string(forKey: globalPinnedKey()),
+           let id = UUID(uuidString: legacy)
+        {
+            let migrated: [UUID] = [id]
+            setPinnedGlobalScenarioIDs(migrated)
+            UserDefaults.standard.removeObject(forKey: globalPinnedKey())
+            return migrated
+        }
+
+        return []
     }
 
-    func setPinnedGlobalScenarioID(_ scenarioID: UUID?) {
-        if let scenarioID {
-            UserDefaults.standard.set(scenarioID.uuidString, forKey: globalPinnedKey())
+    func setPinnedGlobalScenarioIDs(_ scenarioIDs: [UUID]) {
+        let raw = scenarioIDs.map { $0.uuidString }
+        let data = (try? JSONEncoder().encode(raw)) ?? Data()
+        UserDefaults.standard.set(data, forKey: globalPinnedListKey())
+
+        NotificationCenter.default.post(
+            name: Self.pinnedGlobalScenariosDidChangeName(workspaceID: workspaceID),
+            object: nil
+        )
+    }
+
+
+    func isGlobalScenarioPinned(_ scenarioID: UUID) -> Bool {
+        loadPinnedGlobalScenarioIDs().contains(scenarioID)
+    }
+
+    func setGlobalScenarioPinned(_ scenarioID: UUID, isPinned: Bool) {
+        var current = loadPinnedGlobalScenarioIDs()
+        if isPinned {
+            if current.contains(scenarioID) == false {
+                current.append(scenarioID)
+            }
         } else {
-            UserDefaults.standard.removeObject(forKey: globalPinnedKey())
+            current.removeAll { $0 == scenarioID }
         }
+        setPinnedGlobalScenarioIDs(current)
     }
 
     func createGlobalScenario(name: String, overrides: [UUID: Double] = [:]) -> GlobalScenarioInfo {
@@ -319,8 +370,8 @@ struct WhatIfScenarioStore {
         }
 
         // pinned
-        if loadPinnedGlobalScenarioID() == scenarioID {
-            UserDefaults.standard.removeObject(forKey: globalPinnedKey())
+        if isGlobalScenarioPinned(scenarioID) {
+            setGlobalScenarioPinned(scenarioID, isPinned: false)
         }
     }
 

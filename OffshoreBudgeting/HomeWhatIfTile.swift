@@ -8,6 +8,9 @@
 import SwiftUI
 
 struct HomeWhatIfTile: View {
+    
+    @State private var pinnedRefreshTick: Int = 0
+
 
     let workspace: Workspace
     let categories: [Category]
@@ -47,49 +50,46 @@ struct HomeWhatIfTile: View {
         actualIncomeTotal - (plannedExpensesEffectiveTotal + variableExpensesTotal)
     }
 
-    // MARK: - Scenario (pinned global)
+    // MARK: - Scenario (pinned previews)
 
-    private var pinnedScenarioInfo: WhatIfScenarioStore.GlobalScenarioInfo? {
-        guard let pinnedID = scenarioStore.loadPinnedGlobalScenarioID() else { return nil }
-        return scenarioStore.listGlobalScenarios().first(where: { $0.id == pinnedID })
-    }
-
-    private var pinnedOverridesByCategoryID: [UUID: Double]? {
-        guard let pinnedID = scenarioStore.loadPinnedGlobalScenarioID() else { return nil }
-        return scenarioStore.loadGlobalScenario(scenarioID: pinnedID)
+    private struct PinnedPreviewItem: Identifiable {
+        let id: UUID
+        let name: String
+        let savings: Double
     }
 
     private var baselineByCategoryID: [UUID: Double] {
         buildBaselineByCategoryID()
     }
 
-    private var scenarioByCategoryID: [UUID: Double]? {
-        guard let overrides = pinnedOverridesByCategoryID else { return nil }
+    private var pinnedPreviewItems: [PinnedPreviewItem] {
+        _ = pinnedRefreshTick
+        let pinnedIDs = Array(scenarioStore.loadPinnedGlobalScenarioIDs().prefix(3))
+        guard pinnedIDs.isEmpty == false else { return [] }
+
+        // Name lookup is cheap and avoids repeatedly sorting in the UI.
+        let allInfos = scenarioStore.listGlobalScenarios()
         let ids = categories.map { $0.id }
-        return scenarioStore.applyGlobalScenario(
-            overrides: overrides,
-            baselineByCategoryID: baselineByCategoryID,
-            categories: ids
-        )
-    }
 
-    private var scenarioTotalSpend: Double? {
-        guard let scenario = scenarioByCategoryID else { return nil }
-        return categories.reduce(0) { $0 + (scenario[$1.id, default: 0]) }
-    }
+        return pinnedIDs.compactMap { id in
+            guard let info = allInfos.first(where: { $0.id == id }) else { return nil }
+            guard let overrides = scenarioStore.loadGlobalScenario(scenarioID: id) else { return nil }
 
-    private var scenarioSavings: Double? {
-        guard let spend = scenarioTotalSpend else { return nil }
-        return actualIncomeTotal - spend
-    }
+            let scenarioByCategoryID = scenarioStore.applyGlobalScenario(
+                overrides: overrides,
+                baselineByCategoryID: baselineByCategoryID,
+                categories: ids
+            )
 
-    private var displayTitle: String {
-        pinnedScenarioInfo?.name ?? "What If?"
+            let spend = categories.reduce(0) { $0 + (scenarioByCategoryID[$1.id, default: 0]) }
+            let savings = actualIncomeTotal - spend
+            return PinnedPreviewItem(id: id, name: info.name, savings: savings)
+        }
     }
 
     private var displayValue: Double {
-        // If a pinned scenario exists, show its savings; otherwise show actual savings.
-        scenarioSavings ?? actualSavings
+        // Home headline stays “Actual Savings”. Pinned scenarios are previews underneath.
+        actualSavings
     }
 
     private var valueColor: Color {
@@ -101,26 +101,39 @@ struct HomeWhatIfTile: View {
     }
 
     var body: some View {
-        NavigationLink {
-            WhatIfScenarioPlannerView(
-                workspace: workspace,
-                categories: categories,
-                incomes: incomes,
-                plannedExpenses: plannedExpenses,
-                variableExpenses: variableExpenses,
-                startDate: startDate,
-                endDate: endDate
+        HomeTileContainer(
+            title: "What If?",
+            subtitle: subtitleText,
+            accent: valueColor,
+            showsChevron: false,
+            headerTrailing: AnyView(
+                NavigationLink {
+                    WhatIfScenarioPlannerView(
+                        workspace: workspace,
+                        categories: categories,
+                        incomes: incomes,
+                        plannedExpenses: plannedExpenses,
+                        variableExpenses: variableExpenses,
+                        startDate: startDate,
+                        endDate: endDate,
+                        initialScenarioID: nil
+                    )
+                } label: {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 4)
+                        .padding(.leading, 8)
+                        .padding(.bottom, 4)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Open What If planner")
             )
-        } label: {
-            HomeTileContainer(
-                title: displayTitle,
-                subtitle: subtitleText,
-                accent: valueColor,
-                showsChevron: true
-            ) {
-                VStack(alignment: .center, spacing: 10) {
+        ) {
+            VStack(alignment: .center, spacing: 12) {
+                HStack(alignment: .center, spacing: 10) {
                     VStack(alignment: .center, spacing: 6) {
-                        Text(pinnedScenarioInfo == nil ? "Actual Savings" : "Scenario Savings")
+                        Text("Actual Savings")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
 
@@ -130,18 +143,78 @@ struct HomeWhatIfTile: View {
                             .lineLimit(1)
                             .minimumScaleFactor(0.85)
                     }
-
-                    Text("Tap to plan scenarios and see how much you can potentially save.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    Spacer(minLength: 0)
                 }
+
+                pinnedPreviews
             }
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel(displayTitle)
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for: WhatIfScenarioStore.pinnedGlobalScenariosDidChangeName(workspaceID: workspace.id)
+            )
+        ) { _ in
+            pinnedRefreshTick += 1
+        }
+        .accessibilityLabel("What If?")
         .accessibilityValue(CurrencyFormatter.string(from: displayValue))
-        .accessibilityHint("Opens the scenario planner")
+    }
+
+    @ViewBuilder
+    private var pinnedPreviews: some View {
+        let previews = pinnedPreviewItems
+
+        if previews.isEmpty {
+            Text("Pin up to 3 scenarios from inside the planner to preview them here.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        } else {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Pinned")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                ForEach(previews.prefix(3)) { item in
+                    NavigationLink {
+                        WhatIfScenarioPlannerView(
+                            workspace: workspace,
+                            categories: categories,
+                            incomes: incomes,
+                            plannedExpenses: plannedExpenses,
+                            variableExpenses: variableExpenses,
+                            startDate: startDate,
+                            endDate: endDate,
+                            initialScenarioID: item.id
+                        )
+                    } label: {
+                        HStack(spacing: 10) {
+                            Text(item.name)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.primary)
+                                .lineLimit(1)
+
+                            Spacer(minLength: 0)
+
+                            Text(item.savings, format: CurrencyFormatter.currencyStyle())
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(item.savings >= 0 ? Color.green : Color.red)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.85)
+
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 2)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+        }
+        
     }
 
     // MARK: - Helpers
