@@ -80,7 +80,7 @@ struct ManagePresetsView: View {
             } else {
 
                 if let pinned = highlightedPreset {
-                    Section("Pinned: Next Planned Expense") {
+                    Section("Next Planned Expense") {
                         let assignedCount = assignedBudgetCountsByPresetID[pinned.id, default: 0]
 
                         PresetRowView(
