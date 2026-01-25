@@ -80,8 +80,7 @@ struct EditIncomeView: View {
             monthlyIsLastDay: $monthlyIsLastDay,
             yearlyMonth: $yearlyMonth,
             yearlyDayOfMonth: $yearlyDayOfMonth,
-            endDate: $endDate,
-            footerText: "Editing income inside “\(workspace.name)”."
+            endDate: $endDate
         )
         .navigationTitle("Edit Income")
         .toolbar {

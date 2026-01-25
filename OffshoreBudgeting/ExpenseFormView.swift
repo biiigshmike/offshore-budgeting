@@ -112,31 +112,31 @@ struct ExpenseFormView: View {
             }
 
             if !canSave {
-                Section {
-                    VStack(alignment: .leading, spacing: 6) {
-                        if ExpenseFormView.trimmedDescription(descriptionText).isEmpty {
-                            Text("Enter a description.")
-                        }
-
-                        let amt = ExpenseFormView.parseAmount(amountText) ?? 0
-                        if amt <= 0 {
-                            Text("Enter an amount greater than 0.")
-                        }
-
-                        if cards.isEmpty {
-                            Text("Create a card first.")
-                        } else if selectedCardID == nil {
-                            Text("Select a card.")
-                        }
-                    }
-                    .foregroundStyle(.secondary)
-                }
+//                Section {
+//                    VStack(alignment: .leading, spacing: 6) {
+//                        if ExpenseFormView.trimmedDescription(descriptionText).isEmpty {
+//                            Text("Enter a description.")
+//                        }
+//
+//                        let amt = ExpenseFormView.parseAmount(amountText) ?? 0
+//                        if amt <= 0 {
+//                            Text("Enter an amount greater than 0.")
+//                        }
+//
+//                        if cards.isEmpty {
+//                            Text("Create a card first.")
+//                        } else if selectedCardID == nil {
+//                            Text("Select a card.")
+//                        }
+//                    }
+//                    .foregroundStyle(.secondary)
+//                }
             }
 
-            Section {
-                Text("This transaction will be saved inside “\(workspace.name)”.")
-                    .foregroundStyle(.secondary)
-            }
+//            Section {
+//                Text("This transaction will be saved inside “\(workspace.name)”.")
+//                    .foregroundStyle(.secondary)
+//            }
         }
     }
 }

@@ -131,31 +131,31 @@ struct PresetFormView: View {
             }
 
             if !canSave {
-                Section {
-                    VStack(alignment: .leading, spacing: 6) {
-                        if PresetFormView.trimmedTitle(title).isEmpty {
-                            Text("Enter an expense name.")
-                        }
-
-                        let planned = PresetFormView.parsePlannedAmount(plannedAmountText) ?? 0
-                        if planned <= 0 {
-                            Text("Enter a planned amount greater than 0.")
-                        }
-
-                        if cards.isEmpty {
-                            Text("Create a card first.")
-                        } else if selectedCardID == nil {
-                            Text("Select a default card.")
-                        }
-                    }
-                    .foregroundStyle(.secondary)
-                }
+//                Section {
+//                    VStack(alignment: .leading, spacing: 6) {
+//                        if PresetFormView.trimmedTitle(title).isEmpty {
+//                            Text("Enter an expense name.")
+//                        }
+//
+//                        let planned = PresetFormView.parsePlannedAmount(plannedAmountText) ?? 0
+//                        if planned <= 0 {
+//                            Text("Enter a planned amount greater than 0.")
+//                        }
+//
+//                        if cards.isEmpty {
+//                            Text("Create a card first.")
+//                        } else if selectedCardID == nil {
+//                            Text("Select a default card.")
+//                        }
+//                    }
+//                    .foregroundStyle(.secondary)
+//                }
             }
 
-            Section {
-                Text("This preset will be created inside “\(workspace.name)”.")
-                    .foregroundStyle(.secondary)
-            }
+//            Section {
+//                Text("This preset will be created inside “\(workspace.name)”.")
+//                    .foregroundStyle(.secondary)
+//            }
         }
     }
 

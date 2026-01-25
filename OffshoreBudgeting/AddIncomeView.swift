@@ -54,8 +54,7 @@ struct AddIncomeView: View {
             monthlyIsLastDay: $monthlyIsLastDay,
             yearlyMonth: $yearlyMonth,
             yearlyDayOfMonth: $yearlyDayOfMonth,
-            endDate: $endDate,
-            footerText: "This income will be created inside “\(workspace.name)”."
+            endDate: $endDate
         )
         .navigationTitle("Add Income")
         .toolbar {

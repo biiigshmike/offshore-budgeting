@@ -148,13 +148,6 @@ struct BudgetsView: View {
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 Button {
-                    searchFocused = true
-                } label: {
-                    Image(systemName: "magnifyingglass")
-                }
-                .accessibilityLabel("Search Budgets")
-
-                Button {
                     showingAddBudgetSheet = true
                 } label: {
                     Image(systemName: "plus")

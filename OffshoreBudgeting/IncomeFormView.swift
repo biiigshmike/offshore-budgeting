@@ -26,8 +26,6 @@ struct IncomeFormView: View {
     @Binding var yearlyDayOfMonth: Int
     @Binding var endDate: Date?
 
-    let footerText: String?
-
     private var frequency: RecurrenceFrequency {
         RecurrenceFrequency(rawValue: frequencyRaw) ?? .none
     }
@@ -108,13 +106,6 @@ struct IncomeFormView: View {
                         in: date...,
                         displayedComponents: .date
                     )
-                }
-            }
-
-            if let footerText {
-                Section {
-                    Text(footerText)
-                        .foregroundStyle(.secondary)
                 }
             }
         }
