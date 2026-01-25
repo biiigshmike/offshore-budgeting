@@ -60,7 +60,7 @@ struct HomeDateRangeBar: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity)
-        .background(.quinary, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(.quinary.opacity(0.5), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1)
