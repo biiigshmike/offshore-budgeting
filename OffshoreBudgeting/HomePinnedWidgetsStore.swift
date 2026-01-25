@@ -13,6 +13,7 @@ enum HomeWidgetID: String, CaseIterable, Identifiable, Codable {
     case nextPlannedExpense
     case categorySpotlight
     case categoryAvailability
+    case whatIf
 
     var id: String { rawValue }
 
@@ -23,6 +24,7 @@ enum HomeWidgetID: String, CaseIterable, Identifiable, Codable {
         case .nextPlannedExpense: return "Next Planned Expense"
         case .categorySpotlight: return "Category Spotlight"
         case .categoryAvailability: return "Category Availability"
+        case .whatIf: return "What If?"
         }
     }
 }
@@ -40,7 +42,7 @@ struct HomePinnedWidgetsStore {
     func load() -> [HomeWidgetID] {
         guard let data = UserDefaults.standard.data(forKey: storageKey) else {
             // Default order
-            return [.income, .savingsOutlook, .nextPlannedExpense, .categorySpotlight]
+            return [.income, .savingsOutlook, .whatIf, .nextPlannedExpense, .categorySpotlight]
         }
 
         // New format
@@ -49,7 +51,7 @@ struct HomePinnedWidgetsStore {
         }
 
         // Fallback
-        return [.income, .savingsOutlook, .nextPlannedExpense, .categorySpotlight]
+        return [.income, .savingsOutlook, .whatIf, .nextPlannedExpense, .categorySpotlight]
     }
 
     func save(_ widgets: [HomeWidgetID]) {

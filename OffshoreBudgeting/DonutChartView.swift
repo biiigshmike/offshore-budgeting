@@ -10,17 +10,31 @@ import Charts
 
 // MARK: - Donut slice model
 
+enum DonutSliceRole: Equatable {
+    case normal
+    case savings
+    case over
+}
+
 struct DonutSlice: Identifiable, Equatable {
     let id: UUID
     let title: String
     let value: Double
     let color: Color
+    let role: DonutSliceRole
 
-    init(id: UUID = UUID(), title: String, value: Double, color: Color) {
+    init(
+        id: UUID = UUID(),
+        title: String,
+        value: Double,
+        color: Color,
+        role: DonutSliceRole = .normal
+    ) {
         self.id = id
         self.title = title
         self.value = value
         self.color = color
+        self.role = role
     }
 }
 
@@ -59,17 +73,20 @@ struct DonutChartView: View {
             if totalValue <= 0 || slices.isEmpty {
                 emptyState
             } else {
-                chart
-                    .overlay { centerOverlay }
+                ZStack {
+                    baseChart
+                    specialOverlayChart
+                }
+                .overlay { centerOverlay }
             }
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Category breakdown")
     }
 
-    // MARK: - Chart
+    // MARK: - Charts
 
-    private var chart: some View {
+    private var baseChart: some View {
         Chart {
             ForEach(slices) { slice in
                 SectorMark(
@@ -84,9 +101,31 @@ struct DonutChartView: View {
         }
         .chartLegend(showsLegend ? .visible : .hidden)
         .chartPlotStyle { plotArea in
-            plotArea
-                .background(Color.clear)
+            plotArea.background(Color.clear)
         }
+    }
+
+    /// Draw only the special slice(s) with a distinct fill.
+    /// We render a second chart with the same slices so the angles match,
+    /// then make non-special slices clear.
+    private var specialOverlayChart: some View {
+        Chart {
+            ForEach(slices) { slice in
+                SectorMark(
+                    angle: .value("Amount", slice.value),
+                    innerRadius: .ratio(innerRadiusRatio),
+                    outerRadius: .ratio(1.0)
+                )
+                .foregroundStyle(overlayStyle(for: slice))
+                .opacity(slice.role == .normal ? 0 : 1)
+            }
+        }
+        .chartLegend(.hidden)
+        .chartPlotStyle { plotArea in
+            plotArea.background(Color.clear)
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 
     // MARK: - Center overlay
@@ -132,6 +171,71 @@ struct DonutChartView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    // MARK: - Special styles
+
+    private func overlayStyle(for slice: DonutSlice) -> AnyShapeStyle {
+        switch slice.role {
+        case .normal:
+            return AnyShapeStyle(Color.clear)
+
+        case .over:
+            return AnyShapeStyle(
+                stripeGradient(
+                    base: slice.color,
+                    stripeCount: 26,        // thicker stripes
+                    strongOpacity: 1.00,    // slightly softer
+                    weakOpacity: 0.35       // more contrast
+                )
+            )
+
+        case .savings:
+            return AnyShapeStyle(savingsHighlight(base: slice.color))
+        }
+    }
+
+    private func stripeGradient(
+        base: Color,
+        stripeCount: Int = 26,           // fewer = thicker stripes, more = thinner stripes
+        strongOpacity: Double = 1.00,    // “dark” stripe opacity
+        weakOpacity: Double = 0.35       // “light” stripe opacity
+    ) -> LinearGradient {
+        let stripes = max(2, stripeCount)
+        let step = 1.0 / Double(stripes * 2)
+
+        var stops: [Gradient.Stop] = []
+        stops.reserveCapacity(stripes * 2 + 1)
+
+        var loc: Double = 0
+        for i in 0..<(stripes * 2) {
+            let isStripe = (i % 2 == 0)
+            let color = isStripe ? base.opacity(strongOpacity) : base.opacity(weakOpacity)
+            stops.append(.init(color: color, location: loc))
+            loc += step
+        }
+        stops.append(.init(color: base.opacity(strongOpacity), location: 1.0))
+
+        return LinearGradient(
+            gradient: Gradient(stops: stops),
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
+
+    private func savingsHighlight(base: Color) -> LinearGradient {
+        // A gentle diagonal highlight, reads like “special” but calm.
+        LinearGradient(
+            gradient: Gradient(stops: [
+                .init(color: base.opacity(0.95), location: 0.00),
+                .init(color: base.opacity(0.70), location: 0.45),
+                .init(color: base.opacity(0.92), location: 0.70),
+                .init(color: base.opacity(0.78), location: 1.00)
+            ]),
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
     // MARK: - Helpers
 
     private var totalValue: Double {
@@ -172,7 +276,8 @@ extension DonutChartView {
                 id: metric.categoryID,
                 title: metric.categoryName,
                 value: metric.totalSpent,
-                color: metric.categoryColorHex.flatMap { Color(hex: $0) } ?? .secondary
+                color: metric.categoryColorHex.flatMap { Color(hex: $0) } ?? .secondary,
+                role: .normal
             )
         }
 
@@ -183,7 +288,8 @@ extension DonutChartView {
                     DonutSlice(
                         title: "Other",
                         value: otherTotal,
-                        color: .secondary.opacity(0.5)
+                        color: .secondary.opacity(0.5),
+                        role: .normal
                     )
                 )
             }
@@ -192,36 +298,4 @@ extension DonutChartView {
         // Filter any zero/negative just to be safe
         return slices.filter { $0.value > 0 }
     }
-}
-
-// MARK: - Preview
-
-#Preview("DonutChartView") {
-    VStack(spacing: 20) {
-        DonutChartView(
-            slices: [
-                DonutSlice(title: "Food & Drink", value: 420.55, color: .orange),
-                DonutSlice(title: "Shopping", value: 310.20, color: .pink),
-                DonutSlice(title: "Transportation", value: 180.00, color: .blue),
-                DonutSlice(title: "Health", value: 95.75, color: .green),
-                DonutSlice(title: "Other", value: 140.30, color: .secondary.opacity(0.5))
-            ],
-            innerRadiusRatio: 0.70,
-            centerTitle: "Top: Food & Drink",
-            centerValueText: CurrencyFormatter.string(from: 420.55),
-            showsLegend: false
-        )
-        .frame(width: 220, height: 220)
-
-        DonutChartView(
-            slices: [],
-            innerRadiusRatio: 0.70,
-            centerTitle: "No data",
-            centerValueText: nil,
-            showsLegend: false
-        )
-        .frame(width: 220, height: 220)
-    }
-    .padding()
-    .background(Color(.systemBackground))
 }
