@@ -13,59 +13,26 @@ struct WhatIfScenarioStore {
 
     private let workspaceID: UUID
     private let calendar: Calendar
-    private let maxSavedRanges: Int
+    private let maxScenariosPerRange: Int
 
-    init(workspaceID: UUID, calendar: Calendar = .current, maxSavedRanges: Int = 24) {
+    init(workspaceID: UUID, calendar: Calendar = .current, maxScenariosPerRange: Int = 12) {
         self.workspaceID = workspaceID
         self.calendar = calendar
-        self.maxSavedRanges = max(1, maxSavedRanges)
+        self.maxScenariosPerRange = max(1, maxScenariosPerRange)
     }
 
-    // MARK: - Keys
+    // MARK: - Public Models
 
-    private var indexKey: String {
-        "home_whatIfScenarioIndex_\(workspaceID.uuidString)"
+    struct ScenarioInfo: Codable, Identifiable, Equatable {
+        var id: UUID
+        var name: String
+        var lastAccessed: Double
+        var createdAt: Double
     }
 
-    private func payloadKey(rangeKey: String) -> String {
-        "home_whatIfScenario_\(workspaceID.uuidString)_\(rangeKey)"
-    }
+    // MARK: - Keys (range-based)
 
-    // MARK: - Public API
-
-    func load(startDate: Date, endDate: Date) -> [UUID: Double]? {
-        let rk = rangeKey(startDate: startDate, endDate: endDate)
-        bumpLastAccessed(for: rk)
-
-        guard let data = UserDefaults.standard.data(forKey: payloadKey(rangeKey: rk)) else { return nil }
-        let decoded = try? JSONDecoder().decode(ScenarioPayload.self, from: data)
-        return decoded?.scenarioByCategoryID
-    }
-
-    func save(_ scenarioByCategoryID: [UUID: Double], startDate: Date, endDate: Date) {
-        let rk = rangeKey(startDate: startDate, endDate: endDate)
-
-        let payload = ScenarioPayload(
-            rangeKey: rk,
-            scenarioByCategoryID: scenarioByCategoryID
-        )
-
-        let data = (try? JSONEncoder().encode(payload)) ?? Data()
-        UserDefaults.standard.set(data, forKey: payloadKey(rangeKey: rk))
-
-        upsertIndexEntry(for: rk)
-        pruneIfNeeded()
-    }
-
-    func clear(startDate: Date, endDate: Date) {
-        let rk = rangeKey(startDate: startDate, endDate: endDate)
-        UserDefaults.standard.removeObject(forKey: payloadKey(rangeKey: rk))
-        removeIndexEntry(for: rk)
-    }
-
-    // MARK: - Range Key (day-only)
-
-    func rangeKey(startDate: Date, endDate: Date) -> String {
+    private func rangeKey(startDate: Date, endDate: Date) -> String {
         let s = calendar.startOfDay(for: startDate)
         let e = calendar.startOfDay(for: endDate)
 
@@ -78,69 +45,361 @@ struct WhatIfScenarioStore {
         return "\(formatter.string(from: s))_\(formatter.string(from: e))"
     }
 
-    // MARK: - Index Management
-
-    private func loadIndex() -> [ScenarioIndexEntry] {
-        guard let data = UserDefaults.standard.data(forKey: indexKey) else { return [] }
-        return (try? JSONDecoder().decode([ScenarioIndexEntry].self, from: data)) ?? []
+    private func scenariosIndexKey(rangeKey: String) -> String {
+        "home_whatIfScenarioIndex_\(workspaceID.uuidString)_\(rangeKey)"
     }
 
-    private func saveIndex(_ entries: [ScenarioIndexEntry]) {
-        let data = (try? JSONEncoder().encode(entries)) ?? Data()
-        UserDefaults.standard.set(data, forKey: indexKey)
+    private func selectedScenarioKey(rangeKey: String) -> String {
+        "home_whatIfScenarioSelected_\(workspaceID.uuidString)_\(rangeKey)"
     }
 
-    private func upsertIndexEntry(for rangeKey: String) {
-        var entries = loadIndex()
+    private func payloadKey(rangeKey: String, scenarioID: UUID) -> String {
+        "home_whatIfScenario_\(workspaceID.uuidString)_\(rangeKey)_\(scenarioID.uuidString)"
+    }
+
+    // MARK: - Index (range-based)
+
+    func listScenarios(startDate: Date, endDate: Date) -> [ScenarioInfo] {
+        let rk = rangeKey(startDate: startDate, endDate: endDate)
+        var items = loadIndex(rangeKey: rk)
+        items.sort { $0.lastAccessed > $1.lastAccessed }
+        return items
+    }
+
+    func loadSelectedScenarioID(startDate: Date, endDate: Date) -> UUID? {
+        let rk = rangeKey(startDate: startDate, endDate: endDate)
+        guard let raw = UserDefaults.standard.string(forKey: selectedScenarioKey(rangeKey: rk)) else { return nil }
+        return UUID(uuidString: raw)
+    }
+
+    func setSelectedScenarioID(_ scenarioID: UUID, startDate: Date, endDate: Date) {
+        let rk = rangeKey(startDate: startDate, endDate: endDate)
+        UserDefaults.standard.set(scenarioID.uuidString, forKey: selectedScenarioKey(rangeKey: rk))
+        bumpLastAccessed(scenarioID: scenarioID, rangeKey: rk)
+    }
+
+    // MARK: - CRUD (range-based)
+
+    func createScenario(name: String, seed: [UUID: Double], startDate: Date, endDate: Date) -> ScenarioInfo {
+        let rk = rangeKey(startDate: startDate, endDate: endDate)
         let now = Date().timeIntervalSince1970
 
-        if let idx = entries.firstIndex(where: { $0.rangeKey == rangeKey }) {
-            entries[idx].lastAccessed = now
+        let info = ScenarioInfo(
+            id: UUID(),
+            name: name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Scenario" : name,
+            lastAccessed: now,
+            createdAt: now
+        )
+
+        savePayload(seed, scenarioID: info.id, rangeKey: rk)
+        upsertIndex(info, rangeKey: rk)
+        pruneIfNeeded(rangeKey: rk)
+
+        UserDefaults.standard.set(info.id.uuidString, forKey: selectedScenarioKey(rangeKey: rk))
+        return info
+    }
+
+    func renameScenario(scenarioID: UUID, newName: String, startDate: Date, endDate: Date) {
+        let rk = rangeKey(startDate: startDate, endDate: endDate)
+        var items = loadIndex(rangeKey: rk)
+        guard let idx = items.firstIndex(where: { $0.id == scenarioID }) else { return }
+
+        let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        items[idx].name = trimmed.isEmpty ? items[idx].name : trimmed
+        saveIndex(items, rangeKey: rk)
+    }
+
+    func duplicateScenario(scenarioID: UUID, newName: String, startDate: Date, endDate: Date) -> ScenarioInfo? {
+        _ = rangeKey(startDate: startDate, endDate: endDate)
+        guard let existing = loadScenario(scenarioID: scenarioID, startDate: startDate, endDate: endDate) else { return nil }
+
+        let baseName = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let name = baseName.isEmpty ? "Copy" : baseName
+        return createScenario(name: name, seed: existing, startDate: startDate, endDate: endDate)
+    }
+
+    func deleteScenario(scenarioID: UUID, startDate: Date, endDate: Date) {
+        let rk = rangeKey(startDate: startDate, endDate: endDate)
+
+        UserDefaults.standard.removeObject(forKey: payloadKey(rangeKey: rk, scenarioID: scenarioID))
+
+        var items = loadIndex(rangeKey: rk)
+        items.removeAll { $0.id == scenarioID }
+        saveIndex(items, rangeKey: rk)
+
+        if loadSelectedScenarioID(startDate: startDate, endDate: endDate) == scenarioID {
+            let next = items.sorted { $0.lastAccessed > $1.lastAccessed }.first?.id
+            if let next {
+                UserDefaults.standard.set(next.uuidString, forKey: selectedScenarioKey(rangeKey: rk))
+            } else {
+                UserDefaults.standard.removeObject(forKey: selectedScenarioKey(rangeKey: rk))
+            }
+        }
+    }
+
+    // MARK: - Payload (range-based)
+
+    func loadScenario(scenarioID: UUID, startDate: Date, endDate: Date) -> [UUID: Double]? {
+        let rk = rangeKey(startDate: startDate, endDate: endDate)
+        bumpLastAccessed(scenarioID: scenarioID, rangeKey: rk)
+
+        guard let data = UserDefaults.standard.data(forKey: payloadKey(rangeKey: rk, scenarioID: scenarioID)) else { return nil }
+        let decoded = try? JSONDecoder().decode(ScenarioPayload.self, from: data)
+        return decoded?.scenarioByCategoryID
+    }
+
+    func saveScenario(_ scenarioByCategoryID: [UUID: Double], scenarioID: UUID, startDate: Date, endDate: Date) {
+        let rk = rangeKey(startDate: startDate, endDate: endDate)
+        savePayload(scenarioByCategoryID, scenarioID: scenarioID, rangeKey: rk)
+        bumpLastAccessed(scenarioID: scenarioID, rangeKey: rk)
+        pruneIfNeeded(rangeKey: rk)
+    }
+
+    // MARK: - Private (range-based)
+
+    private func loadIndex(rangeKey: String) -> [ScenarioInfo] {
+        guard let data = UserDefaults.standard.data(forKey: scenariosIndexKey(rangeKey: rangeKey)) else { return [] }
+        return (try? JSONDecoder().decode([ScenarioInfo].self, from: data)) ?? []
+    }
+
+    private func saveIndex(_ items: [ScenarioInfo], rangeKey: String) {
+        let data = (try? JSONEncoder().encode(items)) ?? Data()
+        UserDefaults.standard.set(data, forKey: scenariosIndexKey(rangeKey: rangeKey))
+    }
+
+    private func upsertIndex(_ info: ScenarioInfo, rangeKey: String) {
+        var items = loadIndex(rangeKey: rangeKey)
+        if let idx = items.firstIndex(where: { $0.id == info.id }) {
+            items[idx] = info
         } else {
-            entries.append(ScenarioIndexEntry(rangeKey: rangeKey, lastAccessed: now))
+            items.append(info)
+        }
+        saveIndex(items, rangeKey: rangeKey)
+    }
+
+    private func bumpLastAccessed(scenarioID: UUID, rangeKey: String) {
+        var items = loadIndex(rangeKey: rangeKey)
+        guard let idx = items.firstIndex(where: { $0.id == scenarioID }) else { return }
+        items[idx].lastAccessed = Date().timeIntervalSince1970
+        saveIndex(items, rangeKey: rangeKey)
+    }
+
+    private func pruneIfNeeded(rangeKey: String) {
+        var items = loadIndex(rangeKey: rangeKey)
+        guard items.count > maxScenariosPerRange else { return }
+
+        items.sort { $0.lastAccessed > $1.lastAccessed }
+        let keep = Array(items.prefix(maxScenariosPerRange))
+        let drop = Array(items.dropFirst(maxScenariosPerRange))
+
+        for item in drop {
+            UserDefaults.standard.removeObject(forKey: payloadKey(rangeKey: rangeKey, scenarioID: item.id))
         }
 
-        saveIndex(entries)
+        saveIndex(keep, rangeKey: rangeKey)
     }
 
-    private func bumpLastAccessed(for rangeKey: String) {
-        var entries = loadIndex()
-        guard let idx = entries.firstIndex(where: { $0.rangeKey == rangeKey }) else { return }
-        entries[idx].lastAccessed = Date().timeIntervalSince1970
-        saveIndex(entries)
+    private func savePayload(_ scenarioByCategoryID: [UUID: Double], scenarioID: UUID, rangeKey: String) {
+        let payload = ScenarioPayload(
+            scenarioID: scenarioID,
+            rangeKey: rangeKey,
+            scenarioByCategoryID: scenarioByCategoryID
+        )
+
+        let data = (try? JSONEncoder().encode(payload)) ?? Data()
+        UserDefaults.standard.set(data, forKey: payloadKey(rangeKey: rangeKey, scenarioID: scenarioID))
     }
 
-    private func removeIndexEntry(for rangeKey: String) {
-        var entries = loadIndex()
-        entries.removeAll { $0.rangeKey == rangeKey }
-        saveIndex(entries)
+    // MARK: - Global Scenarios (per workspace)
+
+    // Global scenarios store "overrides" by category.
+    // When applying to a date range:
+    // scenarioAmount = overrideAmount ?? baselineActualAmount
+    struct GlobalScenarioInfo: Codable, Identifiable, Equatable {
+        var id: UUID
+        var name: String
+        var lastAccessed: Double
+        var createdAt: Double
     }
 
-    private func pruneIfNeeded() {
-        var entries = loadIndex()
-        guard entries.count > maxSavedRanges else { return }
+    private func globalIndexKey() -> String {
+        "home_whatIfGlobalScenarioIndex_\(workspaceID.uuidString)"
+    }
 
-        entries.sort { $0.lastAccessed > $1.lastAccessed } // newest first
-        let keep = Array(entries.prefix(maxSavedRanges))
-        let drop = Array(entries.dropFirst(maxSavedRanges))
+    private func globalSelectedKey() -> String {
+        "home_whatIfGlobalScenarioSelected_\(workspaceID.uuidString)"
+    }
 
-        // Delete payloads for dropped ranges
-        for entry in drop {
-            UserDefaults.standard.removeObject(forKey: payloadKey(rangeKey: entry.rangeKey))
+    private func globalPinnedKey() -> String {
+        "home_whatIfGlobalScenarioPinned_\(workspaceID.uuidString)"
+    }
+
+    private func globalPayloadKey(scenarioID: UUID) -> String {
+        "home_whatIfGlobalScenario_\(workspaceID.uuidString)_\(scenarioID.uuidString)"
+    }
+
+    func listGlobalScenarios() -> [GlobalScenarioInfo] {
+        var items = loadGlobalIndex()
+        items.sort { $0.lastAccessed > $1.lastAccessed }
+        return items
+    }
+
+    func loadSelectedGlobalScenarioID() -> UUID? {
+        guard let raw = UserDefaults.standard.string(forKey: globalSelectedKey()) else { return nil }
+        return UUID(uuidString: raw)
+    }
+
+    func setSelectedGlobalScenarioID(_ scenarioID: UUID) {
+        UserDefaults.standard.set(scenarioID.uuidString, forKey: globalSelectedKey())
+        bumpGlobalLastAccessed(scenarioID: scenarioID)
+    }
+
+    func loadPinnedGlobalScenarioID() -> UUID? {
+        guard let raw = UserDefaults.standard.string(forKey: globalPinnedKey()) else { return nil }
+        return UUID(uuidString: raw)
+    }
+
+    func setPinnedGlobalScenarioID(_ scenarioID: UUID?) {
+        if let scenarioID {
+            UserDefaults.standard.set(scenarioID.uuidString, forKey: globalPinnedKey())
+        } else {
+            UserDefaults.standard.removeObject(forKey: globalPinnedKey())
+        }
+    }
+
+    func createGlobalScenario(name: String, overrides: [UUID: Double] = [:]) -> GlobalScenarioInfo {
+        let now = Date().timeIntervalSince1970
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let info = GlobalScenarioInfo(
+            id: UUID(),
+            name: trimmed.isEmpty ? "Scenario" : trimmed,
+            lastAccessed: now,
+            createdAt: now
+        )
+
+        saveGlobalPayload(overrides, scenarioID: info.id)
+        upsertGlobalIndex(info)
+        UserDefaults.standard.set(info.id.uuidString, forKey: globalSelectedKey())
+        return info
+    }
+
+    func renameGlobalScenario(scenarioID: UUID, newName: String) {
+        var items = loadGlobalIndex()
+        guard let idx = items.firstIndex(where: { $0.id == scenarioID }) else { return }
+
+        let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        items[idx].name = trimmed.isEmpty ? items[idx].name : trimmed
+        saveGlobalIndex(items)
+    }
+
+    func duplicateGlobalScenario(scenarioID: UUID, newName: String) -> GlobalScenarioInfo? {
+        guard let existing = loadGlobalScenario(scenarioID: scenarioID) else { return nil }
+
+        let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let name = trimmed.isEmpty ? "Copy" : trimmed
+        return createGlobalScenario(name: name, overrides: existing)
+    }
+
+    func deleteGlobalScenario(scenarioID: UUID) {
+        UserDefaults.standard.removeObject(forKey: globalPayloadKey(scenarioID: scenarioID))
+
+        var items = loadGlobalIndex()
+        items.removeAll { $0.id == scenarioID }
+        saveGlobalIndex(items)
+
+        // selection
+        if loadSelectedGlobalScenarioID() == scenarioID {
+            let next = items.sorted { $0.lastAccessed > $1.lastAccessed }.first?.id
+            if let next {
+                UserDefaults.standard.set(next.uuidString, forKey: globalSelectedKey())
+            } else {
+                UserDefaults.standard.removeObject(forKey: globalSelectedKey())
+            }
         }
 
-        saveIndex(keep)
+        // pinned
+        if loadPinnedGlobalScenarioID() == scenarioID {
+            UserDefaults.standard.removeObject(forKey: globalPinnedKey())
+        }
+    }
+
+    func loadGlobalScenario(scenarioID: UUID) -> [UUID: Double]? {
+        bumpGlobalLastAccessed(scenarioID: scenarioID)
+
+        guard let data = UserDefaults.standard.data(forKey: globalPayloadKey(scenarioID: scenarioID)) else { return nil }
+        let decoded = try? JSONDecoder().decode(GlobalScenarioPayload.self, from: data)
+        return decoded?.overridesByCategoryID
+    }
+
+    func saveGlobalScenario(_ overridesByCategoryID: [UUID: Double], scenarioID: UUID) {
+        saveGlobalPayload(overridesByCategoryID, scenarioID: scenarioID)
+        bumpGlobalLastAccessed(scenarioID: scenarioID)
+    }
+
+    // Apply global overrides to a baseline for a specific date range
+    func applyGlobalScenario(overrides: [UUID: Double], baselineByCategoryID: [UUID: Double], categories: [UUID]) -> [UUID: Double] {
+        var result: [UUID: Double] = [:]
+        result.reserveCapacity(categories.count)
+
+        for id in categories {
+            let baseline = baselineByCategoryID[id, default: 0]
+            let override = overrides[id]
+            result[id] = max(0, override ?? baseline)
+        }
+
+        return result
+    }
+
+    // MARK: - Private (global)
+
+    private func loadGlobalIndex() -> [GlobalScenarioInfo] {
+        guard let data = UserDefaults.standard.data(forKey: globalIndexKey()) else { return [] }
+        return (try? JSONDecoder().decode([GlobalScenarioInfo].self, from: data)) ?? []
+    }
+
+    private func saveGlobalIndex(_ items: [GlobalScenarioInfo]) {
+        let data = (try? JSONEncoder().encode(items)) ?? Data()
+        UserDefaults.standard.set(data, forKey: globalIndexKey())
+    }
+
+    private func upsertGlobalIndex(_ info: GlobalScenarioInfo) {
+        var items = loadGlobalIndex()
+        if let idx = items.firstIndex(where: { $0.id == info.id }) {
+            items[idx] = info
+        } else {
+            items.append(info)
+        }
+        saveGlobalIndex(items)
+    }
+
+    private func bumpGlobalLastAccessed(scenarioID: UUID) {
+        var items = loadGlobalIndex()
+        guard let idx = items.firstIndex(where: { $0.id == scenarioID }) else { return }
+        items[idx].lastAccessed = Date().timeIntervalSince1970
+        saveGlobalIndex(items)
+    }
+
+    private func saveGlobalPayload(_ overridesByCategoryID: [UUID: Double], scenarioID: UUID) {
+        let payload = GlobalScenarioPayload(
+            scenarioID: scenarioID,
+            overridesByCategoryID: overridesByCategoryID
+        )
+
+        let data = (try? JSONEncoder().encode(payload)) ?? Data()
+        UserDefaults.standard.set(data, forKey: globalPayloadKey(scenarioID: scenarioID))
     }
 }
 
-// MARK: - Codable Models
+// MARK: - Codable Payloads
 
 private struct ScenarioPayload: Codable {
+    let scenarioID: UUID
     let rangeKey: String
     let scenarioByCategoryID: [UUID: Double]
 }
 
-private struct ScenarioIndexEntry: Codable, Equatable {
-    let rangeKey: String
-    var lastAccessed: Double
+private struct GlobalScenarioPayload: Codable {
+    let scenarioID: UUID
+    let overridesByCategoryID: [UUID: Double]
 }
