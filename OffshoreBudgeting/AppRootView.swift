@@ -21,9 +21,9 @@ enum AppSection: String, CaseIterable, Identifiable {
         switch self {
         case .home: return "house"
         case .budgets: return "chart.pie"
-        case .income: return "dollarsign.circle"
+        case .income: return "calendar"
         case .cards: return "creditcard"
-        case .settings: return "gearshape"
+        case .settings: return "gear"
         }
     }
 }
