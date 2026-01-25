@@ -324,7 +324,8 @@ struct CardDetailView: View {
                     draftStartDate: $draftStartDate,
                     draftEndDate: $draftEndDate,
                     isGoEnabled: isDateDirty,
-                    onTapGo: { applyDraftDates() }
+                    onTapGo: { applyDraftDates() },
+                    onSelectQuickRange: { applyQuickRangePresetDeferred($0) }
                 )
             } header: {
                 Text("Date Range")
@@ -493,18 +494,6 @@ struct CardDetailView: View {
         .searchFocused($searchFocused)
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
-                
-                Menu {
-                    Button("Today") { applyQuickRangePresetDeferred(.today) }
-                    Button("This Week") { applyQuickRangePresetDeferred(.thisWeek) }
-                    Button("This Month") { applyQuickRangePresetDeferred(.thisMonth) }
-                    Button("This Quarter") { applyQuickRangePresetDeferred(.thisQuarter) }
-                    Button("This Year") { applyQuickRangePresetDeferred(.thisYear) }
-                } label: {
-                    Image(systemName: "calendar")
-                }
-                .accessibilityLabel("Quick Date Ranges")
-
 
                 Button {
                     showingAddExpenseSheet = true
@@ -1020,8 +1009,8 @@ private struct HeatMapSpendingBar: View {
                     startPoint: .leading,
                     endPoint: .trailing
                 )
-                .saturation(1.20)
-                .blur(radius: 25)
+                .saturation(1.75)
+                .blur(radius: 36)
                 .overlay(
                     LinearGradient(
                         colors: [
@@ -1103,6 +1092,7 @@ private struct DateFilterRow: View {
 
     let isGoEnabled: Bool
     let onTapGo: () -> Void
+    let onSelectQuickRange: (QuickRangePreset) -> Void
 
     var body: some View {
         HStack(spacing: 12) {
@@ -1112,6 +1102,17 @@ private struct DateFilterRow: View {
 
             IconCircleButton(systemName: "arrow.right", isEnabled: isGoEnabled, action: onTapGo)
                 .accessibilityLabel("Apply Date Range")
+
+            Menu {
+                Button("Today") { onSelectQuickRange(.today) }
+                Button("This Week") { onSelectQuickRange(.thisWeek) }
+                Button("This Month") { onSelectQuickRange(.thisMonth) }
+                Button("This Quarter") { onSelectQuickRange(.thisQuarter) }
+                Button("This Year") { onSelectQuickRange(.thisYear) }
+            } label: {
+                IconCircleLabel(systemName: "calendar")
+            }
+            .accessibilityLabel("Quick Date Ranges")
         }
     }
 }
@@ -1157,6 +1158,24 @@ private struct IconCircleButton: View {
         }
         .buttonStyle(.plain)
         .disabled(!isEnabled)
+    }
+}
+
+// MARK: - Icon Circle Label (for Menu)
+
+private struct IconCircleLabel: View {
+    let systemName: String
+
+    var body: some View {
+        Image(systemName: systemName)
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(.primary)
+            .tint(.primary)
+            .frame(width: 44, height: 44)
+            .background(
+                Circle()
+                    .fill(Color.primary.opacity(0.10))
+            )
     }
 }
 
