@@ -1021,7 +1021,7 @@ private struct HeatMapSpendingBar: View {
                     endPoint: .trailing
                 )
                 .saturation(1.20)
-                .blur(radius: 18)
+                .blur(radius: 25)
                 .overlay(
                     LinearGradient(
                         colors: [
@@ -1107,11 +1107,8 @@ private struct DateFilterRow: View {
     var body: some View {
         HStack(spacing: 12) {
 
-            DatePicker("Start Date", selection: $draftStartDate, displayedComponents: [.date])
-                .labelsHidden()
-
-            DatePicker("End Date", selection: $draftEndDate, displayedComponents: [.date])
-                .labelsHidden()
+            PillDatePickerField(title: "Start Date", date: $draftStartDate)
+            PillDatePickerField(title: "End Date", date: $draftEndDate)
 
             IconCircleButton(systemName: "arrow.right", isEnabled: isGoEnabled, action: onTapGo)
                 .accessibilityLabel("Apply Date Range")
@@ -1407,7 +1404,11 @@ private struct EditPlannedExpenseView: View {
                 TextField("Actual Amount (optional)", text: $actualAmountText)
                     .keyboardType(.decimalPad)
 
-                DatePicker("Date", selection: $expenseDate, displayedComponents: .date)
+                HStack {
+                    Text("Date")
+                    Spacer()
+                    PillDatePickerField(title: "Date", date: $expenseDate)
+                }
             }
 
             Section("Card") {

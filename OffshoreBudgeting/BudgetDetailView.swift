@@ -1163,7 +1163,11 @@ private struct EditPlannedExpenseView: View {
                 TextField("Actual Amount (optional)", text: $actualAmountText)
                     .keyboardType(.decimalPad)
 
-                DatePicker("Date", selection: $expenseDate, displayedComponents: .date)
+                HStack {
+                    Text("Date")
+                    Spacer()
+                    PillDatePickerField(title: "Date", date: $expenseDate)
+                }
             }
 
             Section("Card") {

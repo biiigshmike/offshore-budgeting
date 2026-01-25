@@ -45,16 +45,16 @@ struct SettingsNotificationsView: View {
             // MARK: - Reminder Time
 
             Section("Reminder Time") {
-                DatePicker(
-                    "Time",
-                    selection: $reminderTime,
-                    displayedComponents: [.hourAndMinute]
-                )
+                HStack {
+                    Text("Time")
+                    Spacer()
+                    PillTimePickerField(title: "Time", time: $reminderTime)
+                }
+                .disabled(!canEditReminderTime)
                 .onChange(of: reminderTime) { _, newValue in
                     persistReminderTime(newValue)
                     Task { await syncSchedulesIfPossible() }
                 }
-                .disabled(!canEditReminderTime)
 
                 Text("This time is shared by all reminders below.")
                     .font(.footnote)

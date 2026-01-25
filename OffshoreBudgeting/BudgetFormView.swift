@@ -49,14 +49,13 @@ struct BudgetFormView: View {
             }
 
             Section("Dates") {
-                HStack {
-                    DatePicker("", selection: $startDate, displayedComponents: [.date])
-                        .labelsHidden()
+                HStack(spacing: 12) {
+                    Spacer(minLength: 0)
 
-                    Spacer(minLength: 12)
+                    PillDatePickerField(title: "Start Date", date: $startDate)
+                    PillDatePickerField(title: "End Date", date: $endDate)
 
-                    DatePicker("", selection: $endDate, displayedComponents: [.date])
-                        .labelsHidden()
+                    Spacer(minLength: 0)
                 }
                 .onChange(of: startDate) { _, newValue in
                     onStartDateChanged(newValue)

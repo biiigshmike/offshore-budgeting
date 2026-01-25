@@ -52,7 +52,11 @@ struct IncomeFormView: View {
                 TextField("Amount", text: $amountText)
                     .keyboardType(.decimalPad)
 
-                DatePicker("Date", selection: $date, displayedComponents: .date)
+                HStack {
+                    Text("Date")
+                    Spacer()
+                    PillDatePickerField(title: "Date", date: $date)
+                }
             }
 
             // MARK: - Repeat
@@ -97,15 +101,18 @@ struct IncomeFormView: View {
                         EmptyView()
                     }
 
-                    DatePicker(
-                        "End Date",
-                        selection: Binding(
-                            get: { endDate ?? date },
-                            set: { endDate = $0 }
-                        ),
-                        in: date...,
-                        displayedComponents: .date
-                    )
+                    HStack {
+                        Text("End Date")
+                        Spacer()
+                        PillDatePickerField(
+                            title: "End Date",
+                            date: Binding(
+                                get: { endDate ?? date },
+                                set: { endDate = $0 }
+                            ),
+                            minimumDate: date
+                        )
+                    }
                 }
             }
         }

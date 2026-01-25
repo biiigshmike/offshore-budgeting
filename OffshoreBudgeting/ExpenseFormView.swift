@@ -94,7 +94,11 @@ struct ExpenseFormView: View {
                 TextField("Amount", text: $amountText)
                     .keyboardType(.decimalPad)
 
-                DatePicker("Date", selection: $transactionDate, displayedComponents: .date)
+                HStack {
+                    Text("Date")
+                    Spacer()
+                    PillDatePickerField(title: "Date", date: $transactionDate)
+                }
             }
 
             Section {
