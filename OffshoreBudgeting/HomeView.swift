@@ -16,6 +16,10 @@ struct HomeView: View {
     @Query private var cards: [Card]
     @Query private var plannedExpenses: [PlannedExpense]
 
+    // ✅ Added for Category widgets
+    @Query private var categories: [Category]
+    @Query private var variableExpenses: [VariableExpense]
+
     // MARK: - Date Range Storage (Phase 1)
 
     @AppStorage("home_appliedStartTimestamp")
@@ -46,6 +50,17 @@ struct HomeView: View {
         _plannedExpenses = Query(
             filter: #Predicate<PlannedExpense> { $0.workspace?.id == workspaceID },
             sort: [SortDescriptor(\PlannedExpense.expenseDate, order: .forward)]
+        )
+
+        // ✅ Added for Category widgets
+        _categories = Query(
+            filter: #Predicate<Category> { $0.workspace?.id == workspaceID },
+            sort: [SortDescriptor(\Category.name, order: .forward)]
+        )
+
+        _variableExpenses = Query(
+            filter: #Predicate<VariableExpense> { $0.workspace?.id == workspaceID },
+            sort: [SortDescriptor(\VariableExpense.transactionDate, order: .forward)]
         )
     }
 
@@ -107,6 +122,16 @@ struct HomeView: View {
                                                 .fixedSize(horizontal: false, vertical: true)
                                         }
                                     }
+                                    
+                                    HomeCategorySpotlightTile(
+                                        workspace: workspace,
+                                        categories: categories,
+                                        plannedExpenses: plannedExpenses,
+                                        variableExpenses: variableExpenses,
+                                        startDate: appliedStartDate,
+                                        endDate: appliedEndDate,
+                                        topN: 4
+                                    )
 
                                     ForEach(pinnedCards) { card in
                                         HomeCardSummaryTile(
