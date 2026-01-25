@@ -23,13 +23,6 @@ enum HomeWidgetID: String, CaseIterable, Identifiable, Codable {
 
 struct HomePinnedWidgetsStore {
 
-    // MARK: - Legacy support (optional)
-
-    private struct LegacyState: Codable {
-        var showNextPlannedExpense: Bool
-        var showCategorySpotlight: Bool
-    }
-
     // MARK: - Storage
 
     private let storageKey: String
@@ -47,17 +40,6 @@ struct HomePinnedWidgetsStore {
         // New format
         if let decoded = try? JSONDecoder().decode([HomeWidgetID].self, from: data) {
             return normalize(decoded)
-        }
-
-        // Legacy migration
-        if let legacy = try? JSONDecoder().decode(LegacyState.self, from: data) {
-            var widgets: [HomeWidgetID] = []
-            if legacy.showNextPlannedExpense { widgets.append(.nextPlannedExpense) }
-            if legacy.showCategorySpotlight { widgets.append(.categorySpotlight) }
-
-            // Persist immediately in new format
-            save(widgets)
-            return normalize(widgets)
         }
 
         // Fallback
