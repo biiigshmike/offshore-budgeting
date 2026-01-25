@@ -111,6 +111,9 @@ struct HomeView: View {
                                         case .income:
                                             incomeWidget
 
+                                        case .savingsOutlook:
+                                            savingsOutlookWidget
+
                                         case .nextPlannedExpense:
                                             nextPlannedExpenseWidget
 
@@ -170,6 +173,17 @@ struct HomeView: View {
         HomeIncomeTile(
             workspace: workspace,
             incomes: incomes,
+            startDate: appliedStartDate,
+            endDate: appliedEndDate
+        )
+    }
+
+    private var savingsOutlookWidget: some View {
+        HomeSavingsOutlookTile(
+            workspace: workspace,
+            incomes: incomes,
+            plannedExpenses: plannedExpenses,
+            variableExpenses: variableExpenses,
             startDate: appliedStartDate,
             endDate: appliedEndDate
         )
