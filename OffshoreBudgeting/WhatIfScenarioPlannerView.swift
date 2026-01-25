@@ -106,7 +106,6 @@ struct WhatIfScenarioPlannerView: View {
             )
         }
 
-        // If everything is zero, DonutChartView will show its empty state.
         return slices
     }
 
@@ -126,21 +125,49 @@ struct WhatIfScenarioPlannerView: View {
                 .frame(maxWidth: .infinity)
                 .frame(height: 260)
                 .listRowSeparator(.hidden)
+                .animation(.snappy(duration: 0.25), value: donutSlices)
+                .animation(.snappy(duration: 0.25), value: scenarioSavings)
 
                 savingsLegendRow
                     .listRowSeparator(.hidden)
             }
 
             Section("Categories") {
-                ForEach(categories) { category in
-                    WhatIfCategoryRowView(
-                        categoryName: category.name,
-                        categoryHex: category.hexColor,
-                        baselineAmount: baselineByCategoryID[category.id, default: 0],
-                        amount: bindingForCategory(category.id),
-                        step: 10,
-                        currencyCode: currencyCode
-                    )
+                if categories.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("No categories yet")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.primary)
+
+                        Text("Create categories first, then come back to plan scenarios.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(.vertical, 6)
+                } else {
+                    ForEach(categories) { category in
+                        WhatIfCategoryRowView(
+                            categoryName: category.name,
+                            categoryHex: category.hexColor,
+                            baselineAmount: baselineByCategoryID[category.id, default: 0],
+                            amount: bindingForCategory(category.id),
+                            step: 10,
+                            currencyCode: currencyCode
+                        )
+                        .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            Button {
+                                withAnimation(.snappy(duration: 0.20)) {
+                                    scenarioByCategoryID[category.id] =
+                                        baselineByCategoryID[category.id, default: 0]
+                                }
+                            } label: {
+                                Label("Reset", systemImage: "arrow.counterclockwise")
+                            }
+                            .tint(.secondary)
+                        }
+                    }
                 }
             }
 
@@ -151,6 +178,7 @@ struct WhatIfScenarioPlannerView: View {
                     Text("Clear")
                         .font(.subheadline.weight(.semibold))
                 }
+                .disabled(categories.isEmpty)
             }
         }
         .listStyle(.insetGrouped)
@@ -166,7 +194,27 @@ struct WhatIfScenarioPlannerView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+
+            // Decimal pad has no return key, so give a Done button
+            #if canImport(UIKit)
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Done") {
+                    hideKeyboard()
+                }
+                .font(.subheadline.weight(.semibold))
+            }
+            #endif
         }
+        // Swipe/drag anywhere on the list to dismiss keyboard
+        #if canImport(UIKit)
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 10)
+                .onChanged { _ in
+                    hideKeyboard()
+                }
+        )
+        #endif
         .onAppear {
             loadOrSeedScenarioIfNeeded()
         }
@@ -237,7 +285,10 @@ struct WhatIfScenarioPlannerView: View {
         Binding(
             get: { scenarioByCategoryID[id, default: 0] },
             set: { newValue in
-                scenarioByCategoryID[id] = max(0, newValue)
+                let clamped = max(0, newValue)
+                withAnimation(.snappy(duration: 0.20)) {
+                    scenarioByCategoryID[id] = clamped
+                }
             }
         )
     }
@@ -277,7 +328,9 @@ struct WhatIfScenarioPlannerView: View {
 
         // Reset state back to baseline for this range
         baselineByCategoryID = buildBaselineByCategoryID()
-        scenarioByCategoryID = baselineByCategoryID
+        withAnimation(.snappy(duration: 0.20)) {
+            scenarioByCategoryID = baselineByCategoryID
+        }
     }
 
     // MARK: - Baseline builder
@@ -332,3 +385,11 @@ struct WhatIfScenarioPlannerView: View {
         expense.actualAmount > 0 ? expense.actualAmount : expense.plannedAmount
     }
 }
+
+#if canImport(UIKit)
+private extension View {
+    func hideKeyboard() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+    }
+}
+#endif

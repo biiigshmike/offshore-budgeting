@@ -25,39 +25,75 @@ struct WhatIfCategoryRowView: View {
     private let buttonSize: CGFloat = 32
     private let fieldWidth: CGFloat = 110
     private let controlSpacing: CGFloat = 10
+    private let resetButtonSize: CGFloat = 28
 
     private var controlGroupWidth: CGFloat {
-        // minus + spacing + field + spacing + plus
-        buttonSize + controlSpacing + fieldWidth + controlSpacing + buttonSize
+        // minus + spacing + field + spacing + reset + spacing + plus
+        buttonSize
+        + controlSpacing
+        + fieldWidth
+        + controlSpacing
+        + resetButtonSize
+        + controlSpacing
+        + buttonSize
     }
 
     private var dotColor: Color {
         Color(hex: categoryHex) ?? .secondary
     }
 
+    private var isDirty: Bool {
+        abs(amount - baselineAmount) > 0.000_1
+    }
+
     var body: some View {
         GeometryReader { geo in
             let availableWidth = geo.size.width
-            let labelWidth = max(120, availableWidth - controlGroupWidth - 12) // 12 = left/right breathing room inside HStack
+            let labelWidth = max(120, availableWidth - controlGroupWidth - 12) // 12 = breathing room
 
             HStack(alignment: .center, spacing: 12) {
 
-                // Left column: flexible (takes remaining width)
+                // Left column: flexible
                 HStack(alignment: .top, spacing: 10) {
                     Circle()
                         .fill(dotColor)
                         .frame(width: 10, height: 10)
                         .padding(.top, 5)
-                        .accessibilityHidden(true)
+                        .overlay {
+                            if isDirty {
+                                Circle()
+                                    .strokeBorder(dotColor.opacity(0.45), lineWidth: 3)
+                                    .blur(radius: 0.5)
+                            }
+                        }
+
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(categoryName)
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.primary)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
+                        HStack(spacing: 8) {
+                            Text(categoryName)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.primary)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
 
-                        Text("Baseline: \(formatCurrency(baselineAmount))")
+                            if isDirty {
+                                Text("Edited")
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 3)
+                                    .background(.thinMaterial, in: Capsule())
+                                    .overlay {
+                                        Capsule()
+                                            .strokeBorder(.secondary.opacity(0.25), lineWidth: 1)
+                                    }
+                                    .accessibilityLabel("Edited")
+                            }
+                        }
+
+
+                        // “Baseline actual” reads better as “Actual”
+                        Text("Actual: \(formatCurrency(baselineAmount))")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
@@ -67,6 +103,7 @@ struct WhatIfCategoryRowView: View {
                 .frame(width: labelWidth, alignment: .leading)
 
                 Spacer(minLength: 0)
+
                 HStack(spacing: controlSpacing) {
 
                     RepeatPressButton(
@@ -106,18 +143,26 @@ struct WhatIfCategoryRowView: View {
                         onFire: { adjust(step) }
                     )
                 }
-                .frame(width: controlGroupWidth, alignment: .trailing)
+
+
             }
             .frame(width: availableWidth, alignment: .leading)
         }
         .frame(height: 54)
-//        .padding(.vertical, 4)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(categoryName)
         .accessibilityValue(formatCurrency(amount))
     }
 
     // MARK: - Helpers
+
+    private func resetToBaseline() {
+        amount = max(0, baselineAmount)
+
+        if !isFocused {
+            text = CurrencyFormatter.editingString(from: amount)
+        }
+    }
 
     private func adjust(_ delta: Double) {
         let next = max(0, amount + delta)
