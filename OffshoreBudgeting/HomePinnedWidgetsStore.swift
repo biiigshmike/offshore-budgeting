@@ -8,6 +8,7 @@
 import Foundation
 
 enum HomeWidgetID: String, CaseIterable, Identifiable, Codable {
+    case income
     case nextPlannedExpense
     case categorySpotlight
     case categoryAvailability
@@ -16,6 +17,7 @@ enum HomeWidgetID: String, CaseIterable, Identifiable, Codable {
 
     var title: String {
         switch self {
+        case .income: return "Income"
         case .nextPlannedExpense: return "Next Planned Expense"
         case .categorySpotlight: return "Category Spotlight"
         case .categoryAvailability: return "Category Availability"
@@ -36,7 +38,7 @@ struct HomePinnedWidgetsStore {
     func load() -> [HomeWidgetID] {
         guard let data = UserDefaults.standard.data(forKey: storageKey) else {
             // Default order
-            return [.nextPlannedExpense, .categorySpotlight]
+            return [.income, .nextPlannedExpense, .categorySpotlight]
         }
 
         // New format
@@ -45,7 +47,7 @@ struct HomePinnedWidgetsStore {
         }
 
         // Fallback
-        return [.nextPlannedExpense, .categorySpotlight]
+        return [.income, .nextPlannedExpense, .categorySpotlight]
     }
 
     func save(_ widgets: [HomeWidgetID]) {

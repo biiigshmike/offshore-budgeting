@@ -15,6 +15,7 @@ struct HomeView: View {
     @Query private var budgets: [Budget]
     @Query private var cards: [Card]
     @Query private var plannedExpenses: [PlannedExpense]
+    @Query private var incomes: [Income]
     @Query private var categories: [Category]
     @Query private var variableExpenses: [VariableExpense]
 
@@ -50,6 +51,11 @@ struct HomeView: View {
         _plannedExpenses = Query(
             filter: #Predicate<PlannedExpense> { $0.workspace?.id == workspaceID },
             sort: [SortDescriptor(\PlannedExpense.expenseDate, order: .forward)]
+        )
+
+        _incomes = Query(
+            filter: #Predicate<Income> { $0.workspace?.id == workspaceID },
+            sort: [SortDescriptor(\Income.date, order: .forward)]
         )
 
         _categories = Query(
@@ -102,6 +108,9 @@ struct HomeView: View {
                                     // ✅ Render widgets in persisted order
                                     ForEach(pinnedWidgets) { widget in
                                         switch widget {
+                                        case .income:
+                                            incomeWidget
+
                                         case .nextPlannedExpense:
                                             nextPlannedExpenseWidget
 
@@ -157,6 +166,15 @@ struct HomeView: View {
 
     // MARK: - Widget views
 
+    private var incomeWidget: some View {
+        HomeIncomeTile(
+            workspace: workspace,
+            incomes: incomes,
+            startDate: appliedStartDate,
+            endDate: appliedEndDate
+        )
+    }
+
     @ViewBuilder
     private var nextPlannedExpenseWidget: some View {
         if let next = HomeNextPlannedExpenseFinder.nextExpense(
@@ -209,7 +227,6 @@ struct HomeView: View {
             endDate: appliedEndDate
         )
     }
-
 
     // MARK: - Layout
 
