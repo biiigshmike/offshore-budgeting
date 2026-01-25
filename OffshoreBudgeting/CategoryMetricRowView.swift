@@ -18,17 +18,6 @@ struct CategoryMetricRowView: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 10) {
-
-//            VStack(alignment: .leading, spacing: 6) {
-//                HStack(alignment: .lastTextBaseline, spacing: 8) {
-//                    Circle()
-//                        .fill(color)
-//                        .frame(width: 10, height: 10)
-//                        .accessibilityHidden(true)
-//                }
-// 
-//            }
-
             VStack(alignment: .leading, spacing: 6) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Circle()

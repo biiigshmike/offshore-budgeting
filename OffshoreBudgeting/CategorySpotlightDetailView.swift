@@ -47,9 +47,9 @@ struct CategorySpotlightDetailView: View {
 
     private var showAllButtonTitle: String {
         if showsAll {
-            return "Hide all categories"
+            return "Hide All Categories"
         } else {
-            return "Show all categories (\(result.metrics.count))"
+            return "Show All Categories (\(result.metrics.count))"
         }
     }
 
@@ -120,7 +120,7 @@ struct CategorySpotlightDetailView: View {
                     )
                 }
             } header: {
-                Text("Spending by category")
+                Text("Spending by Category")
             }
         }
         .listStyle(.insetGrouped)

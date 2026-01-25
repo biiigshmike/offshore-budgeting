@@ -13,12 +13,60 @@ struct HomeEditPinnedCardsView: View {
     let workspaceID: UUID
     @Binding var pinnedIDs: [UUID]
 
+    // ✅ New: widget ordering + visibility (presence in array = shown)
+    @Binding var pinnedWidgets: [HomeWidgetID]
+
     @Environment(\.dismiss) private var dismiss
-    @State private var selection: Set<UUID> = []
 
     var body: some View {
         NavigationStack {
             List {
+
+                // MARK: - Widgets
+
+                Section("Pinned Widgets") {
+                    if pinnedWidgets.isEmpty {
+                        Text("No pinned widgets yet.")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(pinnedWidgets) { widget in
+                            HStack {
+                                Text(widget.title)
+                                Spacer()
+                                Image(systemName: "line.3.horizontal")
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .onMove(perform: movePinnedWidgets)
+                        .onDelete(perform: deletePinnedWidgets)
+                    }
+                }
+
+                Section("Available Widgets") {
+                    let available = HomeWidgetID.allCases.filter { !pinnedWidgets.contains($0) }
+
+                    if available.isEmpty {
+                        Text("All widgets are pinned.")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(available) { widget in
+                            Button {
+                                pinnedWidgets.append(widget)
+                            } label: {
+                                HStack {
+                                    Text(widget.title)
+                                        .foregroundStyle(.primary)
+                                    Spacer()
+                                    Image(systemName: "plus.circle.fill")
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // MARK: - Cards (existing behavior)
+
                 Section("Pinned Cards") {
                     if pinnedIDs.isEmpty {
                         Text("No pinned cards yet.")
@@ -34,15 +82,15 @@ struct HomeEditPinnedCardsView: View {
                                 }
                             }
                         }
-                        .onMove(perform: movePinned)
-                        .onDelete(perform: deletePinned)
+                        .onMove(perform: movePinnedCards)
+                        .onDelete(perform: deletePinnedCards)
                     }
                 }
 
                 Section("Available Cards") {
                     ForEach(cards) { card in
                         Button {
-                            togglePinned(card.id)
+                            togglePinnedCard(card.id)
                         } label: {
                             HStack {
                                 Text(card.name)
@@ -77,7 +125,19 @@ struct HomeEditPinnedCardsView: View {
         }
     }
 
-    private func togglePinned(_ id: UUID) {
+    // MARK: - Widgets helpers
+
+    private func movePinnedWidgets(from source: IndexSet, to destination: Int) {
+        pinnedWidgets.move(fromOffsets: source, toOffset: destination)
+    }
+
+    private func deletePinnedWidgets(at offsets: IndexSet) {
+        pinnedWidgets.remove(atOffsets: offsets)
+    }
+
+    // MARK: - Card helpers
+
+    private func togglePinnedCard(_ id: UUID) {
         if let index = pinnedIDs.firstIndex(of: id) {
             pinnedIDs.remove(at: index)
         } else {
@@ -85,11 +145,11 @@ struct HomeEditPinnedCardsView: View {
         }
     }
 
-    private func movePinned(from source: IndexSet, to destination: Int) {
+    private func movePinnedCards(from source: IndexSet, to destination: Int) {
         pinnedIDs.move(fromOffsets: source, toOffset: destination)
     }
 
-    private func deletePinned(at offsets: IndexSet) {
+    private func deletePinnedCards(at offsets: IndexSet) {
         pinnedIDs.remove(atOffsets: offsets)
     }
 }

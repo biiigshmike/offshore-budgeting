@@ -15,12 +15,8 @@ struct HomeView: View {
     @Query private var budgets: [Budget]
     @Query private var cards: [Card]
     @Query private var plannedExpenses: [PlannedExpense]
-
-    // ✅ Added for Category widgets
     @Query private var categories: [Category]
     @Query private var variableExpenses: [VariableExpense]
-
-    // MARK: - Date Range Storage (Phase 1)
 
     @AppStorage("home_appliedStartTimestamp")
     private var appliedStartTimestamp: Double = 0
@@ -30,8 +26,12 @@ struct HomeView: View {
 
     @State private var draftStartDate: Date = Date()
     @State private var draftEndDate: Date = Date()
+
     @State private var isEditingWidgets: Bool = false
     @State private var pinnedCardIDs: [UUID] = []
+
+    // ✅ New: ordered widget list
+    @State private var pinnedWidgets: [HomeWidgetID] = []
 
     init(workspace: Workspace) {
         self.workspace = workspace
@@ -52,7 +52,6 @@ struct HomeView: View {
             sort: [SortDescriptor(\PlannedExpense.expenseDate, order: .forward)]
         )
 
-        // ✅ Added for Category widgets
         _categories = Query(
             filter: #Predicate<Category> { $0.workspace?.id == workspaceID },
             sort: [SortDescriptor(\Category.name, order: .forward)]
@@ -99,40 +98,19 @@ struct HomeView: View {
                                 }
                             } else {
                                 LazyVGrid(columns: homeGridColumns, alignment: .leading, spacing: 12) {
-                                    if let next = HomeNextPlannedExpenseFinder.nextExpense(
-                                        from: plannedExpenses,
-                                        in: appliedStartDate,
-                                        to: appliedEndDate
-                                    ) {
-                                        HomeNextPlannedExpenseTile(
-                                            workspace: workspace,
-                                            expense: next,
-                                            startDate: appliedStartDate,
-                                            endDate: appliedEndDate
-                                        )
-                                    } else {
-                                        HomeTileContainer(
-                                            title: "Next Planned Expense",
-                                            subtitle: dateRangeSubtitle,
-                                            accent: .orange,
-                                            showsChevron: false
-                                        ) {
-                                            Text("No planned expenses coming up in this range.")
-                                                .foregroundStyle(.secondary)
-                                                .fixedSize(horizontal: false, vertical: true)
+
+                                    // ✅ Render widgets in persisted order
+                                    ForEach(pinnedWidgets) { widget in
+                                        switch widget {
+                                        case .nextPlannedExpense:
+                                            nextPlannedExpenseWidget
+
+                                        case .categorySpotlight:
+                                            categorySpotlightWidget
                                         }
                                     }
-                                    
-                                    HomeCategorySpotlightTile(
-                                        workspace: workspace,
-                                        categories: categories,
-                                        plannedExpenses: plannedExpenses,
-                                        variableExpenses: variableExpenses,
-                                        startDate: appliedStartDate,
-                                        endDate: appliedEndDate,
-                                        topN: 4
-                                    )
 
+                                    // Cards after widgets (like your current layout)
                                     ForEach(pinnedCards) { card in
                                         HomeCardSummaryTile(
                                             workspace: workspace,
@@ -159,21 +137,65 @@ struct HomeView: View {
             HomeEditPinnedCardsView(
                 cards: cards,
                 workspaceID: workspace.id,
-                pinnedIDs: $pinnedCardIDs
+                pinnedIDs: $pinnedCardIDs,
+                pinnedWidgets: $pinnedWidgets
             )
             .onDisappear {
-                persistPinned()
+                persistPinnedCards()
+                persistPinnedWidgets()
             }
         }
         .onAppear {
             bootstrapDatesIfNeeded()
-            loadPinnedIfNeeded()
+            loadPinnedCardsIfNeeded()
+            loadPinnedWidgetsIfNeeded()
         }
     }
 
+    // MARK: - Widget views
+
+    @ViewBuilder
+    private var nextPlannedExpenseWidget: some View {
+        if let next = HomeNextPlannedExpenseFinder.nextExpense(
+            from: plannedExpenses,
+            in: appliedStartDate,
+            to: appliedEndDate
+        ) {
+            HomeNextPlannedExpenseTile(
+                workspace: workspace,
+                expense: next,
+                startDate: appliedStartDate,
+                endDate: appliedEndDate
+            )
+        } else {
+            HomeTileContainer(
+                title: "Next Planned Expense",
+                subtitle: dateRangeSubtitle,
+                accent: .orange,
+                showsChevron: false
+            ) {
+                Text("No planned expenses coming up in this range.")
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private var categorySpotlightWidget: some View {
+        HomeCategorySpotlightTile(
+            workspace: workspace,
+            categories: categories,
+            plannedExpenses: plannedExpenses,
+            variableExpenses: variableExpenses,
+            startDate: appliedStartDate,
+            endDate: appliedEndDate,
+            topN: 4
+        )
+    }
+
+    // MARK: - Layout
+
     private var homeGridColumns: [GridItem] {
-        // Adaptive means iPad/Mac will show 2–3 columns as space allows.
-        // iPhone usually stays 1 column because the min width won’t fit 2.
         [GridItem(.adaptive(minimum: 330), spacing: 12, alignment: .top)]
     }
 
@@ -202,7 +224,7 @@ struct HomeView: View {
         .padding(.top, 6)
     }
 
-    // MARK: - Date Range Helpers
+    // MARK: - Date Range
 
     private var appliedStartDate: Date {
         Date(timeIntervalSince1970: appliedStartTimestamp)
@@ -248,12 +270,13 @@ struct HomeView: View {
         date.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted))
     }
 
-    private func loadPinnedIfNeeded() {
+    // MARK: - Persistence: Cards
+
+    private func loadPinnedCardsIfNeeded() {
         if pinnedCardIDs.isEmpty {
             let store = HomePinnedCardsStore(workspaceID: workspace.id)
             let loaded = store.load()
 
-            // If empty, default to “all cards pinned” initially, in current order.
             if loaded.isEmpty {
                 pinnedCardIDs = cards.map { $0.id }
                 store.save(pinnedCardIDs)
@@ -263,9 +286,23 @@ struct HomeView: View {
         }
     }
 
-    private func persistPinned() {
+    private func persistPinnedCards() {
         let store = HomePinnedCardsStore(workspaceID: workspace.id)
         store.save(pinnedCardIDs)
+    }
+
+    // MARK: - Persistence: Widgets (new)
+
+    private func loadPinnedWidgetsIfNeeded() {
+        if pinnedWidgets.isEmpty {
+            let store = HomePinnedWidgetsStore(workspaceID: workspace.id)
+            pinnedWidgets = store.load()
+        }
+    }
+
+    private func persistPinnedWidgets() {
+        let store = HomePinnedWidgetsStore(workspaceID: workspace.id)
+        store.save(pinnedWidgets)
     }
 }
 
