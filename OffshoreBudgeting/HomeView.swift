@@ -107,6 +107,9 @@ struct HomeView: View {
 
                                         case .categorySpotlight:
                                             categorySpotlightWidget
+
+                                        case .categoryAvailability:
+                                            categoryAvailabilityWidget
                                         }
                                     }
 
@@ -192,6 +195,21 @@ struct HomeView: View {
             topN: 4
         )
     }
+
+    /// Phase 2 validation tile (simple, not final UI)
+    @ViewBuilder
+    private var categoryAvailabilityWidget: some View {
+        HomeCategoryAvailabilityTile(
+            workspace: workspace,
+            budgets: budgets,
+            categories: categories,
+            plannedExpenses: plannedExpenses,
+            variableExpenses: variableExpenses,
+            startDate: appliedStartDate,
+            endDate: appliedEndDate
+        )
+    }
+
 
     // MARK: - Layout
 

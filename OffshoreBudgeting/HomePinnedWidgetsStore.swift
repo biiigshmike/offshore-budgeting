@@ -10,6 +10,7 @@ import Foundation
 enum HomeWidgetID: String, CaseIterable, Identifiable, Codable {
     case nextPlannedExpense
     case categorySpotlight
+    case categoryAvailability
 
     var id: String { rawValue }
 
@@ -17,6 +18,7 @@ enum HomeWidgetID: String, CaseIterable, Identifiable, Codable {
         switch self {
         case .nextPlannedExpense: return "Next Planned Expense"
         case .categorySpotlight: return "Category Spotlight"
+        case .categoryAvailability: return "Category Availability"
         }
     }
 }
