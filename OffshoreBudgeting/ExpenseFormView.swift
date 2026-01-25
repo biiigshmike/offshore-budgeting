@@ -110,9 +110,9 @@ struct ExpenseFormView: View {
                     }
                 }
             } header: {
-                Text("Optional")
+                Text("Category")
             } footer: {
-                Text("Categories are workspace-scoped. Transactions are owned by the card.")
+                Text("If no category is set, it will default to Uncategorized.")
             }
 
             if !canSave {

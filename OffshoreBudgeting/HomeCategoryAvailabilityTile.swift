@@ -72,7 +72,7 @@ struct HomeCategoryAvailabilityTile: View {
                 let pageItems: [CategoryAvailabilityMetric] = (start < end) ? Array(result.metrics[start..<end]) : []
                 
                 let reservedRowsHeight =
-                    CGFloat(pageSize) * rowHeight + CGFloat(pageSize - 0) * rowSpacing
+                    CGFloat(pageSize) * rowHeight + CGFloat(pageSize - 1) * rowSpacing
 
                 VStack(alignment: .leading, spacing: 12) {
                     HStack(spacing: 10) {
