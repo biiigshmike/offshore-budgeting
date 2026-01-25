@@ -23,13 +23,26 @@ struct HomeDateRangeBar: View {
 
     var onApply: () -> Void
 
+    @State private var presentedPicker: PresentedPicker?
+
     var body: some View {
         HStack(spacing: 0) {
             Spacer(minLength: 0)
 
             HStack(spacing: 10) {
-                datePill(title: draftStartDate, selection: $draftStartDate)
-                datePill(title: draftEndDate, selection: $draftEndDate)
+                datePill(
+                    title: draftStartDate,
+                    accessibilityPrefix: "Start date"
+                ) {
+                    presentedPicker = .start
+                }
+
+                datePill(
+                    title: draftEndDate,
+                    accessibilityPrefix: "End date"
+                ) {
+                    presentedPicker = .end
+                }
 
                 Button(action: onApply) {
                     Image(systemName: "arrow.right")
@@ -65,19 +78,73 @@ struct HomeDateRangeBar: View {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1)
         }
+        .sheet(item: $presentedPicker) { picker in
+            NavigationStack {
+                VStack(alignment: .leading, spacing: 14) {
+                    DatePicker(
+                        "",
+                        selection: picker.binding(start: $draftStartDate, end: $draftEndDate),
+                        displayedComponents: [.date]
+                    )
+                    .datePickerStyle(.graphical)
+                    .labelsHidden()
+                }
+                .padding()
+                .navigationTitle(picker.title)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") {
+                            presentedPicker = nil
+                        }
+                    }
+                }
+            }
+        }
     }
 
-    private func datePill(title: Date, selection: Binding<Date>) -> some View {
-        DatePicker(
-            "",
-            selection: selection,
-            displayedComponents: [.date]
-        )
-        .labelsHidden()
-        .datePickerStyle(.compact)
-        .padding(.horizontal, 6)
-        .padding(.vertical, 8)
-        .accessibilityLabel(formattedDate(title))
+    private func datePill(
+        title: Date,
+        accessibilityPrefix: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Text(formattedDate(title))
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(.thinMaterial, in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(accessibilityPrefix) \(formattedDate(title))")
+    }
+
+    private enum PresentedPicker: String, Identifiable {
+        case start
+        case end
+
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .start:
+                return "Start Date"
+            case .end:
+                return "End Date"
+            }
+        }
+
+        func binding(start: Binding<Date>, end: Binding<Date>) -> Binding<Date> {
+            switch self {
+            case .start:
+                return start
+            case .end:
+                return end
+            }
+        }
     }
 
     private func formattedDate(_ date: Date) -> String {
