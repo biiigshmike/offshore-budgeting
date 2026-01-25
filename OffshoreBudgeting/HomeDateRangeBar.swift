@@ -100,6 +100,8 @@ struct HomeDateRangeBar: View {
                     }
                 }
             }
+            .presentationDetents([.medium])
+            .presentationDragIndicator(.visible)
         }
     }
 
@@ -108,18 +110,20 @@ struct HomeDateRangeBar: View {
         accessibilityPrefix: String,
         action: @escaping () -> Void
     ) -> some View {
-        Button(action: action) {
-            Text(formattedDate(title))
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.85)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-                .background(.thinMaterial, in: Capsule())
+        let text = formattedDate(title)
+
+        return Button(action: action) {
+            Text(text)
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(.primary)
+            .lineLimit(1)
+            .minimumScaleFactor(0.85)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(.thinMaterial, in: Capsule())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(accessibilityPrefix) \(formattedDate(title))")
+        .accessibilityLabel("\(accessibilityPrefix) \(text)")
     }
 
     private enum PresentedPicker: String, Identifiable {
