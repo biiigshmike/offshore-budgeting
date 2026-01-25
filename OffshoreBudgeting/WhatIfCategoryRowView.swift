@@ -53,56 +53,38 @@ struct WhatIfCategoryRowView: View {
 
             HStack(alignment: .center, spacing: 12) {
 
-                // Left column: flexible
+                // MARK: - Left column (name, actual, edited badge)
+
                 HStack(alignment: .top, spacing: 10) {
                     Circle()
                         .fill(dotColor)
                         .frame(width: 10, height: 10)
                         .padding(.top, 5)
-                        .overlay {
-                            if isDirty {
-                                Circle()
-                                    .strokeBorder(dotColor.opacity(0.45), lineWidth: 3)
-                                    .blur(radius: 0.5)
-                            }
-                        }
-
 
                     VStack(alignment: .leading, spacing: 2) {
-                        HStack(spacing: 8) {
-                            Text(categoryName)
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(.primary)
-                                .lineLimit(1)
-                                .truncationMode(.tail)
+                        Text(categoryName)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
 
-                            if isDirty {
-                                Text("Edited")
-                                    .font(.caption2.weight(.semibold))
-                                    .foregroundStyle(.secondary)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 3)
-                                    .background(.thinMaterial, in: Capsule())
-                                    .overlay {
-                                        Capsule()
-                                            .strokeBorder(.secondary.opacity(0.25), lineWidth: 1)
-                                    }
-                                    .accessibilityLabel("Edited")
-                            }
-                        }
-
-
-                        // “Baseline actual” reads better as “Actual”
                         Text("Actual: \(formatCurrency(baselineAmount))")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                             .truncationMode(.tail)
+
+                        if isDirty {
+                            editedBadge
+                                .padding(.top, 2)
+                        }
                     }
                 }
                 .frame(width: labelWidth, alignment: .leading)
 
                 Spacer(minLength: 0)
+
+                // MARK: - Controls
 
                 HStack(spacing: controlSpacing) {
 
@@ -143,15 +125,30 @@ struct WhatIfCategoryRowView: View {
                         onFire: { adjust(step) }
                     )
                 }
-
-
             }
             .frame(width: availableWidth, alignment: .leading)
         }
-        .frame(height: 54)
+        // Increased slightly so the 3rd line (Edited) doesn’t clip.
+        .frame(height: 66)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(categoryName)
         .accessibilityValue(formatCurrency(amount))
+    }
+
+    // MARK: - Badge
+
+    private var editedBadge: some View {
+        Text("Edited")
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(.thinMaterial, in: Capsule())
+            .overlay {
+                Capsule()
+                    .strokeBorder(.secondary.opacity(0.25), lineWidth: 1)
+            }
+            .accessibilityLabel("Edited")
     }
 
     // MARK: - Helpers
