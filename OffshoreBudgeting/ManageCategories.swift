@@ -50,6 +50,7 @@ struct ManageCategoriesView: View {
 
                         Text(category.name)
                     }
+                    .padding(.vertical, 6)
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                         Button(role: .destructive) {
                             if confirmBeforeDeleting {
