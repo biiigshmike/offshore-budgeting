@@ -150,9 +150,16 @@ struct HomeView: View {
                     .padding(.horizontal, 16)
                     .padding(.bottom, 18)
                     .frame(width: proxy.size.width, alignment: .leading)
+
                 }
             }
         }
+        .postBoardingTip(
+            key: "tip.home.v1",
+            title: "Home",
+            systemImage: "house.fill",
+            message: "Tap any widget to open deeper metrics. Use the date controls to change your range."
+        )
         .navigationTitle("Home")
         .sheet(isPresented: $isEditingWidgets) {
             HomeEditPinnedCardsView(
