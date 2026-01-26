@@ -35,13 +35,6 @@ struct AppRootView: View {
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var selectedSection: AppSection = .home
-
-    @State private var tabStackIDs: [AppSection: UUID] = Dictionary(
-        uniqueKeysWithValues: AppSection.allCases.map { ($0, UUID()) }
-    )
-
-    // Changing this forces the iPad/Mac NavigationSplitView subtree to be recreated,
-    // which reliably clears any pushed (nested) navigation state.
     @State private var splitViewID = UUID()
 
     var body: some View {
@@ -60,35 +53,30 @@ struct AppRootView: View {
             NavigationStack {
                 HomeView(workspace: workspace)
             }
-            .id(tabStackIDs[.home]!)
             .tabItem { Label(AppSection.home.rawValue, systemImage: AppSection.home.systemImage) }
             .tag(AppSection.home)
 
             NavigationStack {
                 BudgetsView(workspace: workspace)
             }
-            .id(tabStackIDs[.budgets]!)
             .tabItem { Label(AppSection.budgets.rawValue, systemImage: AppSection.budgets.systemImage) }
             .tag(AppSection.budgets)
 
             NavigationStack {
                 IncomeView(workspace: workspace)
             }
-            .id(tabStackIDs[.income]!)
             .tabItem { Label(AppSection.income.rawValue, systemImage: AppSection.income.systemImage) }
             .tag(AppSection.income)
 
             NavigationStack {
                 CardsView(workspace: workspace)
             }
-            .id(tabStackIDs[.cards]!)
             .tabItem { Label(AppSection.cards.rawValue, systemImage: AppSection.cards.systemImage) }
             .tag(AppSection.cards)
 
             NavigationStack {
                 SettingsView(workspace: workspace, selectedWorkspaceID: $selectedWorkspaceID)
             }
-            .id(tabStackIDs[.settings]!)
             .tabItem { Label(AppSection.settings.rawValue, systemImage: AppSection.settings.systemImage) }
             .tag(AppSection.settings)
         }
