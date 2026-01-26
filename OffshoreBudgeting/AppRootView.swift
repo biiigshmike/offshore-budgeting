@@ -8,6 +8,10 @@
 import SwiftUI
 import SwiftData
 
+#if canImport(UIKit)
+import UIKit
+#endif
+
 enum AppSection: String, CaseIterable, Identifiable, Hashable {
     case home = "Home"
     case budgets = "Budgets"
@@ -41,8 +45,18 @@ struct AppRootView: View {
     @State private var cardsPath = NavigationPath()
     @State private var settingsPath = NavigationPath()
 
+    private var isPhone: Bool {
+        #if os(iOS)
+        UIDevice.current.userInterfaceIdiom == .phone
+        #else
+        false
+        #endif
+    }
+
     var body: some View {
-        if horizontalSizeClass == .compact {
+        if isPhone {
+            phoneTabs
+        } else if horizontalSizeClass == .compact {
             phoneTabs
         } else {
             splitView
