@@ -18,12 +18,9 @@ struct SettingsGeneralView: View {
 
     // Step 1.3
     @AppStorage("tips_resetToken") private var tipsResetToken: Int = 0
-    @State private var showingTipsResetAlert: Bool = false
-
-    // Step 1.4
-    @State private var showingEraseConfirm: Bool = false
-    @State private var showingEraseResultAlert: Bool = false
     @State private var eraseResultMessage: String = ""
+
+    @State private var activeAlert: ActiveAlert? = nil
 
     // Reset-to-first-run flags
     @AppStorage("didCompleteOnboarding") private var didCompleteOnboarding: Bool = false
@@ -62,8 +59,7 @@ struct SettingsGeneralView: View {
             Section("Maintenance") {
                 HStack(spacing: 12) {
                     Button {
-                        tipsResetToken += 1
-                        showingTipsResetAlert = true
+                        activeAlert = .tipsResetConfirm
                     } label: {
                         Text("Reset Tips & Hints")
                             .frame(maxWidth: .infinity, minHeight: 44)
@@ -72,7 +68,7 @@ struct SettingsGeneralView: View {
                     .tint(.orange)
 
                     Button {
-                        showingEraseConfirm = true
+                        activeAlert = .eraseConfirm
                     } label: {
                         Text("Reset & Erase Content")
                             .frame(maxWidth: .infinity, minHeight: 44)
@@ -88,23 +84,42 @@ struct SettingsGeneralView: View {
         }
         .listStyle(.insetGrouped)
         .navigationTitle("General")
-        .alert("Tips & Hints Reset", isPresented: $showingTipsResetAlert) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text("Tips and hints will be shown again.")
-        }
-        .alert("Reset & Erase Content?", isPresented: $showingEraseConfirm) {
-            Button("Erase", role: .destructive) {
-                performLocalErase()
+        .alert(item: $activeAlert) { alert in
+            switch alert {
+            case .tipsResetConfirm:
+                Alert(
+                    title: Text("Reset Tips & Hints?"),
+                    message: Text("This will make tips and hints appear again."),
+                    primaryButton: .destructive(Text("Reset")) {
+                        tipsResetToken += 1
+                        DispatchQueue.main.async {
+                            activeAlert = .tipsResetResult
+                        }
+                    },
+                    secondaryButton: .cancel()
+                )
+            case .tipsResetResult:
+                Alert(
+                    title: Text("Tips & Hints Reset"),
+                    message: Text("Tips and hints will be shown again."),
+                    dismissButton: .default(Text("OK"))
+                )
+            case .eraseConfirm:
+                Alert(
+                    title: Text("Reset & Erase Content?"),
+                    message: Text("This will permanently remove your data from this device and return you to onboarding."),
+                    primaryButton: .destructive(Text("Erase")) {
+                        performLocalErase()
+                    },
+                    secondaryButton: .cancel()
+                )
+            case .eraseResult:
+                Alert(
+                    title: Text("Reset Complete"),
+                    message: Text(eraseResultMessage),
+                    dismissButton: .default(Text("OK"))
+                )
             }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("This will permanently remove your data from this device and return you to onboarding.")
-        }
-        .alert("Reset Complete", isPresented: $showingEraseResultAlert) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text(eraseResultMessage)
         }
     }
 
@@ -137,10 +152,30 @@ struct SettingsGeneralView: View {
             tipsResetToken = 0
 
             eraseResultMessage = "All content has been erased. You’ll be returned to onboarding."
-            showingEraseResultAlert = true
+            DispatchQueue.main.async {
+                activeAlert = .eraseResult
+            }
         } catch {
             eraseResultMessage = "Something went wrong while erasing data: \(error.localizedDescription)"
-            showingEraseResultAlert = true
+            DispatchQueue.main.async {
+                activeAlert = .eraseResult
+            }
+        }
+    }
+}
+
+private enum ActiveAlert: Identifiable {
+    case tipsResetConfirm
+    case tipsResetResult
+    case eraseConfirm
+    case eraseResult
+
+    var id: Int {
+        switch self {
+        case .tipsResetConfirm: return 1
+        case .tipsResetResult: return 2
+        case .eraseConfirm: return 3
+        case .eraseResult: return 4
         }
     }
 }
