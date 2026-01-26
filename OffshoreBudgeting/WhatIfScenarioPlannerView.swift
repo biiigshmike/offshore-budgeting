@@ -413,6 +413,7 @@ struct WhatIfScenarioPlannerView: View {
     private struct ExportOptionsSheet: View {
         let onSelect: (ExportFormat) -> Void
         @Environment(\.dismiss) private var dismiss
+        @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
         var body: some View {
             NavigationStack {
@@ -444,7 +445,11 @@ struct WhatIfScenarioPlannerView: View {
                     }
                 }
             }
-            .presentationDetents([.medium])
+            .presentationDetents(
+                horizontalSizeClass == .compact
+                ? [.medium]
+                : [.large]
+            )
         }
     }
 

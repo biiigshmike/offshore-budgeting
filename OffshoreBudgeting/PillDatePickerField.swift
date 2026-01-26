@@ -8,6 +8,8 @@
 import SwiftUI
 
 struct PillDatePickerField: View {
+    
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     let title: String
     @Binding var date: Date
@@ -62,7 +64,11 @@ struct PillDatePickerField: View {
                     }
                 }
             }
-            .presentationDetents([.medium])
+            .presentationDetents(
+                horizontalSizeClass == .compact
+                ? [.medium]
+                : [.large]
+            )
             .presentationDragIndicator(.visible)
         }
     }
@@ -100,6 +106,8 @@ struct PillDatePickerField: View {
 }
 
 struct PillTimePickerField: View {
+
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     let title: String
     @Binding var time: Date
@@ -146,7 +154,11 @@ struct PillTimePickerField: View {
                     }
                 }
             }
-            .presentationDetents([.medium])
+            .presentationDetents(
+                horizontalSizeClass == .compact
+                ? [.medium]
+                : [.large]
+            )
             .presentationDragIndicator(.visible)
         }
     }
