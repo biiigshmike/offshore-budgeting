@@ -52,9 +52,6 @@ final class Workspace {
     var name: String = ""
     var hexColor: String = "#3B82F6"
 
-    // Every relationship must have an explicit inverse.
-    // Keep the inverse specified on the to-one side to avoid SwiftData macro cycles.
-
     @Relationship(deleteRule: .cascade)
     var budgets: [Budget]? = nil
 
@@ -78,6 +75,9 @@ final class Workspace {
 
     @Relationship(deleteRule: .cascade)
     var variableExpenses: [VariableExpense]? = nil
+    
+    @Relationship(deleteRule: .cascade)
+    var importMerchantRules: [ImportMerchantRule]? = nil
 
     init(id: UUID = UUID(), name: String, hexColor: String) {
         self.id = id
@@ -135,7 +135,6 @@ final class Card {
     var theme: String = "default"
     var effect: String = "none"
 
-    // Explicit inverse so CloudKit sees a proper pair with Workspace.cards
     @Relationship(inverse: \Workspace.cards)
     var workspace: Workspace? = nil
 
@@ -148,8 +147,11 @@ final class Card {
     @Relationship(deleteRule: .cascade)
     var variableExpenses: [VariableExpense]? = nil
 
-    // Inverse of Preset.defaultCard
-    @Relationship var defaultForPresets: [Preset]? = nil
+    // IMPORTANT:
+    // Do NOT annotate these with @Relationship(inverse:) on this toolchain.
+    // The inverse is declared on Preset.defaultCard / Income.card instead.
+    var defaultForPresets: [Preset]? = nil
+    var incomes: [Income]? = nil
 
     init(
         id: UUID = UUID(),
@@ -194,19 +196,20 @@ final class Category {
     var id: UUID = UUID()
     var name: String = ""
     var hexColor: String = "#3B82F6"
+    
+    var importMerchantRules: [ImportMerchantRule]? = nil
 
-    // Explicit inverse so CloudKit sees a proper pair with Workspace.categories
     @Relationship(inverse: \Workspace.categories)
     var workspace: Workspace? = nil
 
     @Relationship var budgetCategoryLimits: [BudgetCategoryLimit]? = nil
-
     @Relationship var plannedExpenses: [PlannedExpense]? = nil
-
     @Relationship var variableExpenses: [VariableExpense]? = nil
 
-    // Inverse of Preset.defaultCategory
-    @Relationship var defaultForPresets: [Preset]? = nil
+    // IMPORTANT:
+    // Do NOT annotate with @Relationship(inverse:) here.
+    // The inverse is declared on Preset.defaultCategory instead.
+    var defaultForPresets: [Preset]? = nil
 
     init(id: UUID = UUID(), name: String, hexColor: String, workspace: Workspace? = nil) {
         self.id = id
@@ -236,9 +239,11 @@ final class Preset {
     @Relationship(inverse: \Workspace.presets)
     var workspace: Workspace? = nil
 
+    // Inverse is defined here (to-one side). Card.defaultForPresets stays un-annotated.
     @Relationship(inverse: \Card.defaultForPresets)
     var defaultCard: Card? = nil
 
+    // Inverse is defined here (to-one side). Category.defaultForPresets stays un-annotated.
     @Relationship(inverse: \Category.defaultForPresets)
     var defaultCategory: Category? = nil
 
@@ -266,7 +271,10 @@ final class Preset {
         self.frequencyRaw = frequencyRaw
         self.interval = max(1, interval)
         self.weeklyWeekday = min(7, max(1, weeklyWeekday))
+
+        // ✅ fixed typo: weeklyDayOfMonth -> monthlyDayOfMonth
         self.monthlyDayOfMonth = min(31, max(1, monthlyDayOfMonth))
+
         self.monthlyIsLastDay = monthlyIsLastDay
         self.yearlyMonth = min(12, max(1, yearlyMonth))
         self.yearlyDayOfMonth = min(31, max(1, yearlyDayOfMonth))
@@ -442,7 +450,6 @@ final class IncomeSeries {
     var startDate: Date = Date.now
     var endDate: Date = Date.now
 
-    // Explicit inverse so CloudKit sees a proper pair with Workspace.incomeSeries
     @Relationship(inverse: \Workspace.incomeSeries)
     var workspace: Workspace? = nil
 
@@ -490,6 +497,50 @@ extension IncomeSeries {
     }
 }
 
+// MARK : - Merchant Rule
+
+@Model
+final class ImportMerchantRule {
+
+    var id: UUID = UUID()
+
+    /// Normalized merchant identifier used for Option 1 memory.
+    /// Example: "STARBUCKS" or "CHEVRON" after your MerchantNormalizer.
+    var merchantKey: String = ""
+
+    /// Optional preferred display name to import as.
+    /// Example: "MCDONALDS" instead of "xxxxxxxx1234 MCDONALDS 1 HIGHWAY CA".
+    var preferredName: String? = nil
+
+    /// Belongs to a workspace.
+    @Relationship(inverse: \Workspace.importMerchantRules)
+    var workspace: Workspace? = nil
+    
+    @Relationship(inverse: \Category.importMerchantRules)
+    var preferredCategory: Category? = nil
+
+    var createdAt: Date = Date.now
+    var updatedAt: Date = Date.now
+
+    init(
+        id: UUID = UUID(),
+        merchantKey: String,
+        preferredName: String? = nil,
+        preferredCategory: Category? = nil,
+        workspace: Workspace? = nil,
+        createdAt: Date = Date.now,
+        updatedAt: Date = Date.now
+    ) {
+        self.id = id
+        self.merchantKey = merchantKey
+        self.preferredName = preferredName
+        self.preferredCategory = preferredCategory
+        self.workspace = workspace
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+}
+
 // MARK: - Income
 
 @Model
@@ -508,6 +559,10 @@ final class Income {
     @Relationship(inverse: \IncomeSeries.incomes)
     var series: IncomeSeries? = nil
 
+    // Inverse is defined here (to-one side). Card.incomes stays un-annotated.
+    @Relationship(inverse: \Card.incomes)
+    var card: Card? = nil
+
     init(
         id: UUID = UUID(),
         source: String,
@@ -516,7 +571,8 @@ final class Income {
         isPlanned: Bool,
         isException: Bool = false,
         workspace: Workspace? = nil,
-        series: IncomeSeries? = nil
+        series: IncomeSeries? = nil,
+        card: Card? = nil
     ) {
         self.id = id
         self.source = source
@@ -526,5 +582,6 @@ final class Income {
         self.isException = isException
         self.workspace = workspace
         self.series = series
+        self.card = card
     }
 }

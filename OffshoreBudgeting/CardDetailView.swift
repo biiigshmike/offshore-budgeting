@@ -10,7 +10,7 @@ import SwiftData
 
 struct CardDetailView: View {
     let workspace: Workspace
-    let card: Card
+    @Bindable var card: Card
 
     @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
 
@@ -29,6 +29,7 @@ struct CardDetailView: View {
     @State private var presetToEdit: PresetToEdit? = nil
 
     @State private var showingEditCardSheet: Bool = false
+    @State private var showingImportSheet: Bool = false
 
     @State private var searchText: String = ""
     @FocusState private var searchFocused: Bool
@@ -495,12 +496,22 @@ struct CardDetailView: View {
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
 
-                Button {
-                    showingAddExpenseSheet = true
+                Menu {
+                    Button {
+                        showingAddExpenseSheet = true
+                    } label: {
+                        Label("Add Transaction", systemImage: "plus")
+                    }
+
+                    Button {
+                        showingImportSheet = true
+                    } label: {
+                        Label("Import Expenses (.csv)", systemImage: "tray.and.arrow.down")
+                    }
                 } label: {
                     Image(systemName: "plus")
                 }
-                .accessibilityLabel("Add Transaction")
+                .accessibilityLabel("Add")
                 
                 Menu {
                     Button {
@@ -525,6 +536,11 @@ struct CardDetailView: View {
                     Image(systemName: "ellipsis")
                 }
                 .accessibilityLabel("Card Actions")
+            }
+        }
+        .sheet(isPresented: $showingImportSheet) {
+            NavigationStack {
+                ExpenseCSVImportFlowView(workspace: workspace, card: card)
             }
         }
         .sheet(isPresented: $showingAddExpenseSheet) {
@@ -572,6 +588,9 @@ struct CardDetailView: View {
         }
         .onAppear {
             initializeDateRangeIfNeeded()
+        }
+        .onChange(of: (card.variableExpenses?.count ?? 0) + (card.plannedExpenses?.count ?? 0)) { _, _ in
+            refreshDateRangeIfSafe()
         }
     }
 
@@ -658,6 +677,26 @@ struct CardDetailView: View {
         let start = Calendar.current.startOfDay(for: date)
         return Calendar.current.date(byAdding: DateComponents(day: 1, second: -1), to: start) ?? date
     }
+    
+    private func refreshDateRangeIfSafe() {
+        // If the user has manually adjusted the range, do not fight them.
+        guard !isDateDirty else { return }
+
+        let variableDates = (card.variableExpenses ?? []).map(\.transactionDate)
+        let plannedDates = (card.plannedExpenses ?? []).map(\.expenseDate)
+        let allDates = variableDates + plannedDates
+
+        guard let minDate = allDates.min(), let maxDate = allDates.max() else { return }
+
+        let start = normalizedStart(minDate)
+        let end = normalizedEnd(maxDate)
+
+        draftStartDate = start
+        draftEndDate = end
+        appliedStartDate = start
+        appliedEndDate = end
+    }
+
 
     // MARK: - DateRange helper (local)
 
