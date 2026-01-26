@@ -8,7 +8,7 @@
 import SwiftUI
 import SwiftData
 
-enum AppSection: String, CaseIterable, Identifiable {
+enum AppSection: String, CaseIterable, Identifiable, Hashable {
     case home = "Home"
     case budgets = "Budgets"
     case income = "Income"
@@ -35,7 +35,11 @@ struct AppRootView: View {
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var selectedSection: AppSection = .home
-    @State private var splitViewID = UUID()
+    @State private var homePath = NavigationPath()
+    @State private var budgetsPath = NavigationPath()
+    @State private var incomePath = NavigationPath()
+    @State private var cardsPath = NavigationPath()
+    @State private var settingsPath = NavigationPath()
 
     var body: some View {
         if horizontalSizeClass == .compact {
@@ -43,6 +47,16 @@ struct AppRootView: View {
         } else {
             splitView
         }
+    }
+
+    private var selectedSectionForSidebar: Binding<AppSection?> {
+        Binding(
+            get: { selectedSection },
+            set: { newValue in
+                guard let newValue else { return }
+                selectedSection = newValue
+            }
+        )
     }
 
     // MARK: - iPhone
@@ -86,38 +100,34 @@ struct AppRootView: View {
 
     private var splitView: some View {
         NavigationSplitView {
-            List {
+            List(selection: selectedSectionForSidebar) {
                 ForEach(AppSection.allCases) { section in
-                    Button {
-                        selectedSection = section
-                        DispatchQueue.main.async {
-                            resetDetailColumn()
-                        }
-                    } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: section.systemImage)
-                            Text(section.rawValue)
-                            Spacer()
-                            if selectedSection == section {
-                                Image(systemName: "checkmark")
-                                    .foregroundStyle(.tint)
-                            }
-                        }
-                    }
-                    .buttonStyle(.plain)
+                    Label(section.rawValue, systemImage: section.systemImage)
+                        .tag(section)
                 }
             }
+            .listStyle(.sidebar)
             .navigationTitle(workspace.name)
         } detail: {
-            sectionRootView
+            NavigationStack(path: selectedSectionPath) {
+                sectionRootView
+            }
         }
-        .id(splitViewID)
     }
 
-    // MARK: - Detail Reset
-
-    private func resetDetailColumn() {
-        splitViewID = UUID()
+    private var selectedSectionPath: Binding<NavigationPath> {
+        switch selectedSection {
+        case .home:
+            return $homePath
+        case .budgets:
+            return $budgetsPath
+        case .income:
+            return $incomePath
+        case .cards:
+            return $cardsPath
+        case .settings:
+            return $settingsPath
+        }
     }
 
     // MARK: - Detail Root
