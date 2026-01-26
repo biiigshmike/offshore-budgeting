@@ -78,7 +78,6 @@ struct HomeSavingsOutlookMetricsView: View {
             VStack(alignment: .leading, spacing: 16) {
 
                 headerSummary(
-                    rangeSubtitle: "\(formattedDate(resolved.start)) - \(formattedDate(resolved.end))",
                     projectedTotal: projectedTotal,
                     actualTotal: actualTotal,
                     progressLine: progressInfo.lineText
@@ -97,23 +96,32 @@ struct HomeSavingsOutlookMetricsView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
         }
-        .navigationTitle("Savings Outlook")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationTitle("") // we render a custom title + subtitle in the navigation area
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                VStack(spacing: 2) {
+                    Text("Savings Outlook")
+                        .font(.headline.weight(.semibold))
+                        .foregroundStyle(.primary)
+
+                    Text("\(formattedDate(resolved.start)) - \(formattedDate(resolved.end))")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .accessibilityElement(children: .combine)
+            }
+        }
     }
 
     // MARK: - Header
 
     private func headerSummary(
-        rangeSubtitle: String,
         projectedTotal: Double,
         actualTotal: Double,
         progressLine: String
     ) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(rangeSubtitle)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-
             HStack(alignment: .firstTextBaseline) {
                 summaryMetric(title: "Projected", value: projectedTotal)
 
@@ -397,13 +405,13 @@ struct HomeSavingsOutlookMetricsView: View {
         }
 
         if projected > 0 {
-            let ratio = actual / projected
+            let ratio = max(0, actual / projected)
             let pct = Int((ratio * 100).rounded())
             return (lineText: "Progress: \(pct)% of projection", percentText: "\(pct)%")
         }
 
         // Negative projection mode, progress toward break-even (0).
-        let progressToBreakeven = (actual - projected) / abs(projected)
+        let progressToBreakeven = max(0, (actual - projected) / abs(projected))
         let pct = Int((progressToBreakeven * 100).rounded())
         return (lineText: "Progress: \(pct)% toward break-even", percentText: "\(pct)%")
     }

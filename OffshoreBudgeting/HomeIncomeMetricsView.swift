@@ -74,7 +74,6 @@ struct HomeIncomeMetricsView: View {
             VStack(alignment: .leading, spacing: 16) {
 
                 headerSummary(
-                    rangeSubtitle: "\(formattedDate(resolved.start)) - \(formattedDate(resolved.end))",
                     actualTotal: actualTotal,
                     plannedTotal: plannedTotal,
                     percentText: percentText
@@ -92,23 +91,32 @@ struct HomeIncomeMetricsView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
         }
-        .navigationTitle("Income")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationTitle("") // we render a custom title + subtitle in the navigation area
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                VStack(spacing: 2) {
+                    Text("Income")
+                        .font(.headline.weight(.semibold))
+                        .foregroundStyle(.primary)
+
+                    Text("\(formattedDate(resolved.start)) - \(formattedDate(resolved.end))")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .accessibilityElement(children: .combine)
+            }
+        }
     }
 
     // MARK: - Header
 
     private func headerSummary(
-        rangeSubtitle: String,
         actualTotal: Double,
         plannedTotal: Double,
         percentText: String
     ) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(rangeSubtitle)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-
             HStack(alignment: .firstTextBaseline) {
                 summaryMetric(title: "Actual", value: actualTotal)
 

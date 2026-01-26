@@ -46,7 +46,11 @@ struct HomeCategorySpotlightTile: View {
     }
 
     private var subtitle: String {
-        "\(startDate.formatted(.dateTime.month().day())) - \(endDate.formatted(.dateTime.month().day()))"
+        "\(formattedDate(startDate)) - \(formattedDate(endDate))"
+    }
+    
+    private func formattedDate(_ date: Date) -> String {
+        date.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted))
     }
 
     var body: some View {

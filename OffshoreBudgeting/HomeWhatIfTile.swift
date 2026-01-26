@@ -130,7 +130,7 @@ struct HomeWhatIfTile: View {
                 .accessibilityLabel("Open What If planner")
             )
         ) {
-            VStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .center, spacing: 10) {
                     VStack(alignment: .center, spacing: 6) {
                         Text("Actual Savings")

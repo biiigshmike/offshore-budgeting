@@ -459,7 +459,7 @@ private struct DayCellView: View {
     }
 
     private var dayBackgroundStyle: Color {
-        if isSelected { return .secondary.opacity(0.5) }
+        if isSelected { return .secondary.opacity(0.25) }
         return .clear
     }
 

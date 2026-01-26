@@ -230,7 +230,7 @@ private struct HomeSavingsGaugeRow: View {
         if projectedSavings < 0 {
             return "\(percentText) toward break-even"
         }
-        return "\(percentText) of projection"
+        return "\(percentText)"
     }
 }
 

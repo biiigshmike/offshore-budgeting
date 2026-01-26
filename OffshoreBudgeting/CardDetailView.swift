@@ -1153,7 +1153,7 @@ private struct IconCircleButton: View {
                 .frame(width: 44, height: 44)
                 .background(
                     Circle()
-                        .fill(isEnabled ? Color.primary.opacity(0.10) : Color.secondary.opacity(0.08))
+                        .fill(isEnabled ? Color.blue.opacity(0.85) : Color.secondary.opacity(0.1))
                 )
         }
         .buttonStyle(.plain)
@@ -1172,10 +1172,7 @@ private struct IconCircleLabel: View {
             .foregroundStyle(.primary)
             .tint(.primary)
             .frame(width: 44, height: 44)
-            .background(
-                Circle()
-                    .fill(Color.primary.opacity(0.10))
-            )
+            .background(.thinMaterial, in: Circle())
     }
 }
 
@@ -1270,42 +1267,44 @@ private struct PlannedExpenseRow: View {
     }
 
     private var amountLabel: String {
-        if expense.actualAmount > 0 {
-            return "Actual"
-        }
-        return "Planned"
+        expense.actualAmount > 0 ? "Actual" : "Planned"
     }
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
+
             CategoryDotView(category: expense.category)
                 .padding(.top, 6)
 
+            // LEFT SIDE
             VStack(alignment: .leading, spacing: 4) {
                 Text(expense.title)
                     .font(.body)
 
-                HStack(spacing: 8) {
-                    Text(expense.expenseDate.formatted(date: .abbreviated, time: .omitted))
-                    Text("•")
-                    Text(amountToShow, format: CurrencyFormatter.currencyStyle())
-                    Text("•")
-                    Text(amountLabel)
-
-                    if let categoryName = expense.category?.name {
-                        Text("•")
-                        Text(categoryName)
-                    }
+                HStack(spacing: 6) {
+                    Text(
+                        expense.expenseDate.formatted(
+                            date: .abbreviated,
+                            time: .omitted
+                        )
+                    )
                 }
                 .font(.footnote)
                 .foregroundStyle(.secondary)
             }
 
             Spacer(minLength: 0)
+
+            // RIGHT SIDE
+            Text(amountToShow, format: CurrencyFormatter.currencyStyle())
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(.primary)
+                .multilineTextAlignment(.trailing)
         }
         .padding(.vertical, 4)
     }
 }
+
 
 // MARK: - Variable Expense Row
 
@@ -1314,32 +1313,37 @@ private struct VariableExpenseRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
+
             CategoryDotView(category: expense.category)
                 .padding(.top, 6)
 
+            // LEFT SIDE
             VStack(alignment: .leading, spacing: 4) {
                 Text(expense.descriptionText)
                     .font(.body)
 
-                HStack(spacing: 8) {
-                    Text(expense.transactionDate.formatted(date: .abbreviated, time: .omitted))
-                    Text("•")
-                    Text(expense.amount, format: CurrencyFormatter.currencyStyle())
-
-                    if let categoryName = expense.category?.name {
-                        Text("•")
-                        Text(categoryName)
-                    }
-                }
+                Text(
+                    expense.transactionDate.formatted(
+                        date: .abbreviated,
+                        time: .omitted
+                    )
+                )
                 .font(.footnote)
                 .foregroundStyle(.secondary)
             }
 
             Spacer(minLength: 0)
+
+            // RIGHT SIDE
+            Text(expense.amount, format: CurrencyFormatter.currencyStyle())
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(.primary)
+                .multilineTextAlignment(.trailing)
         }
         .padding(.vertical, 4)
     }
 }
+
 
 // MARK: - Category Dot
 

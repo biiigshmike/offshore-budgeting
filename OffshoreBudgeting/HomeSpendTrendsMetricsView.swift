@@ -181,7 +181,8 @@ struct HomeSpendTrendsMetricsView: View {
     private func chartCard(result: HomeSpendTrendsAggregator.Result) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Spending")
-                .font(.headline.weight(.semibold))
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
 
             if result.buckets.allSatisfy({ $0.total <= 0 }) {
                 Text("No spending data in this range.")
@@ -204,7 +205,7 @@ struct HomeSpendTrendsMetricsView: View {
                         AxisGridLine().foregroundStyle(.secondary.opacity(0.22))
                         AxisTick().foregroundStyle(.secondary.opacity(0.28))
                         AxisValueLabel(format: CurrencyFormatter.currencyStyle())
-                            .foregroundStyle(Color.primary)
+                            .foregroundStyle(Color.secondary)
                     }
                 }
                 .chartXAxis {
@@ -212,7 +213,7 @@ struct HomeSpendTrendsMetricsView: View {
                         AxisGridLine().foregroundStyle(.secondary.opacity(0.18))
                         AxisTick().foregroundStyle(.secondary.opacity(0.26))
                         AxisValueLabel()
-                            .foregroundStyle(Color.primary)
+                            .foregroundStyle(Color.secondary)
                     }
                 }
                 .frame(height: 240)

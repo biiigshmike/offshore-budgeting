@@ -258,6 +258,7 @@ struct SettingsView: View {
             .background {
                 shape.fill(selectedWorkspaceColor)
             }
+            .opacity(0.85)
 //            .overlay {
 //                shape.strokeBorder(selectedWorkspaceColor, lineWidth: 1)
 //            }
