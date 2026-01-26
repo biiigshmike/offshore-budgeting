@@ -532,7 +532,7 @@ struct WhatIfScenarioPlannerView: View {
             .disabled(scenarios.count <= 1 || selectedScenarioID == nil)
 
         } label: {
-            Image(systemName: "line.3.horizontal.decrease.circle")
+            Image(systemName: "line.3.horizontal.decrease")
                 .font(.system(size: 16, weight: .semibold))
                 .accessibilityLabel("Scenario options")
         }
