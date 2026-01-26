@@ -154,7 +154,7 @@ struct BudgetsView: View {
                 PostBoardingTipItem(
                     systemImage: "list.triangle",
                     title: "View & Sort",
-                    detail: "Active • happening now\nUpcoming • starts later\nPast • ended."
+                    detail: "Active • happening now\nUpcoming • starts later\nPast • ended"
                 ),
                 PostBoardingTipItem(
                     systemImage: "magnifyingglass",
