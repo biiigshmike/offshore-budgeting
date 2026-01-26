@@ -102,25 +102,28 @@ private struct IntroductionHelpView: View {
                 bullet("Income is tracked via planned or actual income. Use planned income to help gauge savings and actual income for income you actually received to get your actual savings.")
                 bullet("Expense Categories describe what the expense was for (groceries, rent, fuel).")
                 bullet("Presets are reusable planned expenses for recurring bills.")
+                bullet("Variable expenses are one-off or unpredictable expenses tied to a card.")
                 bullet("Budgets group a date range so the app can summarize income, expenses, and savings for that period, such as Daily, Monthly, Quarterly, or Yearly. Budget in a way that makes sense to you.")
 
                 sectionHeader("Planned Expenses")
-                Text("Expected or recurring costs for a budget period (rent, subscriptions). Planned expenses have two amounts:")
-                bullet("Planned amount: what you thought it would be.")
-                bullet("Actual amount: what actually posted.")
-                Text("Planned amounts build your plan. Actual amounts drive your real totals.")
-
+                Text("Expected or recurring costs for a budget period (rent, subscriptions).")
+                bullet("Plannd Amount: The amount you expect to debit from your account.")
+                bullet("Actual Amount: Sometimes, a planned expense may cost more or less than expected. Edit the Planned Expense from your budget and enter the actual amount debited to keep your totals accurate.")
+                Text("Pro Tip: If you notice a planned expense consistently costs more or less than expected, update the planned amount to reflect reality.")
+                
                 sectionHeader("Variable Expenses")
                 Text("Unpredictable, one-off costs during a budget period (fuel, dining). These are always treated as actual spending and are tracked by card and category.")
 
                 sectionHeader("Planned Income")
                 Text("Income you expect to receive (salary, deposits). Planned income is used for forecasts and potential savings.")
+                bullet("Use Planned Income to help plan your budget. If your income is consistent, consider creating a recurring Actual Income entry instead.")
 
                 sectionHeader("Actual Income")
                 Text("Income you actually receive. Actual income drives real totals, real savings, and the amount you can still spend safely.")
+                bullet("Income can be logged as Actual when received, or you can create a recurring Actual Income entry for consistent paychecks.")
 
-                sectionHeader("Budgets & Periods")
-                Text("Budgets are organized by a period you choose in Settings (weekly, bi-weekly, semi-monthly, or monthly). Navigate periods on Home with the date row controls. If no budget exists for a period, create one from the Home menu or the Budgets screen.")
+                sectionHeader("Budgets")
+                Text("Budgets are a lens for viewing your income and expenses over a specific date range. Create budgets that align with your financial goals and pay cycles. Budget in a way that makes sense to you.")
 
                 sectionHeader("How Totals Are Calculated")
                 Text("Everything in Offshore is basic math, and here's how it breaks down:")

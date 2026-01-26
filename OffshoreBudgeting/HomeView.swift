@@ -125,6 +125,9 @@ struct HomeView: View {
 
                                         case .categoryAvailability:
                                             categoryAvailabilityWidget
+
+                                        case .spendTrends:
+                                            spendTrendsWidget
                                         }
                                     }
 
@@ -249,6 +252,18 @@ struct HomeView: View {
         HomeCategoryAvailabilityTile(
             workspace: workspace,
             budgets: budgets,
+            categories: categories,
+            plannedExpenses: plannedExpenses,
+            variableExpenses: variableExpenses,
+            startDate: appliedStartDate,
+            endDate: appliedEndDate
+        )
+    }
+
+    private var spendTrendsWidget: some View {
+        HomeSpendTrendsTile(
+            workspace: workspace,
+            cards: cards,
             categories: categories,
             plannedExpenses: plannedExpenses,
             variableExpenses: variableExpenses,
