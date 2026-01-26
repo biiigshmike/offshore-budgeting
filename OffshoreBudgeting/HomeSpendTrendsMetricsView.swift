@@ -61,14 +61,13 @@ struct HomeSpendTrendsMetricsView: View {
             VStack(alignment: .leading, spacing: 16) {
 
                 headerSummary(
-                    rangeSubtitle: "\(formattedDate(result.resolvedStart)) - \(formattedDate(result.resolvedEnd))",
                     totalSpent: result.totalSpent,
                     selectedCard: selectedCard
                 )
 
                 periodPicker
 
-                cardFilterRow
+                cardCarousel
 
                 chartCard(result: result)
 
@@ -77,22 +76,31 @@ struct HomeSpendTrendsMetricsView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
         }
-        .navigationTitle("Spend Trends")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationTitle("") // we render a custom title + subtitle in the navigation area
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                VStack(spacing: 2) {
+                    Text("Spend Trends")
+                        .font(.headline.weight(.semibold))
+                        .foregroundStyle(.primary)
+
+                    Text("\(formattedDate(result.resolvedStart)) - \(formattedDate(result.resolvedEnd))")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .accessibilityElement(children: .combine)
+            }
+        }
     }
 
     // MARK: - Header
 
     private func headerSummary(
-        rangeSubtitle: String,
         totalSpent: Double,
         selectedCard: Card?
     ) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-
-            Text(rangeSubtitle)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
 
             Text("Total Spending")
                 .font(.subheadline)
@@ -101,12 +109,6 @@ struct HomeSpendTrendsMetricsView: View {
             Text(totalSpent, format: CurrencyFormatter.currencyStyle())
                 .font(.largeTitle.weight(.semibold))
                 .foregroundStyle(.primary)
-
-            if let selectedCard {
-                Text("Filtered to: \(selectedCard.name)")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
-            }
         }
     }
 
@@ -122,28 +124,56 @@ struct HomeSpendTrendsMetricsView: View {
         .accessibilityLabel("Period")
     }
 
-    // MARK: - Card filter (Menu first)
+    // MARK: - Card carousel (replaces Menu)
 
-    private var cardFilterRow: some View {
-        HStack(spacing: 10) {
-
-            Text("Card")
+    private var cardCarousel: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                Text(
+                    selectedCardID
+                        .flatMap { id in cards.first(where: { $0.id == id })?.name }
+                    ?? "All Cards"
+                )
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.secondary)
-
-            Spacer(minLength: 0)
-
-            Picker("Card Filter", selection: $selectedCardID) {
-                Text("All Cards").tag(UUID?.none)
-
-                ForEach(cards) { card in
-                    Text(card.name).tag(UUID?.some(card.id))
-                }
+                Spacer(minLength: 0)
             }
-            .pickerStyle(.menu)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+
+                    ForEach(cards) { card in
+                        SpendTrendsCardTile(
+                            title: card.name,
+                            themeRaw: card.theme,
+                            effectRaw: card.effect,
+                            isSelected: selectedCardID == card.id
+                        ) {
+                            toggleCardSelection(card)
+                        }
+                        .accessibilityLabel(selectedCardID == card.id ? "\(card.name), selected" : card.name)
+                        .accessibilityHint("Double tap to filter spend trends to this card. Tap again to clear and return to period P.")
+                    }
+                }
+                .padding(6)
+            }
+            Text("Press a card to view spending by category for the selected card. Press it again to clear your selection.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .padding(.top, 2)
         }
         .padding(12)
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    private func toggleCardSelection(_ card: Card) {
+        if selectedCardID == card.id {
+            // Tap again: clear selection and return to "P"
+            selectedCardID = nil
+            selectedPeriod = .period
+        } else {
+            selectedCardID = card.id
+        }
     }
 
     // MARK: - Chart
@@ -174,14 +204,15 @@ struct HomeSpendTrendsMetricsView: View {
                         AxisGridLine().foregroundStyle(.secondary.opacity(0.22))
                         AxisTick().foregroundStyle(.secondary.opacity(0.28))
                         AxisValueLabel(format: CurrencyFormatter.currencyStyle())
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.primary)
                     }
                 }
                 .chartXAxis {
                     AxisMarks(values: .automatic(desiredCount: 5)) {
                         AxisGridLine().foregroundStyle(.secondary.opacity(0.18))
                         AxisTick().foregroundStyle(.secondary.opacity(0.26))
-                        AxisValueLabel().foregroundStyle(.secondary)
+                        AxisValueLabel()
+                            .foregroundStyle(.primary)
                     }
                 }
                 .frame(height: 240)
@@ -211,22 +242,6 @@ struct HomeSpendTrendsMetricsView: View {
                         }
                     }
                 }
-//                .overlay {
-//                    // Gentle “Wallet glass” wash over the whole plot area
-//                    LinearGradient(
-//                        colors: [
-//                            Color.white.opacity(0.10),
-//                            Color.white.opacity(0.04),
-//                            Color.clear
-//                        ],
-//                        startPoint: .top,
-//                        endPoint: .bottom
-//                    )
-//                    .blendMode(.softLight)
-//                    .blur(radius: 0.8)
-//                    .allowsHitTesting(false)
-//                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-//                }
 
                 highestCallout(result: result)
                     .padding(.top, 6)
@@ -278,6 +293,56 @@ struct HomeSpendTrendsMetricsView: View {
     }
 }
 
+// MARK: - Card tiles (local)
+
+private struct SpendTrendsCardTile: View {
+    let title: String
+    let themeRaw: String
+    let effectRaw: String
+    let isSelected: Bool
+    let onTap: () -> Void
+
+    private let tileWidth: CGFloat = 160
+
+    var body: some View {
+        Button(action: onTap) {
+            ZStack(alignment: .topTrailing) {
+
+                CardVisualView(
+                    title: title,
+                    theme: themeOption(from: themeRaw),
+                    effect: effectOption(from: effectRaw),
+                    minHeight: nil,
+                    showsShadow: false,
+                    titleFont: .headline,
+                    titlePadding: 12,
+                    titleOpacity: 0.82
+                )
+                .frame(width: tileWidth)
+
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(isSelected ? Color.primary.opacity(0.35) : Color.clear, lineWidth: 2)
+
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.headline)
+                        .foregroundStyle(.white.opacity(0.92))
+                        .padding(10)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func themeOption(from raw: String) -> CardThemeOption {
+        CardThemeOption(rawValue: raw) ?? .graphite
+    }
+
+    private func effectOption(from raw: String) -> CardEffectOption {
+        CardEffectOption(rawValue: raw) ?? .plastic
+    }
+}
+
 // MARK: - Overlay Bar (HeatMap-style)
 
 private struct HeatMapBucketBar: View {
@@ -317,25 +382,6 @@ private struct HeatMapBucketBar: View {
                 .frame(width: barSize.width, height: barSize.height)
                 .position(x: xInPlot, y: topInPlot + (barHeight / 2))
                 .compositingGroup()
-
-//                .overlay {
-//                    shape
-//                        .fill(gradient)
-//                        .frame(width: barSize.width, height: barSize.height)
-//                        .blur(radius: 10)
-//                        .opacity(0.55)
-//                        .mask(
-//                            shape
-//                                .frame(width: barSize.width, height: barSize.height)
-//                        )
-//                        .clipped()
-//                }
-//
-//                .overlay {
-//                    shape
-//                        .strokeBorder(Color.white.opacity(0.18), lineWidth: 1)
-//                        .frame(width: barSize.width, height: barSize.height)
-//                }
         )
     }
 
