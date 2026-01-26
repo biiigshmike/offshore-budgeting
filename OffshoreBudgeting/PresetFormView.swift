@@ -200,39 +200,61 @@ struct PresetFormView: View {
             }
         }
     }
+    
+    // MARK: - Ordinal helper (1st, 2nd, 3rd, 4th...)
+
+    private func ordinal(_ number: Int) -> String {
+        let n = abs(number)
+
+        // 11, 12, 13 are always "th"
+        let lastTwo = n % 100
+        if (11...13).contains(lastTwo) {
+            return "\(n)th"
+        }
+
+        switch n % 10 {
+        case 1: return "\(n)st"
+        case 2: return "\(n)nd"
+        case 3: return "\(n)rd"
+        default: return "\(n)th"
+        }
+    }
+
 
     private var scheduleHelpText: String {
         switch frequency {
         case .none:
-            return "This preset does not repeat."
+            return "This expense does not repeat."
 
         case .daily:
             return interval == 1
-                ? "This is a template that repeats daily."
-                : "This is a template that repeats every \(interval) days."
+                ? "An expense that repeats daily."
+                : "An expense that repeats every \(interval) days."
 
         case .weekly:
             let day = weekdayName(weeklyWeekday)
             return interval == 1
-                ? "This is a template that repeats weekly on \(day)."
-                : "This is a template that repeats every \(interval) weeks on \(day)."
+                ? "An expense that repeats weekly on \(day)."
+                : "An expense that repeats every \(interval) weeks on \(day)."
 
         case .monthly:
             if monthlyIsLastDay {
                 return interval == 1
-                    ? "This is a template that repeats monthly on the last day."
-                    : "This is a template that repeats every \(interval) months on the last day."
+                    ? "An expense that repeats on the last day of every month."
+                    : "An expense that repeats on the last day of every \(interval) months."
             } else {
+                let day = ordinal(monthlyDayOfMonth)
                 return interval == 1
-                    ? "This is a template that repeats monthly on day \(monthlyDayOfMonth)."
-                    : "This is a template that repeats every \(interval) months on day \(monthlyDayOfMonth)."
+                    ? "An expense that repeats on the \(day) of every month."
+                    : "An expense that repeats on the \(day) of every \(interval) months."
             }
 
         case .yearly:
             let month = monthName(yearlyMonth)
+            let day = ordinal(yearlyDayOfMonth)
             return interval == 1
-                ? "This is a template that repeats yearly on \(month) \(yearlyDayOfMonth)."
-                : "This is a template that repeats every \(interval) years on \(month) \(yearlyDayOfMonth)."
+                ? "An expense that repeats yearly on \(month) \(day)."
+                : "An expense that repeats every \(interval) years on \(month) \(day)."
         }
     }
 
