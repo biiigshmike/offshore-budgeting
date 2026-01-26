@@ -129,7 +129,7 @@ struct AppLockGate<Content: View>: View {
 
         do {
             let success = try await LocalAuthenticationService.authenticateForUnlock(
-                localizedReason: "Unlock the app to protect your budgeting data."
+                localizedReason: "Unlock the app to access your budgeting data."
             )
 
             if success {
