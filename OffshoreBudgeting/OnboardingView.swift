@@ -68,7 +68,6 @@ struct OnboardingView: View {
                 .padding(.top, 18)
 
             if onboardingStep != 0 {
-                Divider().opacity(0.35)
 
                 bottomNavBar
                     .padding(.horizontal, 18)
