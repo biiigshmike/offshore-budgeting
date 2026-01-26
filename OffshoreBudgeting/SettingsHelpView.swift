@@ -159,7 +159,7 @@ private struct HomeHelpView: View {
         HelpDetailScreen(
             title: "Home",
             sections: [
-                .init(screenshotSlot: 1, header: "Home is your dashboard for the selected date range.", body: [
+                .init(screenshotSlot: 1, header: "Home: Welcome to Your Dashboard", body: [
                     "By default, Home loads using your default budgeting preference from Settings. You can pick your own custom start and end date, or use the pre-defined ranges in the period menu by pressing on the calendar icon. The widgets respond with the date range you select."
                 ]),
                 .init(screenshotSlot: 2, header: "Widgets Overview", body: [
@@ -187,21 +187,25 @@ private struct BudgetsHelpView: View {
         HelpDetailScreen(
             title: "Budgets",
             sections: [
-                .init(screenshotSlot: 1, header: "Budgets: the place where the actual budgeting magic happens.", body: [
-                    "This screen lists Past, Active, and Upcoming budgets. Tap any budget to open its details and do the real work: add expenses, assign cards, and monitor totals."
+                .init(screenshotSlot: 1, header: "Budgets: Where the Actual Budgeting Magic Happens", body: [
+                    "This screen lists Past, Active, and Upcoming budgets. Tap any budget to open its details and do the real work: add expenses, assign cards, and monitor budget metrics."
                 ]),
                 .init(screenshotSlot: 2, header: "Budget Details: Build the Budget", body: [
                     "Inside a budget, you plan and track expenses in two lanes:",
                     "• Planned: recurring or expected costs.",
-                    "• Variable: one-off spending from your cards."
+                    "• Variable: one-off spending from your cards.",
+                    "• Categories: long-press a category and assign a spending cap to help manage your spending habits."
                 ]),
                 .init(screenshotSlot: 3, header: "How Budget Totals Are Calculated", body: [
                     "These totals are shown in the budget header and summary cards:",
-                    "• Income (Expected) = planned income total in this period.",
-                    "• Income (Received) = actual income total in this period.",
-                    "• Planned expenses (Planned) = sum of planned amounts.",
-                    "• Planned expenses (Actual) = sum of actual amounts entered on planned expenses.",
-                    "• Variable expenses = sum of unplanned expenses on cards for this budget."
+                    "• Planned Income = Planned Income total in this period.",
+                    "• Actual Income = Actual Income total in this period.",
+                    "• Planned Total (Presets) = sum of Preset Planned Expenses. This sum will use the Planned Amount unless a Preset was modified; then, it will use the Actual amount.",
+                    "• Variable Total (Variable Expenses) = sum of Variable Expenses for the budget period.",
+                    "• Unified Total (Preset Planned Expenses + Variable Expenses) = Takes the Planned (or Actual) amounts from Preset Planned Expenses and adds them to Variable Expenses to give you a unified total.",
+                    "• Max Savings: Planned Income - Planned Expenses total.",
+                    "• Projected Savings: Actual Savings + (Planned Income - Planned Expenses).",
+                    "• Actual Savings: Actual Income - (Planned Expenses total + Variable Expenses total).",
                 ])
             ]
         )
@@ -213,14 +217,14 @@ private struct IncomeHelpView: View {
         HelpDetailScreen(
             title: "Income",
             sections: [
-                .init(screenshotSlot: 1, header: "Income is your calendar-based income tracker.", body: [
-                    "The calendar shows planned and actual income totals per day. Tap a day to see its income entries and weekly totals."
+                .init(screenshotSlot: 1, header: "Income: Think Timesheet, but Modern and Cool", body: [
+                    "The calendar shows Planned and Actual income totals per day. Tap a day to see its income entries and weekly totals."
                 ]),
-                .init(screenshotSlot: 2, header: "Planned vs Actual Income", body: [
-                    "If your paycheck is consistent, create a recurring Actual Income entry. If it varies, use Planned Income to estimate, then log Actual Income when it arrives."
+                .init(screenshotSlot: 2, header: "Planned Income vs Actual Income", body: [
+                    "If your paycheck is consistent, create a recurring Actual Income entry. If it varies, use Planned Income to estimate, then log Actual Income when it arrives. Either way, both can be set as recurring."
                 ]),
                 .init(screenshotSlot: 3, header: "How Income Feeds the App", body: [
-                    "Income totals feed Home and Budgets, especially Savings and pacing widgets."
+                    "Income entries contribute to Home and Budget calculations. Actual Income drives real totals and savings, while Planned Income helps with forecasts and potential savings."
                 ])
             ]
         )
@@ -232,7 +236,7 @@ private struct CardsHelpView: View {
         HelpDetailScreen(
             title: "Cards",
             sections: [
-                .init(screenshotSlot: 1, header: "Cards is your full gallery of saved cards.", body: [
+                .init(screenshotSlot: 1, header: "Cards: A Beautiful Gallery of Your Spending Accounts", body: [
                     "Tap + to add a card. Tap a card to open its detail view."
                 ]),
                 .init(screenshotSlot: 2, header: "Card Detail: Deep Dive", body: [
@@ -251,11 +255,13 @@ private struct PresetsHelpView: View {
         HelpDetailScreen(
             title: "Presets",
             sections: [
-                .init(screenshotSlot: 1, header: "Presets are reusable planned expense templates.", body: [
-                    "Use presets for fixed bills (rent, subscriptions). Tap + to create a new preset. Swipe to edit or delete."
+                .init(screenshotSlot: 1, header: "Presets: Reusable Fixed Expense Templates", body: [
+                    "Use presets for fixed bills (rent, subscriptions). Tap + to create a new preset. Swipe to right to edit or left to delete."
                 ]),
                 .init(screenshotSlot: 2, header: "How Presets Affect Totals", body: [
-                    "When assigned to a budget, presets become planned expenses in that budget."
+                    "When assigned to a budget, presets become planned expenses in that budget.",
+                    "• Presets are just a template for Planned Expenses; they don’t hold amounts themselves until assigned to a budget.",
+                    "• Planned Expenses created from Presets use the Preset's planned amount unless you edit the Planned Expense, then it uses the actual amount you entered."
                 ]),
                 .init(screenshotSlot: 3, header: "Tip", body: [
                     "Use presets to make budget setup fast and consistent month to month."
@@ -270,14 +276,22 @@ private struct SettingsHelpDetailsView: View {
         HelpDetailScreen(
             title: "Settings",
             sections: [
-                .init(screenshotSlot: 1, header: "Settings is where you configure the app.", body: [
-                    "Every row here is a separate area to manage the app, including About, Help, General, Privacy, Notifications, iCloud, Categories, and Presets."
+                .init(screenshotSlot: 1, header: "Settings: Could Configuration BE Any Easier?.", body: [
+                    "Every row here is a separate area to manage your Offshore experience.",
+                                        "• About: Version Info, Contact Support, Release Logs",
+                                        "• Help: This guide, Repeat Onboarding",
+                                        "• General: Currency, Budget Period, Start of Week, Reset Tips & Hints, Reset & Erase Content",
+                                        "• Privacy: Enable Biometrics for App Lock",
+                                        "• Notifications: Enable Notifications for a reminder to log variable expenses for the day, compare planned vs actual income, and enable Presets due reminders.",
+                                        "• iCloud: Allow for iCloud Syncing Across Devices and check the iCloud Sync Status",
+                                        "• Categories: Manage your Expense Categories.",
+                                        "• Presets: Manage your Expense Presets.",
                 ]),
-                .init(screenshotSlot: 2, header: "How Settings Affect Calculations", body: [
-                    "Your default budget period influences Home and budgeting screens, and Categories drive grouping and filtering."
+                .init(screenshotSlot: 2, header: "Settings Controls What You See", body: [
+                    "Your default budget period influences Home and new Budgets. For example, if you set Monthly as your default budget period, Home will load with the current month selected, and new Budgets will default to Monthly.",
                 ]),
-                .init(screenshotSlot: 3, header: "Workspace Tip", body: [
-                    "If you use multiple workspaces (Personal, Work), Settings is usually where you decide what defaults each workspace should follow."
+                .init(screenshotSlot: 3, header: "Workspaces", body: [
+                    "Offshore allows you to create multiple Workspaces to separate different budgeting contexts, such as Personal and Work. Each Workspace maintains its own set of Cards, Income, Presets, Categories, and Budgets, ensuring that your financial data remains organized and distinct across various aspects of your life."
                 ])
             ]
         )
