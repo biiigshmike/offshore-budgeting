@@ -384,7 +384,7 @@ private struct OnboardingWorkspaceStep: View {
 
             header(
                 title: "Workspaces",
-                subtitle: "Create your default workspace (like Personal), and add others if you want."
+                subtitle: "A Workspace is where your all of your budgeting data lives. You can create multiple workspaces for different budgeting purposes."
             )
 
             if workspaces.isEmpty {
@@ -420,6 +420,8 @@ private struct OnboardingWorkspaceStep: View {
                     }
                 }
                 .listStyle(.insetGrouped)
+                .scrollContentBackground(.hidden)
+                .background(Color(.systemBackground))
                 .frame(minHeight: 220)
             }
 
@@ -432,7 +434,7 @@ private struct OnboardingWorkspaceStep: View {
             .buttonStyle(.glassProminent)
             .tint(.blue)
 
-            Text("Tip: Most people start with a Personal workspace, then add a Work workspace later.")
+            Text("Tip: Try starting with a workspace called Personal. You can always add more later.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
 
@@ -473,8 +475,8 @@ private struct OnboardingPrivacySyncStep: View {
         VStack(alignment: .leading, spacing: 14) {
 
             header(
-                title: "Privacy and Sync",
-                subtitle: "Choose how you want Offshore to protect and sync your data."
+                title: "Privacy, iCloud, and Notifications",
+                subtitle: "Enable App Lock, iCloud sync, and setup Notifications."
             )
 
             Form {
@@ -623,6 +625,8 @@ private struct OnboardingCategoriesStep: View {
                 }
             }
             .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .background(Color(.systemBackground))
             .frame(minHeight: 260)
 
             Button {
@@ -698,6 +702,8 @@ private struct OnboardingCardsStep: View {
                 }
             }
             .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .background(Color(.systemBackground))
             .frame(minHeight: 260)
 
             Button {
@@ -776,6 +782,8 @@ private struct OnboardingPresetsStep: View {
                 }
             }
             .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .background(Color(.systemBackground))
             .frame(minHeight: 260)
 
             Button {
