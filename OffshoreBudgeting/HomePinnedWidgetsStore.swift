@@ -14,7 +14,7 @@ enum HomeWidgetID: String, CaseIterable, Identifiable, Codable {
     case categorySpotlight
     case categoryAvailability
     case whatIf
-    case spendTrends   // ✅ New
+    case spendTrends
 
     var id: String { rawValue }
 
@@ -26,7 +26,7 @@ enum HomeWidgetID: String, CaseIterable, Identifiable, Codable {
         case .categorySpotlight: return "Category Spotlight"
         case .categoryAvailability: return "Category Availability"
         case .whatIf: return "What If?"
-        case .spendTrends: return "Spend Trends" // ✅ New
+        case .spendTrends: return "Spend Trends"
         }
     }
 }
@@ -50,7 +50,7 @@ struct HomePinnedWidgetsStore {
                 .whatIf,
                 .nextPlannedExpense,
                 .categorySpotlight,
-                .spendTrends // ✅ New default placement
+                .spendTrends
             ]
         }
 
