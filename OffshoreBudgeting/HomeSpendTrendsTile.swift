@@ -165,9 +165,12 @@ private struct SpendTrendsPillBar: View {
     let plotFrame: CGRect
     let barWidth: CGFloat
     let colorForSlice: (HomeSpendTrendsAggregator.Slice) -> Color
+    private let displayEpsilon: Double = 1.00
 
     var body: some View {
-        guard bucket.total > 0 else { return AnyView(EmptyView()) }
+        guard bucket.total > displayEpsilon else {
+            return AnyView(EmptyView())
+        }
 
         guard let x = proxy.position(forX: bucket.label),
               let yTop = proxy.position(forY: bucket.total)
