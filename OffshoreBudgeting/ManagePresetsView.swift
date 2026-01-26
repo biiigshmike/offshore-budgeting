@@ -141,7 +141,7 @@ struct ManagePresetsView: View {
                 PostBoardingTipItem(
                     systemImage: "text.line.first.and.arrowtriangle.forward",
                     title: "Planned Amount",
-                    detail: "Tap any widget to open deeper metrics. Use Edit to pin, reorder, or remove widgets."
+                    detail: "Enter the minimum or antipated amount that you anticipate this expense debiting."
                 ),
                 PostBoardingTipItem(
                     systemImage: "calendar",
