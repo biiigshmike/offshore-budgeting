@@ -24,6 +24,11 @@ struct ContentView: View {
 
     @AppStorage("privacy_requireBiometrics") private var requireBiometrics: Bool = false
 
+    // MARK: - iCloud
+
+    @AppStorage("icloud_useCloud") private var useICloud: Bool = false
+    @AppStorage("icloud_bootstrapStartedAt") private var iCloudBootstrapStartedAt: Double = 0
+
     // MARK: - Alerts
 
     @State private var showingCannotDeleteLastWorkspaceAlert: Bool = false
@@ -59,10 +64,19 @@ struct ContentView: View {
                 }
             }
             .task {
+                let isBootstrapping = ICloudBootstrap.isBootstrapping(
+                    useICloud: useICloud,
+                    startedAt: iCloudBootstrapStartedAt
+                )
+
                 // If onboarding is complete, we can safely seed defaults only when empty.
                 // If onboarding is NOT complete, do not seed anything.
                 if didCompleteOnboarding {
-                    seedDefaultWorkspacesIfNeeded()
+                    if !isBootstrapping {
+                        if !useICloud {
+                            seedDefaultWorkspacesIfNeeded()
+                        }
+                    }
                 } else {
                     // Keep state clean for true first-run.
                     didSeedDefaultWorkspaces = false
@@ -74,10 +88,19 @@ struct ContentView: View {
                 // If the user previously completed onboarding, then enabled iCloud and the
                 // store comes back empty, re-run onboarding instead of dumping them into
                 // a picker with nothing configured.
-                if didCompleteOnboarding, workspaces.isEmpty {
+                if didCompleteOnboarding, !useICloud, workspaces.isEmpty, !isBootstrapping {
                     didCompleteOnboarding = false
                     didSeedDefaultWorkspaces = false
                     selectedWorkspaceID = ""
+                }
+            }
+            .onChange(of: workspaces.count) { _, newCount in
+                if useICloud, newCount > 0 {
+                    iCloudBootstrapStartedAt = 0
+                }
+
+                if didCompleteOnboarding, newCount > 0, selectedWorkspace == nil {
+                    selectedWorkspaceID = workspaces.first?.id.uuidString ?? ""
                 }
             }
             .alert("You must keep at least one workspace.", isPresented: $showingCannotDeleteLastWorkspaceAlert) {

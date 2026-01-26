@@ -40,6 +40,8 @@ struct OffshoreBudgetingApp: App {
 
     private static func makeModelContainer(useICloud: Bool) -> ModelContainer {
         do {
+            LocalProfilesStore.ensureDefaultProfileExists()
+
             let schema = Schema([
                 Workspace.self,
                 Budget.self,
@@ -59,7 +61,7 @@ struct OffshoreBudgetingApp: App {
             let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
             try FileManager.default.createDirectory(at: appSupport, withIntermediateDirectories: true)
 
-            let localStoreURL = appSupport.appendingPathComponent("Local.store")
+            let localStoreURL = LocalProfilesStore.localStoreURL(applicationSupportDirectory: appSupport)
             let cloudStoreURL = appSupport.appendingPathComponent("Cloud.store")
 
             let configuration: ModelConfiguration

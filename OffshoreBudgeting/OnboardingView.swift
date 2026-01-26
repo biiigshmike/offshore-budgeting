@@ -27,6 +27,8 @@ struct OnboardingView: View {
 
     @AppStorage("icloud_useCloud") private var useICloud: Bool = false
     @AppStorage("app_rootResetToken") private var rootResetToken: String = UUID().uuidString
+    @AppStorage("icloud_bootstrapStartedAt") private var iCloudBootstrapStartedAt: Double = 0
+    @AppStorage("profiles_activeLocalID") private var activeLocalProfileID: String = ""
 
     /// Persist step so toggling iCloud (which rebuilds container) doesn't restart the flow.
     @AppStorage("onboarding_step") private var onboardingStep: Int = 0
@@ -49,6 +51,8 @@ struct OnboardingView: View {
 
     @State private var showingMissingWorkspaceAlert: Bool = false
     @State private var showingMissingCardAlert: Bool = false
+    @State private var showingGetStartedICloudChoice: Bool = false
+    @State private var isCheckingICloudForGetStarted: Bool = false
 
     // MARK: - Derived
 
@@ -58,6 +62,10 @@ struct OnboardingView: View {
             return found
         }
         return workspaces.first
+    }
+
+    private var isICloudBootstrapping: Bool {
+        ICloudBootstrap.isBootstrapping(useICloud: useICloud, startedAt: iCloudBootstrapStartedAt)
     }
 
     var body: some View {
@@ -79,6 +87,11 @@ struct OnboardingView: View {
         .onAppear {
             Task { await maybeOfferSkipIfCloudAlreadyHasData() }
         }
+        .onChange(of: workspaces.count) { _, newCount in
+            if useICloud, newCount > 0 {
+                iCloudBootstrapStartedAt = 0
+            }
+        }
         .alert("Workspace Required", isPresented: $showingMissingWorkspaceAlert) {
             Button("OK", role: .cancel) { }
         } message: {
@@ -94,6 +107,13 @@ struct OnboardingView: View {
             Button("Skip Onboarding", role: .destructive) { completeOnboarding() }
         } message: {
             Text(skipPromptMessage)
+        }
+        .alert("Use iCloud or Continue Locally?", isPresented: $showingGetStartedICloudChoice) {
+            Button("Use iCloud") { startUsingICloudFromGetStarted() }
+            Button("Continue Locally", role: .cancel) { startLocalFromGetStarted() }
+            Button("Start Fresh (Local)", role: .destructive) { startFreshLocalFromGetStarted() }
+        } message: {
+            Text("This Apple ID can sync existing Offshore data from iCloud. If you start fresh locally, you can still switch to iCloud later.")
         }
     }
 
@@ -142,13 +162,14 @@ struct OnboardingView: View {
             Spacer(minLength: 0)
 
             Button {
-                goNext()
+                getStartedTapped()
             } label: {
                 Text("Get Started")
                     .frame(maxWidth: .infinity, minHeight: 52)
             }
             .buttonStyle(.glassProminent)
             .tint(.blue)
+            .disabled(isCheckingICloudForGetStarted)
 
             Spacer(minLength: 18)
         }
@@ -161,6 +182,7 @@ struct OnboardingView: View {
         OnboardingWorkspaceStep(
             workspaces: workspaces,
             selectedWorkspaceID: $selectedWorkspaceID,
+            isICloudBootstrapping: isICloudBootstrapping,
             onCreate: createWorkspace(name:hexColor:)
         )
         .frame(maxWidth: 680)
@@ -173,6 +195,8 @@ struct OnboardingView: View {
             requireBiometrics: $requireBiometrics,
             useICloud: $useICloud,
             rootResetToken: $rootResetToken,
+            iCloudBootstrapStartedAt: $iCloudBootstrapStartedAt,
+            hasExistingDataInCurrentStore: !workspaces.isEmpty,
             notificationService: notificationService
         )
         .frame(maxWidth: 680)
@@ -185,11 +209,15 @@ struct OnboardingView: View {
             if let ws = currentWorkspace {
                 OnboardingCategoriesStep(workspace: ws)
             } else {
-                ContentUnavailableView(
-                    "No Workspace",
-                    systemImage: "person.3",
-                    description: Text("Create a workspace first.")
-                )
+                if isICloudBootstrapping {
+                    iCloudRestorePlaceholder
+                } else {
+                    ContentUnavailableView(
+                        "No Workspace",
+                        systemImage: "person.3",
+                        description: Text("Create a workspace first.")
+                    )
+                }
             }
         }
         .frame(maxWidth: 760)
@@ -202,11 +230,15 @@ struct OnboardingView: View {
             if let ws = currentWorkspace {
                 OnboardingCardsStep(workspace: ws)
             } else {
-                ContentUnavailableView(
-                    "No Workspace",
-                    systemImage: "person.3",
-                    description: Text("Create a workspace first.")
-                )
+                if isICloudBootstrapping {
+                    iCloudRestorePlaceholder
+                } else {
+                    ContentUnavailableView(
+                        "No Workspace",
+                        systemImage: "person.3",
+                        description: Text("Create a workspace first.")
+                    )
+                }
             }
         }
         .frame(maxWidth: 760)
@@ -219,14 +251,30 @@ struct OnboardingView: View {
             if let ws = currentWorkspace {
                 OnboardingPresetsStep(workspace: ws)
             } else {
-                ContentUnavailableView(
-                    "No Workspace",
-                    systemImage: "person.3",
-                    description: Text("Create a workspace first.")
-                )
+                if isICloudBootstrapping {
+                    iCloudRestorePlaceholder
+                } else {
+                    ContentUnavailableView(
+                        "No Workspace",
+                        systemImage: "person.3",
+                        description: Text("Create a workspace first.")
+                    )
+                }
             }
         }
         .frame(maxWidth: 760)
+    }
+
+    private var iCloudRestorePlaceholder: some View {
+        VStack(spacing: 12) {
+            ContentUnavailableView(
+                "Setting Up iCloud Sync",
+                systemImage: "icloud.and.arrow.down",
+                description: Text("Looking for existing workspaces on this Apple ID.")
+            )
+            ProgressView()
+        }
+        .padding(.vertical, 10)
     }
 
     // MARK: - Bottom Navigation
@@ -302,6 +350,58 @@ struct OnboardingView: View {
         onboardingStep = min(5, onboardingStep + 1)
     }
 
+    // MARK: - Get Started
+
+    private func getStartedTapped() {
+        LocalProfilesStore.ensureDefaultProfileExists()
+
+        isCheckingICloudForGetStarted = true
+        Task {
+            let status = (try? await CKContainer.default().accountStatus()) ?? .couldNotDetermine
+            await MainActor.run {
+                isCheckingICloudForGetStarted = false
+                if status == .available {
+                    showingGetStartedICloudChoice = true
+                } else {
+                    goNext()
+                }
+            }
+        }
+    }
+
+    private func startLocalFromGetStarted() {
+        useICloud = false
+        iCloudBootstrapStartedAt = 0
+        goNext()
+    }
+
+    private func startUsingICloudFromGetStarted() {
+        useICloud = true
+        iCloudBootstrapStartedAt = Date().timeIntervalSince1970
+        selectedWorkspaceID = ""
+
+        onboardingStep = 1
+        let newToken = UUID().uuidString
+        DispatchQueue.main.async {
+            rootResetToken = newToken
+        }
+    }
+
+    private func startFreshLocalFromGetStarted() {
+        let profile = LocalProfilesStore.makeNewProfile(name: "Fresh Start")
+        useICloud = false
+        iCloudBootstrapStartedAt = 0
+        activeLocalProfileID = profile.id
+        LocalProfilesStore.setActiveProfileID(profile.id)
+        selectedWorkspaceID = ""
+
+        onboardingStep = 1
+        let newToken = UUID().uuidString
+        DispatchQueue.main.async {
+            rootResetToken = newToken
+        }
+    }
+
     // MARK: - Completion
 
     private func completeOnboarding() {
@@ -374,6 +474,7 @@ private struct OnboardingWorkspaceStep: View {
 
     let workspaces: [Workspace]
     @Binding var selectedWorkspaceID: String
+    let isICloudBootstrapping: Bool
     let onCreate: (String, String) -> Void
 
     @State private var showingAddWorkspace: Bool = false
@@ -387,12 +488,24 @@ private struct OnboardingWorkspaceStep: View {
             )
 
             if workspaces.isEmpty {
-                ContentUnavailableView(
-                    "No Workspaces Yet",
-                    systemImage: "person.3",
-                    description: Text("Create at least one workspace to continue.")
-                )
-                .padding(.vertical, 8)
+                if isICloudBootstrapping {
+                    VStack(spacing: 12) {
+                        ContentUnavailableView(
+                            "Restoring from iCloud",
+                            systemImage: "icloud.and.arrow.down",
+                            description: Text("Checking for existing workspaces…")
+                        )
+                        ProgressView()
+                    }
+                    .padding(.vertical, 10)
+                } else {
+                    ContentUnavailableView(
+                        "No Workspaces Yet",
+                        systemImage: "person.3",
+                        description: Text("Create at least one workspace to continue.")
+                    )
+                    .padding(.vertical, 8)
+                }
             } else {
                 List {
                     ForEach(workspaces) { ws in
@@ -464,11 +577,17 @@ private struct OnboardingPrivacySyncStep: View {
     @Binding var requireBiometrics: Bool
     @Binding var useICloud: Bool
     @Binding var rootResetToken: String
+    @Binding var iCloudBootstrapStartedAt: Double
+    let hasExistingDataInCurrentStore: Bool
 
     @ObservedObject var notificationService: LocalNotificationService
 
-    @State private var biometricsInfo = LocalAuthenticationService.biometricAvailability()
-    @State private var showingNotificationsDeniedInfo: Bool = false
+	@State private var biometricsInfo = LocalAuthenticationService.biometricAvailability()
+	@State private var showingNotificationsDeniedInfo: Bool = false
+	@State private var showingICloudSwitchConfirm: Bool = false
+	@State private var showingICloudUnavailable: Bool = false
+	@State private var suppressICloudToggleHandler: Bool = false
+	@State private var didConfirmICloudSwitch: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -496,9 +615,8 @@ private struct OnboardingPrivacySyncStep: View {
 
                 Section("iCloud Sync") {
                     Toggle("Enable iCloud Sync", isOn: $useICloud)
-                        .onChange(of: useICloud) { _, _ in
-                            // Rebuild the SwiftData container (OffshoreBudgetingApp listens for this).
-                            rootResetToken = UUID().uuidString
+                        .onChange(of: useICloud) { oldValue, newValue in
+                            handleICloudToggleChanged(oldValue: oldValue, newValue: newValue)
                         }
 
                     Text("Use iCloud to sync your workspaces and budgets across your devices signed into this Apple ID.")
@@ -517,6 +635,20 @@ private struct OnboardingPrivacySyncStep: View {
         .onAppear {
             biometricsInfo = LocalAuthenticationService.biometricAvailability()
         }
+        .alert("iCloud Unavailable", isPresented: $showingICloudUnavailable) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("To use iCloud sync, sign in to iCloud in the Settings app, then return here and try again.")
+        }
+        .alert("Switch to iCloud?", isPresented: $showingICloudSwitchConfirm) {
+            Button("Switch") {
+                didConfirmICloudSwitch = true
+                useICloud = true
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Switching to iCloud will show your iCloud data. Your current on-device setup will remain available as an on-device profile.")
+        }
         .alert("Notifications Disabled", isPresented: $showingNotificationsDeniedInfo) {
             Button("OK", role: .cancel) { }
             Button("Open Settings") {
@@ -524,6 +656,46 @@ private struct OnboardingPrivacySyncStep: View {
             }
         } message: {
             Text("Notifications are currently disabled for Offshore. You can enable them in Settings.")
+        }
+    }
+
+    private var isICloudAvailable: Bool {
+        FileManager.default.ubiquityIdentityToken != nil
+    }
+
+    private func handleICloudToggleChanged(oldValue: Bool, newValue: Bool) {
+        if suppressICloudToggleHandler {
+            suppressICloudToggleHandler = false
+            return
+        }
+
+        if newValue {
+            guard isICloudAvailable else {
+                suppressICloudToggleHandler = true
+                useICloud = false
+                showingICloudUnavailable = true
+                return
+            }
+
+            if hasExistingDataInCurrentStore, !didConfirmICloudSwitch {
+                suppressICloudToggleHandler = true
+                useICloud = false
+                showingICloudSwitchConfirm = true
+                return
+            }
+
+            didConfirmICloudSwitch = false
+            iCloudBootstrapStartedAt = Date().timeIntervalSince1970
+            let newToken = UUID().uuidString
+            DispatchQueue.main.async {
+                rootResetToken = newToken
+            }
+        } else {
+            iCloudBootstrapStartedAt = 0
+            let newToken = UUID().uuidString
+            DispatchQueue.main.async {
+                rootResetToken = newToken
+            }
         }
     }
 

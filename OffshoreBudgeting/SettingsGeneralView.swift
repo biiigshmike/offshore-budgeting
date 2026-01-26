@@ -27,6 +27,10 @@ struct SettingsGeneralView: View {
     @AppStorage("selectedWorkspaceID") private var selectedWorkspaceID: String = ""
     @AppStorage("didSeedDefaultWorkspaces") private var didSeedDefaultWorkspaces: Bool = false
     @AppStorage("privacy_requireBiometrics") private var requireBiometrics: Bool = false
+    @AppStorage("icloud_useCloud") private var useICloud: Bool = false
+    @AppStorage("app_rootResetToken") private var rootResetToken: String = UUID().uuidString
+    @AppStorage("icloud_bootstrapStartedAt") private var iCloudBootstrapStartedAt: Double = 0
+    @AppStorage("profiles_activeLocalID") private var activeLocalProfileID: String = ""
 
     @State private var searchText: String = ""
 
@@ -138,6 +142,36 @@ struct SettingsGeneralView: View {
 
     private func performLocalErase() {
         do {
+            if useICloud {
+                LocalProfilesStore.ensureDefaultProfileExists()
+                let fresh = LocalProfilesStore.makeNewProfile(name: "Fresh Start")
+                useICloud = false
+                iCloudBootstrapStartedAt = 0
+                activeLocalProfileID = fresh.id
+                LocalProfilesStore.setActiveProfileID(fresh.id)
+                let newToken = UUID().uuidString
+                DispatchQueue.main.async {
+                    rootResetToken = newToken
+                }
+
+                // Reset app flags to feel like first-run
+                selectedWorkspaceID = ""
+                didSeedDefaultWorkspaces = false
+                didCompleteOnboarding = false
+
+                // Safety: if app lock was enabled, disable it so onboarding isn’t blocked
+                requireBiometrics = false
+
+                // Optional: bring tips back to a clean baseline
+                tipsResetToken = 0
+
+                eraseResultMessage = "Switched to a fresh on-device profile. Your iCloud data is still available if you enable iCloud again."
+                DispatchQueue.main.async {
+                    activeAlert = .eraseResult
+                }
+                return
+            }
+
             try AppResetService.eraseAllLocalData(modelContext: modelContext)
 
             // Reset app flags to feel like first-run

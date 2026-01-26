@@ -70,20 +70,6 @@ struct AppLockGate<Content: View>: View {
                 Task { await unlockIfNeeded() }
             }
         }
-        .alert("Unable to Unlock", isPresented: $showingError) {
-            Button("OK", role: .cancel) { }
-
-            Button("Turn Off App Lock", role: .destructive) {
-                isEnabled = false
-                isUnlocked = true
-            }
-
-            #if canImport(UIKit)
-            Button("Open Settings") { openAppSettings() }
-            #endif
-        } message: {
-            Text(errorMessage)
-        }
     }
 
     private var lockScreen: some View {

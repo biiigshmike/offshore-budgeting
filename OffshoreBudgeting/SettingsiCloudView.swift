@@ -11,16 +11,23 @@ import SwiftUI
 import UIKit
 #endif
 
+import SwiftData
+
 struct SettingsiCloudView: View {
 
     // MARK: - Persisted Settings
 
     @AppStorage("icloud_useCloud") private var useICloud: Bool = false
     @AppStorage("app_rootResetToken") private var rootResetToken: String = UUID().uuidString
+    @AppStorage("icloud_bootstrapStartedAt") private var iCloudBootstrapStartedAt: Double = 0
 
     // MARK: - UI State
 
     @State private var showingUnavailableAlert: Bool = false
+    @State private var showingEnableConfirm: Bool = false
+
+    @Query(sort: \Workspace.name, order: .forward)
+    private var workspaces: [Workspace]
 
     private let cloudKitContainerIdentifier: String = "iCloud.com.mb.offshore-budgeting"
 
@@ -57,6 +64,12 @@ struct SettingsiCloudView: View {
             Button("OK", role: .cancel) { }
         } message: {
             Text("To use iCloud sync, sign in to iCloud in the Settings app, then return here and try again.")
+        }
+        .alert("Switch to iCloud?", isPresented: $showingEnableConfirm) {
+            Button("Enable iCloud") { enableICloud() }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This will switch you to your iCloud data. Your current on-device profile stays on this device and can be accessed from Manage Workspaces.")
         }
     }
 
@@ -130,17 +143,32 @@ struct SettingsiCloudView: View {
                 return
             }
 
-            useICloud = true
-            bumpRootResetToken()
+            if !workspaces.isEmpty {
+                useICloud = false
+                showingEnableConfirm = true
+                return
+            }
+
+            enableICloud()
         } else {
             useICloud = false
+            iCloudBootstrapStartedAt = 0
             bumpRootResetToken()
         }
     }
 
+    private func enableICloud() {
+        useICloud = true
+        iCloudBootstrapStartedAt = Date().timeIntervalSince1970
+        bumpRootResetToken()
+    }
+
     private func bumpRootResetToken() {
         // Forces a full SwiftUI rebuild, so the app recreates the SwiftData container.
-        rootResetToken = UUID().uuidString
+        let newToken = UUID().uuidString
+        DispatchQueue.main.async {
+            rootResetToken = newToken
+        }
     }
 
     private func openSystemSettings() {
