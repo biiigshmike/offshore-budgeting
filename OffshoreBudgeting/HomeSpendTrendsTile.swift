@@ -84,7 +84,7 @@ struct HomeSpendTrendsTile: View {
         .chartYAxis(.hidden)
         .chartXAxis {
             AxisMarks(values: .automatic(desiredCount: 4)) {
-                AxisValueLabel().foregroundStyle(.secondary)
+                AxisValueLabel().foregroundStyle(Color.primary)
             }
         }
         .frame(height: 120)

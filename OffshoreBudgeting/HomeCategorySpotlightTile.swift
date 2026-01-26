@@ -103,7 +103,7 @@ struct HomeCategorySpotlightTile: View {
                 VStack(alignment: .leading, spacing: 10) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Total Spent")
-                            .font(.caption)
+                            .font(.subheadline)
                             .foregroundStyle(.secondary)
 
                         Text(CurrencyFormatter.string(from: metricsResult.totalSpent))

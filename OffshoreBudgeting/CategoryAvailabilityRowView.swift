@@ -132,7 +132,6 @@ struct CategoryAvailabilityRowView: View {
                 }
             }
         }
-        .monospacedDigit()
     }
 
     private func labelLine(title: String, value: String) -> some View {
@@ -142,8 +141,7 @@ struct CategoryAvailabilityRowView: View {
 
             Text(value)
                 .foregroundStyle(.primary)
-                .monospacedDigit()
-
+            
             Spacer(minLength: 0)
         }
     }

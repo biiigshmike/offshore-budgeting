@@ -75,7 +75,7 @@ struct HomeNextPlannedExpenseTile: View {
 
                         VStack(spacing: 6) {
                             metricRow(title: "Planned", value: plannedText, isEmphasized: false)
-                            metricRow(title: "Actual", value: actualText, isEmphasized: true)
+                            metricRow(title: "Actual", value: actualText, isEmphasized: false)
                         }
                         .padding(.top, 2)
                     }

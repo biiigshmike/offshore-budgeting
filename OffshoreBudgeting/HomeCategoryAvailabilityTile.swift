@@ -115,7 +115,6 @@ struct HomeCategoryAvailabilityTile: View {
             Text("\(current + 1) of \(totalPages)")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
-                .monospacedDigit()
 
             // Left / Right controls
             HStack {
@@ -234,7 +233,6 @@ private struct AvailabilityCountPill: View {
 
             Text("\(count)")
                 .font(.caption.weight(.semibold))
-                .monospacedDigit()
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)

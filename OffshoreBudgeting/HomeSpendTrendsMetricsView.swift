@@ -204,7 +204,7 @@ struct HomeSpendTrendsMetricsView: View {
                         AxisGridLine().foregroundStyle(.secondary.opacity(0.22))
                         AxisTick().foregroundStyle(.secondary.opacity(0.28))
                         AxisValueLabel(format: CurrencyFormatter.currencyStyle())
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.primary)
                     }
                 }
                 .chartXAxis {
@@ -212,7 +212,7 @@ struct HomeSpendTrendsMetricsView: View {
                         AxisGridLine().foregroundStyle(.secondary.opacity(0.18))
                         AxisTick().foregroundStyle(.secondary.opacity(0.26))
                         AxisValueLabel()
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.primary)
                     }
                 }
                 .frame(height: 240)

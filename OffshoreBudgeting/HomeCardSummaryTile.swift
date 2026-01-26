@@ -51,7 +51,7 @@ struct HomeCardSummaryTile: View {
                     .frame(width: 120)
 
                     VStack(alignment: .leading, spacing: 8) {
-                        metricRow(title: "Total", value: metrics.total, isEmphasized: true)
+                        metricRow(title: "Total", value: metrics.total, isEmphasized: false)
                         metricRow(title: "Planned", value: metrics.plannedTotal, isEmphasized: false)
                         metricRow(title: "Variable", value: metrics.variableTotal, isEmphasized: false)
                     }
