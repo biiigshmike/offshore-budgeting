@@ -16,6 +16,10 @@ struct ContentView: View {
     @AppStorage("didSeedDefaultWorkspaces") private var didSeedDefaultWorkspaces: Bool = false
     @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
 
+    // MARK: - Onboarding
+
+    @AppStorage("didCompleteOnboarding") private var didCompleteOnboarding: Bool = false
+
     // MARK: - Privacy
 
     @AppStorage("privacy_requireBiometrics") private var requireBiometrics: Bool = false
@@ -36,9 +40,11 @@ struct ContentView: View {
     // MARK: - Body
 
     var body: some View {
-        AppLockGate(isEnabled: $requireBiometrics) {
+        AppLockGate(isEnabled: .constant(didCompleteOnboarding && requireBiometrics)) {
             Group {
-                if let selected = selectedWorkspace {
+                if didCompleteOnboarding == false {
+                    OnboardingView()
+                } else if let selected = selectedWorkspace {
                     AppRootView(
                         workspace: selected,
                         selectedWorkspaceID: $selectedWorkspaceID
@@ -53,7 +59,26 @@ struct ContentView: View {
                 }
             }
             .task {
-                seedDefaultWorkspacesIfNeeded()
+                // If onboarding is complete, we can safely seed defaults only when empty.
+                // If onboarding is NOT complete, do not seed anything.
+                if didCompleteOnboarding {
+                    seedDefaultWorkspacesIfNeeded()
+                } else {
+                    // Keep state clean for true first-run.
+                    didSeedDefaultWorkspaces = false
+                    if workspaces.isEmpty {
+                        selectedWorkspaceID = ""
+                    }
+                }
+
+                // If the user previously completed onboarding, then enabled iCloud and the
+                // store comes back empty, re-run onboarding instead of dumping them into
+                // a picker with nothing configured.
+                if didCompleteOnboarding, workspaces.isEmpty {
+                    didCompleteOnboarding = false
+                    didSeedDefaultWorkspaces = false
+                    selectedWorkspaceID = ""
+                }
             }
             .alert("You must keep at least one workspace.", isPresented: $showingCannotDeleteLastWorkspaceAlert) {
                 Button("OK", role: .cancel) { }

@@ -1,4 +1,3 @@
-//
 //  Models.swift
 //  OffshoreBudgeting
 //
@@ -75,7 +74,7 @@ final class Workspace {
 
     @Relationship(deleteRule: .cascade)
     var variableExpenses: [VariableExpense]? = nil
-    
+
     @Relationship(deleteRule: .cascade)
     var importMerchantRules: [ImportMerchantRule]? = nil
 
@@ -196,7 +195,10 @@ final class Category {
     var id: UUID = UUID()
     var name: String = ""
     var hexColor: String = "#3B82F6"
-    
+
+    // ✅ Keep this as a relationship, but do NOT specify inverse here.
+    // The inverse is defined on ImportMerchantRule.preferredCategory.
+    @Relationship
     var importMerchantRules: [ImportMerchantRule]? = nil
 
     @Relationship(inverse: \Workspace.categories)
@@ -504,18 +506,13 @@ final class ImportMerchantRule {
 
     var id: UUID = UUID()
 
-    /// Normalized merchant identifier used for Option 1 memory.
-    /// Example: "STARBUCKS" or "CHEVRON" after your MerchantNormalizer.
     var merchantKey: String = ""
-
-    /// Optional preferred display name to import as.
-    /// Example: "MCDONALDS" instead of "xxxxxxxx1234 MCDONALDS 1 HIGHWAY CA".
     var preferredName: String? = nil
 
-    /// Belongs to a workspace.
     @Relationship(inverse: \Workspace.importMerchantRules)
     var workspace: Workspace? = nil
-    
+
+    // ✅ Define the inverse on the to-one side only.
     @Relationship(inverse: \Category.importMerchantRules)
     var preferredCategory: Category? = nil
 

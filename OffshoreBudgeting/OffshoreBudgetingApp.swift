@@ -1,10 +1,3 @@
-//
-//  OffshoreBudgetingApp.swift
-//  OffshoreBudgeting
-//
-//  Created by Michael Brown on 1/20/26.
-//
-
 import SwiftUI
 import SwiftData
 
@@ -58,6 +51,7 @@ struct OffshoreBudgetingApp: App {
                 Preset.self,
                 PlannedExpense.self,
                 VariableExpense.self,
+                ImportMerchantRule.self,
                 IncomeSeries.self,
                 Income.self
             ])
@@ -103,6 +97,7 @@ struct OffshoreBudgetingApp: App {
                 Preset.self,
                 PlannedExpense.self,
                 VariableExpense.self,
+                ImportMerchantRule.self,
                 IncomeSeries.self,
                 Income.self
             ])
