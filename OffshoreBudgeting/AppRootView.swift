@@ -92,18 +92,6 @@ struct AppRootView: View {
             .tabItem { Label(AppSection.settings.rawValue, systemImage: AppSection.settings.systemImage) }
             .tag(AppSection.settings)
         }
-        #if canImport(UIKit)
-        .background {
-            TabBarReselectHandler { index in
-                guard AppSection.allCases.indices.contains(index) else { return }
-                let section = AppSection.allCases[index]
-                DispatchQueue.main.async {
-                    tabStackIDs[section] = UUID()
-                }
-            }
-            .frame(width: 0, height: 0)
-        }
-        #endif
     }
 
     // MARK: - iPad + Mac
