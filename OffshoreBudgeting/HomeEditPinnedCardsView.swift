@@ -33,8 +33,6 @@ struct HomeEditPinnedCardsView: View {
                             HStack {
                                 Text(widget.title)
                                 Spacer()
-                                Image(systemName: "line.3.horizontal")
-                                    .foregroundStyle(.secondary)
                             }
                         }
                         .onMove(perform: movePinnedWidgets)
@@ -77,8 +75,6 @@ struct HomeEditPinnedCardsView: View {
                                 HStack {
                                     Text(card.name)
                                     Spacer()
-                                    Image(systemName: "line.3.horizontal")
-                                        .foregroundStyle(.secondary)
                                 }
                             }
                         }
@@ -99,8 +95,7 @@ struct HomeEditPinnedCardsView: View {
                                 Spacer()
 
                                 if pinnedIDs.contains(card.id) {
-                                    Image(systemName: "checkmark")
-                                        .font(.system(size: 13, weight: .semibold))
+                                    Image(systemName: "plus.circle.fill")
                                         .foregroundStyle(.secondary)
                                 }
                             }
