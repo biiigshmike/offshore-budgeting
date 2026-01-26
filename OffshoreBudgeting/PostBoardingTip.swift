@@ -7,39 +7,60 @@
 
 import SwiftUI
 
+// MARK: - PostBoardingTip Item Model
+
+struct PostBoardingTipItem: Identifiable, Equatable {
+    let id = UUID()
+    let systemImage: String
+    let title: String
+    let detail: String
+
+    init(systemImage: String, title: String, detail: String) {
+        self.systemImage = systemImage
+        self.title = title
+        self.detail = detail
+    }
+}
+
 /// Full-page “tips & hints” sheet shown once per key, until SettingsGeneralView resets them.
+///
 /// Usage:
 ///     HomeView(...)
 ///         .postBoardingTip(
-///             key: "home",
+///             key: "tip.home.v1",
 ///             title: "Home",
-///             systemImage: "house.fill",
-///             message: "Tap any widget to see deeper metrics. Use the calendar to change ranges."
+///             items: [
+///                 .init(systemImage: "house.fill", title: "Landing Page", detail: "Welcome to your budget dashboard. This is the page you will see each time you open the app."),
+///                 .init(systemImage: "widget.small", title: "Widgets", detail: #"Tap "Edit" to pin, reorder, or remove widgets so the view fits you."#)
+///             ]
 ///         )
+///
 extension View {
+
+    // MARK: - Post Boarding Tip Modifier
+
     func postBoardingTip(
         key: String,
         title: String,
-        systemImage: String,
-        message: String,
+        items: [PostBoardingTipItem],
         buttonTitle: String = "Continue"
     ) -> some View {
         modifier(PostBoardingTipModifier(
             key: key,
             title: title,
-            systemImage: systemImage,
-            message: message,
+            items: items,
             buttonTitle: buttonTitle
         ))
     }
 }
 
+// MARK: - Modifier
+
 private struct PostBoardingTipModifier: ViewModifier {
 
     let key: String
     let title: String
-    let systemImage: String
-    let message: String
+    let items: [PostBoardingTipItem]
     let buttonTitle: String
 
     @AppStorage("didCompleteOnboarding") private var didCompleteOnboarding: Bool = false
@@ -66,8 +87,7 @@ private struct PostBoardingTipModifier: ViewModifier {
             .sheet(isPresented: $showingTip, onDismiss: markSeen) {
                 TipSheet(
                     title: title,
-                    systemImage: systemImage,
-                    message: message,
+                    items: items,
                     buttonTitle: buttonTitle
                 )
             }
@@ -82,6 +102,8 @@ private struct PostBoardingTipModifier: ViewModifier {
 
     private func shouldShowTip() -> Bool {
         guard didCompleteOnboarding else { return false }
+        guard !items.isEmpty else { return false }
+
         let seen = Set(seenKeysCSV.split(separator: ",").map { String($0) })
         return !seen.contains(key)
     }
@@ -93,33 +115,44 @@ private struct PostBoardingTipModifier: ViewModifier {
     }
 }
 
+// MARK: - Sheet
+
 private struct TipSheet: View {
 
     let title: String
-    let systemImage: String
-    let message: String
+    let items: [PostBoardingTipItem]
     let buttonTitle: String
 
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         VStack(spacing: 18) {
-            Spacer(minLength: 0)
 
-            Image(systemName: systemImage)
-                .font(.system(size: 54, weight: .semibold))
-                .foregroundStyle(.tint)
+            // Header
+            HStack(alignment: .firstTextBaseline) {
+                Text(title)
+                    .font(.title2.weight(.bold))
+                    .multilineTextAlignment(.leading)
 
-            Text(title)
-                .font(.title.weight(.bold))
+                Spacer(minLength: 0)
+            }
+            .padding(.top, 18)
+            .padding(.horizontal, 22)
 
-            Text(message)
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 20)
+            // Items
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 16) {
+                    ForEach(items) { item in
+                        TipItemRow(item: item)
+                    }
+                }
+                .padding(.horizontal, 22)
+                .padding(.top, 4)
+                .padding(.bottom, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
 
-            Spacer(minLength: 0)
-
+            // Continue button (kept as-is)
             Button {
                 dismiss()
             } label: {
@@ -131,7 +164,36 @@ private struct TipSheet: View {
             .padding(.horizontal, 22)
             .padding(.bottom, 18)
         }
-        .padding(.top, 28)
         .presentationDetents([.large])
+    }
+}
+
+// MARK: - Row
+
+private struct TipItemRow: View {
+
+    let item: PostBoardingTipItem
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 14) {
+            Image(systemName: item.systemImage)
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(.tint)
+                .frame(width: 34, alignment: .center)
+                .padding(.top, 2)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(item.title)
+                    .font(.headline)
+
+                Text(item.detail)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .accessibilityElement(children: .combine)
     }
 }

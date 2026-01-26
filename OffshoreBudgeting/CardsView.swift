@@ -84,6 +84,17 @@ struct CardsView: View {
                 }
             }
         }
+        .postBoardingTip(
+            key: "tip.cards.v1",
+            title: "Cards",
+            items: [
+                PostBoardingTipItem(
+                    systemImage: "creditcard.fill",
+                    title: "Cards",
+                    detail: "Browse stored cards. Single press to open a card to add expense and to view and filter spending. Long press a card to edit or delete it."
+                )
+            ]
+        )
         .navigationTitle("Cards")
         .toolbar {
             Button {

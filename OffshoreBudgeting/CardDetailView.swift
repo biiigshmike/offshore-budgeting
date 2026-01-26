@@ -489,6 +489,32 @@ struct CardDetailView: View {
                 expensesTitleText
             }
         }
+        .postBoardingTip(
+            key: "tip.carddetail.v1",
+            title: "Card Detail Overview",
+            items: [
+                PostBoardingTipItem(
+                    systemImage: "list.bullet.below.rectangle",
+                    title: "Detailed Overview",
+                    detail: "Review expenses with advanced filtering."
+                ),
+                PostBoardingTipItem(
+                    systemImage: "magnifyingglass",
+                    title: "Search for Expenses",
+                    detail: "Search by name or date using the search bar."
+                ),
+                PostBoardingTipItem(
+                    systemImage: "tag",
+                    title: "Categories",
+                    detail: "Tap a category to filter expenses by that category alone, then tap the same category again to clear your selection."
+                ),
+                PostBoardingTipItem(
+                    systemImage: "tray.and.arrow.down.fill",
+                    title: "Import Expenses",
+                    detail: "Using the plus button in the top right, choose Import Expenses (.csv) and import expenses easily to your card."
+                )
+            ]
+        )
         .listStyle(.insetGrouped)
         .navigationTitle(card.name)
         .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always))

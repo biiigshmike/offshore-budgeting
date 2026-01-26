@@ -142,6 +142,27 @@ struct BudgetsView: View {
                 }
             }
         }
+        .postBoardingTip(
+            key: "tip.budgets.v1",
+            title: "Budgets",
+            items: [
+                PostBoardingTipItem(
+                    systemImage: "chart.pie.fill",
+                    title: "Budgets",
+                    detail: "Create and view your budgets here. Press a budget and you will be taken to it's detail view."
+                ),
+                PostBoardingTipItem(
+                    systemImage: "list.triangle",
+                    title: "View & Sort",
+                    detail: "Active • happening now\nUpcoming • starts later\nPast • ended."
+                ),
+                PostBoardingTipItem(
+                    systemImage: "magnifyingglass",
+                    title: "Search",
+                    detail: "Use the search bar to search budgets by title or date."
+                )
+            ]
+        )
         .navigationTitle("Budgets")
         .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always))
         .searchFocused($searchFocused)

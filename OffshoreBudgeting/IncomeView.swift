@@ -226,6 +226,32 @@ struct IncomeView: View {
                 )
             }
         }
+        .postBoardingTip(
+            key: "tip.income.v1",
+            title: "Income",
+            items: [
+                PostBoardingTipItem(
+                    systemImage: "calendar",
+                    title: "Income Calendar",
+                    detail: "View income in a calendar to visualize earnings, almost like a timesheet."
+                ),
+                PostBoardingTipItem(
+                    systemImage: "calendar.badge.plus",
+                    title: "Planned Income",
+                    detail: "Add income you expect to earn but haven’t received yet."
+                ),
+                PostBoardingTipItem(
+                    systemImage: "calendar.badge.checkmark",
+                    title: "Actual Income",
+                    detail: "Log income you’ve actually received."
+                ),
+                PostBoardingTipItem(
+                    systemImage: "calendar.badge.clock",
+                    title: "Recurring Income",
+                    detail: "Planned and actual income can be setup to be a recurring series."
+                )
+            ]
+        )
         .navigationTitle("Income")
         .toolbar {
             Button {

@@ -129,6 +129,27 @@ struct ManagePresetsView: View {
                 .onDelete(perform: deleteViaListSwipe)
             }
         }
+        .postBoardingTip(
+            key: "tip.preset.v1",
+            title: "Preset Management",
+            items: [
+                PostBoardingTipItem(
+                    systemImage: "list.bullet.badge.ellipsis",
+                    title: "Presets",
+                    detail: "Save planned expenses you expect to reuse in future budgets."
+                ),
+                PostBoardingTipItem(
+                    systemImage: "text.line.first.and.arrowtriangle.forward",
+                    title: "Planned Amount",
+                    detail: "Tap any widget to open deeper metrics. Use Edit to pin, reorder, or remove widgets."
+                ),
+                PostBoardingTipItem(
+                    systemImage: "calendar",
+                    title: "Recurrences",
+                    detail: "Use the Schedule section, choosing from a wide array of recurrence options, and setup a recurrence for your Preset. This makes it easy to plan for regular, fixed expenses, whenver you expect them to debit."
+                )
+            ]
+        )
         .navigationTitle("Presets")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {

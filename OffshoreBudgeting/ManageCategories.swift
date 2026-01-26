@@ -76,6 +76,17 @@ struct ManageCategoriesView: View {
                 }
             }
         }
+        .postBoardingTip(
+            key: "tip.categories.v1",
+            title: "Categories Management",
+            items: [
+                PostBoardingTipItem(
+                    systemImage: "tag",
+                    title: "Categories",
+                    detail: "Add categories to track and visualize spending. Swipe a row to the right to edit; swipe left to delete."
+                )
+            ]
+        )
         .navigationTitle("Categories")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {

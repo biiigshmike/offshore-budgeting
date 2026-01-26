@@ -157,8 +157,23 @@ struct HomeView: View {
         .postBoardingTip(
             key: "tip.home.v1",
             title: "Home",
-            systemImage: "house.fill",
-            message: "Tap any widget to open deeper metrics. Use the date controls to change your range."
+            items: [
+                PostBoardingTipItem(
+                    systemImage: "house.fill",
+                    title: "Dashboard",
+                    detail: "Home is your landing page. This is the first screen you see when opening the app."
+                ),
+                PostBoardingTipItem(
+                    systemImage: "rectangle.grid.2x2",
+                    title: "Widgets",
+                    detail: "Tap any widget to open deeper metrics. Use Edit to pin, reorder, or remove widgets."
+                ),
+                PostBoardingTipItem(
+                    systemImage: "calendar",
+                    title: "Date Range",
+                    detail: "Use the date controls at the top to change the time period shown across all widgets."
+                )
+            ]
         )
         .navigationTitle("Home")
         .sheet(isPresented: $isEditingWidgets) {

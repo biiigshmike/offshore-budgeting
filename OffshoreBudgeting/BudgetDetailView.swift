@@ -485,6 +485,32 @@ struct BudgetDetailView: View {
                 expensesTitleText
             }
         }
+        .postBoardingTip(
+            key: "tip.budgetdetail.v1",
+            title: "Budget Detail Overview",
+            items: [
+                PostBoardingTipItem(
+                    systemImage: "chart.bar.xaxis",
+                    title: "Detailed Overview",
+                    detail: "View income, expenses, and savings summaries for the budget period."
+                ),
+                PostBoardingTipItem(
+                    systemImage: "magnifyingglass",
+                    title: "Search for Expenses",
+                    detail: "Search by name or date using the search bar."
+                ),
+                PostBoardingTipItem(
+                    systemImage: "tag",
+                    title: "Categories",
+                    detail: "Tap a category to filter expenses by that category alone, then tap the same category again to clear your selection."
+                ),
+                PostBoardingTipItem(
+                    systemImage: "ellipsis",
+                    title: "Budget Management",
+                    detail: "Press the three dots and manage your budget easily. Assign cards and presets to track them for your budget period."
+                )
+            ]
+        )
         .listStyle(.insetGrouped)
         .navigationTitle(budget.name)
 
