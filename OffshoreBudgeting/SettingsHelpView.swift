@@ -160,23 +160,22 @@ private struct HomeHelpView: View {
             title: "Home",
             sections: [
                 .init(screenshotSlot: 1, header: "Home is your dashboard for the selected date range.", body: [
-                    "By default, Home loads using your default budgeting preference from Settings. You can pick your own custom start and end date, or use the pre-defined ranges in the period menu by pressing on the calendar icon. The selected range controls every widget on the screen."
+                    "By default, Home loads using your default budgeting preference from Settings. You can pick your own custom start and end date, or use the pre-defined ranges in the period menu by pressing on the calendar icon. The widgets respond with the date range you select."
                 ]),
                 .init(screenshotSlot: 2, header: "Widgets Overview", body: [
                     "Home is made of widgets. Tap any widget to open its detail page.",
-                    "• Income: shows Actual vs Planned income, and the percent received (actual versus planned).",
-                    "• Expense to Income: expenses = planned expenses actual amount + variable expenses amount. Shows % of planned and % of received income.",
-                    "• Savings Outlook: projected savings = actual savings + planned income - remaining planned expenses.",
-                    "• Next Planned Expense: next upcoming planned expense with planned and actual values.",
-                    "• Category Spotlight: top categories by total spend (planned actual + variable).",
-                    "• Day of Week Spend: spend totals grouped by day in the current range.",
-                    "• Category Availability: caps and remaining amounts by category, segmented into All, Planned, or Variable.",
-                    "• What If?: a scenario planner that uses actual savings as the remaining pool."
+                    "• Income: shows Actual Income versus Planned Income. Tapping the widget takes you to a detailed metric overview to view income trends over time.",
+                    "• Savings Outlook: Use Savings Outlook to view your projected savings based on your planned income and expenses. The projected savings is calculated by taking your Actual Savings + Planned Income and subtracting remaining Planned Expenses.",
+                    "• Next Planned Expense: Displays the next upcoming Planned Expense. Tapping it opens the Presets management page where you will see this expense pinned at the top, as well as being able to quickly manage the rest of your presets here.",
+                    "• Category Spotlight: Shows the top categories by spend in the current range. The total is derived by summing the Planned Expenses and Variable together for each category.",
+                    "• Spend Trends: Spend totals segmented by day, week, or month, depending upon which period is being viewed. Tapping the widget opens a detailed trends view.",
+                    "• Category Availability: Caps and remaining amounts for categories with limits set. Planned and Variable expenses are summed to show total spend against the cap for the period.",
+                    "• What If?: An interactive scenario planner to project if you will be over or under your available income threshold. Use it to plan different scenarios. You can even pin scenarios you're closely monitoring on Home (maximum of 3 scenarios can be pinned)."
                 ]),
                 .init(screenshotSlot: 3, header: "Home Calculations", body: [
                     "Home calculations mirror your budget math:",
-                    "• Actual savings = actual income - (planned expenses actual amount + variable expenses total amount).",
-                    "• Remaining income = actual income - expenses."
+                    "• Actual Savings = actual income - (planned expenses actual amount + variable expenses total amount).",
+                    "• Remaining Income = actual income - expenses."
                 ])
             ]
         )
