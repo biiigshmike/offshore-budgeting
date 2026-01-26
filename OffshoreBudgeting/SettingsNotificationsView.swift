@@ -328,11 +328,6 @@ struct SettingsNotificationsView: View {
                 showingErrorAlert = true
                 return
             }
-
-            try await notificationService.scheduleTestNotification()
-        } catch {
-            errorMessage = error.localizedDescription
-            showingErrorAlert = true
         }
     }
 }

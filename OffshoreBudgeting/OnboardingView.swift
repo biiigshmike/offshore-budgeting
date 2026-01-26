@@ -111,9 +111,9 @@ struct OnboardingView: View {
         .alert("Use iCloud or Continue Locally?", isPresented: $showingGetStartedICloudChoice) {
             Button("Use iCloud") { startUsingICloudFromGetStarted() }
             Button("Continue Locally", role: .cancel) { startLocalFromGetStarted() }
-            Button("Start Fresh (Local)", role: .destructive) { startFreshLocalFromGetStarted() }
+            Button("Start Over (Local)", role: .destructive) { startFreshLocalFromGetStarted() }
         } message: {
-            Text("This Apple ID can sync existing Offshore data from iCloud. If you start fresh locally, you can still switch to iCloud later.")
+            Text("This Apple ID can sync existing Offshore data from iCloud. If you start over locally, you can still switch to iCloud later.")
         }
     }
 
@@ -709,10 +709,7 @@ private struct OnboardingPrivacySyncStep: View {
                         _ = try await notificationService.requestAuthorization()
                         if notificationService.authorizationState == .denied {
                             showingNotificationsDeniedInfo = true
-                        } else {
-                            // Quick happy-path ping
-                            try? await notificationService.scheduleTestNotification()
-                        }
+                        } else {}
                     } catch {
                         showingNotificationsDeniedInfo = true
                     }

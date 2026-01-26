@@ -179,25 +179,6 @@ final class LocalNotificationService: ObservableObject {
             cancelNotification(identifier: NotificationID.presetDueReminder)
         }
     }
-
-    // MARK: - Testing
-
-    func scheduleTestNotification() async throws {
-        let content = UNMutableNotificationContent()
-        content.title = "Offshore Budgeting"
-        content.body = "Notifications are enabled ✅"
-        content.sound = .default
-
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 5, repeats: false)
-        let request = UNNotificationRequest(
-            identifier: NotificationID.testNotification,
-            content: content,
-            trigger: trigger
-        )
-
-        try await addNotificationRequest(request)
-    }
-
     // MARK: - Helpers
 
     private func fetchNotificationSettings() async -> UNNotificationSettings {
