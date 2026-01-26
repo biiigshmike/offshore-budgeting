@@ -7,9 +7,25 @@
 
 import SwiftUI
 
+#if canImport(UIKit)
+import UIKit
+#endif
+
+private extension View {
+    @ViewBuilder
+    func platformCalendarDatePickerStyle(useWheelOnPhoneLandscape: Bool) -> some View {
+        if useWheelOnPhoneLandscape {
+            self.datePickerStyle(.wheel)
+        } else {
+            self.datePickerStyle(.graphical)
+        }
+    }
+}
+
 struct PillDatePickerField: View {
     
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     let title: String
     @Binding var date: Date
@@ -29,6 +45,22 @@ struct PillDatePickerField: View {
         self._date = date
         self.minimumDate = minimumDate
         self.maximumDate = maximumDate
+    }
+
+    private var isPhone: Bool {
+        #if os(iOS)
+        UIDevice.current.userInterfaceIdiom == .phone
+        #else
+        false
+        #endif
+    }
+
+    private var useMediumDetent: Bool {
+        isPhone
+    }
+
+    private var useWheelOnPhoneLandscape: Bool {
+        isPhone && verticalSizeClass == .compact
     }
 
     var body: some View {
@@ -65,9 +97,7 @@ struct PillDatePickerField: View {
                 }
             }
             .presentationDetents(
-                horizontalSizeClass == .compact
-                ? [.medium]
-                : [.large]
+                useMediumDetent ? [.medium] : [.large]
             )
             .presentationDragIndicator(.visible)
         }
@@ -77,19 +107,19 @@ struct PillDatePickerField: View {
     private var picker: some View {
         if let range = optionalClosedRange(minimumDate: minimumDate, maximumDate: maximumDate) {
             DatePicker("", selection: $date, in: range, displayedComponents: [.date])
-                .datePickerStyle(.graphical)
+                .platformCalendarDatePickerStyle(useWheelOnPhoneLandscape: useWheelOnPhoneLandscape)
                 .labelsHidden()
         } else if let min = minimumDate {
             DatePicker("", selection: $date, in: min..., displayedComponents: [.date])
-                .datePickerStyle(.graphical)
+                .platformCalendarDatePickerStyle(useWheelOnPhoneLandscape: useWheelOnPhoneLandscape)
                 .labelsHidden()
         } else if let max = maximumDate {
             DatePicker("", selection: $date, in: ...max, displayedComponents: [.date])
-                .datePickerStyle(.graphical)
+                .platformCalendarDatePickerStyle(useWheelOnPhoneLandscape: useWheelOnPhoneLandscape)
                 .labelsHidden()
         } else {
             DatePicker("", selection: $date, displayedComponents: [.date])
-                .datePickerStyle(.graphical)
+                .platformCalendarDatePickerStyle(useWheelOnPhoneLandscape: useWheelOnPhoneLandscape)
                 .labelsHidden()
         }
     }
@@ -108,6 +138,7 @@ struct PillDatePickerField: View {
 struct PillTimePickerField: View {
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     let title: String
     @Binding var time: Date
@@ -117,6 +148,18 @@ struct PillTimePickerField: View {
     init(title: String, time: Binding<Date>) {
         self.title = title
         self._time = time
+    }
+
+    private var isPhone: Bool {
+        #if os(iOS)
+        UIDevice.current.userInterfaceIdiom == .phone
+        #else
+        false
+        #endif
+    }
+
+    private var useMediumDetent: Bool {
+        isPhone
     }
 
     var body: some View {
@@ -155,9 +198,7 @@ struct PillTimePickerField: View {
                 }
             }
             .presentationDetents(
-                horizontalSizeClass == .compact
-                ? [.medium]
-                : [.large]
+                useMediumDetent ? [.medium] : [.large]
             )
             .presentationDragIndicator(.visible)
         }

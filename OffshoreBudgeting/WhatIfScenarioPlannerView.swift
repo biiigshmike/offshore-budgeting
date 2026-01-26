@@ -414,6 +414,19 @@ struct WhatIfScenarioPlannerView: View {
         let onSelect: (ExportFormat) -> Void
         @Environment(\.dismiss) private var dismiss
         @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+        @Environment(\.verticalSizeClass) private var verticalSizeClass
+
+        private var isPhone: Bool {
+            #if os(iOS)
+            UIDevice.current.userInterfaceIdiom == .phone
+            #else
+            false
+            #endif
+        }
+
+        private var useMediumDetent: Bool {
+            isPhone
+        }
 
         var body: some View {
             NavigationStack {
@@ -446,9 +459,7 @@ struct WhatIfScenarioPlannerView: View {
                 }
             }
             .presentationDetents(
-                horizontalSizeClass == .compact
-                ? [.medium]
-                : [.large]
+                useMediumDetent ? [.medium] : [.large]
             )
         }
     }
