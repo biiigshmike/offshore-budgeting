@@ -147,7 +147,7 @@ final class LocalNotificationService: ObservableObject {
             try await scheduleDailyNotification(
                 identifier: NotificationID.dailyExpenseReminder,
                 title: "Offshore Budgeting",
-                body: "Don’t forget to log today’s expenses.",
+                body: "Keep the books tidy and balanced. Log any variable expenses today.",
                 hour: hour,
                 minute: minute
             )
@@ -159,7 +159,7 @@ final class LocalNotificationService: ObservableObject {
             try await scheduleDailyNotification(
                 identifier: NotificationID.plannedIncomeReminder,
                 title: "Offshore Budgeting",
-                body: "Quick check-in, review today’s income and confirm anything planned.",
+                body: "Income is planned to arrive offshore today. Verify any deposits and log actual income.",
                 hour: hour,
                 minute: minute
             )
@@ -171,7 +171,7 @@ final class LocalNotificationService: ObservableObject {
             try await scheduleDailyNotification(
                 identifier: NotificationID.presetDueReminder,
                 title: "Offshore Budgeting",
-                body: "Quick check-in, review today’s presets and confirm anything due.",
+                body: "Presets are scheduled to set sail today. Make sure the planned amount matches what was debited.",
                 hour: hour,
                 minute: minute
             )
