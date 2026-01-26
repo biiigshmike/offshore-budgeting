@@ -38,7 +38,11 @@ struct AppRootView: View {
     @Binding var selectedWorkspaceID: String
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @AppStorage("app_selectedSection") private var storedSelectedSectionRaw: String = AppSection.home.rawValue
+    @AppStorage("app_splitViewVisibility") private var storedSplitViewVisibilityRaw: String = "all"
+
     @State private var selectedSection: AppSection = .home
+    @State private var splitViewVisibility: NavigationSplitViewVisibility = .all
     @State private var homePath = NavigationPath()
     @State private var budgetsPath = NavigationPath()
     @State private var incomePath = NavigationPath()
@@ -54,12 +58,24 @@ struct AppRootView: View {
     }
 
     var body: some View {
-        if isPhone {
-            phoneTabs
-        } else if horizontalSizeClass == .compact {
-            phoneTabs
-        } else {
-            splitView
+        Group {
+            if isPhone {
+                phoneTabs
+            } else if horizontalSizeClass == .compact {
+                phoneTabs
+            } else {
+                splitView
+            }
+        }
+        .onAppear {
+            selectedSection = AppSection(rawValue: storedSelectedSectionRaw) ?? .home
+            splitViewVisibility = splitViewVisibilityFromRaw(storedSplitViewVisibilityRaw)
+        }
+        .onChange(of: selectedSection) { _, newValue in
+            storedSelectedSectionRaw = newValue.rawValue
+        }
+        .onChange(of: splitViewVisibility) { _, newValue in
+            storedSplitViewVisibilityRaw = rawFromSplitViewVisibility(newValue)
         }
     }
 
@@ -113,7 +129,7 @@ struct AppRootView: View {
     // MARK: - iPad + Mac
 
     private var splitView: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $splitViewVisibility) {
             List(selection: selectedSectionForSidebar) {
                 ForEach(AppSection.allCases) { section in
                     Label(section.rawValue, systemImage: section.systemImage)
@@ -125,6 +141,21 @@ struct AppRootView: View {
         } detail: {
             NavigationStack(path: selectedSectionPath) {
                 sectionRootView
+            }
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    if splitViewVisibility == .detailOnly {
+                        Picker("Section", selection: $selectedSection) {
+                            ForEach(AppSection.allCases) { section in
+                                Text(section.rawValue)
+                                    .tag(section)
+                            }
+                        }
+                        #if os(iOS)
+                        .pickerStyle(.segmented)
+                        #endif
+                    }
+                }
             }
         }
     }
@@ -141,6 +172,30 @@ struct AppRootView: View {
             return $cardsPath
         case .settings:
             return $settingsPath
+        }
+    }
+
+    private func splitViewVisibilityFromRaw(_ raw: String) -> NavigationSplitViewVisibility {
+        switch raw {
+        case "automatic":
+            return .automatic
+        case "detailOnly":
+            return .detailOnly
+        default:
+            return .all
+        }
+    }
+
+    private func rawFromSplitViewVisibility(_ visibility: NavigationSplitViewVisibility) -> String {
+        switch visibility {
+        case .automatic:
+            return "automatic"
+        case .detailOnly:
+            return "detailOnly"
+        case .all:
+            return "all"
+        default:
+            return "all"
         }
     }
 
