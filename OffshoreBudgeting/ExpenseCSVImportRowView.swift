@@ -12,6 +12,7 @@ struct ExpenseCSVImportRowView: View {
     let row: ExpenseCSVImportRow
     let allCategories: [Category]
     let onToggleInclude: () -> Void
+    let onSetMerchant: (String) -> Void
     let onSetCategory: (Category?) -> Void
     let onToggleRemember: () -> Void
 
@@ -29,8 +30,16 @@ struct ExpenseCSVImportRowView: View {
                 .accessibilityLabel(row.includeInImport ? "Included" : "Excluded")
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(row.finalMerchant)
-                        .font(.headline)
+                    TextField(
+                        "Merchant",
+                        text: Binding(
+                            get: { row.finalMerchant },
+                            set: { onSetMerchant($0) }
+                        )
+                    )
+                    .font(.headline)
+                    .textInputAutocapitalization(.words)
+                    .autocorrectionDisabled()
 
                     Text(row.finalDate, style: .date)
                         .font(.caption)
@@ -59,27 +68,44 @@ struct ExpenseCSVImportRowView: View {
                     }
                     .pickerStyle(.menu)
 
-                    if row.bucket != .ready {
-                        Toggle(isOn: Binding(
-                            get: { row.rememberMapping },
-                            set: { _ in onToggleRemember() }
-                        )) {
-                            Text("Remember")
-                        }
-                        .labelsHidden()
+                    Toggle(isOn: Binding(
+                        get: { row.rememberMapping },
+                        set: { _ in onToggleRemember() }
+                    )) {
+                        Text("Remember")
                     }
+                    .labelsHidden()
                 }
 
-                // Small hint text (helps you debug while tuning)
-                if row.suggestedConfidence > 0 {
-                    Text("Suggested: \(row.suggestedCategory?.name ?? "None") • \(Int(row.suggestedConfidence * 100))% • \(row.matchReason)")
+                if row.isMissingRequiredData {
+                    Text(row.finalMerchant.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                         ? "Add a merchant name to import."
+                         : "Choose a category to import.")
                         .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.red)
                 }
             } else {
-                Text("Imports as Income (linked to this card)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 10) {
+                    Text("Imports as Income (linked to this card)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    Spacer(minLength: 0)
+
+                    Toggle(isOn: Binding(
+                        get: { row.rememberMapping },
+                        set: { _ in onToggleRemember() }
+                    )) {
+                        Text("Remember")
+                    }
+                    .labelsHidden()
+                }
+
+                if row.isMissingRequiredData {
+                    Text("Add a name to import.")
+                        .font(.caption2)
+                        .foregroundStyle(.red)
+                }
             }
 
             Text(csvSummary)

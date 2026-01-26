@@ -40,7 +40,9 @@ struct ExpenseCSVImportFlowView: View {
             } header: {
                 Text("Import")
             } footer: {
-                Text("You can import one CSV at a time. You will review everything before saving.")
+                Text(selectedFileName == nil
+                     ? "You can import one CSV at a time. You will review everything before saving."
+                     : "Use the toggle switch for any row you want to save and have automatically recognized next time. It will help make future imports faster.")
             }
 
             if vm.state == .idle {
@@ -71,23 +73,23 @@ struct ExpenseCSVImportFlowView: View {
 
             if vm.state == .loaded {
                 if !vm.readyRows.isEmpty {
-                    sectionView(title: "Ready to Import", subtitle: "Exact or high-confidence category match, not a duplicate.", rows: vm.readyRows)
+                    sectionView(title: "Ready to Import", rows: vm.readyRows)
                 }
 
                 if !vm.possibleMatchRows.isEmpty {
-                    sectionView(title: "Possible Matches", subtitle: "We have a suggestion, but it is not confident enough to auto-check.", rows: vm.possibleMatchRows)
+                    sectionView(title: "Possible Matches", rows: vm.possibleMatchRows)
                 }
 
                 if !vm.paymentRows.isEmpty {
-                    sectionView(title: "Income / Payments", subtitle: "These will import as Income linked to this card.", rows: vm.paymentRows)
+                    sectionView(title: "Income / Payments", rows: vm.paymentRows)
                 }
 
                 if !vm.possibleDuplicateRows.isEmpty {
-                    sectionView(title: "Possible Duplicates", subtitle: "Very similar to an existing transaction. Left unchecked.", rows: vm.possibleDuplicateRows)
+                    sectionView(title: "Possible Duplicates", rows: vm.possibleDuplicateRows)
                 }
 
                 if !vm.needsMoreDataRows.isEmpty {
-                    sectionView(title: "Needs More Data", subtitle: "Missing required info or no viable category suggestion.", rows: vm.needsMoreDataRows)
+                    sectionView(title: "Needs More Data", rows: vm.needsMoreDataRows)
                 }
 
                 Section {
@@ -131,21 +133,20 @@ struct ExpenseCSVImportFlowView: View {
     }
 
     @ViewBuilder
-    private func sectionView(title: String, subtitle: String, rows: [ExpenseCSVImportRow]) -> some View {
+    private func sectionView(title: String, rows: [ExpenseCSVImportRow]) -> some View {
         Section {
             ForEach(rows) { row in
                 ExpenseCSVImportRowView(
                     row: row,
                     allCategories: vm.categories,
                     onToggleInclude: { vm.toggleInclude(rowID: row.id) },
+                    onSetMerchant: { text in vm.setMerchant(rowID: row.id, merchant: text) },
                     onSetCategory: { category in vm.setCategory(rowID: row.id, category: category) },
                     onToggleRemember: { vm.toggleRemember(rowID: row.id) }
                 )
             }
         } header: {
             Text(title)
-        } footer: {
-            Text(subtitle)
         }
     }
 }

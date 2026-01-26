@@ -6,10 +6,12 @@ struct ExpenseCSVImportMapper {
         csv: ParsedCSV,
         categories: [Category],
         existingExpenses: [VariableExpense],
+        existingIncomes: [Income],
         learnedRules: [String: ImportMerchantRule]
     ) -> [ExpenseCSVImportRow] {
 
         let headerMap = HeaderMap(headers: csv.headers)
+        let learnedMatcher = ImportMerchantRuleMatcher(rulesByKey: learnedRules)
 
         var out: [ExpenseCSVImportRow] = []
         out.reserveCapacity(csv.rows.count)
@@ -29,18 +31,26 @@ struct ExpenseCSVImportMapper {
 
             let parsedDate = parseDate(postedDateText ?? "") ?? parseDate(dateText)
 
+            let rawMerchant = (merchantText?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false)
+                ? (merchantText ?? "")
+                : descText
+            let sourceMerchantKey = MerchantNormalizer.normalizeKey(rawMerchant)
+            let descriptionMerchantKey = MerchantNormalizer.normalizeKey(descText)
+
             guard let date = parsedDate, let rawAmount = parseAmount(amountText) else {
                 let safeDate = Date()
-                let rawMerchant = merchantText?.isEmpty == false ? (merchantText ?? "") : descText
 
                 let row = ExpenseCSVImportRow(
                     sourceLine: lineNumber,
                     originalDateText: dateText,
                     originalDescriptionText: descText,
+                    originalMerchantText: merchantText,
                     originalAmountText: amountText,
                     originalCategoryText: categoryText,
+                    sourceMerchantKey: sourceMerchantKey,
+                    descriptionMerchantKey: descriptionMerchantKey,
                     finalDate: safeDate,
-                    finalMerchant: MerchantNormalizer.normalize(rawMerchant),
+                    finalMerchant: MerchantNormalizer.displayName(rawMerchant),
                     finalAmount: 0,
                     kind: .expense,
                     suggestedCategory: nil,
@@ -57,23 +67,17 @@ struct ExpenseCSVImportMapper {
                 continue
             }
 
-            let rawMerchant = (merchantText?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false)
-                ? (merchantText ?? "")
-                : descText
-
-            let normalizedMerchantKey = MerchantNormalizer.normalize(rawMerchant)
-            let learned = learnedRules[normalizedMerchantKey]
+            let learned = learnedMatcher.match(for: sourceMerchantKey)?.rule
+                ?? learnedMatcher.match(for: descriptionMerchantKey)?.rule
 
             // Apply learned preferred name if exists
-            let finalMerchant = learned?.preferredName ?? normalizedMerchantKey
+            let learnedName = learned?.preferredName?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let finalMerchant = (learnedName?.isEmpty == false)
+                ? (learnedName ?? "")
+                : MerchantNormalizer.displayName(rawMerchant)
 
             let kind = resolveKind(typeText: typeText, rawAmount: rawAmount)
             let finalAmount = abs(rawAmount)
-
-            var isDup = false
-            if kind == .expense {
-                isDup = looksLikeDuplicate(date: date, amount: finalAmount, merchant: finalMerchant, existing: existingExpenses)
-            }
 
             // Category suggestion
             let suggestion = CategoryMatchingEngine.suggest(
@@ -83,19 +87,32 @@ struct ExpenseCSVImportMapper {
                 learnedRule: learned
             )
 
+            var isDup = false
+            if kind == .expense {
+                isDup = looksLikeDuplicateExpense(
+                    date: date,
+                    amount: finalAmount,
+                    merchant: finalMerchant,
+                    category: suggestion.category,
+                    existing: existingExpenses
+                )
+            } else {
+                isDup = looksLikeDuplicateIncome(date: date, amount: finalAmount, merchant: finalMerchant, existing: existingIncomes)
+            }
+
             // Default bucket + check behavior matches your old flow
             let bucket: ExpenseCSVImportBucket
             let includeDefault: Bool
             let selectedCategory: Category?
 
-            if kind == .income {
-                bucket = .payment
-                includeDefault = true
-                selectedCategory = nil
-            } else if isDup {
+            if isDup {
                 bucket = .possibleDuplicate
                 includeDefault = false
                 selectedCategory = suggestion.category
+            } else if kind == .income {
+                bucket = .payment
+                includeDefault = true
+                selectedCategory = nil
             } else {
                 if suggestion.category == nil {
                     bucket = .needsMoreData
@@ -120,8 +137,11 @@ struct ExpenseCSVImportMapper {
                 sourceLine: lineNumber,
                 originalDateText: dateText,
                 originalDescriptionText: descText,
+                originalMerchantText: merchantText,
                 originalAmountText: amountText,
                 originalCategoryText: categoryText,
+                sourceMerchantKey: sourceMerchantKey,
+                descriptionMerchantKey: descriptionMerchantKey,
                 finalDate: date,
                 finalMerchant: finalMerchant,
                 finalAmount: finalAmount,
@@ -254,13 +274,19 @@ struct ExpenseCSVImportMapper {
 
         let isParenNegative = (trimmed.first == "(") && (trimmed.last == ")")
 
-        let stripped = trimmed
+        var stripped = trimmed
             .replacingOccurrences(of: "(", with: "")
             .replacingOccurrences(of: ")", with: "")
             .replacingOccurrences(of: "\u{00A0}", with: " ")
             .replacingOccurrences(of: "$", with: "")
             .replacingOccurrences(of: ",", with: "")
+            .replacingOccurrences(of: " ", with: "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Some exports use "+ $123.45" / "- $123.45" which becomes "+123.45"/"-123.45" after stripping.
+        if stripped.hasPrefix("+") {
+            stripped = String(stripped.dropFirst())
+        }
 
         guard var val = Double(stripped) else { return nil }
         if isParenNegative { val = -abs(val) }
@@ -294,17 +320,56 @@ struct ExpenseCSVImportMapper {
 
     // MARK: - Duplicate hint
 
-    private static func looksLikeDuplicate(date: Date, amount: Double, merchant: String, existing: [VariableExpense]) -> Bool {
+    private static func looksLikeDuplicateExpense(
+        date: Date,
+        amount: Double,
+        merchant: String,
+        category: Category?,
+        existing: [VariableExpense]
+    ) -> Bool {
         let cal = Calendar.current
         let day = cal.startOfDay(for: date)
+        let merchantKey = MerchantNormalizer.normalizeKey(merchant)
+
+        // 1) Strict match: same day + same amount + same merchant key.
+        var dayAmountMatches: [VariableExpense] = []
+        dayAmountMatches.reserveCapacity(4)
 
         for e in existing {
             if abs(e.amount - amount) > 0.0001 { continue }
             let eDay = cal.startOfDay(for: e.transactionDate)
             if eDay != day { continue }
 
-            let existingMerchant = MerchantNormalizer.normalize(e.descriptionText)
-            if existingMerchant == MerchantNormalizer.normalize(merchant) { return true }
+            dayAmountMatches.append(e)
+
+            let existingMerchant = MerchantNormalizer.normalizeKey(e.descriptionText)
+            if existingMerchant == merchantKey { return true }
+        }
+
+        if dayAmountMatches.isEmpty { return false }
+
+        // 2) Fallback: same day + same amount + matching category (useful when merchant text differs).
+        guard let category else { return false }
+        let sameCategory = dayAmountMatches.filter { $0.category?.id == category.id }
+        if sameCategory.isEmpty { return false }
+
+        // Only mark as duplicate if the match is not ambiguous.
+        if dayAmountMatches.count == 1 { return true }
+        if sameCategory.count == 1 { return true }
+        return false
+    }
+
+    private static func looksLikeDuplicateIncome(date: Date, amount: Double, merchant: String, existing: [Income]) -> Bool {
+        let cal = Calendar.current
+        let day = cal.startOfDay(for: date)
+
+        for i in existing {
+            if abs(i.amount - amount) > 0.0001 { continue }
+            let iDay = cal.startOfDay(for: i.date)
+            if iDay != day { continue }
+
+            let existingSource = MerchantNormalizer.normalizeKey(i.source)
+            if existingSource == MerchantNormalizer.normalizeKey(merchant) { return true }
         }
 
         return false

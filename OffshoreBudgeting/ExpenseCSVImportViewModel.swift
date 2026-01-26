@@ -26,6 +26,9 @@ final class ExpenseCSVImportViewModel: ObservableObject {
     // Option 1 memory dictionary keyed by merchantKey.
     private var learnedRules: [String: ImportMerchantRule] = [:]
 
+    private var existingExpenses: [VariableExpense] = []
+    private var existingIncomes: [Income] = []
+
     // MARK: - Grouped rows
 
     var readyRows: [ExpenseCSVImportRow] { rows.filter { $0.bucket == .ready }.sorted { $0.sourceLine < $1.sourceLine } }
@@ -35,13 +38,13 @@ final class ExpenseCSVImportViewModel: ObservableObject {
     var needsMoreDataRows: [ExpenseCSVImportRow] { rows.filter { $0.bucket == .needsMoreData }.sorted { $0.sourceLine < $1.sourceLine } }
 
     var canCommit: Bool {
-        rows.contains { $0.includeInImport && $0.bucket != .needsMoreData }
+        rows.contains { $0.includeInImport && !$0.isMissingRequiredData }
     }
 
     var commitSummaryText: String {
         let included = rows.filter { $0.includeInImport }
-        let expCount = included.filter { $0.kind == .expense && $0.bucket != .needsMoreData }.count
-        let incCount = included.filter { $0.kind == .income && $0.bucket != .needsMoreData }.count
+        let expCount = included.filter { $0.kind == .expense && !$0.isMissingRequiredData }.count
+        let incCount = included.filter { $0.kind == .income && !$0.isMissingRequiredData }.count
         return "\(expCount) expenses, \(incCount) incomes will be imported."
     }
 
@@ -61,11 +64,15 @@ final class ExpenseCSVImportViewModel: ObservableObject {
         state = .loading
 
         do {
+            existingExpenses = card.variableExpenses ?? []
+            existingIncomes = card.incomes ?? []
+
             let parsed = try CSVParser.parse(url: url)
             let mapped = ExpenseCSVImportMapper.map(
                 csv: parsed,
                 categories: categories,
-                existingExpenses: card.variableExpenses ?? [],
+                existingExpenses: existingExpenses,
+                existingIncomes: existingIncomes,
                 learnedRules: learnedRules
             )
             rows = mapped
@@ -78,8 +85,12 @@ final class ExpenseCSVImportViewModel: ObservableObject {
     func toggleInclude(rowID: UUID) {
         guard let idx = rows.firstIndex(where: { $0.id == rowID }) else { return }
 
-        // If row is Needs More Data, do not allow checking.
-        if rows[idx].bucket == .needsMoreData {
+        // If the row is missing required data, do not allow checking.
+        if rows[idx].finalMerchant.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            rows[idx].includeInImport = false
+            return
+        }
+        if rows[idx].kind == .expense, rows[idx].selectedCategory == nil {
             rows[idx].includeInImport = false
             return
         }
@@ -96,6 +107,40 @@ final class ExpenseCSVImportViewModel: ObservableObject {
             // stay unchecked unless user checks it
         }
 
+        // Recompute duplicate hint since we can use category as a fallback signal.
+        let normalized = MerchantNormalizer.normalizeKey(rows[idx].finalMerchant)
+        if rows[idx].kind == .expense {
+            rows[idx].isDuplicateHint = looksLikeDuplicateExpense(
+                date: rows[idx].finalDate,
+                amount: rows[idx].finalAmount,
+                merchantKey: normalized,
+                categoryID: rows[idx].selectedCategory?.id
+            )
+        } else {
+            rows[idx].isDuplicateHint = looksLikeDuplicateIncome(date: rows[idx].finalDate, amount: rows[idx].finalAmount, merchantKey: normalized)
+        }
+
+        rows[idx].recomputeBucket()
+    }
+
+    func setMerchant(rowID: UUID, merchant: String) {
+        guard let idx = rows.firstIndex(where: { $0.id == rowID }) else { return }
+
+        rows[idx].finalMerchant = merchant
+
+        // Recompute duplicate hint based on the edited merchant.
+        let normalized = MerchantNormalizer.normalizeKey(merchant)
+        if rows[idx].kind == .expense {
+            rows[idx].isDuplicateHint = looksLikeDuplicateExpense(
+                date: rows[idx].finalDate,
+                amount: rows[idx].finalAmount,
+                merchantKey: normalized,
+                categoryID: rows[idx].selectedCategory?.id
+            )
+        } else {
+            rows[idx].isDuplicateHint = looksLikeDuplicateIncome(date: rows[idx].finalDate, amount: rows[idx].finalAmount, merchantKey: normalized)
+        }
+
         rows[idx].recomputeBucket()
     }
 
@@ -105,7 +150,7 @@ final class ExpenseCSVImportViewModel: ObservableObject {
     }
 
     func commitImport(workspace: Workspace, card: Card, modelContext: ModelContext) {
-        let importable = rows.filter { $0.includeInImport && $0.bucket != .needsMoreData }
+        let importable = rows.filter { $0.includeInImport && !$0.isMissingRequiredData }
 
         for row in importable {
             switch row.kind {
@@ -122,13 +167,29 @@ final class ExpenseCSVImportViewModel: ObservableObject {
                 modelContext.insert(exp)
 
                 if row.rememberMapping {
-                    ImportLearningStore.upsertRule(
-                        merchantKey: MerchantNormalizer.normalize(row.finalMerchant),
-                        preferredName: row.finalMerchant,
-                        preferredCategory: category,
-                        workspace: workspace,
-                        modelContext: modelContext
-                    )
+                    let preferredName = row.finalMerchant.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let primaryKey = row.sourceMerchantKey.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let secondaryKey = row.descriptionMerchantKey.trimmingCharacters(in: .whitespacesAndNewlines)
+
+                    if !primaryKey.isEmpty {
+                        ImportLearningStore.upsertRule(
+                            merchantKey: primaryKey,
+                            preferredName: preferredName.isEmpty ? nil : preferredName,
+                            preferredCategory: category,
+                            workspace: workspace,
+                            modelContext: modelContext
+                        )
+                    }
+
+                    if secondaryKey != primaryKey, !secondaryKey.isEmpty {
+                        ImportLearningStore.upsertRule(
+                            merchantKey: secondaryKey,
+                            preferredName: preferredName.isEmpty ? nil : preferredName,
+                            preferredCategory: category,
+                            workspace: workspace,
+                            modelContext: modelContext
+                        )
+                    }
                 }
 
             case .income:
@@ -143,9 +204,78 @@ final class ExpenseCSVImportViewModel: ObservableObject {
                     card: card
                 )
                 modelContext.insert(inc)
+
+                if row.rememberMapping {
+                    let preferredName = row.finalMerchant.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let primaryKey = row.sourceMerchantKey.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let secondaryKey = row.descriptionMerchantKey.trimmingCharacters(in: .whitespacesAndNewlines)
+
+                    if !primaryKey.isEmpty {
+                        ImportLearningStore.upsertRule(
+                            merchantKey: primaryKey,
+                            preferredName: preferredName.isEmpty ? nil : preferredName,
+                            preferredCategory: nil,
+                            workspace: workspace,
+                            modelContext: modelContext
+                        )
+                    }
+
+                    if secondaryKey != primaryKey, !secondaryKey.isEmpty {
+                        ImportLearningStore.upsertRule(
+                            merchantKey: secondaryKey,
+                            preferredName: preferredName.isEmpty ? nil : preferredName,
+                            preferredCategory: nil,
+                            workspace: workspace,
+                            modelContext: modelContext
+                        )
+                    }
+                }
             }
         }
 
         try? modelContext.save()
+    }
+
+    // MARK: - Duplicate hints
+
+    private func looksLikeDuplicateExpense(date: Date, amount: Double, merchantKey: String, categoryID: UUID?) -> Bool {
+        let cal = Calendar.current
+        let day = cal.startOfDay(for: date)
+
+        var dayAmountMatches: [VariableExpense] = []
+        dayAmountMatches.reserveCapacity(4)
+
+        for e in existingExpenses {
+            if abs(e.amount - amount) > 0.0001 { continue }
+            let eDay = cal.startOfDay(for: e.transactionDate)
+            if eDay != day { continue }
+
+            dayAmountMatches.append(e)
+            if MerchantNormalizer.normalizeKey(e.descriptionText) == merchantKey { return true }
+        }
+
+        if dayAmountMatches.isEmpty { return false }
+
+        guard let categoryID else { return false }
+        let sameCategory = dayAmountMatches.filter { $0.category?.id == categoryID }
+        if sameCategory.isEmpty { return false }
+
+        if dayAmountMatches.count == 1 { return true }
+        if sameCategory.count == 1 { return true }
+        return false
+    }
+
+    private func looksLikeDuplicateIncome(date: Date, amount: Double, merchantKey: String) -> Bool {
+        let cal = Calendar.current
+        let day = cal.startOfDay(for: date)
+
+        for i in existingIncomes {
+            if abs(i.amount - amount) > 0.0001 { continue }
+            let iDay = cal.startOfDay(for: i.date)
+            if iDay != day { continue }
+            if MerchantNormalizer.normalizeKey(i.source) == merchantKey { return true }
+        }
+
+        return false
     }
 }

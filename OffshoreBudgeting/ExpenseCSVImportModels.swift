@@ -27,8 +27,13 @@ struct ExpenseCSVImportRow: Identifiable {
     let sourceLine: Int
     let originalDateText: String
     let originalDescriptionText: String
+    let originalMerchantText: String?
     let originalAmountText: String
     let originalCategoryText: String?
+
+    // Matching keys (stable, noise-stripped)
+    let sourceMerchantKey: String
+    let descriptionMerchantKey: String
 
     // Parsed / proposed
     var finalDate: Date
@@ -52,16 +57,22 @@ struct ExpenseCSVImportRow: Identifiable {
     var isDuplicateHint: Bool
     var bucket: ExpenseCSVImportBucket
 
+    var isMissingRequiredData: Bool {
+        if finalMerchant.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return true }
+        if kind == .expense, selectedCategory == nil { return true }
+        return false
+    }
+
     mutating func recomputeBucket() {
+        // Keep bucket stable while the user edits fields to avoid list shuffling.
+        // Use `isMissingRequiredData` + `includeInImport` to control what can be imported.
         if finalMerchant.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            bucket = .needsMoreData
             includeInImport = false
             return
         }
 
         if kind == .expense {
             if selectedCategory == nil {
-                bucket = .needsMoreData
                 includeInImport = false
                 return
             }
@@ -73,13 +84,6 @@ struct ExpenseCSVImportRow: Identifiable {
             return
         }
 
-        if kind == .income {
-            bucket = .payment
-            includeInImport = true
-            return
-        }
-
-        // Expense with a category and not duplicate
-        // The mapper sets ready vs possibleMatch based on confidence.
+        // Do not auto-change bucket or include flags here beyond duplicate/missing-required-data behavior.
     }
 }
