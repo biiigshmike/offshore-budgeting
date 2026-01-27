@@ -13,15 +13,11 @@ struct SettingsView: View {
     let workspace: Workspace
     @Binding var selectedWorkspaceID: String
 
-    @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
-
     @Query(sort: \Workspace.name, order: .forward)
     private var workspaces: [Workspace]
 
     @Environment(\.modelContext) private var modelContext
     @State private var showingWorkspaceManager: Bool = false
-    @State private var showingWorkspaceDeleteConfirm: Bool = false
-    @State private var pendingWorkspaceDelete: (() -> Void)? = nil
 
     // MARK: - Derived
 
@@ -52,15 +48,6 @@ struct SettingsView: View {
         }
         .sheet(isPresented: $showingWorkspaceManager) {
             workspaceManagerSheet
-        }
-        .alert("Delete?", isPresented: $showingWorkspaceDeleteConfirm) {
-            Button("Delete", role: .destructive) {
-                pendingWorkspaceDelete?()
-                pendingWorkspaceDelete = nil
-            }
-            Button("Cancel", role: .cancel) {
-                pendingWorkspaceDelete = nil
-            }
         }
     }
 
@@ -258,7 +245,7 @@ struct SettingsView: View {
 
             if selectedWorkspaceID == ws.id.uuidString {
                 Image(systemName: "checkmark")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.tint)
             }
         }
     }
@@ -289,7 +276,6 @@ struct SettingsView: View {
         )
 
         modelContext.insert(newWorkspace)
-        selectedWorkspaceID = newWorkspace.id.uuidString
     }
 
     private func deleteWorkspaces(at offsets: IndexSet) {
@@ -300,25 +286,12 @@ struct SettingsView: View {
         let deletedIDs = workspacesToDelete.map { $0.id.uuidString }
         let willDeleteSelected = deletedIDs.contains(selectedWorkspaceID)
 
-        if confirmBeforeDeleting {
-            pendingWorkspaceDelete = {
-                for ws in workspacesToDelete {
-                    modelContext.delete(ws)
-                }
+        for ws in workspacesToDelete {
+            modelContext.delete(ws)
+        }
 
-                if willDeleteSelected {
-                    selectedWorkspaceID = ""
-                }
-            }
-            showingWorkspaceDeleteConfirm = true
-        } else {
-            for ws in workspacesToDelete {
-                modelContext.delete(ws)
-            }
-
-            if willDeleteSelected {
-                selectedWorkspaceID = ""
-            }
+        if willDeleteSelected {
+            selectedWorkspaceID = ""
         }
     }
 }

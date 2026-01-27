@@ -14,7 +14,6 @@ struct ContentView: View {
 
     @AppStorage("selectedWorkspaceID") private var selectedWorkspaceID: String = ""
     @AppStorage("didSeedDefaultWorkspaces") private var didSeedDefaultWorkspaces: Bool = false
-    @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
 
     // MARK: - Onboarding
 
@@ -32,8 +31,6 @@ struct ContentView: View {
     // MARK: - Alerts
 
     @State private var showingCannotDeleteLastWorkspaceAlert: Bool = false
-    @State private var showingWorkspaceDeleteConfirm: Bool = false
-    @State private var pendingWorkspaceDelete: (() -> Void)? = nil
 
     // MARK: - SwiftData
 
@@ -119,15 +116,6 @@ struct ContentView: View {
             } message: {
                 Text("Create another workspace first, then you can delete this one.")
             }
-            .alert("Delete?", isPresented: $showingWorkspaceDeleteConfirm) {
-                Button("Delete", role: .destructive) {
-                    pendingWorkspaceDelete?()
-                    pendingWorkspaceDelete = nil
-                }
-                Button("Cancel", role: .cancel) {
-                    pendingWorkspaceDelete = nil
-                }
-            }
         }
     }
     
@@ -205,27 +193,13 @@ struct ContentView: View {
         let willDeleteSelected = deletedIDs.contains(selectedWorkspaceID)
         let fallbackSelectedID = workspaces[remainingIndices[0]].id.uuidString
 
-        if confirmBeforeDeleting {
-            pendingWorkspaceDelete = {
-                for workspace in workspacesToDelete {
-                    modelContext.delete(workspace)
-                }
+        for workspace in workspacesToDelete {
+            modelContext.delete(workspace)
+        }
 
-                // Apply fallback selection after delete if needed.
-                if willDeleteSelected {
-                    selectedWorkspaceID = fallbackSelectedID
-                }
-            }
-            showingWorkspaceDeleteConfirm = true
-        } else {
-            for workspace in workspacesToDelete {
-                modelContext.delete(workspace)
-            }
-
-            // Apply fallback selection after delete if needed.
-            if willDeleteSelected {
-                selectedWorkspaceID = fallbackSelectedID
-            }
+        // Apply fallback selection after delete if needed.
+        if willDeleteSelected {
+            selectedWorkspaceID = fallbackSelectedID
         }
     }
 }

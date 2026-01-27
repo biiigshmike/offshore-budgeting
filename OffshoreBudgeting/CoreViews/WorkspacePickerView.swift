@@ -21,12 +21,16 @@ struct WorkspacePickerView: View {
     @State private var editingWorkspace: Workspace? = nil
 
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
     @AppStorage("icloud_useCloud") private var desiredUseICloud: Bool = false
     @AppStorage("icloud_activeUseCloud") private var activeUseICloud: Bool = false
     @AppStorage("icloud_bootstrapStartedAt") private var iCloudBootstrapStartedAt: Double = 0
     @State private var showingRestartRequired: Bool = false
 
     @State private var showingICloudUnavailable: Bool = false
+    @State private var showingWorkspaceDeleteConfirm: Bool = false
+    @State private var pendingWorkspaceDeleteName: String = ""
+    @State private var pendingWorkspaceDeleteOffsets: IndexSet? = nil
 
     var body: some View {
         List {
@@ -75,7 +79,7 @@ struct WorkspacePickerView: View {
                         // Swipe left (trailing) -> Delete
                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                             Button(role: .destructive) {
-                                delete(workspace)
+                                requestDelete(workspace)
                             } label: {
                                 Label("Delete", systemImage: "trash")
                             }
@@ -94,6 +98,25 @@ struct WorkspacePickerView: View {
             Button("OK", role: .cancel) { }
         } message: {
             Text("To use iCloud sync, sign in to iCloud in the Settings app, then try again.")
+        }
+        .alert("Delete Workspace?", isPresented: $showingWorkspaceDeleteConfirm) {
+            Button("Delete", role: .destructive) {
+                if let offsets = pendingWorkspaceDeleteOffsets {
+                    onDelete(offsets)
+                }
+                pendingWorkspaceDeleteOffsets = nil
+                pendingWorkspaceDeleteName = ""
+            }
+            Button("Cancel", role: .cancel) {
+                pendingWorkspaceDeleteOffsets = nil
+                pendingWorkspaceDeleteName = ""
+            }
+        } message: {
+            if pendingWorkspaceDeleteName.isEmpty {
+                Text("This workspace will be deleted.")
+            } else {
+                Text("“\(pendingWorkspaceDeleteName)” will be deleted.")
+            }
         }
         .sheet(isPresented: $showingRestartRequired) {
             RestartRequiredView(
@@ -140,9 +163,17 @@ struct WorkspacePickerView: View {
 
     // MARK: - Actions
 
-    private func delete(_ workspace: Workspace) {
+    private func requestDelete(_ workspace: Workspace) {
         guard let index = workspaces.firstIndex(where: { $0.id == workspace.id }) else { return }
-        onDelete(IndexSet(integer: index))
+        let offsets = IndexSet(integer: index)
+
+        if confirmBeforeDeleting {
+            pendingWorkspaceDeleteName = workspace.name
+            pendingWorkspaceDeleteOffsets = offsets
+            showingWorkspaceDeleteConfirm = true
+        } else {
+            onDelete(offsets)
+        }
     }
 
     // MARK: - Row
@@ -160,7 +191,7 @@ struct WorkspacePickerView: View {
 
             if selectedWorkspaceID == workspace.id.uuidString {
                 Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.tint)
             }
         }
         .contentShape(Rectangle())
@@ -203,10 +234,10 @@ extension WorkspacePickerView {
     private func dataSourceTrailingIcon(isActive: Bool, isDesired: Bool) -> some View {
         if isActive {
             Image(systemName: "checkmark.circle.fill")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.tint)
         } else if isDesired != isActive {
             Image(systemName: "arrow.clockwise.circle")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.tint)
                 .accessibilityLabel("Restart required")
         }
     }
