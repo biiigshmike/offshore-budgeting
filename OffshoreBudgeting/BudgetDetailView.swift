@@ -1036,10 +1036,6 @@ private struct BudgetPlannedExpenseRow: View {
         expense.actualAmount > 0 ? expense.actualAmount : expense.plannedAmount
     }
 
-    private var amountLabel: String {
-        expense.actualAmount > 0 ? "Actual" : "Planned"
-    }
-
     private var categoryColor: Color {
         if let hex = expense.category?.hexColor, let color = Color(hex: hex) {
             return color
@@ -1049,19 +1045,19 @@ private struct BudgetPlannedExpenseRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
+
             Circle()
                 .fill(categoryColor)
                 .frame(width: 10, height: 10)
                 .padding(.top, 6)
 
+            // LEFT SIDE
             VStack(alignment: .leading, spacing: 4) {
                 Text(expense.title)
                     .font(.body)
 
                 HStack(spacing: 8) {
                     Text(expense.expenseDate.formatted(date: .abbreviated, time: .omitted))
-                    Text("•")
-                    Text("\(amountLabel): \(amountToShow, format: CurrencyFormatter.currencyStyle())")
 
                     if showsCardName, let cardName = expense.card?.name {
                         Text("•")
@@ -1073,13 +1069,24 @@ private struct BudgetPlannedExpenseRow: View {
             }
 
             Spacer(minLength: 0)
+
+            // RIGHT SIDE (CardDetailView styling)
+            Text(amountToShow, format: CurrencyFormatter.currencyStyle())
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(.primary)
+                .multilineTextAlignment(.trailing)
         }
+        .padding(.vertical, 4)
     }
 }
 
 private struct BudgetVariableExpenseRow: View {
     let expense: VariableExpense
     let showsCardName: Bool
+    
+    private var amountToShow: Double {
+        expense.amount
+    }
 
     private var categoryColor: Color {
         if let hex = expense.category?.hexColor, let color = Color(hex: hex) {
@@ -1090,19 +1097,19 @@ private struct BudgetVariableExpenseRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
+
             Circle()
                 .fill(categoryColor)
                 .frame(width: 10, height: 10)
                 .padding(.top, 6)
 
+            // LEFT SIDE
             VStack(alignment: .leading, spacing: 4) {
                 Text(expense.descriptionText)
                     .font(.body)
 
                 HStack(spacing: 8) {
                     Text(expense.transactionDate.formatted(date: .abbreviated, time: .omitted))
-                    Text("•")
-                    Text(expense.amount, format: CurrencyFormatter.currencyStyle())
 
                     if showsCardName, let cardName = expense.card?.name {
                         Text("•")
@@ -1114,7 +1121,14 @@ private struct BudgetVariableExpenseRow: View {
             }
 
             Spacer(minLength: 0)
+
+            // RIGHT SIDE (CardDetailView styling)
+            Text(amountToShow, format: CurrencyFormatter.currencyStyle())
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(.primary)
+                .multilineTextAlignment(.trailing)
         }
+        .padding(.vertical, 4)
     }
 }
 

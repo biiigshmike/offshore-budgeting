@@ -1331,10 +1331,6 @@ private struct PlannedExpenseRow: View {
         expense.actualAmount > 0 ? expense.actualAmount : expense.plannedAmount
     }
 
-    private var amountLabel: String {
-        expense.actualAmount > 0 ? "Actual" : "Planned"
-    }
-
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
 
