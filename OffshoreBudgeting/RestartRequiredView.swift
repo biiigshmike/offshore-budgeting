@@ -66,7 +66,6 @@ struct RestartRequiredView: View {
                 .buttonStyle(.glassProminent)
                 .tint(.blue)
             }
-            .padding(.horizontal, 18)
 
             Spacer(minLength: 0)
         }
