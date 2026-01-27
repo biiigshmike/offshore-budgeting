@@ -51,7 +51,7 @@ struct HomeSpendTrendsTile: View {
                 VStack(alignment: .leading, spacing: 10) {
 
                     if result.buckets.allSatisfy({ $0.total <= 0 }) {
-                        Text("No spending data in this range.")
+                        Text("No spending data found in this range.")
                             .foregroundStyle(.secondary)
                     } else {
                         miniChart(result: result)

@@ -82,12 +82,7 @@ struct HomeCategorySpotlightTile: View {
     private var content: some View {
         if metricsResult.metrics.isEmpty || metricsResult.totalSpent <= 0 {
             VStack(alignment: .leading, spacing: 6) {
-                Text("No spending yet")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
-
-                Text("for this range")
-                    .font(.caption)
+                Text("No spending data found in this range.")
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)

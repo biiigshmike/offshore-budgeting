@@ -163,7 +163,7 @@ struct HomeIncomeMetricsView: View {
 
             if points.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("No income data in this range.")
+                    Text("No income data found in this range.")
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, minHeight: 240, alignment: .center)

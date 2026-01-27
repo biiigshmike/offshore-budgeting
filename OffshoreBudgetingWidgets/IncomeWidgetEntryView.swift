@@ -60,7 +60,7 @@ struct IncomeWidgetEntryView: View {
             Spacer(minLength: 0)
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("No income data.")
+                Text("No income data found in this range.")
                     .font(.headline.weight(.semibold))
 
                 Text("Open Offshore to generate widget data for this period.")

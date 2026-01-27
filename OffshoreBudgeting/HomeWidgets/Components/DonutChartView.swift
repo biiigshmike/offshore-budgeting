@@ -164,10 +164,7 @@ struct DonutChartView: View {
     private var emptyState: some View {
         VStack(spacing: 6) {
 
-            Text("No spending")
-                .font(.headline.weight(.semibold))
-
-            Text("found for this range.")
+            Text("No spending data found in this range.")
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

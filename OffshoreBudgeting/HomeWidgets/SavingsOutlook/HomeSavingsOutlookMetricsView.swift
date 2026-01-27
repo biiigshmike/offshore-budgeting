@@ -168,7 +168,7 @@ struct HomeSavingsOutlookMetricsView: View {
 
             if points.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("No savings data in this range.")
+                    Text("No savings data found in this range.")
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, minHeight: 240, alignment: .center)
