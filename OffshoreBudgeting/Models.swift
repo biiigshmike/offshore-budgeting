@@ -150,6 +150,7 @@ final class Card {
     // Do NOT annotate these with @Relationship(inverse:) on this toolchain.
     // The inverse is declared on Preset.defaultCard / Income.card instead.
     var defaultForPresets: [Preset]? = nil
+    @Relationship(deleteRule: .cascade)
     var incomes: [Income]? = nil
 
     init(
