@@ -37,12 +37,12 @@ struct AppRootView: View {
     let workspace: Workspace
     @Binding var selectedWorkspaceID: String
 
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    @AppStorage("app_selectedSection") private var storedSelectedSectionRaw: String = AppSection.home.rawValue
-    @AppStorage("app_splitViewVisibility") private var storedSplitViewVisibilityRaw: String = "all"
+    @SceneStorage("AppRootView.selectedSection")
+    private var selectedSectionRaw: String = AppSection.home.rawValue
 
-    @State private var selectedSection: AppSection = .home
-    @State private var splitViewVisibility: NavigationSplitViewVisibility = .all
+    @SceneStorage("AppRootView.splitViewVisibility")
+    private var splitViewVisibilityRaw: String = "all"
+
     @State private var homePath = NavigationPath()
     @State private var budgetsPath = NavigationPath()
     @State private var incomePath = NavigationPath()
@@ -57,26 +57,15 @@ struct AppRootView: View {
         #endif
     }
 
-    var body: some View {
-        Group {
-            if isPhone {
-                phoneTabs
-            } else if horizontalSizeClass == .compact {
-                phoneTabs
-            } else {
-                splitView
-            }
-        }
-        .onAppear {
-            selectedSection = AppSection(rawValue: storedSelectedSectionRaw) ?? .home
-            splitViewVisibility = splitViewVisibilityFromRaw(storedSplitViewVisibilityRaw)
-        }
-        .onChange(of: selectedSection) { _, newValue in
-            storedSelectedSectionRaw = newValue.rawValue
-        }
-        .onChange(of: splitViewVisibility) { _, newValue in
-            storedSplitViewVisibilityRaw = rawFromSplitViewVisibility(newValue)
-        }
+    private var selectedSection: AppSection {
+        AppSection(rawValue: selectedSectionRaw) ?? .home
+    }
+
+    private var selectedSectionBinding: Binding<AppSection> {
+        Binding(
+            get: { selectedSection },
+            set: { selectedSectionRaw = $0.rawValue }
+        )
     }
 
     private var selectedSectionForSidebar: Binding<AppSection?> {
@@ -84,15 +73,34 @@ struct AppRootView: View {
             get: { selectedSection },
             set: { newValue in
                 guard let newValue else { return }
-                selectedSection = newValue
+                selectedSectionRaw = newValue.rawValue
             }
         )
+    }
+
+    private var splitViewVisibility: NavigationSplitViewVisibility {
+        splitViewVisibilityFromRaw(splitViewVisibilityRaw)
+    }
+
+    private var splitViewVisibilityBinding: Binding<NavigationSplitViewVisibility> {
+        Binding(
+            get: { splitViewVisibility },
+            set: { splitViewVisibilityRaw = rawFromSplitViewVisibility($0) }
+        )
+    }
+
+    var body: some View {
+        if isPhone {
+            phoneTabs
+        } else {
+            splitView
+        }
     }
 
     // MARK: - iPhone
 
     private var phoneTabs: some View {
-        TabView(selection: $selectedSection) {
+        TabView(selection: selectedSectionBinding) {
 
             NavigationStack {
                 HomeView(workspace: workspace)
@@ -129,7 +137,7 @@ struct AppRootView: View {
     // MARK: - iPad + Mac
 
     private var splitView: some View {
-        NavigationSplitView(columnVisibility: $splitViewVisibility) {
+        NavigationSplitView(columnVisibility: splitViewVisibilityBinding) {
             List(selection: selectedSectionForSidebar) {
                 ForEach(AppSection.allCases) { section in
                     Label(section.rawValue, systemImage: section.systemImage)
@@ -141,21 +149,6 @@ struct AppRootView: View {
         } detail: {
             NavigationStack(path: selectedSectionPath) {
                 sectionRootView
-            }
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    if splitViewVisibility == .detailOnly {
-                        Picker("Section", selection: $selectedSection) {
-                            ForEach(AppSection.allCases) { section in
-                                Text(section.rawValue)
-                                    .tag(section)
-                            }
-                        }
-                        #if os(iOS)
-                        .pickerStyle(.segmented)
-                        #endif
-                    }
-                }
             }
         }
     }
