@@ -18,6 +18,10 @@ struct HomeEditPinnedCardsView: View {
 
     @Environment(\.dismiss) private var dismiss
 
+    @State private var editMode: EditMode = .inactive
+
+    private var isEditing: Bool { editMode == .active }
+
     var body: some View {
         NavigationStack {
             List {
@@ -34,6 +38,8 @@ struct HomeEditPinnedCardsView: View {
                                 Text(widget.title)
                                 Spacer()
                             }
+                            .moveDisabled(!isEditing)
+                            .deleteDisabled(!isEditing)
                         }
                         .onMove(perform: movePinnedWidgets)
                         .onDelete(perform: deletePinnedWidgets)
@@ -76,6 +82,8 @@ struct HomeEditPinnedCardsView: View {
                                     Text(card.name)
                                     Spacer()
                                 }
+                                .moveDisabled(!isEditing)
+                                .deleteDisabled(!isEditing)
                             }
                         }
                         .onMove(perform: movePinnedCards)
@@ -84,9 +92,15 @@ struct HomeEditPinnedCardsView: View {
                 }
 
                 Section("Available Cards") {
-                    ForEach(cards) { card in
+                    let availableCards = cards.filter { !pinnedIDs.contains($0.id) }
+
+                    if availableCards.isEmpty {
+                        Text("All cards are pinned.")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(availableCards) { card in
                         Button {
-                            togglePinnedCard(card.id)
+                            pinnedIDs.append(card.id)
                         } label: {
                             HStack {
                                 Text(card.name)
@@ -94,12 +108,11 @@ struct HomeEditPinnedCardsView: View {
 
                                 Spacer()
 
-                                if pinnedIDs.contains(card.id) {
-                                    Image(systemName: "plus.circle.fill")
-                                        .foregroundStyle(.secondary)
-                                }
+                                Image(systemName: "plus.circle.fill")
+                                    .foregroundStyle(.secondary)
                             }
                         }
+                    }
                     }
                 }
             }
@@ -118,6 +131,7 @@ struct HomeEditPinnedCardsView: View {
                 }
             }
         }
+        .environment(\.editMode, $editMode)
     }
 
     // MARK: - Widgets helpers
@@ -131,14 +145,6 @@ struct HomeEditPinnedCardsView: View {
     }
 
     // MARK: - Card helpers
-
-    private func togglePinnedCard(_ id: UUID) {
-        if let index = pinnedIDs.firstIndex(of: id) {
-            pinnedIDs.remove(at: index)
-        } else {
-            pinnedIDs.append(id)
-        }
-    }
 
     private func movePinnedCards(from source: IndexSet, to destination: Int) {
         pinnedIDs.move(fromOffsets: source, toOffset: destination)

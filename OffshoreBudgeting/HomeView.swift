@@ -91,14 +91,14 @@ struct HomeView: View {
                                 cards.first(where: { $0.id == id })
                             }
 
-                            if pinnedCards.isEmpty {
+                            if pinnedWidgets.isEmpty && pinnedCards.isEmpty {
                                 HomeTileContainer(
-                                    title: "Card Summary",
+                                    title: "Home",
                                     subtitle: dateRangeSubtitle,
                                     accent: .primary,
                                     showsChevron: false
                                 ) {
-                                    Text("Tap Edit to pin cards to Home.")
+                                    Text("Tap Edit to pin widgets and cards to Home.")
                                         .foregroundStyle(.secondary)
                                         .fixedSize(horizontal: false, vertical: true)
                                 }
@@ -131,15 +131,28 @@ struct HomeView: View {
                                         }
                                     }
 
-                                    // Cards after widgets (like your current layout)
-                                    ForEach(pinnedCards) { card in
-                                        HomeCardSummaryTile(
-                                            workspace: workspace,
-                                            card: card,
-                                            startDate: appliedStartDate,
-                                            endDate: appliedEndDate
-                                        )
-                                        .accessibilityElement(children: .combine)
+                                    if pinnedCards.isEmpty {
+                                        HomeTileContainer(
+                                            title: "Card Summary",
+                                            subtitle: dateRangeSubtitle,
+                                            accent: .primary,
+                                            showsChevron: false
+                                        ) {
+                                            Text("Tap Edit to pin cards to Home.")
+                                                .foregroundStyle(.secondary)
+                                                .fixedSize(horizontal: false, vertical: true)
+                                        }
+                                    } else {
+                                        // Cards after widgets (like your current layout)
+                                        ForEach(pinnedCards) { card in
+                                            HomeCardSummaryTile(
+                                                workspace: workspace,
+                                                card: card,
+                                                startDate: appliedStartDate,
+                                                endDate: appliedEndDate
+                                            )
+                                            .accessibilityElement(children: .combine)
+                                        }
                                     }
                                 }
                             }
