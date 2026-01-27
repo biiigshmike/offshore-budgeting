@@ -117,6 +117,10 @@ struct HomeEditPinnedCardsView: View {
                 }
             }
             .navigationTitle("Edit Widgets")
+            .environment(\.editMode, $editMode)
+            .onDisappear {
+                editMode = .inactive
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button {
@@ -127,11 +131,20 @@ struct HomeEditPinnedCardsView: View {
                 }
 
                 ToolbarItem(placement: .topBarTrailing) {
-                    EditButton()
+                    Button {
+                        withAnimation {
+                            editMode = isEditing ? .inactive : .active
+                        }
+                    } label: {
+                        if isEditing {
+                            Label("Done", systemImage: "checkmark")
+                        } else {
+                            Text("Edit")
+                        }
+                    }
                 }
             }
         }
-        .environment(\.editMode, $editMode)
     }
 
     // MARK: - Widgets helpers
