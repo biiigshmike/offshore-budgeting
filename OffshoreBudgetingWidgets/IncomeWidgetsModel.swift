@@ -5,7 +5,6 @@
 //  Created by Michael Brown on 1/27/26.
 //
 
-
 import Foundation
 import WidgetKit
 
@@ -24,14 +23,16 @@ struct IncomeWidgetSnapshot: Codable, Hashable {
         let source: String
         let amount: Double
         let date: Date
+        let isPlanned: Bool
     }
 }
 
 struct IncomeWidgetEntry: TimelineEntry {
     let date: Date
-    let configuration: IncomeWidgetConfigurationIntent
+    let periodToken: String
     let snapshot: IncomeWidgetSnapshot?
 }
+
 
 extension IncomeWidgetSnapshot {
     static var placeholder: IncomeWidgetSnapshot {
@@ -43,9 +44,9 @@ extension IncomeWidgetSnapshot {
             plannedTotal: 4200,
             actualTotal: 3890,
             recentItems: [
-                .init(source: "Paycheck", amount: 2200, date: Calendar.current.date(byAdding: .day, value: -3, to: .now) ?? .now),
-                .init(source: "Side Gig", amount: 350, date: Calendar.current.date(byAdding: .day, value: -9, to: .now) ?? .now),
-                .init(source: "Bonus", amount: 600, date: Calendar.current.date(byAdding: .day, value: -18, to: .now) ?? .now)
+                .init(source: "Paycheck", amount: 2200, date: Calendar.current.date(byAdding: .day, value: -3, to: .now) ?? .now, isPlanned: false),
+                .init(source: "Side Gig", amount: 350, date: Calendar.current.date(byAdding: .day, value: -9, to: .now) ?? .now, isPlanned: false),
+                .init(source: "Bonus", amount: 600, date: Calendar.current.date(byAdding: .day, value: -18, to: .now) ?? .now, isPlanned: true)
             ]
         )
     }

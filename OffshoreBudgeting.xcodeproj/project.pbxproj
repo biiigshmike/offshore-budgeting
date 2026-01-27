@@ -61,6 +61,15 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		4C198A072F294BB5005D2D0D /* Exceptions for "OffshoreBudgetingWidgets" folder in "OffshoreBudgeting" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				IncomeWidgetPeriod.swift,
+				IncomeWidgetsModel.swift,
+				IncomeWidgetSnapshotStore.swift,
+			);
+			target = 4C96F8502F20523700541774 /* OffshoreBudgeting */;
+		};
 		4C8C82192F2486440024DBD0 /* Exceptions for "OffshoreBudgeting" folder in "OffshoreBudgeting" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -99,6 +108,7 @@
 		4CAD3C422F28AF7D001E3F5B /* OffshoreBudgetingWidgets */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
+				4C198A072F294BB5005D2D0D /* Exceptions for "OffshoreBudgetingWidgets" folder in "OffshoreBudgeting" target */,
 				4CAD3C562F28AF7F001E3F5B /* Exceptions for "OffshoreBudgetingWidgets" folder in "OffshoreBudgetingWidgetsExtension" target */,
 			);
 			path = OffshoreBudgetingWidgets;

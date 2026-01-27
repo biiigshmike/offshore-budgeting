@@ -97,6 +97,14 @@ struct ContentView: View {
                     selectedWorkspaceID = ""
                 }
             }
+            .onAppear {
+                IncomeWidgetSnapshotStore.setSelectedWorkspaceID(selectedWorkspaceID)
+                refreshIncomeWidgetSnapshotsIfPossible()
+            }
+            .onChange(of: selectedWorkspaceID) { _, newValue in
+                IncomeWidgetSnapshotStore.setSelectedWorkspaceID(newValue)
+                refreshIncomeWidgetSnapshotsIfPossible()
+            }
             .onChange(of: workspaces.count) { _, newCount in
                 if activeUseICloud, newCount > 0 {
                     iCloudBootstrapStartedAt = 0
@@ -121,6 +129,14 @@ struct ContentView: View {
                 }
             }
         }
+    }
+    
+    private func refreshIncomeWidgetSnapshotsIfPossible() {
+        guard let id = UUID(uuidString: selectedWorkspaceID) else { return }
+        IncomeWidgetSnapshotBuilder.buildAndSaveAllPeriods(
+            modelContext: modelContext,
+            workspaceID: id
+        )
     }
 
     // MARK: - Derived

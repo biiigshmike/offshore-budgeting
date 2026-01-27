@@ -5,7 +5,6 @@
 //  Created by Michael Brown on 1/27/26.
 //
 
-
 import WidgetKit
 
 struct IncomeWidgetProvider: AppIntentTimelineProvider {
@@ -13,32 +12,50 @@ struct IncomeWidgetProvider: AppIntentTimelineProvider {
     typealias Entry = IncomeWidgetEntry
 
     func placeholder(in context: Context) -> IncomeWidgetEntry {
+        // Placeholder should always render even if the app group has no data yet.
         IncomeWidgetEntry(
             date: .now,
-            configuration: IncomeWidgetConfigurationIntent(),
+            periodToken: "1M",
             snapshot: .placeholder
         )
     }
 
     func snapshot(for configuration: IncomeWidgetConfigurationIntent, in context: Context) async -> IncomeWidgetEntry {
-        IncomeWidgetEntry(
+        let snap = loadSnapshot(configuration: configuration)
+
+        return IncomeWidgetEntry(
             date: .now,
-            configuration: configuration,
-            snapshot: .placeholder
+            periodToken: configuration.resolvedPeriodToken,
+            snapshot: snap ?? .placeholder
         )
     }
 
     func timeline(for configuration: IncomeWidgetConfigurationIntent, in context: Context) async -> Timeline<IncomeWidgetEntry> {
-        // TODO: Replace with App Group snapshot loader keyed by configuration.period
-        let snap: IncomeWidgetSnapshot? = .placeholder
+        let snap = loadSnapshot(configuration: configuration)
 
         let entry = IncomeWidgetEntry(
             date: .now,
-            configuration: configuration,
+            periodToken: configuration.resolvedPeriodToken,
             snapshot: snap
         )
 
-        let nextRefresh = Calendar.current.date(byAdding: .minute, value: 30, to: .now) ?? .now.addingTimeInterval(1800)
+        // Refresh a few times a day is usually plenty for finance dashboards.
+        let nextRefresh = Calendar.current.date(byAdding: .hour, value: 3, to: .now)
+            ?? .now.addingTimeInterval(3 * 3600)
+
         return Timeline(entries: [entry], policy: .after(nextRefresh))
+    }
+
+    private func loadSnapshot(configuration: IncomeWidgetConfigurationIntent) -> IncomeWidgetSnapshot? {
+        let periodToken = configuration.resolvedPeriodToken
+
+        guard let workspaceID = IncomeWidgetSnapshotStore.selectedWorkspaceID(), !workspaceID.isEmpty else {
+            return nil
+        }
+
+        return IncomeWidgetSnapshotStore.load(
+            workspaceID: workspaceID,
+            periodToken: periodToken
+        )
     }
 }

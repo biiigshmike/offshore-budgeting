@@ -93,24 +93,37 @@ private struct MetricValueView: View {
     }
 }
 
-private struct RecentIncomeCell: View {
+struct RecentIncomeCell: View {
     let item: IncomeWidgetSnapshot.IncomeWidgetRecentItem
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(item.source)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
+    private var dotColor: Color {
+        item.isPlanned ? .orange : .blue
+    }
 
-            Text(item.amount, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.9)
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Circle()
+                .fill(dotColor)
+                .frame(width: 7, height: 7)
+                .padding(.top, 3)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(item.source)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+
+                Text(item.amount, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.9)
+            }
         }
     }
 }
+
 
 // MARK: - Small
 
@@ -214,17 +227,6 @@ struct IncomeWidgetLargeView: View {
             HStack(spacing: 12) {
                 MetricValueView(title: "Planned", value: snapshot.plannedTotal)
                 MetricValueView(title: "Actual", value: snapshot.actualTotal)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Delta")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    Text(snapshot.delta, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
-                        .font(.headline.weight(.semibold))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.85)
-                }
 
                 Spacer(minLength: 0)
             }
