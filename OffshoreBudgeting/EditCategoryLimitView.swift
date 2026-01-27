@@ -51,16 +51,29 @@ struct EditCategoryLimitView: View {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") { dismiss() }
                 }
-
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Save") {
-                        save()
-                        dismiss()
+                
+                if #available(iOS 26.0, *) {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Save") {
+                            save()
+                            dismiss()
+                        }
+                        .disabled(!canSave)
+                        .tint(.accentColor)
+                        .controlSize(.large)
+                        .buttonStyle(.glassProminent)
                     }
-                    .disabled(!canSave)
-                    .tint(.accentColor)
-                    .controlSize(.large)
-                    .buttonStyle(.glassProminent)
+                } else {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Save") {
+                            save()
+                            dismiss()
+                        }
+                        .disabled(!canSave)
+                        .tint(.accentColor)
+                        .controlSize(.large)
+                        .buttonStyle(.plain)
+                    }
                 }
             }
             .onAppear {

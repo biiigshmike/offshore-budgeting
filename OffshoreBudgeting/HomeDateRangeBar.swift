@@ -21,6 +21,8 @@ struct HomeDateRangeBar: View {
     @Binding var draftStartDate: Date
     @Binding var draftEndDate: Date
 
+    /// Parent decides this (draft differs from applied, or whatever your logic is).
+    let isApplyEnabled: Bool
     var onApply: () -> Void
 
     var body: some View {
@@ -35,9 +37,15 @@ struct HomeDateRangeBar: View {
                     Image(systemName: "arrow.right")
                         .font(.system(size: 14, weight: .semibold))
                         .frame(width: 44, height: 44)
-                        .background(.thinMaterial, in: Circle())
+                        .background(
+                            Circle()
+                                .fill(isApplyEnabled
+                                      ? Color.accentColor.opacity(0.85)
+                                      : Color.secondary.opacity(0.1))
+                        )
                 }
                 .buttonStyle(.plain)
+                .disabled(!isApplyEnabled)
                 .accessibilityLabel("Apply date range")
 
                 Menu {
@@ -50,7 +58,7 @@ struct HomeDateRangeBar: View {
                     Image(systemName: "calendar")
                         .font(.system(size: 14, weight: .semibold))
                         .frame(width: 44, height: 44)
-                        .background(.thinMaterial, in: Circle())
+                        .background(Circle().fill(Color.secondary.opacity(0.1)))
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Quick ranges")

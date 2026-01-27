@@ -81,8 +81,13 @@ struct SettingsHelpView: View {
 
     // MARK: - Repeat Onboarding Button
 
+    // MARK: - Repeat Onboarding Button
+
+    // MARK: - Repeat Onboarding Button
+
+    @ViewBuilder
     private var repeatOnboardingButton: some View {
-        Button {
+        let baseButton = Button {
             showOnboardingAlert = true
         } label: {
             Text("Repeat Onboarding")
@@ -90,9 +95,14 @@ struct SettingsHelpView: View {
                 .frame(maxWidth: .infinity)
                 .frame(minHeight: 44)
         }
-        .buttonStyle(.glassProminent)
-        .tint(.blue)
+        .tint(.accentColor)
         .listRowInsets(EdgeInsets())
+
+        if #available(iOS 26.0, *) {
+            baseButton.buttonStyle(.glassProminent)
+        } else {
+            baseButton.buttonStyle(.borderedProminent)
+        }
     }
 }
 

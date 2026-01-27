@@ -38,30 +38,42 @@ struct OnboardingStartGateView: View {
     private var welcomeScreen: some View {
         VStack(alignment: .leading, spacing: 14) {
             Spacer(minLength: 8)
-
+            
             Image(systemName: "sailboat.fill")
                 .font(.system(size: 46, weight: .semibold))
                 .foregroundStyle(.tint)
-
+            
             Text("Welcome to Offshore Budgeting!")
                 .font(.largeTitle.weight(.bold))
-
+            
             Text("Press the button below to get started setting up your budgeting workspace.")
                 .font(.body)
                 .foregroundStyle(.secondary)
-
+            
             Spacer(minLength: 0)
-
-            Button {
-                didPressGetStarted = true
-                path = [.dataSource]
-            } label: {
-                Text("Get Started")
-                    .font(.headline.weight(.semibold))
-                    .frame(maxWidth: .infinity, minHeight: 44)
+            if #available(iOS 26.0, *) {
+                Button {
+                    didPressGetStarted = true
+                    path = [.dataSource]
+                } label: {
+                    Text("Get Started")
+                        .font(.headline.weight(.semibold))
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.glassProminent)
+                .tint(.accentColor)
+            } else {
+                Button {
+                    didPressGetStarted = true
+                    path = [.dataSource]
+                } label: {
+                    Text("Get Started")
+                        .font(.headline.weight(.semibold))
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.accentColor)
             }
-            .buttonStyle(.glassProminent)
-            .tint(.blue)
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 18)

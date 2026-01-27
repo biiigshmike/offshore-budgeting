@@ -38,15 +38,47 @@ struct RestartRequiredView: View {
 
             if let secondaryButtonTitle, let onSecondary {
                 HStack(spacing: 12) {
-                    Button {
-                        onSecondary()
-                    } label: {
-                        Text(secondaryButtonTitle)
-                            .frame(maxWidth: .infinity, minHeight: 44)
+                    if #available(iOS 26.0, *) {
+                        Button {
+                            onSecondary()
+                        } label: {
+                            Text(secondaryButtonTitle)
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                        }
+                        .buttonStyle(.glassProminent)
+                        .tint(.gray)
+                    } else {
+                        Button {
+                            onSecondary()
+                        } label: {
+                            Text(secondaryButtonTitle)
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.gray)
                     }
-                    .buttonStyle(.glassProminent)
-                    .tint(.gray)
-
+                    if #available(iOS 26.0, *) {
+                        Button {
+                            onPrimary()
+                        } label: {
+                            Text(primaryButtonTitle)
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                        }
+                        .buttonStyle(.glassProminent)
+                        .tint(.accentColor)
+                    } else {
+                        Button {
+                            onPrimary()
+                        } label: {
+                            Text(primaryButtonTitle)
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.accentColor)
+                    }
+                }
+            } else {
+                if #available(iOS 26.0, *) {
                     Button {
                         onPrimary()
                     } label: {
@@ -55,16 +87,16 @@ struct RestartRequiredView: View {
                     }
                     .buttonStyle(.glassProminent)
                     .tint(.blue)
+                } else {
+                    Button {
+                        onPrimary()
+                    } label: {
+                        Text(primaryButtonTitle)
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.accentColor)
                 }
-            } else {
-                Button {
-                    onPrimary()
-                } label: {
-                    Text(primaryButtonTitle)
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                }
-                .buttonStyle(.glassProminent)
-                .tint(.blue)
             }
 
             Spacer(minLength: 0)

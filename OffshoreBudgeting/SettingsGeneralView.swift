@@ -65,23 +65,43 @@ struct SettingsGeneralView: View {
 
             Section("Maintenance") {
                 HStack(spacing: 12) {
-                    Button {
-                        activeAlert = .tipsResetConfirm
-                    } label: {
-                        Text("Reset Tips & Hints")
-                            .frame(maxWidth: .infinity, minHeight: 44)
+                    if #available(iOS 26.0, *) {
+                        Button {
+                            activeAlert = .tipsResetConfirm
+                        } label: {
+                            Text("Reset Tips & Hints")
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                        }
+                        .buttonStyle(.glassProminent)
+                        .tint(.orange)
+                        
+                        Button {
+                            activeAlert = .eraseConfirm
+                        } label: {
+                            Text("Reset & Erase Content")
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                        }
+                        .buttonStyle(.glassProminent)
+                        .tint(.red)
+                    } else {
+                        Button {
+                            activeAlert = .tipsResetConfirm
+                        } label: {
+                            Text("Reset Tips & Hints")
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.orange)
+                        
+                        Button {
+                            activeAlert = .eraseConfirm
+                        } label: {
+                            Text("Reset & Erase Content")
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.red)
                     }
-                    .buttonStyle(.glassProminent)
-                    .tint(.orange)
-
-                    Button {
-                        activeAlert = .eraseConfirm
-                    } label: {
-                        Text("Reset & Erase Content")
-                            .frame(maxWidth: .infinity, minHeight: 44)
-                    }
-                    .buttonStyle(.glassProminent)
-                    .tint(.red)
                 }
 
 //                Text("Erase will remove all budgets, cards, categories, presets, transactions, and workspaces from this device.")

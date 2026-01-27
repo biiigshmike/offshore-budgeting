@@ -77,27 +77,42 @@ struct AppLockGate<Content: View>: View {
             Image(systemName: "lock.fill")
                 .font(.system(size: 44, weight: .semibold))
                 .foregroundStyle(.secondary)
-
+            
             Text("App Locked")
                 .font(.title2.weight(.semibold))
-
+            
             Text("Authenticate to continue.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
-
-            Button {
-                Task { await unlockIfNeeded() }
-            } label: {
-                if isAuthenticating {
-                    ProgressView()
-                        .frame(minWidth: 120, minHeight: 44)
-                } else {
-                    Text("Unlock")
-                        .frame(minWidth: 120, minHeight: 44)
+            if #available(iOS 26.0, *) {
+                Button {
+                    Task { await unlockIfNeeded() }
+                } label: {
+                    if isAuthenticating {
+                        ProgressView()
+                            .frame(minWidth: 120, minHeight: 44)
+                    } else {
+                        Text("Unlock")
+                            .frame(minWidth: 120, minHeight: 44)
+                    }
                 }
+                .buttonStyle(.glassProminent)
+                .disabled(isAuthenticating)
+            } else {
+                Button {
+                    Task { await unlockIfNeeded() }
+                } label: {
+                    if isAuthenticating {
+                        ProgressView()
+                            .frame(minWidth: 120, minHeight: 44)
+                    } else {
+                        Text("Unlock")
+                            .frame(minWidth: 120, minHeight: 44)
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(isAuthenticating)
             }
-            .buttonStyle(.glassProminent)
-            .disabled(isAuthenticating)
         }
         .padding()
     }

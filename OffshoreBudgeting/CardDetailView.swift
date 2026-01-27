@@ -1218,7 +1218,7 @@ private struct IconCircleButton: View {
                 .frame(width: 44, height: 44)
                 .background(
                     Circle()
-                        .fill(isEnabled ? Color.blue.opacity(0.85) : Color.secondary.opacity(0.1))
+                        .fill(isEnabled ? Color.accentColor.opacity(0.85) : Color.secondary.opacity(0.1))
                 )
         }
         .buttonStyle(.plain)
@@ -1553,12 +1553,22 @@ private struct EditPlannedExpenseView: View {
             ToolbarItem(placement: .topBarLeading) {
                 Button("Cancel") { dismiss() }
             }
-            ToolbarItem(placement: .topBarTrailing) {
-                Button("Save") { save() }
-                    .disabled(!canSave)
-                    .tint(.accentColor)
-                    .controlSize(.large)
-                    .buttonStyle(.glassProminent)
+            if #available(iOS 26.0, *) {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Save") { save() }
+                        .disabled(!canSave)
+                        .tint(.accentColor)
+                        .controlSize(.large)
+                        .buttonStyle(.glassProminent)
+                }
+            } else {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Save") { save() }
+                        .disabled(!canSave)
+                        .tint(.accentColor)
+                        .controlSize(.large)
+                        .buttonStyle(.plain)
+                }
             }
         }
         .alert("Invalid Amount", isPresented: $showingInvalidAmountAlert) {

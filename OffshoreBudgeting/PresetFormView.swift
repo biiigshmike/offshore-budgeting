@@ -176,10 +176,10 @@ struct PresetFormView: View {
             }
 
         case .monthly:
-            Toggle("Last day of month", isOn: $monthlyIsLastDay)
+            Toggle("Last Day of Month", isOn: $monthlyIsLastDay)
 
             if !monthlyIsLastDay {
-                Picker("Day of month", selection: $monthlyDayOfMonth) {
+                Picker("Day of Month", selection: $monthlyDayOfMonth) {
                     ForEach(1...31, id: \.self) { day in
                         Text("\(day)").tag(day)
                     }

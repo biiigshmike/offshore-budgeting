@@ -94,13 +94,20 @@ struct AddPresetView: View {
             ToolbarItem(placement: .topBarLeading) {
                 Button("Cancel") { dismiss() }
             }
-
-            ToolbarItem(placement: .topBarTrailing) {
-                Button("Save") { save() }
-                    .disabled(!canSave)
-                    .tint(.accentColor)
-                    .controlSize(.large)
-                    .buttonStyle(.glassProminent)
+            if #available(iOS 26.0, *) {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Save") { save() }
+                        .disabled(!canSave)
+                        .tint(.accentColor)
+                        .buttonStyle(.glassProminent)
+                }
+            } else {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Save") { save() }
+                        .disabled(!canSave)
+                        .tint(.accentColor)
+                        .buttonStyle(.plain)
+                }
             }
         }
         .alert("Invalid Amount", isPresented: $showingInvalidAmountAlert) {

@@ -199,8 +199,11 @@ struct SettingsView: View {
 
     // MARK: - Toolbar Workspace Item (Single Source of Truth)
 
+    // MARK: - Toolbar Workspace Item (Single Source of Truth)
+
+    @ViewBuilder
     private var workspaceTrailingNavBarItem: some View {
-        Menu {
+        let baseMenu = Menu {
             workspaceSwitcherMenuContent
 
             Button {
@@ -216,6 +219,14 @@ struct SettingsView: View {
         }
         .accessibilityLabel("Workspaces")
         .accessibilityHint("Switch workspaces or manage them")
+        .tint(.primary)
+        .controlSize(.large)
+
+        if #available(iOS 26.0, *) {
+            baseMenu.buttonStyle(.glassProminent)
+        } else {
+            baseMenu.buttonStyle(.plain)
+        }
     }
 
     @ViewBuilder

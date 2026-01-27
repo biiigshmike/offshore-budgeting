@@ -152,17 +152,29 @@ private struct TipSheet: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            // Continue button (kept as-is)
-            Button {
-                dismiss()
-            } label: {
-                Text(buttonTitle)
-                    .frame(maxWidth: .infinity, minHeight: 52)
+            if #available(iOS 26.0, *) {
+                Button {
+                    dismiss()
+                } label: {
+                    Text(buttonTitle)
+                        .frame(maxWidth: .infinity, minHeight: 52)
+                }
+                .buttonStyle(.glassProminent)
+                .tint(.blue)
+                .padding(.horizontal, 22)
+                .padding(.bottom, 18)
+            } else {
+                Button {
+                    dismiss()
+                } label: {
+                    Text(buttonTitle)
+                        .frame(maxWidth: .infinity, minHeight: 52)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.blue)
+                .padding(.horizontal, 22)
+                .padding(.bottom, 18)
             }
-            .buttonStyle(.glassProminent)
-            .tint(.blue)
-            .padding(.horizontal, 22)
-            .padding(.bottom, 18)
         }
         .presentationDetents([.large])
     }

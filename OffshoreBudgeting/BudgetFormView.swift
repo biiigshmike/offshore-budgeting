@@ -66,14 +66,25 @@ struct BudgetFormView: View {
             }
 
             Section("Cards to Track") {
-                Button {
-                    onToggleAllCards()
-                } label: {
-                    Text(selectedCardIDs.count == cards.count && !cards.isEmpty ? "Clear All" : "Toggle All")
-                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .center)
+                if #available(iOS 26.0, *) {
+                    Button {
+                        onToggleAllCards()
+                    } label: {
+                        Text(selectedCardIDs.count == cards.count && !cards.isEmpty ? "Clear All" : "Toggle All")
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .center)
+                    }
+                    .buttonStyle(.glassProminent)
+                    .disabled(cards.isEmpty)
+                } else {
+                    Button {
+                        onToggleAllCards()
+                    } label: {
+                        Text(selectedCardIDs.count == cards.count && !cards.isEmpty ? "Clear All" : "Toggle All")
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .center)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(cards.isEmpty)
                 }
-                .buttonStyle(.borderedProminent)
-                .disabled(cards.isEmpty)
                 
                 ForEach(cards) { card in
                     Toggle(isOn: bindingForCard(card)) {
@@ -88,14 +99,25 @@ struct BudgetFormView: View {
             }
 
             Section("Preset Planned Expenses") {
-                Button {
-                    onToggleAllPresets()
-                } label: {
-                    Text(selectedPresetIDs.count == presets.count && !presets.isEmpty ? "Clear All" : "Toggle All")
-                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .center)
+                if #available(iOS 26.0, *) {
+                    Button {
+                        onToggleAllPresets()
+                    } label: {
+                        Text(selectedPresetIDs.count == presets.count && !presets.isEmpty ? "Clear All" : "Toggle All")
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .center)
+                    }
+                    .buttonStyle(.glassProminent)
+                    .disabled(presets.isEmpty)
+                } else {
+                    Button {
+                        onToggleAllPresets()
+                    } label: {
+                        Text(selectedPresetIDs.count == presets.count && !presets.isEmpty ? "Clear All" : "Toggle All")
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .center)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(presets.isEmpty)
                 }
-                .buttonStyle(.borderedProminent)
-                .disabled(presets.isEmpty)
 
                 ForEach(presets) { preset in
                     Toggle(isOn: bindingForPreset(preset)) {

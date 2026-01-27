@@ -69,7 +69,7 @@ struct IncomeFormView: View {
                 }
 
                 if frequency != .none {
-                    Stepper("Every \(max(1, interval))", value: $interval, in: 1...52)
+                    Stepper("Every: \(max(1, interval))", value: $interval, in: 1...52)
 
                     switch frequency {
                     case .daily:
@@ -83,7 +83,7 @@ struct IncomeFormView: View {
                         }
 
                     case .monthly:
-                        Toggle("Last day of month", isOn: $monthlyIsLastDay)
+                        Toggle("Last Day of Month", isOn: $monthlyIsLastDay)
 
                         if !monthlyIsLastDay {
                             Stepper("Day \(monthlyDayOfMonth)", value: $monthlyDayOfMonth, in: 1...31)

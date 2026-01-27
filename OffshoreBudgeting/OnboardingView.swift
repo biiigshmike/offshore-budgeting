@@ -175,31 +175,44 @@ struct OnboardingView: View {
     private var welcomeStep: some View {
         VStack(alignment: .leading, spacing: 14) {
             Spacer(minLength: 8)
-
+            
             Image(systemName: "sailboat.fill")
                 .font(.system(size: 46, weight: .semibold))
                 .foregroundStyle(.tint)
-
+            
             Text("Welcome to Offshore Budgeting!")
                 .font(.largeTitle.weight(.bold))
-
+            
             Text("Press the button below to get started setting up your budgeting workspace.")
                 .font(.body)
                 .foregroundStyle(.secondary)
-
+            
             Spacer(minLength: 0)
-
-            Button {
-                getStartedTapped()
-            } label: {
-                Text("Get Started")
-                    .frame(maxWidth: .infinity, minHeight: 52)
+            if #available(iOS 26.0, *) {
+                Button {
+                    getStartedTapped()
+                } label: {
+                    Text("Get Started")
+                        .frame(maxWidth: .infinity, minHeight: 52)
+                }
+                .buttonStyle(.glassProminent)
+                .tint(.blue)
+                .disabled(isCheckingICloudForGetStarted)
+                
+                Spacer(minLength: 18)
+            } else {
+                Button {
+                    getStartedTapped()
+                } label: {
+                    Text("Get Started")
+                        .frame(maxWidth: .infinity, minHeight: 52)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.blue)
+                .disabled(isCheckingICloudForGetStarted)
+                
+                Spacer(minLength: 18)
             }
-            .buttonStyle(.glassProminent)
-            .tint(.blue)
-            .disabled(isCheckingICloudForGetStarted)
-
-            Spacer(minLength: 18)
         }
         .frame(maxWidth: 560, alignment: .leading)
     }
@@ -306,26 +319,48 @@ struct OnboardingView: View {
 
     private var bottomNavBar: some View {
         HStack(spacing: 12) {
-            Button {
-                goBack()
-            } label: {
-                Text("Back")
-                    .frame(minWidth: 110, minHeight: 44)
+            if #available(iOS 26.0, *) {
+                Button {
+                    goBack()
+                } label: {
+                    Text("Back")
+                        .frame(minWidth: 110, minHeight: 44)
+                }
+                .buttonStyle(.glassProminent)
+                .tint(.gray)
+                .disabled(onboardingStep == 0)
+            } else {
+                Button {
+                    goBack()
+                } label: {
+                    Text("Back")
+                        .frame(minWidth: 110, minHeight: 44)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.gray)
+                .disabled(onboardingStep == 0)
             }
-            .buttonStyle(.glassProminent)
-            .tint(.gray)
-            .disabled(onboardingStep == 0)
 
             Spacer(minLength: 0)
-
-            Button {
-                primaryActionTapped()
-            } label: {
-                Text(primaryButtonTitle)
-                    .frame(minWidth: 140, minHeight: 44)
+            if #available(iOS 26.0, *) {
+                Button {
+                    primaryActionTapped()
+                } label: {
+                    Text(primaryButtonTitle)
+                        .frame(minWidth: 140, minHeight: 44)
+                }
+                .buttonStyle(.glassProminent)
+                .tint(.accentColor)
+            } else {
+                Button {
+                    primaryActionTapped()
+                } label: {
+                    Text(primaryButtonTitle)
+                        .frame(minWidth: 140, minHeight: 44)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.accentColor)
             }
-            .buttonStyle(.glassProminent)
-            .tint(.blue)
         }
     }
 
@@ -542,15 +577,25 @@ private struct OnboardingWorkspaceStep: View {
                 .background(Color(.systemBackground))
                 .frame(minHeight: 220)
             }
-
-            Button {
-                showingAddWorkspace = true
-            } label: {
-                Label("Add Workspace", systemImage: "plus")
-                    .frame(maxWidth: .infinity, minHeight: 44)
+            if #available(iOS 26.0, *) {
+                Button {
+                    showingAddWorkspace = true
+                } label: {
+                    Label("Add Workspace", systemImage: "plus")
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.glassProminent)
+                .tint(.blue)
+            } else {
+                Button {
+                    showingAddWorkspace = true
+                } label: {
+                    Label("Add Workspace", systemImage: "plus")
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.bordered)
+                .tint(.blue)
             }
-            .buttonStyle(.glassProminent)
-            .tint(.blue)
 
             Text("Tip: Try starting with a workspace called Personal. You can always add more later.")
                 .font(.footnote)
@@ -807,16 +852,25 @@ private struct OnboardingCategoriesStep: View {
             .scrollContentBackground(.hidden)
             .background(Color(.systemBackground))
             .frame(minHeight: 260)
-
-            Button {
-                showingAddCategory = true
-            } label: {
-                Label("Add Category", systemImage: "plus")
-                    .frame(maxWidth: .infinity, minHeight: 44)
+            if #available(iOS 26.0, *) {
+                Button {
+                    showingAddCategory = true
+                } label: {
+                    Label("Add Category", systemImage: "plus")
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.glassProminent)
+                .tint(.accentColor)
+            } else {
+                Button {
+                    showingAddCategory = true
+                } label: {
+                    Label("Add Category", systemImage: "plus")
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.accentColor)
             }
-            .buttonStyle(.glassProminent)
-            .tint(.blue)
-
             Spacer(minLength: 0)
         }
         .sheet(isPresented: $showingAddCategory) {
@@ -884,15 +938,25 @@ private struct OnboardingCardsStep: View {
             .scrollContentBackground(.hidden)
             .background(Color(.systemBackground))
             .frame(minHeight: 260)
-
-            Button {
-                showingAddCard = true
-            } label: {
-                Label("Add Card", systemImage: "plus")
-                    .frame(maxWidth: .infinity, minHeight: 44)
+            if #available(iOS 26.0, *) {
+                Button {
+                    showingAddCard = true
+                } label: {
+                    Label("Add Card", systemImage: "plus")
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.glassProminent)
+                .tint(.accentColor)
+            } else {
+                Button {
+                    showingAddCard = true
+                } label: {
+                    Label("Add Card", systemImage: "plus")
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.accentColor)
             }
-            .buttonStyle(.glassProminent)
-            .tint(.blue)
 
             Spacer(minLength: 0)
         }
@@ -964,15 +1028,25 @@ private struct OnboardingPresetsStep: View {
             .scrollContentBackground(.hidden)
             .background(Color(.systemBackground))
             .frame(minHeight: 260)
-
-            Button {
-                showingAddPreset = true
-            } label: {
-                Label("Add Preset", systemImage: "plus")
-                    .frame(maxWidth: .infinity, minHeight: 44)
+            if #available(iOS 26.0, *) {
+                Button {
+                    showingAddPreset = true
+                } label: {
+                    Label("Add Preset", systemImage: "plus")
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.glassProminent)
+                .tint(.accentColor)
+            } else {
+                Button {
+                    showingAddPreset = true
+                } label: {
+                    Label("Add Preset", systemImage: "plus")
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.accentColor)
             }
-            .buttonStyle(.glassProminent)
-            .tint(.blue)
 
             Spacer(minLength: 0)
         }

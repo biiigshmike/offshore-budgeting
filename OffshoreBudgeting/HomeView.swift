@@ -80,6 +80,7 @@ struct HomeView: View {
                         HomeDateRangeBar(
                             draftStartDate: $draftStartDate,
                             draftEndDate: $draftEndDate,
+                            isApplyEnabled: isDateRangeDirty,
                             onApply: applyDraftRange
                         )
                         .padding(.top, 8)
@@ -339,6 +340,10 @@ struct HomeView: View {
     }
 
     // MARK: - Date Range
+    
+    private var isDateRangeDirty: Bool {
+        draftStartDate != appliedStartDate || draftEndDate != appliedEndDate
+    }
 
     private var appliedStartDate: Date {
         Date(timeIntervalSince1970: appliedStartTimestamp)
