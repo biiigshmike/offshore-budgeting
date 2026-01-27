@@ -98,10 +98,10 @@ struct ExpenseCSVImportFlowView: View {
                 }
             }
         }
-        .navigationTitle("Import CSV")
+        .navigationTitle("Import Expenses")
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                Button("Close") { dismiss() }
+                Button("Cancel") { dismiss() }
             }
 
             ToolbarItem(placement: .topBarTrailing) {

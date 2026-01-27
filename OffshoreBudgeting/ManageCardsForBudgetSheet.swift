@@ -59,7 +59,11 @@ struct ManageCardsForBudgetSheet: View {
         .navigationTitle("Linked Cards")
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                Button("Done") { dismiss() }
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark")
+                }
             }
         }
         .onAppear {

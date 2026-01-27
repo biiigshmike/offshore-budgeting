@@ -63,7 +63,11 @@ struct ManagePresetsForBudgetSheet: View {
         .navigationTitle("Linked Presets")
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                Button("Done") { dismiss() }
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark")
+                }
             }
         }
         .onAppear {
