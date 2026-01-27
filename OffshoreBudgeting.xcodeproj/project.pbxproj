@@ -6,6 +6,12 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		4CAD3C3F2F28AF7D001E3F5B /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4CAD3C3E2F28AF7C001E3F5B /* WidgetKit.framework */; };
+		4CAD3C412F28AF7D001E3F5B /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4CAD3C402F28AF7D001E3F5B /* SwiftUI.framework */; };
+		4CAD3C522F28AF7F001E3F5B /* OffshoreBudgetingWidgetsExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 4CAD3C3C2F28AF7C001E3F5B /* OffshoreBudgetingWidgetsExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		4C96F85F2F20523900541774 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -21,13 +27,37 @@
 			remoteGlobalIDString = 4C96F8502F20523700541774;
 			remoteInfo = BudgetPlayground;
 		};
+		4CAD3C502F28AF7F001E3F5B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 4C96F8492F20523700541774 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 4CAD3C3B2F28AF7C001E3F5B;
+			remoteInfo = OffshoreBudgetingWidgetsExtension;
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		4CAD3C572F28AF7F001E3F5B /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				4CAD3C522F28AF7F001E3F5B /* OffshoreBudgetingWidgetsExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		4C8C82152F247DA50024DBD0 /* OffshoreBudgeting.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = OffshoreBudgeting.xctestplan; sourceTree = "<group>"; };
 		4C96F8512F20523700541774 /* OffshoreBudgeting.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OffshoreBudgeting.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4C96F85E2F20523900541774 /* OffshoreBudgetingTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OffshoreBudgetingTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		4C96F8682F20523900541774 /* OffshoreBudgetingUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OffshoreBudgetingUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		4CAD3C3C2F28AF7C001E3F5B /* OffshoreBudgetingWidgetsExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = OffshoreBudgetingWidgetsExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		4CAD3C3E2F28AF7C001E3F5B /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		4CAD3C402F28AF7D001E3F5B /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -37,6 +67,13 @@
 				Info.plist,
 			);
 			target = 4C96F8502F20523700541774 /* OffshoreBudgeting */;
+		};
+		4CAD3C562F28AF7F001E3F5B /* Exceptions for "OffshoreBudgetingWidgets" folder in "OffshoreBudgetingWidgetsExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 4CAD3C3B2F28AF7C001E3F5B /* OffshoreBudgetingWidgetsExtension */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -57,6 +94,14 @@
 		4C96F86B2F20523900541774 /* OffshoreBudgetingUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = OffshoreBudgetingUITests;
+			sourceTree = "<group>";
+		};
+		4CAD3C422F28AF7D001E3F5B /* OffshoreBudgetingWidgets */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				4CAD3C562F28AF7F001E3F5B /* Exceptions for "OffshoreBudgetingWidgets" folder in "OffshoreBudgetingWidgetsExtension" target */,
+			);
+			path = OffshoreBudgetingWidgets;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -83,6 +128,15 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		4CAD3C392F28AF7C001E3F5B /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4CAD3C412F28AF7D001E3F5B /* SwiftUI.framework in Frameworks */,
+				4CAD3C3F2F28AF7D001E3F5B /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -93,6 +147,8 @@
 				4C96F8532F20523700541774 /* OffshoreBudgeting */,
 				4C96F8612F20523900541774 /* OffshoreBudgetingTests */,
 				4C96F86B2F20523900541774 /* OffshoreBudgetingUITests */,
+				4CAD3C422F28AF7D001E3F5B /* OffshoreBudgetingWidgets */,
+				4CAD3C3D2F28AF7C001E3F5B /* Frameworks */,
 				4C96F8522F20523700541774 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -103,8 +159,18 @@
 				4C96F8512F20523700541774 /* OffshoreBudgeting.app */,
 				4C96F85E2F20523900541774 /* OffshoreBudgetingTests.xctest */,
 				4C96F8682F20523900541774 /* OffshoreBudgetingUITests.xctest */,
+				4CAD3C3C2F28AF7C001E3F5B /* OffshoreBudgetingWidgetsExtension.appex */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		4CAD3C3D2F28AF7C001E3F5B /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				4CAD3C3E2F28AF7C001E3F5B /* WidgetKit.framework */,
+				4CAD3C402F28AF7D001E3F5B /* SwiftUI.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -117,10 +183,12 @@
 				4C96F84D2F20523700541774 /* Sources */,
 				4C96F84E2F20523700541774 /* Frameworks */,
 				4C96F84F2F20523700541774 /* Resources */,
+				4CAD3C572F28AF7F001E3F5B /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				4CAD3C512F28AF7F001E3F5B /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				4C96F8532F20523700541774 /* OffshoreBudgeting */,
@@ -178,6 +246,28 @@
 			productReference = 4C96F8682F20523900541774 /* OffshoreBudgetingUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		4CAD3C3B2F28AF7C001E3F5B /* OffshoreBudgetingWidgetsExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4CAD3C532F28AF7F001E3F5B /* Build configuration list for PBXNativeTarget "OffshoreBudgetingWidgetsExtension" */;
+			buildPhases = (
+				4CAD3C382F28AF7C001E3F5B /* Sources */,
+				4CAD3C392F28AF7C001E3F5B /* Frameworks */,
+				4CAD3C3A2F28AF7C001E3F5B /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				4CAD3C422F28AF7D001E3F5B /* OffshoreBudgetingWidgets */,
+			);
+			name = OffshoreBudgetingWidgetsExtension;
+			packageProductDependencies = (
+			);
+			productName = OffshoreBudgetingWidgetsExtension;
+			productReference = 4CAD3C3C2F28AF7C001E3F5B /* OffshoreBudgetingWidgetsExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -199,6 +289,9 @@
 						CreatedOnToolsVersion = 26.2;
 						TestTargetID = 4C96F8502F20523700541774;
 					};
+					4CAD3C3B2F28AF7C001E3F5B = {
+						CreatedOnToolsVersion = 26.2;
+					};
 				};
 			};
 			buildConfigurationList = 4C96F84C2F20523700541774 /* Build configuration list for PBXProject "OffshoreBudgeting" */;
@@ -218,6 +311,7 @@
 				4C96F8502F20523700541774 /* OffshoreBudgeting */,
 				4C96F85D2F20523900541774 /* OffshoreBudgetingTests */,
 				4C96F8672F20523900541774 /* OffshoreBudgetingUITests */,
+				4CAD3C3B2F28AF7C001E3F5B /* OffshoreBudgetingWidgetsExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -238,6 +332,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		4C96F8662F20523900541774 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4CAD3C3A2F28AF7C001E3F5B /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -268,6 +369,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		4CAD3C382F28AF7C001E3F5B /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -280,6 +388,11 @@
 			isa = PBXTargetDependency;
 			target = 4C96F8502F20523700541774 /* OffshoreBudgeting */;
 			targetProxy = 4C96F8692F20523900541774 /* PBXContainerItemProxy */;
+		};
+		4CAD3C512F28AF7F001E3F5B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 4CAD3C3B2F28AF7C001E3F5B /* OffshoreBudgetingWidgetsExtension */;
+			targetProxy = 4CAD3C502F28AF7F001E3F5B /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -611,6 +724,78 @@
 			};
 			name = Release;
 		};
+		4CAD3C542F28AF7F001E3F5B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = T6DP3686XU;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = OffshoreBudgetingWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = OffshoreBudgetingWidgets;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 2.2;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.mb.offshore-budgeting.OffshoreBudgetingWidgets";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = YES;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		4CAD3C552F28AF7F001E3F5B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = T6DP3686XU;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = OffshoreBudgetingWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = OffshoreBudgetingWidgets;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 2.2;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.mb.offshore-budgeting.OffshoreBudgetingWidgets";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = YES;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -646,6 +831,15 @@
 			buildConfigurations = (
 				4C96F8792F20523900541774 /* Debug */,
 				4C96F87A2F20523900541774 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		4CAD3C532F28AF7F001E3F5B /* Build configuration list for PBXNativeTarget "OffshoreBudgetingWidgetsExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4CAD3C542F28AF7F001E3F5B /* Debug */,
+				4CAD3C552F28AF7F001E3F5B /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
