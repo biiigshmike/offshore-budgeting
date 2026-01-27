@@ -32,7 +32,7 @@ struct OffshoreBudgetingApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            AppBootstrapRootView(modelContainer: $modelContainer)
                 .id(rootResetToken)
         }
         .modelContainer(modelContainer)
@@ -42,7 +42,7 @@ struct OffshoreBudgetingApp: App {
 
     private static let cloudKitContainerIdentifier: String = "iCloud.com.mb.offshore-budgeting"
 
-    private static func makeModelContainer(useICloud: Bool) -> ModelContainer {
+    static func makeModelContainer(useICloud: Bool) -> ModelContainer {
         do {
             let schema = Schema([
                 Workspace.self,

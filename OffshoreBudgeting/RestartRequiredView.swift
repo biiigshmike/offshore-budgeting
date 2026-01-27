@@ -6,8 +6,24 @@ struct RestartRequiredView: View {
     let primaryButtonTitle: String
     let onPrimary: () -> Void
 
-    let secondaryButtonTitle: String
-    let onSecondary: () -> Void
+    let secondaryButtonTitle: String?
+    let onSecondary: (() -> Void)?
+
+    init(
+        title: String,
+        message: String,
+        primaryButtonTitle: String,
+        onPrimary: @escaping () -> Void,
+        secondaryButtonTitle: String? = nil,
+        onSecondary: (() -> Void)? = nil
+    ) {
+        self.title = title
+        self.message = message
+        self.primaryButtonTitle = primaryButtonTitle
+        self.onPrimary = onPrimary
+        self.secondaryButtonTitle = secondaryButtonTitle
+        self.onSecondary = onSecondary
+    }
 
     var body: some View {
         VStack(spacing: 18) {
@@ -20,16 +36,27 @@ struct RestartRequiredView: View {
             )
             .padding(.horizontal, 18)
 
-            HStack(spacing: 12) {
-                Button {
-                    onSecondary()
-                } label: {
-                    Text(secondaryButtonTitle)
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                }
-                .buttonStyle(.glassProminent)
-                .tint(.gray)
+            if let secondaryButtonTitle, let onSecondary {
+                HStack(spacing: 12) {
+                    Button {
+                        onSecondary()
+                    } label: {
+                        Text(secondaryButtonTitle)
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(.glassProminent)
+                    .tint(.gray)
 
+                    Button {
+                        onPrimary()
+                    } label: {
+                        Text(primaryButtonTitle)
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(.glassProminent)
+                    .tint(.blue)
+                }
+            } else {
                 Button {
                     onPrimary()
                 } label: {

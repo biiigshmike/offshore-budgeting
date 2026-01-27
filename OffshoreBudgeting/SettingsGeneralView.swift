@@ -27,6 +27,9 @@ struct SettingsGeneralView: View {
     @AppStorage("selectedWorkspaceID") private var selectedWorkspaceID: String = ""
     @AppStorage("didSeedDefaultWorkspaces") private var didSeedDefaultWorkspaces: Bool = false
     @AppStorage("privacy_requireBiometrics") private var requireBiometrics: Bool = false
+    @AppStorage("onboarding_step") private var onboardingStep: Int = 0
+    @AppStorage("onboarding_didPressGetStarted") private var didPressGetStarted: Bool = false
+    @AppStorage("onboarding_didChooseDataSource") private var didChooseDataSource: Bool = false
     @AppStorage("icloud_useCloud") private var desiredUseICloud: Bool = false
     @AppStorage("icloud_activeUseCloud") private var activeUseICloud: Bool = false
     @AppStorage("app_rootResetToken") private var rootResetToken: String = UUID().uuidString
@@ -144,9 +147,7 @@ struct SettingsGeneralView: View {
                     releaseExtraMessage: "After restarting, you can run Reset & Erase Content again."
                 ),
                 primaryButtonTitle: AppRestartService.closeAppButtonTitle,
-                onPrimary: { AppRestartService.closeAppOrDismiss { showingRestartRequired = false } },
-                secondaryButtonTitle: "Not Now",
-                onSecondary: { showingRestartRequired = false }
+                onPrimary: { AppRestartService.closeAppOrDismiss { showingRestartRequired = false } }
             )
             .presentationDetents([.medium])
         }
@@ -179,6 +180,9 @@ struct SettingsGeneralView: View {
             selectedWorkspaceID = ""
             didSeedDefaultWorkspaces = false
             didCompleteOnboarding = false
+            onboardingStep = 0
+            didPressGetStarted = false
+            didChooseDataSource = false
 
             // Safety: if app lock was enabled, disable it so onboarding isn’t blocked
             requireBiometrics = false

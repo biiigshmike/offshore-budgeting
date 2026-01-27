@@ -3,6 +3,9 @@ import SwiftUI
 struct SettingsHelpView: View {
 
     @AppStorage("didCompleteOnboarding") private var didCompleteOnboarding: Bool = true
+    @AppStorage("onboarding_step") private var onboardingStep: Int = 0
+    @AppStorage("onboarding_didPressGetStarted") private var didPressGetStarted: Bool = false
+    @AppStorage("onboarding_didChooseDataSource") private var didChooseDataSource: Bool = false
     @State private var showOnboardingAlert: Bool = false
 
     var body: some View {
@@ -64,7 +67,12 @@ struct SettingsHelpView: View {
         .listStyle(.insetGrouped)
         .navigationTitle("Help")
         .alert("Repeat Onboarding?", isPresented: $showOnboardingAlert) {
-            Button("Go", role: .destructive) { didCompleteOnboarding = false }
+            Button("Go", role: .destructive) {
+                onboardingStep = 0
+                didPressGetStarted = false
+                didChooseDataSource = false
+                didCompleteOnboarding = false
+            }
             Button("Cancel", role: .cancel) { }
         } message: {
             Text("You can restart onboarding at any time.")

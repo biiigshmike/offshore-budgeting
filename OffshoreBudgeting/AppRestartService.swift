@@ -14,6 +14,10 @@ enum AppRestartService {
         canCloseAppProgrammatically ? "Close App" : "Got It"
     }
 
+    static var nextButtonTitle: String {
+        canCloseAppProgrammatically ? "Close App" : "Next"
+    }
+
     static func restartRequiredMessage(
         debugMessage: String,
         appName: String = "Offshore",

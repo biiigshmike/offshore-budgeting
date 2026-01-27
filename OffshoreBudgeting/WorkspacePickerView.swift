@@ -102,9 +102,7 @@ struct WorkspacePickerView: View {
                     debugMessage: "Switching between On Device and iCloud takes effect after you close and reopen Offshore."
                 ),
                 primaryButtonTitle: AppRestartService.closeAppButtonTitle,
-                onPrimary: { AppRestartService.closeAppOrDismiss { showingRestartRequired = false } },
-                secondaryButtonTitle: "Not Now",
-                onSecondary: { showingRestartRequired = false }
+                onPrimary: { AppRestartService.closeAppOrDismiss { showingRestartRequired = false } }
             )
             .presentationDetents([.medium])
         }

@@ -121,7 +121,7 @@ struct OnboardingView: View {
                 message: AppRestartService.restartRequiredMessage(
                     debugMessage: "Switching to iCloud takes effect after you close and reopen Offshore."
                 ),
-                primaryButtonTitle: AppRestartService.closeAppButtonTitle,
+                primaryButtonTitle: AppRestartService.nextButtonTitle,
                 onPrimary: {
                     AppRestartService.closeAppOrDismiss {
                         showingRestartRequired = false
