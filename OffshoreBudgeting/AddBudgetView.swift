@@ -80,7 +80,7 @@ struct AddBudgetView: View {
             }
 
             ToolbarItem(placement: .topBarTrailing) {
-                Button("Create Budget") { createBudget() }
+                Button("Save") { createBudget() }
                     .disabled(!canCreate)
             }
         }

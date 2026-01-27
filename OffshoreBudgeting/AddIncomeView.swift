@@ -62,7 +62,7 @@ struct AddIncomeView: View {
                 Button("Cancel") { dismiss() }
             }
             ToolbarItem(placement: .topBarTrailing) {
-                Button("Add Income") { save() }
+                Button("Save") { save() }
                     .disabled(!canSave)
             }
         }

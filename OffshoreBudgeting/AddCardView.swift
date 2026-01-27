@@ -32,7 +32,7 @@ struct AddCardView: View {
                 }
 
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Create Card") { save() }
+                    Button("Save") { save() }
                         .disabled(!canSave)
                 }
             }
