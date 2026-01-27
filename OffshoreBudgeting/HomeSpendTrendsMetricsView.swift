@@ -185,9 +185,12 @@ struct HomeSpendTrendsMetricsView: View {
                 .foregroundStyle(.secondary)
 
             if result.buckets.allSatisfy({ $0.total <= 0 }) {
-                Text("No spending data in this range.")
-                    .foregroundStyle(.secondary)
-                    .padding(.vertical, 18)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("No savings data in this range.")
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, minHeight: 240, alignment: .center)
+                .padding(.vertical, 18)
             } else {
                 Chart {
                     // Invisible marks: these define x buckets + y scale for the chart.

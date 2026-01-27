@@ -256,7 +256,7 @@ struct WhatIfScenarioPlannerView: View {
                             step: 10,
                             currencyCode: currencyCode
                         )
-                        .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
+                        .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                             Button {
                                 resetCategoryToBaseline(category.id)
@@ -532,7 +532,7 @@ struct WhatIfScenarioPlannerView: View {
             .disabled(scenarios.count <= 1 || selectedScenarioID == nil)
 
         } label: {
-            Image(systemName: "line.3.horizontal.decrease")
+            Image(systemName: "ellipsis")
                 .font(.system(size: 16, weight: .semibold))
                 .accessibilityLabel("Scenario options")
         }

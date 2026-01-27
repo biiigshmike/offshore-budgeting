@@ -162,9 +162,12 @@ struct HomeIncomeMetricsView: View {
                 .font(.headline.weight(.semibold))
 
             if points.isEmpty {
-                Text("No income data in this range.")
-                    .foregroundStyle(.secondary)
-                    .padding(.vertical, 18)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("No income data in this range.")
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, minHeight: 240, alignment: .center)
+                .padding(.vertical, 18)
             } else {
                 Chart(points) { point in
                     BarMark(

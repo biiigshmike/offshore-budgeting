@@ -143,8 +143,8 @@ struct DonutChartView: View {
                 Text(centerValueText)
                     .font(.title3.weight(.bold))
                     .foregroundStyle(.primary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.85)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.75)
             }
             .multilineTextAlignment(.center)
             .padding(.horizontal, 10)
@@ -156,16 +156,11 @@ struct DonutChartView: View {
 
     private var emptyState: some View {
         VStack(spacing: 6) {
-            Image(systemName: "chart.pie")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(.secondary)
 
             Text("No spending")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .font(.headline.weight(.semibold))
 
-            Text("for this range")
-                .font(.caption)
+            Text("found for this range.")
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

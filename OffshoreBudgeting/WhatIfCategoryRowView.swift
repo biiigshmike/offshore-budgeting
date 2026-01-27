@@ -26,6 +26,7 @@ struct WhatIfCategoryRowView: View {
     private let fieldWidth: CGFloat = 110
     private let controlSpacing: CGFloat = 10
     private let resetButtonSize: CGFloat = 28
+    private let editedBadgeReserveHeight: CGFloat = 20
 
     private var controlGroupWidth: CGFloat {
         // minus + spacing + field + spacing + reset + spacing + plus
@@ -45,21 +46,24 @@ struct WhatIfCategoryRowView: View {
     private var isDirty: Bool {
         abs(amount - baselineAmount) > 0.000_1
     }
+    
+    private var badgeTextLeadingInset: CGFloat {
+        10 /* dot width */ + 10 /* spacing between dot and text */
+    }
 
     var body: some View {
         GeometryReader { geo in
             let availableWidth = geo.size.width
-            let labelWidth = max(120, availableWidth - controlGroupWidth - 12) // 12 = breathing room
-
+            let labelWidth = max(120, availableWidth - controlGroupWidth - 12)
+            
             HStack(alignment: .center, spacing: 12) {
 
-                // MARK: - Left column (name, actual, edited badge)
+                // MARK: - Left column (name + actual, badge as overlay)
 
-                HStack(alignment: .top, spacing: 10) {
+                HStack(alignment: .center, spacing: 10) {
                     Circle()
                         .fill(dotColor)
                         .frame(width: 10, height: 10)
-                        .padding(.top, 5)
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text(categoryName)
@@ -73,14 +77,17 @@ struct WhatIfCategoryRowView: View {
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                             .truncationMode(.tail)
-
-                        if isDirty {
-                            editedBadge
-                                .padding(.top, 2)
-                        }
                     }
+                    .frame(maxHeight: .infinity, alignment: .center) // keeps the two lines centered
                 }
                 .frame(width: labelWidth, alignment: .leading)
+                .padding(.bottom, editedBadgeReserveHeight) // reserve the space no matter what
+                .overlay(alignment: .bottomLeading) {
+                    editedBadge
+                        .padding(.leading, badgeTextLeadingInset)
+                        .opacity(isDirty ? 1 : 0)
+                        .accessibilityHidden(!isDirty)
+                }
 
                 Spacer(minLength: 0)
 
