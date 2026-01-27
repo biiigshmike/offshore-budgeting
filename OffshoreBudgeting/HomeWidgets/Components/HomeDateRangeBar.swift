@@ -113,5 +113,12 @@ struct HomeDateRangeBar: View {
         if draftEndDate < draftStartDate {
             draftEndDate = draftStartDate
         }
+
+        // Match CardDetailView behavior: quick range selection auto-applies the range.
+        // Defer to the next run loop so the menu can dismiss cleanly.
+        let apply = onApply
+        DispatchQueue.main.async {
+            apply()
+        }
     }
 }

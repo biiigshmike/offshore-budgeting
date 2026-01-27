@@ -77,6 +77,7 @@ struct AddBudgetView: View {
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button("Cancel") { dismiss() }
+                    .clipShape(.containerRelative)
             }
             if #available(iOS 26.0, *) {
                 ToolbarItem(placement: .topBarTrailing) {

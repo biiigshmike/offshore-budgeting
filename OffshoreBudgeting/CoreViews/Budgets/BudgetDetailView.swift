@@ -17,30 +17,13 @@ struct BudgetDetailView: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.budgetsSheetRoute) private var budgetsSheetRoute
 
     @State private var showingBudgetDeleteConfirm: Bool = false
     @State private var pendingBudgetDelete: (() -> Void)? = nil
 
     @State private var showingExpenseDeleteConfirm: Bool = false
     @State private var pendingExpenseDelete: (() -> Void)? = nil
-
-    @State private var showingManageCardsSheet: Bool = false
-    @State private var showingManagePresetsSheet: Bool = false
-    @State private var showingAddExpenseSheet: Bool = false
-
-    // MARK: - Edit Budget
-
-    @State private var showingEditBudgetSheet: Bool = false
-
-    // MARK: - Edit Expense (added, matches CardDetailView behavior)
-
-    @State private var expenseToEdit: ExpenseToEdit? = nil
-    @State private var plannedExpenseToEdit: PlannedExpenseToEdit? = nil
-    @State private var presetToEdit: PresetToEdit? = nil
-
-    // MARK: - Category Limits
-
-    @State private var limitEditorCategory: Category? = nil
 
     // MARK: - UI State
 
@@ -348,7 +331,12 @@ struct BudgetDetailView: View {
                         categories: categoriesInBudget,
                         selectedID: $selectedCategoryID,
                         onLongPressCategory: { category in
-                            limitEditorCategory = category
+                            budgetsSheetRoute.wrappedValue = .editCategoryLimit(
+                                budget: budget,
+                                category: category,
+                                plannedContribution: plannedContribution(for: category),
+                                variableContribution: variableContribution(for: category)
+                            )
                         }
                     )
                 } header: {
@@ -521,7 +509,7 @@ struct BudgetDetailView: View {
 
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
-                    showingAddExpenseSheet = true
+                    budgetsSheetRoute.wrappedValue = .addExpense(budget: budget)
                 }
                 label: {
                     Image(systemName: "plus")
@@ -533,13 +521,13 @@ struct BudgetDetailView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Button {
-                        showingManagePresetsSheet = true
+                        budgetsSheetRoute.wrappedValue = .managePresets(budget: budget)
                     } label: {
                         Label("Manage Presets", systemImage: "list.bullet.rectangle")
                     }
 
                     Button {
-                        showingManageCardsSheet = true
+                        budgetsSheetRoute.wrappedValue = .manageCards(budget: budget)
                     } label: {
                         Label("Manage Cards", systemImage: "creditcard")
                     }
@@ -547,7 +535,7 @@ struct BudgetDetailView: View {
                     Divider()
 
                     Button {
-                        showingEditBudgetSheet = true
+                        budgetsSheetRoute.wrappedValue = .editBudget(budget)
                     } label: {
                         Label("Edit Budget", systemImage: "pencil")
                     }
@@ -569,53 +557,6 @@ struct BudgetDetailView: View {
                 }
                 .accessibilityLabel("Budget Actions")
             }
-        }
-        .sheet(isPresented: $showingEditBudgetSheet) {
-            NavigationStack {
-                EditBudgetView(workspace: workspace, budget: budget)
-            }
-        }
-        .sheet(isPresented: $showingAddExpenseSheet) {
-            NavigationStack {
-                AddExpenseView(
-                    workspace: workspace,
-                    allowedCards: linkedCards,
-                    defaultDate: .now
-                )
-            }
-        }
-        .sheet(isPresented: $showingManageCardsSheet) {
-            NavigationStack {
-                ManageCardsForBudgetSheet(workspace: workspace, budget: budget)
-            }
-        }
-        .sheet(isPresented: $showingManagePresetsSheet) {
-            NavigationStack {
-                ManagePresetsForBudgetSheet(workspace: workspace, budget: budget)
-            }
-        }
-        .sheet(item: $expenseToEdit) { item in
-            NavigationStack {
-                EditExpenseView(workspace: workspace, expense: item.expense)
-            }
-        }
-        .sheet(item: $plannedExpenseToEdit) { item in
-            NavigationStack {
-                EditPlannedExpenseView(workspace: workspace, plannedExpense: item.plannedExpense)
-            }
-        }
-        .sheet(item: $presetToEdit) { item in
-            NavigationStack {
-                EditPresetView(workspace: workspace, preset: item.preset)
-            }
-        }
-        .sheet(item: $limitEditorCategory) { category in
-            EditCategoryLimitView(
-                budget: budget,
-                category: category,
-                plannedContribution: plannedContribution(for: category),
-                variableContribution: variableContribution(for: category)
-            )
         }
         .alert("Delete?", isPresented: $showingBudgetDeleteConfirm) {
             Button("Delete", role: .destructive) {
@@ -672,15 +613,15 @@ struct BudgetDetailView: View {
     // MARK: - Edit + Preset lookup (added, matches CardDetailView)
 
     private func openEdit(_ expense: VariableExpense) {
-        expenseToEdit = ExpenseToEdit(expense: expense)
+        budgetsSheetRoute.wrappedValue = .editExpense(expense)
     }
 
     private func openEdit(_ plannedExpense: PlannedExpense) {
-        plannedExpenseToEdit = PlannedExpenseToEdit(plannedExpense: plannedExpense)
+        budgetsSheetRoute.wrappedValue = .editPlannedExpense(plannedExpense)
     }
 
     private func openEditPreset(_ preset: Preset) {
-        presetToEdit = PresetToEdit(preset: preset)
+        budgetsSheetRoute.wrappedValue = .editPreset(preset)
     }
 
     private func presetForPlannedExpense(_ expense: PlannedExpense) -> Preset? {
@@ -836,38 +777,6 @@ private enum BudgetUnifiedExpenseItem: Identifiable {
         case .planned(let e): return e.card?.name
         case .variable(let e): return e.card?.name
         }
-    }
-}
-
-// MARK: - Swipe/Edit supporting types (added, matches CardDetailView)
-
-private struct ExpenseToEdit: Identifiable {
-    let id: UUID
-    let expense: VariableExpense
-
-    init(expense: VariableExpense) {
-        self.id = expense.id
-        self.expense = expense
-    }
-}
-
-private struct PlannedExpenseToEdit: Identifiable {
-    let id: UUID
-    let plannedExpense: PlannedExpense
-
-    init(plannedExpense: PlannedExpense) {
-        self.id = plannedExpense.id
-        self.plannedExpense = plannedExpense
-    }
-}
-
-private struct PresetToEdit: Identifiable {
-    let id: UUID
-    let preset: Preset
-
-    init(preset: Preset) {
-        self.id = preset.id
-        self.preset = preset
     }
 }
 
@@ -1129,186 +1038,6 @@ private struct BudgetVariableExpenseRow: View {
                 .multilineTextAlignment(.trailing)
         }
         .padding(.vertical, 4)
-    }
-}
-
-private struct EditPlannedExpenseView: View {
-
-    let workspace: Workspace
-    let plannedExpense: PlannedExpense
-
-    @Environment(\.modelContext) private var modelContext
-    @Environment(\.dismiss) private var dismiss
-
-    @Query private var cards: [Card]
-    @Query private var categories: [Category]
-
-    // MARK: - Form State
-
-    @State private var title: String = ""
-    @State private var plannedAmountText: String = ""
-    @State private var actualAmountText: String = ""
-    @State private var expenseDate: Date = .now
-    @State private var selectedCardID: UUID? = nil
-    @State private var selectedCategoryID: UUID? = nil
-
-    // MARK: - Alerts
-
-    @State private var showingInvalidAmountAlert: Bool = false
-    @State private var showingMissingCardAlert: Bool = false
-
-    init(workspace: Workspace, plannedExpense: PlannedExpense) {
-        self.workspace = workspace
-        self.plannedExpense = plannedExpense
-
-        let workspaceID = workspace.id
-        _cards = Query(
-            filter: #Predicate<Card> { $0.workspace?.id == workspaceID },
-            sort: [SortDescriptor(\Card.name, order: .forward)]
-        )
-
-        _categories = Query(
-            filter: #Predicate<Category> { $0.workspace?.id == workspaceID },
-            sort: [SortDescriptor(\Category.name, order: .forward)]
-        )
-    }
-
-    private var canSave: Bool {
-        let trimmedTitle = PresetFormView.trimmedTitle(title)
-        guard !trimmedTitle.isEmpty else { return false }
-
-        guard let plannedAmount = PresetFormView.parsePlannedAmount(plannedAmountText),
-              plannedAmount > 0
-        else { return false }
-
-        // actual can be blank or 0
-        if !actualAmountText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            guard let actual = PresetFormView.parsePlannedAmount(actualAmountText),
-                  actual >= 0
-            else { return false }
-        }
-
-        guard selectedCardID != nil else { return false }
-        return true
-    }
-
-    var body: some View {
-        List {
-            Section("Details") {
-                TextField("Title", text: $title)
-
-                TextField("Planned Amount", text: $plannedAmountText)
-                    .keyboardType(.decimalPad)
-
-                TextField("Actual Amount (optional)", text: $actualAmountText)
-                    .keyboardType(.decimalPad)
-
-                HStack {
-                    Text("Date")
-                    Spacer()
-                    PillDatePickerField(title: "Date", date: $expenseDate)
-                }
-            }
-
-            Section("Card") {
-                Picker("Card", selection: $selectedCardID) {
-                    Text("Select").tag(UUID?.none)
-                    ForEach(cards) { card in
-                        Text(card.name).tag(UUID?.some(card.id))
-                    }
-                }
-            }
-
-            Section("Category") {
-                Picker("Category", selection: $selectedCategoryID) {
-                    Text("None").tag(UUID?.none)
-                    ForEach(categories) { category in
-                        Text(category.name).tag(UUID?.some(category.id))
-                    }
-                }
-            }
-        }
-        .navigationTitle("Edit Planned Expense")
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button("Cancel") { dismiss() }
-            }
-            if #available(iOS 26.0, *) {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Save") { save() }
-                        .disabled(!canSave)
-                        .tint(.accentColor)
-                        .controlSize(.large)
-                        .buttonStyle(.glassProminent)
-                }
-            } else {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Save") { save() }
-                        .disabled(!canSave)
-                        .tint(.accentColor)
-                        .controlSize(.large)
-                        .buttonStyle(.plain)
-                }
-            }
-        }
-        .alert("Invalid Amount", isPresented: $showingInvalidAmountAlert) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text("Please enter a planned amount greater than 0, and an actual amount that is 0 or greater.")
-        }
-        .alert("Select a Card", isPresented: $showingMissingCardAlert) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text("Choose a card for this planned expense.")
-        }
-        .onAppear {
-            title = plannedExpense.title
-            plannedAmountText = CurrencyFormatter.editingString(from: plannedExpense.plannedAmount)
-            actualAmountText = plannedExpense.actualAmount > 0 ? CurrencyFormatter.editingString(from: plannedExpense.actualAmount) : ""
-            expenseDate = plannedExpense.expenseDate
-            selectedCardID = plannedExpense.card?.id
-            selectedCategoryID = plannedExpense.category?.id
-        }
-    }
-
-    private func save() {
-        let trimmedTitle = PresetFormView.trimmedTitle(title)
-        guard !trimmedTitle.isEmpty else { return }
-
-        guard let planned = PresetFormView.parsePlannedAmount(plannedAmountText), planned > 0 else {
-            showingInvalidAmountAlert = true
-            return
-        }
-
-        let actual: Double
-        let actualTrimmed = actualAmountText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if actualTrimmed.isEmpty {
-            actual = 0
-        } else {
-            guard let parsed = PresetFormView.parsePlannedAmount(actualAmountText), parsed >= 0 else {
-                showingInvalidAmountAlert = true
-                return
-            }
-            actual = parsed
-        }
-
-        guard let selectedCard = cards.first(where: { $0.id == selectedCardID }) else {
-            showingMissingCardAlert = true
-            return
-        }
-
-        let selectedCategory = categories.first(where: { $0.id == selectedCategoryID })
-
-        plannedExpense.title = trimmedTitle
-        plannedExpense.plannedAmount = planned
-        plannedExpense.actualAmount = actual
-        plannedExpense.expenseDate = expenseDate
-        plannedExpense.workspace = workspace
-        plannedExpense.card = selectedCard
-        plannedExpense.category = selectedCategory
-
-        try? modelContext.save()
-        dismiss()
     }
 }
 

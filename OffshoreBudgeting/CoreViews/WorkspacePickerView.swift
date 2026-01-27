@@ -17,15 +17,30 @@ struct WorkspacePickerView: View {
     let onCreate: (String, String) -> Void
     let onDelete: (IndexSet) -> Void
 
-    @State private var showingAddWorkspace: Bool = false
-    @State private var editingWorkspace: Workspace? = nil
+    private enum SheetRoute: Identifiable {
+        case restartRequired
+        case addWorkspace
+        case editWorkspace(Workspace)
+
+        var id: String {
+            switch self {
+            case .restartRequired:
+                return "restartRequired"
+            case .addWorkspace:
+                return "addWorkspace"
+            case .editWorkspace(let workspace):
+                return "editWorkspace-\(workspace.id.uuidString)"
+            }
+        }
+    }
+
+    @State private var sheetRoute: SheetRoute? = nil
 
     @Environment(\.dismiss) private var dismiss
     @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
     @AppStorage("icloud_useCloud") private var desiredUseICloud: Bool = false
     @AppStorage("icloud_activeUseCloud") private var activeUseICloud: Bool = false
     @AppStorage("icloud_bootstrapStartedAt") private var iCloudBootstrapStartedAt: Double = 0
-    @State private var showingRestartRequired: Bool = false
 
     @State private var showingICloudUnavailable: Bool = false
     @State private var showingWorkspaceDeleteConfirm: Bool = false
@@ -69,7 +84,7 @@ struct WorkspacePickerView: View {
                         // Swipe right (leading) -> Edit
                         .swipeActions(edge: .leading, allowsFullSwipe: false) {
                             Button {
-                                editingWorkspace = workspace
+                                sheetRoute = .editWorkspace(workspace)
                             } label: {
                                 Label("Edit", systemImage: "pencil")
                             }
@@ -118,17 +133,6 @@ struct WorkspacePickerView: View {
                 Text("“\(pendingWorkspaceDeleteName)” will be deleted.")
             }
         }
-        .sheet(isPresented: $showingRestartRequired) {
-            RestartRequiredView(
-                title: "Restart Required",
-                message: AppRestartService.restartRequiredMessage(
-                    debugMessage: "Switching between On Device and iCloud takes effect after you close and reopen Offshore."
-                ),
-                primaryButtonTitle: AppRestartService.closeAppButtonTitle,
-                onPrimary: { AppRestartService.closeAppOrDismiss { showingRestartRequired = false } }
-            )
-            .presentationDetents([.medium])
-        }
         .toolbar {
             if showsCloseButton {
                 ToolbarItem(placement: .topBarLeading) {
@@ -143,20 +147,34 @@ struct WorkspacePickerView: View {
 
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
-                    showingAddWorkspace = true
+                    sheetRoute = .addWorkspace
                 } label: {
                     Image(systemName: "plus")
                 }
             }
         }
-        .sheet(isPresented: $showingAddWorkspace) {
-            NavigationStack {
-                AddWorkspaceView(onCreate: onCreate)
-            }
-        }
-        .sheet(item: $editingWorkspace) { workspace in
-            NavigationStack {
-                EditWorkspaceView(workspace: workspace)
+        .sheet(item: $sheetRoute) { route in
+            switch route {
+            case .restartRequired:
+                RestartRequiredView(
+                    title: "Restart Required",
+                    message: AppRestartService.restartRequiredMessage(
+                        debugMessage: "Switching between On Device and iCloud takes effect after you close and reopen Offshore."
+                    ),
+                    primaryButtonTitle: AppRestartService.closeAppButtonTitle,
+                    onPrimary: { AppRestartService.closeAppOrDismiss { sheetRoute = nil } }
+                )
+                .presentationDetents([.medium])
+
+            case .addWorkspace:
+                NavigationStack {
+                    AddWorkspaceView(onCreate: onCreate)
+                }
+
+            case .editWorkspace(let workspace):
+                NavigationStack {
+                    EditWorkspaceView(workspace: workspace)
+                }
             }
         }
     }
@@ -221,7 +239,7 @@ extension WorkspacePickerView {
             } label: {
                 HStack(spacing: 10) {
                     Image(systemName: "icloud")
-                        .foregroundStyle(.blue)
+                        .foregroundStyle(.tint)
                     Text("iCloud")
                     Spacer()
                     dataSourceTrailingIcon(isActive: activeUseICloud, isDesired: desiredUseICloud)
@@ -264,14 +282,14 @@ extension WorkspacePickerView {
     private func requestSwitchToICloud() {
         desiredUseICloud = true
         if desiredUseICloud != activeUseICloud {
-            showingRestartRequired = true
+            sheetRoute = .restartRequired
         }
     }
 
     private func requestSwitchToOnDevice() {
         desiredUseICloud = false
         if desiredUseICloud != activeUseICloud {
-            showingRestartRequired = true
+            sheetRoute = .restartRequired
         }
     }
 }

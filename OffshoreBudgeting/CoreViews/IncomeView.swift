@@ -11,6 +11,7 @@ import SwiftData
 struct IncomeView: View {
 
     let workspace: Workspace
+    @Binding var sheetRoute: IncomeSheetRoute?
     @Query private var incomes: [Income]
 
     @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
@@ -20,13 +21,12 @@ struct IncomeView: View {
     @State private var displayedMonth: Date
     @State private var selectedDate: Date
 
-    @State private var showingAddIncomeSheet: Bool = false
-    @State private var editingIncome: Income? = nil
     @State private var showingIncomeDeleteConfirm: Bool = false
     @State private var pendingIncomeDelete: (() -> Void)? = nil
 
-    init(workspace: Workspace) {
+    init(workspace: Workspace, sheetRoute: Binding<IncomeSheetRoute?>) {
         self.workspace = workspace
+        self._sheetRoute = sheetRoute
 
         let workspaceID = workspace.id
         _incomes = Query(
@@ -184,7 +184,7 @@ struct IncomeView: View {
                 } else {
                     ForEach(incomesForSelectedDay) { income in
                         Button {
-                            editingIncome = income
+                            sheetRoute = .edit(income)
                         } label: {
                             IncomeRowView(income: income)
                         }
@@ -205,7 +205,7 @@ struct IncomeView: View {
                         }
                         .swipeActions(edge: .leading) {
                             Button {
-                                editingIncome = income
+                                sheetRoute = .edit(income)
                             } label: {
                                 Label("Edit", systemImage: "pencil")
                             }
@@ -255,19 +255,9 @@ struct IncomeView: View {
         .navigationTitle("Income")
         .toolbar {
             Button {
-                showingAddIncomeSheet = true
+                sheetRoute = .add(initialDate: selectedDayStart)
             } label: {
                 Image(systemName: "plus")
-            }
-        }
-        .sheet(isPresented: $showingAddIncomeSheet) {
-            NavigationStack {
-                AddIncomeView(workspace: workspace, initialDate: selectedDayStart)
-            }
-        }
-        .sheet(item: $editingIncome) { income in
-            NavigationStack {
-                EditIncomeView(workspace: workspace, income: income)
             }
         }
         .alert("Delete?", isPresented: $showingIncomeDeleteConfirm) {
@@ -285,8 +275,8 @@ struct IncomeView: View {
 
     private func deleteIncome(_ income: Income) {
         modelContext.delete(income)
-        if editingIncome?.id == income.id {
-            editingIncome = nil
+        if case .edit(let editing)? = sheetRoute, editing.id == income.id {
+            sheetRoute = nil
         }
     }
 }
@@ -659,7 +649,7 @@ private enum CalendarGridHelper {
     let container = PreviewSeed.makeContainer()
     PreviewHost(container: container) { ws in
         NavigationStack {
-            IncomeView(workspace: ws)
+            IncomeView(workspace: ws, sheetRoute: .constant(nil))
         }
     }
 }

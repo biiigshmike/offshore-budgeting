@@ -75,7 +75,7 @@ private struct PostBoardingTipModifier: ViewModifier {
     @State private var showingTip: Bool = false
 
     func body(content: Content) -> some View {
-        content
+        let base = content
             .onAppear {
                 normalizeForResetIfNeeded()
                 showingTip = shouldShowTip()
@@ -84,13 +84,29 @@ private struct PostBoardingTipModifier: ViewModifier {
                 normalizeForResetIfNeeded()
                 showingTip = shouldShowTip()
             }
-            .sheet(isPresented: $showingTip, onDismiss: markSeen) {
+
+        if shouldAttachSheet {
+            base.sheet(isPresented: $showingTip, onDismiss: markSeen) {
                 TipSheet(
                     title: title,
                     items: items,
                     buttonTitle: buttonTitle
                 )
             }
+        } else {
+            base
+        }
+    }
+
+    /// Important: don't attach a `.sheet` modifier once the tip is not eligible to show.
+    /// In complex hierarchies (e.g. `NavigationSplitView`), extra "inactive" sheet presenters can
+    /// cause sluggish or conflicted presentation of other sheets.
+    private var shouldAttachSheet: Bool {
+        guard didCompleteOnboarding else { return false }
+        guard !items.isEmpty else { return false }
+
+        let seen = Set(seenKeysCSV.split(separator: ",").map { String($0) })
+        return !seen.contains(key)
     }
 
     private func normalizeForResetIfNeeded() {

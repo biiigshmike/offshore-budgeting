@@ -11,14 +11,13 @@ import SwiftData
 struct BudgetsView: View {
 
     let workspace: Workspace
+    @Binding var sheetRoute: BudgetsSheetRoute?
 
     @Environment(\.modelContext) private var modelContext
 
     @Query private var budgets: [Budget]
 
     // MARK: - UI State
-
-    @State private var showingAddBudgetSheet: Bool = false
 
     @State private var upcomingExpanded: Bool = true
     @State private var activeExpanded: Bool = true
@@ -27,8 +26,9 @@ struct BudgetsView: View {
     @State private var searchText: String = ""
     @FocusState private var searchFocused: Bool
 
-    init(workspace: Workspace) {
+    init(workspace: Workspace, sheetRoute: Binding<BudgetsSheetRoute?>) {
         self.workspace = workspace
+        self._sheetRoute = sheetRoute
         let workspaceID = workspace.id
 
         _budgets = Query(
@@ -169,16 +169,11 @@ struct BudgetsView: View {
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 Button {
-                    showingAddBudgetSheet = true
+                    sheetRoute = .addBudget
                 } label: {
                     Image(systemName: "plus")
                 }
                 .accessibilityLabel("Add Budget")
-            }
-        }
-        .sheet(isPresented: $showingAddBudgetSheet) {
-            NavigationStack {
-                AddBudgetView(workspace: workspace)
             }
         }
     }
@@ -206,7 +201,7 @@ struct BudgetsView: View {
     let container = PreviewSeed.makeContainer()
     PreviewHost(container: container) { ws in
         NavigationStack {
-            BudgetsView(workspace: ws)
+            BudgetsView(workspace: ws, sheetRoute: .constant(nil))
         }
     }
 }

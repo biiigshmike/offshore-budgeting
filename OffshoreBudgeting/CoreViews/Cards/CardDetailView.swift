@@ -16,20 +16,13 @@ struct CardDetailView: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.cardsSheetRoute) private var cardsSheetRoute
 
     @State private var showingCardDeleteConfirm: Bool = false
     @State private var pendingCardDelete: (() -> Void)? = nil
 
     @State private var showingExpenseDeleteConfirm: Bool = false
     @State private var pendingExpenseDelete: (() -> Void)? = nil
-
-    @State private var showingAddExpenseSheet: Bool = false
-    @State private var expenseToEdit: ExpenseToEdit? = nil
-    @State private var plannedExpenseToEdit: PlannedExpenseToEdit? = nil
-    @State private var presetToEdit: PresetToEdit? = nil
-
-    @State private var showingEditCardSheet: Bool = false
-    @State private var showingImportSheet: Bool = false
 
     @State private var searchText: String = ""
     @FocusState private var searchFocused: Bool
@@ -41,6 +34,7 @@ struct CardDetailView: View {
     @State private var draftEndDate: Date = .now
     @State private var appliedStartDate: Date = .now
     @State private var appliedEndDate: Date = .now
+    @State private var isApplyingQuickRange: Bool = false
 
     @State private var selectedCategoryID: UUID? = nil
 
@@ -324,7 +318,7 @@ struct CardDetailView: View {
                 DateFilterRow(
                     draftStartDate: $draftStartDate,
                     draftEndDate: $draftEndDate,
-                    isGoEnabled: isDateDirty,
+                    isGoEnabled: isDateDirty && !isApplyingQuickRange,
                     onTapGo: { applyDraftDates() },
                     onSelectQuickRange: { applyQuickRangePresetDeferred($0) }
                 )
@@ -524,13 +518,13 @@ struct CardDetailView: View {
 
                 Menu {
                     Button {
-                        showingAddExpenseSheet = true
+                        cardsSheetRoute.wrappedValue = .addExpense(defaultCard: card)
                     } label: {
                         Label("Add Transaction", systemImage: "plus")
                     }
 
                     Button {
-                        showingImportSheet = true
+                        cardsSheetRoute.wrappedValue = .importExpenses(card: card)
                     } label: {
                         Label("Import Expenses (.csv)", systemImage: "tray.and.arrow.down")
                     }
@@ -541,7 +535,7 @@ struct CardDetailView: View {
                 
                 Menu {
                     Button {
-                        showingEditCardSheet = true
+                        cardsSheetRoute.wrappedValue = .editCard(card)
                     } label: {
                         Label("Edit Card", systemImage: "pencil")
                     }
@@ -562,36 +556,6 @@ struct CardDetailView: View {
                     Image(systemName: "ellipsis")
                 }
                 .accessibilityLabel("Card Actions")
-            }
-        }
-        .sheet(isPresented: $showingImportSheet) {
-            NavigationStack {
-                ExpenseCSVImportFlowView(workspace: workspace, card: card)
-            }
-        }
-        .sheet(isPresented: $showingAddExpenseSheet) {
-            NavigationStack {
-                AddExpenseView(workspace: workspace, defaultCard: card)
-            }
-        }
-        .sheet(isPresented: $showingEditCardSheet) {
-            NavigationStack {
-                EditCardView(workspace: workspace, card: card)
-            }
-        }
-        .sheet(item: $expenseToEdit) { item in
-            NavigationStack {
-                EditExpenseView(workspace: workspace, expense: item.expense)
-            }
-        }
-        .sheet(item: $plannedExpenseToEdit) { item in
-            NavigationStack {
-                EditPlannedExpenseView(workspace: workspace, plannedExpense: item.plannedExpense)
-            }
-        }
-        .sheet(item: $presetToEdit) { item in
-            NavigationStack {
-                EditPresetView(workspace: workspace, preset: item.preset)
             }
         }
         .alert("Delete?", isPresented: $showingCardDeleteConfirm) {
@@ -683,9 +647,11 @@ struct CardDetailView: View {
     private func applyQuickRangePresetDeferred(_ preset: QuickRangePreset) {
         // Update draft immediately so the UI reflects the selection,
         // then apply on the next run loop, so the menu can dismiss cleanly.
+        isApplyingQuickRange = true
         applyQuickRangePreset(preset)
         DispatchQueue.main.async {
             applyDraftDates()
+            isApplyingQuickRange = false
         }
     }
 
@@ -858,15 +824,15 @@ struct CardDetailView: View {
     // MARK: - Actions
 
     private func openEdit(_ expense: VariableExpense) {
-        expenseToEdit = ExpenseToEdit(expense: expense)
+        cardsSheetRoute.wrappedValue = .editExpense(expense)
     }
 
     private func openEdit(_ plannedExpense: PlannedExpense) {
-        plannedExpenseToEdit = PlannedExpenseToEdit(plannedExpense: plannedExpense)
+        cardsSheetRoute.wrappedValue = .editPlannedExpense(plannedExpense)
     }
 
     private func openEditPreset(_ preset: Preset) {
-        presetToEdit = PresetToEdit(preset: preset)
+        cardsSheetRoute.wrappedValue = .editPreset(preset)
     }
 
     private func presetForPlannedExpense(_ expense: PlannedExpense) -> Preset? {
@@ -972,36 +938,6 @@ private enum QuickRangePreset {
     case thisMonth
     case thisQuarter
     case thisYear
-}
-
-private struct ExpenseToEdit: Identifiable {
-    let id: UUID
-    let expense: VariableExpense
-
-    init(expense: VariableExpense) {
-        self.id = expense.id
-        self.expense = expense
-    }
-}
-
-private struct PlannedExpenseToEdit: Identifiable {
-    let id: UUID
-    let plannedExpense: PlannedExpense
-
-    init(plannedExpense: PlannedExpense) {
-        self.id = plannedExpense.id
-        self.plannedExpense = plannedExpense
-    }
-}
-
-private struct PresetToEdit: Identifiable {
-    let id: UUID
-    let preset: Preset
-
-    init(preset: Preset) {
-        self.id = preset.id
-        self.preset = preset
-    }
 }
 
 private enum UnifiedExpenseItem: Identifiable {
@@ -1422,207 +1358,6 @@ private struct CategoryDotView: View {
         Circle()
             .fill(dotColor)
             .frame(width: 10, height: 10)
-    }
-}
-
-// MARK: - Edit Planned Expense (local)
-
-private struct EditPlannedExpenseView: View {
-
-    let workspace: Workspace
-    let plannedExpense: PlannedExpense
-
-    @Environment(\.modelContext) private var modelContext
-    @Environment(\.dismiss) private var dismiss
-
-    @Query private var cards: [Card]
-    @Query private var categories: [Category]
-
-    // MARK: - Form State
-
-    @State private var title: String = ""
-    @State private var plannedAmountText: String = ""
-    @State private var actualAmountText: String = ""
-    @State private var expenseDate: Date = .now
-    @State private var selectedCardID: UUID? = nil
-    @State private var selectedCategoryID: UUID? = nil
-
-    // MARK: - Alerts
-
-    @State private var showingInvalidAmountAlert: Bool = false
-    @State private var showingMissingCardAlert: Bool = false
-
-    init(workspace: Workspace, plannedExpense: PlannedExpense) {
-        self.workspace = workspace
-        self.plannedExpense = plannedExpense
-
-        let workspaceID = workspace.id
-        _cards = Query(
-            filter: #Predicate<Card> { $0.workspace?.id == workspaceID },
-            sort: [SortDescriptor(\Card.name, order: .forward)]
-        )
-
-        _categories = Query(
-            filter: #Predicate<Category> { $0.workspace?.id == workspaceID },
-            sort: [SortDescriptor(\Category.name, order: .forward)]
-        )
-    }
-
-    private var canSave: Bool {
-        let t = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !t.isEmpty else { return false }
-        guard parseAmount(plannedAmountText) ?? 0 > 0 else { return false }
-        guard !cards.isEmpty else { return false }
-        guard selectedCardID != nil else { return false }
-        return true
-    }
-
-    var body: some View {
-        Form {
-            Section("Planned Expense") {
-                TextField("Title", text: $title)
-
-                TextField("Planned Amount", text: $plannedAmountText)
-                    .keyboardType(.decimalPad)
-
-                TextField("Actual Amount (optional)", text: $actualAmountText)
-                    .keyboardType(.decimalPad)
-
-                HStack {
-                    Text("Date")
-                    Spacer()
-                    PillDatePickerField(title: "Date", date: $expenseDate)
-                }
-            }
-
-            Section("Card") {
-                if cards.isEmpty {
-                    Text("No cards yet.")
-                        .foregroundStyle(.secondary)
-                } else {
-                    Picker("Card", selection: $selectedCardID) {
-                        ForEach(cards) { card in
-                            Text(card.name).tag(Optional(card.id))
-                        }
-                    }
-                }
-
-                if selectedCardID == nil && !cards.isEmpty {
-                    Text("Select a card to continue.")
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            Section {
-                Picker("Category", selection: $selectedCategoryID) {
-                    Text("None").tag(UUID?.none)
-                    ForEach(categories) { category in
-                        Text(category.name).tag(Optional(category.id))
-                    }
-                }
-            } header: {
-                Text("Category")
-            } footer: {
-                Text("If this planned expense came from a preset, swiping right also lets you edit the preset.")
-            }
-
-            if !canSave {
-                Section {
-                    VStack(alignment: .leading, spacing: 6) {
-                        if title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                            Text("Enter a title.")
-                        }
-
-                        let plannedAmt = parseAmount(plannedAmountText) ?? 0
-                        if plannedAmt <= 0 {
-                            Text("Enter a planned amount greater than 0.")
-                        }
-
-                        if cards.isEmpty {
-                            Text("Create a card first.")
-                        } else if selectedCardID == nil {
-                            Text("Select a card.")
-                        }
-                    }
-                    .foregroundStyle(.secondary)
-                }
-            }
-        }
-        .navigationTitle("Edit Planned")
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button("Cancel") { dismiss() }
-            }
-            if #available(iOS 26.0, *) {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Save") { save() }
-                        .disabled(!canSave)
-                        .tint(.accentColor)
-                        .controlSize(.large)
-                        .buttonStyle(.glassProminent)
-                }
-            } else {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Save") { save() }
-                        .disabled(!canSave)
-                        .tint(.accentColor)
-                        .controlSize(.large)
-                        .buttonStyle(.plain)
-                }
-            }
-        }
-        .alert("Invalid Amount", isPresented: $showingInvalidAmountAlert) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text("Please enter a planned amount greater than 0.")
-        }
-        .alert("Select a Card", isPresented: $showingMissingCardAlert) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text("Choose a card for this planned expense.")
-        }
-        .onAppear {
-            title = plannedExpense.title
-            plannedAmountText = CurrencyFormatter.editingString(from: plannedExpense.plannedAmount)
-            actualAmountText = plannedExpense.actualAmount > 0 ?
-            CurrencyFormatter.editingString(from: plannedExpense.actualAmount) : ""
-            expenseDate = plannedExpense.expenseDate
-            selectedCardID = plannedExpense.card?.id
-            selectedCategoryID = plannedExpense.category?.id
-        }
-    }
-
-    private func parseAmount(_ text: String) -> Double? {
-        CurrencyFormatter.parseAmount(text)
-    }
-
-    private func save() {
-        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedTitle.isEmpty else { return }
-
-        guard let plannedAmt = parseAmount(plannedAmountText), plannedAmt > 0 else {
-            showingInvalidAmountAlert = true
-            return
-        }
-
-        guard let selectedCard = cards.first(where: { $0.id == selectedCardID }) else {
-            showingMissingCardAlert = true
-            return
-        }
-
-        let actualAmt = parseAmount(actualAmountText) ?? 0
-        let selectedCategory = categories.first(where: { $0.id == selectedCategoryID })
-
-        plannedExpense.title = trimmedTitle
-        plannedExpense.plannedAmount = plannedAmt
-        plannedExpense.actualAmount = max(0, actualAmt)
-        plannedExpense.expenseDate = expenseDate
-        plannedExpense.workspace = workspace
-        plannedExpense.card = selectedCard
-        plannedExpense.category = selectedCategory
-
-        try? modelContext.save()
-        dismiss()
     }
 }
 

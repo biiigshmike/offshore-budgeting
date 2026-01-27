@@ -14,16 +14,16 @@ struct CardsView: View {
 
     @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
 
-    @State private var showingAddCardSheet = false
-    @State private var editingCard: Card? = nil
+    @Binding var sheetRoute: CardsSheetRoute?
     @State private var showingCardDeleteConfirm: Bool = false
     @State private var pendingCardDelete: (() -> Void)? = nil
 
     let workspace: Workspace
     @Query private var cards: [Card]
 
-    init(workspace: Workspace) {
+    init(workspace: Workspace, sheetRoute: Binding<CardsSheetRoute?>) {
         self.workspace = workspace
+        self._sheetRoute = sheetRoute
         let workspaceID = workspace.id
 
         _cards = Query(
@@ -60,7 +60,7 @@ struct CardsView: View {
                             .buttonStyle(.plain)
                             .contextMenu {
                                 Button {
-                                    editingCard = card
+                                    sheetRoute = .editCard(card)
                                 } label: {
                                     Label("Edit", systemImage: "pencil")
                                 }
@@ -98,21 +98,11 @@ struct CardsView: View {
         .navigationTitle("Cards")
         .toolbar {
             Button {
-                showingAddCardSheet = true
+                sheetRoute = .addCard
             } label: {
                 Image(systemName: "plus")
             }
             .accessibilityLabel("Add Card")
-        }
-        .sheet(isPresented: $showingAddCardSheet) {
-            NavigationStack {
-                AddCardView(workspace: workspace)
-            }
-        }
-        .sheet(item: $editingCard) { card in
-            NavigationStack {
-                EditCardView(workspace: workspace, card: card)
-            }
         }
         .alert("Delete?", isPresented: $showingCardDeleteConfirm) {
             Button("Delete", role: .destructive) {
@@ -140,7 +130,7 @@ struct CardsView: View {
 
     return NavigationStack {
         if let workspace {
-            CardsView(workspace: workspace)
+            CardsView(workspace: workspace, sheetRoute: .constant(nil))
         } else {
             ContentUnavailableView(
                 "Missing Preview Data",

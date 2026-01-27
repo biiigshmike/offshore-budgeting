@@ -24,9 +24,21 @@ struct ManagePresetsView: View {
     // We'll pull links broadly and filter in-memory for the current workspace.
     @Query private var presetLinks: [BudgetPresetLink]
 
-    @State private var showingAddPresetSheet: Bool = false
+    private enum SheetRoute: Identifiable {
+        case add
+        case edit(Preset)
 
-    @State private var presetPendingEdit: Preset? = nil
+        var id: String {
+            switch self {
+            case .add:
+                return "add"
+            case .edit(let preset):
+                return "edit-\(preset.id.uuidString)"
+            }
+        }
+    }
+
+    @State private var sheetRoute: SheetRoute? = nil
 
     @State private var showingPresetDeleteConfirm: Bool = false
     @State private var pendingPresetDelete: (() -> Void)? = nil
@@ -105,7 +117,7 @@ struct ManagePresetsView: View {
                     )
                     .swipeActions(edge: .leading, allowsFullSwipe: false) {
                         Button {
-                            presetPendingEdit = preset
+                            sheetRoute = .edit(preset)
                         } label: {
                             Label("Edit", systemImage: "pencil")
                         }
@@ -154,21 +166,23 @@ struct ManagePresetsView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
-                    showingAddPresetSheet = true
+                    sheetRoute = .add
                 } label: {
                     Image(systemName: "plus")
                 }
                 .accessibilityLabel("Add Preset")
             }
         }
-        .sheet(isPresented: $showingAddPresetSheet) {
-            NavigationStack {
-                AddPresetView(workspace: workspace)
-            }
-        }
-        .sheet(item: $presetPendingEdit) { preset in
-            NavigationStack {
-                EditPresetView(workspace: workspace, preset: preset)
+        .sheet(item: $sheetRoute) { route in
+            switch route {
+            case .add:
+                NavigationStack {
+                    AddPresetView(workspace: workspace)
+                }
+            case .edit(let preset):
+                NavigationStack {
+                    EditPresetView(workspace: workspace, preset: preset)
+                }
             }
         }
         .alert("Delete?", isPresented: $showingPresetDeleteConfirm) {

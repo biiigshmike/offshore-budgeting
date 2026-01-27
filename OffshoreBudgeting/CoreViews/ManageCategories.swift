@@ -18,8 +18,21 @@ struct ManageCategoriesView: View {
 
     @Query private var categories: [Category]
 
-    @State private var showingAddSheet: Bool = false
-    @State private var editingCategory: Category? = nil
+    private enum SheetRoute: Identifiable {
+        case add
+        case edit(Category)
+
+        var id: String {
+            switch self {
+            case .add:
+                return "add"
+            case .edit(let category):
+                return "edit-\(category.id.uuidString)"
+            }
+        }
+    }
+
+    @State private var sheetRoute: SheetRoute? = nil
     @State private var showingCategoryDeleteConfirm: Bool = false
     @State private var pendingCategoryDelete: (() -> Void)? = nil
 
@@ -67,7 +80,7 @@ struct ManageCategoriesView: View {
                     }
                     .swipeActions(edge: .leading, allowsFullSwipe: false) {
                         Button {
-                            editingCategory = category
+                            sheetRoute = .edit(category)
                         } label: {
                             Label("Edit", systemImage: "pencil")
                         }
@@ -91,20 +104,22 @@ struct ManageCategoriesView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
-                    showingAddSheet = true
+                    sheetRoute = .add
                 } label: {
                     Image(systemName: "plus")
                 }
             }
         }
-        .sheet(isPresented: $showingAddSheet) {
-            NavigationStack {
-                AddCategoryView(workspace: workspace)
-            }
-        }
-        .sheet(item: $editingCategory) { category in
-            NavigationStack {
-                EditCategoryView(workspace: workspace, category: category)
+        .sheet(item: $sheetRoute) { route in
+            switch route {
+            case .add:
+                NavigationStack {
+                    AddCategoryView(workspace: workspace)
+                }
+            case .edit(let category):
+                NavigationStack {
+                    EditCategoryView(workspace: workspace, category: category)
+                }
             }
         }
         .alert("Delete?", isPresented: $showingCategoryDeleteConfirm) {
