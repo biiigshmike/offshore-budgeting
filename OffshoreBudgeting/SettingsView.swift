@@ -272,6 +272,7 @@ struct SettingsView: View {
             WorkspacePickerView(
                 workspaces: workspaces,
                 selectedWorkspaceID: $selectedWorkspaceID,
+                showsCloseButton: true,
                 onCreate: createWorkspace(name:hexColor:),
                 onDelete: deleteWorkspaces
             )

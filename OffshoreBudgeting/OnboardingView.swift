@@ -25,12 +25,11 @@ struct OnboardingView: View {
 
     @AppStorage("privacy_requireBiometrics") private var requireBiometrics: Bool = false
 
-    @AppStorage("icloud_useCloud") private var useICloud: Bool = false
-    @AppStorage("app_rootResetToken") private var rootResetToken: String = UUID().uuidString
+    @AppStorage("icloud_useCloud") private var desiredUseICloud: Bool = false
+    @AppStorage("icloud_activeUseCloud") private var activeUseICloud: Bool = false
     @AppStorage("icloud_bootstrapStartedAt") private var iCloudBootstrapStartedAt: Double = 0
-    @AppStorage("profiles_activeLocalID") private var activeLocalProfileID: String = ""
 
-    /// Persist step so toggling iCloud (which rebuilds container) doesn't restart the flow.
+    /// Persist step so relaunches and resets don't restart the flow.
     @AppStorage("onboarding_step") private var onboardingStep: Int = 0
 
     // MARK: - SwiftData
@@ -53,6 +52,8 @@ struct OnboardingView: View {
     @State private var showingMissingCardAlert: Bool = false
     @State private var showingGetStartedICloudChoice: Bool = false
     @State private var isCheckingICloudForGetStarted: Bool = false
+    @State private var showingRestartRequired: Bool = false
+    @State private var didChooseICloudFromGetStarted: Bool = false
 
     // MARK: - Derived
 
@@ -65,7 +66,7 @@ struct OnboardingView: View {
     }
 
     private var isICloudBootstrapping: Bool {
-        ICloudBootstrap.isBootstrapping(useICloud: useICloud, startedAt: iCloudBootstrapStartedAt)
+        ICloudBootstrap.isBootstrapping(useICloud: activeUseICloud, startedAt: iCloudBootstrapStartedAt)
     }
 
     var body: some View {
@@ -88,7 +89,7 @@ struct OnboardingView: View {
             Task { await maybeOfferSkipIfCloudAlreadyHasData() }
         }
         .onChange(of: workspaces.count) { _, newCount in
-            if useICloud, newCount > 0 {
+            if activeUseICloud, newCount > 0 {
                 iCloudBootstrapStartedAt = 0
             }
         }
@@ -111,9 +112,36 @@ struct OnboardingView: View {
         .alert("Use iCloud or Continue Locally?", isPresented: $showingGetStartedICloudChoice) {
             Button("Use iCloud") { startUsingICloudFromGetStarted() }
             Button("Continue Locally", role: .cancel) { startLocalFromGetStarted() }
-            Button("Start Over (Local)", role: .destructive) { startFreshLocalFromGetStarted() }
         } message: {
-            Text("This Apple ID can sync existing Offshore data from iCloud. If you start over locally, you can still switch to iCloud later.")
+            Text("This Apple ID can sync existing Offshore data from iCloud. You can always switch later from Manage Workspaces.")
+        }
+        .sheet(isPresented: $showingRestartRequired) {
+            RestartRequiredView(
+                title: "Restart Required",
+                message: AppRestartService.restartRequiredMessage(
+                    debugMessage: "Switching to iCloud takes effect after you close and reopen Offshore."
+                ),
+                primaryButtonTitle: AppRestartService.closeAppButtonTitle,
+                onPrimary: {
+                    AppRestartService.closeAppOrDismiss {
+                        showingRestartRequired = false
+                        if didChooseICloudFromGetStarted {
+                            didChooseICloudFromGetStarted = false
+                            goNext()
+                        }
+                    }
+                },
+                secondaryButtonTitle: "Not Now",
+                onSecondary: {
+                    showingRestartRequired = false
+                    if didChooseICloudFromGetStarted {
+                        didChooseICloudFromGetStarted = false
+                        desiredUseICloud = false
+                        goNext()
+                    }
+                }
+            )
+            .presentationDetents([.medium])
         }
     }
 
@@ -193,9 +221,6 @@ struct OnboardingView: View {
     private var privacyAndSyncStep: some View {
         OnboardingPrivacySyncStep(
             requireBiometrics: $requireBiometrics,
-            useICloud: $useICloud,
-            rootResetToken: $rootResetToken,
-            iCloudBootstrapStartedAt: $iCloudBootstrapStartedAt,
             hasExistingDataInCurrentStore: !workspaces.isEmpty,
             notificationService: notificationService
         )
@@ -353,8 +378,6 @@ struct OnboardingView: View {
     // MARK: - Get Started
 
     private func getStartedTapped() {
-        LocalProfilesStore.ensureDefaultProfileExists()
-
         isCheckingICloudForGetStarted = true
         Task {
             let status = (try? await CKContainer.default().accountStatus()) ?? .couldNotDetermine
@@ -370,36 +393,19 @@ struct OnboardingView: View {
     }
 
     private func startLocalFromGetStarted() {
-        useICloud = false
-        iCloudBootstrapStartedAt = 0
         goNext()
     }
 
     private func startUsingICloudFromGetStarted() {
-        useICloud = true
-        iCloudBootstrapStartedAt = Date().timeIntervalSince1970
-        selectedWorkspaceID = ""
+        desiredUseICloud = true
+        didChooseICloudFromGetStarted = true
 
-        onboardingStep = 1
-        let newToken = UUID().uuidString
-        DispatchQueue.main.async {
-            rootResetToken = newToken
+        if desiredUseICloud == activeUseICloud {
+            didChooseICloudFromGetStarted = false
+            goNext()
+            return
         }
-    }
-
-    private func startFreshLocalFromGetStarted() {
-        let profile = LocalProfilesStore.makeNewProfile(name: "Fresh Start")
-        useICloud = false
-        iCloudBootstrapStartedAt = 0
-        activeLocalProfileID = profile.id
-        LocalProfilesStore.setActiveProfileID(profile.id)
-        selectedWorkspaceID = ""
-
-        onboardingStep = 1
-        let newToken = UUID().uuidString
-        DispatchQueue.main.async {
-            rootResetToken = newToken
-        }
+        showingRestartRequired = (desiredUseICloud != activeUseICloud)
     }
 
     // MARK: - Completion
@@ -453,7 +459,7 @@ struct OnboardingView: View {
         guard onboardingStep == 0 else { return }
 
         // If the store already has data (often after enabling iCloud), offer to skip.
-        if useICloud, !workspaces.isEmpty {
+        if activeUseICloud, !workspaces.isEmpty {
             skipPromptMessage = "It looks like iCloud Sync is enabled and data already exists on this Apple ID. You can skip onboarding to jump straight into your existing workspaces."
             showingSkipPrompt = true
             return
@@ -575,19 +581,17 @@ private struct OnboardingWorkspaceStep: View {
 private struct OnboardingPrivacySyncStep: View {
 
     @Binding var requireBiometrics: Bool
-    @Binding var useICloud: Bool
-    @Binding var rootResetToken: String
-    @Binding var iCloudBootstrapStartedAt: Double
     let hasExistingDataInCurrentStore: Bool
+    @AppStorage("icloud_useCloud") private var desiredUseICloud: Bool = false
+    @AppStorage("icloud_activeUseCloud") private var activeUseICloud: Bool = false
 
     @ObservedObject var notificationService: LocalNotificationService
 
-	@State private var biometricsInfo = LocalAuthenticationService.biometricAvailability()
-	@State private var showingNotificationsDeniedInfo: Bool = false
-	@State private var showingICloudSwitchConfirm: Bool = false
-	@State private var showingICloudUnavailable: Bool = false
-	@State private var suppressICloudToggleHandler: Bool = false
-	@State private var didConfirmICloudSwitch: Bool = false
+    @State private var biometricsInfo = LocalAuthenticationService.biometricAvailability()
+    @State private var showingNotificationsDeniedInfo: Bool = false
+    @State private var showingICloudSwitchConfirm: Bool = false
+    @State private var showingICloudUnavailable: Bool = false
+    @State private var showingRestartRequired: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -614,10 +618,12 @@ private struct OnboardingPrivacySyncStep: View {
                 }
 
                 Section("iCloud Sync") {
-                    Toggle("Enable iCloud Sync", isOn: $useICloud)
-                        .onChange(of: useICloud) { oldValue, newValue in
-                            handleICloudToggleChanged(oldValue: oldValue, newValue: newValue)
+                    Toggle("Enable iCloud Sync", isOn: Binding(
+                        get: { desiredUseICloud },
+                        set: { wantsEnabled in
+                            handleICloudToggleChanged(wantsEnabled: wantsEnabled)
                         }
+                    ))
 
                     Text("Use iCloud to sync your workspaces and budgets across your devices signed into this Apple ID.")
                         .font(.footnote)
@@ -642,12 +648,27 @@ private struct OnboardingPrivacySyncStep: View {
         }
         .alert("Switch to iCloud?", isPresented: $showingICloudSwitchConfirm) {
             Button("Switch") {
-                didConfirmICloudSwitch = true
-                useICloud = true
+                desiredUseICloud = true
+                if desiredUseICloud != activeUseICloud {
+                    showingRestartRequired = true
+                }
             }
             Button("Cancel", role: .cancel) { }
         } message: {
-            Text("Switching to iCloud will show your iCloud data. Your current on-device setup will remain available as an on-device profile.")
+            Text("Switching to iCloud will show your iCloud data. Your on-device data will remain on this device if you switch back later.")
+        }
+        .sheet(isPresented: $showingRestartRequired) {
+            RestartRequiredView(
+                title: "Restart Required",
+                message: AppRestartService.restartRequiredMessage(
+                    debugMessage: "Changing iCloud sync takes effect after you close and reopen Offshore."
+                ),
+                primaryButtonTitle: AppRestartService.closeAppButtonTitle,
+                onPrimary: { AppRestartService.closeAppOrDismiss { showingRestartRequired = false } },
+                secondaryButtonTitle: "Not Now",
+                onSecondary: { showingRestartRequired = false }
+            )
+            .presentationDetents([.medium])
         }
         .alert("Notifications Disabled", isPresented: $showingNotificationsDeniedInfo) {
             Button("OK", role: .cancel) { }
@@ -663,38 +684,28 @@ private struct OnboardingPrivacySyncStep: View {
         FileManager.default.ubiquityIdentityToken != nil
     }
 
-    private func handleICloudToggleChanged(oldValue: Bool, newValue: Bool) {
-        if suppressICloudToggleHandler {
-            suppressICloudToggleHandler = false
-            return
-        }
-
-        if newValue {
+    private func handleICloudToggleChanged(wantsEnabled: Bool) {
+        if wantsEnabled {
             guard isICloudAvailable else {
-                suppressICloudToggleHandler = true
-                useICloud = false
+                desiredUseICloud = false
                 showingICloudUnavailable = true
                 return
             }
 
-            if hasExistingDataInCurrentStore, !didConfirmICloudSwitch {
-                suppressICloudToggleHandler = true
-                useICloud = false
+            if hasExistingDataInCurrentStore {
+                desiredUseICloud = false
                 showingICloudSwitchConfirm = true
                 return
             }
 
-            didConfirmICloudSwitch = false
-            iCloudBootstrapStartedAt = Date().timeIntervalSince1970
-            let newToken = UUID().uuidString
-            DispatchQueue.main.async {
-                rootResetToken = newToken
+            desiredUseICloud = true
+            if desiredUseICloud != activeUseICloud {
+                showingRestartRequired = true
             }
         } else {
-            iCloudBootstrapStartedAt = 0
-            let newToken = UUID().uuidString
-            DispatchQueue.main.async {
-                rootResetToken = newToken
+            desiredUseICloud = false
+            if desiredUseICloud != activeUseICloud {
+                showingRestartRequired = true
             }
         }
     }

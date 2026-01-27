@@ -17,25 +17,24 @@ struct SettingsiCloudView: View {
 
     // MARK: - Persisted Settings
 
-    @AppStorage("icloud_useCloud") private var useICloud: Bool = false
-    @AppStorage("app_rootResetToken") private var rootResetToken: String = UUID().uuidString
-    @AppStorage("icloud_bootstrapStartedAt") private var iCloudBootstrapStartedAt: Double = 0
+    @AppStorage("icloud_useCloud") private var desiredUseICloud: Bool = false
+    @AppStorage("icloud_activeUseCloud") private var activeUseICloud: Bool = false
+    @AppStorage("selectedWorkspaceID") private var selectedWorkspaceID: String = ""
 
     // MARK: - UI State
 
     @State private var showingUnavailableAlert: Bool = false
     @State private var showingEnableConfirm: Bool = false
+    @State private var showingRestartRequired: Bool = false
 
     @Query(sort: \Workspace.name, order: .forward)
     private var workspaces: [Workspace]
-
-    private let cloudKitContainerIdentifier: String = "iCloud.com.mb.offshore-budgeting"
 
     var body: some View {
         List {
             Section("iCloud Sync") {
                 Toggle("Use iCloud to Sync Data", isOn: Binding(
-                    get: { useICloud },
+                    get: { desiredUseICloud },
                     set: { newValue in
                         handleToggleChange(newValue)
                     }
@@ -66,10 +65,23 @@ struct SettingsiCloudView: View {
             Text("To use iCloud sync, sign in to iCloud in the Settings app, then return here and try again.")
         }
         .alert("Switch to iCloud?", isPresented: $showingEnableConfirm) {
-            Button("Enable iCloud") { enableICloud() }
+            Button("Enable iCloud") { requestEnableICloud() }
             Button("Cancel", role: .cancel) { }
         } message: {
-            Text("This will switch you to your iCloud data. Your current on-device profile stays on this device and can be accessed from Manage Workspaces.")
+            Text("This will switch you to your iCloud data. Your on-device data stays on this device and can be accessed by switching back to On Device.")
+        }
+        .sheet(isPresented: $showingRestartRequired) {
+            RestartRequiredView(
+                title: "Restart Required",
+                message: AppRestartService.restartRequiredMessage(
+                    debugMessage: "Changing iCloud sync takes effect after you close and reopen Offshore."
+                ),
+                primaryButtonTitle: AppRestartService.closeAppButtonTitle,
+                onPrimary: { AppRestartService.closeAppOrDismiss { showingRestartRequired = false } },
+                secondaryButtonTitle: "Not Now",
+                onSecondary: { showingRestartRequired = false }
+            )
+            .presentationDetents([.medium])
         }
     }
 
@@ -99,7 +111,7 @@ struct SettingsiCloudView: View {
     }
 
     private var statusIconName: String {
-        if useICloud {
+        if activeUseICloud {
             return isICloudAvailable ? "checkmark.icloud.fill" : "exclamationmark.icloud.fill"
         } else {
             return "icloud"
@@ -107,7 +119,7 @@ struct SettingsiCloudView: View {
     }
 
     private var statusIconColor: Color {
-        if useICloud {
+        if activeUseICloud {
             return isICloudAvailable ? .green : .orange
         } else {
             return .secondary
@@ -115,7 +127,11 @@ struct SettingsiCloudView: View {
     }
 
     private var statusTitle: String {
-        if useICloud {
+        if desiredUseICloud != activeUseICloud {
+            return "Restart Required"
+        }
+
+        if activeUseICloud {
             return isICloudAvailable ? "Syncing Enabled" : "Enabled, But Not Available"
         } else {
             return "Syncing Disabled"
@@ -123,7 +139,11 @@ struct SettingsiCloudView: View {
     }
 
     private var statusSubtitle: String {
-        if useICloud {
+        if desiredUseICloud != activeUseICloud {
+            return "Close and reopen Offshore to apply this change."
+        }
+
+        if activeUseICloud {
             return isICloudAvailable
             ? "Your data will sync via iCloud."
             : "Sign in to iCloud in Settings to enable syncing."
@@ -138,36 +158,30 @@ struct SettingsiCloudView: View {
         if wantsEnabled {
             guard isICloudAvailable else {
                 // Revert toggle and explain.
-                useICloud = false
+                desiredUseICloud = false
                 showingUnavailableAlert = true
                 return
             }
 
             if !workspaces.isEmpty {
-                useICloud = false
+                desiredUseICloud = false
                 showingEnableConfirm = true
                 return
             }
 
-            enableICloud()
+            requestEnableICloud()
         } else {
-            useICloud = false
-            iCloudBootstrapStartedAt = 0
-            bumpRootResetToken()
+            desiredUseICloud = false
+            if desiredUseICloud != activeUseICloud {
+                showingRestartRequired = true
+            }
         }
     }
 
-    private func enableICloud() {
-        useICloud = true
-        iCloudBootstrapStartedAt = Date().timeIntervalSince1970
-        bumpRootResetToken()
-    }
-
-    private func bumpRootResetToken() {
-        // Forces a full SwiftUI rebuild, so the app recreates the SwiftData container.
-        let newToken = UUID().uuidString
-        DispatchQueue.main.async {
-            rootResetToken = newToken
+    private func requestEnableICloud() {
+        desiredUseICloud = true
+        if desiredUseICloud != activeUseICloud {
+            showingRestartRequired = true
         }
     }
 

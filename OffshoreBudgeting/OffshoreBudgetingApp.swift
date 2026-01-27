@@ -13,23 +13,27 @@ struct OffshoreBudgetingApp: App {
 
     // MARK: - iCloud Opt-In State
 
-    @AppStorage("icloud_useCloud") private var useICloud: Bool = false
     @AppStorage("app_rootResetToken") private var rootResetToken: String = UUID().uuidString
 
     // MARK: - ModelContainer
 
     @State private var modelContainer: ModelContainer = {
-        let useICloud = UserDefaults.standard.bool(forKey: "icloud_useCloud")
-        return Self.makeModelContainer(useICloud: useICloud)
+        let desiredUseICloud = UserDefaults.standard.bool(forKey: "icloud_useCloud")
+        UserDefaults.standard.set(desiredUseICloud, forKey: "icloud_activeUseCloud")
+
+        if desiredUseICloud {
+            UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "icloud_bootstrapStartedAt")
+        } else {
+            UserDefaults.standard.set(0.0, forKey: "icloud_bootstrapStartedAt")
+        }
+
+        return Self.makeModelContainer(useICloud: desiredUseICloud)
     }()
 
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .id(rootResetToken)
-                .onChange(of: rootResetToken) { _, _ in
-                    modelContainer = Self.makeModelContainer(useICloud: useICloud)
-                }
         }
         .modelContainer(modelContainer)
     }
@@ -40,8 +44,6 @@ struct OffshoreBudgetingApp: App {
 
     private static func makeModelContainer(useICloud: Bool) -> ModelContainer {
         do {
-            LocalProfilesStore.ensureDefaultProfileExists()
-
             let schema = Schema([
                 Workspace.self,
                 Budget.self,
@@ -61,7 +63,7 @@ struct OffshoreBudgetingApp: App {
             let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
             try FileManager.default.createDirectory(at: appSupport, withIntermediateDirectories: true)
 
-            let localStoreURL = LocalProfilesStore.localStoreURL(applicationSupportDirectory: appSupport)
+            let localStoreURL = appSupport.appendingPathComponent("Local.store")
             let cloudStoreURL = appSupport.appendingPathComponent("Cloud.store")
 
             let configuration: ModelConfiguration

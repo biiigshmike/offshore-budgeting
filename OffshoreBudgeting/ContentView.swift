@@ -26,7 +26,7 @@ struct ContentView: View {
 
     // MARK: - iCloud
 
-    @AppStorage("icloud_useCloud") private var useICloud: Bool = false
+    @AppStorage("icloud_activeUseCloud") private var activeUseICloud: Bool = false
     @AppStorage("icloud_bootstrapStartedAt") private var iCloudBootstrapStartedAt: Double = 0
 
     // MARK: - Alerts
@@ -55,17 +55,20 @@ struct ContentView: View {
                         selectedWorkspaceID: $selectedWorkspaceID
                     )
                 } else {
-                    WorkspacePickerView(
-                        workspaces: workspaces,
-                        selectedWorkspaceID: $selectedWorkspaceID,
-                        onCreate: createWorkspace(name:hexColor:),
-                        onDelete: deleteWorkspaces
-                    )
+                    NavigationStack {
+                        WorkspacePickerView(
+                            workspaces: workspaces,
+                            selectedWorkspaceID: $selectedWorkspaceID,
+                            showsCloseButton: false,
+                            onCreate: createWorkspace(name:hexColor:),
+                            onDelete: deleteWorkspaces
+                        )
+                    }
                 }
             }
             .task {
                 let isBootstrapping = ICloudBootstrap.isBootstrapping(
-                    useICloud: useICloud,
+                    useICloud: activeUseICloud,
                     startedAt: iCloudBootstrapStartedAt
                 )
 
@@ -73,7 +76,7 @@ struct ContentView: View {
                 // If onboarding is NOT complete, do not seed anything.
                 if didCompleteOnboarding {
                     if !isBootstrapping {
-                        if !useICloud {
+                        if !activeUseICloud {
                             seedDefaultWorkspacesIfNeeded()
                         }
                     }
@@ -88,14 +91,14 @@ struct ContentView: View {
                 // If the user previously completed onboarding, then enabled iCloud and the
                 // store comes back empty, re-run onboarding instead of dumping them into
                 // a picker with nothing configured.
-                if didCompleteOnboarding, !useICloud, workspaces.isEmpty, !isBootstrapping {
+                if didCompleteOnboarding, !activeUseICloud, workspaces.isEmpty, !isBootstrapping {
                     didCompleteOnboarding = false
                     didSeedDefaultWorkspaces = false
                     selectedWorkspaceID = ""
                 }
             }
             .onChange(of: workspaces.count) { _, newCount in
-                if useICloud, newCount > 0 {
+                if activeUseICloud, newCount > 0 {
                     iCloudBootstrapStartedAt = 0
                 }
 

@@ -12,6 +12,7 @@ struct WorkspacePickerView: View {
 
     let workspaces: [Workspace]
     @Binding var selectedWorkspaceID: String
+    let showsCloseButton: Bool
 
     let onCreate: (String, String) -> Void
     let onDelete: (IndexSet) -> Void
@@ -20,30 +21,20 @@ struct WorkspacePickerView: View {
     @State private var editingWorkspace: Workspace? = nil
 
     @Environment(\.dismiss) private var dismiss
-    @AppStorage("icloud_useCloud") private var useICloud: Bool = false
+    @AppStorage("icloud_useCloud") private var desiredUseICloud: Bool = false
+    @AppStorage("icloud_activeUseCloud") private var activeUseICloud: Bool = false
     @AppStorage("icloud_bootstrapStartedAt") private var iCloudBootstrapStartedAt: Double = 0
-    @AppStorage("app_rootResetToken") private var rootResetToken: String = UUID().uuidString
-    @AppStorage("profiles_activeLocalID") private var activeLocalProfileID: String = ""
+    @State private var showingRestartRequired: Bool = false
 
-    @State private var localProfiles: [LocalProfile] = []
-    @State private var newProfileName: String = ""
-    @State private var renameProfileID: String = ""
-    @State private var renameProfileName: String = ""
-    @State private var pendingDeleteProfileID: String = ""
-
-    @State private var showingNewProfilePrompt: Bool = false
-    @State private var showingRenameProfilePrompt: Bool = false
-    @State private var showingDeleteProfileConfirm: Bool = false
     @State private var showingICloudUnavailable: Bool = false
-    @State private var showingICloudSwitchConfirm: Bool = false
 
     var body: some View {
         List {
-            profilesSection
+            dataSourceSection
 
             Section("Workspaces") {
                 if workspaces.isEmpty {
-                    if ICloudBootstrap.isBootstrapping(useICloud: useICloud, startedAt: iCloudBootstrapStartedAt) {
+                    if ICloudBootstrap.isBootstrapping(useICloud: activeUseICloud, startedAt: iCloudBootstrapStartedAt) {
                         VStack(spacing: 12) {
                             ContentUnavailableView(
                                 "Setting Up iCloud Sync",
@@ -94,52 +85,39 @@ struct WorkspacePickerView: View {
             }
         }
         .navigationTitle("Workspaces")
-        .task {
-            LocalProfilesStore.ensureDefaultProfileExists()
-            refreshProfiles()
-        }
         .onChange(of: workspaces.count) { _, newCount in
-            if useICloud, newCount > 0 {
+            if activeUseICloud, newCount > 0 {
                 iCloudBootstrapStartedAt = 0
             }
-        }
-        .alert("New Profile", isPresented: $showingNewProfilePrompt) {
-            TextField("Name", text: $newProfileName)
-            Button("Create") { createProfileAndSwitch() }
-            Button("Cancel", role: .cancel) { newProfileName = "" }
-        } message: {
-            Text("Create a separate on-device profile with its own workspaces and budgets.")
-        }
-        .alert("Rename Profile", isPresented: $showingRenameProfilePrompt) {
-            TextField("Name", text: $renameProfileName)
-            Button("Save") { renameProfile() }
-            Button("Cancel", role: .cancel) { renameProfileID = ""; renameProfileName = "" }
-        }
-        .alert("Delete Profile?", isPresented: $showingDeleteProfileConfirm) {
-            Button("Delete", role: .destructive) { deleteProfile() }
-            Button("Cancel", role: .cancel) { pendingDeleteProfileID = "" }
-        } message: {
-            Text("This will delete the on-device data for this profile. This cannot be undone.")
         }
         .alert("iCloud Unavailable", isPresented: $showingICloudUnavailable) {
             Button("OK", role: .cancel) { }
         } message: {
             Text("To use iCloud sync, sign in to iCloud in the Settings app, then try again.")
         }
-        .alert("Switch to iCloud?", isPresented: $showingICloudSwitchConfirm) {
-            Button("Switch", role: .destructive) { switchToICloud() }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("Your current on-device profile will remain available. iCloud data may take a moment to restore.")
+        .sheet(isPresented: $showingRestartRequired) {
+            RestartRequiredView(
+                title: "Restart Required",
+                message: AppRestartService.restartRequiredMessage(
+                    debugMessage: "Switching between On Device and iCloud takes effect after you close and reopen Offshore."
+                ),
+                primaryButtonTitle: AppRestartService.closeAppButtonTitle,
+                onPrimary: { AppRestartService.closeAppOrDismiss { showingRestartRequired = false } },
+                secondaryButtonTitle: "Not Now",
+                onSecondary: { showingRestartRequired = false }
+            )
+            .presentationDetents([.medium])
         }
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "xmark")
+            if showsCloseButton {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                    }
+                    .accessibilityLabel("Close")
                 }
-                .accessibilityLabel("Close")
             }
 
             ToolbarItem(placement: .topBarTrailing) {
@@ -191,90 +169,52 @@ struct WorkspacePickerView: View {
     }
 }
 
-// MARK: - Profiles
+// MARK: - Data Source
 
 extension WorkspacePickerView {
 
-    private var profilesSection: some View {
-        Section("Profiles") {
+    private var dataSourceSection: some View {
+        Section("Data Source") {
+            Button {
+                handleOnDeviceRowTapped()
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "iphone")
+                        .foregroundStyle(.secondary)
+                    Text("On Device")
+                    Spacer()
+                    dataSourceTrailingIcon(isActive: !activeUseICloud, isDesired: !desiredUseICloud)
+                }
+            }
+
             Button {
                 handleICloudRowTapped()
             } label: {
                 HStack(spacing: 10) {
                     Image(systemName: "icloud")
                         .foregroundStyle(.blue)
-
                     Text("iCloud")
-
                     Spacer()
-
-                    if useICloud {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(.secondary)
-                    }
+                    dataSourceTrailingIcon(isActive: activeUseICloud, isDesired: desiredUseICloud)
                 }
             }
+        }
+    }
 
-            ForEach(localProfiles) { profile in
-                Button {
-                    switchToLocal(profileID: profile.id)
-                } label: {
-                    HStack(spacing: 10) {
-                        Image(systemName: "iphone")
-                            .foregroundStyle(.secondary)
-
-                        Text(profile.name)
-
-                        Spacer()
-
-                        if !useICloud, activeLocalProfileID == profile.id {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-                .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                    if profile.id != "default" {
-                        Button {
-                            renameProfileID = profile.id
-                            renameProfileName = profile.name
-                            showingRenameProfilePrompt = true
-                        } label: {
-                            Label("Rename", systemImage: "pencil")
-                        }
-                        .tint(.blue)
-                    }
-                }
-                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                    if profile.id != "default" {
-                        Button(role: .destructive) {
-                            pendingDeleteProfileID = profile.id
-                            showingDeleteProfileConfirm = true
-                        } label: {
-                            Label("Delete", systemImage: "trash")
-                        }
-                    }
-                }
-            }
-
-            Button {
-                newProfileName = ""
-                showingNewProfilePrompt = true
-            } label: {
-                Label("New On-Device Profile", systemImage: "plus")
-            }
+    @ViewBuilder
+    private func dataSourceTrailingIcon(isActive: Bool, isDesired: Bool) -> some View {
+        if isActive {
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(.secondary)
+        } else if isDesired != isActive {
+            Image(systemName: "arrow.clockwise.circle")
+                .foregroundStyle(.secondary)
+                .accessibilityLabel("Restart required")
         }
     }
 
     private var isICloudAvailable: Bool {
         FileManager.default.ubiquityIdentityToken != nil
-    }
-
-    private func refreshProfiles() {
-        localProfiles = LocalProfilesStore.loadProfiles()
-        if activeLocalProfileID.isEmpty {
-            activeLocalProfileID = LocalProfilesStore.activeProfileID()
-        }
     }
 
     private func handleICloudRowTapped() {
@@ -283,69 +223,26 @@ extension WorkspacePickerView {
             return
         }
 
-        guard !useICloud else { return }
+        guard !activeUseICloud else { return }
+        requestSwitchToICloud()
+    }
 
-        if !workspaces.isEmpty {
-            showingICloudSwitchConfirm = true
-        } else {
-            switchToICloud()
+    private func handleOnDeviceRowTapped() {
+        guard activeUseICloud else { return }
+        requestSwitchToOnDevice()
+    }
+
+    private func requestSwitchToICloud() {
+        desiredUseICloud = true
+        if desiredUseICloud != activeUseICloud {
+            showingRestartRequired = true
         }
     }
 
-    private func switchToICloud() {
-        useICloud = true
-        iCloudBootstrapStartedAt = Date().timeIntervalSince1970
-        selectedWorkspaceID = ""
-        dismiss()
-        let newToken = UUID().uuidString
-        DispatchQueue.main.async {
-            rootResetToken = newToken
-        }
-    }
-
-    private func switchToLocal(profileID: String) {
-        guard !(useICloud == false && activeLocalProfileID == profileID) else { return }
-
-        useICloud = false
-        iCloudBootstrapStartedAt = 0
-        activeLocalProfileID = profileID
-        LocalProfilesStore.setActiveProfileID(profileID)
-        selectedWorkspaceID = ""
-        dismiss()
-        let newToken = UUID().uuidString
-        DispatchQueue.main.async {
-            rootResetToken = newToken
-        }
-    }
-
-    private func createProfileAndSwitch() {
-        let profile = LocalProfilesStore.makeNewProfile(name: newProfileName)
-        refreshProfiles()
-        switchToLocal(profileID: profile.id)
-        newProfileName = ""
-    }
-
-    private func renameProfile() {
-        let id = renameProfileID
-        guard !id.isEmpty else { return }
-        LocalProfilesStore.renameProfile(id: id, newName: renameProfileName)
-        renameProfileID = ""
-        renameProfileName = ""
-        refreshProfiles()
-    }
-
-    private func deleteProfile() {
-        let id = pendingDeleteProfileID
-        guard !id.isEmpty else { return }
-
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        LocalProfilesStore.deleteLocalStoreFileIfPresent(applicationSupportDirectory: appSupport, profileID: id)
-        LocalProfilesStore.deleteProfile(id: id)
-        pendingDeleteProfileID = ""
-        refreshProfiles()
-
-        if !useICloud, activeLocalProfileID == id {
-            switchToLocal(profileID: LocalProfilesStore.activeProfileID())
+    private func requestSwitchToOnDevice() {
+        desiredUseICloud = false
+        if desiredUseICloud != activeUseICloud {
+            showingRestartRequired = true
         }
     }
 }
@@ -360,6 +257,7 @@ extension WorkspacePickerView {
                 Workspace(name: "Work", hexColor: "#10B981")
             ],
             selectedWorkspaceID: .constant(""),
+            showsCloseButton: true,
             onCreate: { _, _ in },
             onDelete: { _ in }
         )
