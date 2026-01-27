@@ -97,7 +97,7 @@ struct HomeCategorySpotlightTile: View {
                 DonutChartView(
                     slices: slices,
                     innerRadiusRatio: 0.70,
-                    centerTitle: topMetric.map { "Top: \($0.categoryName)" },
+                    centerTitle: nil,
                     centerValueText: topMetric.map { CurrencyFormatter.string(from: $0.totalSpent) },
                     showsLegend: false
                 )

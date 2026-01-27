@@ -132,19 +132,26 @@ struct DonutChartView: View {
 
     @ViewBuilder
     private var centerOverlay: some View {
-        if let centerTitle, let centerValueText {
-            VStack(spacing: 4) {
-                Text(centerTitle)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.85)
+        let hasTitle = (centerTitle?.isEmpty == false)
+        let hasValue = (centerValueText?.isEmpty == false)
 
-                Text(centerValueText)
-                    .font(.title3.weight(.bold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.75)
+        if hasTitle || hasValue {
+            VStack(spacing: hasTitle && hasValue ? 4 : 2) {
+                if let centerTitle, hasTitle {
+                    Text(centerTitle)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                }
+
+                if let centerValueText, hasValue {
+                    Text(centerValueText)
+                        .font(.title3.weight(.bold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.75)
+                }
             }
             .multilineTextAlignment(.center)
             .padding(.horizontal, 10)

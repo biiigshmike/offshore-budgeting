@@ -60,12 +60,28 @@ struct CategorySpotlightDetailView: View {
                     DonutChartView(
                         slices: slices,
                         innerRadiusRatio: 0.70,
-                        centerTitle: topMetric.map { "Top: \($0.categoryName)" },
+                        centerTitle: nil,
                         centerValueText: topMetric.map { CurrencyFormatter.string(from: $0.totalSpent) },
                         showsLegend: false
                     )
                     .frame(maxWidth: .infinity)
                     .frame(height: 240)
+
+                    if let topMetric {
+                        VStack(spacing: 4) {
+                            Text("Top Category")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+
+                            Text(topMetric.categoryName)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.primary)
+                                .multilineTextAlignment(.center)
+                                .lineLimit(2)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 2)
+                    }
 
                     HStack {
                         VStack(alignment: .leading, spacing: 4) {
