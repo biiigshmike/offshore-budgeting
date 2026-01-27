@@ -58,6 +58,9 @@ struct EditCategoryLimitView: View {
                         dismiss()
                     }
                     .disabled(!canSave)
+                    .tint(.accentColor)
+                    .controlSize(.large)
+                    .buttonStyle(.glassProminent)
                 }
             }
             .onAppear {

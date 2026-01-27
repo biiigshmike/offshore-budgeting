@@ -47,7 +47,7 @@ struct SettingsView: View {
         .navigationTitle("Settings")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                workspaceMenu
+                workspaceTrailingNavBarItem
             }
         }
         .sheet(isPresented: $showingWorkspaceManager) {
@@ -197,20 +197,25 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Toolbar Menu
+    // MARK: - Toolbar Workspace Item (Single Source of Truth)
 
-    private var workspaceMenu: some View {
+    private var workspaceTrailingNavBarItem: some View {
         Menu {
             workspaceSwitcherMenuContent
 
             Button {
                 showingWorkspaceManager = true
             } label: {
-                Label("Manage Workspaces", systemImage: "person.3.fill")
+                Label("Manage Workspaces", systemImage: "person.fill")
             }
         } label: {
-            workspaceMenuLabel
+            WorkspaceToolbarMenuLabel(
+                tint: selectedWorkspaceColor,
+                systemImage: "person.fill"
+            )
         }
+        .accessibilityLabel("Workspaces")
+        .accessibilityHint("Switch workspaces or manage them")
     }
 
     @ViewBuilder
@@ -245,26 +250,6 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
         }
-    }
-
-    private var workspaceMenuLabel: some View {
-        let shape = Capsule()
-
-        return Image(systemName: "person.3.fill")
-            .font(.system(size: 14, weight: .semibold))
-            .foregroundStyle(.primary)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background {
-                shape.fill(selectedWorkspaceColor)
-            }
-            .opacity(0.85)
-//            .overlay {
-//                shape.strokeBorder(selectedWorkspaceColor, lineWidth: 1)
-//            }
-            .contentShape(shape)
-            .accessibilityLabel("Workspaces")
-            .accessibilityHint("Switch workspaces or manage them")
     }
 
     private var workspaceManagerSheet: some View {
@@ -324,6 +309,28 @@ struct SettingsView: View {
                 selectedWorkspaceID = ""
             }
         }
+    }
+}
+
+// MARK: - Workspace Toolbar Menu Label
+
+private struct WorkspaceToolbarMenuLabel: View {
+
+    let tint: Color
+    let systemImage: String
+
+    var body: some View {
+        Image(systemName: systemImage)
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(width: 34, height: 34)
+            .background(
+                Circle()
+                    .fill(tint)
+            )
+            .background(.thinMaterial, in: Circle())
+            .opacity(0.95)
+            .contentShape(Circle())
     }
 }
 

@@ -119,6 +119,10 @@ private struct PaintedCapsule: View {
     let effect: CardEffectOption
     let isSelected: Bool
     let showEffectOverlay: Bool
+    
+    private var selectionStrokeColor: Color {
+        CardThemePalette.colors(for: theme).first ?? .accentColor
+    }
 
     var body: some View {
         ZStack {
@@ -146,7 +150,7 @@ private struct PaintedCapsule: View {
         .frame(maxWidth: .infinity, minHeight: 52)
         .overlay(
             Capsule(style: .continuous)
-                .stroke(isSelected ? Color.accentColor : .clear, lineWidth: 3)
+                .stroke(isSelected ? selectionStrokeColor : .clear, lineWidth: 3)
         )
     }
 

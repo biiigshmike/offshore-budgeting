@@ -70,11 +70,11 @@ struct BudgetFormView: View {
                     onToggleAllCards()
                 } label: {
                     Text(selectedCardIDs.count == cards.count && !cards.isEmpty ? "Clear All" : "Toggle All")
-                        .frame(maxWidth: .infinity, alignment: .center)
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .center)
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(cards.isEmpty)
-
+                
                 ForEach(cards) { card in
                     Toggle(isOn: bindingForCard(card)) {
                         Text(card.name)
@@ -92,7 +92,7 @@ struct BudgetFormView: View {
                     onToggleAllPresets()
                 } label: {
                     Text(selectedPresetIDs.count == presets.count && !presets.isEmpty ? "Clear All" : "Toggle All")
-                        .frame(maxWidth: .infinity, alignment: .center)
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .center)
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(presets.isEmpty)

@@ -82,6 +82,9 @@ struct AddBudgetView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Save") { createBudget() }
                     .disabled(!canCreate)
+                    .tint(.accentColor)
+                    .controlSize(.large)
+                    .buttonStyle(.glassProminent)
             }
         }
         .onAppear {

@@ -239,7 +239,7 @@ struct OnboardingView: View {
                 } else {
                     ContentUnavailableView(
                         "No Workspace",
-                        systemImage: "person.3",
+                        systemImage: "person.fill",
                         description: Text("Create a workspace first.")
                     )
                 }
@@ -260,7 +260,7 @@ struct OnboardingView: View {
                 } else {
                     ContentUnavailableView(
                         "No Workspace",
-                        systemImage: "person.3",
+                        systemImage: "person.fill",
                         description: Text("Create a workspace first.")
                     )
                 }
@@ -281,7 +281,7 @@ struct OnboardingView: View {
                 } else {
                     ContentUnavailableView(
                         "No Workspace",
-                        systemImage: "person.3",
+                        systemImage: "person.fill",
                         description: Text("Create a workspace first.")
                     )
                 }
@@ -507,7 +507,7 @@ private struct OnboardingWorkspaceStep: View {
                 } else {
                     ContentUnavailableView(
                         "No Workspaces Yet",
-                        systemImage: "person.3",
+                        systemImage: "person.fill",
                         description: Text("Create at least one workspace to continue.")
                     )
                     .padding(.vertical, 8)

@@ -49,7 +49,7 @@ struct WorkspacePickerView: View {
                     } else {
                         ContentUnavailableView(
                             "No Workspaces Yet",
-                            systemImage: "person.3",
+                            systemImage: "person.fill",
                             description: Text("Create a workspace to begin.")
                         )
                     }

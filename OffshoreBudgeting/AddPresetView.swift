@@ -98,6 +98,9 @@ struct AddPresetView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Save") { save() }
                     .disabled(!canSave)
+                    .tint(.accentColor)
+                    .controlSize(.large)
+                    .buttonStyle(.glassProminent)
             }
         }
         .alert("Invalid Amount", isPresented: $showingInvalidAmountAlert) {
