@@ -541,7 +541,7 @@ struct BudgetDetailView: View {
                     Button {
                         showingManageCardsSheet = true
                     } label: {
-                        Label("Manage Cards", systemImage: "link")
+                        Label("Manage Cards", systemImage: "creditcard")
                     }
 
                     Divider()
