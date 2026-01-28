@@ -15,6 +15,6 @@ struct OffshoreBudgetingWidgetsBundle: WidgetBundle {
         CardWidget()
         OffshoreBudgetingWidgets()
         OffshoreBudgetingWidgetsControl()
-        OffshoreBudgetingWidgetsLiveActivity()
+//        OffshoreBudgetingWidgetsLiveActivity()
     }
 }
