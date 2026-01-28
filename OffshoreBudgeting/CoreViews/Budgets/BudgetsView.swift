@@ -109,36 +109,45 @@ struct BudgetsView: View {
 
                 if !activeBudgets.isEmpty {
                     Section {
-                        DisclosureGroup(isExpanded: $activeExpanded) {
+                        BucketDisclosureRow(
+                            title: "Active Budgets (\(activeBudgets.count))",
+                            isExpanded: $activeExpanded
+                        )
+
+                        if activeExpanded {
                             ForEach(activeBudgets) { budget in
                                 budgetRow(budget)
                             }
-                        } label: {
-                            Text("Active Budgets (\(activeBudgets.count))")
                         }
                     }
                 }
 
                 if !upcomingBudgets.isEmpty {
                     Section {
-                        DisclosureGroup(isExpanded: $upcomingExpanded) {
+                        BucketDisclosureRow(
+                            title: "Upcoming Budgets (\(upcomingBudgets.count))",
+                            isExpanded: $upcomingExpanded
+                        )
+
+                        if upcomingExpanded {
                             ForEach(upcomingBudgets) { budget in
                                 budgetRow(budget)
                             }
-                        } label: {
-                            Text("Upcoming Budgets (\(upcomingBudgets.count))")
                         }
                     }
                 }
 
                 if !pastBudgets.isEmpty {
                     Section {
-                        DisclosureGroup(isExpanded: $pastExpanded) {
+                        BucketDisclosureRow(
+                            title: "Past Budgets (\(pastBudgets.count))",
+                            isExpanded: $pastExpanded
+                        )
+
+                        if pastExpanded {
                             ForEach(pastBudgets) { budget in
                                 budgetRow(budget)
                             }
-                        } label: {
-                            Text("Past Budgets (\(pastBudgets.count))")
                         }
                     }
                 }
@@ -200,6 +209,36 @@ struct BudgetsView: View {
                     .foregroundStyle(.secondary)
             }
         }
+    }
+}
+
+private struct BucketDisclosureRow: View {
+    let title: String
+    @Binding var isExpanded: Bool
+
+    var body: some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.18)) {
+                isExpanded.toggle()
+            }
+        } label: {
+            HStack(spacing: 10) {
+                Text(title)
+                    .foregroundStyle(.primary)
+
+                Spacer(minLength: 0)
+
+                Image(systemName: "chevron.down")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .rotationEffect(.degrees(isExpanded ? 0 : -90))
+                    .animation(.easeInOut(duration: 0.18), value: isExpanded)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
     }
 }
 
