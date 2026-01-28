@@ -76,7 +76,7 @@ struct PillDatePickerField: View {
                 .minimumScaleFactor(0.85)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
-                .background(.thinMaterial, in: Capsule())
+                .background(Color.secondary.opacity(0.1), in: Capsule())
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(title) \(dateText)")
@@ -175,7 +175,7 @@ struct PillTimePickerField: View {
                 .minimumScaleFactor(0.85)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
-                .background(.thinMaterial, in: Capsule())
+                .background(Color.secondary.opacity(0.1), in: Capsule())
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(title) \(timeText)")

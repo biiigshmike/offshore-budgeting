@@ -9,60 +9,54 @@ import SwiftUI
 
 struct HomeBackgroundView: View {
 
-    @Environment(\.colorScheme) private var colorScheme
-
     var body: some View {
         GeometryReader { proxy in
+            let minSide = min(proxy.size.width, proxy.size.height)
+
             ZStack {
                 base
-
-                // Light-mode: pastel wash.
-                // Dark-mode: richer glow without crushing everything into black.
                 RadialGradient(
                     colors: [
-                        Color.blue.opacity(colorScheme == .dark ? 0.35 : 0.16),
+                        Color("OffshoreWave").opacity(0.33),
                         Color.clear
                     ],
-                    center: .topLeading,
+                    center: UnitPoint(x: 0.5, y: 0.25),
                     startRadius: 1,
-                    endRadius: proxy.size.width * 0.95
+                    endRadius: minSide * 0.85
                 )
-
+                .blendMode(.screen)
                 RadialGradient(
                     colors: [
-                        Color.green.opacity(colorScheme == .dark ? 0.26 : 0.13),
+                        Color("OffshoreSky").opacity(0.4),
                         Color.clear
                     ],
-                    center: .topTrailing,
+                    center: UnitPoint(x: 0.5, y: 0.0),
                     startRadius: 1,
-                    endRadius: proxy.size.width * 0.95
+                    endRadius: minSide * 1.05
                 )
-
                 RadialGradient(
                     colors: [
-                        Color.orange.opacity(colorScheme == .dark ? 0.22 : 0.12),
+                        Color("OffshoreBrand").opacity(0.3),
                         Color.clear
                     ],
-                    center: .bottomLeading,
+                    center: UnitPoint(x: 0.5, y: 0.55),
                     startRadius: 1,
-                    endRadius: proxy.size.width * 0.95
+                    endRadius: minSide * 0.95
                 )
-
                 RadialGradient(
                     colors: [
-                        Color.purple.opacity(colorScheme == .dark ? 0.24 : 0.12),
+                        Color("OffshoreSand").opacity(0.44),
                         Color.clear
                     ],
-                    center: .bottomTrailing,
+                    center: UnitPoint(x: 0.5, y: 1.08),
                     startRadius: 1,
-                    endRadius: proxy.size.width * 0.95
+                    endRadius: minSide * 1.05
                 )
-
-                // A subtle top-to-bottom depth gradient, but not a “dark vignette”
+                .blendMode(.plusLighter)
                 LinearGradient(
                     colors: [
-                        Color.black.opacity(colorScheme == .dark ? 0.30 : 0.05),
-                        Color.black.opacity(colorScheme == .dark ? 0.55 : 0.08)
+                        Color("OffshoreDepth").opacity(0.10),
+                        Color("OffshoreDepth").opacity(0.45)
                     ],
                     startPoint: .top,
                     endPoint: .bottom
@@ -74,26 +68,17 @@ struct HomeBackgroundView: View {
     }
 
     private var base: some View {
-        Group {
-            if colorScheme == .dark {
-                LinearGradient(
-                    colors: [
-                        Color(.systemBackground).opacity(0.10),
-                        Color.black.opacity(0.90)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            } else {
-                LinearGradient(
-                    colors: [
-                        Color(.systemGroupedBackground),
-                        Color(.secondarySystemGroupedBackground)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            }
-        }
+        LinearGradient(
+            colors: [
+                Color("OffshoreSand").opacity(0.4),
+                Color("OffshoreWave").opacity(0.1),
+                Color("OffshoreBrand").opacity(0.2),
+                Color("OffshoreWave").opacity(0.4),
+                Color("OffshoreDepth").opacity(0.2),
+                Color("OffshoreSky").opacity(0.3)
+            ],
+            startPoint: .bottom,
+            endPoint: .top
+        )
     }
 }
