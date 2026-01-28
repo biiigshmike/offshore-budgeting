@@ -23,7 +23,7 @@ private extension View {
 }
 
 struct PillDatePickerField: View {
-    
+
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.verticalSizeClass) private var verticalSizeClass
 
@@ -89,39 +89,70 @@ struct PillDatePickerField: View {
                 .navigationTitle(title)
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Done") {
-                            isPresented = false
+                    if #available(iOS 26.0, *) {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button("Done") {
+                                isPresented = false
+                            }
+                            .tint(.accentColor)
+                            .controlSize(.large)
+                            .buttonStyle(.glassProminent)
+                            .buttonBorderShape(.automatic)
+                        }
+                    } else {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button("Done") {
+                                isPresented = false
+                            }
+                            .tint(.accentColor)
+                            .controlSize(.large)
+                            .buttonStyle(.plain)
                         }
                     }
                 }
             }
-            .presentationDetents(
-                useMediumDetent ? [.medium] : [.large]
-            )
-            .presentationDragIndicator(.visible)
+            .modifier(PillPickerSheetPresentationModifier(useMediumDetent: useMediumDetent))
         }
     }
 
     @ViewBuilder
     private var picker: some View {
-        if let range = optionalClosedRange(minimumDate: minimumDate, maximumDate: maximumDate) {
-            DatePicker("", selection: $date, in: range, displayedComponents: [.date])
-                .platformCalendarDatePickerStyle(useWheelOnPhoneLandscape: useWheelOnPhoneLandscape)
-                .labelsHidden()
-        } else if let min = minimumDate {
-            DatePicker("", selection: $date, in: min..., displayedComponents: [.date])
-                .platformCalendarDatePickerStyle(useWheelOnPhoneLandscape: useWheelOnPhoneLandscape)
-                .labelsHidden()
-        } else if let max = maximumDate {
-            DatePicker("", selection: $date, in: ...max, displayedComponents: [.date])
-                .platformCalendarDatePickerStyle(useWheelOnPhoneLandscape: useWheelOnPhoneLandscape)
-                .labelsHidden()
-        } else {
-            DatePicker("", selection: $date, displayedComponents: [.date])
-                .platformCalendarDatePickerStyle(useWheelOnPhoneLandscape: useWheelOnPhoneLandscape)
-                .labelsHidden()
-        }
+        let content: AnyView = {
+            if let range = optionalClosedRange(minimumDate: minimumDate, maximumDate: maximumDate) {
+                return AnyView(
+                    DatePicker("", selection: $date, in: range, displayedComponents: [.date])
+                        .platformCalendarDatePickerStyle(useWheelOnPhoneLandscape: useWheelOnPhoneLandscape)
+                        .labelsHidden()
+                )
+            } else if let min = minimumDate {
+                return AnyView(
+                    DatePicker("", selection: $date, in: min..., displayedComponents: [.date])
+                        .platformCalendarDatePickerStyle(useWheelOnPhoneLandscape: useWheelOnPhoneLandscape)
+                        .labelsHidden()
+                )
+            } else if let max = maximumDate {
+                return AnyView(
+                    DatePicker("", selection: $date, in: ...max, displayedComponents: [.date])
+                        .platformCalendarDatePickerStyle(useWheelOnPhoneLandscape: useWheelOnPhoneLandscape)
+                        .labelsHidden()
+                )
+            } else {
+                return AnyView(
+                    DatePicker("", selection: $date, displayedComponents: [.date])
+                        .platformCalendarDatePickerStyle(useWheelOnPhoneLandscape: useWheelOnPhoneLandscape)
+                        .labelsHidden()
+                )
+            }
+        }()
+
+        // macOS stability:
+        // - lock the graphical DatePicker to a steady layout box
+        // - remove implicit animations that can amplify tiny layout re-measures
+        content
+            .frame(minHeight: useWheelOnPhoneLandscape ? nil : 340)
+            .transaction { txn in
+                txn.animation = nil
+            }
     }
 
     private func optionalClosedRange(minimumDate: Date?, maximumDate: Date?) -> ClosedRange<Date>? {
@@ -185,26 +216,62 @@ struct PillTimePickerField: View {
                     DatePicker("", selection: $time, displayedComponents: [.hourAndMinute])
                         .datePickerStyle(.wheel)
                         .labelsHidden()
+                        .transaction { txn in
+                            txn.animation = nil
+                        }
                 }
                 .padding()
                 .navigationTitle(title)
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Done") {
-                            isPresented = false
+                    if #available(iOS 26.0, *) {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button("Done") {
+                                isPresented = false
+                            }
+                            .tint(.accentColor)
+                            .controlSize(.large)
+                            .buttonStyle(.glassProminent)
+                            .buttonBorderShape(.automatic)
+                        }
+                    } else {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button("Done") {
+                                isPresented = false
+                            }
+                            .tint(.accentColor)
+                            .controlSize(.large)
+                            .buttonStyle(.plain)
                         }
                     }
                 }
             }
-            .presentationDetents(
-                useMediumDetent ? [.medium] : [.large]
-            )
-            .presentationDragIndicator(.visible)
+            .modifier(PillPickerSheetPresentationModifier(useMediumDetent: useMediumDetent))
         }
     }
 
     private func formattedTime(_ date: Date) -> String {
         date.formatted(Date.FormatStyle(date: .omitted, time: .shortened))
+    }
+}
+
+// MARK: - Sheet presentation (platform-tuned)
+
+private struct PillPickerSheetPresentationModifier: ViewModifier {
+
+    let useMediumDetent: Bool
+
+    func body(content: Content) -> some View {
+        #if os(macOS)
+        // On macOS, detents + graphical DatePicker often triggers repeated re-measurement -> flicker.
+        // Use a stable fixed-height detent to stop the sheet from “breathing”.
+        content
+            .presentationDetents([.height(520)])
+            .presentationDragIndicator(.visible)
+        #else
+        content
+            .presentationDetents(useMediumDetent ? [.medium] : [.large])
+            .presentationDragIndicator(.visible)
+        #endif
     }
 }
