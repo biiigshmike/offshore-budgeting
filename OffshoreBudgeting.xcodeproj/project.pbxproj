@@ -53,7 +53,7 @@
 /* Begin PBXFileReference section */
 		4C198A392F298962005D2D0D /* OffshoreBudgetingWidgetsExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = OffshoreBudgetingWidgetsExtension.entitlements; sourceTree = "<group>"; };
 		4C8C82152F247DA50024DBD0 /* OffshoreBudgeting.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = OffshoreBudgeting.xctestplan; sourceTree = "<group>"; };
-		4C96F8512F20523700541774 /* OffshoreBudgeting.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OffshoreBudgeting.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		4C96F8512F20523700541774 /* Offshore.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Offshore.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4C96F85E2F20523900541774 /* OffshoreBudgetingTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OffshoreBudgetingTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		4C96F8682F20523900541774 /* OffshoreBudgetingUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OffshoreBudgetingUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		4CAD3C3C2F28AF7C001E3F5B /* OffshoreBudgetingWidgetsExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = OffshoreBudgetingWidgetsExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -171,7 +171,7 @@
 		4C96F8522F20523700541774 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				4C96F8512F20523700541774 /* OffshoreBudgeting.app */,
+				4C96F8512F20523700541774 /* Offshore.app */,
 				4C96F85E2F20523900541774 /* OffshoreBudgetingTests.xctest */,
 				4C96F8682F20523900541774 /* OffshoreBudgetingUITests.xctest */,
 				4CAD3C3C2F28AF7C001E3F5B /* OffshoreBudgetingWidgetsExtension.appex */,
@@ -212,7 +212,7 @@
 			packageProductDependencies = (
 			);
 			productName = BudgetPlayground;
-			productReference = 4C96F8512F20523700541774 /* OffshoreBudgeting.app */;
+			productReference = 4C96F8512F20523700541774 /* Offshore.app */;
 			productType = "com.apple.product-type.application";
 		};
 		4C96F85D2F20523900541774 /* OffshoreBudgetingTests */ = {
@@ -568,7 +568,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 2.2;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.mb.offshore-budgeting";
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = Offshore;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -615,7 +615,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 2.2;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.mb.offshore-budgeting";
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = Offshore;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -656,10 +656,10 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-					TEST_HOST = "$(BUILT_PRODUCTS_DIR)/OffshoreBudgeting.app/OffshoreBudgeting";
-				};
-				name = Debug;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/OffshoreBudgeting.app/OffshoreBudgeting";
 			};
+			name = Debug;
+		};
 		4C96F8772F20523900541774 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -684,10 +684,10 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-					TEST_HOST = "$(BUILT_PRODUCTS_DIR)/OffshoreBudgeting.app/OffshoreBudgeting";
-				};
-				name = Release;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/OffshoreBudgeting.app/OffshoreBudgeting";
 			};
+			name = Release;
+		};
 		4C96F8792F20523900541774 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -711,10 +711,10 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-					TEST_TARGET_NAME = OffshoreBudgeting;
-				};
-				name = Debug;
+				TEST_TARGET_NAME = OffshoreBudgeting;
 			};
+			name = Debug;
+		};
 		4C96F87A2F20523900541774 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -738,10 +738,10 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-					TEST_TARGET_NAME = OffshoreBudgeting;
-				};
-				name = Release;
+				TEST_TARGET_NAME = OffshoreBudgeting;
 			};
+			name = Release;
+		};
 		4CAD3C542F28AF7F001E3F5B /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {

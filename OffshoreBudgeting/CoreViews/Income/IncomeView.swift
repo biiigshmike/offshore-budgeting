@@ -23,6 +23,23 @@ struct IncomeView: View {
 
     @State private var showingIncomeDeleteConfirm: Bool = false
     @State private var pendingIncomeDelete: (() -> Void)? = nil
+    
+    @State private var viewWidth: CGFloat = 0
+
+    // MARK: - Calendar width tracking
+
+    @State private var calendarAvailableWidth: CGFloat = 0
+    
+    private var calendarMonthCount: Int {
+        #if targetEnvironment(macCatalyst)
+        if viewWidth >= 1400 { return 4 }
+        if viewWidth >= 980 { return 2 }
+        return 1
+        #else
+        if viewWidth >= 980 { return 2 }
+        return 1
+        #endif
+    }
 
     // MARK: - Search
 
@@ -87,30 +104,24 @@ struct IncomeView: View {
 
     // MARK: - Month indicators (planned vs actual per day)
 
-    private var displayedMonthStart: Date {
-        CalendarGridHelper.startOfMonth(for: displayedMonth)
-    }
-
-    private var displayedMonthEnd: Date {
-        CalendarGridHelper.addingMonths(1, to: displayedMonthStart)
-    }
-
     struct DayIncomePresence {
         var hasPlanned: Bool = false
         var hasActual: Bool = false
     }
 
-    /// Keyed by start-of-day Date for the displayed month.
-    private var displayedMonthIncomePresenceByDay: [Date: DayIncomePresence] {
+    private func incomePresenceByDay(for startMonth: Date, monthCount: Int) -> [Date: DayIncomePresence] {
         let cal = CalendarGridHelper.sundayFirstCalendar
 
-        let monthIncomes = incomes.filter { income in
-            income.date >= displayedMonthStart && income.date < displayedMonthEnd
+        let start = CalendarGridHelper.startOfMonth(for: startMonth)
+        let end = CalendarGridHelper.addingMonths(monthCount, to: start)
+
+        let rangeIncomes = incomes.filter { income in
+            income.date >= start && income.date < end
         }
 
         var presence: [Date: DayIncomePresence] = [:]
 
-        for income in monthIncomes {
+        for income in rangeIncomes {
             let dayKey = cal.startOfDay(for: income.date)
             var current = presence[dayKey, default: DayIncomePresence()]
 
@@ -158,151 +169,138 @@ struct IncomeView: View {
     }
 
     var body: some View {
-        List {
-            // MARK: - Calendar
+        let monthPresence = incomePresenceByDay(for: displayedMonth, monthCount: calendarMonthCount)
 
-            Section {
-                VStack(spacing: 12) {
-                    MonthHeaderView(
-                        displayedMonth: displayedMonth,
-                        onPreviousMonth: {
-                            displayedMonth = CalendarGridHelper.addingMonths(-1, to: displayedMonth)
-                        },
-                        onNextMonth: {
-                            displayedMonth = CalendarGridHelper.addingMonths(1, to: displayedMonth)
-                        }
-                    )
+        GeometryReader { proxy in
+            List {
+                // MARK: - Calendar
 
-                    WeekdayHeaderView()
-
-                    MonthGridView(
-                        displayedMonth: displayedMonth,
+                Section {
+                    MultiMonthCalendarView(
+                        startMonth: displayedMonth,
+                        monthCount: calendarMonthCount,
                         selectedDate: selectedDate,
-                        incomePresenceByDay: displayedMonthIncomePresenceByDay,
+                        incomePresenceByDay: monthPresence,
+                        onStepMonths: { delta in
+                            displayedMonth = CalendarGridHelper.addingMonths(delta, to: displayedMonth)
+                        },
                         onSelectDate: { tapped in
                             let cal = CalendarGridHelper.sundayFirstCalendar
                             selectedDate = cal.startOfDay(for: tapped)
                             displayedMonth = CalendarGridHelper.startOfMonth(for: tapped)
                         }
                     )
+                    .padding(.vertical, 8)
+
+                    // You can remove WidthReader now if you're switching to proxy-based width.
+                    // Keeping it won't break anything, it just becomes redundant.
+                    // .background(WidthReader())
+                    // .onPreferenceChange(WidthPreferenceKey.self) { newWidth in
+                    //     if newWidth > 0 { calendarAvailableWidth = newWidth }
+                    // }
                 }
-                .padding(.vertical, 8)
-            }
 
-            // MARK: - Row 1: Selected day list (swipe edit/delete)
+                // MARK: - Row 1: Selected day list (swipe edit/delete)
 
-            Section(
-                header: VStack(alignment: .leading, spacing: 4) {
-                    Text(isSearching ? "Search Results" : "Income")
-                        .font(.headline)
+                Section(
+                    header: VStack(alignment: .leading, spacing: 4) {
+                        Text(isSearching ? "Search Results" : "Income")
+                            .font(.headline)
 
-                    Text(isSearching ? "All income entries" : selectedDayTitle)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-            ) {
-                let rows = isSearching ? incomesSearchedAll : incomesForSelectedDay
+                        Text(isSearching ? "All income entries" : selectedDayTitle)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                ) {
+                    let rows = isSearching ? incomesSearchedAll : incomesForSelectedDay
 
-                if rows.isEmpty {
-                    Text(isSearching ? "No matching income." : "No income for \(CalendarGridHelper.shortDateFormatter.string(from: selectedDayStart)).")
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(rows) { income in
-                        Button {
-                            sheetRoute = .edit(income)
-                        } label: {
-                            IncomeRowView(income: income)
-                        }
-                        .buttonStyle(.plain)
-                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                            Button(role: .destructive) {
-                                if confirmBeforeDeleting {
-                                    pendingIncomeDelete = {
-                                        deleteIncome(income)
-                                    }
-                                    showingIncomeDeleteConfirm = true
-                                } else {
-                                    deleteIncome(income)
-                                }
-                            } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
-                        }
-                        .swipeActions(edge: .leading) {
+                    if rows.isEmpty {
+                        Text(isSearching ? "No matching income." : "No income for \(CalendarGridHelper.shortDateFormatter.string(from: selectedDayStart)).")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(rows) { income in
                             Button {
                                 sheetRoute = .edit(income)
                             } label: {
-                                Label("Edit", systemImage: "pencil")
+                                IncomeRowView(income: income)
                             }
-                            .tint(.blue)
+                            .buttonStyle(.plain)
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button(role: .destructive) {
+                                    if confirmBeforeDeleting {
+                                        pendingIncomeDelete = {
+                                            deleteIncome(income)
+                                        }
+                                        showingIncomeDeleteConfirm = true
+                                    } else {
+                                        deleteIncome(income)
+                                    }
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
+                            .swipeActions(edge: .leading) {
+                                Button {
+                                    sheetRoute = .edit(income)
+                                } label: {
+                                    Label("Edit", systemImage: "pencil")
+                                }
+                                .tint(.blue)
+                            }
                         }
                     }
                 }
+
+                // MARK: - Row 2: Week totals
+
+                Section(header: Text("Week Total Income")) {
+                    WeeklyIncomeTotalsRow(
+                        plannedTotal: weekPlannedTotal,
+                        actualTotal: weekActualTotal,
+                        rangeText: selectedWeekRangeText
+                    )
+                }
+            }
+            // ✅ proxy is in scope here
+            .onAppear { viewWidth = proxy.size.width }
+            .onChange(of: proxy.size.width) { _, newValue in
+                viewWidth = newValue
             }
 
-
-            // MARK: - Row 2: Week totals
-
-            Section(header: Text("Week Total Income")) {
-                WeeklyIncomeTotalsRow(
-                    plannedTotal: weekPlannedTotal,
-                    actualTotal: weekActualTotal,
-                    rangeText: selectedWeekRangeText
-                )
+            // keep your existing modifiers on the List
+            .postBoardingTip(
+                key: "tip.income.v1",
+                title: "Income",
+                items: [
+                    PostBoardingTipItem(systemImage: "calendar", title: "Income Calendar", detail: "View income in a calendar to visualize earnings, almost like a timesheet."),
+                    PostBoardingTipItem(systemImage: "calendar.badge.plus", title: "Planned Income", detail: "Add income you expect to earn but haven’t received yet."),
+                    PostBoardingTipItem(systemImage: "calendar.badge.checkmark", title: "Actual Income", detail: "Log income you’ve actually received."),
+                    PostBoardingTipItem(systemImage: "calendar.badge.clock", title: "Recurring Income", detail: "Planned and actual income can be setup to be a recurring series."),
+                    PostBoardingTipItem(systemImage: "magnifyingglass", title: "Search Income", detail: "Search by source, card, date, or amount using the search bar.")
+                ]
+            )
+            .navigationTitle("Income")
+            .searchable(
+                text: $searchText,
+                placement: .navigationBarDrawer(displayMode: .always),
+                prompt: "Search"
+            )
+            .searchFocused($searchFocused)
+            .toolbar {
+                Button {
+                    sheetRoute = .add(initialDate: selectedDayStart)
+                } label: {
+                    Image(systemName: "plus")
+                }
             }
-        }
-        .postBoardingTip(
-            key: "tip.income.v1",
-            title: "Income",
-            items: [
-                PostBoardingTipItem(
-                    systemImage: "calendar",
-                    title: "Income Calendar",
-                    detail: "View income in a calendar to visualize earnings, almost like a timesheet."
-                ),
-                PostBoardingTipItem(
-                    systemImage: "calendar.badge.plus",
-                    title: "Planned Income",
-                    detail: "Add income you expect to earn but haven’t received yet."
-                ),
-                PostBoardingTipItem(
-                    systemImage: "calendar.badge.checkmark",
-                    title: "Actual Income",
-                    detail: "Log income you’ve actually received."
-                ),
-                PostBoardingTipItem(
-                    systemImage: "calendar.badge.clock",
-                    title: "Recurring Income",
-                    detail: "Planned and actual income can be setup to be a recurring series."
-                ),
-                PostBoardingTipItem(
-                    systemImage: "magnifyingglass",
-                    title: "Search Income",
-                    detail: "Search by source, card, date, or amount using the search bar."
-                )
-            ]
-        )
-        .navigationTitle("Income")
-        .searchable(
-            text: $searchText,
-            placement: .navigationBarDrawer(displayMode: .always),
-            prompt: "Search"
-        )
-        .searchFocused($searchFocused)
-        .toolbar {
-            Button {
-                sheetRoute = .add(initialDate: selectedDayStart)
-            } label: {
-                Image(systemName: "plus")
-            }
-        }
-        .alert("Delete?", isPresented: $showingIncomeDeleteConfirm) {
-            Button("Delete", role: .destructive) {
-                pendingIncomeDelete?()
-                pendingIncomeDelete = nil
-            }
-            Button("Cancel", role: .cancel) {
-                pendingIncomeDelete = nil
+            .alert("Delete?", isPresented: $showingIncomeDeleteConfirm) {
+                Button("Delete", role: .destructive) {
+                    pendingIncomeDelete?()
+                    pendingIncomeDelete = nil
+                }
+                Button("Cancel", role: .cancel) {
+                    pendingIncomeDelete = nil
+                }
             }
         }
     }
@@ -383,48 +381,106 @@ private struct WeeklyIncomeTotalsRow: View {
     }
 }
 
-// MARK: - Calendar UI
+// MARK: - Calendar (Multi-month)
 
-private struct MonthHeaderView: View {
+private struct MultiMonthCalendarView: View {
 
-    let displayedMonth: Date
-    let onPreviousMonth: () -> Void
-    let onNextMonth: () -> Void
+    let startMonth: Date
+    let monthCount: Int
+    let selectedDate: Date
+    let incomePresenceByDay: [Date: IncomeView.DayIncomePresence]
+    let onStepMonths: (Int) -> Void
+    let onSelectDate: (Date) -> Void
 
-    private var monthTitle: String {
-        CalendarGridHelper.monthTitleFormatter.string(from: displayedMonth)
+    private var headerTitle: String {
+        if monthCount <= 1 {
+            return CalendarGridHelper.monthTitleFormatter.string(from: startMonth)
+        }
+
+        let endMonth = CalendarGridHelper.addingMonths(monthCount - 1, to: startMonth)
+
+        // If same year, show: "Jan – Mar 2026"
+        let cal = CalendarGridHelper.sundayFirstCalendar
+        let startYear = cal.component(.year, from: startMonth)
+        let endYear = cal.component(.year, from: endMonth)
+
+        if startYear == endYear {
+            let startShort = CalendarGridHelper.monthShortFormatter.string(from: startMonth)
+            let endShort = CalendarGridHelper.monthShortFormatter.string(from: endMonth)
+            return "\(startShort) – \(endShort) \(startYear)"
+        } else {
+            // Cross-year, show both full: "Dec 2026 – Jan 2027"
+            let startFull = CalendarGridHelper.monthTitleFormatter.string(from: startMonth)
+            let endFull = CalendarGridHelper.monthTitleFormatter.string(from: endMonth)
+            return "\(startFull) – \(endFull)"
+        }
     }
 
     var body: some View {
-        HStack(spacing: 12) {
-            Button(action: onPreviousMonth) {
-                Image(systemName: "chevron.left")
+        VStack(spacing: 12) {
+            HStack(spacing: 12) {
+                Button {
+                    onStepMonths(-monthCount)
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.headline)
+                }
+                .buttonStyle(.plain)
+
+                Spacer()
+
+                Text(headerTitle)
                     .font(.headline)
+
+                Spacer()
+
+                Button {
+                    onStepMonths(monthCount)
+                } label: {
+                    Image(systemName: "chevron.right")
+                        .font(.headline)
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
 
-            Spacer()
+            HStack(alignment: .top, spacing: 24) {
+                ForEach(0..<monthCount, id: \.self) { offset in
+                    let month = CalendarGridHelper.addingMonths(offset, to: startMonth)
 
-            Text(monthTitle)
-                .font(.headline)
+                    VStack(spacing: 8) {
+                        Text(CalendarGridHelper.monthTitleFormatter.string(from: month))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.secondary)
 
-            Spacer()
+                        WeekdayHeaderView()
 
-            Button(action: onNextMonth) {
-                Image(systemName: "chevron.right")
-                    .font(.headline)
+                        MonthGridView(
+                            displayedMonth: month,
+                            selectedDate: selectedDate,
+                            incomePresenceByDay: incomePresenceByDay,
+                            onSelectDate: onSelectDate
+                        )
+                    }
+                    .frame(maxWidth: 420)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                }
             }
-            .buttonStyle(.plain)
+
         }
     }
 }
 
+// MARK: - Calendar UI (shared pieces)
+
 private struct WeekdayHeaderView: View {
 
-    private let columns: [GridItem] = Array(repeating: GridItem(.flexible(), spacing: 0), count: 7)
+    private let columns: [GridItem] = Array(
+        repeating: GridItem(.flexible(minimum: 34, maximum: 56), spacing: 0),
+        count: 7
+    )
 
     var body: some View {
-        LazyVGrid(columns: columns, spacing: 6) {
+        LazyVGrid(columns: columns, spacing: 4) {
             let symbols = CalendarGridHelper.weekdaySymbolsSundayFirst
             ForEach(Array(symbols.enumerated()), id: \.offset) { _, symbol in
                 Text(symbol)
@@ -434,6 +490,8 @@ private struct WeekdayHeaderView: View {
             }
         }
         .accessibilityHidden(true)
+        .frame(maxWidth: 420)
+        .frame(maxWidth: .infinity, alignment: .center)
     }
 }
 
@@ -444,7 +502,10 @@ private struct MonthGridView: View {
     let incomePresenceByDay: [Date: IncomeView.DayIncomePresence]
     let onSelectDate: (Date) -> Void
 
-    private let columns: [GridItem] = Array(repeating: GridItem(.flexible(), spacing: 0), count: 7)
+    private let columns: [GridItem] = Array(
+        repeating: GridItem(.flexible(minimum: 34, maximum: 56), spacing: 0),
+        count: 7
+    )
 
     private var days: [CalendarGridHelper.DayCell] {
         CalendarGridHelper.makeMonthGrid(for: displayedMonth)
@@ -465,6 +526,8 @@ private struct MonthGridView: View {
                 }
             }
         }
+        .frame(maxWidth: 420)
+        .frame(maxWidth: .infinity, alignment: .center)
     }
 }
 
@@ -565,6 +628,24 @@ private struct DotIndicatorView: View {
     }
 }
 
+// MARK: - Width measurement helpers (non-invasive)
+
+private struct WidthPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
+private struct WidthReader: View {
+    var body: some View {
+        GeometryReader { proxy in
+            Color.clear
+                .preference(key: WidthPreferenceKey.self, value: proxy.size.width)
+        }
+    }
+}
+
 // MARK: - Calendar Helpers
 
 private enum CalendarGridHelper {
@@ -580,6 +661,14 @@ private enum CalendarGridHelper {
         df.calendar = sundayFirstCalendar
         df.locale = .current
         df.setLocalizedDateFormatFromTemplate("LLLL yyyy")
+        return df
+    }()
+
+    static let monthShortFormatter: DateFormatter = {
+        let df = DateFormatter()
+        df.calendar = sundayFirstCalendar
+        df.locale = .current
+        df.setLocalizedDateFormatFromTemplate("LLL")
         return df
     }()
 
