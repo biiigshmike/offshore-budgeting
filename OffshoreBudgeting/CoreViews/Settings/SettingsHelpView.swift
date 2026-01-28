@@ -128,7 +128,7 @@ private struct IntroductionHelpView: View {
                 bullet("Plannd Amount: The amount you expect to debit from your account.")
                 bullet("Actual Amount: Sometimes, a planned expense may cost more or less than expected. Edit the Planned Expense from your budget and enter the actual amount debited to keep your totals accurate.")
                 Text("Pro Tip: If you notice a planned expense consistently costs more or less than expected, update the planned amount to reflect reality.")
-                
+
                 sectionHeader("Variable Expenses")
                 Text("Unpredictable, one-off costs during a budget period (fuel, dining). These are always treated as actual spending and are tracked by card and category.")
 
@@ -178,22 +178,22 @@ private struct HomeHelpView: View {
             title: "Home",
             sections: [
                 .init(screenshotSlot: 1, header: "Home: Welcome to Your Dashboard", body: [
-                    "You can pick your own custom start and end date, or use the pre-defined ranges in the period menu by pressing on the calendar icon. The widgets respond with the date range you select."
+                    .text("You can pick your own custom start and end date, or use the pre-defined ranges in the period menu by pressing on the calendar icon. The widgets respond with the date range you select.")
                 ]),
                 .init(screenshotSlot: 2, header: "Widgets Overview", body: [
-                    "Home is made of widgets. Tap any widget to open its detail page.",
-                    "• Income: shows Actual Income versus Planned Income. Tapping the widget takes you to a detailed metric overview to view income trends over time.",
-                    "• Savings Outlook: Use Savings Outlook to view your projected savings based on your planned income and expenses. The projected savings is calculated by taking your Actual Savings + Planned Income and subtracting remaining Planned Expenses.",
-                    "• Next Planned Expense: Displays the next upcoming Planned Expense. Tapping it opens the Presets management page where you will see this expense pinned at the top, as well as being able to quickly manage the rest of your presets here.",
-                    "• Category Spotlight: Shows the top categories by spend in the current range. The total is derived by summing the Planned Expenses and Variable together for each category.",
-                    "• Spend Trends: Spend totals segmented by day, week, or month, depending upon which period is being viewed. Tapping the widget opens a detailed trends view.",
-                    "• Category Availability: Caps and remaining amounts for categories with limits set. Planned and Variable expenses are summed to show total spend against the cap for the period.",
-                    "• What If?: An interactive scenario planner to project if you will be over or under your available income threshold. Use it to plan different scenarios. You can even pin scenarios you're closely monitoring on Home (maximum of 3 scenarios can be pinned)."
+                    .text("Home is made of widgets. Tap any widget to open its detail page."),
+                    .bullet("Income: shows Actual Income versus Planned Income. Tapping the widget takes you to a detailed metric overview to view income trends over time."),
+                    .bullet("Savings Outlook: Use Savings Outlook to view your projected savings based on your planned income and expenses. The projected savings is calculated by taking your Actual Savings + Planned Income and subtracting remaining Planned Expenses."),
+                    .bullet("Next Planned Expense: Displays the next upcoming Planned Expense. Tapping it opens the Presets management page where you will see this expense pinned at the top, as well as being able to quickly manage the rest of your presets here."),
+                    .bullet("Category Spotlight: Shows the top categories by spend in the current range. The total is derived by summing the Planned Expenses and Variable together for each category."),
+                    .bullet("Spend Trends: Spend totals segmented by day, week, or month, depending upon which period is being viewed. Tapping the widget opens a detailed trends view."),
+                    .bullet("Category Availability: Caps and remaining amounts for categories with limits set. Planned and Variable expenses are summed to show total spend against the cap for the period."),
+                    .bullet("What If?: An interactive scenario planner to project if you will be over or under your available income threshold. Use it to plan different scenarios. You can even pin scenarios you're closely monitoring on Home (maximum of 3 scenarios can be pinned).")
                 ]),
                 .init(screenshotSlot: 3, header: "Home Calculations", body: [
-                    "Home calculations mirror budget math:",
-                    "• Actual Savings = actual income - (planned expenses actual amount + variable expenses total amount).",
-                    "• Remaining Income = actual income - expenses."
+                    .text("Home calculations mirror budget math:"),
+                    .bullet("Actual Savings = actual income - (planned expenses actual amount + variable expenses total amount)."),
+                    .bullet("Remaining Income = actual income - expenses.")
                 ])
             ]
         )
@@ -206,24 +206,24 @@ private struct BudgetsHelpView: View {
             title: "Budgets",
             sections: [
                 .init(screenshotSlot: 1, header: "Budgets: Where the Actual Budgeting Magic Happens", body: [
-                    "This screen lists Past, Active, and Upcoming budgets. Tap any budget to open its details and do the real work: add expenses, assign cards, and monitor budget metrics."
+                    .text("This screen lists Past, Active, and Upcoming budgets. Tap any budget to open its details and do the real work: add expenses, assign cards, and monitor budget metrics.")
                 ]),
                 .init(screenshotSlot: 2, header: "Budget Details: Build the Budget", body: [
-                    "Inside a budget, you plan and track expenses in two lanes:",
-                    "• Planned: recurring or expected costs.",
-                    "• Variable: one-off spending from your cards.",
-                    "• Categories: long-press a category and assign a spending cap to help manage your spending habits for your defined budgeting period."
+                    .text("Inside a budget, you plan and track expenses in two lanes:"),
+                    .bullet("Planned: recurring or expected costs."),
+                    .bullet("Variable: one-off spending from your cards."),
+                    .bullet("Categories: long-press a category and assign a spending cap to help manage your spending habits for your defined budgeting period.")
                 ]),
                 .init(screenshotSlot: 3, header: "How Budget Totals Are Calculated", body: [
-                    "These totals are shown in the budget header:",
-                    "• Planned Income = Planned Income total in this period.",
-                    "• Actual Income = Actual Income total in this period.",
-                    "• Planned Total (Presets) = sum of Preset Planned Expenses. This sum will use the Planned Amount unless a Preset was modified; then, it will use the Actual amount.",
-                    "• Variable Total (Variable Expenses) = sum of Variable Expenses for the budget period.",
-                    "• Unified Total (Preset Planned Expenses + Variable Expenses) = Takes the Planned (or Actual) amounts from Preset Planned Expenses and adds them to Variable Expenses to give you a unified total.",
-                    "• Max Savings: Planned Income - Planned Expenses total.",
-                    "• Projected Savings: Actual Savings + (Planned Income - Planned Expenses).",
-                    "• Actual Savings: Actual Income - (Planned Expenses total + Variable Expenses total).",
+                    .text("These totals are shown in the budget header:"),
+                    .bullet("Planned Income = Planned Income total in this period."),
+                    .bullet("Actual Income = Actual Income total in this period."),
+                    .bullet("Planned Total (Presets) = sum of Preset Planned Expenses. This sum will use the Planned Amount unless a Preset was modified; then, it will use the Actual amount."),
+                    .bullet("Variable Total (Variable Expenses) = sum of Variable Expenses for the budget period."),
+                    .bullet("Unified Total (Preset Planned Expenses + Variable Expenses) = Takes the Planned (or Actual) amounts from Preset Planned Expenses and adds them to Variable Expenses to give you a unified total."),
+                    .bullet("Max Savings: Planned Income - Planned Expenses total."),
+                    .bullet("Projected Savings: Actual Savings + (Planned Income - Planned Expenses)."),
+                    .bullet("Actual Savings: Actual Income - (Planned Expenses total + Variable Expenses total)."),
                 ])
             ]
         )
@@ -236,13 +236,13 @@ private struct IncomeHelpView: View {
             title: "Income",
             sections: [
                 .init(screenshotSlot: 1, header: "Income: Think Timesheet, but Modern and Cool", body: [
-                    "The calendar shows Planned and Actual income totals per day. Tap a day to see its income entries and weekly totals."
+                    .text("The calendar shows Planned and Actual income totals per day. Tap a day to see its income entries and weekly totals.")
                 ]),
                 .init(screenshotSlot: 2, header: "Planned Income vs Actual Income", body: [
-                    "If your paycheck is consistent, create a recurring Actual Income entry. If it varies, use Planned Income to estimate, then log Actual Income when it arrives. Either way, both can be set as recurring."
+                    .text("If your paycheck is consistent, create a recurring Actual Income entry. If it varies, use Planned Income to estimate, then log Actual Income when it arrives. Either way, both can be set as recurring.")
                 ]),
                 .init(screenshotSlot: 3, header: "How Income Feeds the App", body: [
-                    "Income entries contribute to Home and Budget calculations. Actual Income drives real totals and savings, while Planned Income helps with forecasts and potential savings."
+                    .text("Income entries contribute to Home and Budget calculations. Actual Income drives real totals and savings, while Planned Income helps with forecasts and potential savings.")
                 ])
             ]
         )
@@ -255,13 +255,13 @@ private struct CardsHelpView: View {
             title: "Cards",
             sections: [
                 .init(screenshotSlot: 1, header: "Cards: A Beautiful Gallery of Your Spending Accounts", body: [
-                    "Tap + to add a card. Tap a card to open its detail view."
+                    .text("Tap + to add a card. Tap a card to open its detail view.")
                 ]),
                 .init(screenshotSlot: 2, header: "Card Detail: Deep Dive", body: [
-                    "The detail view is a focused spending console with filters, segmented scope, sorting, and search functionalities."
+                    .text("The detail view is a focused spending console with filters, segmented scope, sorting, and search functionalities.")
                 ]),
                 .init(screenshotSlot: 3, header: "Card Calculations", body: [
-                    "Totals reflect the current filters. Variable is always actual, planned depends on actual amounts entered. If a preset planned expense's amount did not changed, the planned amount will always be used. If the expense gets updated later, then the actual amount entered at that point will be used for calculuations."
+                    .text("Totals reflect the current filters. Variable is always actual, planned depends on actual amounts entered. If a preset planned expense's amount did not changed, the planned amount will always be used. If the expense gets updated later, then the actual amount entered at that point will be used for calculuations.")
                 ])
             ]
         )
@@ -274,15 +274,15 @@ private struct PresetsHelpView: View {
             title: "Presets",
             sections: [
                 .init(screenshotSlot: 1, header: "Presets: Reusable Fixed Expense Templates", body: [
-                    "Use presets for fixed bills (rent, subscriptions). Tap + to create a new preset. Swipe to right to edit or left to delete."
+                    .text("Use presets for fixed bills (rent, subscriptions). Tap + to create a new preset. Swipe to right to edit or left to delete.")
                 ]),
                 .init(screenshotSlot: 2, header: "How Presets Affect Totals", body: [
-                    "When assigned to a budget, presets become planned expenses in that budget.",
-                    "• Presets are just a template for Planned Expenses; they don’t hold amounts themselves until assigned to a budget.",
-                    "• Planned Expenses created from Presets use the Preset's planned amount unless you edit the Planned Expense, then it uses the actual amount you entered."
+                    .text("When assigned to a budget, presets become planned expenses in that budget."),
+                    .bullet("Presets are just a template for Planned Expenses; they don’t hold amounts themselves until assigned to a budget."),
+                    .bullet("Planned Expenses created from Presets use the Preset's planned amount unless you edit the Planned Expense, then it uses the actual amount you entered.")
                 ]),
                 .init(screenshotSlot: 3, header: "Tip", body: [
-                    "Use presets to make budget setup fast and consistent month to month."
+                    .text("Use presets to make budget setup fast and consistent month to month.")
                 ])
             ]
         )
@@ -295,21 +295,21 @@ private struct SettingsHelpDetailsView: View {
             title: "Settings",
             sections: [
                 .init(screenshotSlot: 1, header: "Settings: Could Configuration BE Any Easier?.", body: [
-                    "Every row here is a separate area to manage your Offshore experience.",
-                                        "• About: Version Info, Contact Support, Release Logs",
-                                        "• Help: This guide, Repeat Onboarding",
-                                        "• General: Currency, Budget Period, Start of Week, Reset Tips & Hints, Reset & Erase Content",
-                                        "• Privacy: Enable Biometrics for App Lock",
-                                        "• Notifications: Enable Notifications for a reminder to log variable expenses for the day, compare planned vs actual income, and enable Presets due reminders.",
-                                        "• iCloud: Allow for iCloud Syncing Across Devices and check the iCloud Sync Status",
-                                        "• Categories: Manage your Expense Categories.",
-                                        "• Presets: Manage your Expense Presets.",
+                    .text("Every row here is a separate area to manage your Offshore experience."),
+                    .bullet("About: Version Info, Contact Support, Release Logs"),
+                    .bullet("Help: This guide, Repeat Onboarding"),
+                    .bullet("General: Currency, Budget Period, Start of Week, Reset Tips & Hints, Reset & Erase Content"),
+                    .bullet("Privacy: Enable Biometrics for App Lock"),
+                    .bullet("Notifications: Enable Notifications for a reminder to log variable expenses for the day, compare planned vs actual income, and enable Presets due reminders."),
+                    .bullet("iCloud: Allow for iCloud Syncing Across Devices and check the iCloud Sync Status"),
+                    .bullet("Categories: Manage your Expense Categories."),
+                    .bullet("Presets: Manage your Expense Presets."),
                 ]),
                 .init(screenshotSlot: 2, header: "Settings Controls What You See", body: [
-                    "A default currency can be set from going to General > Formatting > Currency. Also from this page you can control if you want to be alerted each time you delete something from your app or not.",
+                    .text("A default currency can be set from going to General > Formatting > Currency. Also from this page you can control if you want to be alerted each time you delete something from your app or not."),
                 ]),
                 .init(screenshotSlot: 3, header: "Workspaces", body: [
-                    "Offshore allows you to create multiple Workspaces to separate different budgeting contexts, such as Personal and Work. Each Workspace maintains its own set of Cards, Income, Presets, Categories, and Budgets, ensuring that your financial data remains organized and distinct across various aspects of your life.\nIt is important to note that you can only have (1) Local data source, and only 1 iCloud data source, but you can create as many Workspaces inside each data source as you would like."
+                    .text("Offshore allows you to create multiple Workspaces to separate different budgeting contexts, such as Personal and Work. Each Workspace maintains its own set of Cards, Income, Presets, Categories, and Budgets, ensuring that your financial data remains organized and distinct across various aspects of your life.\nIt is important to note that you can only have (1) Local data source, and only 1 iCloud data source, but you can create as many Workspaces inside each data source as you would like.")
                 ])
             ]
         )
@@ -318,11 +318,23 @@ private struct SettingsHelpDetailsView: View {
 
 // MARK: - Shared Detail Screen Components
 
+private enum HelpLine: Identifiable, Hashable {
+    case text(String)
+    case bullet(String)
+
+    var id: String {
+        switch self {
+        case .text(let value): return "text-\(value)"
+        case .bullet(let value): return "bullet-\(value)"
+        }
+    }
+}
+
 private struct HelpScreenSection: Identifiable {
     let id = UUID()
     let screenshotSlot: Int
     let header: String?
-    let body: [String]
+    let body: [HelpLine]
 }
 
 private struct HelpDetailScreen: View {
@@ -345,8 +357,13 @@ private struct HelpDetailScreen: View {
                         Divider()
                     }
 
-                    ForEach(section.body, id: \.self) { line in
-                        Text(line)
+                    ForEach(section.body) { line in
+                        switch line {
+                        case .text(let value):
+                            Text(value)
+                        case .bullet(let value):
+                            bullet(value)
+                        }
                     }
 
                     if section.id != sections.last?.id {
@@ -357,6 +374,10 @@ private struct HelpDetailScreen: View {
             .padding()
         }
         .navigationTitle(title)
+    }
+
+    private func bullet(_ text: String) -> Text {
+        Text("• \(text)")
     }
 }
 
