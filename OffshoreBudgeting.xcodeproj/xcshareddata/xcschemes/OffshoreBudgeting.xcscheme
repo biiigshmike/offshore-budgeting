@@ -16,7 +16,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "4C96F8502F20523700541774"
-               BuildableName = "OffshoreBudgeting.app"
+               BuildableName = "Offshore.app"
                BlueprintName = "OffshoreBudgeting"
                ReferencedContainer = "container:OffshoreBudgeting.xcodeproj">
             </BuildableReference>
@@ -58,7 +58,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "4C96F8502F20523700541774"
-            BuildableName = "OffshoreBudgeting.app"
+            BuildableName = "Offshore.app"
             BlueprintName = "OffshoreBudgeting"
             ReferencedContainer = "container:OffshoreBudgeting.xcodeproj">
          </BuildableReference>
@@ -75,7 +75,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "4C96F8502F20523700541774"
-            BuildableName = "OffshoreBudgeting.app"
+            BuildableName = "Offshore.app"
             BlueprintName = "OffshoreBudgeting"
             ReferencedContainer = "container:OffshoreBudgeting.xcodeproj">
          </BuildableReference>
