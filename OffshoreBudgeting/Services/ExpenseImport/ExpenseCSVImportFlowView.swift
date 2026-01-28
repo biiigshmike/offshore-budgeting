@@ -142,6 +142,7 @@ struct ExpenseCSVImportFlowView: View {
                     onToggleInclude: { vm.toggleInclude(rowID: row.id) },
                     onSetMerchant: { text in vm.setMerchant(rowID: row.id, merchant: text) },
                     onSetCategory: { category in vm.setCategory(rowID: row.id, category: category) },
+                    onSetKind: { kind in vm.setKind(rowID: row.id, kind: kind) },
                     onToggleRemember: { vm.toggleRemember(rowID: row.id) }
                 )
             }

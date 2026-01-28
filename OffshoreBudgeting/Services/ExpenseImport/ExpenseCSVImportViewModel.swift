@@ -27,6 +27,7 @@ final class ExpenseCSVImportViewModel: ObservableObject {
     private var learnedRules: [String: ImportMerchantRule] = [:]
 
     private var existingExpenses: [VariableExpense] = []
+    private var existingPlannedExpenses: [PlannedExpense] = []
     private var existingIncomes: [Income] = []
 
     // MARK: - Grouped rows
@@ -65,6 +66,7 @@ final class ExpenseCSVImportViewModel: ObservableObject {
 
         do {
             existingExpenses = card.variableExpenses ?? []
+            existingPlannedExpenses = card.plannedExpenses ?? []
             existingIncomes = card.incomes ?? []
 
             let parsed = try CSVParser.parse(url: url)
@@ -72,6 +74,7 @@ final class ExpenseCSVImportViewModel: ObservableObject {
                 csv: parsed,
                 categories: categories,
                 existingExpenses: existingExpenses,
+                existingPlannedExpenses: existingPlannedExpenses,
                 existingIncomes: existingIncomes,
                 learnedRules: learnedRules
             )
@@ -140,6 +143,43 @@ final class ExpenseCSVImportViewModel: ObservableObject {
         } else {
             rows[idx].isDuplicateHint = looksLikeDuplicateIncome(date: rows[idx].finalDate, amount: rows[idx].finalAmount, merchantKey: normalized)
         }
+
+        rows[idx].recomputeBucket()
+    }
+
+    func setKind(rowID: UUID, kind: ExpenseCSVImportKind) {
+        guard let idx = rows.firstIndex(where: { $0.id == rowID }) else { return }
+        if rows[idx].kind == kind { return }
+
+        let wasIncluded = rows[idx].includeInImport
+        rows[idx].kind = kind
+
+        if kind == .income {
+            rows[idx].selectedCategory = nil
+            rows[idx].bucket = .payment
+        } else {
+            if rows[idx].selectedCategory == nil {
+                rows[idx].selectedCategory = rows[idx].suggestedCategory
+            }
+        }
+
+        let normalized = MerchantNormalizer.normalizeKey(rows[idx].finalMerchant)
+        if rows[idx].kind == .expense {
+            rows[idx].isDuplicateHint = looksLikeDuplicateExpense(
+                date: rows[idx].finalDate,
+                amount: rows[idx].finalAmount,
+                merchantKey: normalized,
+                categoryID: rows[idx].selectedCategory?.id
+            )
+            rows[idx].bucket = bucketForExpenseRow(rows[idx])
+        } else {
+            rows[idx].isDuplicateHint = looksLikeDuplicateIncome(date: rows[idx].finalDate, amount: rows[idx].finalAmount, merchantKey: normalized)
+            rows[idx].bucket = .payment
+        }
+
+        let canInclude = !rows[idx].isMissingRequiredData && !rows[idx].isDuplicateHint
+        let includeDefault = (rows[idx].bucket == .ready || rows[idx].bucket == .payment)
+        rows[idx].includeInImport = (wasIncluded && canInclude) ? true : (includeDefault && canInclude)
 
         rows[idx].recomputeBucket()
     }
@@ -277,5 +317,18 @@ final class ExpenseCSVImportViewModel: ObservableObject {
         }
 
         return false
+    }
+
+    private func bucketForExpenseRow(_ row: ExpenseCSVImportRow) -> ExpenseCSVImportBucket {
+        if row.isDuplicateHint { return .possibleDuplicate }
+        guard let selectedCategory = row.selectedCategory else { return .needsMoreData }
+
+        if let suggestedCategory = row.suggestedCategory, suggestedCategory.id == selectedCategory.id {
+            if row.suggestedConfidence >= CategoryMatchingEngine.readyThreshold { return .ready }
+            if row.suggestedConfidence >= CategoryMatchingEngine.possibleThreshold { return .possibleMatch }
+            return .possibleMatch
+        }
+
+        return .ready
     }
 }

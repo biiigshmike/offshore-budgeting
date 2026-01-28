@@ -6,12 +6,14 @@ struct ExpenseCSVImportMapper {
         csv: ParsedCSV,
         categories: [Category],
         existingExpenses: [VariableExpense],
+        existingPlannedExpenses: [PlannedExpense],
         existingIncomes: [Income],
         learnedRules: [String: ImportMerchantRule]
     ) -> [ExpenseCSVImportRow] {
 
         let headerMap = HeaderMap(headers: csv.headers)
         let learnedMatcher = ImportMerchantRuleMatcher(rulesByKey: learnedRules)
+        let isAppleCardCSV = headerMap.isAppleCardCSV
 
         var out: [ExpenseCSVImportRow] = []
         out.reserveCapacity(csv.rows.count)
@@ -19,15 +21,15 @@ struct ExpenseCSVImportMapper {
         for (idx, fields) in csv.rows.enumerated() {
             let lineNumber = idx + 2
 
-            let isAppleRow = headerMap.isAppleCardRow(fields: fields)
-
-            let dateText = headerMap.value(in: fields, for: .date, isAppleRow: isAppleRow) ?? ""
-            let postedDateText = headerMap.value(in: fields, for: .postedDate, isAppleRow: isAppleRow)
-            let descText = headerMap.value(in: fields, for: .description, isAppleRow: isAppleRow) ?? ""
-            let merchantText = headerMap.value(in: fields, for: .merchant, isAppleRow: isAppleRow)
-            let amountText = headerMap.value(in: fields, for: .amount, isAppleRow: isAppleRow) ?? ""
-            let categoryText = headerMap.value(in: fields, for: .category, isAppleRow: isAppleRow)
-            let typeText = headerMap.value(in: fields, for: .type, isAppleRow: isAppleRow)
+            let dateText = headerMap.value(in: fields, for: .date, isAppleRow: isAppleCardCSV) ?? ""
+            let postedDateText = headerMap.value(in: fields, for: .postedDate, isAppleRow: isAppleCardCSV)
+            let descText = headerMap.value(in: fields, for: .description, isAppleRow: isAppleCardCSV) ?? ""
+            let merchantText = headerMap.value(in: fields, for: .merchant, isAppleRow: isAppleCardCSV)
+            let amountText = headerMap.value(in: fields, for: .amount, isAppleRow: isAppleCardCSV)
+            let debitText = headerMap.value(in: fields, for: .debit, isAppleRow: isAppleCardCSV)
+            let creditText = headerMap.value(in: fields, for: .credit, isAppleRow: isAppleCardCSV)
+            let categoryText = headerMap.value(in: fields, for: .category, isAppleRow: isAppleCardCSV)
+            let typeText = headerMap.value(in: fields, for: .type, isAppleRow: isAppleCardCSV)
 
             let parsedDate = parseDate(postedDateText ?? "") ?? parseDate(dateText)
 
@@ -37,7 +39,13 @@ struct ExpenseCSVImportMapper {
             let sourceMerchantKey = MerchantNormalizer.normalizeKey(rawMerchant)
             let descriptionMerchantKey = MerchantNormalizer.normalizeKey(descText)
 
-            guard let date = parsedDate, let rawAmount = parseAmount(amountText) else {
+            let originalAmountText = (amountText ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+                ? (amountText ?? "")
+                : ((debitText ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+                   ? (debitText ?? "")
+                   : (creditText ?? ""))
+
+            guard let date = parsedDate, let rawAmount = resolveRawAmount(amountText: amountText, debitText: debitText, creditText: creditText) else {
                 let safeDate = Date()
 
                 let row = ExpenseCSVImportRow(
@@ -45,7 +53,7 @@ struct ExpenseCSVImportMapper {
                     originalDateText: dateText,
                     originalDescriptionText: descText,
                     originalMerchantText: merchantText,
-                    originalAmountText: amountText,
+                    originalAmountText: originalAmountText,
                     originalCategoryText: categoryText,
                     sourceMerchantKey: sourceMerchantKey,
                     descriptionMerchantKey: descriptionMerchantKey,
@@ -76,7 +84,12 @@ struct ExpenseCSVImportMapper {
                 ? (learnedName ?? "")
                 : MerchantNormalizer.displayName(rawMerchant)
 
-            let kind = resolveKind(typeText: typeText, rawAmount: rawAmount)
+            let kind = resolveKind(
+                typeText: typeText,
+                rawAmount: rawAmount,
+                descriptionText: descText,
+                categoryText: categoryText
+            )
             let finalAmount = abs(rawAmount)
 
             // Category suggestion
@@ -96,6 +109,15 @@ struct ExpenseCSVImportMapper {
                     category: suggestion.category,
                     existing: existingExpenses
                 )
+                if !isDup {
+                    isDup = looksLikeDuplicatePlannedExpense(
+                        date: date,
+                        amount: finalAmount,
+                        merchant: finalMerchant,
+                        category: suggestion.category,
+                        existing: existingPlannedExpenses
+                    )
+                }
             } else {
                 isDup = looksLikeDuplicateIncome(date: date, amount: finalAmount, merchant: finalMerchant, existing: existingIncomes)
             }
@@ -138,7 +160,7 @@ struct ExpenseCSVImportMapper {
                 originalDateText: dateText,
                 originalDescriptionText: descText,
                 originalMerchantText: merchantText,
-                originalAmountText: amountText,
+                originalAmountText: originalAmountText,
                 originalCategoryText: categoryText,
                 sourceMerchantKey: sourceMerchantKey,
                 descriptionMerchantKey: descriptionMerchantKey,
@@ -165,7 +187,12 @@ struct ExpenseCSVImportMapper {
 
     // MARK: - Kind resolution
 
-    private static func resolveKind(typeText: String?, rawAmount: Double) -> ExpenseCSVImportKind {
+    private static func resolveKind(
+        typeText: String?,
+        rawAmount: Double,
+        descriptionText: String,
+        categoryText: String?
+    ) -> ExpenseCSVImportKind {
         let t = (typeText ?? "").lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
 
         if !t.isEmpty {
@@ -175,8 +202,23 @@ struct ExpenseCSVImportMapper {
             if t.contains("fee") || t.contains("interest") { return .expense }
         }
 
-        // Fallback (for exports without Type)
-        return rawAmount < 0 ? .expense : .income
+        // Amount sign (when present) wins.
+        if rawAmount < 0 { return .expense }
+
+        // Heuristics for exports that use unsigned amounts.
+        let desc = descriptionText.lowercased()
+        let cat = (categoryText ?? "").lowercased()
+
+        if desc.contains("payment") || desc.contains("autopay") || desc.contains("online payment") { return .income }
+        if cat.contains("payment") { return .income }
+
+        if desc.contains("refund") || desc.contains("reversal") { return .income }
+        if cat.contains("refund") || cat.contains("reversal") { return .income }
+
+        if desc.contains("fee") || desc.contains("interest") { return .expense }
+
+        // Default for this flow: treat unsigned amounts as expenses.
+        return .expense
     }
 
     // MARK: - Header mapping
@@ -187,6 +229,8 @@ struct ExpenseCSVImportMapper {
         case description
         case merchant
         case amount
+        case debit
+        case credit
         case category
         case type
     }
@@ -194,10 +238,12 @@ struct ExpenseCSVImportMapper {
     private struct HeaderMap {
         let headers: [String]
         private let lower: [String]
+        let isAppleCardCSV: Bool
 
         init(headers: [String]) {
             self.headers = headers
             self.lower = headers.map { $0.lowercased() }
+            self.isAppleCardCSV = HeaderMap.detectAppleCardCSV(lowerHeaders: self.lower)
         }
 
         func value(in fields: [String], for field: Field, isAppleRow: Bool) -> String? {
@@ -213,15 +259,20 @@ struct ExpenseCSVImportMapper {
             return val.isEmpty ? nil : val
         }
 
-        func isAppleCardRow(fields: [String]) -> Bool {
-            guard fields.count >= 7 else { return false }
-            let a = fields[0].trimmingCharacters(in: .whitespacesAndNewlines)
-            let b = fields[1].trimmingCharacters(in: .whitespacesAndNewlines)
-            let c = fields[2].trimmingCharacters(in: .whitespacesAndNewlines)
+        private static func detectAppleCardCSV(lowerHeaders: [String]) -> Bool {
+            func has(_ needle: String) -> Bool {
+                lowerHeaders.contains(where: { $0.contains(needle) })
+            }
 
-            if parseDate(a) == nil { return false }
-            if parseDate(b) == nil { return false }
-            return !c.isEmpty
+            // Apple Card CSVs have explicit Merchant + Type columns.
+            // Avoid false positives for bank exports that also have 2 date columns + 7 fields (e.g. Chase).
+            let hasMerchant = has("merchant")
+            let hasType = has("type")
+            let hasTransactionDate = has("transaction date")
+            let hasPostedOrClearing = has("posted date") || has("clearing date")
+            let hasAmount = has("amount")
+
+            return hasMerchant && hasType && hasTransactionDate && hasPostedOrClearing && hasAmount
         }
 
         // Apple Card common layout:
@@ -236,6 +287,8 @@ struct ExpenseCSVImportMapper {
             case .category: return fields[4]
             case .type: return fields[5]
             case .amount: return fields[6]
+            case .debit: return nil
+            case .credit: return nil
             }
         }
 
@@ -258,6 +311,10 @@ struct ExpenseCSVImportMapper {
                 return firstIndex(whereAny: ["merchant"])
             case .amount:
                 return firstIndex(whereAny: ["amount", "amount (usd)", "amt", "value", "total"])
+            case .debit:
+                return firstIndex(whereAny: ["debit", "withdrawal", "outflow", "charge"])
+            case .credit:
+                return firstIndex(whereAny: ["credit", "deposit", "inflow"])
             case .category:
                 return firstIndex(whereAny: ["category", "classification"])
             case .type:
@@ -267,6 +324,33 @@ struct ExpenseCSVImportMapper {
     }
 
     // MARK: - Parsing
+
+    private static func amountHasExplicitSign(_ text: String) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { return false }
+        if trimmed.hasPrefix("-") || trimmed.hasPrefix("+") { return true }
+        return trimmed.hasPrefix("(") && trimmed.hasSuffix(")")
+    }
+
+    private static func resolveRawAmount(amountText: String?, debitText: String?, creditText: String?) -> Double? {
+        if let amountText, amountHasExplicitSign(amountText), let v = parseAmount(amountText) {
+            return v
+        }
+
+        if let debitText, let d = parseAmount(debitText), abs(d) > 0.0001 {
+            return -abs(d)
+        }
+
+        if let creditText, let c = parseAmount(creditText), abs(c) > 0.0001 {
+            return abs(c)
+        }
+
+        if let amountText, let v = parseAmount(amountText) {
+            return v
+        }
+
+        return nil
+    }
 
     private static func parseAmount(_ text: String) -> Double? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -370,6 +454,57 @@ struct ExpenseCSVImportMapper {
 
             let existingSource = MerchantNormalizer.normalizeKey(i.source)
             if existingSource == MerchantNormalizer.normalizeKey(merchant) { return true }
+        }
+
+        return false
+    }
+
+    private static func looksLikeDuplicatePlannedExpense(
+        date: Date,
+        amount: Double,
+        merchant: String,
+        category: Category?,
+        existing: [PlannedExpense]
+    ) -> Bool {
+        let cal = Calendar.current
+        let day = cal.startOfDay(for: date)
+
+        let merchantKey = MerchantNormalizer.normalizeKey(merchant)
+
+        var dayAmountMatches: [PlannedExpense] = []
+        dayAmountMatches.reserveCapacity(4)
+
+        for p in existing {
+            let effectiveAmount = (abs(p.actualAmount) > 0.0001) ? p.actualAmount : p.plannedAmount
+            if abs(effectiveAmount - amount) > 0.0001 { continue }
+            let pDay = cal.startOfDay(for: p.expenseDate)
+            if pDay != day { continue }
+
+            dayAmountMatches.append(p)
+
+            let plannedKey = MerchantNormalizer.normalizeKey(p.title)
+            if !merchantKey.isEmpty, plannedKey == merchantKey { return true }
+        }
+
+        if dayAmountMatches.isEmpty { return false }
+
+        // Category match: a strong duplicate signal for planned expenses.
+        if let category {
+            let sameCategory = dayAmountMatches.filter { $0.category?.id == category.id }
+            if sameCategory.isEmpty == false {
+                if dayAmountMatches.count == 1 { return true }
+                if sameCategory.count == 1 { return true }
+            }
+        }
+
+        // Title similarity fallback (for generic planned categories, e.g. "Gas", "Phone", etc.)
+        if !merchantKey.isEmpty {
+            let similar = dayAmountMatches.filter {
+                let plannedKey = MerchantNormalizer.normalizeKey($0.title)
+                if plannedKey.isEmpty { return false }
+                return plannedKey.contains(merchantKey) || merchantKey.contains(plannedKey)
+            }
+            if !similar.isEmpty, (dayAmountMatches.count == 1 || similar.count == 1) { return true }
         }
 
         return false

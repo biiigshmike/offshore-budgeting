@@ -14,6 +14,7 @@ struct ExpenseCSVImportRowView: View {
     let onToggleInclude: () -> Void
     let onSetMerchant: (String) -> Void
     let onSetCategory: (Category?) -> Void
+    let onSetKind: (ExpenseCSVImportKind) -> Void
     let onToggleRemember: () -> Void
 
     var body: some View {
@@ -48,8 +49,20 @@ struct ExpenseCSVImportRowView: View {
 
                 Spacer(minLength: 0)
 
-                Text(row.finalAmount, format: CurrencyFormatter.currencyStyle())
-                    .font(.headline)
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(row.finalAmount, format: CurrencyFormatter.currencyStyle())
+                        .font(.headline)
+
+                    Picker("Type", selection: Binding(
+                        get: { row.kind },
+                        set: { onSetKind($0) }
+                    )) {
+                        Text("Expense").tag(ExpenseCSVImportKind.expense)
+                        Text("Income").tag(ExpenseCSVImportKind.income)
+                    }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
+                }
             }
 
             if row.kind == .expense {

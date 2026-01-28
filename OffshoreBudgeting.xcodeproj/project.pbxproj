@@ -656,10 +656,10 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/BudgetPlayground.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/BudgetPlayground";
+					TEST_HOST = "$(BUILT_PRODUCTS_DIR)/OffshoreBudgeting.app/OffshoreBudgeting";
+				};
+				name = Debug;
 			};
-			name = Debug;
-		};
 		4C96F8772F20523900541774 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -684,10 +684,10 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/BudgetPlayground.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/BudgetPlayground";
+					TEST_HOST = "$(BUILT_PRODUCTS_DIR)/OffshoreBudgeting.app/OffshoreBudgeting";
+				};
+				name = Release;
 			};
-			name = Release;
-		};
 		4C96F8792F20523900541774 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -711,10 +711,10 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = BudgetPlayground;
+					TEST_TARGET_NAME = OffshoreBudgeting;
+				};
+				name = Debug;
 			};
-			name = Debug;
-		};
 		4C96F87A2F20523900541774 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -738,10 +738,10 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = BudgetPlayground;
+					TEST_TARGET_NAME = OffshoreBudgeting;
+				};
+				name = Release;
 			};
-			name = Release;
-		};
 		4CAD3C542F28AF7F001E3F5B /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
