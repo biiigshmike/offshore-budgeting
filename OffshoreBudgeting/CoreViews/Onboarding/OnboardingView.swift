@@ -5,7 +5,6 @@
 //  Created by Michael Brown on 1/25/26.
 //
 
-
 import SwiftUI
 import SwiftData
 import CloudKit
@@ -31,6 +30,9 @@ struct OnboardingView: View {
 
     /// Persist step so relaunches and resets don't restart the flow.
     @AppStorage("onboarding_step") private var onboardingStep: Int = 0
+    
+    @AppStorage("onboarding_didChooseDataSource") private var didChooseDataSource: Bool = false
+    @AppStorage("onboarding_didPressGetStarted") private var didPressGetStarted: Bool = false
 
     // MARK: - SwiftData
 
@@ -54,6 +56,9 @@ struct OnboardingView: View {
     @State private var isCheckingICloudForGetStarted: Bool = false
     @State private var showingRestartRequired: Bool = false
     @State private var didChooseICloudFromGetStarted: Bool = false
+
+    // Drives the “wake up” background motion on the welcome step.
+    @State private var isExitingWelcome: Bool = false
 
     // MARK: - Derived
 
@@ -173,48 +178,54 @@ struct OnboardingView: View {
     // MARK: - Step 1: Welcome
 
     private var welcomeStep: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Spacer(minLength: 8)
-            
-            Image(systemName: "sailboat.fill")
-                .font(.system(size: 46, weight: .semibold))
-                .foregroundStyle(.tint)
-            
-            Text("Welcome to Offshore Budgeting!")
-                .font(.largeTitle.weight(.bold))
-            
-            Text("Press the button below to get started setting up your budgeting workspace.")
-                .font(.body)
-                .foregroundStyle(.secondary)
-            
-            Spacer(minLength: 0)
-            if #available(iOS 26.0, *) {
-                Button {
-                    getStartedTapped()
-                } label: {
-                    Text("Get Started")
-                        .frame(maxWidth: .infinity, minHeight: 52)
+        ZStack {
+            WaveBackdrop(isExiting: isExitingWelcome)
+                .ignoresSafeArea()
+
+            VStack(alignment: .leading, spacing: 14) {
+                Spacer(minLength: 8)
+
+                Image(systemName: "sailboat.fill")
+                    .font(.system(size: 46, weight: .semibold))
+                    .foregroundStyle(.tint)
+
+                Text("Welcome to Offshore Budgeting!")
+                    .font(.largeTitle.weight(.bold))
+
+                Text("Press the button below to get started setting up your budgeting workspace.")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+
+                Spacer(minLength: 0)
+
+                if #available(iOS 26.0, *) {
+                    Button {
+                        getStartedTapped()
+                    } label: {
+                        Text("Get Started")
+                            .frame(maxWidth: .infinity, minHeight: 52)
+                    }
+                    .buttonStyle(.glassProminent)
+                    .tint(.accentColor)
+                    .disabled(isCheckingICloudForGetStarted)
+
+                    Spacer(minLength: 18)
+                } else {
+                    Button {
+                        getStartedTapped()
+                    } label: {
+                        Text("Get Started")
+                            .frame(maxWidth: .infinity, minHeight: 52)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.accentColor)
+                    .disabled(isCheckingICloudForGetStarted)
+
+                    Spacer(minLength: 18)
                 }
-                .buttonStyle(.glassProminent)
-                .tint(.accentColor)
-                .disabled(isCheckingICloudForGetStarted)
-                
-                Spacer(minLength: 18)
-            } else {
-                Button {
-                    getStartedTapped()
-                } label: {
-                    Text("Get Started")
-                        .frame(maxWidth: .infinity, minHeight: 52)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(.accentColor)
-                .disabled(isCheckingICloudForGetStarted)
-                
-                Spacer(minLength: 18)
             }
+            .frame(maxWidth: 560, alignment: .leading)
         }
-        .frame(maxWidth: 560, alignment: .leading)
     }
 
     // MARK: - Step 2: Workspaces
@@ -319,12 +330,13 @@ struct OnboardingView: View {
 
     private var bottomNavBar: some View {
         HStack(spacing: 12) {
+
             if #available(iOS 26.0, *) {
                 Button {
                     goBack()
                 } label: {
                     Text("Back")
-                        .frame(minWidth: 110, minHeight: 44)
+                        .frame(maxWidth: .infinity, minHeight: 44)
                 }
                 .buttonStyle(.glassProminent)
                 .tint(.gray)
@@ -334,20 +346,19 @@ struct OnboardingView: View {
                     goBack()
                 } label: {
                     Text("Back")
-                        .frame(minWidth: 110, minHeight: 44)
+                        .frame(maxWidth: .infinity, minHeight: 44)
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(.gray)
                 .disabled(onboardingStep == 0)
             }
 
-            Spacer(minLength: 0)
             if #available(iOS 26.0, *) {
                 Button {
                     primaryActionTapped()
                 } label: {
                     Text(primaryButtonTitle)
-                        .frame(minWidth: 140, minHeight: 44)
+                        .frame(maxWidth: .infinity, minHeight: 44)
                 }
                 .buttonStyle(.glassProminent)
                 .tint(.accentColor)
@@ -356,13 +367,14 @@ struct OnboardingView: View {
                     primaryActionTapped()
                 } label: {
                     Text(primaryButtonTitle)
-                        .frame(minWidth: 140, minHeight: 44)
+                        .frame(maxWidth: .infinity, minHeight: 44)
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(.accentColor)
             }
         }
     }
+
 
     private var primaryButtonTitle: String {
         onboardingStep >= 5 ? "Done" : "Next"
@@ -401,8 +413,24 @@ struct OnboardingView: View {
             goNext()
         }
     }
+    
+    private func returnToDataSource() {
+        // Ensure the gate opens directly on the data source screen.
+        didPressGetStarted = true
+
+        // This flips AppBootstrapRootView back to OnboardingStartGateView.
+        didChooseDataSource = false
+
+        // Reset onboarding to welcome for when the user comes back through.
+        onboardingStep = 0
+    }
 
     private func goBack() {
+        if onboardingStep == 1 {
+            returnToDataSource()
+            return
+        }
+
         onboardingStep = max(0, onboardingStep - 1)
     }
 
@@ -413,23 +441,38 @@ struct OnboardingView: View {
     // MARK: - Get Started
 
     private func getStartedTapped() {
+        withAnimation(.easeInOut(duration: 0.55)) {
+            isExitingWelcome = true
+        }
+
         isCheckingICloudForGetStarted = true
         Task {
             let status = (try? await CKContainer.default().accountStatus()) ?? .couldNotDetermine
+
             await MainActor.run {
                 isCheckingICloudForGetStarted = false
+
+                let delay: Double = 0.28
+
                 if status == .available {
-                    showingGetStartedICloudChoice = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                        showingGetStartedICloudChoice = true
+                    }
                 } else {
-                    goNext()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                        goNext()
+                    }
                 }
             }
         }
     }
 
     private func startLocalFromGetStarted() {
-        goNext()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+            goNext()
+        }
     }
+
 
     private func startUsingICloudFromGetStarted() {
         desiredUseICloud = true
@@ -593,7 +636,7 @@ private struct OnboardingWorkspaceStep: View {
                     Label("Add Workspace", systemImage: "plus")
                         .frame(maxWidth: .infinity, minHeight: 44)
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.borderedProminent)
                 .tint(.accentColor)
             }
 
