@@ -36,8 +36,8 @@ struct CategoryMetricRowView: View {
                         Text(amountText)
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(.primary)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.85)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.75)
 
                         Text(percentText(percentValue))
                             .font(.caption.weight(.semibold))

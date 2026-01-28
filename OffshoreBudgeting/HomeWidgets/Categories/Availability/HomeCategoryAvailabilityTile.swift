@@ -26,7 +26,7 @@ struct HomeCategoryAvailabilityTile: View {
     @State private var scope: AvailabilityScope = .all
     @State private var pageIndex: Int = 0
 
-    private let pageSize: Int = 5
+    private let pageSize: Int = 3
     private let rowHeight: CGFloat = 76
     private let rowSpacing: CGFloat = 10
 

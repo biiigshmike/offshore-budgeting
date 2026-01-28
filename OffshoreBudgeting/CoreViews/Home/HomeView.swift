@@ -29,10 +29,13 @@ struct HomeView: View {
     @State private var draftEndDate: Date = Date()
 
     @State private var isEditingWidgets: Bool = false
-    @State private var pinnedCardIDs: [UUID] = []
 
-    // ✅ New: ordered widget list
-    @State private var pinnedWidgets: [HomeWidgetID] = []
+    @State private var pinnedItems: [HomePinnedItem] = []
+
+    // MARK: - A11y + Layout Environment
+
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
 
     init(workspace: Workspace) {
         self.workspace = workspace
@@ -88,11 +91,8 @@ struct HomeView: View {
                         widgetsHeader
 
                         VStack(spacing: 12) {
-                            let pinnedCards = pinnedCardIDs.compactMap { id in
-                                cards.first(where: { $0.id == id })
-                            }
 
-                            if pinnedWidgets.isEmpty && pinnedCards.isEmpty {
+                            if pinnedItems.isEmpty {
                                 HomeTileContainer(
                                     title: "Home",
                                     subtitle: dateRangeSubtitle,
@@ -103,57 +103,16 @@ struct HomeView: View {
                                         .foregroundStyle(.secondary)
                                         .fixedSize(horizontal: false, vertical: true)
                                 }
+                                .frame(maxWidth: .infinity, alignment: .leading)
                             } else {
-                                LazyVGrid(columns: homeGridColumns, alignment: .leading, spacing: 12) {
 
-                                    // ✅ Render widgets in persisted order
-                                    ForEach(pinnedWidgets) { widget in
-                                        switch widget {
-                                        case .income:
-                                            incomeWidget
+                                let columns = homeGridColumns(for: proxy.size.width)
 
-                                        case .savingsOutlook:
-                                            savingsOutlookWidget
+                                LazyVGrid(columns: columns, alignment: .leading, spacing: 12) {
 
-                                        case .whatIf:
-                                            whatIfWidget
-
-                                        case .nextPlannedExpense:
-                                            nextPlannedExpenseWidget
-
-                                        case .categorySpotlight:
-                                            categorySpotlightWidget
-
-                                        case .categoryAvailability:
-                                            categoryAvailabilityWidget
-
-                                        case .spendTrends:
-                                            spendTrendsWidget
-                                        }
-                                    }
-
-                                    if pinnedCards.isEmpty {
-                                        HomeTileContainer(
-                                            title: "Card Summary",
-                                            subtitle: dateRangeSubtitle,
-                                            accent: .primary,
-                                            showsChevron: false
-                                        ) {
-                                            Text("Tap Edit to pin cards to Home.")
-                                                .foregroundStyle(.secondary)
-                                                .fixedSize(horizontal: false, vertical: true)
-                                        }
-                                    } else {
-                                        // Cards after widgets (like your current layout)
-                                        ForEach(pinnedCards) { card in
-                                            HomeCardSummaryTile(
-                                                workspace: workspace,
-                                                card: card,
-                                                startDate: appliedStartDate,
-                                                endDate: appliedEndDate
-                                            )
-                                            .accessibilityElement(children: .combine)
-                                        }
+                                    ForEach(pinnedItems) { item in
+                                        pinnedItemView(item)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
                                     }
                                 }
                             }
@@ -164,7 +123,6 @@ struct HomeView: View {
                     .padding(.horizontal, 16)
                     .padding(.bottom, 18)
                     .frame(width: proxy.size.width, alignment: .leading)
-
                 }
             }
         }
@@ -194,18 +152,73 @@ struct HomeView: View {
             HomeEditPinnedCardsView(
                 cards: cards,
                 workspaceID: workspace.id,
-                pinnedIDs: $pinnedCardIDs,
-                pinnedWidgets: $pinnedWidgets
+                pinnedItems: $pinnedItems
             )
             .onDisappear {
-                persistPinnedCards()
-                persistPinnedWidgets()
+                persistPinnedItems()
             }
         }
         .onAppear {
             bootstrapDatesIfNeeded()
-            loadPinnedCardsIfNeeded()
-            loadPinnedWidgetsIfNeeded()
+            loadPinnedItemsIfNeeded()
+        }
+    }
+
+    // MARK: - Unified tile rendering
+
+    @ViewBuilder
+    private func pinnedItemView(_ item: HomePinnedItem) -> some View {
+        switch item {
+        case .widget(let widget):
+            widgetView(for: widget)
+
+        case .card(let id):
+            if let card = cards.first(where: { $0.id == id }) {
+                HomeCardSummaryTile(
+                    workspace: workspace,
+                    card: card,
+                    startDate: appliedStartDate,
+                    endDate: appliedEndDate
+                )
+                .accessibilityElement(children: .combine)
+            } else {
+                HomeTileContainer(
+                    title: "Missing Card",
+                    subtitle: dateRangeSubtitle,
+                    accent: .secondary,
+                    showsChevron: false
+                ) {
+                    Text("This pinned card no longer exists.")
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func widgetView(for widget: HomeWidgetID) -> some View {
+        switch widget {
+        case .income:
+            incomeWidget
+
+        case .savingsOutlook:
+            savingsOutlookWidget
+
+        case .whatIf:
+            whatIfWidget
+
+        case .nextPlannedExpense:
+            nextPlannedExpenseWidget
+
+        case .categorySpotlight:
+            categorySpotlightWidget
+
+        case .categoryAvailability:
+            categoryAvailabilityWidget
+
+        case .spendTrends:
+            spendTrendsWidget
         }
     }
 
@@ -267,6 +280,7 @@ struct HomeView: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -282,7 +296,6 @@ struct HomeView: View {
         )
     }
 
-    /// Phase 2 validation tile (simple, not final UI)
     @ViewBuilder
     private var categoryAvailabilityWidget: some View {
         HomeCategoryAvailabilityTile(
@@ -310,8 +323,25 @@ struct HomeView: View {
 
     // MARK: - Layout
 
-    private var homeGridColumns: [GridItem] {
-        [GridItem(.adaptive(minimum: 330), spacing: 12, alignment: .top)]
+    private var gridSpacing: CGFloat { 12 }
+
+    private func homeColumnCount(for width: CGFloat) -> Int {
+        if voiceOverEnabled { return 1 }
+        if dynamicTypeSize.isAccessibilitySize { return 1 }
+
+        let minTileWidth: CGFloat = (dynamicTypeSize >= .xxLarge) ? 420 : 330
+        let usable = width
+        let columns = Int((usable + gridSpacing) / (minTileWidth + gridSpacing))
+
+        return max(1, min(columns, 4))
+    }
+
+    private func homeGridColumns(for width: CGFloat) -> [GridItem] {
+        let count = homeColumnCount(for: width)
+        return Array(
+            repeating: GridItem(.flexible(minimum: 0), spacing: gridSpacing, alignment: .top),
+            count: count
+        )
     }
 
     // MARK: - Widgets Header
@@ -340,7 +370,7 @@ struct HomeView: View {
     }
 
     // MARK: - Date Range
-    
+
     private var isDateRangeDirty: Bool {
         draftStartDate != appliedStartDate || draftEndDate != appliedEndDate
     }
@@ -389,41 +419,42 @@ struct HomeView: View {
         date.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted))
     }
 
-    // MARK: - Persistence: Cards
+    // MARK: - Persistence: Unified pins + Migration
 
-    private func loadPinnedCardsIfNeeded() {
-        if pinnedCardIDs.isEmpty {
-            let store = HomePinnedCardsStore(workspaceID: workspace.id)
-            let loaded = store.load()
+    private func loadPinnedItemsIfNeeded() {
+        if pinnedItems.isEmpty {
+            let itemsStore = HomePinnedItemsStore(workspaceID: workspace.id)
+            let loaded = itemsStore.load()
 
-            if loaded.isEmpty {
-                pinnedCardIDs = cards.map { $0.id }
-                store.save(pinnedCardIDs)
-            } else {
-                pinnedCardIDs = loaded
+            if !loaded.isEmpty {
+                pinnedItems = loaded
+                return
             }
+
+            let widgetsStore = HomePinnedWidgetsStore(workspaceID: workspace.id)
+            let cardsStore = HomePinnedCardsStore(workspaceID: workspace.id)
+
+            let migratedWidgets = widgetsStore.load().map { HomePinnedItem.widget($0) }
+
+            var migratedCardIDs = cardsStore.load()
+            if migratedCardIDs.isEmpty {
+                migratedCardIDs = cards.map { $0.id }
+            }
+            let migratedCards = migratedCardIDs.map { HomePinnedItem.card($0) }
+
+            let migrated = migratedWidgets + migratedCards
+            pinnedItems = migrated
+            itemsStore.save(migrated)
         }
     }
 
-    private func persistPinnedCards() {
-        let store = HomePinnedCardsStore(workspaceID: workspace.id)
-        store.save(pinnedCardIDs)
-    }
-
-    // MARK: - Persistence: Widgets (new)
-
-    private func loadPinnedWidgetsIfNeeded() {
-        if pinnedWidgets.isEmpty {
-            let store = HomePinnedWidgetsStore(workspaceID: workspace.id)
-            pinnedWidgets = store.load()
-        }
-    }
-
-    private func persistPinnedWidgets() {
-        let store = HomePinnedWidgetsStore(workspaceID: workspace.id)
-        store.save(pinnedWidgets)
+    private func persistPinnedItems() {
+        let store = HomePinnedItemsStore(workspaceID: workspace.id)
+        store.save(pinnedItems)
     }
 }
+
+// MARK: Preview
 
 #Preview("Home") {
     let container = PreviewSeed.makeContainer()
