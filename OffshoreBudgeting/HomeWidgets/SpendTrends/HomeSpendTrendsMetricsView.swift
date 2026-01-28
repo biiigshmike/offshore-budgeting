@@ -445,10 +445,25 @@ private struct HeatMapBucketBar: View {
         // End
         stops.append(.init(color: colors.last ?? firstColor, location: 1))
 
+        // Ensure stops are ordered by location (monotonic non-decreasing)
+        var ordered = stops.sorted { $0.location < $1.location }
+        let epsilon: Double = 1e-6
+        if !ordered.isEmpty {
+            var last = ordered[0].location
+            for i in 1..<ordered.count {
+                var loc = ordered[i].location
+                if loc < last { loc = last }
+                if abs(loc - last) < epsilon { loc = last + epsilon }
+                ordered[i].location = loc
+                last = loc
+            }
+        }
+
         return LinearGradient(
-            gradient: Gradient(stops: stops),
+            gradient: Gradient(stops: ordered),
             startPoint: .bottom,
             endPoint: .top
         )
     }
 }
+
