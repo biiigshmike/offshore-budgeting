@@ -178,7 +178,7 @@ private struct HomeHelpView: View {
             title: "Home",
             sections: [
                 .init(screenshotSlot: 1, header: "Home: Welcome to Your Dashboard", body: [
-                    "By default, Home loads using your default budgeting preference from Settings. You can pick your own custom start and end date, or use the pre-defined ranges in the period menu by pressing on the calendar icon. The widgets respond with the date range you select."
+                    "You can pick your own custom start and end date, or use the pre-defined ranges in the period menu by pressing on the calendar icon. The widgets respond with the date range you select."
                 ]),
                 .init(screenshotSlot: 2, header: "Widgets Overview", body: [
                     "Home is made of widgets. Tap any widget to open its detail page.",
@@ -191,7 +191,7 @@ private struct HomeHelpView: View {
                     "• What If?: An interactive scenario planner to project if you will be over or under your available income threshold. Use it to plan different scenarios. You can even pin scenarios you're closely monitoring on Home (maximum of 3 scenarios can be pinned)."
                 ]),
                 .init(screenshotSlot: 3, header: "Home Calculations", body: [
-                    "Home calculations mirror your budget math:",
+                    "Home calculations mirror budget math:",
                     "• Actual Savings = actual income - (planned expenses actual amount + variable expenses total amount).",
                     "• Remaining Income = actual income - expenses."
                 ])
@@ -212,10 +212,10 @@ private struct BudgetsHelpView: View {
                     "Inside a budget, you plan and track expenses in two lanes:",
                     "• Planned: recurring or expected costs.",
                     "• Variable: one-off spending from your cards.",
-                    "• Categories: long-press a category and assign a spending cap to help manage your spending habits."
+                    "• Categories: long-press a category and assign a spending cap to help manage your spending habits for your defined budgeting period."
                 ]),
                 .init(screenshotSlot: 3, header: "How Budget Totals Are Calculated", body: [
-                    "These totals are shown in the budget header and summary cards:",
+                    "These totals are shown in the budget header:",
                     "• Planned Income = Planned Income total in this period.",
                     "• Actual Income = Actual Income total in this period.",
                     "• Planned Total (Presets) = sum of Preset Planned Expenses. This sum will use the Planned Amount unless a Preset was modified; then, it will use the Actual amount.",
@@ -258,10 +258,10 @@ private struct CardsHelpView: View {
                     "Tap + to add a card. Tap a card to open its detail view."
                 ]),
                 .init(screenshotSlot: 2, header: "Card Detail: Deep Dive", body: [
-                    "The detail view is a focused spending console with filters, segmented scope, sorting, and search."
+                    "The detail view is a focused spending console with filters, segmented scope, sorting, and search functionalities."
                 ]),
                 .init(screenshotSlot: 3, header: "Card Calculations", body: [
-                    "Totals reflect the current filters. Variable is always actual, planned depends on actual amounts entered."
+                    "Totals reflect the current filters. Variable is always actual, planned depends on actual amounts entered. If a preset planned expense's amount did not changed, the planned amount will always be used. If the expense gets updated later, then the actual amount entered at that point will be used for calculuations."
                 ])
             ]
         )
@@ -306,10 +306,10 @@ private struct SettingsHelpDetailsView: View {
                                         "• Presets: Manage your Expense Presets.",
                 ]),
                 .init(screenshotSlot: 2, header: "Settings Controls What You See", body: [
-                    "Your default budget period influences Home and new Budgets. For example, if you set Monthly as your default budget period, Home will load with the current month selected, and new Budgets will default to Monthly.",
+                    "A default currency can be set from going to General > Formatting > Currency. Also from this page you can control if you want to be alerted each time you delete something from your app or not.",
                 ]),
                 .init(screenshotSlot: 3, header: "Workspaces", body: [
-                    "Offshore allows you to create multiple Workspaces to separate different budgeting contexts, such as Personal and Work. Each Workspace maintains its own set of Cards, Income, Presets, Categories, and Budgets, ensuring that your financial data remains organized and distinct across various aspects of your life."
+                    "Offshore allows you to create multiple Workspaces to separate different budgeting contexts, such as Personal and Work. Each Workspace maintains its own set of Cards, Income, Presets, Categories, and Budgets, ensuring that your financial data remains organized and distinct across various aspects of your life.\nIt is important to note that you can only have (1) Local data source, and only 1 iCloud data source, but you can create as many Workspaces inside each data source as you would like."
                 ])
             ]
         )
