@@ -17,7 +17,7 @@ struct HomeBackgroundView: View {
                 base
                 RadialGradient(
                     colors: [
-                        Color("OffshoreWave").opacity(0.33),
+                        Color("OffshoreWave").opacity(0.18),
                         Color.clear
                     ],
                     center: UnitPoint(x: 0.5, y: 0.25),
@@ -45,21 +45,21 @@ struct HomeBackgroundView: View {
                 )
                 RadialGradient(
                     colors: [
-                        Color("OffshoreSand").opacity(0.44),
+                        Color("OffshoreSand").opacity(0.55),
                         Color.clear
                     ],
-                    center: UnitPoint(x: 0.5, y: 1.08),
-                    startRadius: 1,
-                    endRadius: minSide * 1.05
+                    center: UnitPoint(x: 0.5, y: 1.15),
+                    startRadius: minSide * 0.12,
+                    endRadius: minSide * 0.95
                 )
-                .blendMode(.plusLighter)
+                .blendMode(.softLight)
                 LinearGradient(
                     colors: [
-                        Color("OffshoreDepth").opacity(0.10),
-                        Color("OffshoreDepth").opacity(0.45)
+                        Color.black.opacity(0.18),
+                        Color.clear
                     ],
                     startPoint: .top,
-                    endPoint: .bottom
+                    endPoint: .center
                 )
                 .blendMode(.overlay)
             }
@@ -73,7 +73,7 @@ struct HomeBackgroundView: View {
                 Color("OffshoreSand").opacity(0.4),
                 Color("OffshoreWave").opacity(0.1),
                 Color("OffshoreBrand").opacity(0.2),
-                Color("OffshoreWave").opacity(0.4),
+                Color("OffshoreWave").opacity(0.18),
                 Color("OffshoreDepth").opacity(0.2),
                 Color("OffshoreSky").opacity(0.3)
             ],
