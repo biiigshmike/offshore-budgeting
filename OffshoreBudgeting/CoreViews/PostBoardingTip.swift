@@ -176,7 +176,7 @@ private struct TipSheet: View {
                         .frame(maxWidth: .infinity, minHeight: 52)
                 }
                 .buttonStyle(.glassProminent)
-                .tint(.blue)
+                .tint(.accentColor)
                 .padding(.horizontal, 22)
                 .padding(.bottom, 18)
             } else {
@@ -187,7 +187,7 @@ private struct TipSheet: View {
                         .frame(maxWidth: .infinity, minHeight: 52)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(.blue)
+                .tint(.accentColor)
                 .padding(.horizontal, 22)
                 .padding(.bottom, 18)
             }

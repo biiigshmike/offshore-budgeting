@@ -101,7 +101,7 @@ struct OnboardingView: View {
         .alert("Card Required", isPresented: $showingMissingCardAlert) {
             Button("OK", role: .cancel) { }
         } message: {
-            Text("Create at least one card to continue, presets need a default card.")
+            Text("Create at least one card to continue.")
         }
         .alert("Existing iCloud Data Detected", isPresented: $showingSkipPrompt) {
             Button("Continue Setup", role: .cancel) { }
@@ -196,7 +196,7 @@ struct OnboardingView: View {
                         .frame(maxWidth: .infinity, minHeight: 52)
                 }
                 .buttonStyle(.glassProminent)
-                .tint(.blue)
+                .tint(.accentColor)
                 .disabled(isCheckingICloudForGetStarted)
                 
                 Spacer(minLength: 18)
@@ -208,7 +208,7 @@ struct OnboardingView: View {
                         .frame(maxWidth: .infinity, minHeight: 52)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(.blue)
+                .tint(.accentColor)
                 .disabled(isCheckingICloudForGetStarted)
                 
                 Spacer(minLength: 18)
@@ -585,7 +585,7 @@ private struct OnboardingWorkspaceStep: View {
                         .frame(maxWidth: .infinity, minHeight: 44)
                 }
                 .buttonStyle(.glassProminent)
-                .tint(.blue)
+                .tint(.accentColor)
             } else {
                 Button {
                     showingAddWorkspace = true
@@ -594,7 +594,7 @@ private struct OnboardingWorkspaceStep: View {
                         .frame(maxWidth: .infinity, minHeight: 44)
                 }
                 .buttonStyle(.bordered)
-                .tint(.blue)
+                .tint(.accentColor)
             }
 
             Text("Tip: Try starting with a workspace called Personal. You can always add more later.")
@@ -922,7 +922,7 @@ private struct OnboardingCardsStep: View {
                     ContentUnavailableView(
                         "No Cards Yet",
                         systemImage: "creditcard",
-                        description: Text("Create at least one card. Presets need a default card.")
+                        description: Text("Create at least one card to continue.")
                     )
                 } else {
                     ForEach(cards) { card in

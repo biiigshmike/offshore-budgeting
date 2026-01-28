@@ -86,7 +86,7 @@ struct RestartRequiredView: View {
                             .frame(maxWidth: .infinity, minHeight: 44)
                     }
                     .buttonStyle(.glassProminent)
-                    .tint(.blue)
+                    .tint(.accentColor)
                 } else {
                     Button {
                         onPrimary()

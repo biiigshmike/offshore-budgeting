@@ -97,7 +97,7 @@ struct OnboardingStartGateView: View {
                 } label: {
                     HStack(spacing: 10) {
                         Image(systemName: "iphone")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.tint)
                         Text("On Device")
                         Spacer()
                     }
@@ -108,7 +108,7 @@ struct OnboardingStartGateView: View {
                 } label: {
                     HStack(spacing: 10) {
                         Image(systemName: "icloud")
-                            .foregroundStyle(.blue)
+                            .foregroundStyle(.tint)
                         Text("iCloud")
                         Spacer()
                     }
