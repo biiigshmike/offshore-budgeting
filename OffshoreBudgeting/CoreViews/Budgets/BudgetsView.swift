@@ -59,11 +59,13 @@ struct BudgetsView: View {
     }
 
     private var filteredBudgets: [Budget] {
-        let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return budgets }
+        let query = SearchQueryParser.parse(searchText)
+        guard !query.isEmpty else { return budgets }
 
         return budgets.filter { budget in
-            budget.name.localizedCaseInsensitiveContains(trimmed)
+            if !SearchMatch.matchesTextTerms(query, in: [budget.name]) { return false }
+            if !SearchMatch.matchesDateRange(query, startDate: budget.startDate, endDate: budget.endDate) { return false }
+            return true
         }
     }
 
@@ -164,7 +166,11 @@ struct BudgetsView: View {
             ]
         )
         .navigationTitle("Budgets")
-        .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always))
+        .searchable(
+            text: $searchText,
+            placement: .navigationBarDrawer(displayMode: .always),
+            prompt: "Search"
+        )
         .searchFocused($searchFocused)
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {

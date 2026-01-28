@@ -24,6 +24,11 @@ struct IncomeView: View {
     @State private var showingIncomeDeleteConfirm: Bool = false
     @State private var pendingIncomeDelete: (() -> Void)? = nil
 
+    // MARK: - Search
+
+    @State private var searchText: String = ""
+    @FocusState private var searchFocused: Bool
+
     init(workspace: Workspace, sheetRoute: Binding<IncomeSheetRoute?>) {
         self.workspace = workspace
         self._sheetRoute = sheetRoute
@@ -56,6 +61,24 @@ struct IncomeView: View {
             income.date >= selectedDayStart && income.date < selectedDayEnd
         }
         .sorted { $0.date > $1.date }
+    }
+
+    private var incomesSearchedAll: [Income] {
+        let query = SearchQueryParser.parse(searchText)
+        guard !query.isEmpty else { return incomes }
+
+        return incomes
+            .filter { income in
+                if !SearchMatch.matchesDateRange(query, date: income.date) { return false }
+                if !SearchMatch.matchesTextTerms(query, in: [income.source, income.card?.name]) { return false }
+                if !SearchMatch.matchesAmountDigitTerms(query, amounts: [income.amount]) { return false }
+                return true
+            }
+            .sorted { $0.date > $1.date }
+    }
+
+    private var isSearching: Bool {
+        !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private var selectedDayTitle: String {
@@ -170,19 +193,21 @@ struct IncomeView: View {
 
             Section(
                 header: VStack(alignment: .leading, spacing: 4) {
-                    Text("Income")
+                    Text(isSearching ? "Search Results" : "Income")
                         .font(.headline)
 
-                    Text(selectedDayTitle)
+                    Text(isSearching ? "All income entries" : selectedDayTitle)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
             ) {
-                if incomesForSelectedDay.isEmpty {
-                    Text("No income for \(CalendarGridHelper.shortDateFormatter.string(from: selectedDayStart)).")
+                let rows = isSearching ? incomesSearchedAll : incomesForSelectedDay
+
+                if rows.isEmpty {
+                    Text(isSearching ? "No matching income." : "No income for \(CalendarGridHelper.shortDateFormatter.string(from: selectedDayStart)).")
                         .foregroundStyle(.secondary)
                 } else {
-                    ForEach(incomesForSelectedDay) { income in
+                    ForEach(rows) { income in
                         Button {
                             sheetRoute = .edit(income)
                         } label: {
@@ -249,10 +274,21 @@ struct IncomeView: View {
                     systemImage: "calendar.badge.clock",
                     title: "Recurring Income",
                     detail: "Planned and actual income can be setup to be a recurring series."
+                ),
+                PostBoardingTipItem(
+                    systemImage: "magnifyingglass",
+                    title: "Search Income",
+                    detail: "Search by source, card, date, or amount using the search bar."
                 )
             ]
         )
         .navigationTitle("Income")
+        .searchable(
+            text: $searchText,
+            placement: .navigationBarDrawer(displayMode: .always),
+            prompt: "Search"
+        )
+        .searchFocused($searchFocused)
         .toolbar {
             Button {
                 sheetRoute = .add(initialDate: selectedDayStart)

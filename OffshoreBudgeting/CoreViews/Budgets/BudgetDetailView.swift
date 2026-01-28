@@ -120,25 +120,44 @@ struct BudgetDetailView: View {
     }
 
     private func matchesSearch(_ planned: PlannedExpense) -> Bool {
-        let q = trimmedSearch
-        guard !q.isEmpty else { return true }
+        let query = SearchQueryParser.parse(searchText)
+        guard !query.isEmpty else { return true }
 
-        if planned.title.localizedCaseInsensitiveContains(q) { return true }
-        if let categoryName = planned.category?.name, categoryName.localizedCaseInsensitiveContains(q) { return true }
-        if let cardName = planned.card?.name, cardName.localizedCaseInsensitiveContains(q) { return true }
+        if !SearchMatch.matchesDateRange(query, date: planned.expenseDate) { return false }
 
-        return false
+        let textFields: [String?] = [
+            planned.title,
+            planned.category?.name,
+            planned.card?.name
+        ]
+        if !SearchMatch.matchesTextTerms(query, in: textFields) { return false }
+
+        let amounts: [Double] = [
+            planned.plannedAmount,
+            planned.actualAmount,
+            plannedAmountForSort(planned)
+        ]
+        if !SearchMatch.matchesAmountDigitTerms(query, amounts: amounts) { return false }
+
+        return true
     }
 
     private func matchesSearch(_ variable: VariableExpense) -> Bool {
-        let q = trimmedSearch
-        guard !q.isEmpty else { return true }
+        let query = SearchQueryParser.parse(searchText)
+        guard !query.isEmpty else { return true }
 
-        if variable.descriptionText.localizedCaseInsensitiveContains(q) { return true }
-        if let categoryName = variable.category?.name, categoryName.localizedCaseInsensitiveContains(q) { return true }
-        if let cardName = variable.card?.name, cardName.localizedCaseInsensitiveContains(q) { return true }
+        if !SearchMatch.matchesDateRange(query, date: variable.transactionDate) { return false }
 
-        return false
+        let textFields: [String?] = [
+            variable.descriptionText,
+            variable.category?.name,
+            variable.card?.name
+        ]
+        if !SearchMatch.matchesTextTerms(query, in: textFields) { return false }
+
+        if !SearchMatch.matchesAmountDigitTerms(query, amounts: [variable.amount]) { return false }
+
+        return true
     }
 
     // MARK: - Filtering
@@ -485,7 +504,7 @@ struct BudgetDetailView: View {
                 PostBoardingTipItem(
                     systemImage: "magnifyingglass",
                     title: "Search for Expenses",
-                    detail: "Search by name or date using the search bar."
+                    detail: "Search by name, category, card, date, or amount using the search bar."
                 ),
                 PostBoardingTipItem(
                     systemImage: "tag",
@@ -502,7 +521,11 @@ struct BudgetDetailView: View {
         .listStyle(.insetGrouped)
         .navigationTitle(budget.name)
 
-        .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always))
+        .searchable(
+            text: $searchText,
+            placement: .navigationBarDrawer(displayMode: .always),
+            prompt: "Search"
+        )
         .searchFocused($searchFocused)
 
         .toolbar {

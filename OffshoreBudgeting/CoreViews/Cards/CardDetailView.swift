@@ -82,7 +82,7 @@ struct CardDetailView: View {
         let start = normalizedStart(appliedStartDate)
         let end = normalizedEnd(appliedEndDate)
 
-        let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let query = SearchQueryParser.parse(searchText)
 
         let dateFiltered = variableExpensesBase.filter { expense in
             let d = expense.transactionDate
@@ -99,13 +99,13 @@ struct CardDetailView: View {
         }
 
         let searched: [VariableExpense]
-        if trimmed.isEmpty {
+        if query.isEmpty {
             searched = categoryFiltered
         } else {
             searched = categoryFiltered.filter { expense in
-                if expense.descriptionText.localizedCaseInsensitiveContains(trimmed) { return true }
-                if let categoryName = expense.category?.name, categoryName.localizedCaseInsensitiveContains(trimmed) { return true }
-                return false
+                if !SearchMatch.matchesDateRange(query, date: expense.transactionDate) { return false }
+                if !SearchMatch.matchesTextTerms(query, in: [expense.descriptionText, expense.category?.name]) { return false }
+                return true
             }
         }
 
@@ -116,7 +116,7 @@ struct CardDetailView: View {
         let start = normalizedStart(appliedStartDate)
         let end = normalizedEnd(appliedEndDate)
 
-        let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let query = SearchQueryParser.parse(searchText)
 
         let dateFiltered = plannedExpensesBase.filter { expense in
             let d = expense.expenseDate
@@ -133,13 +133,13 @@ struct CardDetailView: View {
         }
 
         let searched: [PlannedExpense]
-        if trimmed.isEmpty {
+        if query.isEmpty {
             searched = categoryFiltered
         } else {
             searched = categoryFiltered.filter { expense in
-                if expense.title.localizedCaseInsensitiveContains(trimmed) { return true }
-                if let categoryName = expense.category?.name, categoryName.localizedCaseInsensitiveContains(trimmed) { return true }
-                return false
+                if !SearchMatch.matchesDateRange(query, date: expense.expenseDate) { return false }
+                if !SearchMatch.matchesTextTerms(query, in: [expense.title, expense.category?.name]) { return false }
+                return true
             }
         }
 
@@ -495,7 +495,7 @@ struct CardDetailView: View {
                 PostBoardingTipItem(
                     systemImage: "magnifyingglass",
                     title: "Search for Expenses",
-                    detail: "Search by name or date using the search bar."
+                    detail: "Search by name, category, or date using the search bar."
                 ),
                 PostBoardingTipItem(
                     systemImage: "tag",
@@ -511,7 +511,11 @@ struct CardDetailView: View {
         )
         .listStyle(.insetGrouped)
         .navigationTitle(card.name)
-        .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always))
+        .searchable(
+            text: $searchText,
+            placement: .navigationBarDrawer(displayMode: .always),
+            prompt: "Search"
+        )
         .searchFocused($searchFocused)
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
