@@ -27,7 +27,7 @@ struct PresetRowView: View {
                 Text(preset.title)
                     .font(.headline)
                     .foregroundStyle(.primary)
-                    .lineLimit(1)
+                    .lineLimit(2)
 
                 Spacer(minLength: 8)
 
