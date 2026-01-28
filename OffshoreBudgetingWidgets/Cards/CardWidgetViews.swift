@@ -14,7 +14,7 @@ struct CardWidgetSmallView: View {
     let snapshot: CardWidgetSnapshot
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 4) {
             Text(snapshot.title)
                 .font(.headline.weight(.semibold))
                 .foregroundStyle(.primary)
@@ -23,8 +23,12 @@ struct CardWidgetSmallView: View {
                 .minimumScaleFactor(0.78)
                 .allowsTightening(true)
 
-            Spacer(minLength: 0)
-
+            Text("\(snapshot.periodToken) • \(formattedRange(snapshot.rangeStart, snapshot.rangeEnd))")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.9)
+            Spacer()
             VStack(alignment: .leading, spacing: 4) {
                 Text("Expenses")
                     .font(.caption.weight(.semibold))
@@ -46,21 +50,21 @@ struct CardWidgetSmallView: View {
 struct CardWidgetMediumView: View {
     let snapshot: CardWidgetSnapshot
 
-    private let cardWidth: CGFloat = 130
-    private let cardHeight: CGFloat = 110
+    private let cardWidth: CGFloat = 140
+    private let cardHeight: CGFloat = 120
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
 
             // Leading content
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 4) {
 
                 Text(snapshot.title)
                     .font(.headline.weight(.semibold))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
                     .truncationMode(.tail)
-                    .minimumScaleFactor(0.82)
+                    .minimumScaleFactor(0.78)
                     .allowsTightening(true)
 
                 Text("\(snapshot.periodToken) • \(formattedRange(snapshot.rangeStart, snapshot.rangeEnd))")
@@ -68,8 +72,9 @@ struct CardWidgetMediumView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.9)
+                
+                Spacer()
 
-                // group the metric so it reads as a unit
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Expenses")
                         .font(.caption.weight(.semibold))
@@ -86,7 +91,7 @@ struct CardWidgetMediumView: View {
             }
 
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(14)
+            .padding(10)
             .padding(.trailing, cardWidth + 14)
 
             WidgetCardVisualView(
