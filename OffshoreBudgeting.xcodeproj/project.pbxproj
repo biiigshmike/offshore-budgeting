@@ -51,6 +51,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		4C198A392F298962005D2D0D /* OffshoreBudgetingWidgetsExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = OffshoreBudgetingWidgetsExtension.entitlements; sourceTree = "<group>"; };
 		4C8C82152F247DA50024DBD0 /* OffshoreBudgeting.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = OffshoreBudgeting.xctestplan; sourceTree = "<group>"; };
 		4C96F8512F20523700541774 /* OffshoreBudgeting.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OffshoreBudgeting.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4C96F85E2F20523900541774 /* OffshoreBudgetingTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OffshoreBudgetingTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -64,9 +65,12 @@
 		4C198A072F294BB5005D2D0D /* Exceptions for "OffshoreBudgetingWidgets" folder in "OffshoreBudgeting" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				IncomeWidgetPeriod.swift,
-				IncomeWidgetsModel.swift,
-				IncomeWidgetSnapshotStore.swift,
+				Cards/CardWidgetModels.swift,
+				Cards/CardWidgetPeriod.swift,
+				Cards/CardWidgetSnapshotStore.swift,
+				Income/IncomeWidgetPeriod.swift,
+				Income/IncomeWidgetsModel.swift,
+				Income/IncomeWidgetSnapshotStore.swift,
 			);
 			target = 4C96F8502F20523700541774 /* OffshoreBudgeting */;
 		};
@@ -153,6 +157,7 @@
 		4C96F8482F20523700541774 = {
 			isa = PBXGroup;
 			children = (
+				4C198A392F298962005D2D0D /* OffshoreBudgetingWidgetsExtension.entitlements */,
 				4C8C82152F247DA50024DBD0 /* OffshoreBudgeting.xctestplan */,
 				4C96F8532F20523700541774 /* OffshoreBudgeting */,
 				4C96F8612F20523900541774 /* OffshoreBudgetingTests */,
@@ -287,6 +292,7 @@
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 2620;
 				LastUpgradeCheck = 2620;
+				ORGANIZATIONNAME = "";
 				TargetAttributes = {
 					4C96F8502F20523700541774 = {
 						CreatedOnToolsVersion = 26.2;
@@ -564,6 +570,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = "com.mb.offshore-budgeting";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
+				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = YES;
@@ -610,6 +617,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = "com.mb.offshore-budgeting";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
+				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = YES;
@@ -739,6 +747,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = OffshoreBudgetingWidgetsExtension.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -756,6 +765,7 @@
 				MARKETING_VERSION = 2.2;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.mb.offshore-budgeting.OffshoreBudgetingWidgets";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -775,6 +785,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = OffshoreBudgetingWidgetsExtension.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -792,6 +803,7 @@
 				MARKETING_VERSION = 2.2;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.mb.offshore-budgeting.OffshoreBudgetingWidgets";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";

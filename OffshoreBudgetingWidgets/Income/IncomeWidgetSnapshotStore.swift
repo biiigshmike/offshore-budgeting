@@ -10,10 +10,8 @@ import Foundation
 import WidgetKit
 
 enum IncomeWidgetSnapshotStore {
-    // IMPORTANT:
-    // 1) Add App Group capability to BOTH targets.
-    // 2) Replace this with your real group identifier.
-    static let appGroupID = "group.com.michaelbrown.offshorebudgeting"
+    
+    static let appGroupID = "group.com.mb.offshore-budgeting"
 
     private static var defaults: UserDefaults? {
         UserDefaults(suiteName: appGroupID)

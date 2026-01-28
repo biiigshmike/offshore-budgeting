@@ -14,6 +14,7 @@ struct ContentView: View {
 
     @AppStorage("selectedWorkspaceID") private var selectedWorkspaceID: String = ""
     @AppStorage("didSeedDefaultWorkspaces") private var didSeedDefaultWorkspaces: Bool = false
+    @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
 
     // MARK: - Onboarding
 
@@ -31,6 +32,8 @@ struct ContentView: View {
     // MARK: - Alerts
 
     @State private var showingCannotDeleteLastWorkspaceAlert: Bool = false
+    @State private var showingWorkspaceDeleteConfirm: Bool = false
+    @State private var pendingWorkspaceDelete: (() -> Void)? = nil
 
     // MARK: - SwiftData
 
@@ -38,6 +41,7 @@ struct ContentView: View {
     private var workspaces: [Workspace]
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.scenePhase) private var scenePhase
 
     // MARK: - Body
 
@@ -69,8 +73,6 @@ struct ContentView: View {
                     startedAt: iCloudBootstrapStartedAt
                 )
 
-                // If onboarding is complete, we can safely seed defaults only when empty.
-                // If onboarding is NOT complete, do not seed anything.
                 if didCompleteOnboarding {
                     if !isBootstrapping {
                         if !activeUseICloud {
@@ -78,16 +80,12 @@ struct ContentView: View {
                         }
                     }
                 } else {
-                    // Keep state clean for true first-run.
                     didSeedDefaultWorkspaces = false
                     if workspaces.isEmpty {
                         selectedWorkspaceID = ""
                     }
                 }
 
-                // If the user previously completed onboarding, then enabled iCloud and the
-                // store comes back empty, re-run onboarding instead of dumping them into
-                // a picker with nothing configured.
                 if didCompleteOnboarding, !activeUseICloud, workspaces.isEmpty, !isBootstrapping {
                     didCompleteOnboarding = false
                     didSeedDefaultWorkspaces = false
@@ -95,12 +93,30 @@ struct ContentView: View {
                 }
             }
             .onAppear {
+                // Ensure the widget extension can see the active workspace immediately
                 IncomeWidgetSnapshotStore.setSelectedWorkspaceID(selectedWorkspaceID)
+                CardWidgetSnapshotStore.setSelectedWorkspaceID(selectedWorkspaceID)
+
                 refreshIncomeWidgetSnapshotsIfPossible()
+                refreshCardWidgetSnapshotsIfPossible()
             }
             .onChange(of: selectedWorkspaceID) { _, newValue in
                 IncomeWidgetSnapshotStore.setSelectedWorkspaceID(newValue)
+                CardWidgetSnapshotStore.setSelectedWorkspaceID(newValue)
+
                 refreshIncomeWidgetSnapshotsIfPossible()
+                refreshCardWidgetSnapshotsIfPossible()
+            }
+            .onChange(of: scenePhase) { _, newPhase in
+                // This is the big fix: after SwiftData/iCloud finishes loading, the app often
+                // becomes active with fresh data. Rebuild snapshots so the widget has options.
+                guard newPhase == .active else { return }
+
+                IncomeWidgetSnapshotStore.setSelectedWorkspaceID(selectedWorkspaceID)
+                CardWidgetSnapshotStore.setSelectedWorkspaceID(selectedWorkspaceID)
+
+                refreshIncomeWidgetSnapshotsIfPossible()
+                refreshCardWidgetSnapshotsIfPossible()
             }
             .onChange(of: workspaces.count) { _, newCount in
                 if activeUseICloud, newCount > 0 {
@@ -110,18 +126,44 @@ struct ContentView: View {
                 if didCompleteOnboarding, newCount > 0, selectedWorkspace == nil {
                     selectedWorkspaceID = workspaces.first?.id.uuidString ?? ""
                 }
+
+                // Another big fix: when the store populates (especially iCloud), rebuild widget caches.
+                IncomeWidgetSnapshotStore.setSelectedWorkspaceID(selectedWorkspaceID)
+                CardWidgetSnapshotStore.setSelectedWorkspaceID(selectedWorkspaceID)
+
+                refreshIncomeWidgetSnapshotsIfPossible()
+                refreshCardWidgetSnapshotsIfPossible()
             }
             .alert("You must keep at least one workspace.", isPresented: $showingCannotDeleteLastWorkspaceAlert) {
                 Button("OK", role: .cancel) { }
             } message: {
                 Text("Create another workspace first, then you can delete this one.")
             }
+            .alert("Delete?", isPresented: $showingWorkspaceDeleteConfirm) {
+                Button("Delete", role: .destructive) {
+                    pendingWorkspaceDelete?()
+                    pendingWorkspaceDelete = nil
+                }
+                Button("Cancel", role: .cancel) {
+                    pendingWorkspaceDelete = nil
+                }
+            }
         }
     }
-    
+
+    // MARK: - Widget Refresh
+
     private func refreshIncomeWidgetSnapshotsIfPossible() {
         guard let id = UUID(uuidString: selectedWorkspaceID) else { return }
         IncomeWidgetSnapshotBuilder.buildAndSaveAllPeriods(
+            modelContext: modelContext,
+            workspaceID: id
+        )
+    }
+
+    private func refreshCardWidgetSnapshotsIfPossible() {
+        guard let id = UUID(uuidString: selectedWorkspaceID) else { return }
+        CardWidgetSnapshotBuilder.buildAndSaveAllPeriods(
             modelContext: modelContext,
             workspaceID: id
         )
@@ -146,7 +188,6 @@ struct ContentView: View {
             return
         }
 
-        // Store is empty. Seed defaults.
         if didSeedDefaultWorkspaces == false || workspaces.isEmpty {
             let personal = Workspace(name: "Personal", hexColor: "#3B82F6")
             let work = Workspace(name: "Work", hexColor: "#10B981")
@@ -177,7 +218,6 @@ struct ContentView: View {
     }
 
     private func deleteWorkspaces(at offsets: IndexSet) {
-        // Enforce: must keep at least 1 workspace
         let remainingIndices = workspaces.indices.filter { !offsets.contains($0) }
         guard !remainingIndices.isEmpty else {
             showingCannotDeleteLastWorkspaceAlert = true
@@ -188,18 +228,29 @@ struct ContentView: View {
             workspaces.indices.contains(index) ? workspaces[index] : nil
         }
 
-        // If the selected workspace is being deleted, choose a safe fallback.
         let deletedIDs = workspacesToDelete.map { $0.id.uuidString }
         let willDeleteSelected = deletedIDs.contains(selectedWorkspaceID)
         let fallbackSelectedID = workspaces[remainingIndices[0]].id.uuidString
 
-        for workspace in workspacesToDelete {
-            modelContext.delete(workspace)
-        }
+        if confirmBeforeDeleting {
+            pendingWorkspaceDelete = {
+                for workspace in workspacesToDelete {
+                    modelContext.delete(workspace)
+                }
 
-        // Apply fallback selection after delete if needed.
-        if willDeleteSelected {
-            selectedWorkspaceID = fallbackSelectedID
+                if willDeleteSelected {
+                    selectedWorkspaceID = fallbackSelectedID
+                }
+            }
+            showingWorkspaceDeleteConfirm = true
+        } else {
+            for workspace in workspacesToDelete {
+                modelContext.delete(workspace)
+            }
+
+            if willDeleteSelected {
+                selectedWorkspaceID = fallbackSelectedID
+            }
         }
     }
 }
