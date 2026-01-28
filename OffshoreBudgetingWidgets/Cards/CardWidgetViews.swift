@@ -41,39 +41,105 @@ struct CardWidgetSmallView: View {
     }
 }
 
-// MARK: - Medium
+// MARK: - Medium (card tile visible)
 
 struct CardWidgetMediumView: View {
     let snapshot: CardWidgetSnapshot
 
+    private let cardWidth: CGFloat = 130
+    private let cardHeight: CGFloat = 110
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(snapshot.title)
-                .font(.headline.weight(.semibold))
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.82)
+        ZStack(alignment: .bottomTrailing) {
 
-            Text("\(snapshot.periodToken) • \(formattedRange(snapshot.rangeStart, snapshot.rangeEnd))")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
+            // Leading content
+            VStack(alignment: .leading, spacing: 8) {
 
-            Text("Expenses")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
+                Text(snapshot.title)
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .minimumScaleFactor(0.82)
+                    .allowsTightening(true)
 
-            Text(snapshot.unifiedExpensesTotal, format: widgetCurrencyFormatStyle())
-                .font(.title2.weight(.semibold))
-                .foregroundStyle(.primary)
+                Text("\(snapshot.periodToken) • \(formattedRange(snapshot.rangeStart, snapshot.rangeEnd))")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.9)
 
-            Spacer(minLength: 0)
+                // group the metric so it reads as a unit
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Expenses")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+
+                    Text(snapshot.unifiedExpensesTotal, format: widgetCurrencyFormatStyle())
+                        .font(.title2.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                }
+
+                Spacer(minLength: 0)
+            }
+
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(14)
+            .padding(.trailing, cardWidth + 14)
+
+            WidgetCardVisualView(
+                title: snapshot.title,
+                themeToken: snapshot.themeToken,
+                effectToken: snapshot.effectToken,
+                showsTitle: false
+            )
+            .frame(width: cardWidth, height: cardHeight)
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .padding(.trailing, 14)
+            .padding(.bottom, 14)
+            .accessibilityHidden(true)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(14)
-
     }
 }
+
+
+
+//
+//// MARK: - Medium (no card preview)
+//
+//struct CardWidgetMediumView: View {
+//    let snapshot: CardWidgetSnapshot
+//
+//    var body: some View {
+//        VStack(alignment: .leading, spacing: 10) {
+//            Text(snapshot.title)
+//                .font(.headline.weight(.semibold))
+//                .foregroundStyle(.primary)
+//                .lineLimit(1)
+//                .minimumScaleFactor(0.82)
+//
+//            Text("\(snapshot.periodToken) • \(formattedRange(snapshot.rangeStart, snapshot.rangeEnd))")
+//                .font(.footnote)
+//                .foregroundStyle(.secondary)
+//                .lineLimit(1)
+//
+//            Text("Expenses")
+//                .font(.caption.weight(.semibold))
+//                .foregroundStyle(.secondary)
+//
+//            Text(snapshot.unifiedExpensesTotal, format: widgetCurrencyFormatStyle())
+//                .font(.title2.weight(.semibold))
+//                .foregroundStyle(.primary)
+//
+//            Spacer(minLength: 0)
+//        }
+//        .frame(maxWidth: .infinity, alignment: .leading)
+//        .padding(14)
+//
+//    }
+//}
 
 // MARK: - Large
 
@@ -101,7 +167,7 @@ struct CardWidgetLargeView: View {
                     titlePadding: 14,
                     titleOpacity: 0.86
                 )
-                .frame(width: 232)
+                .frame(width: 260)
 
                 Spacer(minLength: 0)
             }
@@ -118,7 +184,7 @@ struct CardWidgetLargeView: View {
                     .minimumScaleFactor(0.9)
             }
 
-            Spacer(minLength: 0)
+            Spacer(minLength: 4)
         }
         .padding(14)
     }
@@ -148,7 +214,7 @@ struct CardWidgetExtraLargeView: View {
                     titlePadding: 14,
                     titleOpacity: 0.86
                 )
-                .frame(width: 240)
+                .frame(width: 292)
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Expenses")
