@@ -12,15 +12,24 @@ import Foundation
 struct BudgetDetailView: View {
     let workspace: Workspace
     let budget: Budget
-    
+
     @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(\.budgetsSheetRoute) private var budgetsSheetRoute
 
+    // MARK: - Budget Delete Flow
+
     @State private var showingBudgetDeleteConfirm: Bool = false
     @State private var pendingBudgetDelete: (() -> Void)? = nil
+
+    @State private var showingBudgetDeleteOptionsDialog: Bool = false
+    @State private var showingNothingToDeleteAlert: Bool = false
+
+    @State private var showingReviewRecordedBudgetPlannedExpenses: Bool = false
+
+    // MARK: - Expense Delete Flow
 
     @State private var showingExpenseDeleteConfirm: Bool = false
     @State private var pendingExpenseDelete: (() -> Void)? = nil
@@ -361,7 +370,7 @@ struct BudgetDetailView: View {
                 } header: {
                     Text("Categories")
                 } footer: {
-                    Text("Single-press a category to filter expenses. Long-press a category to edit its spending limit for this budget.")
+                    Text("Single-press a category to filter expenses by that category alone, then tap the same category again to clear your selection. Long-press a category to edit its spending limit for this budget.")
                 }
             }
 
@@ -533,8 +542,7 @@ struct BudgetDetailView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     budgetsSheetRoute.wrappedValue = .addExpense(budget: budget)
-                }
-                label: {
+                } label: {
                     Image(systemName: "plus")
                 }
                 .accessibilityLabel("Add Transaction")
@@ -564,14 +572,7 @@ struct BudgetDetailView: View {
                     }
 
                     Button(role: .destructive) {
-                        if confirmBeforeDeleting {
-                            pendingBudgetDelete = {
-                                deleteBudget()
-                            }
-                            showingBudgetDeleteConfirm = true
-                        } else {
-                            deleteBudget()
-                        }
+                        handleDeleteBudgetTapped()
                     } label: {
                         Label("Delete Budget", systemImage: "trash")
                     }
@@ -581,6 +582,27 @@ struct BudgetDetailView: View {
                 .accessibilityLabel("Budget Actions")
             }
         }
+
+        // MARK: - Deletion UI
+
+        .confirmationDialog(
+            "Delete Budget?",
+            isPresented: $showingBudgetDeleteOptionsDialog,
+            titleVisibility: .visible
+        ) {
+            Button("Keep All Expenses") {
+                deleteBudgetOnly()
+            }
+
+            Button("Delete Budget-Planned Expenses", role: .destructive) {
+                deleteBudgetAndHandleGeneratedPlannedExpenses()
+            }
+
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This budget created planned expenses on your cards. What should Offshore do with them?")
+        }
+
         .alert("Delete?", isPresented: $showingBudgetDeleteConfirm) {
             Button("Delete", role: .destructive) {
                 pendingBudgetDelete?()
@@ -590,6 +612,13 @@ struct BudgetDetailView: View {
                 pendingBudgetDelete = nil
             }
         }
+
+        .alert("Nothing to delete", isPresented: $showingNothingToDeleteAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("These planned expenses have actual spending recorded.")
+        }
+
         .alert("Delete?", isPresented: $showingExpenseDeleteConfirm) {
             Button("Delete", role: .destructive) {
                 pendingExpenseDelete?()
@@ -597,6 +626,22 @@ struct BudgetDetailView: View {
             }
             Button("Cancel", role: .cancel) {
                 pendingExpenseDelete = nil
+            }
+        }
+
+        .sheet(isPresented: $showingReviewRecordedBudgetPlannedExpenses) {
+            NavigationStack {
+                BudgetRecordedPlannedExpensesReviewView(
+                    workspace: workspace,
+                    budget: budget,
+                    onDeleteBudget: {
+                        showingReviewRecordedBudgetPlannedExpenses = false
+                        deleteBudgetOnly()
+                    },
+                    onDone: {
+                        showingReviewRecordedBudgetPlannedExpenses = false
+                    }
+                )
             }
         }
     }
@@ -626,11 +671,102 @@ struct BudgetDetailView: View {
         }
     }
 
-    // MARK: - Actions
+    // MARK: - Budget Deletion (Policy A)
 
-    private func deleteBudget() {
+    private func handleDeleteBudgetTapped() {
+        if budgetHasAnyGeneratedPlannedExpenses() {
+            showingBudgetDeleteOptionsDialog = true
+            return
+        }
+
+        // No generated planned expenses, normal behavior
+        if confirmBeforeDeleting {
+            pendingBudgetDelete = { deleteBudgetOnly() }
+            showingBudgetDeleteConfirm = true
+        } else {
+            deleteBudgetOnly()
+        }
+    }
+
+    private func budgetHasAnyGeneratedPlannedExpenses() -> Bool {
+        let budgetID: UUID? = budget.id
+
+        var descriptor = FetchDescriptor<PlannedExpense>(
+            predicate: #Predicate<PlannedExpense> { expense in
+                expense.sourceBudgetID == budgetID
+            }
+        )
+        descriptor.fetchLimit = 1
+
+        do {
+            let matches = try modelContext.fetch(descriptor)
+            return !matches.isEmpty
+        } catch {
+            return false
+        }
+    }
+
+    private func deleteBudgetOnly() {
         modelContext.delete(budget)
         dismiss()
+    }
+
+    /// New flow:
+    /// - Deletes unspent generated planned expenses (actualAmount == 0).
+    /// - If recorded generated planned expenses exist (actualAmount > 0), opens the review screen.
+    /// - Otherwise deletes the budget immediately.
+    private func deleteBudgetAndHandleGeneratedPlannedExpenses() {
+        let deletedUnspentCount = deleteUnspentGeneratedPlannedExpensesForBudget()
+        let recordedCount = countRecordedGeneratedPlannedExpensesForBudget()
+
+        if recordedCount > 0 {
+            // If everything is recorded (deletedUnspentCount == 0), we still route the user to review
+            // instead of showing "Nothing to delete", because there *is* something to consider.
+            showingReviewRecordedBudgetPlannedExpenses = true
+            return
+        }
+
+        if deletedUnspentCount == 0 {
+            showingNothingToDeleteAlert = true
+            return
+        }
+
+        modelContext.delete(budget)
+        dismiss()
+    }
+
+    private func deleteUnspentGeneratedPlannedExpensesForBudget() -> Int {
+        let budgetID: UUID? = budget.id
+
+        let descriptor = FetchDescriptor<PlannedExpense>(
+            predicate: #Predicate<PlannedExpense> { expense in
+                expense.sourceBudgetID == budgetID &&
+                expense.actualAmount == 0
+            }
+        )
+
+        do {
+            let matches = try modelContext.fetch(descriptor)
+            for expense in matches {
+                modelContext.delete(expense)
+            }
+            return matches.count
+        } catch {
+            return 0
+        }
+    }
+
+    private func countRecordedGeneratedPlannedExpensesForBudget() -> Int {
+        let budgetID: UUID? = budget.id
+
+        let descriptor = FetchDescriptor<PlannedExpense>(
+            predicate: #Predicate<PlannedExpense> { expense in
+                expense.sourceBudgetID == budgetID &&
+                expense.actualAmount > 0
+            }
+        )
+
+        return (try? modelContext.fetchCount(descriptor)) ?? 0
     }
 
     // MARK: - Edit + Preset lookup (added, matches CardDetailView)
@@ -1015,7 +1151,7 @@ private struct BudgetPlannedExpenseRow: View {
 private struct BudgetVariableExpenseRow: View {
     let expense: VariableExpense
     let showsCardName: Bool
-    
+
     private var amountToShow: Double {
         expense.amount
     }

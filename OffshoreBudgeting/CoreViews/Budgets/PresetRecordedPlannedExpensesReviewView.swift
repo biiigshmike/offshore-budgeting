@@ -1,0 +1,154 @@
+//
+//  PresetRecordedPlannedExpensesReviewView.swift
+//  OffshoreBudgeting
+//
+//  Created by Michael Brown on 1/29/26.
+//
+
+import SwiftUI
+import SwiftData
+
+struct PresetRecordedPlannedExpensesReviewView: View {
+    let workspace: Workspace
+    let budget: Budget
+    let preset: Preset
+
+    let onDone: () -> Void
+
+    @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
+
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.budgetsSheetRoute) private var budgetsSheetRoute
+
+    @State private var recordedExpenses: [PlannedExpense] = []
+
+    @State private var showingDeleteExpenseConfirm: Bool = false
+    @State private var pendingExpenseDelete: (() -> Void)? = nil
+
+    // MARK: - Body
+
+    var body: some View {
+        List {
+            Section {
+                Text("Some planned expenses from this preset have recorded spending. Review them below if you want to delete any.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                if recordedExpenses.isEmpty {
+                    ContentUnavailableView(
+                        "No recorded expenses found",
+                        systemImage: "checkmark.circle",
+                        description: Text("You can tap Done to return.")
+                    )
+                } else {
+                    ForEach(recordedExpenses, id: \.id) { expense in
+                        Button {
+                            budgetsSheetRoute.wrappedValue = .editPlannedExpense(expense)
+                        } label: {
+                            row(expense)
+                        }
+                        .buttonStyle(.plain)
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            Button(role: .destructive) {
+                                requestDeleteExpense(expense)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
+                    }
+                }
+            } header: {
+                Text("Recorded Planned Expenses")
+            } footer: {
+                Text("")
+            }
+        }
+        .navigationTitle("Review \(preset.title)")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Done") {
+                    onDone()
+                }
+            }
+        }
+        .onAppear {
+            reload()
+        }
+        .alert("Delete?", isPresented: $showingDeleteExpenseConfirm) {
+            Button("Delete", role: .destructive) {
+                pendingExpenseDelete?()
+                pendingExpenseDelete = nil
+                reload()
+            }
+            Button("Cancel", role: .cancel) {
+                pendingExpenseDelete = nil
+            }
+        }
+    }
+
+    // MARK: - Row
+
+    private func row(_ expense: PlannedExpense) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+
+            HStack(alignment: .firstTextBaseline) {
+                Text(expense.title)
+                    .font(.body)
+
+                Spacer(minLength: 0)
+
+                Text(expense.actualAmount, format: CurrencyFormatter.currencyStyle())
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(.primary)
+            }
+
+            HStack(spacing: 8) {
+                Text(expense.expenseDate.formatted(date: .abbreviated, time: .omitted))
+                if let cardName = expense.card?.name {
+                    Text("•")
+                    Text(cardName)
+                }
+            }
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 4)
+    }
+
+    // MARK: - Data
+
+    private func reload() {
+        let budgetID: UUID? = budget.id
+        let presetID: UUID? = preset.id
+
+        let descriptor = FetchDescriptor<PlannedExpense>(
+            predicate: #Predicate<PlannedExpense> { expense in
+                expense.sourceBudgetID == budgetID &&
+                expense.sourcePresetID == presetID &&
+                expense.actualAmount > 0
+            },
+            sortBy: [
+                SortDescriptor(\.expenseDate, order: .reverse)
+            ]
+        )
+
+        recordedExpenses = (try? modelContext.fetch(descriptor)) ?? []
+    }
+
+    // MARK: - Delete
+
+    private func requestDeleteExpense(_ expense: PlannedExpense) {
+        if confirmBeforeDeleting {
+            pendingExpenseDelete = {
+                modelContext.delete(expense)
+            }
+            showingDeleteExpenseConfirm = true
+        } else {
+            modelContext.delete(expense)
+            reload()
+        }
+    }
+}

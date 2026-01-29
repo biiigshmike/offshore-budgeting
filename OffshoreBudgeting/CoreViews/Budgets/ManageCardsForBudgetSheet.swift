@@ -17,16 +17,25 @@ struct ManageCardsForBudgetSheet: View {
 
     @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
 
-    @State private var showingUnlinkDeleteConfirm: Bool = false
-    @State private var pendingUnlinkDelete: (() -> Void)? = nil
-
     @Query private var cards: [Card]
+
+    // MARK: - Unlink Policy UI
+
+    @State private var pendingCardForUnlink: Card? = nil
+    @State private var showingUnlinkPolicyAlert: Bool = false
+
+    @State private var showingDetachPresetsChoiceAlert: Bool = false
+
+    @State private var showingNothingToDeleteAlert: Bool = false
+
+    @State private var reviewCard: Card? = nil
+    @State private var showingReviewRecordedExpenses: Bool = false
 
     init(workspace: Workspace, budget: Budget) {
         self.workspace = workspace
         self.budget = budget
 
-        let workspaceID = workspace.id
+        let workspaceID: UUID? = workspace.id
         _cards = Query(
             filter: #Predicate<Card> { $0.workspace?.id == workspaceID },
             sort: [SortDescriptor(\Card.name, order: .forward)]
@@ -69,13 +78,73 @@ struct ManageCardsForBudgetSheet: View {
         .onAppear {
             cleanupOrphanLinks()
         }
-        .alert("Delete?", isPresented: $showingUnlinkDeleteConfirm) {
-            Button("Delete", role: .destructive) {
-                pendingUnlinkDelete?()
-                pendingUnlinkDelete = nil
+
+        // MARK: - Unlink Policy Prompt (native)
+
+        .alert("Unlink Card?", isPresented: $showingUnlinkPolicyAlert) {
+            Button("Keep All Expenses") {
+                guard let card = pendingCardForUnlink else { return }
+                unlink(card)
+                pendingCardForUnlink = nil
             }
+
+            Button("Delete Budget-Planned Expenses", role: .destructive) {
+                // Give the user a choice to also detach presets, so re-linking the card
+                // doesn't re-generate budget-planned expenses automatically.
+                showingDetachPresetsChoiceAlert = true
+            }
+
             Button("Cancel", role: .cancel) {
-                pendingUnlinkDelete = nil
+                pendingCardForUnlink = nil
+            }
+        } message: {
+            Text("This card has planned expenses created for this budget. What should Offshore do with them?")
+        }
+
+        .alert("Also remove presets?", isPresented: $showingDetachPresetsChoiceAlert) {
+            Button("Delete Expenses Only", role: .destructive) {
+                guard let card = pendingCardForUnlink else { return }
+                unlinkAndDeleteBudgetPlannedExpenses(for: card)
+                pendingCardForUnlink = nil
+            }
+
+            Button("Delete Expenses and Detach Presets", role: .destructive) {
+                guard let card = pendingCardForUnlink else { return }
+                unlinkDeleteExpensesAndDetachPresets(for: card)
+                pendingCardForUnlink = nil
+            }
+
+            Button("Cancel", role: .cancel) {
+                // Keep the card linked, user backed out.
+                pendingCardForUnlink = nil
+            }
+        } message: {
+            Text("If presets stay linked to this budget, they may apply again when you re-link this card.")
+        }
+
+        .alert("Nothing to delete", isPresented: $showingNothingToDeleteAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("These planned expenses have actual spending recorded.")
+        }
+
+        .sheet(isPresented: $showingReviewRecordedExpenses) {
+            if let reviewCard {
+                NavigationStack {
+                    BudgetRecordedPlannedExpensesReviewView(
+                        workspace: workspace,
+                        budget: budget,
+                        card: reviewCard,
+                        onDeleteBudget: {
+                            showingReviewRecordedExpenses = false
+                            modelContext.delete(budget)
+                            dismiss()
+                        },
+                        onDone: {
+                            showingReviewRecordedExpenses = false
+                        }
+                    )
+                }
             }
         }
     }
@@ -99,20 +168,26 @@ struct ManageCardsForBudgetSheet: View {
             get: { isLinked(card) },
             set: { newValue in
                 guard canLink(card) else { return }
+
                 if newValue {
                     link(card)
                 } else {
-                    if confirmBeforeDeleting {
-                        pendingUnlinkDelete = {
-                            unlink(card)
-                        }
-                        showingUnlinkDeleteConfirm = true
-                    } else {
-                        unlink(card)
-                    }
+                    handleToggleOff(card)
                 }
             }
         )
+    }
+
+    private func handleToggleOff(_ card: Card) {
+        // If there are no generated planned expenses for this budget + card, unlink quietly.
+        if !hasAnyGeneratedPlannedExpenses(for: card) {
+            unlink(card)
+            return
+        }
+
+        // There are generated items, so show the policy prompt.
+        pendingCardForUnlink = card
+        showingUnlinkPolicyAlert = true
     }
 
     private func link(_ card: Card) {
@@ -134,6 +209,137 @@ struct ManageCardsForBudgetSheet: View {
         let orphans = (budget.cardLinks ?? []).filter { $0.card == nil || $0.budget == nil }
         for link in orphans {
             modelContext.delete(link)
+        }
+    }
+
+    // MARK: - Policy B: Generated Planned Expense Checks
+    //
+    // Note: SwiftData predicates can struggle with relationship keypaths like `expense.card?.id == ...`.
+    // To keep compilation stable, we predicate on sourceBudgetID + amount only, then filter by card in memory.
+
+    private func hasAnyGeneratedPlannedExpenses(for card: Card) -> Bool {
+        let budgetID: UUID? = budget.id
+        let cardID = card.id
+
+        var descriptor = FetchDescriptor<PlannedExpense>(
+            predicate: #Predicate<PlannedExpense> { expense in
+                expense.sourceBudgetID == budgetID
+            }
+        )
+        descriptor.fetchLimit = 200
+
+        let matches = (try? modelContext.fetch(descriptor)) ?? []
+        return matches.contains { $0.card?.id == cardID }
+    }
+
+    private func deleteUnspentGeneratedPlannedExpenses(for card: Card) -> Int {
+        let budgetID: UUID? = budget.id
+        let cardID = card.id
+
+        let descriptor = FetchDescriptor<PlannedExpense>(
+            predicate: #Predicate<PlannedExpense> { expense in
+                expense.sourceBudgetID == budgetID &&
+                expense.actualAmount == 0
+            }
+        )
+
+        let matches = (try? modelContext.fetch(descriptor)) ?? []
+        let scoped = matches.filter { $0.card?.id == cardID }
+
+        for expense in scoped {
+            modelContext.delete(expense)
+        }
+
+        return scoped.count
+    }
+
+    private func countRecordedGeneratedPlannedExpenses(for card: Card) -> Int {
+        let budgetID: UUID? = budget.id
+        let cardID = card.id
+
+        let descriptor = FetchDescriptor<PlannedExpense>(
+            predicate: #Predicate<PlannedExpense> { expense in
+                expense.sourceBudgetID == budgetID &&
+                expense.actualAmount > 0
+            }
+        )
+
+        let matches = (try? modelContext.fetch(descriptor)) ?? []
+        return matches.filter { $0.card?.id == cardID }.count
+    }
+
+    private func presetIDsAffectingCard(for card: Card) -> Set<UUID> {
+        let budgetID: UUID? = budget.id
+        let cardID = card.id
+
+        let descriptor = FetchDescriptor<PlannedExpense>(
+            predicate: #Predicate<PlannedExpense> { expense in
+                expense.sourceBudgetID == budgetID
+            }
+        )
+
+        let matches = (try? modelContext.fetch(descriptor)) ?? []
+        let scoped = matches.filter { $0.card?.id == cardID }
+
+        return Set(scoped.compactMap { $0.sourcePresetID })
+    }
+
+    private func detachPresetLinksFromBudget(presetIDs: Set<UUID>) {
+        guard !presetIDs.isEmpty else { return }
+
+        // Keep this stable, same approach as cards, filter in-memory.
+        let links = budget.presetLinks ?? []
+        let matches = links.filter { link in
+            guard let presetID = link.preset?.id else { return false }
+            return presetIDs.contains(presetID)
+        }
+
+        for link in matches {
+            modelContext.delete(link)
+        }
+    }
+
+    private func unlinkAndDeleteBudgetPlannedExpenses(for card: Card) {
+        let deletedUnspentCount = deleteUnspentGeneratedPlannedExpenses(for: card)
+        let recordedCount = countRecordedGeneratedPlannedExpenses(for: card)
+
+        // Unlink always happens as part of the user's action choice.
+        unlink(card)
+
+        // If there are recorded items, route to review instead of pretending "nothing happened".
+        if recordedCount > 0 {
+            reviewCard = card
+            showingReviewRecordedExpenses = true
+            return
+        }
+
+        // No recorded items exist.
+        if deletedUnspentCount == 0 {
+            showingNothingToDeleteAlert = true
+        }
+    }
+
+    private func unlinkDeleteExpensesAndDetachPresets(for card: Card) {
+        // Capture preset IDs up front, since we may delete the expenses we use to infer these.
+        let presetIDs = presetIDsAffectingCard(for: card)
+
+        let deletedUnspentCount = deleteUnspentGeneratedPlannedExpenses(for: card)
+        let recordedCount = countRecordedGeneratedPlannedExpenses(for: card)
+
+        // User is unlinking the card, always do that.
+        unlink(card)
+
+        // This is the key behavior: prevent re-materialization when the card is re-linked.
+        detachPresetLinksFromBudget(presetIDs: presetIDs)
+
+        if recordedCount > 0 {
+            reviewCard = card
+            showingReviewRecordedExpenses = true
+            return
+        }
+
+        if deletedUnspentCount == 0 {
+            showingNothingToDeleteAlert = true
         }
     }
 }

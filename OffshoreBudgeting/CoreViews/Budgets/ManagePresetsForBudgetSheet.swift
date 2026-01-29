@@ -17,8 +17,13 @@ struct ManagePresetsForBudgetSheet: View {
 
     @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
 
-    @State private var showingUnlinkDeleteConfirm: Bool = false
-    @State private var pendingUnlinkDelete: (() -> Void)? = nil
+    @State private var showingRemovePresetConfirm: Bool = false
+    @State private var showingRemovePresetWithRecordedConfirm: Bool = false
+
+    @State private var pendingPresetForUnlink: Preset? = nil
+
+    @State private var showingReviewRecordedPresetExpenses: Bool = false
+    @State private var reviewPreset: Preset? = nil
 
     @Query private var presets: [Preset]
 
@@ -73,13 +78,58 @@ struct ManagePresetsForBudgetSheet: View {
         .onAppear {
             cleanupOrphanLinks()
         }
-        .alert("Delete?", isPresented: $showingUnlinkDeleteConfirm) {
-            Button("Delete", role: .destructive) {
-                pendingUnlinkDelete?()
-                pendingUnlinkDelete = nil
+
+        // MARK: - Confirm remove preset (no recorded spending)
+
+        .alert("Remove Preset From Budget?", isPresented: $showingRemovePresetConfirm) {
+            Button("Remove", role: .destructive) {
+                guard let preset = pendingPresetForUnlink else { return }
+                unlinkPresetApplyingGuardrails(preset, presentReviewIfNeeded: true)
+                pendingPresetForUnlink = nil
             }
             Button("Cancel", role: .cancel) {
-                pendingUnlinkDelete = nil
+                pendingPresetForUnlink = nil
+            }
+        } message: {
+            Text("Expenses with recorded spending are kept.")
+        }
+
+        // MARK: - Confirm remove preset (recorded spending exists)
+
+        .alert("Remove Preset From Budget?", isPresented: $showingRemovePresetWithRecordedConfirm) {
+            Button("Review Recorded Expenses") {
+                guard let preset = pendingPresetForUnlink else { return }
+                unlinkPresetApplyingGuardrails(preset, presentReviewIfNeeded: true)
+                pendingPresetForUnlink = nil
+            }
+
+            Button("Remove Preset Only") {
+                guard let preset = pendingPresetForUnlink else { return }
+                unlinkPresetApplyingGuardrails(preset, presentReviewIfNeeded: false)
+                pendingPresetForUnlink = nil
+            }
+
+            Button("Cancel", role: .cancel) {
+                pendingPresetForUnlink = nil
+            }
+        } message: {
+            Text("This preset has expenses with recorded spending.")
+        }
+
+        // MARK: - Review recorded expenses (preset + budget)
+
+        .sheet(isPresented: $showingReviewRecordedPresetExpenses) {
+            if let reviewPreset {
+                NavigationStack {
+                    PresetRecordedPlannedExpensesReviewView(
+                        workspace: workspace,
+                        budget: budget,
+                        preset: reviewPreset,
+                        onDone: {
+                            showingReviewRecordedPresetExpenses = false
+                        }
+                    )
+                }
             }
         }
     }
@@ -107,20 +157,37 @@ struct ManagePresetsForBudgetSheet: View {
             get: { isLinked(preset) },
             set: { newValue in
                 guard canLink(preset) else { return }
+
                 if newValue {
                     link(preset)
                 } else {
-                    if confirmBeforeDeleting {
-                        pendingUnlinkDelete = {
-                            unlink(preset)
-                        }
-                        showingUnlinkDeleteConfirm = true
-                    } else {
-                        unlink(preset)
-                    }
+                    handleToggleOff(preset)
                 }
             }
         )
+    }
+
+    private func handleToggleOff(_ preset: Preset) {
+        // If nothing was generated for this budget+preset, unlink quietly.
+        if !hasAnyGeneratedPlannedExpenses(budget: budget, preset: preset) {
+            unlinkPresetApplyingGuardrails(preset, presentReviewIfNeeded: false)
+            return
+        }
+
+        let recordedCount = countRecordedGeneratedPlannedExpenses(budget: budget, preset: preset)
+
+        pendingPresetForUnlink = preset
+
+        if recordedCount > 0 {
+            showingRemovePresetWithRecordedConfirm = true
+        } else {
+            if confirmBeforeDeleting {
+                showingRemovePresetConfirm = true
+            } else {
+                unlinkPresetApplyingGuardrails(preset, presentReviewIfNeeded: false)
+                pendingPresetForUnlink = nil
+            }
+        }
     }
 
     private func link(_ preset: Preset) {
@@ -130,7 +197,6 @@ struct ManagePresetsForBudgetSheet: View {
         let link = BudgetPresetLink(budget: budget, preset: preset)
         modelContext.insert(link)
 
-        // ✅ Materialize immediately when toggled ON
         materializePlannedExpenses(
             for: budget,
             selectedPresets: [preset],
@@ -138,33 +204,74 @@ struct ManagePresetsForBudgetSheet: View {
         )
     }
 
-    private func unlink(_ preset: Preset) {
+    // MARK: - Unlink policy D
+
+    private func unlinkPresetApplyingGuardrails(_ preset: Preset, presentReviewIfNeeded: Bool) {
         // 1) Delete the join link(s)
         let matches = (budget.presetLinks ?? []).filter { $0.preset?.id == preset.id }
         for link in matches {
             modelContext.delete(link)
         }
 
-        // 2) Delete planned expenses that were generated for THIS budget from THIS preset
-        deleteGeneratedPlannedExpenses(budgetID: budget.id, presetID: preset.id)
+        // 2) Delete ONLY unspent generated planned expenses for this budget+preset
+        _ = deleteUnspentGeneratedPlannedExpenses(budget: budget, preset: preset)
+
+        // 3) If recorded generated exist, offer review
+        let recordedCount = countRecordedGeneratedPlannedExpenses(budget: budget, preset: preset)
+        if presentReviewIfNeeded, recordedCount > 0 {
+            reviewPreset = preset
+            showingReviewRecordedPresetExpenses = true
+        }
     }
 
-    private func deleteGeneratedPlannedExpenses(budgetID: UUID, presetID: UUID) {
-        let descriptor = FetchDescriptor<PlannedExpense>(
-            predicate: #Predicate { expense in
+    private func hasAnyGeneratedPlannedExpenses(budget: Budget, preset: Preset) -> Bool {
+        let budgetID: UUID? = budget.id
+        let presetID: UUID? = preset.id
+
+        var descriptor = FetchDescriptor<PlannedExpense>(
+            predicate: #Predicate<PlannedExpense> { expense in
                 expense.sourceBudgetID == budgetID &&
                 expense.sourcePresetID == presetID
             }
         )
+        descriptor.fetchLimit = 1
 
-        do {
-            let matches = try modelContext.fetch(descriptor)
-            for expense in matches {
-                modelContext.delete(expense)
+        let matches = (try? modelContext.fetch(descriptor)) ?? []
+        return !matches.isEmpty
+    }
+
+    private func deleteUnspentGeneratedPlannedExpenses(budget: Budget, preset: Preset) -> Int {
+        let budgetID: UUID? = budget.id
+        let presetID: UUID? = preset.id
+
+        let descriptor = FetchDescriptor<PlannedExpense>(
+            predicate: #Predicate<PlannedExpense> { expense in
+                expense.sourceBudgetID == budgetID &&
+                expense.sourcePresetID == presetID &&
+                expense.actualAmount == 0
             }
-        } catch {
-            // Intentionally ignore fetch errors for now.
+        )
+
+        let matches = (try? modelContext.fetch(descriptor)) ?? []
+        for expense in matches {
+            modelContext.delete(expense)
         }
+        return matches.count
+    }
+
+    private func countRecordedGeneratedPlannedExpenses(budget: Budget, preset: Preset) -> Int {
+        let budgetID: UUID? = budget.id
+        let presetID: UUID? = preset.id
+
+        let descriptor = FetchDescriptor<PlannedExpense>(
+            predicate: #Predicate<PlannedExpense> { expense in
+                expense.sourceBudgetID == budgetID &&
+                expense.sourcePresetID == presetID &&
+                expense.actualAmount > 0
+            }
+        )
+
+        return (try? modelContext.fetchCount(descriptor)) ?? 0
     }
 
     private func cleanupOrphanLinks() {
@@ -212,12 +319,14 @@ struct ManagePresetsForBudgetSheet: View {
     }
 
     private func plannedExpenseExists(budgetID: UUID, presetID: UUID, date: Date) -> Bool {
+        let budgetIDOpt: UUID? = budgetID
+        let presetIDOpt: UUID? = presetID
         let day = Calendar.current.startOfDay(for: date)
 
         let descriptor = FetchDescriptor<PlannedExpense>(
-            predicate: #Predicate { expense in
-                expense.sourceBudgetID == budgetID &&
-                expense.sourcePresetID == presetID &&
+            predicate: #Predicate<PlannedExpense> { expense in
+                expense.sourceBudgetID == budgetIDOpt &&
+                expense.sourcePresetID == presetIDOpt &&
                 expense.expenseDate == day
             }
         )
