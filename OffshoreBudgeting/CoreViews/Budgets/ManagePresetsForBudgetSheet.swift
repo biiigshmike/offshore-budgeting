@@ -98,6 +98,10 @@ struct ManagePresetsForBudgetSheet: View {
         (budget.presetLinks ?? []).contains { $0.preset?.id == preset.id }
     }
 
+    private var linkedCardIDs: Set<UUID> {
+        Set((budget.cardLinks ?? []).compactMap { $0.card?.id })
+    }
+
     private func bindingForPreset(_ preset: Preset) -> Binding<Bool> {
         Binding(
             get: { isLinked(preset) },
@@ -125,6 +129,13 @@ struct ManagePresetsForBudgetSheet: View {
 
         let link = BudgetPresetLink(budget: budget, preset: preset)
         modelContext.insert(link)
+
+        // ✅ Materialize immediately when toggled ON
+        materializePlannedExpenses(
+            for: budget,
+            selectedPresets: [preset],
+            selectedCardIDs: linkedCardIDs
+        )
     }
 
     private func unlink(_ preset: Preset) {
@@ -163,12 +174,68 @@ struct ManagePresetsForBudgetSheet: View {
         }
     }
 
+    // MARK: - Materialize (copied from AddBudgetView behavior)
+
+    private func materializePlannedExpenses(
+        for budget: Budget,
+        selectedPresets: [Preset],
+        selectedCardIDs: Set<UUID>
+    ) {
+        for preset in selectedPresets {
+            let dates = PresetScheduleEngine.occurrences(for: preset, in: budget)
+
+            let defaultCard: Card? = {
+                guard let card = preset.defaultCard else { return nil }
+                return selectedCardIDs.contains(card.id) ? card : nil
+            }()
+
+            for date in dates {
+                if plannedExpenseExists(budgetID: budget.id, presetID: preset.id, date: date) {
+                    continue
+                }
+
+                let planned = PlannedExpense(
+                    title: preset.title,
+                    plannedAmount: preset.plannedAmount,
+                    actualAmount: 0,
+                    expenseDate: date,
+                    workspace: workspace,
+                    card: defaultCard,
+                    category: preset.defaultCategory,
+                    sourcePresetID: preset.id,
+                    sourceBudgetID: budget.id
+                )
+
+                modelContext.insert(planned)
+            }
+        }
+    }
+
+    private func plannedExpenseExists(budgetID: UUID, presetID: UUID, date: Date) -> Bool {
+        let day = Calendar.current.startOfDay(for: date)
+
+        let descriptor = FetchDescriptor<PlannedExpense>(
+            predicate: #Predicate { expense in
+                expense.sourceBudgetID == budgetID &&
+                expense.sourcePresetID == presetID &&
+                expense.expenseDate == day
+            }
+        )
+
+        do {
+            let matches = try modelContext.fetch(descriptor)
+            return !matches.isEmpty
+        } catch {
+            return false
+        }
+    }
+
     // MARK: - Display
 
     private func scheduleString(for preset: Preset) -> String {
         switch preset.frequency {
         case .none: return "This preset does not repeat."
-            
+
         case .daily:
             return preset.interval == 1 ? "Daily" : "Every \(preset.interval) days"
 

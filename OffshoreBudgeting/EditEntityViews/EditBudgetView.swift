@@ -131,7 +131,6 @@ struct EditBudgetView: View {
     }
 
     private func handleEndDateChanged(_ newValue: Date) {
-        // no-op, but keeps symmetry and a hook for later if we want it.
         if newValue < startDate {
             endDate = startDate
         }
@@ -201,8 +200,138 @@ struct EditBudgetView: View {
             modelContext.insert(BudgetPresetLink(budget: budget, preset: preset))
         }
 
+        // ✅ Reconcile generated planned expenses based on new:
+        // - budget dates
+        // - selected presets
+        // - selected cards
+        let selectedPresets = presets.filter { selectedPresetIDs.contains($0.id) }
+        syncGeneratedPlannedExpenses(
+            for: budget,
+            selectedPresets: selectedPresets,
+            selectedCardIDs: selectedCardIDs
+        )
+
         try? modelContext.save()
         dismiss()
+    }
+
+    // MARK: - PlannedExpense sync (budget-local generated rows)
+
+    private func syncGeneratedPlannedExpenses(
+        for budget: Budget,
+        selectedPresets: [Preset],
+        selectedCardIDs: Set<UUID>
+    ) {
+        let selectedPresetIDSet = Set(selectedPresets.map { $0.id })
+        let windowStart = Calendar.current.startOfDay(for: budget.startDate)
+        let windowEnd = Calendar.current.startOfDay(for: budget.endDate)
+
+        // 1) Delete generated expenses that should no longer exist:
+        //    - preset unselected
+        //    - outside new date window
+        //    - card no longer linked to this budget
+        deleteGeneratedPlannedExpensesNotMatchingSelection(
+            budgetID: budget.id,
+            selectedPresetIDs: selectedPresetIDSet,
+            windowStart: windowStart,
+            windowEnd: windowEnd,
+            selectedCardIDs: selectedCardIDs
+        )
+
+        // 2) Materialize missing occurrences for selected presets within the window.
+        materializePlannedExpenses(
+            for: budget,
+            selectedPresets: selectedPresets,
+            selectedCardIDs: selectedCardIDs
+        )
+    }
+
+    private func deleteGeneratedPlannedExpensesNotMatchingSelection(
+        budgetID: UUID,
+        selectedPresetIDs: Set<UUID>,
+        windowStart: Date,
+        windowEnd: Date,
+        selectedCardIDs: Set<UUID>
+    ) {
+        let descriptor = FetchDescriptor<PlannedExpense>(
+            predicate: #Predicate { expense in
+                expense.sourceBudgetID == budgetID
+            }
+        )
+
+        do {
+            let matches = try modelContext.fetch(descriptor)
+            for expense in matches {
+                let presetID = expense.sourcePresetID
+                let inSelectedPresets = presetID.map { selectedPresetIDs.contains($0) } ?? false
+
+                let day = Calendar.current.startOfDay(for: expense.expenseDate)
+                let inWindow = (day >= windowStart && day <= windowEnd)
+
+                let cardID = expense.card?.id
+                let cardStillLinked = cardID.map { selectedCardIDs.contains($0) } ?? true
+
+                if !inSelectedPresets || !inWindow || !cardStillLinked {
+                    modelContext.delete(expense)
+                }
+            }
+        } catch {
+            // Intentionally ignore fetch errors for now.
+        }
+    }
+
+    private func materializePlannedExpenses(
+        for budget: Budget,
+        selectedPresets: [Preset],
+        selectedCardIDs: Set<UUID>
+    ) {
+        for preset in selectedPresets {
+            let dates = PresetScheduleEngine.occurrences(for: preset, in: budget)
+
+            let defaultCard: Card? = {
+                guard let card = preset.defaultCard else { return nil }
+                return selectedCardIDs.contains(card.id) ? card : nil
+            }()
+
+            for date in dates {
+                if plannedExpenseExists(budgetID: budget.id, presetID: preset.id, date: date) {
+                    continue
+                }
+
+                let planned = PlannedExpense(
+                    title: preset.title,
+                    plannedAmount: preset.plannedAmount,
+                    actualAmount: 0,
+                    expenseDate: date,
+                    workspace: workspace,
+                    card: defaultCard,
+                    category: preset.defaultCategory,
+                    sourcePresetID: preset.id,
+                    sourceBudgetID: budget.id
+                )
+
+                modelContext.insert(planned)
+            }
+        }
+    }
+
+    private func plannedExpenseExists(budgetID: UUID, presetID: UUID, date: Date) -> Bool {
+        let day = Calendar.current.startOfDay(for: date)
+
+        let descriptor = FetchDescriptor<PlannedExpense>(
+            predicate: #Predicate { expense in
+                expense.sourceBudgetID == budgetID &&
+                expense.sourcePresetID == presetID &&
+                expense.expenseDate == day
+            }
+        )
+
+        do {
+            let matches = try modelContext.fetch(descriptor)
+            return !matches.isEmpty
+        } catch {
+            return false
+        }
     }
 
     // MARK: - Display
