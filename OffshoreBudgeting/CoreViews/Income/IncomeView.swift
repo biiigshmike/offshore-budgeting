@@ -11,7 +11,6 @@ import SwiftData
 struct IncomeView: View {
 
     let workspace: Workspace
-    @Binding var sheetRoute: IncomeSheetRoute?
     @Query private var incomes: [Income]
 
     @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
@@ -46,9 +45,16 @@ struct IncomeView: View {
     @State private var searchText: String = ""
     @FocusState private var searchFocused: Bool
 
-    init(workspace: Workspace, sheetRoute: Binding<IncomeSheetRoute?>) {
+    // MARK: - Sheets
+
+    @State private var showingAddIncome: Bool = false
+    @State private var addIncomeInitialDate: Date = .now
+
+    @State private var showingEditIncome: Bool = false
+    @State private var editingIncome: Income? = nil
+
+    init(workspace: Workspace) {
         self.workspace = workspace
-        self._sheetRoute = sheetRoute
 
         let workspaceID = workspace.id
         _incomes = Query(
@@ -220,7 +226,8 @@ struct IncomeView: View {
                     } else {
                         ForEach(rows) { income in
                             Button {
-                                sheetRoute = .edit(income)
+                                editingIncome = income
+                                showingEditIncome = true
                             } label: {
                                 IncomeRowView(income: income)
                             }
@@ -241,7 +248,8 @@ struct IncomeView: View {
                             }
                             .swipeActions(edge: .leading) {
                                 Button {
-                                    sheetRoute = .edit(income)
+                                    editingIncome = income
+                                    showingEditIncome = true
                                 } label: {
                                     Label("Edit", systemImage: "pencil")
                                 }
@@ -288,7 +296,8 @@ struct IncomeView: View {
             .searchFocused($searchFocused)
             .toolbar {
                 Button {
-                    sheetRoute = .add(initialDate: selectedDayStart)
+                    addIncomeInitialDate = selectedDayStart
+                    showingAddIncome = true
                 } label: {
                     Image(systemName: "plus")
                 }
@@ -302,6 +311,20 @@ struct IncomeView: View {
                     pendingIncomeDelete = nil
                 }
             }
+            .sheet(isPresented: $showingAddIncome) {
+                NavigationStack {
+                    AddIncomeView(workspace: workspace, initialDate: addIncomeInitialDate)
+                }
+            }
+            .sheet(isPresented: $showingEditIncome, onDismiss: { editingIncome = nil }) {
+                NavigationStack {
+                    if let editingIncome {
+                        EditIncomeView(workspace: workspace, income: editingIncome)
+                    } else {
+                        EmptyView()
+                    }
+                }
+            }
         }
     }
 
@@ -309,8 +332,9 @@ struct IncomeView: View {
 
     private func deleteIncome(_ income: Income) {
         modelContext.delete(income)
-        if case .edit(let editing)? = sheetRoute, editing.id == income.id {
-            sheetRoute = nil
+        if editingIncome?.id == income.id {
+            showingEditIncome = false
+            editingIncome = nil
         }
     }
 }
@@ -774,7 +798,7 @@ private enum CalendarGridHelper {
     let container = PreviewSeed.makeContainer()
     PreviewHost(container: container) { ws in
         NavigationStack {
-            IncomeView(workspace: ws, sheetRoute: .constant(nil))
+            IncomeView(workspace: ws)
         }
     }
 }

@@ -18,7 +18,21 @@ struct CardDetailView: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.cardsSheetRoute) private var cardsSheetRoute
+
+    // MARK: - Sheets
+
+    @State private var showingAddExpenseSheet: Bool = false
+    @State private var showingImportExpensesSheet: Bool = false
+    @State private var showingEditCardSheet: Bool = false
+
+    @State private var showingEditExpenseSheet: Bool = false
+    @State private var editingExpense: VariableExpense? = nil
+
+    @State private var showingEditPlannedExpenseSheet: Bool = false
+    @State private var editingPlannedExpense: PlannedExpense? = nil
+
+    @State private var showingEditPresetSheet: Bool = false
+    @State private var editingPreset: Preset? = nil
 
     @State private var showingCardDeleteConfirm: Bool = false
     @State private var pendingCardDelete: (() -> Void)? = nil
@@ -524,13 +538,13 @@ struct CardDetailView: View {
 
                 Menu {
                     Button {
-                        cardsSheetRoute.wrappedValue = .addExpense(defaultCard: card)
+                        showingAddExpenseSheet = true
                     } label: {
                         Label("Add Transaction", systemImage: "plus")
                     }
 
                     Button {
-                        cardsSheetRoute.wrappedValue = .importExpenses(card: card)
+                        showingImportExpensesSheet = true
                     } label: {
                         Label("Import Expenses (.csv)", systemImage: "tray.and.arrow.down")
                     }
@@ -541,7 +555,7 @@ struct CardDetailView: View {
                 
                 Menu {
                     Button {
-                        cardsSheetRoute.wrappedValue = .editCard(card)
+                        showingEditCardSheet = true
                     } label: {
                         Label("Edit Card", systemImage: "pencil")
                     }
@@ -582,6 +596,48 @@ struct CardDetailView: View {
             }
             Button("Cancel", role: .cancel) {
                 pendingExpenseDelete = nil
+            }
+        }
+        .sheet(isPresented: $showingAddExpenseSheet) {
+            NavigationStack {
+                AddExpenseView(workspace: workspace, defaultCard: card)
+            }
+        }
+        .sheet(isPresented: $showingImportExpensesSheet) {
+            NavigationStack {
+                ExpenseCSVImportFlowView(workspace: workspace, card: card)
+            }
+        }
+        .sheet(isPresented: $showingEditCardSheet) {
+            NavigationStack {
+                EditCardView(workspace: workspace, card: card)
+            }
+        }
+        .sheet(isPresented: $showingEditExpenseSheet, onDismiss: { editingExpense = nil }) {
+            NavigationStack {
+                if let editingExpense {
+                    EditExpenseView(workspace: workspace, expense: editingExpense)
+                } else {
+                    EmptyView()
+                }
+            }
+        }
+        .sheet(isPresented: $showingEditPlannedExpenseSheet, onDismiss: { editingPlannedExpense = nil }) {
+            NavigationStack {
+                if let editingPlannedExpense {
+                    EditPlannedExpenseView(workspace: workspace, plannedExpense: editingPlannedExpense)
+                } else {
+                    EmptyView()
+                }
+            }
+        }
+        .sheet(isPresented: $showingEditPresetSheet, onDismiss: { editingPreset = nil }) {
+            NavigationStack {
+                if let editingPreset {
+                    EditPresetView(workspace: workspace, preset: editingPreset)
+                } else {
+                    EmptyView()
+                }
             }
         }
         .onAppear {
@@ -821,15 +877,18 @@ struct CardDetailView: View {
     // MARK: - Actions
 
     private func openEdit(_ expense: VariableExpense) {
-        cardsSheetRoute.wrappedValue = .editExpense(expense)
+        editingExpense = expense
+        showingEditExpenseSheet = true
     }
 
     private func openEdit(_ plannedExpense: PlannedExpense) {
-        cardsSheetRoute.wrappedValue = .editPlannedExpense(plannedExpense)
+        editingPlannedExpense = plannedExpense
+        showingEditPlannedExpenseSheet = true
     }
 
     private func openEditPreset(_ preset: Preset) {
-        cardsSheetRoute.wrappedValue = .editPreset(preset)
+        editingPreset = preset
+        showingEditPresetSheet = true
     }
 
     private func presetForPlannedExpense(_ expense: PlannedExpense) -> Preset? {

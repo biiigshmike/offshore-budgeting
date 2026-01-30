@@ -43,10 +43,6 @@ struct AppRootView: View {
     @SceneStorage("AppRootView.splitViewVisibility")
     private var splitViewVisibilityRaw: String = "all"
 
-    @State private var budgetsSheetRoute: BudgetsSheetRoute? = nil
-    @State private var cardsSheetRoute: CardsSheetRoute? = nil
-    @State private var incomeSheetRoute: IncomeSheetRoute? = nil
-
     @State private var homePath = NavigationPath()
     @State private var budgetsPath = NavigationPath()
     @State private var incomePath = NavigationPath()
@@ -93,50 +89,6 @@ struct AppRootView: View {
         )
     }
 
-    private enum AppRootSheetRoute: Identifiable {
-        case budgets(BudgetsSheetRoute)
-        case cards(CardsSheetRoute)
-        case income(IncomeSheetRoute)
-
-        var id: String {
-            switch self {
-            case .budgets(let route):
-                return "budgets-\(route.id)"
-            case .cards(let route):
-                return "cards-\(route.id)"
-            case .income(let route):
-                return "income-\(route.id)"
-            }
-        }
-    }
-
-    private var appRootSheetRouteBinding: Binding<AppRootSheetRoute?> {
-        Binding(
-            get: {
-                if let budgetsSheetRoute { return .budgets(budgetsSheetRoute) }
-                if let cardsSheetRoute { return .cards(cardsSheetRoute) }
-                if let incomeSheetRoute { return .income(incomeSheetRoute) }
-                return nil
-            },
-            set: { newValue in
-                budgetsSheetRoute = nil
-                cardsSheetRoute = nil
-                incomeSheetRoute = nil
-
-                switch newValue {
-                case .budgets(let route):
-                    budgetsSheetRoute = route
-                case .cards(let route):
-                    cardsSheetRoute = route
-                case .income(let route):
-                    incomeSheetRoute = route
-                case nil:
-                    break
-                }
-            }
-        )
-    }
-
     var body: some View {
         Group {
             if isPhone {
@@ -145,109 +97,6 @@ struct AppRootView: View {
                 splitView
             }
         }
-        .environment(\.budgetsSheetRoute, $budgetsSheetRoute)
-        .environment(\.cardsSheetRoute, $cardsSheetRoute)
-        .environment(\.incomeSheetRoute, $incomeSheetRoute)
-        .sheet(item: appRootSheetRouteBinding) { route in
-            switch route {
-            case .budgets(let budgetsRoute):
-                switch budgetsRoute {
-                case .addBudget:
-                    NavigationStack {
-                        AddBudgetView(workspace: workspace)
-                    }
-                case .editBudget(let budget):
-                    NavigationStack {
-                        EditBudgetView(workspace: workspace, budget: budget)
-                    }
-                case .addExpense(let budget):
-                    NavigationStack {
-                        AddExpenseView(
-                            workspace: workspace,
-                            allowedCards: linkedCards(for: budget),
-                            defaultDate: .now
-                        )
-                    }
-                case .manageCards(let budget):
-                    NavigationStack {
-                        ManageCardsForBudgetSheet(workspace: workspace, budget: budget)
-                    }
-                case .managePresets(let budget):
-                    NavigationStack {
-                        ManagePresetsForBudgetSheet(workspace: workspace, budget: budget)
-                    }
-                case .editExpense(let expense):
-                    NavigationStack {
-                        EditExpenseView(workspace: workspace, expense: expense)
-                    }
-                case .editPlannedExpense(let plannedExpense):
-                    NavigationStack {
-                        EditPlannedExpenseView(workspace: workspace, plannedExpense: plannedExpense)
-                    }
-                case .editPreset(let preset):
-                    NavigationStack {
-                        EditPresetView(workspace: workspace, preset: preset)
-                    }
-                case .editCategoryLimit(let budget, let category, let plannedContribution, let variableContribution):
-                    EditCategoryLimitView(
-                        budget: budget,
-                        category: category,
-                        plannedContribution: plannedContribution,
-                        variableContribution: variableContribution
-                    )
-                }
-
-            case .cards(let cardsRoute):
-                switch cardsRoute {
-                case .addCard:
-                    NavigationStack {
-                        AddCardView(workspace: workspace)
-                    }
-                case .editCard(let card):
-                    NavigationStack {
-                        EditCardView(workspace: workspace, card: card)
-                    }
-                case .addExpense(let card):
-                    NavigationStack {
-                        AddExpenseView(workspace: workspace, defaultCard: card)
-                    }
-                case .importExpenses(let card):
-                    NavigationStack {
-                        ExpenseCSVImportFlowView(workspace: workspace, card: card)
-                    }
-                case .editExpense(let expense):
-                    NavigationStack {
-                        EditExpenseView(workspace: workspace, expense: expense)
-                    }
-                case .editPlannedExpense(let plannedExpense):
-                    NavigationStack {
-                        EditPlannedExpenseView(workspace: workspace, plannedExpense: plannedExpense)
-                    }
-                case .editPreset(let preset):
-                    NavigationStack {
-                        EditPresetView(workspace: workspace, preset: preset)
-                    }
-                }
-
-            case .income(let incomeRoute):
-                switch incomeRoute {
-                case .add(let initialDate):
-                    NavigationStack {
-                        AddIncomeView(workspace: workspace, initialDate: initialDate)
-                    }
-                case .edit(let income):
-                    NavigationStack {
-                        EditIncomeView(workspace: workspace, income: income)
-                    }
-                }
-            }
-        }
-    }
-
-    private func linkedCards(for budget: Budget) -> [Card] {
-        (budget.cardLinks ?? [])
-            .compactMap { $0.card }
-            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
     // MARK: - iPhone
@@ -262,19 +111,19 @@ struct AppRootView: View {
             .tag(AppSection.home)
 
             NavigationStack {
-                BudgetsView(workspace: workspace, sheetRoute: $budgetsSheetRoute)
+                BudgetsView(workspace: workspace)
             }
             .tabItem { Label(AppSection.budgets.rawValue, systemImage: AppSection.budgets.systemImage) }
             .tag(AppSection.budgets)
 
             NavigationStack {
-                IncomeView(workspace: workspace, sheetRoute: $incomeSheetRoute)
+                IncomeView(workspace: workspace)
             }
             .tabItem { Label(AppSection.income.rawValue, systemImage: AppSection.income.systemImage) }
             .tag(AppSection.income)
 
             NavigationStack {
-                CardsView(workspace: workspace, sheetRoute: $cardsSheetRoute)
+                CardsView(workspace: workspace)
             }
             .tabItem { Label(AppSection.cards.rawValue, systemImage: AppSection.cards.systemImage) }
             .tag(AppSection.cards)
@@ -353,11 +202,11 @@ struct AppRootView: View {
         case .home:
             HomeView(workspace: workspace)
         case .budgets:
-            BudgetsView(workspace: workspace, sheetRoute: $budgetsSheetRoute)
+            BudgetsView(workspace: workspace)
         case .income:
-            IncomeView(workspace: workspace, sheetRoute: $incomeSheetRoute)
+            IncomeView(workspace: workspace)
         case .cards:
-            CardsView(workspace: workspace, sheetRoute: $cardsSheetRoute)
+            CardsView(workspace: workspace)
         case .settings:
             SettingsView(workspace: workspace, selectedWorkspaceID: $selectedWorkspaceID)
         }

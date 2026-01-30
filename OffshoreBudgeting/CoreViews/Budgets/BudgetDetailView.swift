@@ -17,7 +17,6 @@ struct BudgetDetailView: View {
     
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.budgetsSheetRoute) private var budgetsSheetRoute
     
     // MARK: - Budget Delete Flow
     
@@ -28,6 +27,27 @@ struct BudgetDetailView: View {
     @State private var showingNothingToDeleteAlert: Bool = false
     
     @State private var showingReviewRecordedBudgetPlannedExpenses: Bool = false
+
+    // MARK: - Sheets
+
+    @State private var showingAddExpenseSheet: Bool = false
+    @State private var showingManagePresetsSheet: Bool = false
+    @State private var showingManageCardsSheet: Bool = false
+    @State private var showingEditBudgetSheet: Bool = false
+
+    @State private var showingEditExpenseSheet: Bool = false
+    @State private var editingExpense: VariableExpense? = nil
+
+    @State private var showingEditPlannedExpenseSheet: Bool = false
+    @State private var editingPlannedExpense: PlannedExpense? = nil
+
+    @State private var showingEditPresetSheet: Bool = false
+    @State private var editingPreset: Preset? = nil
+
+    @State private var showingEditCategoryLimitSheet: Bool = false
+    @State private var editingCategoryLimitCategory: Category? = nil
+    @State private var editingCategoryLimitPlannedContribution: Double = 0
+    @State private var editingCategoryLimitVariableContribution: Double = 0
     
     // MARK: - Expense Delete Flow
     
@@ -377,12 +397,10 @@ struct BudgetDetailView: View {
                         categories: categoriesInBudget,
                         selectedID: $selectedCategoryID,
                         onLongPressCategory: { category in
-                            budgetsSheetRoute.wrappedValue = .editCategoryLimit(
-                                budget: budget,
-                                category: category,
-                                plannedContribution: plannedContribution(for: category),
-                                variableContribution: variableContribution(for: category)
-                            )
+                            editingCategoryLimitCategory = category
+                            editingCategoryLimitPlannedContribution = plannedContribution(for: category)
+                            editingCategoryLimitVariableContribution = variableContribution(for: category)
+                            showingEditCategoryLimitSheet = true
                         }
                     )
                 } header: {
@@ -559,7 +577,7 @@ struct BudgetDetailView: View {
 
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
-                    budgetsSheetRoute.wrappedValue = .addExpense(budget: budget)
+                    showingAddExpenseSheet = true
                 } label: {
                     Image(systemName: "plus")
                 }
@@ -570,13 +588,13 @@ struct BudgetDetailView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Button {
-                        budgetsSheetRoute.wrappedValue = .managePresets(budget: budget)
+                        showingManagePresetsSheet = true
                     } label: {
                         Label("Manage Presets", systemImage: "list.bullet.rectangle")
                     }
 
                     Button {
-                        budgetsSheetRoute.wrappedValue = .manageCards(budget: budget)
+                        showingManageCardsSheet = true
                     } label: {
                         Label("Manage Cards", systemImage: "creditcard")
                     }
@@ -584,7 +602,7 @@ struct BudgetDetailView: View {
                     Divider()
 
                     Button {
-                        budgetsSheetRoute.wrappedValue = .editBudget(budget)
+                        showingEditBudgetSheet = true
                     } label: {
                         Label("Edit Budget", systemImage: "pencil")
                     }
@@ -644,6 +662,81 @@ struct BudgetDetailView: View {
             }
             Button("Cancel", role: .cancel) {
                 pendingExpenseDelete = nil
+            }
+        }
+
+        .sheet(isPresented: $showingAddExpenseSheet) {
+            NavigationStack {
+                AddExpenseView(
+                    workspace: workspace,
+                    allowedCards: linkedCards,
+                    defaultDate: .now
+                )
+            }
+        }
+
+        .sheet(isPresented: $showingManagePresetsSheet) {
+            NavigationStack {
+                ManagePresetsForBudgetSheet(workspace: workspace, budget: budget)
+            }
+        }
+
+        .sheet(isPresented: $showingManageCardsSheet) {
+            NavigationStack {
+                ManageCardsForBudgetSheet(workspace: workspace, budget: budget)
+            }
+        }
+
+        .sheet(isPresented: $showingEditBudgetSheet) {
+            NavigationStack {
+                EditBudgetView(workspace: workspace, budget: budget)
+            }
+        }
+
+        .sheet(isPresented: $showingEditExpenseSheet, onDismiss: { editingExpense = nil }) {
+            NavigationStack {
+                if let editingExpense {
+                    EditExpenseView(workspace: workspace, expense: editingExpense)
+                } else {
+                    EmptyView()
+                }
+            }
+        }
+
+        .sheet(isPresented: $showingEditPlannedExpenseSheet, onDismiss: { editingPlannedExpense = nil }) {
+            NavigationStack {
+                if let editingPlannedExpense {
+                    EditPlannedExpenseView(workspace: workspace, plannedExpense: editingPlannedExpense)
+                } else {
+                    EmptyView()
+                }
+            }
+        }
+
+        .sheet(isPresented: $showingEditPresetSheet, onDismiss: { editingPreset = nil }) {
+            NavigationStack {
+                if let editingPreset {
+                    EditPresetView(workspace: workspace, preset: editingPreset)
+                } else {
+                    EmptyView()
+                }
+            }
+        }
+
+        .sheet(isPresented: $showingEditCategoryLimitSheet, onDismiss: {
+            editingCategoryLimitCategory = nil
+            editingCategoryLimitPlannedContribution = 0
+            editingCategoryLimitVariableContribution = 0
+        }) {
+            if let editingCategoryLimitCategory {
+                EditCategoryLimitView(
+                    budget: budget,
+                    category: editingCategoryLimitCategory,
+                    plannedContribution: editingCategoryLimitPlannedContribution,
+                    variableContribution: editingCategoryLimitVariableContribution
+                )
+            } else {
+                EmptyView()
             }
         }
 
@@ -790,15 +883,18 @@ struct BudgetDetailView: View {
     // MARK: - Edit + Preset lookup (added, matches CardDetailView)
 
     private func openEdit(_ expense: VariableExpense) {
-        budgetsSheetRoute.wrappedValue = .editExpense(expense)
+        editingExpense = expense
+        showingEditExpenseSheet = true
     }
 
     private func openEdit(_ plannedExpense: PlannedExpense) {
-        budgetsSheetRoute.wrappedValue = .editPlannedExpense(plannedExpense)
+        editingPlannedExpense = plannedExpense
+        showingEditPlannedExpenseSheet = true
     }
 
     private func openEditPreset(_ preset: Preset) {
-        budgetsSheetRoute.wrappedValue = .editPreset(preset)
+        editingPreset = preset
+        showingEditPresetSheet = true
     }
 
     private func presetForPlannedExpense(_ expense: PlannedExpense) -> Preset? {

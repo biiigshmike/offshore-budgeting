@@ -11,7 +11,6 @@ import SwiftData
 struct BudgetsView: View {
 
     let workspace: Workspace
-    @Binding var sheetRoute: BudgetsSheetRoute?
 
     @Environment(\.modelContext) private var modelContext
 
@@ -26,9 +25,10 @@ struct BudgetsView: View {
     @State private var searchText: String = ""
     @FocusState private var searchFocused: Bool
 
-    init(workspace: Workspace, sheetRoute: Binding<BudgetsSheetRoute?>) {
+    @State private var showingAddBudget: Bool = false
+
+    init(workspace: Workspace) {
         self.workspace = workspace
-        self._sheetRoute = sheetRoute
         let workspaceID = workspace.id
 
         _budgets = Query(
@@ -184,11 +184,16 @@ struct BudgetsView: View {
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 Button {
-                    sheetRoute = .addBudget
+                    showingAddBudget = true
                 } label: {
                     Image(systemName: "plus")
                 }
                 .accessibilityLabel("Add Budget")
+            }
+        }
+        .sheet(isPresented: $showingAddBudget) {
+            NavigationStack {
+                AddBudgetView(workspace: workspace)
             }
         }
     }
@@ -246,7 +251,7 @@ private struct BucketDisclosureRow: View {
     let container = PreviewSeed.makeContainer()
     PreviewHost(container: container) { ws in
         NavigationStack {
-            BudgetsView(workspace: ws, sheetRoute: .constant(nil))
+            BudgetsView(workspace: ws)
         }
     }
 }

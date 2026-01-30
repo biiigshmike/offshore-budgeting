@@ -22,9 +22,11 @@ struct BudgetRecordedPlannedExpensesReviewView: View {
     @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
 
     @Environment(\.modelContext) private var modelContext
-    @Environment(\.budgetsSheetRoute) private var budgetsSheetRoute
 
     @State private var recordedExpenses: [PlannedExpense] = []
+
+    @State private var showingEditPlannedExpense: Bool = false
+    @State private var editingPlannedExpense: PlannedExpense? = nil
 
     @State private var showingDeleteExpenseConfirm: Bool = false
     @State private var pendingExpenseDelete: (() -> Void)? = nil
@@ -67,7 +69,8 @@ struct BudgetRecordedPlannedExpensesReviewView: View {
                 } else {
                     ForEach(recordedExpenses, id: \.id) { expense in
                         Button {
-                            budgetsSheetRoute.wrappedValue = .editPlannedExpense(expense)
+                            editingPlannedExpense = expense
+                            showingEditPlannedExpense = true
                         } label: {
                             row(expense)
                         }
@@ -124,6 +127,15 @@ struct BudgetRecordedPlannedExpensesReviewView: View {
             Button("Cancel", role: .cancel) { }
         } message: {
             Text("This deletes the budget only. Any remaining expenses stay on their cards.")
+        }
+        .sheet(isPresented: $showingEditPlannedExpense, onDismiss: { editingPlannedExpense = nil }) {
+            NavigationStack {
+                if let editingPlannedExpense {
+                    EditPlannedExpenseView(workspace: workspace, plannedExpense: editingPlannedExpense)
+                } else {
+                    EmptyView()
+                }
+            }
         }
     }
 
