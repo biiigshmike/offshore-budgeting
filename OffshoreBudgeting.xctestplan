@@ -1,18 +1,30 @@
 {
   "configurations" : [
     {
-      "id" : "183783A0-3D70-4479-B8DE-3ACE9716DD5A",
-      "name" : "Configuration 1",
+      "id" : "E1E80921-F9F7-443C-9D45-5943FB00CAF1",
+      "name" : "Test Scheme Action",
       "options" : {
 
       }
     }
   ],
   "defaultOptions" : {
-
+    "performanceAntipatternCheckerEnabled" : true,
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:OffshoreBudgeting.xcodeproj",
+      "identifier" : "4C96F8502F20523700541774",
+      "name" : "OffshoreBudgeting"
+    }
   },
   "testTargets" : [
-
+    {
+      "parallelizable" : true,
+      "target" : {
+        "containerPath" : "container:OffshoreBudgeting.xcodeproj",
+        "identifier" : "4C96F85D2F20523900541774",
+        "name" : "OffshoreBudgetingTests"
+      }
+    }
   ],
   "version" : 1
 }

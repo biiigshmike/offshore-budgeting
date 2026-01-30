@@ -7,7 +7,7 @@
 
 import Foundation
 import Testing
-@testable import OffshoreBudgeting
+@testable import Offshore
 
 struct OffshoreBudgetingTests {
 
