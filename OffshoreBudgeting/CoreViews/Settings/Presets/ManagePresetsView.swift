@@ -92,19 +92,31 @@ struct ManagePresetsView: View {
         return hasAnyCardsInSystem ? "Card Unassigned" : "No Cards Available"
     }
 
-    private var highlightedPreset: Preset? {
-        guard let id = highlightedPresetID else { return nil }
-        return presets.first(where: { $0.id == id })
+    // MARK: - Active vs archived
+
+    private var activePresets: [Preset] {
+        presets.filter { $0.isArchived == false }
     }
 
-    private var presetsWithoutHighlighted: [Preset] {
-        guard let highlightedPresetID else { return presets }
-        return presets.filter { $0.id != highlightedPresetID }
+    private var archivedPresets: [Preset] {
+        presets.filter { $0.isArchived }
     }
+
+    private var highlightedPreset: Preset? {
+        guard let id = highlightedPresetID else { return nil }
+        return activePresets.first(where: { $0.id == id })
+    }
+
+    private var activePresetsWithoutHighlighted: [Preset] {
+        guard let highlightedPresetID else { return activePresets }
+        return activePresets.filter { $0.id != highlightedPresetID }
+    }
+
+    // MARK: - View
 
     var body: some View {
         List {
-            if presets.isEmpty {
+            if activePresets.isEmpty && archivedPresets.isEmpty {
                 ContentUnavailableView(
                     "No Presets Yet",
                     systemImage: "list.bullet.rectangle",
@@ -131,51 +143,120 @@ struct ManagePresetsView: View {
                         .padding(.vertical, 4)
                         .listRowBackground(pinnedPresetBackground(for: pinned))
                         .listRowSeparator(.hidden)
-                        // Removed the overlay strokes entirely.
-                        // SwiftUI can still render a hairline even when lineWidth is 0,
-                        // so removing the overlay is the reliable fix.
-                    }
-                }
-
-                ForEach(presetsWithoutHighlighted) { preset in
-                    let assignedCount = assignedBudgetCountsByPresetID[preset.id, default: 0]
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        PresetRowView(
-                            preset: preset,
-                            assignedBudgetsCount: assignedCount
-                        )
-
-                        if presetIDsMissingLinkedCards.contains(preset.id) {
-                            Text(presetRequiresCardFootnoteText)
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                        Button {
-                            sheetRoute = .edit(preset)
-                        } label: {
-                            Label("Edit", systemImage: "pencil")
-                        }
-                        .tint(.blue)
-                    }
-                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                        Button(role: .destructive) {
-                            if confirmBeforeDeleting {
-                                pendingPresetDelete = {
-                                    modelContext.delete(preset)
-                                }
-                                showingPresetDeleteConfirm = true
-                            } else {
-                                modelContext.delete(preset)
+                        .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                            Button {
+                                sheetRoute = .edit(pinned)
+                            } label: {
+                                Label("Edit", systemImage: "pencil")
                             }
-                        } label: {
-                            Label("Delete", systemImage: "trash")
+                            .tint(.blue)
+
+                            Button {
+                                archive(pinned)
+                            } label: {
+                                Label("Archive", systemImage: "archivebox")
+                            }
+                            .tint(.orange)
+                        }
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            Button(role: .destructive) {
+                                deletePresetWithOptionalConfirm(pinned)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
                         }
                     }
                 }
-                .onDelete(perform: deleteViaListSwipe)
+
+                // MARK: - Active presets
+
+                Section {
+                    ForEach(activePresetsWithoutHighlighted) { preset in
+                        let assignedCount = assignedBudgetCountsByPresetID[preset.id, default: 0]
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            PresetRowView(
+                                preset: preset,
+                                assignedBudgetsCount: assignedCount
+                            )
+
+                            if presetIDsMissingLinkedCards.contains(preset.id) {
+                                Text(presetRequiresCardFootnoteText)
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                            Button {
+                                sheetRoute = .edit(preset)
+                            } label: {
+                                Label("Edit", systemImage: "pencil")
+                            }
+                            .tint(.blue)
+
+                            Button {
+                                archive(preset)
+                            } label: {
+                                Label("Archive", systemImage: "archivebox")
+                            }
+                            .tint(.orange)
+                        }
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            Button(role: .destructive) {
+                                deletePresetWithOptionalConfirm(preset)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
+                    }
+                    .onDelete(perform: deleteActiveViaListSwipe)
+                }
+
+                // MARK: - Archived presets
+
+                if archivedPresets.isEmpty == false {
+                    Section("Archived") {
+                        ForEach(archivedPresets) { preset in
+                            let assignedCount = assignedBudgetCountsByPresetID[preset.id, default: 0]
+
+                            VStack(alignment: .leading, spacing: 6) {
+                                PresetRowView(
+                                    preset: preset,
+                                    assignedBudgetsCount: assignedCount
+                                )
+
+                                if presetIDsMissingLinkedCards.contains(preset.id) {
+                                    Text(presetRequiresCardFootnoteText)
+                                        .font(.footnote)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                                Button {
+                                    unarchive(preset)
+                                } label: {
+                                    Label("Unarchive", systemImage: "arrow.uturn.backward")
+                                }
+                                .tint(.green)
+
+                                Button {
+                                    sheetRoute = .edit(preset)
+                                } label: {
+                                    Label("Edit", systemImage: "pencil")
+                                }
+                                .tint(.blue)
+                            }
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button(role: .destructive) {
+                                    deletePresetWithOptionalConfirm(preset)
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
+                        }
+                        .onDelete(perform: deleteArchivedViaListSwipe)
+                    }
+                }
             }
         }
         .postBoardingTip(
@@ -233,10 +314,31 @@ struct ManagePresetsView: View {
         }
     }
 
-    private func deleteViaListSwipe(at offsets: IndexSet) {
-        let presetsToDelete = offsets.compactMap { index in
-            presets.indices.contains(index) ? presets[index] : nil
+    // MARK: - Actions
+
+    private func archive(_ preset: Preset) {
+        preset.isArchived = true
+        preset.archivedAt = Date()
+    }
+
+    private func unarchive(_ preset: Preset) {
+        preset.isArchived = false
+        preset.archivedAt = nil
+    }
+
+    private func deletePresetWithOptionalConfirm(_ preset: Preset) {
+        if confirmBeforeDeleting {
+            pendingPresetDelete = {
+                modelContext.delete(preset)
+            }
+            showingPresetDeleteConfirm = true
+        } else {
+            modelContext.delete(preset)
         }
+    }
+
+    private func deletePresetsWithOptionalConfirm(_ presetsToDelete: [Preset]) {
+        if presetsToDelete.isEmpty { return }
 
         if confirmBeforeDeleting {
             pendingPresetDelete = {
@@ -251,6 +353,24 @@ struct ManagePresetsView: View {
             }
         }
     }
+
+    private func deleteActiveViaListSwipe(at offsets: IndexSet) {
+        let presetsToDelete = offsets.compactMap { index in
+            activePresetsWithoutHighlighted.indices.contains(index) ? activePresetsWithoutHighlighted[index] : nil
+        }
+
+        deletePresetsWithOptionalConfirm(presetsToDelete)
+    }
+
+    private func deleteArchivedViaListSwipe(at offsets: IndexSet) {
+        let presetsToDelete = offsets.compactMap { index in
+            archivedPresets.indices.contains(index) ? archivedPresets[index] : nil
+        }
+
+        deletePresetsWithOptionalConfirm(presetsToDelete)
+    }
+
+    // MARK: - Styling
 
     private func pinnedPresetBackground(for preset: Preset) -> some View {
         let categoryTint = preset.defaultCategory.flatMap { Color(hex: $0.hexColor) } ?? Color.secondary.opacity(0.22)

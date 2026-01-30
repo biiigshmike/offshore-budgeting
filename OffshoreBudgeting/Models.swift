@@ -224,12 +224,20 @@ final class Category {
 
 // MARK: - Preset
 
+// MARK: - Preset
+
 @Model
 final class Preset {
 
     var id: UUID = UUID()
     var title: String = ""
     var plannedAmount: Double = 0
+
+    // MARK: - Archiving
+    // When true, this preset is hidden from normal selection/management flows.
+    // Archiving never deletes any Planned Expenses that were already created from this preset.
+    var isArchived: Bool = false
+    var archivedAt: Date? = nil
 
     var frequencyRaw: String = RecurrenceFrequency.monthly.rawValue
     var interval: Int = 1
@@ -265,7 +273,9 @@ final class Preset {
         yearlyDayOfMonth: Int = 15,
         workspace: Workspace? = nil,
         defaultCard: Card? = nil,
-        defaultCategory: Category? = nil
+        defaultCategory: Category? = nil,
+        isArchived: Bool = false,
+        archivedAt: Date? = nil
     ) {
         self.id = id
         self.title = title
@@ -285,6 +295,9 @@ final class Preset {
         self.workspace = workspace
         self.defaultCard = defaultCard
         self.defaultCategory = defaultCategory
+
+        self.isArchived = isArchived
+        self.archivedAt = archivedAt
     }
 }
 
