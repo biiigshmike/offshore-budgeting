@@ -187,8 +187,25 @@ struct IncomeView: View {
                         monthCount: calendarMonthCount,
                         selectedDate: selectedDate,
                         incomePresenceByDay: monthPresence,
-                        onStepMonths: { delta in
-                            displayedMonth = CalendarGridHelper.addingMonths(delta, to: displayedMonth)
+                        onStepDay: { deltaDays in
+                            let cal = CalendarGridHelper.sundayFirstCalendar
+                            let newDate = cal.date(byAdding: .day, value: deltaDays, to: selectedDate) ?? selectedDate
+                            let normalized = cal.startOfDay(for: newDate)
+                            selectedDate = normalized
+                            displayedMonth = CalendarGridHelper.startOfMonth(for: normalized)
+                        },
+                        onJumpToMonthStart: { deltaMonths in
+                            let cal = CalendarGridHelper.sundayFirstCalendar
+                            let targetMonth = CalendarGridHelper.addingMonths(deltaMonths, to: displayedMonth)
+                            let monthStart = CalendarGridHelper.startOfMonth(for: targetMonth)
+                            selectedDate = cal.startOfDay(for: monthStart)
+                            displayedMonth = monthStart
+                        },
+                        onJumpToToday: {
+                            let cal = CalendarGridHelper.sundayFirstCalendar
+                            let today = cal.startOfDay(for: Date())
+                            selectedDate = today
+                            displayedMonth = CalendarGridHelper.startOfMonth(for: today)
                         },
                         onSelectDate: { tapped in
                             let cal = CalendarGridHelper.sundayFirstCalendar
@@ -197,13 +214,6 @@ struct IncomeView: View {
                         }
                     )
                     .padding(.vertical, 8)
-
-                    // You can remove WidthReader now if you're switching to proxy-based width.
-                    // Keeping it won't break anything, it just becomes redundant.
-                    // .background(WidthReader())
-                    // .onPreferenceChange(WidthPreferenceKey.self) { newWidth in
-                    //     if newWidth > 0 { calendarAvailableWidth = newWidth }
-                    // }
                 }
 
                 // MARK: - Row 1: Selected day list (swipe edit/delete)
@@ -413,59 +423,92 @@ private struct MultiMonthCalendarView: View {
     let monthCount: Int
     let selectedDate: Date
     let incomePresenceByDay: [Date: IncomeView.DayIncomePresence]
-    let onStepMonths: (Int) -> Void
+    let onStepDay: (Int) -> Void
+    let onJumpToMonthStart: (Int) -> Void
+    let onJumpToToday: () -> Void
     let onSelectDate: (Date) -> Void
-
-    private var headerTitle: String {
-        if monthCount <= 1 {
-            return CalendarGridHelper.monthTitleFormatter.string(from: startMonth)
-        }
-
-        let endMonth = CalendarGridHelper.addingMonths(monthCount - 1, to: startMonth)
-
-        // If same year, show: "Jan – Mar 2026"
-        let cal = CalendarGridHelper.sundayFirstCalendar
-        let startYear = cal.component(.year, from: startMonth)
-        let endYear = cal.component(.year, from: endMonth)
-
-        if startYear == endYear {
-            let startShort = CalendarGridHelper.monthShortFormatter.string(from: startMonth)
-            let endShort = CalendarGridHelper.monthShortFormatter.string(from: endMonth)
-            return "\(startShort) – \(endShort) \(startYear)"
-        } else {
-            // Cross-year, show both full: "Dec 2026 – Jan 2027"
-            let startFull = CalendarGridHelper.monthTitleFormatter.string(from: startMonth)
-            let endFull = CalendarGridHelper.monthTitleFormatter.string(from: endMonth)
-            return "\(startFull) – \(endFull)"
-        }
-    }
 
     var body: some View {
         VStack(spacing: 12) {
-            HStack(spacing: 12) {
-                Button {
-                    onStepMonths(-monthCount)
-                } label: {
-                    Image(systemName: "chevron.left")
+                    if #available(iOS 26.0, *) {
+                        HStack {
+                            Spacer()
+                            Button {
+                                onJumpToMonthStart(-1)
+                            } label: {
+                                Image(systemName: "chevron.backward.2")
+                            }
+                            .accessibilityLabel("Previous Month")
+                            Spacer()
+                            Button {
+                                onStepDay(-1)
+                            } label: {
+                                Image(systemName: "chevron.backward")
+                            }
+                            .accessibilityLabel("Previous Day")
+                            Spacer()
+                            Button("Today") {
+                                onJumpToToday()
+                            }
+                            .accessibilityLabel("Jump to Today")
+                            Spacer()
+                            Button {
+                                onStepDay(1)
+                            } label: {
+                                Image(systemName: "chevron.forward")
+                            }
+                            .accessibilityLabel("Next Day")
+                            Spacer()
+                            Button {
+                                onJumpToMonthStart(1)
+                            } label: {
+                                Image(systemName: "chevron.forward.2")
+                            }
+                            .accessibilityLabel("Next Month")
+                            Spacer()
+                        }
                         .font(.headline)
-                }
-                .buttonStyle(.plain)
-
-                Spacer()
-
-                Text(headerTitle)
-                    .font(.headline)
-
-                Spacer()
-
-                Button {
-                    onStepMonths(monthCount)
-                } label: {
-                    Image(systemName: "chevron.right")
+                        .buttonStyle(.glass)
+                    } else {
+                        HStack {
+                            Spacer()
+                            Button {
+                                onJumpToMonthStart(-1)
+                            } label: {
+                                Image(systemName: "chevron.backward.2")
+                            }
+                            .accessibilityLabel("Previous Month")
+                            Spacer()
+                            Button {
+                                onStepDay(-1)
+                            } label: {
+                                Image(systemName: "chevron.backward")
+                            }
+                            .accessibilityLabel("Previous Day")
+                            Spacer()
+                            Button("Today") {
+                                onJumpToToday()
+                            }
+                            .accessibilityLabel("Jump to Today")
+                            Spacer()
+                            Button {
+                                onStepDay(1)
+                            } label: {
+                                Image(systemName: "chevron.forward")
+                            }
+                            .accessibilityLabel("Next Day")
+                            Spacer()
+                            Button {
+                                onJumpToMonthStart(1)
+                            } label: {
+                                Image(systemName: "chevron.forward.2")
+                            }
+                            .accessibilityLabel("Next Month")
+                            Spacer()
+                        }
                         .font(.headline)
-                }
-                .buttonStyle(.plain)
-            }
+                        .buttonStyle(.plain)
+                    }
 
             HStack(alignment: .top, spacing: 24) {
                 ForEach(0..<monthCount, id: \.self) { offset in
