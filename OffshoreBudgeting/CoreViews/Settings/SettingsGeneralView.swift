@@ -16,6 +16,8 @@ struct SettingsGeneralView: View {
     // Step 1.2
     @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
 
+    @AppStorage("general_rememberTabSelection") private var rememberTabSelection: Bool = false
+
     @AppStorage("general_defaultBudgetingPeriod")
     private var defaultBudgetingPeriodRaw: String = BudgetingPeriod.monthly.rawValue
 
@@ -62,6 +64,12 @@ struct SettingsGeneralView: View {
                 Toggle("Confirm Before Deleting", isOn: $confirmBeforeDeleting)
 
                 Text("When enabled, you’ll always be asked to confirm before anything is deleted.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
+                Toggle("Remember Tab Selection", isOn: $rememberTabSelection)
+
+                Text("When enabled, the app will always launch with the last view you were on instead of defaulting to Home.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }

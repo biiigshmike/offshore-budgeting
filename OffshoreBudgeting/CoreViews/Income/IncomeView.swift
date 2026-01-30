@@ -437,6 +437,7 @@ private struct MultiMonthCalendarView: View {
                                 onJumpToMonthStart(-1)
                             } label: {
                                 Image(systemName: "chevron.backward.2")
+                                    .frame(width: 25, height: 25)
                             }
                             .accessibilityLabel("Previous Month")
                             Spacer()
@@ -444,11 +445,16 @@ private struct MultiMonthCalendarView: View {
                                 onStepDay(-1)
                             } label: {
                                 Image(systemName: "chevron.backward")
+                                    .frame(width: 25, height: 25)
+
                             }
                             .accessibilityLabel("Previous Day")
                             Spacer()
-                            Button("Today") {
+                            Button {
                                 onJumpToToday()
+                            } label: {
+                                Text("Today")
+                                    .frame(width: 55, height: 25)
                             }
                             .accessibilityLabel("Jump to Today")
                             Spacer()
@@ -456,6 +462,7 @@ private struct MultiMonthCalendarView: View {
                                 onStepDay(1)
                             } label: {
                                 Image(systemName: "chevron.forward")
+                                    .frame(width: 25, height: 25)
                             }
                             .accessibilityLabel("Next Day")
                             Spacer()
@@ -463,6 +470,7 @@ private struct MultiMonthCalendarView: View {
                                 onJumpToMonthStart(1)
                             } label: {
                                 Image(systemName: "chevron.forward.2")
+                                    .frame(width: 25, height: 25)
                             }
                             .accessibilityLabel("Next Month")
                             Spacer()
@@ -476,6 +484,7 @@ private struct MultiMonthCalendarView: View {
                                 onJumpToMonthStart(-1)
                             } label: {
                                 Image(systemName: "chevron.backward.2")
+                                    .frame(width: 33, height: 33)
                             }
                             .accessibilityLabel("Previous Month")
                             Spacer()
@@ -483,11 +492,15 @@ private struct MultiMonthCalendarView: View {
                                 onStepDay(-1)
                             } label: {
                                 Image(systemName: "chevron.backward")
+                                    .frame(width: 33, height: 33)
                             }
                             .accessibilityLabel("Previous Day")
                             Spacer()
-                            Button("Today") {
+                            Button {
                                 onJumpToToday()
+                            } label: {
+                                Text("Today")
+                                    .frame(width: 55, height: 33)
                             }
                             .accessibilityLabel("Jump to Today")
                             Spacer()
@@ -495,6 +508,7 @@ private struct MultiMonthCalendarView: View {
                                 onStepDay(1)
                             } label: {
                                 Image(systemName: "chevron.forward")
+                                    .frame(width: 33, height: 33)
                             }
                             .accessibilityLabel("Next Day")
                             Spacer()
@@ -502,6 +516,7 @@ private struct MultiMonthCalendarView: View {
                                 onJumpToMonthStart(1)
                             } label: {
                                 Image(systemName: "chevron.forward.2")
+                                    .frame(width: 33, height: 33)
                             }
                             .accessibilityLabel("Next Month")
                             Spacer()

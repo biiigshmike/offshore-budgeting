@@ -37,17 +37,18 @@ struct AppRootView: View {
     let workspace: Workspace
     @Binding var selectedWorkspaceID: String
 
+    @AppStorage("general_rememberTabSelection") private var rememberTabSelection: Bool = false
+
     @SceneStorage("AppRootView.selectedSection")
     private var selectedSectionRaw: String = AppSection.home.rawValue
-
-    @SceneStorage("AppRootView.splitViewVisibility")
-    private var splitViewVisibilityRaw: String = "all"
 
     @State private var homePath = NavigationPath()
     @State private var budgetsPath = NavigationPath()
     @State private var incomePath = NavigationPath()
     @State private var cardsPath = NavigationPath()
     @State private var settingsPath = NavigationPath()
+
+    @State private var didApplyInitialSection: Bool = false
 
     private var isPhone: Bool {
         #if os(iOS)
@@ -78,17 +79,6 @@ struct AppRootView: View {
         )
     }
 
-    private var splitViewVisibility: NavigationSplitViewVisibility {
-        splitViewVisibilityFromRaw(splitViewVisibilityRaw)
-    }
-
-    private var splitViewVisibilityBinding: Binding<NavigationSplitViewVisibility> {
-        Binding(
-            get: { splitViewVisibility },
-            set: { splitViewVisibilityRaw = rawFromSplitViewVisibility($0) }
-        )
-    }
-
     var body: some View {
         Group {
             if isPhone {
@@ -96,6 +86,17 @@ struct AppRootView: View {
             } else {
                 splitView
             }
+        }
+        .onAppear {
+            guard didApplyInitialSection == false else { return }
+            didApplyInitialSection = true
+
+            guard rememberTabSelection == false else { return }
+            selectedSectionRaw = AppSection.home.rawValue
+        }
+        .onChange(of: rememberTabSelection) { _, newValue in
+            guard newValue == false else { return }
+            selectedSectionRaw = AppSection.home.rawValue
         }
     }
 
@@ -139,7 +140,7 @@ struct AppRootView: View {
     // MARK: - iPad + Mac
 
     private var splitView: some View {
-        NavigationSplitView(columnVisibility: splitViewVisibilityBinding) {
+        NavigationSplitView {
             List(selection: selectedSectionForSidebar) {
                 ForEach(AppSection.allCases) { section in
                     Label(section.rawValue, systemImage: section.systemImage)
@@ -152,6 +153,7 @@ struct AppRootView: View {
             NavigationStack(path: selectedSectionPath) {
                 sectionRootView
             }
+            .id(selectedSection)
         }
     }
 
@@ -167,30 +169,6 @@ struct AppRootView: View {
             return $cardsPath
         case .settings:
             return $settingsPath
-        }
-    }
-
-    private func splitViewVisibilityFromRaw(_ raw: String) -> NavigationSplitViewVisibility {
-        switch raw {
-        case "automatic":
-            return .automatic
-        case "detailOnly":
-            return .detailOnly
-        default:
-            return .all
-        }
-    }
-
-    private func rawFromSplitViewVisibility(_ visibility: NavigationSplitViewVisibility) -> String {
-        switch visibility {
-        case .automatic:
-            return "automatic"
-        case .detailOnly:
-            return "detailOnly"
-        case .all:
-            return "all"
-        default:
-            return "all"
         }
     }
 
