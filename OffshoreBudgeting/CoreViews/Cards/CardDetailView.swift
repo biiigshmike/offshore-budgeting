@@ -13,6 +13,8 @@ struct CardDetailView: View {
     @Bindable var card: Card
 
     @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
+    @AppStorage("general_defaultBudgetingPeriod")
+    private var defaultBudgetingPeriodRaw: String = BudgetingPeriod.monthly.rawValue
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -585,8 +587,8 @@ struct CardDetailView: View {
         .onAppear {
             initializeDateRangeIfNeeded()
         }
-        .onChange(of: (card.variableExpenses?.count ?? 0) + (card.plannedExpenses?.count ?? 0)) { _, _ in
-            refreshDateRangeIfSafe()
+        .onChange(of: defaultBudgetingPeriodRaw) { _, _ in
+            applyDefaultPeriodRange()
         }
     }
 
@@ -605,27 +607,16 @@ struct CardDetailView: View {
         guard !didInitializeDateRange else { return }
         didInitializeDateRange = true
 
-        let variableDates = variableExpensesBase.map(\.transactionDate)
-        let plannedDates = plannedExpensesBase.map(\.expenseDate)
-        let allDates = variableDates + plannedDates
+        applyDefaultPeriodRange()
+    }
 
-        if let minDate = allDates.min(), let maxDate = allDates.max() {
-            let start = normalizedStart(minDate)
-            let end = normalizedEnd(maxDate)
-            draftStartDate = start
-            draftEndDate = end
-            appliedStartDate = start
-            appliedEndDate = end
-            return
-        }
-
-        // Fallback: current month
+    private func applyDefaultPeriodRange() {
         let now = Date()
-        let start = Calendar.current.date(from: Calendar.current.dateComponents([.year, .month], from: now)) ?? now
-        let end = Calendar.current.date(byAdding: DateComponents(month: 1, day: -1), to: start) ?? now
+        let period = BudgetingPeriod(rawValue: defaultBudgetingPeriodRaw) ?? .monthly
+        let range = period.defaultRange(containing: now, calendar: .current)
 
-        draftStartDate = normalizedStart(start)
-        draftEndDate = normalizedEnd(end)
+        draftStartDate = normalizedStart(range.start)
+        draftEndDate = normalizedEnd(range.end)
         appliedStartDate = draftStartDate
         appliedEndDate = draftEndDate
     }

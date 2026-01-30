@@ -16,6 +16,9 @@ struct SettingsGeneralView: View {
     // Step 1.2
     @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
 
+    @AppStorage("general_defaultBudgetingPeriod")
+    private var defaultBudgetingPeriodRaw: String = BudgetingPeriod.monthly.rawValue
+
     // Step 1.3
     @AppStorage("tips_resetToken") private var tipsResetToken: Int = 0
     @State private var eraseResultMessage: String = ""
@@ -61,6 +64,16 @@ struct SettingsGeneralView: View {
                 Text("When enabled, you’ll always be asked to confirm before anything is deleted.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+            }
+
+            Section("Budgets") {
+                Picker("Default Budgeting Period", selection: defaultBudgetingPeriodBinding) {
+                    ForEach(BudgetingPeriod.allCases) { period in
+                        Text(period.displayTitle)
+                            .tag(period)
+                    }
+                }
+                .pickerStyle(.menu)
             }
 
             Section("Maintenance") {
@@ -182,6 +195,13 @@ struct SettingsGeneralView: View {
             let name = CurrencyPickerConstants.localizedCurrencyName(for: currencyCode)
             return "\(name) • \(currencyCode)"
         }
+    }
+
+    private var defaultBudgetingPeriodBinding: Binding<BudgetingPeriod> {
+        Binding(
+            get: { BudgetingPeriod(rawValue: defaultBudgetingPeriodRaw) ?? .monthly },
+            set: { defaultBudgetingPeriodRaw = $0.rawValue }
+        )
     }
 
     // MARK: - Erase

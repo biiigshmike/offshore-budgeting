@@ -42,10 +42,15 @@ struct BudgetFormView: View {
         Form {
 
             Section("Name") {
-                TextField("January 2026", text: $name)
-                    .onChange(of: name) { _, _ in
-                        userEditedName = true
+                TextField(
+                    "January 2026",
+                    text: $name,
+                    onEditingChanged: { isEditing in
+                        if isEditing {
+                            userEditedName = true
+                        }
                     }
+                )
             }
 
             Section("Dates") {

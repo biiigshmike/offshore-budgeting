@@ -113,10 +113,12 @@ struct EditBudgetView: View {
 
     private func seedFromBudget() {
         name = budget.name
-        userEditedName = true
 
         startDate = Calendar.current.startOfDay(for: budget.startDate)
         endDate = Calendar.current.startOfDay(for: budget.endDate)
+
+        let suggested = BudgetNameSuggestion.suggestedName(start: startDate, end: endDate, calendar: .current)
+        userEditedName = trimmedName != suggested
 
         selectedCardIDs = Set((budget.cardLinks ?? []).compactMap { $0.card?.id })
         selectedPresetIDs = Set((budget.presetLinks ?? []).compactMap { $0.preset?.id })
@@ -128,12 +130,19 @@ struct EditBudgetView: View {
         if endDate < newValue {
             endDate = newValue
         }
+        autoFillNameIfNeeded()
     }
 
     private func handleEndDateChanged(_ newValue: Date) {
         if newValue < startDate {
             endDate = startDate
         }
+        autoFillNameIfNeeded()
+    }
+
+    private func autoFillNameIfNeeded() {
+        guard !userEditedName else { return }
+        name = BudgetNameSuggestion.suggestedName(start: startDate, end: endDate, calendar: .current)
     }
 
     // MARK: - Toggle helpers

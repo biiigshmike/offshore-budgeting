@@ -20,6 +20,9 @@ struct AddBudgetView: View {
 
     // MARK: - Form State
 
+    @AppStorage("general_defaultBudgetingPeriod")
+    private var defaultBudgetingPeriodRaw: String = BudgetingPeriod.monthly.rawValue
+
     @State private var name: String = ""
     @State private var userEditedName: Bool = false
 
@@ -100,6 +103,10 @@ struct AddBudgetView: View {
         .onAppear {
             seedInitialDatesAndName()
         }
+        .onChange(of: defaultBudgetingPeriodRaw) { _, _ in
+            applyDefaultPeriodRange()
+            autoFillNameIfNeeded()
+        }
         .alert("Invalid Dates", isPresented: $showingInvalidDatesAlert) {
             Button("OK", role: .cancel) { }
         } message: {
@@ -110,10 +117,17 @@ struct AddBudgetView: View {
     // MARK: - Setup
 
     private func seedInitialDatesAndName() {
-        let today = Calendar.current.startOfDay(for: Date())
-        startDate = today
-        endDate = today
+        userEditedName = false
+        applyDefaultPeriodRange()
         autoFillNameIfNeeded(force: true)
+    }
+
+    private func applyDefaultPeriodRange() {
+        let now = Date()
+        let period = BudgetingPeriod(rawValue: defaultBudgetingPeriodRaw) ?? .monthly
+        let range = period.defaultRange(containing: now, calendar: .current)
+        startDate = range.start
+        endDate = range.end
     }
 
     private func handleStartDateChanged(_ newValue: Date) {
@@ -132,10 +146,7 @@ struct AddBudgetView: View {
 
     private func autoFillNameIfNeeded(force: Bool = false) {
         guard force || !userEditedName else { return }
-
-        let formatter = DateFormatter()
-        formatter.dateFormat = "LLLL yyyy"
-        name = formatter.string(from: startDate)
+        name = BudgetNameSuggestion.suggestedName(start: startDate, end: endDate, calendar: .current)
     }
 
     // MARK: - Toggle Helpers

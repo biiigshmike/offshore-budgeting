@@ -9,6 +9,222 @@ import SwiftData
 
 // MARK: - Shared helpers
 
+// MARK: - BudgetingPeriod
+
+enum BudgetingPeriod: String, CaseIterable, Identifiable {
+    case daily
+    case weekly
+    case monthly
+    case quarterly
+    case yearly
+
+    var id: String { rawValue }
+
+    var displayTitle: String {
+        switch self {
+        case .daily: return "Daily"
+        case .weekly: return "Weekly"
+        case .monthly: return "Monthly"
+        case .quarterly: return "Quarterly"
+        case .yearly: return "Yearly"
+        }
+    }
+
+    var accessibilityLabel: String {
+        displayTitle
+    }
+
+    func defaultRange(containing date: Date, calendar: Calendar = .current) -> (start: Date, end: Date) {
+        let day = calendar.startOfDay(for: date)
+
+        switch self {
+        case .daily:
+            return (start: day, end: day)
+
+        case .weekly:
+            let start = startOfWeekSunday(containing: day, calendar: calendar)
+            let end = calendar.date(byAdding: DateComponents(day: 6), to: start) ?? day
+            return (start: start, end: end)
+
+        case .monthly:
+            let start = startOfMonth(containing: day, calendar: calendar)
+            let end = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: start) ?? day
+            return (start: start, end: end)
+
+        case .quarterly:
+            let start = startOfQuarter(containing: day, calendar: calendar)
+            let end = calendar.date(byAdding: DateComponents(month: 3, day: -1), to: start) ?? day
+            return (start: start, end: end)
+
+        case .yearly:
+            let start = startOfYear(containing: day, calendar: calendar)
+            let end = calendar.date(byAdding: DateComponents(year: 1, day: -1), to: start) ?? day
+            return (start: start, end: end)
+        }
+    }
+
+    // MARK: - Period boundaries
+
+    private func startOfWeekSunday(containing date: Date, calendar: Calendar) -> Date {
+        var cal = calendar
+        cal.firstWeekday = 1 // Sunday
+
+        if let interval = cal.dateInterval(of: .weekOfYear, for: date) {
+            return cal.startOfDay(for: interval.start)
+        }
+
+        // Fallback: if dateInterval fails, compute the last Sunday.
+        let weekday = cal.component(.weekday, from: date) // Sunday = 1
+        let daysToSubtract = (weekday - cal.firstWeekday + 7) % 7
+        let start = cal.date(byAdding: .day, value: -daysToSubtract, to: date) ?? date
+        return cal.startOfDay(for: start)
+    }
+
+    private func startOfMonth(containing date: Date, calendar: Calendar) -> Date {
+        calendar.date(from: calendar.dateComponents([.year, .month], from: date)) ?? calendar.startOfDay(for: date)
+    }
+
+    private func startOfQuarter(containing date: Date, calendar: Calendar) -> Date {
+        let comps = calendar.dateComponents([.year, .month], from: date)
+        let year = comps.year ?? calendar.component(.year, from: date)
+        let month = comps.month ?? calendar.component(.month, from: date)
+
+        let quarterStartMonth: Int
+        switch month {
+        case 1...3: quarterStartMonth = 1
+        case 4...6: quarterStartMonth = 4
+        case 7...9: quarterStartMonth = 7
+        default: quarterStartMonth = 10
+        }
+
+        return calendar.date(from: DateComponents(year: year, month: quarterStartMonth, day: 1)) ?? calendar.startOfDay(for: date)
+    }
+
+    private func startOfYear(containing date: Date, calendar: Calendar) -> Date {
+        let year = calendar.component(.year, from: date)
+        return calendar.date(from: DateComponents(year: year, month: 1, day: 1)) ?? calendar.startOfDay(for: date)
+    }
+}
+
+// MARK: - Budget name suggestion
+
+enum BudgetNameSuggestion {
+    static func suggestedName(start: Date, end: Date, calendar: Calendar = .current) -> String {
+        let startDay = calendar.startOfDay(for: start)
+        let endDay = calendar.startOfDay(for: end)
+
+        if startDay == endDay {
+            return formatSingleDay(startDay)
+        }
+
+        if isFullYear(start: startDay, end: endDay, calendar: calendar) {
+            return yearString(for: startDay, calendar: calendar)
+        }
+
+        if let quarter = quarterStringIfFullQuarter(start: startDay, end: endDay, calendar: calendar) {
+            return quarter
+        }
+
+        if let month = monthStringIfFullMonth(start: startDay, end: endDay, calendar: calendar) {
+            return month
+        }
+
+        if isFullWeekSunday(start: startDay, end: endDay, calendar: calendar) {
+            return formatRange(start: startDay, end: endDay, includeYear: false, calendar: calendar)
+        }
+
+        let includeYear = calendar.component(.year, from: startDay) != calendar.component(.year, from: endDay)
+        return formatRange(start: startDay, end: endDay, includeYear: includeYear, calendar: calendar)
+    }
+
+    // MARK: - Period detection
+
+    private static func isFullWeekSunday(start: Date, end: Date, calendar: Calendar) -> Bool {
+        var cal = calendar
+        cal.firstWeekday = 1 // Sunday
+
+        guard let interval = cal.dateInterval(of: .weekOfYear, for: start) else { return false }
+        let weekStart = cal.startOfDay(for: interval.start)
+        let weekEnd = cal.date(byAdding: .day, value: 6, to: weekStart) ?? weekStart
+
+        return start == weekStart && end == cal.startOfDay(for: weekEnd)
+    }
+
+    private static func isFullYear(start: Date, end: Date, calendar: Calendar) -> Bool {
+        guard let interval = calendar.dateInterval(of: .year, for: start) else { return false }
+        let yearStart = calendar.startOfDay(for: interval.start)
+        let yearEnd = calendar.date(byAdding: .day, value: -1, to: interval.end) ?? yearStart
+        return start == yearStart && end == calendar.startOfDay(for: yearEnd)
+    }
+
+    private static func quarterStringIfFullQuarter(start: Date, end: Date, calendar: Calendar) -> String? {
+        guard let interval = calendar.dateInterval(of: .quarter, for: start) else { return nil }
+        let quarterStart = calendar.startOfDay(for: interval.start)
+        let quarterEnd = calendar.date(byAdding: .day, value: -1, to: interval.end) ?? quarterStart
+
+        guard start == quarterStart && end == calendar.startOfDay(for: quarterEnd) else { return nil }
+
+        let year = calendar.component(.year, from: start)
+        let month = calendar.component(.month, from: start)
+        let quarter: Int
+        switch month {
+        case 1...3: quarter = 1
+        case 4...6: quarter = 2
+        case 7...9: quarter = 3
+        default: quarter = 4
+        }
+        return "Q\(quarter) \(year)"
+    }
+
+    private static func monthStringIfFullMonth(start: Date, end: Date, calendar: Calendar) -> String? {
+        guard let interval = calendar.dateInterval(of: .month, for: start) else { return nil }
+        let monthStart = calendar.startOfDay(for: interval.start)
+        let monthEnd = calendar.date(byAdding: .day, value: -1, to: interval.end) ?? monthStart
+
+        guard start == monthStart && end == calendar.startOfDay(for: monthEnd) else { return nil }
+        return formatMonthYear(start)
+    }
+
+    // MARK: - Formatting
+
+    private static func yearString(for date: Date, calendar: Calendar) -> String {
+        "\(calendar.component(.year, from: date))"
+    }
+
+    private static func formatMonthYear(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "LLLL yyyy"
+        return formatter.string(from: date)
+    }
+
+    private static func formatSingleDay(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d, yyyy"
+        return formatter.string(from: date)
+    }
+
+    private static func formatRange(start: Date, end: Date, includeYear: Bool, calendar: Calendar) -> String {
+        let sameMonth = calendar.component(.month, from: start) == calendar.component(.month, from: end)
+        let sameYear = calendar.component(.year, from: start) == calendar.component(.year, from: end)
+
+        let startFormatter = DateFormatter()
+        let endFormatter = DateFormatter()
+
+        if sameMonth && sameYear {
+            startFormatter.dateFormat = includeYear ? "MMM d, yyyy" : "MMM d"
+            endFormatter.dateFormat = includeYear ? "d, yyyy" : "d"
+        } else if sameYear {
+            startFormatter.dateFormat = includeYear ? "MMM d, yyyy" : "MMM d"
+            endFormatter.dateFormat = includeYear ? "MMM d, yyyy" : "MMM d"
+        } else {
+            startFormatter.dateFormat = "MMM d, yyyy"
+            endFormatter.dateFormat = "MMM d, yyyy"
+        }
+
+        return "\(startFormatter.string(from: start)) – \(endFormatter.string(from: end))"
+    }
+}
+
 enum TransactionType: String, CaseIterable, Identifiable {
     case expense = "Expense"
     case income = "Income"

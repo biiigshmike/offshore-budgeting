@@ -25,6 +25,9 @@ struct HomeView: View {
     @AppStorage("home_appliedEndTimestamp")
     private var appliedEndTimestamp: Double = 0
 
+    @AppStorage("general_defaultBudgetingPeriod")
+    private var defaultBudgetingPeriodRaw: String = BudgetingPeriod.monthly.rawValue
+
     @State private var draftStartDate: Date = Date()
     @State private var draftEndDate: Date = Date()
 
@@ -161,6 +164,9 @@ struct HomeView: View {
         .onAppear {
             bootstrapDatesIfNeeded()
             loadPinnedItemsIfNeeded()
+        }
+        .onChange(of: defaultBudgetingPeriodRaw) { _, _ in
+            bootstrapDatesIfNeeded()
         }
     }
 
@@ -388,18 +394,14 @@ struct HomeView: View {
     }
 
     private func bootstrapDatesIfNeeded() {
-        if appliedStartTimestamp == 0 || appliedEndTimestamp == 0 {
-            let calendar = Calendar.current
-            let now = Date()
-            let start = calendar.date(from: calendar.dateComponents([.year, .month], from: now)) ?? now
-            let end = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: start) ?? now
+        let now = Date()
+        let period = BudgetingPeriod(rawValue: defaultBudgetingPeriodRaw) ?? .monthly
+        let range = period.defaultRange(containing: now, calendar: .current)
 
-            appliedStartTimestamp = start.timeIntervalSince1970
-            appliedEndTimestamp = end.timeIntervalSince1970
-        }
-
-        draftStartDate = appliedStartDate
-        draftEndDate = appliedEndDate
+        appliedStartTimestamp = range.start.timeIntervalSince1970
+        appliedEndTimestamp = range.end.timeIntervalSince1970
+        draftStartDate = range.start
+        draftEndDate = range.end
     }
 
     private func applyDraftRange() {
