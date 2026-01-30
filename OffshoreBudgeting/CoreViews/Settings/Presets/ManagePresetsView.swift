@@ -21,7 +21,7 @@ struct ManagePresetsView: View {
 
     // IMPORTANT:
     // Avoid deep relationship chains in SwiftData predicates, they can crash in previews (and sometimes runtime).
-    // We'll pull links broadly and filter in-memory for the current workspace.
+    // pull links broadly and filter in-memory for the current workspace.
     @Query private var presetLinks: [BudgetPresetLink]
 
     private enum SheetRoute: Identifiable {
@@ -71,6 +71,27 @@ struct ManagePresetsView: View {
         return counts
     }
 
+    private var presetIDsMissingLinkedCards: Set<UUID> {
+        var ids = Set<UUID>()
+
+        for link in presetLinks {
+            guard link.budget?.workspace?.id == workspace.id else { continue }
+            guard let presetID = link.preset?.id else { continue }
+
+            let budgetHasCards = ((link.budget?.cardLinks ?? []).isEmpty == false)
+            if !budgetHasCards {
+                ids.insert(presetID)
+            }
+        }
+
+        return ids
+    }
+
+    private var presetRequiresCardFootnoteText: String {
+        let hasAnyCardsInSystem = (workspace.cards ?? []).isEmpty == false
+        return hasAnyCardsInSystem ? "Card Unassigned" : "No Cards Available"
+    }
+
     private var highlightedPreset: Preset? {
         guard let id = highlightedPresetID else { return nil }
         return presets.first(where: { $0.id == id })
@@ -95,10 +116,18 @@ struct ManagePresetsView: View {
                     Section("Next Planned Expense") {
                         let assignedCount = assignedBudgetCountsByPresetID[pinned.id, default: 0]
 
-                        PresetRowView(
-                            preset: pinned,
-                            assignedBudgetsCount: assignedCount
-                        )
+                        VStack(alignment: .leading, spacing: 6) {
+                            PresetRowView(
+                                preset: pinned,
+                                assignedBudgetsCount: assignedCount
+                            )
+
+                            if presetIDsMissingLinkedCards.contains(pinned.id) {
+                                Text(presetRequiresCardFootnoteText)
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
                         .padding(.vertical, 4)
                         .listRowBackground(pinnedPresetBackground(for: pinned))
                         .listRowSeparator(.hidden)
@@ -111,10 +140,18 @@ struct ManagePresetsView: View {
                 ForEach(presetsWithoutHighlighted) { preset in
                     let assignedCount = assignedBudgetCountsByPresetID[preset.id, default: 0]
 
-                    PresetRowView(
-                        preset: preset,
-                        assignedBudgetsCount: assignedCount
-                    )
+                    VStack(alignment: .leading, spacing: 6) {
+                        PresetRowView(
+                            preset: preset,
+                            assignedBudgetsCount: assignedCount
+                        )
+
+                        if presetIDsMissingLinkedCards.contains(preset.id) {
+                            Text(presetRequiresCardFootnoteText)
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                     .swipeActions(edge: .leading, allowsFullSwipe: false) {
                         Button {
                             sheetRoute = .edit(preset)

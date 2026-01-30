@@ -562,7 +562,7 @@ struct CardDetailView: View {
                 .accessibilityLabel("Card Actions")
             }
         }
-        .alert("Delete?", isPresented: $showingCardDeleteConfirm) {
+        .alert("Delete Card?", isPresented: $showingCardDeleteConfirm) {
             Button("Delete", role: .destructive) {
                 pendingCardDelete?()
                 pendingCardDelete = nil
@@ -570,8 +570,10 @@ struct CardDetailView: View {
             Button("Cancel", role: .cancel) {
                 pendingCardDelete = nil
             }
+        } message: {
+            Text("This deletes the card and all of its expenses.")
         }
-        .alert("Delete?", isPresented: $showingExpenseDeleteConfirm) {
+        .alert("Delete Expense?", isPresented: $showingExpenseDeleteConfirm) {
             Button("Delete", role: .destructive) {
                 pendingExpenseDelete?()
                 pendingExpenseDelete = nil
@@ -850,9 +852,37 @@ struct CardDetailView: View {
     }
 
     private func deleteCard() {
+
+        // I prefer being explicit here even though SwiftData delete rules are set to cascade.
+        // This keeps behavior predictable if those rules ever change.
+        if let planned = card.plannedExpenses {
+            for expense in planned {
+                modelContext.delete(expense)
+            }
+        }
+
+        if let variable = card.variableExpenses {
+            for expense in variable {
+                modelContext.delete(expense)
+            }
+        }
+
+        if let incomes = card.incomes {
+            for income in incomes {
+                modelContext.delete(income)
+            }
+        }
+
+        if let links = card.budgetLinks {
+            for link in links {
+                modelContext.delete(link)
+            }
+        }
+
         modelContext.delete(card)
         dismiss()
     }
+
 
     private func deleteVariableExpensesFiltered(at offsets: IndexSet) {
         // IMPORTANT: offsets are for the filtered/sorted list

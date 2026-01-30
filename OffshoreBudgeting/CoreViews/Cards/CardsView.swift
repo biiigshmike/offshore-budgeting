@@ -104,7 +104,7 @@ struct CardsView: View {
             }
             .accessibilityLabel("Add Card")
         }
-        .alert("Delete?", isPresented: $showingCardDeleteConfirm) {
+        .alert("Delete Card?", isPresented: $showingCardDeleteConfirm) {
             Button("Delete", role: .destructive) {
                 pendingCardDelete?()
                 pendingCardDelete = nil
@@ -112,10 +112,40 @@ struct CardsView: View {
             Button("Cancel", role: .cancel) {
                 pendingCardDelete = nil
             }
+        } message: {
+            Text("This deletes the card and all of its expenses.")
         }
     }
 
+    // MARK: - Delete
+
     private func delete(_ card: Card) {
+        // I prefer being explicit here even though SwiftData delete rules are set to cascade.
+        // This keeps behavior predictable if those rules ever change.
+        if let planned = card.plannedExpenses {
+            for expense in planned {
+                modelContext.delete(expense)
+            }
+        }
+
+        if let variable = card.variableExpenses {
+            for expense in variable {
+                modelContext.delete(expense)
+            }
+        }
+
+        if let incomes = card.incomes {
+            for income in incomes {
+                modelContext.delete(income)
+            }
+        }
+
+        if let links = card.budgetLinks {
+            for link in links {
+                modelContext.delete(link)
+            }
+        }
+
         modelContext.delete(card)
     }
 }

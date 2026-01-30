@@ -12,241 +12,255 @@ import Foundation
 struct BudgetDetailView: View {
     let workspace: Workspace
     let budget: Budget
-
+    
     @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
-
+    
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(\.budgetsSheetRoute) private var budgetsSheetRoute
-
+    
     // MARK: - Budget Delete Flow
-
+    
     @State private var showingBudgetDeleteConfirm: Bool = false
     @State private var pendingBudgetDelete: (() -> Void)? = nil
-
+    
     @State private var showingBudgetDeleteOptionsDialog: Bool = false
     @State private var showingNothingToDeleteAlert: Bool = false
-
+    
     @State private var showingReviewRecordedBudgetPlannedExpenses: Bool = false
-
+    
     // MARK: - Expense Delete Flow
-
+    
     @State private var showingExpenseDeleteConfirm: Bool = false
     @State private var pendingExpenseDelete: (() -> Void)? = nil
-
+    
     // MARK: - UI State
-
+    
     @State private var selectedCategoryID: UUID? = nil
     @State private var expenseScope: ExpenseScope = .unified
     @State private var sortMode: BudgetSortMode = .dateDesc
-
+    
     // MARK: - Search
-
+    
     @State private var searchText: String = ""
     @FocusState private var searchFocused: Bool
-
+    
     // MARK: - Budget Window
-
+    
     private func isWithinBudget(_ date: Date) -> Bool {
         let cal = Calendar.current
-
+        
         let start = cal.startOfDay(for: budget.startDate)
         let endStart = cal.startOfDay(for: budget.endDate)
         let end = cal.date(byAdding: DateComponents(day: 1, second: -1), to: endStart) ?? budget.endDate
-
+        
         return date >= start && date <= end
     }
-
+    
     private var budgetDateRangeLabel: String {
         let start = budget.startDate.formatted(date: .abbreviated, time: .omitted)
         let end = budget.endDate.formatted(date: .abbreviated, time: .omitted)
         return "\(start) – \(end)"
     }
-
+    
     // MARK: - Linked Cards
-
+    
     private var linkedCards: [Card] {
         (budget.cardLinks ?? [])
             .compactMap { $0.card }
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
-
+    
+    // MARK: - Linked Presets (for edge-case messaging)
+    
+    private var linkedPresetsCount: Int {
+        (budget.presetLinks ?? []).compactMap { $0.preset }.count
+    }
+    
+    private var presetRequiresCardFootnote: String? {
+        guard linkedPresetsCount > 0 else { return nil }
+        guard linkedCards.isEmpty else { return nil }
+        
+        let hasAnyCardsInSystem = (workspace.cards ?? []).isEmpty == false
+        return hasAnyCardsInSystem ? "Card Unassigned" : "No Cards Available"
+    }
+    
     // MARK: - Income (within budget window)
-
+    
     private var incomesInBudget: [Income] {
         (workspace.incomes ?? [])
             .filter { isWithinBudget($0.date) }
             .sorted { $0.date > $1.date }
     }
-
+    
     private var plannedIncomeTotal: Double {
         incomesInBudget
             .filter { $0.isPlanned }
             .reduce(0) { $0 + $1.amount }
     }
-
+    
     private var actualIncomeTotal: Double {
         incomesInBudget
             .filter { !$0.isPlanned }
             .reduce(0) { $0 + $1.amount }
     }
-
+    
     // MARK: - Expenses aggregated from linked cards (within budget window)
-
+    
     private var plannedExpensesInBudget: [PlannedExpense] {
         linkedCards
             .flatMap { $0.plannedExpenses ?? [] }
             .filter { isWithinBudget($0.expenseDate) }
             .sorted { $0.expenseDate > $1.expenseDate }
     }
-
+    
     private var variableExpensesInBudget: [VariableExpense] {
         linkedCards
             .flatMap { $0.variableExpenses ?? [] }
             .filter { isWithinBudget($0.transactionDate) }
             .sorted { $0.transactionDate > $1.transactionDate }
     }
-
+    
     // MARK: - Categories (chips)
-
+    
     private var categoriesInBudget: [Category] {
         var seen = Set<UUID>()
         let all = (plannedExpensesInBudget.compactMap { $0.category } + variableExpensesInBudget.compactMap { $0.category })
-
+        
         let uniques = all.filter { cat in
             guard !seen.contains(cat.id) else { return false }
             seen.insert(cat.id)
             return true
         }
-
+        
         return uniques.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
-
+    
     // MARK: - Search helpers
-
+    
     private var trimmedSearch: String {
         searchText.trimmingCharacters(in: .whitespacesAndNewlines)
     }
-
+    
     private func matchesSearch(_ planned: PlannedExpense) -> Bool {
         let query = SearchQueryParser.parse(searchText)
         guard !query.isEmpty else { return true }
-
+        
         if !SearchMatch.matchesDateRange(query, date: planned.expenseDate) { return false }
-
+        
         let textFields: [String?] = [
             planned.title,
             planned.category?.name,
             planned.card?.name
         ]
         if !SearchMatch.matchesTextTerms(query, in: textFields) { return false }
-
+        
         let amounts: [Double] = [
             planned.plannedAmount,
             planned.actualAmount,
             plannedAmountForSort(planned)
         ]
         if !SearchMatch.matchesAmountDigitTerms(query, amounts: amounts) { return false }
-
+        
         return true
     }
-
+    
     private func matchesSearch(_ variable: VariableExpense) -> Bool {
         let query = SearchQueryParser.parse(searchText)
         guard !query.isEmpty else { return true }
-
+        
         if !SearchMatch.matchesDateRange(query, date: variable.transactionDate) { return false }
-
+        
         let textFields: [String?] = [
             variable.descriptionText,
             variable.category?.name,
             variable.card?.name
         ]
         if !SearchMatch.matchesTextTerms(query, in: textFields) { return false }
-
+        
         if !SearchMatch.matchesAmountDigitTerms(query, amounts: [variable.amount]) { return false }
-
+        
         return true
     }
-
+    
     // MARK: - Filtering
-
+    
     private var plannedExpensesFiltered: [PlannedExpense] {
         let base = plannedExpensesInBudget
-
+        
         let categoryFiltered: [PlannedExpense]
         if let selectedCategoryID {
             categoryFiltered = base.filter { $0.category?.id == selectedCategoryID }
         } else {
             categoryFiltered = base
         }
-
+        
         let searched: [PlannedExpense]
         if trimmedSearch.isEmpty {
             searched = categoryFiltered
         } else {
             searched = categoryFiltered.filter { matchesSearch($0) }
         }
-
+        
         return sortPlanned(searched)
     }
-
+    
     private var variableExpensesFiltered: [VariableExpense] {
         let base = variableExpensesInBudget
-
+        
         let categoryFiltered: [VariableExpense]
         if let selectedCategoryID {
             categoryFiltered = base.filter { $0.category?.id == selectedCategoryID }
         } else {
             categoryFiltered = base
         }
-
+        
         let searched: [VariableExpense]
         if trimmedSearch.isEmpty {
             searched = categoryFiltered
         } else {
             searched = categoryFiltered.filter { matchesSearch($0) }
         }
-
+        
         return sortVariable(searched)
     }
-
+    
     private var unifiedItemsFiltered: [BudgetUnifiedExpenseItem] {
         let planned = plannedExpensesFiltered.map { BudgetUnifiedExpenseItem.planned($0) }
         let variable = variableExpensesFiltered.map { BudgetUnifiedExpenseItem.variable($0) }
         return sortUnified(planned + variable)
     }
-
+    
     // MARK: - Totals that react to Type + Category filter
-
+    
     private var plannedExpensesPlannedTotal: Double {
         plannedExpensesFiltered.reduce(0) { $0 + $1.plannedAmount }
     }
-
+    
     private var plannedExpensesActualTotal: Double {
         plannedExpensesFiltered.reduce(0) { $0 + max(0, $1.actualAmount) }
     }
-
+    
     private var variableExpensesTotal: Double {
         variableExpensesFiltered.reduce(0) { $0 + $1.amount }
     }
-
+    
     // MARK: - Savings math (reacts to category + type)
-
+    
     private var maxSavings: Double {
         plannedIncomeTotal - plannedExpensesPlannedTotal
     }
-
+    
     private var projectedSavings: Double {
         plannedIncomeTotal - plannedExpensesPlannedTotal - variableExpensesTotal
     }
-
+    
     private var actualSavings: Double {
         actualIncomeTotal - plannedExpensesActualTotal - variableExpensesTotal
     }
-
+    
     // MARK: - Sort
-
+    
     private func sortPlanned(_ items: [PlannedExpense]) -> [PlannedExpense] {
         switch sortMode {
         case .az:
@@ -261,7 +275,7 @@ struct BudgetDetailView: View {
             return items.sorted { $0.expenseDate > $1.expenseDate }
         }
     }
-
+    
     private func sortVariable(_ items: [VariableExpense]) -> [VariableExpense] {
         switch sortMode {
         case .az:
@@ -276,7 +290,7 @@ struct BudgetDetailView: View {
             return items.sorted { $0.transactionDate > $1.transactionDate }
         }
     }
-
+    
     private func sortUnified(_ items: [BudgetUnifiedExpenseItem]) -> [BudgetUnifiedExpenseItem] {
         switch sortMode {
         case .az:
@@ -291,36 +305,36 @@ struct BudgetDetailView: View {
             return items.sorted { $0.date > $1.date }
         }
     }
-
+    
     private func plannedAmountForSort(_ expense: PlannedExpense) -> Double {
         expense.actualAmount > 0 ? expense.actualAmount : expense.plannedAmount
     }
-
+    
     // MARK: - List title (reacts to type)
-
+    
     private var expensesTitleText: Text {
         switch expenseScope {
         case .planned:
             return Text("Planned Expenses • \(plannedExpensesPlannedTotal, format: CurrencyFormatter.currencyStyle())")
-
+            
         case .unified:
             let unifiedTotal = plannedExpensesPlannedTotal + variableExpensesTotal
             return Text("All Expenses • \(unifiedTotal, format: CurrencyFormatter.currencyStyle())")
-
+            
         case .variable:
             return Text("Variable Expenses • \(variableExpensesTotal, format: CurrencyFormatter.currencyStyle())")
         }
     }
-
+    
     // MARK: - Body
-
+    
     var body: some View {
         List {
             // MARK: - Summary (3 equal-height rows)
-
+            
             Section {
                 VStack(spacing: 12) {
-
+                    
                     BudgetSummaryBucketCard(
                         title: "Income",
                         titleColor: .blue,
@@ -329,13 +343,13 @@ struct BudgetDetailView: View {
                             .init(label: "Actual Income", value: actualIncomeTotal)
                         ]
                     )
-
+                    
                     BudgetSummaryBucketCard(
                         title: "Expenses",
                         titleColor: .orange,
                         rows: expenseRowsForCurrentSelection()
                     )
-
+                    
                     BudgetSummaryBucketCard(
                         title: "Savings",
                         titleColor: .green,
@@ -349,6 +363,10 @@ struct BudgetDetailView: View {
                 .padding(.vertical, 4)
             } header: {
                 Text("Overview • \(budgetDateRangeLabel)")
+            } footer: {
+                if let footnote = presetRequiresCardFootnote {
+                    Text(footnote)
+                }
             }
 
             // MARK: - Category Chips
