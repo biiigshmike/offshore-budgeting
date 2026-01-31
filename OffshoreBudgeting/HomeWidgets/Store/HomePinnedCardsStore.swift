@@ -26,3 +26,12 @@ struct HomePinnedCardsStore {
         UserDefaults.standard.set(data, forKey: storageKey)
     }
 }
+
+// MARK: - Mutations
+
+extension HomePinnedCardsStore {
+    func removePinnedCardID(_ id: UUID) {
+        let updated = load().filter { $0 != id }
+        save(updated)
+    }
+}

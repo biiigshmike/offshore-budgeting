@@ -70,6 +70,14 @@ struct HomeView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
 
+    private var isPhone: Bool {
+        #if canImport(UIKit)
+        return UIDevice.current.userInterfaceIdiom == .phone
+        #else
+        return false
+        #endif
+    }
+
     init(workspace: Workspace) {
         self.workspace = workspace
         let workspaceID = workspace.id
@@ -112,13 +120,13 @@ struct HomeView: View {
         )
     }
 
-	    var body: some View {
-	        ZStack {
-	            HomeBackgroundView()
+    var body: some View {
+        ZStack {
+            HomeBackgroundView()
 
-	            GeometryReader { proxy in
-	                ScrollView {
-	                    VStack(alignment: .leading, spacing: 14) {
+            GeometryReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 14) {
 
                         HomeDateRangeBar(
                             draftStartDate: $draftStartDate,
@@ -131,7 +139,6 @@ struct HomeView: View {
                         widgetsHeader
 
                         VStack(spacing: 12) {
-
                             if pinnedItems.isEmpty {
                                 HomeTileContainer(
                                     title: "Home",
@@ -145,49 +152,19 @@ struct HomeView: View {
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)
                             } else {
-
-                                let columnCount = homeColumnCount(for: proxy.size.width)
-
-                                if columnCount <= 1 {
-                                    VStack(spacing: gridSpacing) {
-                                        ForEach(pinnedItems) { item in
-                                            pinnedItemView(item)
-                                                .frame(maxWidth: .infinity, alignment: .leading)
-                                        }
-                                    }
-                                } else {
-                                    let rows = pinnedGridRows(columnCount: columnCount)
-
-                                    Grid(horizontalSpacing: gridSpacing, verticalSpacing: gridSpacing) {
-                                        ForEach(rows.indices, id: \.self) { rowIndex in
-                                            GridRow {
-                                                ForEach(rows[rowIndex].cells.indices, id: \.self) { cellIndex in
-                                                    pinnedItemView(rows[rowIndex].cells[cellIndex].item)
-                                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                                        .gridCellColumns(rows[rowIndex].cells[cellIndex].span)
-                                                }
-
-                                                if rows[rowIndex].remainingColumns > 0 {
-                                                    Color.clear
-                                                        .frame(height: 0)
-                                                        .gridCellColumns(rows[rowIndex].remainingColumns)
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
+                                pinnedItemsLayout(availableWidth: proxy.size.width)
                             }
                         }
 
-	                        Spacer(minLength: 22)
-	                    }
-	                    .padding(.horizontal, contentHorizontalPadding)
-	                    .padding(.bottom, 18)
-	                    .frame(maxWidth: .infinity, alignment: .leading)
-	                }
-	            }
-	        }
-	        .postBoardingTip(
+                        Spacer(minLength: 22)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, contentHorizontalPadding)
+                    .padding(.bottom, 18)
+                }
+            }
+        }
+        .postBoardingTip(
             key: "tip.home.v1",
             title: "Home",
             items: [
@@ -224,9 +201,13 @@ struct HomeView: View {
             applyDefaultBudgetingPeriodIfSettingsChanged()
             syncDraftToApplied()
             loadPinnedItemsIfNeeded()
+            prunePinnedCardsIfNeeded()
         }
         .onChange(of: pinnedItems) { _, _ in
             persistPinnedItems()
+        }
+        .onChange(of: cardIDSet) { _, _ in
+            prunePinnedCardsIfNeeded()
         }
         .onChange(of: defaultBudgetingPeriodRaw) { _, _ in
             applyDefaultBudgetingPeriodToApplied()
@@ -290,6 +271,57 @@ struct HomeView: View {
 
         case .spendTrends:
             spendTrendsWidget
+        }
+    }
+
+    // MARK: - Pinned Items Layout
+
+    private enum PinnedItemsRowKind {
+        case smallRow
+        case wideRow
+    }
+
+    private struct PinnedItemsRow: Identifiable {
+        let id: UUID
+        let kind: PinnedItemsRowKind
+        let items: [HomePinnedItem]
+
+        init(kind: PinnedItemsRowKind, items: [HomePinnedItem]) {
+            self.id = UUID()
+            self.kind = kind
+            self.items = items
+        }
+    }
+
+    private func pinnedItemsLayout(availableWidth: CGFloat) -> some View {
+        let usableWidth = max(0, availableWidth - (contentHorizontalPadding * 2))
+        let maxSmallPerRow = homeMaxSmallTilesPerRow(for: usableWidth)
+        let rows = pinnedRows(maxSmallPerRow: maxSmallPerRow)
+
+        return LazyVStack(alignment: .leading, spacing: gridSpacing) {
+            ForEach(rows) { row in
+                switch row.kind {
+                case .wideRow:
+                    if let item = row.items.first {
+                        pinnedItemView(item)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+
+                case .smallRow:
+                    if row.items.count <= 1, let item = row.items.first {
+                        pinnedItemView(item)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    } else {
+                        HStack(alignment: .top, spacing: gridSpacing) {
+                            ForEach(row.items) { item in
+                                pinnedItemView(item)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+            }
         }
     }
 
@@ -392,73 +424,51 @@ struct HomeView: View {
         )
     }
 
-	    // MARK: - Layout
-	
-	    private var contentHorizontalPadding: CGFloat { 16 }
+    // MARK: - Layout
 
-	    private var gridSpacing: CGFloat { 12 }
+    private var contentHorizontalPadding: CGFloat { 16 }
 
-    private struct PinnedGridCell {
-        let item: HomePinnedItem
-        let span: Int
+    private var gridSpacing: CGFloat { 12 }
+
+    private func homeMaxSmallTilesPerRow(for usableWidth: CGFloat) -> Int {
+        if isPhone { return 1 }
+        if voiceOverEnabled { return 1 }
+        if dynamicTypeSize.isAccessibilitySize { return 1 }
+
+        let minTileWidth: CGFloat = (dynamicTypeSize >= .xxLarge) ? 420 : 330
+        let fit = Int((usableWidth + gridSpacing) / (minTileWidth + gridSpacing))
+        return max(1, min(fit, 3))
     }
 
-    private struct PinnedGridRowModel {
-        let cells: [PinnedGridCell]
-        let remainingColumns: Int
-    }
+    private func pinnedRows(maxSmallPerRow: Int) -> [PinnedItemsRow] {
+        let maxSmallPerRow = max(1, maxSmallPerRow)
 
-	    private func homeColumnCount(for width: CGFloat) -> Int {
-	        if voiceOverEnabled { return 1 }
-	        if dynamicTypeSize.isAccessibilitySize { return 1 }
+        var rows: [PinnedItemsRow] = []
+        var currentSmallRow: [HomePinnedItem] = []
 
-	        let minTileWidth: CGFloat = (dynamicTypeSize >= .xxLarge) ? 420 : 330
-	        let usable = max(0, width - (contentHorizontalPadding * 2))
-	        let columns = Int((usable + gridSpacing) / (minTileWidth + gridSpacing))
-
-	        return max(1, min(columns, 4))
-	    }
-
-    private func pinnedGridRows(columnCount: Int) -> [PinnedGridRowModel] {
-        let columnCount = max(1, columnCount)
-
-        var rows: [PinnedGridRowModel] = []
-        var current: [PinnedGridCell] = []
-        var used = 0
-
-        func flush() {
-            guard !current.isEmpty else { return }
-            rows.append(.init(cells: current, remainingColumns: max(0, columnCount - used)))
-            current = []
-            used = 0
+        func flushSmallRow() {
+            guard currentSmallRow.isEmpty == false else { return }
+            rows.append(PinnedItemsRow(kind: .smallRow, items: currentSmallRow))
+            currentSmallRow = []
         }
 
         for item in pinnedItems {
-            let desiredSpan = (item.tileSize == .wide) ? columnCount : 1
-            let clampedSpan = max(1, min(desiredSpan, columnCount))
+            switch item.tileSize {
+            case .wide:
+                flushSmallRow()
+                rows.append(PinnedItemsRow(kind: .wideRow, items: [item]))
 
-            if used + clampedSpan > columnCount {
-                flush()
-            }
+            case .small:
+                currentSmallRow.append(item)
 
-            current.append(.init(item: item, span: clampedSpan))
-            used += clampedSpan
-
-            if used == columnCount {
-                flush()
+                if currentSmallRow.count >= maxSmallPerRow {
+                    flushSmallRow()
+                }
             }
         }
 
-        flush()
+        flushSmallRow()
         return rows
-    }
-
-    private func homeGridColumns(for width: CGFloat) -> [GridItem] {
-        let count = homeColumnCount(for: width)
-        return Array(
-            repeating: GridItem(.flexible(minimum: 0), spacing: gridSpacing, alignment: .top),
-            count: count
-        )
     }
 
     // MARK: - Widgets Header
@@ -608,6 +618,28 @@ struct HomeView: View {
     private func persistPinnedItems() {
         let store = HomePinnedItemsStore(workspaceID: workspace.id)
         store.save(pinnedItems)
+    }
+
+    // MARK: - Pin fixups
+
+    private var cardIDSet: Set<UUID> {
+        Set(cards.map(\.id))
+    }
+
+    private func prunePinnedCardsIfNeeded() {
+        let existingCardIDs = cardIDSet
+
+        let pruned = pinnedItems.filter { item in
+            switch item {
+            case .widget:
+                return true
+            case .card(let id, _):
+                return existingCardIDs.contains(id)
+            }
+        }
+
+        guard pruned != pinnedItems else { return }
+        pinnedItems = pruned
     }
 }
 

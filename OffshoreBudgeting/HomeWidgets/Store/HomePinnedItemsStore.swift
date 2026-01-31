@@ -135,3 +135,15 @@ struct HomePinnedItemsStore {
         return result
     }
 }
+
+// MARK: - Mutations
+
+extension HomePinnedItemsStore {
+    func removePinnedCard(id: UUID) {
+        let updated = load().filter { item in
+            guard case .card(let cardID, _) = item else { return true }
+            return cardID != id
+        }
+        save(updated)
+    }
+}
