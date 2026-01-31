@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import Charts
 
 struct HomeSpendTrendsTile: View {
 
@@ -70,48 +69,38 @@ struct HomeSpendTrendsTile: View {
     private func miniChart(result: HomeSpendTrendsAggregator.Result) -> some View {
         let buckets = Array(result.buckets.prefix(8))
 
-        return Chart {
-            // Invisible marks: establish x buckets + y domain for ChartProxy positioning.
-            ForEach(buckets) { bucket in
-                BarMark(
-                    x: .value("Bucket", bucket.label),
-                    y: .value("Amount", max(bucket.total, 0.000_001))
-                )
-                .foregroundStyle(.clear)
-                .opacity(0.001)
-            }
-        }
-        .chartYAxis(.hidden)
-        .chartXAxis {
-            AxisMarks(values: .automatic(desiredCount: 4)) {
-                AxisValueLabel().foregroundStyle(Color.secondary)
-            }
-        }
-        .frame(height: 120)
-        .chartOverlay { proxy in
+        return VStack(spacing: 8) {
             GeometryReader { geo in
-                if let plotAnchor = proxy.plotFrame {
-                    let plotFrame = geo[plotAnchor]
+                let maxTotal = max(1.0, buckets.map(\.total).max() ?? 1.0)
+                let slotWidth = geo.size.width / CGFloat(max(1, buckets.count))
+                let barWidth = min(26, slotWidth * 0.70)
+                let height = geo.size.height
 
-                    ZStack(alignment: .topLeading) {
-                        ForEach(buckets) { bucket in
-                            SpendTrendsPillBar(
-                                bucket: bucket,
-                                proxy: proxy,
-                                plotFrame: plotFrame,
-                                barWidth: min(
-                                    26,
-                                    plotFrame.width / CGFloat(max(4, buckets.count)) * 0.70
-                                ),
-                                colorForSlice: color(for:)
-                            )
-                        }
+                ZStack(alignment: .bottomLeading) {
+                    ForEach(Array(buckets.enumerated()), id: \.element.id) { index, bucket in
+                        SpendTrendsScaledPillBar(
+                            bucket: bucket,
+                            maxTotal: maxTotal,
+                            availableHeight: height,
+                            barWidth: barWidth,
+                            colorForSlice: color(for:)
+                        )
+                        .position(
+                            x: (slotWidth * CGFloat(index)) + (slotWidth / 2),
+                            y: height / 2
+                        )
                     }
-                    .frame(width: plotFrame.width, height: plotFrame.height)
-                    .position(x: plotFrame.midX, y: plotFrame.midY)
-                    .allowsHitTesting(false)
                 }
+                .frame(width: geo.size.width, height: geo.size.height, alignment: .bottomLeading)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
             }
+            .frame(height: 120)
+
+            SpendTrendsXAxisLabels(
+                labels: buckets.map(\.label)
+            )
+            .frame(height: 18)
         }
     }
 
@@ -156,13 +145,32 @@ struct HomeSpendTrendsTile: View {
     }
 }
 
-// MARK: - Pill Bar (feathered gradient only, no blur)
+// MARK: - X Axis Labels (manual)
 
-private struct SpendTrendsPillBar: View {
+private struct SpendTrendsXAxisLabels: View {
+    let labels: [String]
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 0) {
+            ForEach(labels.indices, id: \.self) { index in
+                Text(labels[index])
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.60)
+                    .frame(maxWidth: .infinity, alignment: .center)
+            }
+        }
+    }
+}
+
+// MARK: - Pill Bar (scaled, feathered gradient only, no blur)
+
+private struct SpendTrendsScaledPillBar: View {
 
     let bucket: HomeSpendTrendsAggregator.Bucket
-    let proxy: ChartProxy
-    let plotFrame: CGRect
+    let maxTotal: Double
+    let availableHeight: CGFloat
     let barWidth: CGFloat
     let colorForSlice: (HomeSpendTrendsAggregator.Slice) -> Color
     private let displayEpsilon: Double = 1.00
@@ -172,29 +180,23 @@ private struct SpendTrendsPillBar: View {
             return AnyView(EmptyView())
         }
 
-        guard let x = proxy.position(forX: bucket.label),
-              let yTop = proxy.position(forY: bucket.total)
-        else {
-            return AnyView(EmptyView())
-        }
-
-        let xInPlot = plotFrame.minX + x
-        let topInPlot = plotFrame.minY + yTop
-        let barHeight = max(2, plotFrame.maxY - topInPlot)
+        let fraction = min(1.0, max(0.0, bucket.total / max(0.000_1, maxTotal)))
+        let barHeight = max(2, availableHeight * CGFloat(fraction))
 
         let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
         let gradient = featheredGradient(bucket: bucket)
 
         return AnyView(
-            shape
-                .fill(gradient)
-                .frame(width: barWidth, height: barHeight)
-                .position(x: xInPlot, y: topInPlot + (barHeight / 2))
-                .overlay {
-                    shape
-                        .strokeBorder(Color.white.opacity(0.16), lineWidth: 1)
-                        .frame(width: barWidth, height: barHeight)
-                }
+            ZStack(alignment: .bottom) {
+                shape
+                    .fill(gradient)
+                    .frame(width: barWidth, height: barHeight)
+
+                shape
+                    .strokeBorder(Color.white.opacity(0.16), lineWidth: 1)
+                    .frame(width: barWidth, height: barHeight)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
         )
     }
 

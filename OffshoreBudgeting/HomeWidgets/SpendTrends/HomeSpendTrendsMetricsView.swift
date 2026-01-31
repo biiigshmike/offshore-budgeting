@@ -195,12 +195,14 @@ struct HomeSpendTrendsMetricsView: View {
                 Chart {
                     // Invisible marks: these define x buckets + y scale for the chart.
                     ForEach(result.buckets) { bucket in
-                        BarMark(
+                        PointMark(
                             x: .value("Bucket", bucket.label),
                             y: .value("Amount", max(bucket.total, 0.000_001))
                         )
+                        .symbolSize(0)
                         .foregroundStyle(.clear)
                         .opacity(0.001)
+                        .accessibilityHidden(true)
                     }
                 }
                 .chartYAxis {
@@ -375,9 +377,7 @@ private struct HeatMapBucketBar: View {
             return AnyView(EmptyView())
         }
 
-        let xInPlot = plotFrame.minX + x
-        let topInPlot = plotFrame.minY + yTop
-        let barHeight = max(2, plotFrame.maxY - topInPlot)
+        let barHeight = max(2, plotFrame.height - yTop)
 
         let gradient = bucketMeltGradient(bucket: bucket)
 
@@ -388,7 +388,7 @@ private struct HeatMapBucketBar: View {
             shape
                 .fill(gradient)
                 .frame(width: barSize.width, height: barSize.height)
-                .position(x: xInPlot, y: topInPlot + (barHeight / 2))
+                .position(x: x, y: yTop + (barHeight / 2))
                 .compositingGroup()
         )
     }
@@ -466,4 +466,3 @@ private struct HeatMapBucketBar: View {
         )
     }
 }
-
