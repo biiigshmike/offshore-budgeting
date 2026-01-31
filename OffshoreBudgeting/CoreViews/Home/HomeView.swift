@@ -146,13 +146,34 @@ struct HomeView: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                             } else {
 
-                                let columns = homeGridColumns(for: proxy.size.width)
+                                let columnCount = homeColumnCount(for: proxy.size.width)
 
-                                LazyVGrid(columns: columns, alignment: .leading, spacing: 12) {
+                                if columnCount <= 1 {
+                                    VStack(spacing: gridSpacing) {
+                                        ForEach(pinnedItems) { item in
+                                            pinnedItemView(item)
+                                                .frame(maxWidth: .infinity, alignment: .leading)
+                                        }
+                                    }
+                                } else {
+                                    let rows = pinnedGridRows(columnCount: columnCount)
 
-                                    ForEach(pinnedItems) { item in
-                                        pinnedItemView(item)
-                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                    Grid(horizontalSpacing: gridSpacing, verticalSpacing: gridSpacing) {
+                                        ForEach(rows.indices, id: \.self) { rowIndex in
+                                            GridRow {
+                                                ForEach(rows[rowIndex].cells.indices, id: \.self) { cellIndex in
+                                                    pinnedItemView(rows[rowIndex].cells[cellIndex].item)
+                                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                                        .gridCellColumns(rows[rowIndex].cells[cellIndex].span)
+                                                }
+
+                                                if rows[rowIndex].remainingColumns > 0 {
+                                                    Color.clear
+                                                        .frame(height: 0)
+                                                        .gridCellColumns(rows[rowIndex].remainingColumns)
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -204,6 +225,9 @@ struct HomeView: View {
             syncDraftToApplied()
             loadPinnedItemsIfNeeded()
         }
+        .onChange(of: pinnedItems) { _, _ in
+            persistPinnedItems()
+        }
         .onChange(of: defaultBudgetingPeriodRaw) { _, _ in
             applyDefaultBudgetingPeriodToApplied()
             lastSyncedDefaultBudgetingPeriodRaw = defaultBudgetingPeriodRaw
@@ -216,10 +240,10 @@ struct HomeView: View {
     @ViewBuilder
     private func pinnedItemView(_ item: HomePinnedItem) -> some View {
         switch item {
-        case .widget(let widget):
+        case .widget(let widget, _):
             widgetView(for: widget)
 
-        case .card(let id):
+        case .card(let id, _):
             if let card = cards.first(where: { $0.id == id }) {
                 HomeCardSummaryTile(
                     workspace: workspace,
@@ -372,6 +396,16 @@ struct HomeView: View {
 
     private var gridSpacing: CGFloat { 12 }
 
+    private struct PinnedGridCell {
+        let item: HomePinnedItem
+        let span: Int
+    }
+
+    private struct PinnedGridRowModel {
+        let cells: [PinnedGridCell]
+        let remainingColumns: Int
+    }
+
     private func homeColumnCount(for width: CGFloat) -> Int {
         if voiceOverEnabled { return 1 }
         if dynamicTypeSize.isAccessibilitySize { return 1 }
@@ -381,6 +415,40 @@ struct HomeView: View {
         let columns = Int((usable + gridSpacing) / (minTileWidth + gridSpacing))
 
         return max(1, min(columns, 4))
+    }
+
+    private func pinnedGridRows(columnCount: Int) -> [PinnedGridRowModel] {
+        let columnCount = max(1, columnCount)
+
+        var rows: [PinnedGridRowModel] = []
+        var current: [PinnedGridCell] = []
+        var used = 0
+
+        func flush() {
+            guard !current.isEmpty else { return }
+            rows.append(.init(cells: current, remainingColumns: max(0, columnCount - used)))
+            current = []
+            used = 0
+        }
+
+        for item in pinnedItems {
+            let desiredSpan = (item.tileSize == .wide) ? columnCount : 1
+            let clampedSpan = max(1, min(desiredSpan, columnCount))
+
+            if used + clampedSpan > columnCount {
+                flush()
+            }
+
+            current.append(.init(item: item, span: clampedSpan))
+            used += clampedSpan
+
+            if used == columnCount {
+                flush()
+            }
+        }
+
+        flush()
+        return rows
     }
 
     private func homeGridColumns(for width: CGFloat) -> [GridItem] {
@@ -521,13 +589,13 @@ struct HomeView: View {
             let widgetsStore = HomePinnedWidgetsStore(workspaceID: workspace.id)
             let cardsStore = HomePinnedCardsStore(workspaceID: workspace.id)
 
-            let migratedWidgets = widgetsStore.load().map { HomePinnedItem.widget($0) }
+            let migratedWidgets = widgetsStore.load().map { HomePinnedItem.widget($0, .small) }
 
             var migratedCardIDs = cardsStore.load()
             if migratedCardIDs.isEmpty {
                 migratedCardIDs = cards.map { $0.id }
             }
-            let migratedCards = migratedCardIDs.map { HomePinnedItem.card($0) }
+            let migratedCards = migratedCardIDs.map { HomePinnedItem.card($0, .small) }
 
             let migrated = migratedWidgets + migratedCards
             pinnedItems = migrated

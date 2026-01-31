@@ -9,15 +9,43 @@ import Foundation
 
 // MARK: - Unified pinned items
 
+enum HomeTileSize: String, CaseIterable, Codable, Equatable {
+    case small
+    case wide
+
+    var title: String {
+        switch self {
+        case .small: return "Small"
+        case .wide: return "Wide"
+        }
+    }
+}
+
 enum HomePinnedItem: Identifiable, Codable, Equatable {
 
-    case widget(HomeWidgetID)
-    case card(UUID)
+    case widget(HomeWidgetID, HomeTileSize)
+    case card(UUID, HomeTileSize)
 
     var id: String {
         switch self {
-        case .widget(let widget): return "widget-\(widget.rawValue)"
-        case .card(let uuid): return "card-\(uuid.uuidString)"
+        case .widget(let widget, _): return "widget-\(widget.rawValue)"
+        case .card(let uuid, _): return "card-\(uuid.uuidString)"
+        }
+    }
+
+    var tileSize: HomeTileSize {
+        switch self {
+        case .widget(_, let size): return size
+        case .card(_, let size): return size
+        }
+    }
+
+    func withTileSize(_ size: HomeTileSize) -> HomePinnedItem {
+        switch self {
+        case .widget(let widget, _):
+            return .widget(widget, size)
+        case .card(let id, _):
+            return .card(id, size)
         }
     }
 
@@ -27,6 +55,7 @@ enum HomePinnedItem: Identifiable, Codable, Equatable {
         case type
         case widget
         case cardID
+        case size
     }
 
     private enum ItemType: String, Codable {
@@ -41,11 +70,13 @@ enum HomePinnedItem: Identifiable, Codable, Equatable {
         switch type {
         case .widget:
             let widget = try container.decode(HomeWidgetID.self, forKey: .widget)
-            self = .widget(widget)
+            let size = (try? container.decode(HomeTileSize.self, forKey: .size)) ?? .small
+            self = .widget(widget, size)
 
         case .card:
             let id = try container.decode(UUID.self, forKey: .cardID)
-            self = .card(id)
+            let size = (try? container.decode(HomeTileSize.self, forKey: .size)) ?? .small
+            self = .card(id, size)
         }
     }
 
@@ -53,13 +84,15 @@ enum HomePinnedItem: Identifiable, Codable, Equatable {
         var container = encoder.container(keyedBy: CodingKeys.self)
 
         switch self {
-        case .widget(let widget):
+        case .widget(let widget, let size):
             try container.encode(ItemType.widget, forKey: .type)
             try container.encode(widget, forKey: .widget)
+            try container.encode(size, forKey: .size)
 
-        case .card(let id):
+        case .card(let id, let size):
             try container.encode(ItemType.card, forKey: .type)
             try container.encode(id, forKey: .cardID)
+            try container.encode(size, forKey: .size)
         }
     }
 }
@@ -76,7 +109,8 @@ struct HomePinnedItemsStore {
 
     func load() -> [HomePinnedItem] {
         guard let data = UserDefaults.standard.data(forKey: storageKey) else { return [] }
-        return (try? JSONDecoder().decode([HomePinnedItem].self, from: data)) ?? []
+        guard let decoded = try? JSONDecoder().decode([HomePinnedItem].self, from: data) else { return [] }
+        return normalize(decoded)
     }
 
     func save(_ items: [HomePinnedItem]) {

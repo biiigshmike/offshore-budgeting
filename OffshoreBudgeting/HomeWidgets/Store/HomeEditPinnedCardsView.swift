@@ -32,8 +32,8 @@ struct HomeEditPinnedCardsView: View {
                         Text("Nothing is pinned yet.")
                             .foregroundStyle(.secondary)
                     } else {
-                        ForEach(pinnedItems) { item in
-                            row(for: item)
+                        ForEach($pinnedItems) { $item in
+                            row(item: $item)
                                 .moveDisabled(!isEditing)
                                 .deleteDisabled(!isEditing)
                         }
@@ -46,7 +46,7 @@ struct HomeEditPinnedCardsView: View {
 
                 Section("Available Widgets") {
                     let pinnedWidgetSet = Set(pinnedItems.compactMap { item -> HomeWidgetID? in
-                        if case .widget(let w) = item { return w }
+                        if case .widget(let w, _) = item { return w }
                         return nil
                     })
 
@@ -58,7 +58,7 @@ struct HomeEditPinnedCardsView: View {
                     } else {
                         ForEach(availableWidgets) { widget in
                             Button {
-                                pinnedItems.append(.widget(widget))
+                                pinnedItems.append(.widget(widget, .small))
                             } label: {
                                 HStack {
                                     Text(widget.title)
@@ -76,7 +76,7 @@ struct HomeEditPinnedCardsView: View {
 
                 Section("Available Cards") {
                     let pinnedCardSet = Set(pinnedItems.compactMap { item -> UUID? in
-                        if case .card(let id) = item { return id }
+                        if case .card(let id, _) = item { return id }
                         return nil
                     })
 
@@ -88,7 +88,7 @@ struct HomeEditPinnedCardsView: View {
                     } else {
                         ForEach(availableCards) { card in
                             Button {
-                                pinnedItems.append(.card(card.id))
+                                pinnedItems.append(.card(card.id, .small))
                             } label: {
                                 HStack {
                                     Text(card.name)
@@ -136,40 +136,51 @@ struct HomeEditPinnedCardsView: View {
     // MARK: - Row UI
 
     @ViewBuilder
-    private func row(for item: HomePinnedItem) -> some View {
-        switch item {
-        case .widget(let widget):
-            HStack(spacing: 10) {
-                Text(widget.title)
-                Spacer()
-                Text("Widget")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(.secondary)
-            }
+    private func row(item: Binding<HomePinnedItem>) -> some View {
+        let sizeBinding = Binding<HomeTileSize>(
+            get: { item.wrappedValue.tileSize },
+            set: { item.wrappedValue = item.wrappedValue.withTileSize($0) }
+        )
 
-        case .card(let id):
-            if let card = cards.first(where: { $0.id == id }) {
-                HStack(spacing: 10) {
-                    Text(card.name)
-                    Spacer()
-                    Text("Card")
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                }
-            } else {
-                HStack(spacing: 10) {
-                    Text("Missing Card")
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Text("Card")
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(.secondary)
+        HStack(spacing: 10) {
+            Text(title(for: item.wrappedValue))
+
+            Spacer()
+
+            Text(typeLabel(for: item.wrappedValue))
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            Picker("Size", selection: sizeBinding) {
+                ForEach(HomeTileSize.allCases, id: \.self) { size in
+                    Text(size.title).tag(size)
                 }
             }
+            .pickerStyle(.segmented)
+            .frame(width: 160)
+            .disabled(!isEditing)
         }
     }
 
     // MARK: - Helpers
+
+    private func title(for item: HomePinnedItem) -> String {
+        switch item {
+        case .widget(let widget, _):
+            return widget.title
+        case .card(let id, _):
+            return cards.first(where: { $0.id == id })?.name ?? "Missing Card"
+        }
+    }
+
+    private func typeLabel(for item: HomePinnedItem) -> String {
+        switch item {
+        case .widget:
+            return "Widget"
+        case .card:
+            return "Card"
+        }
+    }
 
     private func movePinnedItems(from source: IndexSet, to destination: Int) {
         pinnedItems.move(fromOffsets: source, toOffset: destination)
