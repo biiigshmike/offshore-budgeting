@@ -393,6 +393,7 @@ struct HomeSpendTrendsAggregator {
 
         var topSlices: [Slice] = []
         var otherTotal: Double = 0
+        var otherDominant: (id: UUID, amount: Double)? = nil
         let uncategorizedTotal: Double = totals[nil, default: 0]
 
         for id in topCategoryIDs {
@@ -416,6 +417,14 @@ struct HomeSpendTrendsAggregator {
             guard value > 0 else { continue }
             guard !topCategoryIDs.contains(key) else { continue }
             otherTotal += value
+
+            if let current = otherDominant {
+                if value > current.amount {
+                    otherDominant = (id: key, amount: value)
+                }
+            } else {
+                otherDominant = (id: key, amount: value)
+            }
         }
 
         var slices: [Slice] = []
@@ -434,11 +443,18 @@ struct HomeSpendTrendsAggregator {
         slices.append(contentsOf: topSlices)
 
         if otherTotal > 0 {
+            // I color "Other" using the biggest contributor outside the topN.
+            // This avoids the "mystery gray" segment when everything is categorized.
+            let otherHex: String? = {
+                guard let dominant = otherDominant else { return nil }
+                return categories.first(where: { $0.id == dominant.id })?.hexColor
+            }()
+
             slices.append(
                 Slice(
                     categoryID: UUID(uuidString: "00000000-0000-0000-0000-000000000001"),
                     name: "Other",
-                    hexColor: nil,
+                    hexColor: otherHex,
                     amount: otherTotal
                 )
             )

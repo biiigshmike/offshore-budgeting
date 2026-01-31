@@ -16,7 +16,7 @@ struct HomeCategorySpotlightTile: View {
     let startDate: Date
     let endDate: Date
 
-    var topN: Int = 5
+    var topN: Int = 6
 
     private var metricsResult: HomeCategoryMetricsResult {
         HomeCategoryMetricsCalculator.calculate(
@@ -36,7 +36,7 @@ struct HomeCategorySpotlightTile: View {
         DonutChartView.slicesFromCategoryMetrics(
             metricsResult.metrics,
             topN: topN,
-            includeOther: true
+            includeOther: false
         )
     }
 

@@ -26,7 +26,7 @@ struct HomeSpendTrendsTile: View {
             rangeStart: startDate,
             rangeEnd: endDate,
             cardFilter: nil,
-            topN: 4
+            topN: 3
         )
 
         NavigationLink {
@@ -76,8 +76,8 @@ struct HomeSpendTrendsTile: View {
                 let barWidth = min(26, slotWidth * 0.70)
                 let height = geo.size.height
 
-                ZStack(alignment: .bottomLeading) {
-                    ForEach(Array(buckets.enumerated()), id: \.element.id) { index, bucket in
+                HStack(alignment: .bottom, spacing: 0) {
+                    ForEach(buckets) { bucket in
                         SpendTrendsScaledPillBar(
                             bucket: bucket,
                             maxTotal: maxTotal,
@@ -85,13 +85,9 @@ struct HomeSpendTrendsTile: View {
                             barWidth: barWidth,
                             colorForSlice: color(for:)
                         )
-                        .position(
-                            x: (slotWidth * CGFloat(index)) + (slotWidth / 2),
-                            y: height / 2
-                        )
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                     }
                 }
-                .frame(width: geo.size.width, height: geo.size.height, alignment: .bottomLeading)
                 .allowsHitTesting(false)
                 .accessibilityHidden(true)
             }
@@ -127,14 +123,6 @@ struct HomeSpendTrendsTile: View {
     private func color(for slice: HomeSpendTrendsAggregator.Slice) -> Color {
         if let hex = slice.hexColor, let c = Color(hex: hex) {
             return c
-        }
-
-        if slice.name == "Other" {
-            return .secondary
-        }
-
-        if slice.name == "Uncategorized" {
-            return .secondary
         }
 
         return .secondary
@@ -176,28 +164,29 @@ private struct SpendTrendsScaledPillBar: View {
     private let displayEpsilon: Double = 1.00
 
     var body: some View {
-        guard bucket.total > displayEpsilon else {
-            return AnyView(EmptyView())
-        }
+        if bucket.total > displayEpsilon {
+            let fraction = min(1.0, max(0.0, bucket.total / max(0.000_1, maxTotal)))
+            let barHeight = max(2, availableHeight * CGFloat(fraction))
 
-        let fraction = min(1.0, max(0.0, bucket.total / max(0.000_1, maxTotal)))
-        let barHeight = max(2, availableHeight * CGFloat(fraction))
+            let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
+            let gradient = featheredGradient(bucket: bucket)
 
-        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
-        let gradient = featheredGradient(bucket: bucket)
+            VStack(spacing: 0) {
+                Spacer(minLength: 0)
 
-        return AnyView(
-            ZStack(alignment: .bottom) {
-                shape
-                    .fill(gradient)
-                    .frame(width: barWidth, height: barHeight)
+                ZStack(alignment: .bottom) {
+                    shape
+                        .fill(gradient)
+                        .frame(width: barWidth, height: barHeight)
 
-                shape
-                    .strokeBorder(Color.white.opacity(0.16), lineWidth: 1)
-                    .frame(width: barWidth, height: barHeight)
+                    shape
+                        .strokeBorder(Color.white.opacity(0.16), lineWidth: 1)
+                        .frame(width: barWidth, height: barHeight)
+                }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-        )
+        } else {
+            EmptyView()
+        }
     }
 
     /// Feathered gradient: blends colors at boundaries without blur, so nothing can “float”.

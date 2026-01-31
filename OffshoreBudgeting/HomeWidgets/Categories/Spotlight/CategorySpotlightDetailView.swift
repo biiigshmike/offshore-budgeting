@@ -41,7 +41,7 @@ struct CategorySpotlightDetailView: View {
         DonutChartView.slicesFromCategoryMetrics(
             result.metrics,
             topN: topN,
-            includeOther: true
+            includeOther: false
         )
     }
 

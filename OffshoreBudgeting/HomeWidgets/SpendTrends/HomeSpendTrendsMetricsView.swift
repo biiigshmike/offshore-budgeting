@@ -54,7 +54,7 @@ struct HomeSpendTrendsMetricsView: View {
             rangeStart: startDate,
             rangeEnd: endDate,
             cardFilter: selectedCard,
-            topN: 4
+            topN: 3
         )
 
         ScrollView {

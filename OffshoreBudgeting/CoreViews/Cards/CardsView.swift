@@ -137,6 +137,12 @@ struct CardsView: View {
     // MARK: - Delete
 
     private func delete(_ card: Card) {
+        let cardID = card.id
+        let workspaceID = workspace.id
+
+        HomePinnedItemsStore(workspaceID: workspaceID).removePinnedCard(id: cardID)
+        HomePinnedCardsStore(workspaceID: workspaceID).removePinnedCardID(cardID)
+
         // I prefer being explicit here even though SwiftData delete rules are set to cascade.
         // This keeps behavior predictable if those rules ever change.
         if let planned = card.plannedExpenses {
