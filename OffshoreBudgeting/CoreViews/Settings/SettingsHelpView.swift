@@ -178,7 +178,7 @@ private struct HomeHelpView: View {
             title: "Home",
             sections: [
                 .init(screenshotSlot: 1, header: "Home: Welcome to Your Dashboard", body: [
-                    .text("You can pick your own custom start and end date, or use the pre-defined ranges in the period menu by pressing on the calendar icon. The widgets respond with the date range you select.")
+                    .text("You can pick your own custom start and end date, or use the pre-defined ranges in the period menu by pressing on the calendar icon. The widgets respond with the date range you select. Change the default loading behavior by going to Settings > General > Default Budgeting Period.")
                 ]),
                 .init(screenshotSlot: 2, header: "Widgets Overview", body: [
                     .text("Home is made of widgets. Tap any widget to open its detail page."),
@@ -298,7 +298,7 @@ private struct SettingsHelpDetailsView: View {
                     .text("Every row here is a separate area to manage your Offshore experience."),
                     .bullet("About: Version Info, Contact Support, Release Logs"),
                     .bullet("Help: This guide, Repeat Onboarding"),
-                    .bullet("General: Currency, Budget Period, Start of Week, Reset Tips & Hints, Reset & Erase Content"),
+                    .bullet("General: Currency, Budget Period, Reset Tips & Hints, Reset & Erase Content"),
                     .bullet("Privacy: Enable Biometrics for App Lock"),
                     .bullet("Notifications: Enable Notifications for a reminder to log variable expenses for the day, compare planned vs actual income, and enable Presets due reminders."),
                     .bullet("iCloud: Allow for iCloud Syncing Across Devices and check the iCloud Sync Status"),
