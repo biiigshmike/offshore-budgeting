@@ -260,7 +260,11 @@ struct BudgetDetailView: View {
     private var plannedExpensesActualTotal: Double {
         plannedExpensesFiltered.reduce(0) { $0 + max(0, $1.actualAmount) }
     }
-    
+
+    private var plannedExpensesEffectiveTotal: Double {
+        plannedExpensesFiltered.reduce(0) { $0 + $1.effectiveAmount() }
+    }
+
     private var variableExpensesTotal: Double {
         variableExpensesFiltered.reduce(0) { $0 + $1.amount }
     }
@@ -268,15 +272,15 @@ struct BudgetDetailView: View {
     // MARK: - Savings math (reacts to category + type)
     
     private var maxSavings: Double {
-        plannedIncomeTotal - plannedExpensesPlannedTotal
+        plannedIncomeTotal - plannedExpensesEffectiveTotal
     }
     
     private var projectedSavings: Double {
-        plannedIncomeTotal - plannedExpensesPlannedTotal - variableExpensesTotal
+        plannedIncomeTotal - plannedExpensesPlannedTotal
     }
     
     private var actualSavings: Double {
-        actualIncomeTotal - plannedExpensesActualTotal - variableExpensesTotal
+        actualIncomeTotal - plannedExpensesEffectiveTotal - variableExpensesTotal
     }
     
     // MARK: - Sort
@@ -327,7 +331,7 @@ struct BudgetDetailView: View {
     }
     
     private func plannedAmountForSort(_ expense: PlannedExpense) -> Double {
-        expense.actualAmount > 0 ? expense.actualAmount : expense.plannedAmount
+        expense.effectiveAmount()
     }
     
     // MARK: - List title (reacts to type)
@@ -338,7 +342,7 @@ struct BudgetDetailView: View {
             return Text("Planned Expenses • \(plannedExpensesPlannedTotal, format: CurrencyFormatter.currencyStyle())")
             
         case .unified:
-            let unifiedTotal = plannedExpensesPlannedTotal + variableExpensesTotal
+            let unifiedTotal = plannedExpensesEffectiveTotal + variableExpensesTotal
             return Text("All Expenses • \(unifiedTotal, format: CurrencyFormatter.currencyStyle())")
             
         case .variable:
@@ -773,9 +777,9 @@ struct BudgetDetailView: View {
             ]
 
         case .unified:
-            let unifiedTotal = plannedExpensesPlannedTotal + variableExpensesTotal
+            let unifiedTotal = plannedExpensesEffectiveTotal + variableExpensesTotal
             return [
-                .init(label: "Planned Total", value: plannedExpensesPlannedTotal),
+                .init(label: "Planned Total", value: plannedExpensesEffectiveTotal),
                 .init(label: "Variable Total", value: variableExpensesTotal),
                 .init(label: "Unified Total", value: unifiedTotal)
             ]
@@ -980,7 +984,7 @@ struct BudgetDetailView: View {
         plannedExpensesInBudget
             .filter { $0.category?.id == category.id }
             .reduce(0) { total, expense in
-                total + (expense.actualAmount > 0 ? expense.actualAmount : expense.plannedAmount)
+                total + expense.effectiveAmount()
             }
     }
 
@@ -1026,7 +1030,7 @@ private enum BudgetUnifiedExpenseItem: Identifiable {
 
     var amount: Double {
         switch self {
-        case .planned(let e): return e.actualAmount > 0 ? e.actualAmount : e.plannedAmount
+        case .planned(let e): return e.effectiveAmount()
         case .variable(let e): return e.amount
         }
     }
@@ -1215,7 +1219,7 @@ private struct BudgetPlannedExpenseRow: View {
     let showsCardName: Bool
 
     private var amountToShow: Double {
-        expense.actualAmount > 0 ? expense.actualAmount : expense.plannedAmount
+        expense.effectiveAmount()
     }
 
     private var categoryColor: Color {

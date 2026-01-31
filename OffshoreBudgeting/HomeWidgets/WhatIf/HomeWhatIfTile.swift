@@ -37,7 +37,7 @@ struct HomeWhatIfTile: View {
     private var plannedExpensesEffectiveTotal: Double {
         plannedExpenses
             .filter { isInRange($0.expenseDate) }
-            .reduce(0) { $0 + effectivePlannedExpenseAmount($1) }
+            .reduce(0) { $0 + $1.effectiveAmount() }
     }
 
     private var variableExpensesTotal: Double {
@@ -227,17 +227,13 @@ struct HomeWhatIfTile: View {
         date.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted))
     }
 
-    private func effectivePlannedExpenseAmount(_ expense: PlannedExpense) -> Double {
-        expense.actualAmount > 0 ? expense.actualAmount : expense.plannedAmount
-    }
-
     private func buildBaselineByCategoryID() -> [UUID: Double] {
         var plannedByCategoryID: [UUID: Double] = [:]
         var variableByCategoryID: [UUID: Double] = [:]
 
         for expense in plannedExpenses {
             guard isInRange(expense.expenseDate), let category = expense.category else { continue }
-            plannedByCategoryID[category.id, default: 0] += effectivePlannedExpenseAmount(expense)
+            plannedByCategoryID[category.id, default: 0] += expense.effectiveAmount()
         }
 
         for expense in variableExpenses {

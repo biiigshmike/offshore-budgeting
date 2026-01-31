@@ -31,7 +31,7 @@ struct HomeCategoryMetricsCalculator {
                 let category = expense.category
             else { continue }
 
-            let effectiveAmount: Double = (expense.actualAmount > 0) ? expense.actualAmount : expense.plannedAmount
+            let effectiveAmount = expense.effectiveAmount()
             plannedByCategoryID[category.id, default: 0] += effectiveAmount
         }
 

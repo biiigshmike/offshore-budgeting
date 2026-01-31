@@ -35,6 +35,21 @@ struct HomeView: View {
 
     @State private var pinnedItems: [HomePinnedItem] = []
 
+    // MARK: - Data Fixups
+
+    private var plannedExpensesForHome: [PlannedExpense] {
+        // I filter out budget-generated planned expenses whose source budget no longer exists,
+        // because deleting a budget can leave orphan planned expenses behind.
+        let existingBudgetIDs = Set(budgets.map(\.id))
+
+        return plannedExpenses.filter { expense in
+            guard let sourceBudgetID = expense.sourceBudgetID else {
+                return true
+            }
+            return existingBudgetIDs.contains(sourceBudgetID)
+        }
+    }
+
     // MARK: - A11y + Layout Environment
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -243,7 +258,7 @@ struct HomeView: View {
         HomeSavingsOutlookTile(
             workspace: workspace,
             incomes: incomes,
-            plannedExpenses: plannedExpenses,
+            plannedExpenses: plannedExpensesForHome,
             variableExpenses: variableExpenses,
             startDate: appliedStartDate,
             endDate: appliedEndDate
@@ -255,7 +270,7 @@ struct HomeView: View {
             workspace: workspace,
             categories: categories,
             incomes: incomes,
-            plannedExpenses: plannedExpenses,
+            plannedExpenses: plannedExpensesForHome,
             variableExpenses: variableExpenses,
             startDate: appliedStartDate,
             endDate: appliedEndDate
@@ -265,7 +280,7 @@ struct HomeView: View {
     @ViewBuilder
     private var nextPlannedExpenseWidget: some View {
         if let next = HomeNextPlannedExpenseFinder.nextExpense(
-            from: plannedExpenses,
+            from: plannedExpensesForHome,
             in: appliedStartDate,
             to: appliedEndDate
         ) {
@@ -294,7 +309,7 @@ struct HomeView: View {
         HomeCategorySpotlightTile(
             workspace: workspace,
             categories: categories,
-            plannedExpenses: plannedExpenses,
+            plannedExpenses: plannedExpensesForHome,
             variableExpenses: variableExpenses,
             startDate: appliedStartDate,
             endDate: appliedEndDate,
@@ -308,7 +323,7 @@ struct HomeView: View {
             workspace: workspace,
             budgets: budgets,
             categories: categories,
-            plannedExpenses: plannedExpenses,
+            plannedExpenses: plannedExpensesForHome,
             variableExpenses: variableExpenses,
             startDate: appliedStartDate,
             endDate: appliedEndDate
@@ -320,7 +335,7 @@ struct HomeView: View {
             workspace: workspace,
             cards: cards,
             categories: categories,
-            plannedExpenses: plannedExpenses,
+            plannedExpenses: plannedExpensesForHome,
             variableExpenses: variableExpenses,
             startDate: appliedStartDate,
             endDate: appliedEndDate

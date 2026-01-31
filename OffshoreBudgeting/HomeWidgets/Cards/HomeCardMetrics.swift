@@ -37,7 +37,7 @@ enum HomeCardMetricsCalculator {
     }
 
     private static func plannedEffectiveAmount(_ expense: PlannedExpense) -> Double {
-        expense.actualAmount > 0 ? expense.actualAmount : expense.plannedAmount
+        expense.effectiveAmount()
     }
 
     private static func normalizedStart(_ date: Date) -> Date {

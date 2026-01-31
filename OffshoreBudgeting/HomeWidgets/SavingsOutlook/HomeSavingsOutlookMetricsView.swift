@@ -386,18 +386,13 @@ struct HomeSavingsOutlookMetricsView: View {
     private func sumPlannedExpensesEffectiveActual(from start: Date, to end: Date) -> Double {
         plannedExpenses
             .filter { $0.expenseDate >= start && $0.expenseDate <= end }
-            .reduce(0) { $0 + effectivePlannedExpenseAmount($1) }
+            .reduce(0) { $0 + $1.effectiveAmount() }
     }
 
     private func sumVariableExpenses(from start: Date, to end: Date) -> Double {
         variableExpenses
             .filter { $0.transactionDate >= start && $0.transactionDate <= end }
             .reduce(0) { $0 + $1.amount }
-    }
-
-    private func effectivePlannedExpenseAmount(_ expense: PlannedExpense) -> Double {
-        // Planned by default, unless edited, then actualAmount is used.
-        return expense.actualAmount > 0 ? expense.actualAmount : expense.plannedAmount
     }
 
     // MARK: - Progress Summary

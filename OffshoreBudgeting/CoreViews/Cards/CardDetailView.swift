@@ -825,7 +825,7 @@ struct CardDetailView: View {
     }
 
     private func plannedEffectiveAmount(_ expense: PlannedExpense) -> Double {
-        expense.actualAmount > 0 ? expense.actualAmount : expense.plannedAmount
+        expense.effectiveAmount()
     }
 
     private func sortPlannedExpenses(_ expenses: [PlannedExpense], by mode: SortMode) -> [PlannedExpense] {
@@ -1044,7 +1044,7 @@ private enum UnifiedExpenseItem: Identifiable {
 
     var amount: Double {
         switch self {
-        case .planned(let e): return e.actualAmount > 0 ? e.actualAmount : e.plannedAmount
+        case .planned(let e): return e.effectiveAmount()
         case .variable(let e): return e.amount
         }
     }
@@ -1348,7 +1348,7 @@ private struct PlannedExpenseRow: View {
     let expense: PlannedExpense
 
     private var amountToShow: Double {
-        expense.actualAmount > 0 ? expense.actualAmount : expense.plannedAmount
+        expense.effectiveAmount()
     }
 
     var body: some View {

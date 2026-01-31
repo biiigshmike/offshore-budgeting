@@ -183,7 +183,7 @@ private struct HomeHelpView: View {
                 .init(screenshotSlot: 2, header: "Widgets Overview", body: [
                     .text("Home is made of widgets. Tap any widget to open its detail page."),
                     .bullet("Income: shows Actual Income versus Planned Income. Tapping the widget takes you to a detailed metric overview to view income trends over time."),
-                    .bullet("Savings Outlook: Use Savings Outlook to view your projected savings based on your planned income and expenses. The projected savings is calculated by taking your Actual Savings + Planned Income and subtracting remaining Planned Expenses."),
+                    .bullet("Savings Outlook: Use Savings Outlook to view your projected savings based on your planned income and planned expenses. Projected Savings is calculated as Planned Income - Planned Expenses (planned amounts)."),
                     .bullet("Next Planned Expense: Displays the next upcoming Planned Expense. Tapping it opens the Presets management page where you will see this expense pinned at the top, as well as being able to quickly manage the rest of your presets here."),
                     .bullet("Category Spotlight: Shows the top categories by spend in the current range. The total is derived by summing the Planned Expenses and Variable together for each category."),
                     .bullet("Spend Trends: Spend totals segmented by day, week, or month, depending upon which period is being viewed. Tapping the widget opens a detailed trends view."),
@@ -192,7 +192,7 @@ private struct HomeHelpView: View {
                 ]),
                 .init(screenshotSlot: 3, header: "Home Calculations", body: [
                     .text("Home calculations mirror budget math:"),
-                    .bullet("Actual Savings = actual income - (planned expenses actual amount + variable expenses total amount)."),
+                    .bullet("Actual Savings = actual income - (planned expenses effective amount + variable expenses total amount). Planned effective amount uses Actual Amount when set (> 0); otherwise, it uses Planned Amount."),
                     .bullet("Remaining Income = actual income - expenses.")
                 ])
             ]
@@ -218,12 +218,12 @@ private struct BudgetsHelpView: View {
                     .text("These totals are shown in the budget header:"),
                     .bullet("Planned Income = Planned Income total in this period."),
                     .bullet("Actual Income = Actual Income total in this period."),
-                    .bullet("Planned Total (Presets) = sum of Preset Planned Expenses. This sum will use the Planned Amount unless a Preset was modified; then, it will use the Actual amount."),
+                    .bullet("Planned Total (Presets) = sum of Preset Planned Expenses planned amounts."),
                     .bullet("Variable Total (Variable Expenses) = sum of Variable Expenses for the budget period."),
-                    .bullet("Unified Total (Preset Planned Expenses + Variable Expenses) = Takes the Planned (or Actual) amounts from Preset Planned Expenses and adds them to Variable Expenses to give you a unified total."),
-                    .bullet("Max Savings: Planned Income - Planned Expenses total."),
-                    .bullet("Projected Savings: Actual Savings + (Planned Income - Planned Expenses)."),
-                    .bullet("Actual Savings: Actual Income - (Planned Expenses total + Variable Expenses total)."),
+                    .bullet("Unified Total (Preset Planned Expenses + Variable Expenses) = Takes the Planned Expenses effective amounts (Actual Amount when set (> 0); otherwise Planned Amount) and adds them to Variable Expenses to give you a unified total."),
+                    .bullet("Max Savings: Planned Income - Planned Expenses effective total."),
+                    .bullet("Projected Savings: Planned Income - Planned Expenses planned total."),
+                    .bullet("Actual Savings: Actual Income - (Planned Expenses effective total + Variable Expenses total)."),
                 ])
             ]
         )

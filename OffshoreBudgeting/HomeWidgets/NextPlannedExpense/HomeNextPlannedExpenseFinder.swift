@@ -32,7 +32,7 @@ enum HomeNextPlannedExpenseFinder {
     }
 
     static func effectiveAmount(for expense: PlannedExpense) -> Double {
-        expense.actualAmount > 0 ? expense.actualAmount : expense.plannedAmount
+        expense.effectiveAmount()
     }
 
     private static func normalizedStart(_ date: Date, calendar: Calendar) -> Date {

@@ -172,10 +172,10 @@ struct WhatIfScenarioPlannerView: View {
 
         for c in categories {
             let amount = scenarioByCategoryID[c.id, default: 0]
-            rows.append("\"\(c.name)\",\(amount)")
+            rows.append("\"\(c.name)\",\(CurrencyFormatter.csvNumberString(from: amount))")
         }
 
-        rows.append("\"Savings/Remaining\",\(scenarioSavings)")
+        rows.append("\"Savings/Remaining\",\(CurrencyFormatter.csvNumberString(from: scenarioSavings))")
         return rows.joined(separator: "\n")
     }
 
@@ -758,7 +758,7 @@ struct WhatIfScenarioPlannerView: View {
 
     private func setScenarioValue(_ newValue: Double, for categoryID: UUID) {
         let baseline = baselineByCategoryID[categoryID, default: 0]
-        let clamped = max(0, newValue)
+        let clamped = max(0, CurrencyFormatter.roundedToCurrency(newValue))
 
         // If it matches baseline, remove override (keeps payload clean)
         if abs(clamped - baseline) < 0.000_1 {
@@ -795,7 +795,7 @@ struct WhatIfScenarioPlannerView: View {
         cleaned.reserveCapacity(overrides.count)
 
         for (id, value) in overrides where validIDs.contains(id) {
-            cleaned[id] = max(0, value)
+            cleaned[id] = max(0, CurrencyFormatter.roundedToCurrency(value))
         }
 
         return cleaned
@@ -851,7 +851,7 @@ struct WhatIfScenarioPlannerView: View {
         for category in categories {
             let planned = plannedByCategoryID[category.id, default: 0]
             let variable = variableByCategoryID[category.id, default: 0]
-            result[category.id] = max(0, planned + variable)
+            result[category.id] = max(0, CurrencyFormatter.roundedToCurrency(planned + variable))
         }
 
         return result
@@ -868,7 +868,7 @@ struct WhatIfScenarioPlannerView: View {
     }
 
     private func effectivePlannedExpenseAmount(_ expense: PlannedExpense) -> Double {
-        expense.actualAmount > 0 ? describedAsCurrencySafe(expense.actualAmount) : describedAsCurrencySafe(expense.plannedAmount)
+        describedAsCurrencySafe(expense.effectiveAmount())
     }
 
     // This keeps behavior stable if any values ever drift negative/NaN.

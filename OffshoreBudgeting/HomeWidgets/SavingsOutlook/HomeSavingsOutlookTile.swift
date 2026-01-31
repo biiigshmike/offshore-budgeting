@@ -39,7 +39,7 @@ struct HomeSavingsOutlookTile: View {
     private var plannedExpensesEffectiveActualTotal: Double {
         plannedExpenses
             .filter { isInRange($0.expenseDate) }
-            .reduce(0) { $0 + effectivePlannedExpenseAmount($1) }
+            .reduce(0) { $0 + $1.effectiveAmount() }
     }
 
     private var variableExpensesTotal: Double {
@@ -182,11 +182,6 @@ struct HomeSavingsOutlookTile: View {
         (date >= startDate) && (date <= endDate)
     }
 
-    private func effectivePlannedExpenseAmount(_ expense: PlannedExpense) -> Double {
-        // Planned by default, unless the user has edited it, in which case actualAmount is used.
-        // Practical detection, since actualAmount defaults to 0.
-        return expense.actualAmount > 0 ? expense.actualAmount : expense.plannedAmount
-    }
 }
 
 // MARK: - Gauge Row

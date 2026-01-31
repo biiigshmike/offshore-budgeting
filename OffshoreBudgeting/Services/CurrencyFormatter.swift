@@ -117,6 +117,44 @@ enum CurrencyFormatter {
         return nil
     }
 
+    // MARK: - Public: Rounding
+
+    /// Rounds to the selected currency's minor units (USD/EUR = 2, JPY = 0, etc.).
+    static func roundedToCurrency(_ value: Double) -> Double {
+        guard value.isFinite else { return 0 }
+
+        let digits = currencyFractionDigits()
+        guard digits > 0 else { return value.rounded() }
+
+        let factor = pow(10, Double(digits))
+        return (value * factor).rounded() / factor
+    }
+
+    // MARK: - Public: CSV String
+
+    /// Stable numeric output for CSV exports:
+    /// - Uses a dot decimal separator
+    /// - No grouping separators
+    /// - Fixed fraction digits based on the selected currency
+    static func csvNumberString(from value: Double) -> String {
+        let digits = currencyFractionDigits()
+
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.usesGroupingSeparator = false
+        formatter.minimumFractionDigits = digits
+        formatter.maximumFractionDigits = digits
+
+        let rounded = roundedToCurrency(value)
+
+        if let formatted = formatter.string(from: NSNumber(value: rounded)) {
+            return formatted
+        }
+
+        return rounded.formatted(.number.locale(Locale(identifier: "en_US_POSIX")).precision(.fractionLength(digits)))
+    }
+
     // MARK: - Internals
 
     private static func makeCurrencyFormatter() -> NumberFormatter {

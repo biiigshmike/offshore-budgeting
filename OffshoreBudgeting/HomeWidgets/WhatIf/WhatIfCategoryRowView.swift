@@ -114,7 +114,7 @@ struct WhatIfCategoryRowView: View {
                         .onChange(of: text) { _, newValue in
                             guard isFocused else { return }
                             if let parsed = CurrencyFormatter.parseAmount(newValue) {
-                                amount = max(0, parsed)
+                                amount = max(0, CurrencyFormatter.roundedToCurrency(parsed))
                             }
                         }
                         .onChange(of: amount) { _, newValue in
@@ -161,7 +161,7 @@ struct WhatIfCategoryRowView: View {
     // MARK: - Helpers
 
     private func resetToBaseline() {
-        amount = max(0, baselineAmount)
+        amount = max(0, CurrencyFormatter.roundedToCurrency(baselineAmount))
 
         if !isFocused {
             text = CurrencyFormatter.editingString(from: amount)
@@ -169,7 +169,7 @@ struct WhatIfCategoryRowView: View {
     }
 
     private func adjust(_ delta: Double) {
-        let next = max(0, amount + delta)
+        let next = max(0, CurrencyFormatter.roundedToCurrency(amount + delta))
         amount = next
 
         if !isFocused {
