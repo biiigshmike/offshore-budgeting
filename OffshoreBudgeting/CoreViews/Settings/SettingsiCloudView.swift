@@ -38,7 +38,7 @@ struct SettingsiCloudView: View {
                     set: { newValue in
                         handleToggleChange(newValue)
                     }
-                ))
+                )).tint(Color("AccentColor"))
 
                 statusRow
 

@@ -88,6 +88,7 @@ struct ExpenseCSVImportRowView: View {
                         Text("Remember")
                     }
                     .labelsHidden()
+                    .tint(Color("AccentColor"))
                 }
 
                 if row.isMissingRequiredData {
@@ -112,6 +113,7 @@ struct ExpenseCSVImportRowView: View {
                         Text("Remember")
                     }
                     .labelsHidden()
+                    .tint(Color("AccentColor"))
                 }
 
                 if row.isMissingRequiredData {

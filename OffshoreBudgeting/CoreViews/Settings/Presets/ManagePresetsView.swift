@@ -149,14 +149,14 @@ struct ManagePresetsView: View {
                             } label: {
                                 Label("Edit", systemImage: "pencil")
                             }
-                            .tint(.blue)
+                            .tint(Color("AccentColor"))
 
                             Button {
                                 archive(pinned)
                             } label: {
                                 Label("Archive", systemImage: "archivebox")
                             }
-                            .tint(.orange)
+                            .tint(Color("OffshoreSand"))
                         }
                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                             Button(role: .destructive) {
@@ -164,6 +164,7 @@ struct ManagePresetsView: View {
                             } label: {
                                 Label("Delete", systemImage: "trash")
                             }
+                            .tint(Color("OffshoreDepth"))
                         }
                     }
                 }
@@ -192,14 +193,14 @@ struct ManagePresetsView: View {
                             } label: {
                                 Label("Edit", systemImage: "pencil")
                             }
-                            .tint(.blue)
+                            .tint(Color("AccentColor"))
 
                             Button {
                                 archive(preset)
                             } label: {
                                 Label("Archive", systemImage: "archivebox")
                             }
-                            .tint(.orange)
+                            .tint(Color("OffshoreSand"))
                         }
                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                             Button(role: .destructive) {
@@ -207,6 +208,7 @@ struct ManagePresetsView: View {
                             } label: {
                                 Label("Delete", systemImage: "trash")
                             }
+                            .tint(Color("OffshoreDepth"))
                         }
                     }
                     .onDelete(perform: deleteActiveViaListSwipe)
@@ -244,7 +246,7 @@ struct ManagePresetsView: View {
                                 } label: {
                                     Label("Edit", systemImage: "pencil")
                                 }
-                                .tint(.blue)
+                                .tint(Color("AccentColor"))
                             }
                             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                 Button(role: .destructive) {
@@ -252,6 +254,7 @@ struct ManagePresetsView: View {
                                 } label: {
                                     Label("Delete", systemImage: "trash")
                                 }
+                                .tint(Color("OffshoreDepth"))
                             }
                         }
                         .onDelete(perform: deleteArchivedViaListSwipe)

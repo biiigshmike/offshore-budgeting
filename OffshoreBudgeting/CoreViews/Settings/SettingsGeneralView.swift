@@ -61,13 +61,17 @@ struct SettingsGeneralView: View {
             }
 
             Section("Behavior") {
-                Toggle("Confirm Before Deleting", isOn: $confirmBeforeDeleting)
+                Toggle("Confirm Before Deleting", isOn: $confirmBeforeDeleting
+                )
+                .tint(Color("AccentColor"))
 
                 Text("When enabled, you’ll always be asked to confirm before anything is deleted.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
 
-                Toggle("Remember Tab Selection", isOn: $rememberTabSelection)
+                Toggle("Remember Tab Selection", isOn: $rememberTabSelection
+                )
+                .tint(Color("AccentColor"))
 
                 Text("When enabled, the app will always launch with the last view you were on instead of defaulting to Home.")
                     .font(.footnote)

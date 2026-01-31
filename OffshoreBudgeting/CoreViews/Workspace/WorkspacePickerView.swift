@@ -88,7 +88,7 @@ struct WorkspacePickerView: View {
                             } label: {
                                 Label("Edit", systemImage: "pencil")
                             }
-                            .tint(.blue)
+                            .tint(Color("AccentColor"))
                         }
 
                         // Swipe left (trailing) -> Delete
@@ -98,6 +98,7 @@ struct WorkspacePickerView: View {
                             } label: {
                                 Label("Delete", systemImage: "trash")
                             }
+                            .tint(Color("OffshoreDepth"))
                         }
                     }
                 }

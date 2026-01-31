@@ -70,6 +70,7 @@ struct ManagePresetsForBudgetSheet: View {
                                 }
                             }
                         }
+                        .tint(Color("AccentColor"))
                         .disabled(!canLink(preset) || (linkedCardIDs.isEmpty && !isLinked(preset)))
                     }
                 }

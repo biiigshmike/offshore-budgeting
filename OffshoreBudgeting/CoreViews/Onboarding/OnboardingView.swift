@@ -16,52 +16,52 @@ import CloudKit
 /// - SettingsHelpView -> "Repeat Onboarding" sets didCompleteOnboarding = false
 /// - SettingsGeneralView -> "Reset & Erase Content" sets didCompleteOnboarding = false
 struct OnboardingView: View {
-
+    
     // MARK: - Persisted State
-
+    
     @AppStorage("didCompleteOnboarding") private var didCompleteOnboarding: Bool = false
     @AppStorage("selectedWorkspaceID") private var selectedWorkspaceID: String = ""
-
+    
     @AppStorage("privacy_requireBiometrics") private var requireBiometrics: Bool = false
-
+    
     @AppStorage("icloud_useCloud") private var desiredUseICloud: Bool = false
     @AppStorage("icloud_activeUseCloud") private var activeUseICloud: Bool = false
     @AppStorage("icloud_bootstrapStartedAt") private var iCloudBootstrapStartedAt: Double = 0
-
+    
     /// Persist step so relaunches and resets don't restart the flow.
     @AppStorage("onboarding_step") private var onboardingStep: Int = 0
     
     @AppStorage("onboarding_didChooseDataSource") private var didChooseDataSource: Bool = false
     @AppStorage("onboarding_didPressGetStarted") private var didPressGetStarted: Bool = false
-
+    
     // MARK: - SwiftData
-
+    
     @Query(sort: \Workspace.name, order: .forward)
     private var workspaces: [Workspace]
-
+    
     @Environment(\.modelContext) private var modelContext
-
+    
     // MARK: - Local Notifications
-
+    
     @StateObject private var notificationService = LocalNotificationService()
-
+    
     // MARK: - UI
-
+    
     @State private var showingSkipPrompt: Bool = false
     @State private var skipPromptMessage: String = ""
-
+    
     @State private var showingMissingWorkspaceAlert: Bool = false
     @State private var showingMissingCardAlert: Bool = false
     @State private var showingGetStartedICloudChoice: Bool = false
     @State private var isCheckingICloudForGetStarted: Bool = false
     @State private var showingRestartRequired: Bool = false
     @State private var didChooseICloudFromGetStarted: Bool = false
-
+    
     // Drives the “wake up” background motion on the welcome step.
     @State private var isExitingWelcome: Bool = false
-
+    
     // MARK: - Derived
-
+    
     private var currentWorkspace: Workspace? {
         if let uuid = UUID(uuidString: selectedWorkspaceID),
            let found = workspaces.first(where: { $0.id == uuid }) {
@@ -69,25 +69,25 @@ struct OnboardingView: View {
         }
         return workspaces.first
     }
-
+    
     private var isICloudBootstrapping: Bool {
         ICloudBootstrap.isBootstrapping(useICloud: activeUseICloud, startedAt: iCloudBootstrapStartedAt)
     }
-
+    
     var body: some View {
         VStack(spacing: 0) {
             stepBody
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding(.horizontal, 18)
                 .padding(.top, 18)
-
+            
             if onboardingStep != 0 {
-
+                
                 bottomNavBar
                     .padding(.horizontal, 18)
                     .padding(.vertical, 14)
             }
-
+            
         }
         .navigationBarBackButtonHidden(true)
         .onAppear {
@@ -149,55 +149,55 @@ struct OnboardingView: View {
             .presentationDetents([.medium])
         }
     }
-
+    
     // MARK: - Step Body
-
+    
     @ViewBuilder
     private var stepBody: some View {
         switch onboardingStep {
         case 0:
             welcomeStep
-
+            
         case 1:
             workspaceStep
-
+            
         case 2:
             privacyAndSyncStep
-
+            
         case 3:
             categoriesStep
-
+            
         case 4:
             cardsStep
-
+            
         default:
             presetsStep
         }
     }
-
+    
     // MARK: - Step 1: Welcome
-
+    
     private var welcomeStep: some View {
         ZStack {
             WaveBackdrop(isExiting: isExitingWelcome)
                 .ignoresSafeArea()
-
+            
             VStack(alignment: .leading, spacing: 14) {
                 Spacer(minLength: 8)
-
+                
                 Image(systemName: "sailboat.fill")
                     .font(.system(size: 46, weight: .semibold))
                     .foregroundStyle(.tint)
-
+                
                 Text("Welcome to Offshore Budgeting!")
                     .font(.largeTitle.weight(.bold))
-
+                
                 Text("Press the button below to get started setting up your budgeting workspace.")
                     .font(.body)
                     .foregroundStyle(.secondary)
-
+                
                 Spacer(minLength: 0)
-
+                
                 if #available(iOS 26.0, *) {
                     Button {
                         getStartedTapped()
@@ -208,7 +208,7 @@ struct OnboardingView: View {
                     .buttonStyle(.glassProminent)
                     .tint(.accentColor)
                     .disabled(isCheckingICloudForGetStarted)
-
+                    
                     Spacer(minLength: 18)
                 } else {
                     Button {
@@ -220,16 +220,16 @@ struct OnboardingView: View {
                     .buttonStyle(.borderedProminent)
                     .tint(.accentColor)
                     .disabled(isCheckingICloudForGetStarted)
-
+                    
                     Spacer(minLength: 18)
                 }
             }
             .frame(maxWidth: 560, alignment: .leading)
         }
     }
-
+    
     // MARK: - Step 2: Workspaces
-
+    
     private var workspaceStep: some View {
         OnboardingWorkspaceStep(
             workspaces: workspaces,
@@ -239,9 +239,9 @@ struct OnboardingView: View {
         )
         .frame(maxWidth: 680)
     }
-
+    
     // MARK: - Step 3: Privacy + Sync + Notifications
-
+    
     private var privacyAndSyncStep: some View {
         OnboardingPrivacySyncStep(
             requireBiometrics: $requireBiometrics,
@@ -250,9 +250,9 @@ struct OnboardingView: View {
         )
         .frame(maxWidth: 680)
     }
-
+    
     // MARK: - Step 4: Categories
-
+    
     private var categoriesStep: some View {
         Group {
             if let ws = currentWorkspace {
@@ -271,9 +271,9 @@ struct OnboardingView: View {
         }
         .frame(maxWidth: 760)
     }
-
+    
     // MARK: - Step 5: Cards
-
+    
     private var cardsStep: some View {
         Group {
             if let ws = currentWorkspace {
@@ -292,9 +292,9 @@ struct OnboardingView: View {
         }
         .frame(maxWidth: 760)
     }
-
+    
     // MARK: - Step 6: Presets
-
+    
     private var presetsStep: some View {
         Group {
             if let ws = currentWorkspace {
@@ -313,7 +313,7 @@ struct OnboardingView: View {
         }
         .frame(maxWidth: 760)
     }
-
+    
     private var iCloudRestorePlaceholder: some View {
         VStack(spacing: 12) {
             ContentUnavailableView(
@@ -325,12 +325,12 @@ struct OnboardingView: View {
         }
         .padding(.vertical, 10)
     }
-
+    
     // MARK: - Bottom Navigation
-
+    
     private var bottomNavBar: some View {
         HStack(spacing: 12) {
-
+            
             if #available(iOS 26.0, *) {
                 Button {
                     goBack()
@@ -352,7 +352,7 @@ struct OnboardingView: View {
                 .tint(.gray)
                 .disabled(onboardingStep == 0)
             }
-
+            
             if #available(iOS 26.0, *) {
                 Button {
                     primaryActionTapped()
@@ -374,12 +374,12 @@ struct OnboardingView: View {
             }
         }
     }
-
-
+    
+    
     private var primaryButtonTitle: String {
         onboardingStep >= 5 ? "Done" : "Next"
     }
-
+    
     private func primaryActionTapped() {
         // Step-specific gating
         switch onboardingStep {
@@ -388,11 +388,11 @@ struct OnboardingView: View {
                 showingMissingWorkspaceAlert = true
                 return
             }
-
+            
             if selectedWorkspaceID.isEmpty {
                 selectedWorkspaceID = (workspaces.first?.id.uuidString ?? "")
             }
-
+            
         case 4:
             // Require at least one card before presets.
             if let ws = currentWorkspace {
@@ -402,11 +402,11 @@ struct OnboardingView: View {
                     return
                 }
             }
-
+            
         default:
             break
         }
-
+        
         if onboardingStep >= 5 {
             completeOnboarding()
         } else {
@@ -417,43 +417,43 @@ struct OnboardingView: View {
     private func returnToDataSource() {
         // Ensure the gate opens directly on the data source screen.
         didPressGetStarted = true
-
+        
         // This flips AppBootstrapRootView back to OnboardingStartGateView.
         didChooseDataSource = false
-
+        
         // Reset onboarding to welcome for when the user comes back through.
         onboardingStep = 0
     }
-
+    
     private func goBack() {
         if onboardingStep == 1 {
             returnToDataSource()
             return
         }
-
+        
         onboardingStep = max(0, onboardingStep - 1)
     }
-
+    
     private func goNext() {
         onboardingStep = min(5, onboardingStep + 1)
     }
-
+    
     // MARK: - Get Started
-
+    
     private func getStartedTapped() {
         withAnimation(.easeInOut(duration: 0.55)) {
             isExitingWelcome = true
         }
-
+        
         isCheckingICloudForGetStarted = true
         Task {
             let status = (try? await CKContainer.default().accountStatus()) ?? .couldNotDetermine
-
+            
             await MainActor.run {
                 isCheckingICloudForGetStarted = false
-
+                
                 let delay: Double = 0.28
-
+                
                 if status == .available {
                     DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
                         showingGetStartedICloudChoice = true
@@ -466,18 +466,18 @@ struct OnboardingView: View {
             }
         }
     }
-
+    
     private func startLocalFromGetStarted() {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
             goNext()
         }
     }
-
-
+    
+    
     private func startUsingICloudFromGetStarted() {
         desiredUseICloud = true
         didChooseICloudFromGetStarted = true
-
+        
         if desiredUseICloud == activeUseICloud {
             didChooseICloudFromGetStarted = false
             goNext()
@@ -485,38 +485,38 @@ struct OnboardingView: View {
         }
         showingRestartRequired = (desiredUseICloud != activeUseICloud)
     }
-
+    
     // MARK: - Completion
-
+    
     private func completeOnboarding() {
         if selectedWorkspaceID.isEmpty {
             selectedWorkspaceID = workspaces.first?.id.uuidString ?? ""
         }
-
+        
         didCompleteOnboarding = true
         onboardingStep = 0
     }
-
+    
     // MARK: - Workspace Create
-
+    
     private func createWorkspace(name: String, hexColor: String) {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedHex = hexColor.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedName.isEmpty else { return }
-
+        
         let workspace = Workspace(
             name: trimmedName,
             hexColor: trimmedHex.isEmpty ? "#3B82F6" : trimmedHex
         )
-
+        
         modelContext.insert(workspace)
-
+        
         // Keep this in sync for downstream onboarding steps.
         selectedWorkspaceID = workspace.id.uuidString
     }
-
+    
     // MARK: - Cards check
-
+    
     private func hasAtLeastOneCard(in workspace: Workspace) -> Bool {
         let workspaceID = workspace.id
         let descriptor = FetchDescriptor<Card>(
@@ -525,9 +525,9 @@ struct OnboardingView: View {
         let cards = (try? modelContext.fetch(descriptor)) ?? []
         return !cards.isEmpty
     }
-
+    
     // MARK: - Skip prompt
-
+    
     /// We can't reliably enumerate SwiftData-backed CloudKit records without plumbing.
     /// This is a pragmatic check:
     /// - If iCloud is enabled AND we already have workspaces, onboarding is likely redundant.
@@ -535,14 +535,14 @@ struct OnboardingView: View {
     private func maybeOfferSkipIfCloudAlreadyHasData() async {
         // Only offer the prompt on the welcome screen.
         guard onboardingStep == 0 else { return }
-
+        
         // If the store already has data (often after enabling iCloud), offer to skip.
         if activeUseICloud, !workspaces.isEmpty {
             skipPromptMessage = "It looks like iCloud Sync is enabled and data already exists on this Apple ID. You can skip onboarding to jump straight into your existing workspaces."
             showingSkipPrompt = true
             return
         }
-
+        
         // If user is not using iCloud yet, we can still detect whether their iCloud account is available.
         // This helps us message the Step 3 toggle.
         let status = try? await CKContainer.default().accountStatus()
@@ -555,22 +555,22 @@ struct OnboardingView: View {
 // MARK: - Step: Workspace Setup
 
 private struct OnboardingWorkspaceStep: View {
-
+    
     let workspaces: [Workspace]
     @Binding var selectedWorkspaceID: String
     let isICloudBootstrapping: Bool
     let onCreate: (String, String) -> Void
-
+    
     @State private var showingAddWorkspace: Bool = false
-
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-
+            
             header(
                 title: "Workspaces",
                 subtitle: "A Workspace is where your all of your budgeting data lives. You can create multiple workspaces for different budgeting purposes."
             )
-
+            
             if workspaces.isEmpty {
                 if isICloudBootstrapping {
                     VStack(spacing: 12) {
@@ -600,11 +600,11 @@ private struct OnboardingWorkspaceStep: View {
                                 Circle()
                                     .fill(Color(hex: ws.hexColor) ?? .secondary)
                                     .frame(width: 12, height: 12)
-
+                                
                                 Text(ws.name)
-
+                                
                                 Spacer(minLength: 0)
-
+                                
                                 if selectedWorkspaceID == ws.id.uuidString {
                                     Image(systemName: "checkmark.circle.fill")
                                         .foregroundStyle(.secondary)
@@ -639,11 +639,11 @@ private struct OnboardingWorkspaceStep: View {
                 .buttonStyle(.borderedProminent)
                 .tint(.accentColor)
             }
-
+            
             Text("Tip: Try starting with a workspace called Personal. You can always add more later.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
-
+            
             Spacer(minLength: 0)
         }
         .sheet(isPresented: $showingAddWorkspace) {
@@ -652,7 +652,7 @@ private struct OnboardingWorkspaceStep: View {
             }
         }
     }
-
+    
     @ViewBuilder
     private func header(title: String, subtitle: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -667,33 +667,35 @@ private struct OnboardingWorkspaceStep: View {
 // MARK: - Step: Privacy + iCloud + Notifications
 
 private struct OnboardingPrivacySyncStep: View {
-
+    
     @Binding var requireBiometrics: Bool
     let hasExistingDataInCurrentStore: Bool
     @AppStorage("icloud_useCloud") private var desiredUseICloud: Bool = false
     @AppStorage("icloud_activeUseCloud") private var activeUseICloud: Bool = false
-
+    
     @ObservedObject var notificationService: LocalNotificationService
-
+    
     @State private var biometricsInfo = LocalAuthenticationService.biometricAvailability()
     @State private var showingNotificationsDeniedInfo: Bool = false
     @State private var showingICloudSwitchConfirm: Bool = false
     @State private var showingICloudUnavailable: Bool = false
     @State private var showingRestartRequired: Bool = false
-
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-
+            
             header(
                 title: "Privacy, iCloud, and Notifications",
                 subtitle: "Enable App Lock, iCloud sync, and setup Notifications."
             )
-
+            
             Form {
                 Section("App Lock") {
                     Toggle(biometricsInfo.kind.displayName, isOn: $requireBiometrics)
+                        .tint(Color("AccentColor"))
                         .disabled(!biometricsInfo.isAvailable)
-
+                    
+                    
                     if !biometricsInfo.isAvailable {
                         Text(biometricsInfo.errorMessage ?? "Biometrics are not available on this device.")
                             .font(.footnote)
@@ -704,26 +706,27 @@ private struct OnboardingPrivacySyncStep: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-
+                
                 Section("iCloud Sync") {
                     Toggle("Enable iCloud Sync", isOn: Binding(
                         get: { desiredUseICloud },
                         set: { wantsEnabled in
                             handleICloudToggleChanged(wantsEnabled: wantsEnabled)
                         }
-                    ))
+                    )).tint(Color("AccentColor"))
 
+                    
                     Text("Use iCloud to sync your workspaces and budgets across your devices signed into this Apple ID.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
-
+                
                 Section("Notifications") {
                     notificationRow
                 }
             }
             .scrollContentBackground(.hidden)
-
+            
             Spacer(minLength: 0)
         }
         .onAppear {
@@ -767,11 +770,11 @@ private struct OnboardingPrivacySyncStep: View {
             Text("Notifications are currently disabled for Offshore. You can enable them in Settings.")
         }
     }
-
+    
     private var isICloudAvailable: Bool {
         FileManager.default.ubiquityIdentityToken != nil
     }
-
+    
     private func handleICloudToggleChanged(wantsEnabled: Bool) {
         if wantsEnabled {
             guard isICloudAvailable else {
@@ -779,13 +782,13 @@ private struct OnboardingPrivacySyncStep: View {
                 showingICloudUnavailable = true
                 return
             }
-
+            
             if hasExistingDataInCurrentStore {
                 desiredUseICloud = false
                 showingICloudSwitchConfirm = true
                 return
             }
-
+            
             desiredUseICloud = true
             if desiredUseICloud != activeUseICloud {
                 showingRestartRequired = true
@@ -797,7 +800,7 @@ private struct OnboardingPrivacySyncStep: View {
             }
         }
     }
-
+    
     @ViewBuilder
     private var notificationRow: some View {
         switch notificationService.authorizationState {
@@ -816,11 +819,11 @@ private struct OnboardingPrivacySyncStep: View {
             } label: {
                 Label("Enable Notifications", systemImage: "bell.badge")
             }
-
+            
             Text("Enable reminders for logging expenses and reviewing presets.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
-
+            
         case .denied:
             Button {
                 showingNotificationsDeniedInfo = true
@@ -828,13 +831,13 @@ private struct OnboardingPrivacySyncStep: View {
                 Label("Notifications Disabled", systemImage: "bell.slash")
             }
             .foregroundStyle(.secondary)
-
+            
         case .authorized:
             Label("Notifications Enabled", systemImage: "bell.fill")
                 .foregroundStyle(.secondary)
         }
     }
-
+    
     @ViewBuilder
     private func header(title: String, subtitle: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -849,13 +852,13 @@ private struct OnboardingPrivacySyncStep: View {
 // MARK: - Step: Categories
 
 private struct OnboardingCategoriesStep: View {
-
+    
     let workspace: Workspace
-
+    
     @Query private var categories: [Category]
-
+    
     @State private var showingAddCategory: Bool = false
-
+    
     init(workspace: Workspace) {
         self.workspace = workspace
         let workspaceID = workspace.id
@@ -864,15 +867,15 @@ private struct OnboardingCategoriesStep: View {
             sort: [SortDescriptor(\Category.name, order: .forward)]
         )
     }
-
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-
+            
             header(
                 title: "Categories",
                 subtitle: "Categories help you understand where money goes, groceries, rent, fuel, and more."
             )
-
+            
             List {
                 if categories.isEmpty {
                     ContentUnavailableView(
@@ -922,7 +925,7 @@ private struct OnboardingCategoriesStep: View {
             }
         }
     }
-
+    
     @ViewBuilder
     private func header(title: String, subtitle: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -937,12 +940,12 @@ private struct OnboardingCategoriesStep: View {
 // MARK: - Step: Cards
 
 private struct OnboardingCardsStep: View {
-
+    
     let workspace: Workspace
-
+    
     @Query private var cards: [Card]
     @State private var showingAddCard: Bool = false
-
+    
     init(workspace: Workspace) {
         self.workspace = workspace
         let workspaceID = workspace.id
@@ -951,15 +954,15 @@ private struct OnboardingCardsStep: View {
             sort: [SortDescriptor(\Card.name, order: .forward)]
         )
     }
-
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-
+            
             header(
                 title: "Cards",
                 subtitle: "Cards represent where spending happens, debit, credit, cash, or any account you track."
             )
-
+            
             List {
                 if cards.isEmpty {
                     ContentUnavailableView(
@@ -1000,7 +1003,7 @@ private struct OnboardingCardsStep: View {
                 .buttonStyle(.borderedProminent)
                 .tint(.accentColor)
             }
-
+            
             Spacer(minLength: 0)
         }
         .sheet(isPresented: $showingAddCard) {
@@ -1009,7 +1012,7 @@ private struct OnboardingCardsStep: View {
             }
         }
     }
-
+    
     @ViewBuilder
     private func header(title: String, subtitle: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -1024,12 +1027,12 @@ private struct OnboardingCardsStep: View {
 // MARK: - Step: Presets
 
 private struct OnboardingPresetsStep: View {
-
+    
     let workspace: Workspace
-
+    
     @Query private var presets: [Preset]
     @State private var showingAddPreset: Bool = false
-
+    
     init(workspace: Workspace) {
         self.workspace = workspace
         let workspaceID = workspace.id
@@ -1038,15 +1041,15 @@ private struct OnboardingPresetsStep: View {
             sort: [SortDescriptor(\Preset.title, order: .forward)]
         )
     }
-
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-
+            
             header(
                 title: "Presets",
                 subtitle: "Presets are reusable templates for recurring bills, rent, subscriptions, and more."
             )
-
+            
             List {
                 if presets.isEmpty {
                     ContentUnavailableView(
@@ -1090,7 +1093,7 @@ private struct OnboardingPresetsStep: View {
                 .buttonStyle(.borderedProminent)
                 .tint(.accentColor)
             }
-
+            
             Spacer(minLength: 0)
         }
         .sheet(isPresented: $showingAddPreset) {
@@ -1099,7 +1102,7 @@ private struct OnboardingPresetsStep: View {
             }
         }
     }
-
+    
     @ViewBuilder
     private func header(title: String, subtitle: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {

@@ -453,7 +453,7 @@ struct BudgetDetailView: View {
                                     } label: {
                                         Label("Edit", systemImage: "pencil")
                                     }
-                                    .tint(.blue)
+                                    .tint(Color("AccentColor"))
 
                                     if let preset = presetForPlannedExpense(expense) {
                                         Button {
@@ -461,7 +461,7 @@ struct BudgetDetailView: View {
                                         } label: {
                                             Label("Edit Preset", systemImage: "list.bullet.rectangle")
                                         }
-                                        .tint(.indigo)
+                                        .tint(.orange)
                                     }
                                 }
                         }
@@ -485,7 +485,7 @@ struct BudgetDetailView: View {
                                 } label: {
                                     Label("Edit", systemImage: "pencil")
                                 }
-                                .tint(.blue)
+                                .tint(Color("AccentColor"))
                             }
                         }
                         .onDelete(perform: deleteVariableExpensesFiltered)
@@ -505,7 +505,7 @@ struct BudgetDetailView: View {
                                         } label: {
                                             Label("Edit", systemImage: "pencil")
                                         }
-                                        .tint(.blue)
+                                        .tint(Color("AccentColor"))
 
                                         if let preset = presetForPlannedExpense(expense) {
                                             Button {
@@ -513,7 +513,7 @@ struct BudgetDetailView: View {
                                             } label: {
                                                 Label("Edit Preset", systemImage: "list.bullet.rectangle")
                                             }
-                                            .tint(.indigo)
+                                            .tint(.orange)
                                         }
                                     }
 
@@ -530,7 +530,7 @@ struct BudgetDetailView: View {
                                     } label: {
                                         Label("Edit", systemImage: "pencil")
                                     }
-                                    .tint(.blue)
+                                    .tint(Color("AccentColor"))
                                 }
                             }
                         }

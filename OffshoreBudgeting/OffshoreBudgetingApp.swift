@@ -3,13 +3,14 @@ import SwiftData
 
 @main
 struct OffshoreBudgetingApp: App {
-
+    
     // MARK: - Notifications Delegate
 
     #if canImport(UIKit)
     @UIApplicationDelegateAdaptor(NotificationsAppDelegate.self)
     private var notificationsAppDelegate
     #endif
+
 
     // MARK: - iCloud Opt-In State
 

@@ -59,6 +59,7 @@ struct PresetRecordedPlannedExpensesReviewView: View {
                             } label: {
                                 Label("Delete", systemImage: "trash")
                             }
+                            .tint(Color("OffshoreDepth"))
                         }
                     }
                 }

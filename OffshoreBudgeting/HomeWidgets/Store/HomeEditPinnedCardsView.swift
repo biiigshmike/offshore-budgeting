@@ -12,7 +12,6 @@ struct HomeEditPinnedCardsView: View {
     let cards: [Card]
     let workspaceID: UUID
 
-    // ✅ Unified ordering + visibility (presence in array = shown)
     @Binding var pinnedItems: [HomePinnedItem]
 
     @Environment(\.dismiss) private var dismiss

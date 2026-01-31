@@ -35,6 +35,7 @@ struct SettingsNotificationsView: View {
 
             Section("Permission") {
                 Toggle("Enable Notifications", isOn: $notificationsToggle)
+                    .tint(Color("AccentColor"))
                     .onChange(of: notificationsToggle) { _, newValue in
                         Task { await handleToggleChange(newValue) }
                     }
@@ -65,6 +66,7 @@ struct SettingsNotificationsView: View {
 
             Section("Expenses") {
                 Toggle("Daily Expense Reminder", isOn: $dailyExpenseReminderEnabled)
+                    .tint(Color("AccentColor"))
                     .disabled(!canEditReminderToggles)
                     .onChange(of: dailyExpenseReminderEnabled) { _, _ in
                         Task { await syncSchedulesIfPossible() }
@@ -79,6 +81,8 @@ struct SettingsNotificationsView: View {
 
             Section("Income") {
                 Toggle("Planned Income Reminder", isOn: $plannedIncomeReminderEnabled)
+                    .tint(Color("AccentColor"))
+
                     .disabled(!canEditReminderToggles)
                     .onChange(of: plannedIncomeReminderEnabled) { _, _ in
                         Task { await syncSchedulesIfPossible() }
@@ -93,6 +97,8 @@ struct SettingsNotificationsView: View {
 
             Section("Presets") {
                 Toggle("Preset Expense Due Reminder", isOn: $presetDueReminderEnabled)
+                    .tint(Color("AccentColor"))
+
                     .disabled(!canEditReminderToggles)
                     .onChange(of: presetDueReminderEnabled) { _, _ in
                         Task { await syncSchedulesIfPossible() }

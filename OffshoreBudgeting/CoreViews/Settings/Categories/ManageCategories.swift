@@ -77,6 +77,7 @@ struct ManageCategoriesView: View {
                         } label: {
                             Label("Delete", systemImage: "trash")
                         }
+                        .tint(Color("OffshoreDepth"))
                     }
                     .swipeActions(edge: .leading, allowsFullSwipe: false) {
                         Button {
@@ -84,7 +85,7 @@ struct ManageCategoriesView: View {
                         } label: {
                             Label("Edit", systemImage: "pencil")
                         }
-                        .tint(.blue)
+                        .tint(Color("AccentColor"))
                     }
                 }
             }

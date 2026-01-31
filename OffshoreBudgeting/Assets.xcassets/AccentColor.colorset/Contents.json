@@ -10,7 +10,7 @@
           "red" : "0x6F"
         }
       },
-      "idiom" : "universal"
+      "idiom" : "iphone"
     },
     {
       "appearances" : [
@@ -28,7 +28,69 @@
           "red" : "0x50"
         }
       },
-      "idiom" : "universal"
+      "idiom" : "iphone"
+    },
+    {
+      "color" : {
+        "color-space" : "display-p3",
+        "components" : {
+          "alpha" : "1.000",
+          "blue" : "0xB5",
+          "green" : "0x9F",
+          "red" : "0x6F"
+        }
+      },
+      "idiom" : "ipad"
+    },
+    {
+      "appearances" : [
+        {
+          "appearance" : "luminosity",
+          "value" : "dark"
+        }
+      ],
+      "color" : {
+        "color-space" : "display-p3",
+        "components" : {
+          "alpha" : "1.000",
+          "blue" : "0x9E",
+          "green" : "0x82",
+          "red" : "0x50"
+        }
+      },
+      "idiom" : "ipad"
+    },
+    {
+      "color" : {
+        "color-space" : "display-p3",
+        "components" : {
+          "alpha" : "1.000",
+          "blue" : "0xB5",
+          "green" : "0x9F",
+          "red" : "0x6F"
+        }
+      },
+      "idiom" : "ipad",
+      "subtype" : "mac-catalyst"
+    },
+    {
+      "appearances" : [
+        {
+          "appearance" : "luminosity",
+          "value" : "dark"
+        }
+      ],
+      "color" : {
+        "color-space" : "display-p3",
+        "components" : {
+          "alpha" : "1.000",
+          "blue" : "0x9E",
+          "green" : "0x82",
+          "red" : "0x50"
+        }
+      },
+      "idiom" : "ipad",
+      "subtype" : "mac-catalyst"
     }
   ],
   "info" : {

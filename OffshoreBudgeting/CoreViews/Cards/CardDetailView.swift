@@ -409,7 +409,7 @@ struct CardDetailView: View {
                                     } label: {
                                         Label("Edit", systemImage: "pencil")
                                     }
-                                    .tint(.blue)
+                                    .tint(Color("AccentColor"))
 
                                     if let preset = presetForPlannedExpense(expense) {
                                         Button {
@@ -417,7 +417,7 @@ struct CardDetailView: View {
                                         } label: {
                                             Label("Edit Preset", systemImage: "list.bullet.rectangle")
                                         }
-                                        .tint(.indigo)
+                                        .tint(.orange)
                                     }
                                 }
                         }
@@ -442,7 +442,7 @@ struct CardDetailView: View {
                                 } label: {
                                     Label("Edit", systemImage: "pencil")
                                 }
-                                .tint(.blue)
+                                .tint(Color("AccentColor"))
                             }
                         }
                         .onDelete(perform: deleteVariableExpensesFiltered)
@@ -463,7 +463,7 @@ struct CardDetailView: View {
                                         } label: {
                                             Label("Edit", systemImage: "pencil")
                                         }
-                                        .tint(.blue)
+                                        .tint(Color("AccentColor"))
 
                                         if let preset = presetForPlannedExpense(expense) {
                                             Button {
@@ -471,7 +471,7 @@ struct CardDetailView: View {
                                             } label: {
                                                 Label("Edit Preset", systemImage: "list.bullet.rectangle")
                                             }
-                                            .tint(.indigo)
+                                            .tint(.orange)
                                         }
                                     }
 
@@ -488,7 +488,7 @@ struct CardDetailView: View {
                                     } label: {
                                         Label("Edit", systemImage: "pencil")
                                     }
-                                    .tint(.blue)
+                                    .tint(Color("AccentColor"))
                                 }
                             }
                         }
@@ -682,22 +682,7 @@ struct CardDetailView: View {
         appliedEndDate = normalizedEnd(draftEndDate)
     }
 
-    private func applyQuickRangePreset(_ preset: QuickRangePreset) {
-        switch preset {
-        case .today:
-            applyQuickRange(.today())
-        case .thisWeek:
-            applyQuickRange(.thisWeek())
-        case .thisMonth:
-            applyQuickRange(.thisMonth())
-        case .thisQuarter:
-            applyQuickRange(.thisQuarter())
-        case .thisYear:
-            applyQuickRange(.thisYear())
-        }
-    }
-
-    private func applyQuickRangePresetDeferred(_ preset: QuickRangePreset) {
+    private func applyQuickRangePresetDeferred(_ preset: CalendarQuickRangePreset) {
         // Update draft immediately so the UI reflects the selection,
         // then apply on the next run loop, so the menu can dismiss cleanly.
         isApplyingQuickRange = true
@@ -708,7 +693,12 @@ struct CardDetailView: View {
         }
     }
 
-    private func applyQuickRange(_ range: DateRange) {
+    private func applyQuickRangePreset(_ preset: CalendarQuickRangePreset) {
+        let range = preset.makeRange(now: Date(), calendar: .current)
+        applyQuickRange(range)
+    }
+
+    private func applyQuickRange(_ range: CalendarQuickRange) {
         draftStartDate = normalizedStart(range.start)
         draftEndDate = normalizedEnd(range.end)
         // Do not apply here, applyQuickRangePresetDeferred handles it.
@@ -742,70 +732,6 @@ struct CardDetailView: View {
         appliedEndDate = end
     }
 
-
-    // MARK: - DateRange helper (local)
-
-    private struct DateRange {
-        let start: Date
-        let end: Date
-
-        static func today() -> DateRange {
-            let cal = Calendar.current
-            let start = cal.startOfDay(for: Date())
-            let end = cal.date(byAdding: DateComponents(day: 1, second: -1), to: start) ?? start
-            return DateRange(start: start, end: end)
-        }
-
-        static func thisWeek() -> DateRange {
-            let cal = Calendar.current
-            let now = Date()
-
-            // Start of week based on user’s locale settings
-            let start = cal.date(from: cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: now)) ?? cal.startOfDay(for: now)
-            let end = cal.date(byAdding: DateComponents(day: 7, second: -1), to: start) ?? now
-            return DateRange(start: start, end: end)
-        }
-
-        static func thisMonth() -> DateRange {
-            let cal = Calendar.current
-            let now = Date()
-
-            let start = cal.date(from: cal.dateComponents([.year, .month], from: now)) ?? cal.startOfDay(for: now)
-            let end = cal.date(byAdding: DateComponents(month: 1, day: -1), to: start) ?? now
-            return DateRange(start: start, end: end)
-        }
-
-        static func thisQuarter() -> DateRange {
-            let cal = Calendar.current
-            let now = Date()
-
-            let comps = cal.dateComponents([.year, .month], from: now)
-            let year = comps.year ?? cal.component(.year, from: now)
-            let month = comps.month ?? cal.component(.month, from: now)
-
-            let quarterStartMonth: Int
-            switch month {
-            case 1...3: quarterStartMonth = 1
-            case 4...6: quarterStartMonth = 4
-            case 7...9: quarterStartMonth = 7
-            default: quarterStartMonth = 10
-            }
-
-            let start = cal.date(from: DateComponents(year: year, month: quarterStartMonth, day: 1)) ?? cal.startOfDay(for: now)
-            let end = cal.date(byAdding: DateComponents(month: 3, day: -1), to: start) ?? now
-            return DateRange(start: start, end: end)
-        }
-
-        static func thisYear() -> DateRange {
-            let cal = Calendar.current
-            let now = Date()
-
-            let year = cal.component(.year, from: now)
-            let start = cal.date(from: DateComponents(year: year, month: 1, day: 1)) ?? cal.startOfDay(for: now)
-            let end = cal.date(byAdding: DateComponents(year: 1, day: -1), to: start) ?? now
-            return DateRange(start: start, end: end)
-        }
-    }
 
     // MARK: - Sorting
 
@@ -1016,14 +942,6 @@ private enum SortMode: String, Identifiable {
     var id: String { rawValue }
 }
 
-private enum QuickRangePreset {
-    case today
-    case thisWeek
-    case thisMonth
-    case thisQuarter
-    case thisYear
-}
-
 private enum UnifiedExpenseItem: Identifiable {
     case planned(PlannedExpense)
     case variable(VariableExpense)
@@ -1177,7 +1095,7 @@ private struct DateFilterRow: View {
 
     let isGoEnabled: Bool
     let onTapGo: () -> Void
-    let onSelectQuickRange: (QuickRangePreset) -> Void
+    let onSelectQuickRange: (CalendarQuickRangePreset) -> Void
 
     var body: some View {
         HStack(spacing: 12) {
@@ -1189,11 +1107,9 @@ private struct DateFilterRow: View {
                 .accessibilityLabel("Apply Date Range")
 
             Menu {
-                Button("Today") { onSelectQuickRange(.today) }
-                Button("This Week") { onSelectQuickRange(.thisWeek) }
-                Button("This Month") { onSelectQuickRange(.thisMonth) }
-                Button("This Quarter") { onSelectQuickRange(.thisQuarter) }
-                Button("This Year") { onSelectQuickRange(.thisYear) }
+                CalendarQuickRangeMenuItems { preset in
+                    onSelectQuickRange(preset)
+                }
             } label: {
                 IconCircleLabel(systemName: "calendar")
             }

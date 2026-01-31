@@ -262,7 +262,7 @@ struct IncomeView: View {
                                 } label: {
                                     Label("Edit", systemImage: "pencil")
                                 }
-                                .tint(.blue)
+                                .tint(Color("AccentColor"))
                             }
                         }
                     }
