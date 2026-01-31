@@ -112,13 +112,13 @@ struct HomeView: View {
         )
     }
 
-    var body: some View {
-        ZStack {
-            HomeBackgroundView()
+	    var body: some View {
+	        ZStack {
+	            HomeBackgroundView()
 
-            GeometryReader { proxy in
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 14) {
+	            GeometryReader { proxy in
+	                ScrollView {
+	                    VStack(alignment: .leading, spacing: 14) {
 
                         HomeDateRangeBar(
                             draftStartDate: $draftStartDate,
@@ -179,15 +179,15 @@ struct HomeView: View {
                             }
                         }
 
-                        Spacer(minLength: 22)
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 18)
-                    .frame(width: proxy.size.width, alignment: .leading)
-                }
-            }
-        }
-        .postBoardingTip(
+	                        Spacer(minLength: 22)
+	                    }
+	                    .padding(.horizontal, contentHorizontalPadding)
+	                    .padding(.bottom, 18)
+	                    .frame(maxWidth: .infinity, alignment: .leading)
+	                }
+	            }
+	        }
+	        .postBoardingTip(
             key: "tip.home.v1",
             title: "Home",
             items: [
@@ -392,9 +392,11 @@ struct HomeView: View {
         )
     }
 
-    // MARK: - Layout
+	    // MARK: - Layout
+	
+	    private var contentHorizontalPadding: CGFloat { 16 }
 
-    private var gridSpacing: CGFloat { 12 }
+	    private var gridSpacing: CGFloat { 12 }
 
     private struct PinnedGridCell {
         let item: HomePinnedItem
@@ -406,16 +408,16 @@ struct HomeView: View {
         let remainingColumns: Int
     }
 
-    private func homeColumnCount(for width: CGFloat) -> Int {
-        if voiceOverEnabled { return 1 }
-        if dynamicTypeSize.isAccessibilitySize { return 1 }
+	    private func homeColumnCount(for width: CGFloat) -> Int {
+	        if voiceOverEnabled { return 1 }
+	        if dynamicTypeSize.isAccessibilitySize { return 1 }
 
-        let minTileWidth: CGFloat = (dynamicTypeSize >= .xxLarge) ? 420 : 330
-        let usable = width
-        let columns = Int((usable + gridSpacing) / (minTileWidth + gridSpacing))
+	        let minTileWidth: CGFloat = (dynamicTypeSize >= .xxLarge) ? 420 : 330
+	        let usable = max(0, width - (contentHorizontalPadding * 2))
+	        let columns = Int((usable + gridSpacing) / (minTileWidth + gridSpacing))
 
-        return max(1, min(columns, 4))
-    }
+	        return max(1, min(columns, 4))
+	    }
 
     private func pinnedGridRows(columnCount: Int) -> [PinnedGridRowModel] {
         let columnCount = max(1, columnCount)
