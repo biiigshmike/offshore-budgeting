@@ -16,7 +16,7 @@ struct HomeCategorySpotlightTile: View {
     let startDate: Date
     let endDate: Date
 
-    var topN: Int = 4
+    var topN: Int = 5
 
     private var metricsResult: HomeCategoryMetricsResult {
         HomeCategoryMetricsCalculator.calculate(
