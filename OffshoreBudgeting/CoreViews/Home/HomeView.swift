@@ -19,11 +19,26 @@ struct HomeView: View {
     @Query private var categories: [Category]
     @Query private var variableExpenses: [VariableExpense]
 
-    @AppStorage("home_appliedStartTimestamp")
-    private var appliedStartTimestamp: Double = 0
+    // MARK: - Date Range Storage (per workspace)
 
-    @AppStorage("home_appliedEndTimestamp")
-    private var appliedEndTimestamp: Double = 0
+    private static func appliedStartKey(workspaceID: UUID) -> String {
+        "home_appliedStartTimestamp_\(workspaceID.uuidString)"
+    }
+
+    private static func appliedEndKey(workspaceID: UUID) -> String {
+        "home_appliedEndTimestamp_\(workspaceID.uuidString)"
+    }
+
+    private static func lastSyncedDefaultBudgetingPeriodKey(workspaceID: UUID) -> String {
+        "home_lastSyncedDefaultBudgetingPeriod_\(workspaceID.uuidString)"
+    }
+
+    private static let legacyAppliedStartKey = "home_appliedStartTimestamp"
+    private static let legacyAppliedEndKey = "home_appliedEndTimestamp"
+
+    @AppStorage private var appliedStartTimestamp: Double
+    @AppStorage private var appliedEndTimestamp: Double
+    @AppStorage private var lastSyncedDefaultBudgetingPeriodRaw: String
 
     @AppStorage("general_defaultBudgetingPeriod")
     private var defaultBudgetingPeriodRaw: String = BudgetingPeriod.monthly.rawValue
@@ -58,6 +73,13 @@ struct HomeView: View {
     init(workspace: Workspace) {
         self.workspace = workspace
         let workspaceID = workspace.id
+
+        _appliedStartTimestamp = AppStorage(wrappedValue: 0, Self.appliedStartKey(workspaceID: workspaceID))
+        _appliedEndTimestamp = AppStorage(wrappedValue: 0, Self.appliedEndKey(workspaceID: workspaceID))
+        _lastSyncedDefaultBudgetingPeriodRaw = AppStorage(
+            wrappedValue: "",
+            Self.lastSyncedDefaultBudgetingPeriodKey(workspaceID: workspaceID)
+        )
 
         _budgets = Query(
             filter: #Predicate<Budget> { $0.workspace?.id == workspaceID },
@@ -177,11 +199,15 @@ struct HomeView: View {
             }
         }
         .onAppear {
-            bootstrapDatesIfNeeded()
+            bootstrapAppliedDatesIfNeeded()
+            applyDefaultBudgetingPeriodIfSettingsChanged()
+            syncDraftToApplied()
             loadPinnedItemsIfNeeded()
         }
         .onChange(of: defaultBudgetingPeriodRaw) { _, _ in
-            bootstrapDatesIfNeeded()
+            applyDefaultBudgetingPeriodToApplied()
+            lastSyncedDefaultBudgetingPeriodRaw = defaultBudgetingPeriodRaw
+            syncDraftToApplied()
         }
     }
 
@@ -408,28 +434,72 @@ struct HomeView: View {
         "\(formattedDate(appliedStartDate)) - \(formattedDate(appliedEndDate))"
     }
 
-    private func bootstrapDatesIfNeeded() {
+    private func syncDraftToApplied() {
+        draftStartDate = appliedStartDate
+        draftEndDate = appliedEndDate
+    }
+
+    private func bootstrapAppliedDatesIfNeeded() {
+        guard isAppliedRangeInitialized == false else { return }
+
+        if migrateLegacyAppliedRangeIfNeeded() {
+            lastSyncedDefaultBudgetingPeriodRaw = defaultBudgetingPeriodRaw
+            return
+        }
+
+        applyDefaultBudgetingPeriodToApplied()
+        lastSyncedDefaultBudgetingPeriodRaw = defaultBudgetingPeriodRaw
+    }
+
+    private var isAppliedRangeInitialized: Bool {
+        appliedStartTimestamp > 0 && appliedEndTimestamp > 0
+    }
+
+    @discardableResult
+    private func migrateLegacyAppliedRangeIfNeeded() -> Bool {
+        let defaults = UserDefaults.standard
+
+        let legacyStart = defaults.double(forKey: Self.legacyAppliedStartKey)
+        let legacyEnd = defaults.double(forKey: Self.legacyAppliedEndKey)
+
+        guard legacyStart > 0, legacyEnd > 0 else { return false }
+
+        appliedStartTimestamp = legacyStart
+        appliedEndTimestamp = legacyEnd
+        return true
+    }
+
+    private func applyDefaultBudgetingPeriodToApplied() {
         let now = Date()
         let period = BudgetingPeriod(rawValue: defaultBudgetingPeriodRaw) ?? .monthly
         let range = period.defaultRange(containing: now, calendar: .current)
 
-        appliedStartTimestamp = range.start.timeIntervalSince1970
-        appliedEndTimestamp = range.end.timeIntervalSince1970
-        draftStartDate = range.start
-        draftEndDate = range.end
+        setAppliedRange(start: range.start, end: range.end)
+    }
+
+    private func applyDefaultBudgetingPeriodIfSettingsChanged() {
+        guard lastSyncedDefaultBudgetingPeriodRaw != defaultBudgetingPeriodRaw else { return }
+        applyDefaultBudgetingPeriodToApplied()
+        lastSyncedDefaultBudgetingPeriodRaw = defaultBudgetingPeriodRaw
+    }
+
+    private func setAppliedRange(start: Date, end: Date) {
+        let clampedEnd = max(end, start)
+        appliedStartTimestamp = start.timeIntervalSince1970
+        appliedEndTimestamp = clampedEnd.timeIntervalSince1970
     }
 
     private func applyDraftRange() {
         let start = draftStartDate
-        var end = draftEndDate
+        let end = draftEndDate
 
         if end < start {
-            end = start
             draftEndDate = start
+            setAppliedRange(start: start, end: start)
+            return
         }
 
-        appliedStartTimestamp = start.timeIntervalSince1970
-        appliedEndTimestamp = end.timeIntervalSince1970
+        setAppliedRange(start: start, end: end)
     }
 
     private func formattedDate(_ date: Date) -> String {
