@@ -74,20 +74,36 @@ struct OnboardingView: View {
         ICloudBootstrap.isBootstrapping(useICloud: activeUseICloud, startedAt: iCloudBootstrapStartedAt)
     }
     
+    // MARK: - Layout
+
+    private var stepMaxWidth: CGFloat {
+        switch onboardingStep {
+        case 0:
+            return 680
+        case 1, 2, 3, 4:
+            return 680
+        default:
+            return 680
+        }
+    }
+    
     var body: some View {
         VStack(spacing: 0) {
+
             stepBody
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding(.horizontal, 18)
                 .padding(.top, 18)
-            
+                .frame(maxWidth: stepMaxWidth)
+                .frame(maxWidth: .infinity, alignment: .center)
+
             if onboardingStep != 0 {
-                
                 bottomNavBar
                     .padding(.horizontal, 18)
                     .padding(.vertical, 14)
+                    .frame(maxWidth: stepMaxWidth)
+                    .frame(maxWidth: .infinity, alignment: .center)
             }
-            
         }
         .navigationBarBackButtonHidden(true)
         .onAppear {
