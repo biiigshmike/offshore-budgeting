@@ -47,8 +47,7 @@ struct IncomeView: View {
 
     // MARK: - Sheets
 
-    @State private var showingAddIncome: Bool = false
-    @State private var addIncomeInitialDate: Date = .now
+    @State private var addIncomeSheet: AddIncomeSheet? = nil
 
     @State private var showingEditIncome: Bool = false
     @State private var editingIncome: Income? = nil
@@ -306,8 +305,7 @@ struct IncomeView: View {
             .searchFocused($searchFocused)
             .toolbar {
                 Button {
-                    addIncomeInitialDate = selectedDayStart
-                    showingAddIncome = true
+                    addIncomeSheet = AddIncomeSheet(initialDate: selectedDayStart)
                 } label: {
                     Image(systemName: "plus")
                 }
@@ -321,9 +319,9 @@ struct IncomeView: View {
                     pendingIncomeDelete = nil
                 }
             }
-            .sheet(isPresented: $showingAddIncome) {
+            .sheet(item: $addIncomeSheet) { sheet in
                 NavigationStack {
-                    AddIncomeView(workspace: workspace, initialDate: addIncomeInitialDate)
+                    AddIncomeView(workspace: workspace, initialDate: sheet.initialDate)
                 }
             }
             .sheet(isPresented: $showingEditIncome, onDismiss: { editingIncome = nil }) {
@@ -347,6 +345,13 @@ struct IncomeView: View {
             editingIncome = nil
         }
     }
+}
+
+// MARK: - Sheet Models
+
+private struct AddIncomeSheet: Identifiable {
+    let id = UUID()
+    let initialDate: Date
 }
 
 // MARK: - Row Views

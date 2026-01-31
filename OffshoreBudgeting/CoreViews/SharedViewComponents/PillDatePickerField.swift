@@ -268,9 +268,16 @@ private struct PillPickerSheetPresentationModifier: ViewModifier {
         content
             .presentationDetents([.height(520)])
             .presentationDragIndicator(.visible)
+        #elseif targetEnvironment(macCatalyst)
+        // On Mac Catalyst, we still compile in the iOS branch, and `.large` isn't stable with a graphical DatePicker.
+        // Use a fixed height to avoid repeated sheet re-measurements (calendar + Done button flicker).
+        content
+            .presentationDetents([.height(520)])
+            .presentationDragIndicator(.visible)
         #else
         content
-            .presentationDetents(useMediumDetent ? [.medium] : [.large])
+            // iPhone: medium is fine. iPad: fixed height avoids the calendar driving the sheet size.
+            .presentationDetents(useMediumDetent ? [.medium] : [.height(520)])
             .presentationDragIndicator(.visible)
         #endif
     }
