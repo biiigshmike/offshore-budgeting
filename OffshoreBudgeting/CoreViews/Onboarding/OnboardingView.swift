@@ -570,17 +570,17 @@ struct OnboardingView: View {
 
 // MARK: - Step: Workspace Setup
 
-private struct OnboardingWorkspaceStep: View {
-    
-    let workspaces: [Workspace]
-    @Binding var selectedWorkspaceID: String
-    let isICloudBootstrapping: Bool
-    let onCreate: (String, String) -> Void
+	private struct OnboardingWorkspaceStep: View {
+	    
+	    let workspaces: [Workspace]
+	    @Binding var selectedWorkspaceID: String
+	    let isICloudBootstrapping: Bool
+	    let onCreate: (String, String) -> Void
     
     @State private var showingAddWorkspace: Bool = false
     
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+	    var body: some View {
+	        VStack(alignment: .leading, spacing: 14) {
             
             header(
                 title: "Workspaces",
@@ -630,6 +630,7 @@ private struct OnboardingWorkspaceStep: View {
                         }
                         .buttonStyle(.plain)
                     }
+                    Text("")
                 }
                 .listStyle(.insetGrouped)
                 .scrollContentBackground(.hidden)
@@ -656,29 +657,40 @@ private struct OnboardingWorkspaceStep: View {
                 .tint(.accentColor)
             }
             
-            Text("Tip: Try starting with a workspace called Personal. You can always add more later.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-            
-            Spacer(minLength: 0)
-        }
-        .sheet(isPresented: $showingAddWorkspace) {
-            NavigationStack {
-                AddWorkspaceView(onCreate: onCreate)
-            }
-        }
-    }
-    
-    @ViewBuilder
-    private func header(title: String, subtitle: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title)
-                .font(.title2.weight(.bold))
-            Text(subtitle)
-                .foregroundStyle(.secondary)
-        }
-    }
-}
+	            Text("Tip: Try starting with a workspace called Personal. You can always add more later.")
+	                .font(.footnote)
+	                .foregroundStyle(.secondary)
+	            
+	            Spacer(minLength: 0)
+	        }
+	        .onAppear {
+	            ensureInitialSelection()
+	        }
+	        .onChange(of: workspaces.count) { _, _ in
+	            ensureInitialSelection()
+	        }
+	        .sheet(isPresented: $showingAddWorkspace) {
+	            NavigationStack {
+	                AddWorkspaceView(onCreate: onCreate)
+	            }
+	        }
+	    }
+	    
+	    private func ensureInitialSelection() {
+	        guard selectedWorkspaceID.isEmpty else { return }
+	        selectedWorkspaceID = workspaces.first?.id.uuidString ?? ""
+	    }
+	    
+	    @ViewBuilder
+	    private func header(title: String, subtitle: String) -> some View {
+	        VStack(alignment: .leading, spacing: 6) {
+	            Text(title)
+	                .font(.title2.weight(.bold))
+	            Text(subtitle)
+	                .foregroundStyle(.secondary)
+	        }
+	    }
+	}
 
 // MARK: - Step: Privacy + iCloud + Notifications
 
