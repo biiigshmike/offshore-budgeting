@@ -627,10 +627,9 @@ struct BudgetDetailView: View {
 
         // MARK: - Deletion UI
 
-        .confirmationDialog(
+        .alert(
             "Delete Budget?",
-            isPresented: $showingBudgetDeleteOptionsDialog,
-            titleVisibility: .visible
+            isPresented: $showingBudgetDeleteOptionsDialog
         ) {
             Button("Keep All Expenses") {
                 deleteBudgetOnly()
