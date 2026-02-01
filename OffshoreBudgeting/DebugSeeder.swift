@@ -192,19 +192,19 @@ enum DebugSeeder {
             context.insert(BudgetPresetLink(budget: budget, preset: presetStreaming))
         }
 
-        // Category limits (Double literals so Swift stays happy)
+        // Category limits (Double literals)
         applyCategoryLimits(
             context: context,
             budget: currentBudget,
             limits: [
-                (catGroceries, 500.0),
-                (catDining, 250.0),
-                (catServices, 220.0),
-                (catTransport, 180.0),
-                (catEntertainment, 120.0),
-                (catShopping, 200.0),
-                (catHealth, 150.0),
-                (catUtilities, 180.0)
+                (catGroceries, 520.0),
+                (catDining, 320.0),
+                (catServices, 260.0),
+                (catTransport, 220.0),
+                (catEntertainment, 180.0),
+                (catShopping, 260.0),
+                (catHealth, 220.0),
+                (catUtilities, 220.0)
             ]
         )
 
@@ -212,14 +212,14 @@ enum DebugSeeder {
             context: context,
             budget: futureMonthlyBudget,
             limits: [
-                (catGroceries, 520.0),
-                (catDining, 260.0),
-                (catServices, 220.0),
-                (catTransport, 180.0),
-                (catEntertainment, 120.0),
-                (catShopping, 200.0),
-                (catHealth, 150.0),
-                (catUtilities, 180.0)
+                (catGroceries, 540.0),
+                (catDining, 330.0),
+                (catServices, 260.0),
+                (catTransport, 220.0),
+                (catEntertainment, 180.0),
+                (catShopping, 260.0),
+                (catHealth, 220.0),
+                (catUtilities, 220.0)
             ]
         )
 
@@ -309,7 +309,7 @@ enum DebugSeeder {
             )
         }
 
-        // Yearly budget: enough to make charts interesting, not thousands of rows
+        // Yearly budget: enough to make charts interesting
         seedYearlyIncomeAndSpending(
             context: context,
             workspace: workspace,
@@ -321,7 +321,7 @@ enum DebugSeeder {
             calendar: cal
         )
 
-        // Income for visible range (more realistic amounts and a little variability)
+        // Income for visible range (realistic planned vs actual with cents)
         seedIncomeForRange(
             context: context,
             workspace: workspace,
@@ -433,33 +433,32 @@ enum DebugSeeder {
             ))
         }
 
-        // Core fixed bills
         addPlanned(title: "Rent", planned: 1500, actual: 1500, day: 1, category: categories.housing, card: cardChecking, presetID: presets.rent.id)
         addPlanned(title: "Internet", planned: 80, actual: 80, day: 3, category: categories.utilities, card: cardChecking, presetID: presets.internet.id)
 
-        // A couple "non-preset" fixed-ish bills that help reduce magical savings
-        let electricActual = actualsMatchPlanned ? 112 : 112
-        addPlanned(title: "Electric", planned: 115, actual: Double(electricActual), day: 6, category: categories.utilities, card: cardChecking, presetID: nil)
+        let electricActual = actualsMatchPlanned ? 128 : 128
+        addPlanned(title: "Electric", planned: 130, actual: Double(electricActual), day: 6, category: categories.utilities, card: cardChecking, presetID: nil)
 
-        let waterActual = actualsMatchPlanned ? 45 : 45
-        addPlanned(title: "Water", planned: 45, actual: Double(waterActual), day: 8, category: categories.utilities, card: cardChecking, presetID: nil)
+        let waterActual = actualsMatchPlanned ? 55 : 55
+        addPlanned(title: "Water", planned: 55, actual: Double(waterActual), day: 8, category: categories.utilities, card: cardChecking, presetID: nil)
 
-        let carPaymentActual = actualsMatchPlanned ? 325 : 325
-        addPlanned(title: "Car Payment", planned: 325, actual: Double(carPaymentActual), day: 10, category: categories.health, card: cardChecking, presetID: nil)
+        let carPaymentActual = actualsMatchPlanned ? 345 : 345
+        addPlanned(title: "Car Payment", planned: 345, actual: Double(carPaymentActual), day: 10, category: categories.health, card: cardChecking, presetID: nil)
 
-        // Gym + streaming: sometimes pending in current month
         let gymActual = actualsMatchPlanned ? 45 : 0
         addPlanned(title: "Gym", planned: 45, actual: Double(gymActual), day: 12, category: categories.health, card: cardVisa, presetID: presets.gym.id)
 
-        let insuranceActual = actualsMatchPlanned ? 120 : 120
-        addPlanned(title: "Insurance", planned: 120, actual: Double(insuranceActual), day: 15, category: categories.health, card: cardChecking, presetID: presets.insurance.id)
+        let insuranceActual = actualsMatchPlanned ? 132 : 132
+        addPlanned(title: "Insurance", planned: 132, actual: Double(insuranceActual), day: 15, category: categories.health, card: cardChecking, presetID: presets.insurance.id)
 
         let streamingActual = actualsMatchPlanned ? 25 : 0
         addPlanned(title: "Streaming", planned: 25, actual: Double(streamingActual), day: 19, category: categories.entertainment, card: cardVisa, presetID: presets.streaming.id)
 
-        // One more realistic monthly obligation
-        let loanActual = actualsMatchPlanned ? 180 : 180
-        addPlanned(title: "Student Loan", planned: 180, actual: Double(loanActual), day: 22, category: categories.health, card: cardChecking, presetID: nil)
+        let loanActual = actualsMatchPlanned ? 210 : 210
+        addPlanned(title: "Student Loan", planned: 210, actual: Double(loanActual), day: 22, category: categories.health, card: cardChecking, presetID: nil)
+
+        let phoneActual = actualsMatchPlanned ? 78 : 78
+        addPlanned(title: "Phone", planned: 78, actual: Double(phoneActual), day: 24, category: categories.utilities, card: cardChecking, presetID: nil)
     }
 
     private static func seedMonthlyPlannedExpensesFuture(
@@ -492,15 +491,16 @@ enum DebugSeeder {
         addPlanned(title: "Rent", planned: 1500, day: 1, category: categories.housing, card: cardChecking, presetID: presets.rent.id)
         addPlanned(title: "Internet", planned: 80, day: 3, category: categories.utilities, card: cardChecking, presetID: presets.internet.id)
 
-        addPlanned(title: "Electric", planned: 115, day: 6, category: categories.utilities, card: cardChecking, presetID: nil)
-        addPlanned(title: "Water", planned: 45, day: 8, category: categories.utilities, card: cardChecking, presetID: nil)
-        addPlanned(title: "Car Payment", planned: 325, day: 10, category: categories.health, card: cardChecking, presetID: nil)
+        addPlanned(title: "Electric", planned: 130, day: 6, category: categories.utilities, card: cardChecking, presetID: nil)
+        addPlanned(title: "Water", planned: 55, day: 8, category: categories.utilities, card: cardChecking, presetID: nil)
+        addPlanned(title: "Car Payment", planned: 345, day: 10, category: categories.health, card: cardChecking, presetID: nil)
 
         addPlanned(title: "Gym", planned: 45, day: 12, category: categories.health, card: cardVisa, presetID: presets.gym.id)
-        addPlanned(title: "Insurance", planned: 120, day: 15, category: categories.health, card: cardChecking, presetID: presets.insurance.id)
+        addPlanned(title: "Insurance", planned: 132, day: 15, category: categories.health, card: cardChecking, presetID: presets.insurance.id)
         addPlanned(title: "Streaming", planned: 25, day: 19, category: categories.entertainment, card: cardVisa, presetID: presets.streaming.id)
 
-        addPlanned(title: "Student Loan", planned: 180, day: 22, category: categories.health, card: cardChecking, presetID: nil)
+        addPlanned(title: "Student Loan", planned: 210, day: 22, category: categories.health, card: cardChecking, presetID: nil)
+        addPlanned(title: "Phone", planned: 78, day: 24, category: categories.utilities, card: cardChecking, presetID: nil)
     }
 
     private static func seedQuarterlyPlannedExpensesFuture(
@@ -563,43 +563,63 @@ enum DebugSeeder {
             ))
         }
 
-        // Baseline month spending (a bit higher than before so savings stops looking fake)
-        add("Trader Joe's", 104.65, day(3), cardVisa, categories.groceries)
-        add("Safeway", 72.40, day(9), cardVisa, categories.groceries)
-        add("Costco", 168.90, day(16), cardAmex, categories.groceries)
-        add("Grocery Run", 79.15, day(24), cardVisa, categories.groceries)
+        // Higher baseline spend so "actual savings" is not fantasy.
+        // Groceries (5)
+        add("Trader Joe's", 124.65, day(3), cardVisa, categories.groceries)
+        add("Safeway", 92.40, day(8), cardVisa, categories.groceries)
+        add("Costco", 214.90, day(14), cardAmex, categories.groceries)
+        add("Grocery Run", 89.15, day(20), cardVisa, categories.groceries)
+        add("Quick Groceries", 34.22, day(26), cardVisa, categories.groceries)
 
-        add("Coffee", 9.10, day(5), cardVisa, categories.dining)
-        add("Lunch", 19.75, day(12), cardVisa, categories.dining)
-        add("Dinner", 48.60, day(21), cardAmex, categories.dining)
+        // Dining (5)
+        add("Coffee", 9.85, day(4), cardVisa, categories.dining)
+        add("Lunch", 22.60, day(7), cardVisa, categories.dining)
+        add("Dinner", 58.40, day(11), cardAmex, categories.dining)
+        add("Takeout", 31.20, day(18), cardVisa, categories.dining)
+        add("Brunch", 44.10, day(23), cardAmex, categories.dining)
 
-        add("Uber", 24.80, day(7), cardVisa, categories.transport)
-        add("Gas", 58.25, day(15), cardChecking, categories.transport)
-        add("Parking", 12.00, day(20), cardVisa, categories.transport)
+        // Transport (4)
+        add("Uber", 28.40, day(6), cardVisa, categories.transport)
+        add("Gas", 68.25, day(10), cardChecking, categories.transport)
+        add("Parking", 14.00, day(15), cardVisa, categories.transport)
+        add("Gas", 64.10, day(25), cardChecking, categories.transport)
 
-        add("Haircut", 75.00, day(13), cardChecking, categories.services)
-        add("Car Wash", 16.00, day(26), cardChecking, categories.services)
+        // Utilities type stuff (2, non preset overlap is fine for realism)
+        add("Household Supplies", 42.18, day(9), cardAmex, categories.utilities)
+        add("Mobile Add-On", 18.99, day(16), cardChecking, categories.utilities)
 
-        add("Target", 62.30, day(10), cardAmex, categories.shopping)
-        add("Amazon", 49.99, day(19), cardVisa, categories.shopping)
+        // Services (2)
+        add("Haircut", 85.00, day(12), cardChecking, categories.services)
+        add("Car Wash", 18.00, day(21), cardChecking, categories.services)
 
-        add("Movie", 22.00, day(17), cardVisa, categories.entertainment)
-        add("Pharmacy", 28.40, day(22), cardChecking, categories.health)
+        // Shopping (3)
+        add("Target", 88.30, day(5), cardAmex, categories.shopping)
+        add("Amazon", 62.49, day(17), cardVisa, categories.shopping)
+        add("Home Stuff", 54.99, day(28), cardAmex, categories.shopping)
 
-        add("Mobile Phone", 65.00, day(8), cardChecking, categories.utilities)
+        // Entertainment (2)
+        add("Movie", 26.00, day(13), cardVisa, categories.entertainment)
+        add("Concert / Event", 74.00, day(24), cardAmex, categories.entertainment)
 
-        // Month-to-month realism "hits"
-        // I keep these deterministic so screenshots are consistent.
+        // Health (2)
+        add("Pharmacy", 32.40, day(19), cardChecking, categories.health)
+        add("Copay", 45.00, day(27), cardChecking, categories.health)
+
+        // Deterministic "life hits" so some months go negative
         if month % 2 == 0 {
-            add("Car Repair", 480.00, day(18), cardChecking, categories.services)
+            add("Car Repair", 520.00, day(22), cardChecking, categories.services)
         }
 
         if month % 3 == 0 {
-            add("Medical", 220.00, day(23), cardChecking, categories.health)
+            add("Medical", 260.00, day(29), cardChecking, categories.health)
+        }
+
+        if month % 4 == 0 {
+            add("Weekend Trip", 420.00, day(30), cardVisa, categories.entertainment)
         }
 
         if month % 5 == 0 {
-            add("Weekend Trip", 350.00, day(27), cardVisa, categories.entertainment)
+            add("Vet / Pet", 185.00, day(2), cardChecking, categories.health)
         }
     }
 
@@ -614,13 +634,14 @@ enum DebugSeeder {
         calendar: Calendar
     ) {
         // Realistic paychecks:
-        // - lower amounts than before
-        // - small month-to-month variability
-        // - one month missing a second paycheck (life happens)
+        // Planned: 1500.00 and 1500.00 each month
+        // Actual: slightly off with cents, month-to-month wobble
+        // One month: second paycheck is delayed/missing (optional realism)
 
         var cursor = startOfMonth(containing: rangeStart, calendar: calendar)
+
         let nowMonthStart = startOfMonth(containing: Date(), calendar: calendar)
-        let missingSecondPaycheckMonthStart = calendar.date(byAdding: .month, value: -1, to: nowMonthStart) ?? nowMonthStart
+        let missingSecondPaycheckMonthStart = calendar.date(byAdding: .month, value: -2, to: nowMonthStart) ?? nowMonthStart
 
         while cursor <= rangeEnd {
             let monthStart = startOfMonth(containing: cursor, calendar: calendar)
@@ -633,23 +654,41 @@ enum DebugSeeder {
             if monthStart > rangeEnd { break }
 
             let month = calendar.component(.month, from: monthStart)
+            let year = calendar.component(.year, from: monthStart)
 
-            // Base: ~3400–3600/month grossed across two checks
-            var p1Amount: Double = 1700
-            var p2Amount: Double = 1650
+            // Deterministic cents wobble so screenshots are consistent.
+            // I derive cents from month/year so it "feels" random but never changes per run.
+            func actualForPlanned(_ planned: Double, paycheckIndex: Int) -> Double {
+                let seed = (year * 100) + (month * 10) + paycheckIndex
+                let dollarsBump = Double((seed % 7) - 3) // -3 ... +3
+                let centsBump = Double((seed * 37) % 97) / 100.0 // 0.00 ... 0.96
 
-            // Deterministic small wobble
-            if month % 2 == 0 { p1Amount -= 75 }
-            if month % 3 == 0 { p2Amount -= 100 }
-            if month % 5 == 0 { p2Amount += 60 } // tiny "bonus" month
+                // Slight underpayment bias most months, occasional tiny over.
+                // Example: 1500 -> 1476.94 style results appear naturally.
+                let baseDelta: Double
+                switch seed % 5 {
+                case 0: baseDelta = -22.00
+                case 1: baseDelta = -13.00
+                case 2: baseDelta = -7.00
+                case 3: baseDelta = -28.00
+                default: baseDelta = -10.00
+                }
+
+                let result = planned + baseDelta + dollarsBump + centsBump
+                // Keep it sane
+                return max(1200.00, min(1550.99, round(result * 100) / 100))
+            }
 
             // Paycheck #1
+            let p1Planned = 1500.00
+            let p1Actual = actualForPlanned(p1Planned, paycheckIndex: 1)
+
             let p1PlannedDate = monthStart
             let p1ActualDate = monthStart
 
             context.insert(Income(
                 source: "Paycheck",
-                amount: p1Amount,
+                amount: p1Planned,
                 date: p1PlannedDate,
                 isPlanned: true,
                 workspace: workspace,
@@ -659,7 +698,7 @@ enum DebugSeeder {
 
             context.insert(Income(
                 source: "Paycheck",
-                amount: p1Amount,
+                amount: p1Actual,
                 date: p1ActualDate,
                 isPlanned: false,
                 workspace: workspace,
@@ -672,13 +711,16 @@ enum DebugSeeder {
             let p2PlannedDate = calendar.date(byAdding: .day, value: midDay - 1, to: monthStart) ?? monthStart
             let p2ActualDate = p2PlannedDate
 
-            // One month: second paycheck missing (makes at least one budget clearly negative)
+            let p2Planned = 1500.00
+            let p2Actual = actualForPlanned(p2Planned, paycheckIndex: 2)
+
+            // Optional: one month missing second paycheck, but not catastrophic because expenses are already tight
             let shouldSkipSecondPaycheck = (monthStart == missingSecondPaycheckMonthStart)
 
             if !shouldSkipSecondPaycheck {
                 context.insert(Income(
                     source: "Paycheck",
-                    amount: p2Amount,
+                    amount: p2Planned,
                     date: p2PlannedDate,
                     isPlanned: true,
                     workspace: workspace,
@@ -688,8 +730,21 @@ enum DebugSeeder {
 
                 context.insert(Income(
                     source: "Paycheck",
-                    amount: p2Amount,
+                    amount: p2Actual,
                     date: p2ActualDate,
+                    isPlanned: false,
+                    workspace: workspace,
+                    series: nil,
+                    card: cardChecking
+                ))
+            }
+
+            // Side income every other month, small and believable
+            if month % 2 == 1 {
+                context.insert(Income(
+                    source: "Side Hustle",
+                    amount: 165.32,
+                    date: calendar.date(byAdding: .day, value: 20, to: monthStart) ?? monthStart,
                     isPlanned: false,
                     workspace: workspace,
                     series: nil,
