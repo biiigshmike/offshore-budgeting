@@ -162,7 +162,7 @@ struct OnboardingView: View {
                     }
                 }
             )
-            .presentationDetents([.medium])
+            .presentationDetents([.large])
         }
     }
     
@@ -697,12 +697,23 @@ private struct OnboardingPrivacySyncStep: View {
     @State private var showingICloudUnavailable: Bool = false
     @State private var showingRestartRequired: Bool = false
     
+    private var shouldShowICloudSyncSection: Bool {
+        // If the user chose "On Device" as the data source at the start gate,
+        // keep onboarding focused and hide iCloud here. They can switch later
+        // from Manage Workspaces.
+        activeUseICloud
+    }
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             
             header(
-                title: "Privacy, iCloud, and Notifications",
-                subtitle: "Enable App Lock, iCloud sync, and setup Notifications."
+                title: shouldShowICloudSyncSection
+                    ? "Privacy, iCloud, and Notifications"
+                    : "Privacy and Notifications",
+                subtitle: shouldShowICloudSyncSection
+                    ? "Enable App Lock, iCloud sync, and setup Notifications."
+                    : "Enable App Lock and setup Notifications."
             )
             
             Form {
@@ -723,18 +734,20 @@ private struct OnboardingPrivacySyncStep: View {
                     }
                 }
                 
-                Section("iCloud Sync") {
-                    Toggle("Enable iCloud Sync", isOn: Binding(
-                        get: { desiredUseICloud },
-                        set: { wantsEnabled in
-                            handleICloudToggleChanged(wantsEnabled: wantsEnabled)
-                        }
-                    )).tint(Color("AccentColor"))
+                if shouldShowICloudSyncSection {
+                    Section("iCloud Sync") {
+                        Toggle("Enable iCloud Sync", isOn: Binding(
+                            get: { desiredUseICloud },
+                            set: { wantsEnabled in
+                                handleICloudToggleChanged(wantsEnabled: wantsEnabled)
+                            }
+                        )).tint(Color("AccentColor"))
 
-                    
-                    Text("Use iCloud to sync your workspaces and budgets across your devices signed into this Apple ID.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        
+                        Text("Use iCloud to sync your workspaces and budgets across your devices signed into this Apple ID.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 
                 Section("Notifications") {
@@ -775,7 +788,7 @@ private struct OnboardingPrivacySyncStep: View {
                 secondaryButtonTitle: "Not Now",
                 onSecondary: { showingRestartRequired = false }
             )
-            .presentationDetents([.medium])
+            .presentationDetents([.large])
         }
         .alert("Notifications Disabled", isPresented: $showingNotificationsDeniedInfo) {
             Button("OK", role: .cancel) { }

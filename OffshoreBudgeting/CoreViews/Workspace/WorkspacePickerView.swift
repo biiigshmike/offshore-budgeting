@@ -101,6 +101,9 @@ struct WorkspacePickerView: View {
                             .tint(Color("OffshoreDepth"))
                         }
                     }
+                    Text("Choose a Workspace to switch contexts.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
             }
         }
@@ -165,7 +168,7 @@ struct WorkspacePickerView: View {
                     primaryButtonTitle: AppRestartService.closeAppButtonTitle,
                     onPrimary: { AppRestartService.closeAppOrDismiss { sheetRoute = nil } }
                 )
-                .presentationDetents([.medium])
+                .presentationDetents([.large])
 
             case .addWorkspace:
                 NavigationStack {

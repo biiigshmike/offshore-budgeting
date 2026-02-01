@@ -102,5 +102,6 @@ struct RestartRequiredView: View {
             Spacer(minLength: 0)
         }
         .padding(.vertical, 18)
+        .padding(.horizontal, 18)
     }
 }

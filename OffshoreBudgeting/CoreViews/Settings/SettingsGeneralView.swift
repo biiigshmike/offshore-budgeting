@@ -194,7 +194,7 @@ struct SettingsGeneralView: View {
                 primaryButtonTitle: AppRestartService.closeAppButtonTitle,
                 onPrimary: { AppRestartService.closeAppOrDismiss { showingRestartRequired = false } }
             )
-            .presentationDetents([.medium])
+            .presentationDetents([.large])
         }
     }
 
