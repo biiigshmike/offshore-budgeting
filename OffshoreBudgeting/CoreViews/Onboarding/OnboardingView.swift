@@ -88,21 +88,28 @@ struct OnboardingView: View {
     }
     
     var body: some View {
-        VStack(spacing: 0) {
+        ZStack {
+            if onboardingStep == 0 {
+                WaveBackdrop(isExiting: isExitingWelcome)
+                    .ignoresSafeArea()
+            }
 
-            stepBody
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding(.horizontal, 18)
-                .padding(.top, 18)
-                .frame(maxWidth: stepMaxWidth)
-                .frame(maxWidth: .infinity, alignment: .center)
+            VStack(spacing: 0) {
 
-            if onboardingStep != 0 {
-                bottomNavBar
+                stepBody
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .padding(.horizontal, 18)
-                    .padding(.vertical, 14)
+                    .padding(.top, 18)
                     .frame(maxWidth: stepMaxWidth)
                     .frame(maxWidth: .infinity, alignment: .center)
+
+                if onboardingStep != 0 {
+                    bottomNavBar
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 14)
+                        .frame(maxWidth: stepMaxWidth)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                }
             }
         }
         .navigationBarBackButtonHidden(true)
@@ -194,54 +201,49 @@ struct OnboardingView: View {
     // MARK: - Step 1: Welcome
     
     private var welcomeStep: some View {
-        ZStack {
-            WaveBackdrop(isExiting: isExitingWelcome)
-                .ignoresSafeArea()
-            
-            VStack(alignment: .leading, spacing: 14) {
-                Spacer(minLength: 8)
-                
-                Image(systemName: "sailboat.fill")
-                    .font(.system(size: 46, weight: .semibold))
-                    .foregroundStyle(.tint)
-                
-                Text("Welcome to Offshore Budgeting!")
-                    .font(.largeTitle.weight(.bold))
-                
-                Text("Press the button below to get started setting up your budgeting workspace.")
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-                
-                Spacer(minLength: 0)
-                
-                if #available(iOS 26.0, *) {
-                    Button {
-                        getStartedTapped()
-                    } label: {
-                        Text("Get Started")
-                            .frame(maxWidth: .infinity, minHeight: 52)
-                    }
-                    .buttonStyle(.glassProminent)
-                    .tint(.accentColor)
-                    .disabled(isCheckingICloudForGetStarted)
-                    
-                    Spacer(minLength: 18)
-                } else {
-                    Button {
-                        getStartedTapped()
-                    } label: {
-                        Text("Get Started")
-                            .frame(maxWidth: .infinity, minHeight: 52)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.accentColor)
-                    .disabled(isCheckingICloudForGetStarted)
-                    
-                    Spacer(minLength: 18)
+        VStack(alignment: .leading, spacing: 14) {
+            Spacer(minLength: 8)
+
+            Image(systemName: "sailboat.fill")
+                .font(.system(size: 46, weight: .semibold))
+                .foregroundStyle(.tint)
+
+            Text("Welcome to Offshore Budgeting!")
+                .font(.largeTitle.weight(.bold))
+
+            Text("Press the button below to get started setting up your budgeting workspace.")
+                .font(.body)
+                .foregroundStyle(.secondary)
+
+            Spacer(minLength: 0)
+
+            if #available(iOS 26.0, *) {
+                Button {
+                    getStartedTapped()
+                } label: {
+                    Text("Get Started")
+                        .frame(maxWidth: .infinity, minHeight: 52)
                 }
+                .buttonStyle(.glassProminent)
+                .tint(.accentColor)
+                .disabled(isCheckingICloudForGetStarted)
+
+                Spacer(minLength: 18)
+            } else {
+                Button {
+                    getStartedTapped()
+                } label: {
+                    Text("Get Started")
+                        .frame(maxWidth: .infinity, minHeight: 52)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.accentColor)
+                .disabled(isCheckingICloudForGetStarted)
+
+                Spacer(minLength: 18)
             }
-            .frame(maxWidth: 560, alignment: .leading)
         }
+        .frame(maxWidth: 560, alignment: .leading)
     }
     
     // MARK: - Step 2: Workspaces
@@ -630,7 +632,6 @@ struct OnboardingView: View {
                         }
                         .buttonStyle(.plain)
                     }
-                    Text("")
                 }
                 .listStyle(.insetGrouped)
                 .scrollContentBackground(.hidden)
