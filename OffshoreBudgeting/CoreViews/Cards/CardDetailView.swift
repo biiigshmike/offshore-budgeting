@@ -417,8 +417,18 @@ struct CardDetailView: View {
                                         } label: {
                                             Label("Edit Preset", systemImage: "list.bullet.rectangle")
                                         }
-                                        .tint(.orange)
+                                        .tint(Color("OffshoreSand"))
                                     }
+                                }
+                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                    Button(role: .destructive) {
+                                        deleteWithOptionalConfirm {
+                                            modelContext.delete(expense)
+                                        }
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
+                                    }
+                                    .tint(Color("OffshoreDepth"))
                                 }
                         }
                         .onDelete(perform: deletePlannedExpensesFiltered)
@@ -443,6 +453,16 @@ struct CardDetailView: View {
                                     Label("Edit", systemImage: "pencil")
                                 }
                                 .tint(Color("AccentColor"))
+                            }
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button(role: .destructive) {
+                                    deleteWithOptionalConfirm {
+                                        modelContext.delete(expense)
+                                    }
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                                .tint(Color("OffshoreDepth"))
                             }
                         }
                         .onDelete(perform: deleteVariableExpensesFiltered)
@@ -471,8 +491,18 @@ struct CardDetailView: View {
                                             } label: {
                                                 Label("Edit Preset", systemImage: "list.bullet.rectangle")
                                             }
-                                            .tint(.orange)
+                                            .tint(Color("OffshoreSand"))
                                         }
+                                    }
+                                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                        Button(role: .destructive) {
+                                            deleteWithOptionalConfirm {
+                                                modelContext.delete(expense)
+                                            }
+                                        } label: {
+                                            Label("Delete", systemImage: "trash")
+                                        }
+                                        .tint(Color("OffshoreDepth"))
                                     }
 
                             case .variable(let expense):
@@ -489,6 +519,16 @@ struct CardDetailView: View {
                                         Label("Edit", systemImage: "pencil")
                                     }
                                     .tint(Color("AccentColor"))
+                                }
+                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                    Button(role: .destructive) {
+                                        deleteWithOptionalConfirm {
+                                            modelContext.delete(expense)
+                                        }
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
+                                    }
+                                    .tint(Color("OffshoreDepth"))
                                 }
                             }
                         }
@@ -827,7 +867,21 @@ struct CardDetailView: View {
         return (try? modelContext.fetch(desc))?.first
     }
 
+    private func deleteWithOptionalConfirm(_ deleteAction: @escaping () -> Void) {
+        if confirmBeforeDeleting {
+            pendingExpenseDelete = deleteAction
+            showingExpenseDeleteConfirm = true
+        } else {
+            deleteAction()
+        }
+    }
+
     private func deleteCard() {
+        let cardID = card.id
+        let workspaceID = workspace.id
+
+        HomePinnedItemsStore(workspaceID: workspaceID).removePinnedCard(id: cardID)
+        HomePinnedCardsStore(workspaceID: workspaceID).removePinnedCardID(cardID)
 
         // I prefer being explicit here even though SwiftData delete rules are set to cascade.
         // This keeps behavior predictable if those rules ever change.
