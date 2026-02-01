@@ -56,6 +56,7 @@ struct HomeTileContainer<Content: View>: View {
         .overlay {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1)
+                .allowsHitTesting(false)
         }
     }
 

@@ -8,8 +8,11 @@
 import SwiftUI
 
 struct HomeWhatIfTile: View {
-    
+	    
+    @GestureState private var isPressed: Bool = false
     @State private var pinnedRefreshTick: Int = 0
+    @State private var selectedScenarioID: UUID? = nil
+    @State private var isShowingPlanner: Bool = false
 
 
     let workspace: Workspace
@@ -107,27 +110,13 @@ struct HomeWhatIfTile: View {
             accent: valueColor,
             showsChevron: false,
             headerTrailing: AnyView(
-                NavigationLink {
-                    WhatIfScenarioPlannerView(
-                        workspace: workspace,
-                        categories: categories,
-                        incomes: incomes,
-                        plannedExpenses: plannedExpenses,
-                        variableExpenses: variableExpenses,
-                        startDate: startDate,
-                        endDate: endDate,
-                        initialScenarioID: nil
-                    )
-                } label: {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                        .padding(.top, 4)
-                        .padding(.leading, 8)
-                        .padding(.bottom, 4)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Open What If planner")
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 4)
+                    .padding(.leading, 8)
+                    .padding(.bottom, 4)
+                    .accessibilityHidden(true)
             )
         ) {
             VStack(alignment: .leading, spacing: 12) {
@@ -150,6 +139,36 @@ struct HomeWhatIfTile: View {
                 pinnedPreviews
             }
         }
+        .scaleEffect(isPressed ? 0.99 : 1.0)
+        .opacity(isPressed ? 0.96 : 1.0)
+        .animation(.easeOut(duration: 0.12), value: isPressed)
+        .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .updating($isPressed) { _, state, _ in
+                    state = true
+                },
+            including: .gesture
+        )
+        .simultaneousGesture(
+            TapGesture().onEnded {
+                selectedScenarioID = nil
+                isShowingPlanner = true
+            },
+            including: .gesture
+        )
+        .navigationDestination(isPresented: $isShowingPlanner) {
+            WhatIfScenarioPlannerView(
+                workspace: workspace,
+                categories: categories,
+                incomes: incomes,
+                plannedExpenses: plannedExpenses,
+                variableExpenses: variableExpenses,
+                startDate: startDate,
+                endDate: endDate,
+                initialScenarioID: selectedScenarioID
+            )
+        }
         .onReceive(
             NotificationCenter.default.publisher(
                 for: WhatIfScenarioStore.pinnedGlobalScenariosDidChangeName(workspaceID: workspace.id)
@@ -159,6 +178,8 @@ struct HomeWhatIfTile: View {
         }
         .accessibilityLabel("What If?")
         .accessibilityValue(CurrencyFormatter.string(from: displayValue))
+        .accessibilityAddTraits(.isButton)
+        .accessibilityHint("Opens What If planner")
     }
 
     @ViewBuilder
@@ -177,17 +198,9 @@ struct HomeWhatIfTile: View {
                     .foregroundStyle(.secondary)
 
                 ForEach(previews.prefix(3)) { item in
-                    NavigationLink {
-                        WhatIfScenarioPlannerView(
-                            workspace: workspace,
-                            categories: categories,
-                            incomes: incomes,
-                            plannedExpenses: plannedExpenses,
-                            variableExpenses: variableExpenses,
-                            startDate: startDate,
-                            endDate: endDate,
-                            initialScenarioID: item.id
-                        )
+                    Button {
+                        selectedScenarioID = item.id
+                        isShowingPlanner = true
                     } label: {
                         HStack(spacing: 10) {
                             Text(item.name)
