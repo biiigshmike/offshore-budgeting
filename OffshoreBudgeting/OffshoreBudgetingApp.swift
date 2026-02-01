@@ -1,16 +1,21 @@
+//  OffshoreBudgetingApp.swift
+//  OffshoreBudgeting
+//
+//  Created by Michael Brown on 1/20/26.
+//
+
 import SwiftUI
 import SwiftData
 
 @main
 struct OffshoreBudgetingApp: App {
-    
+
     // MARK: - Notifications Delegate
 
     #if canImport(UIKit)
     @UIApplicationDelegateAdaptor(NotificationsAppDelegate.self)
     private var notificationsAppDelegate
     #endif
-
 
     // MARK: - iCloud Opt-In State
 
@@ -28,6 +33,16 @@ struct OffshoreBudgetingApp: App {
             UserDefaults.standard.set(0.0, forKey: "icloud_bootstrapStartedAt")
         }
 
+        #if DEBUG
+        // If screenshot mode is enabled, we ALWAYS use a local-only container
+        // so we never touch Cloud data while staging screenshots.
+        if Self.isScreenshotModeEnabled {
+            UserDefaults.standard.set(false, forKey: "icloud_activeUseCloud")
+            UserDefaults.standard.set(0.0, forKey: "icloud_bootstrapStartedAt")
+            return Self.makeModelContainer(useICloud: false, debugStoreOverride: "Screenshots")
+        }
+        #endif
+
         return Self.makeModelContainer(useICloud: desiredUseICloud)
     }()
 
@@ -35,6 +50,16 @@ struct OffshoreBudgetingApp: App {
         WindowGroup {
             AppBootstrapRootView(modelContainer: $modelContainer)
                 .id(rootResetToken)
+                .task {
+                    #if DEBUG
+                    if Self.isScreenshotModeEnabled {
+                        DebugSeeder.runIfNeeded(
+                            container: modelContainer,
+                            forceReset: Self.isSeedResetRequested
+                        )
+                    }
+                    #endif
+                }
         }
         .modelContainer(modelContainer)
     }
@@ -43,7 +68,7 @@ struct OffshoreBudgetingApp: App {
 
     private static let cloudKitContainerIdentifier: String = "iCloud.com.mb.offshore-budgeting"
 
-    static func makeModelContainer(useICloud: Bool) -> ModelContainer {
+    static func makeModelContainer(useICloud: Bool, debugStoreOverride: String? = nil) -> ModelContainer {
         do {
             let schema = Schema([
                 Workspace.self,
@@ -66,6 +91,20 @@ struct OffshoreBudgetingApp: App {
 
             let localStoreURL = appSupport.appendingPathComponent("Local.store")
             let cloudStoreURL = appSupport.appendingPathComponent("Cloud.store")
+
+            #if DEBUG
+            if let debugStoreOverride {
+                let debugURL = appSupport.appendingPathComponent("\(debugStoreOverride).store")
+                let configuration = ModelConfiguration(
+                    debugStoreOverride,
+                    schema: schema,
+                    url: debugURL,
+                    allowsSave: true,
+                    cloudKitDatabase: .none
+                )
+                return try ModelContainer(for: schema, configurations: [configuration])
+            }
+            #endif
 
             let configuration: ModelConfiguration
 
@@ -125,4 +164,20 @@ struct OffshoreBudgetingApp: App {
             }()
         }
     }
+
+    // MARK: - DEBUG Screenshot Mode
+
+    #if DEBUG
+    private static var isScreenshotModeEnabled: Bool {
+        let args = ProcessInfo.processInfo.arguments
+        if args.contains("-screenshotMode") { return true }
+        return UserDefaults.standard.bool(forKey: "debug_screenshotMode")
+    }
+
+    private static var isSeedResetRequested: Bool {
+        let args = ProcessInfo.processInfo.arguments
+        if args.contains("-resetSeed") { return true }
+        return false
+    }
+    #endif
 }
