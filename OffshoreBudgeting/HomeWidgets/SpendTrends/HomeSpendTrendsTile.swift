@@ -67,7 +67,9 @@ struct HomeSpendTrendsTile: View {
     // MARK: - Mini chart (Wallet-y pill bars)
 
     private func miniChart(result: HomeSpendTrendsAggregator.Result) -> some View {
-        let buckets = Array(result.buckets.prefix(8))
+        // This tile is primarily a preview, but yearly ranges need all 12 months to read correctly.
+        // Keeping zeros in the layout avoids bar/label drift when some buckets have no spending.
+        let buckets = Array(result.buckets.prefix(12))
 
         return VStack(spacing: 8) {
             GeometryReader { geo in
@@ -164,16 +166,16 @@ private struct SpendTrendsScaledPillBar: View {
     private let displayEpsilon: Double = 1.00
 
     var body: some View {
-        if bucket.total > displayEpsilon {
-            let fraction = min(1.0, max(0.0, bucket.total / max(0.000_1, maxTotal)))
-            let barHeight = max(2, availableHeight * CGFloat(fraction))
+        let fraction = min(1.0, max(0.0, bucket.total / max(0.000_1, maxTotal)))
+        let barHeight = max(2, availableHeight * CGFloat(fraction))
 
-            let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
-            let gradient = featheredGradient(bucket: bucket)
+        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
+        let gradient = featheredGradient(bucket: bucket)
 
-            VStack(spacing: 0) {
-                Spacer(minLength: 0)
+        VStack(spacing: 0) {
+            Spacer(minLength: 0)
 
+            if bucket.total > displayEpsilon {
                 ZStack(alignment: .bottom) {
                     shape
                         .fill(gradient)
@@ -183,9 +185,12 @@ private struct SpendTrendsScaledPillBar: View {
                         .strokeBorder(Color.white.opacity(0.16), lineWidth: 1)
                         .frame(width: barWidth, height: barHeight)
                 }
+            } else {
+                // I keep a "transparent bar" here so zero buckets still reserve their slot width.
+                // Without this, the HStack can compress and labels drift away from their bars.
+                Color.clear
+                    .frame(width: barWidth, height: 2)
             }
-        } else {
-            EmptyView()
         }
     }
 
