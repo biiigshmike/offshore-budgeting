@@ -144,16 +144,18 @@ struct BudgetDetailView: View {
     // MARK: - Categories (chips)
     
     private var categoriesInBudget: [Category] {
-        var seen = Set<UUID>()
-        let all = (plannedExpensesInBudget.compactMap { $0.category } + variableExpensesInBudget.compactMap { $0.category })
-        
-        let uniques = all.filter { cat in
-            guard !seen.contains(cat.id) else { return false }
-            seen.insert(cat.id)
-            return true
+        var categoriesByID: [UUID: Category] = [:]
+
+        for category in (workspace.categories ?? []) {
+            categoriesByID[category.id] = category
         }
-        
-        return uniques.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+
+        for category in (plannedExpensesInBudget.compactMap { $0.category } + variableExpensesInBudget.compactMap { $0.category }) {
+            categoriesByID[category.id] = category
+        }
+
+        return categoriesByID.values
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
     
     // MARK: - Search helpers
