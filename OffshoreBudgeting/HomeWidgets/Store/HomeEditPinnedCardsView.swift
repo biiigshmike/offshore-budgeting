@@ -68,6 +68,7 @@ struct HomeEditPinnedCardsView: View {
                                 }
                             }
                         }
+                        .disabled(!isEditing)
                     }
                 }
 
@@ -98,6 +99,7 @@ struct HomeEditPinnedCardsView: View {
                                 }
                             }
                         }
+                        .disabled(!isEditing)
                     }
                 }
             }
@@ -143,12 +145,9 @@ struct HomeEditPinnedCardsView: View {
 
         HStack(spacing: 10) {
             Text(title(for: item.wrappedValue))
+                .foregroundStyle(Color("AccentColor"))
 
             Spacer()
-
-            Text(typeLabel(for: item.wrappedValue))
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(.secondary)
 
             Picker("Size", selection: sizeBinding) {
                 ForEach(HomeTileSize.allCases, id: \.self) { size in
@@ -169,15 +168,6 @@ struct HomeEditPinnedCardsView: View {
             return widget.title
         case .card(let id, _):
             return cards.first(where: { $0.id == id })?.name ?? "Missing Card"
-        }
-    }
-
-    private func typeLabel(for item: HomePinnedItem) -> String {
-        switch item {
-        case .widget:
-            return "Widget"
-        case .card:
-            return "Card"
         }
     }
 
