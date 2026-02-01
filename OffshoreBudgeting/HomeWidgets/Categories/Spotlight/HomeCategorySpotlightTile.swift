@@ -16,7 +16,7 @@ struct HomeCategorySpotlightTile: View {
     let startDate: Date
     let endDate: Date
 
-    var topN: Int = 6
+    let topN: Int = 3
 
     private var metricsResult: HomeCategoryMetricsResult {
         HomeCategoryMetricsCalculator.calculate(
@@ -116,7 +116,7 @@ struct HomeCategorySpotlightTile: View {
                         .opacity(0.25)
 
                     VStack(alignment: .leading, spacing: 8) {
-                        ForEach(Array(metricsResult.metrics.prefix(3))) { metric in
+                        ForEach(Array(metricsResult.metrics.prefix(topN))) { metric in
                             let color = metric.categoryColorHex.flatMap { Color(hex: $0) } ?? .secondary
 
                             CategoryMetricRowView(

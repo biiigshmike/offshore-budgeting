@@ -394,8 +394,7 @@ struct HomeView: View {
             plannedExpenses: plannedExpensesForHome,
             variableExpenses: variableExpenses,
             startDate: appliedStartDate,
-            endDate: appliedEndDate,
-            topN: 4
+            endDate: appliedEndDate
         )
     }
 
