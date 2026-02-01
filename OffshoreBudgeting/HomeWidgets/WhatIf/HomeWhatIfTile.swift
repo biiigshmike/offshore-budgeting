@@ -11,8 +11,6 @@ struct HomeWhatIfTile: View {
 	    
     @GestureState private var isPressed: Bool = false
     @State private var pinnedRefreshTick: Int = 0
-    @State private var selectedScenarioID: UUID? = nil
-    @State private var isShowingPlanner: Bool = false
 
 
     let workspace: Workspace
@@ -22,6 +20,7 @@ struct HomeWhatIfTile: View {
     let variableExpenses: [VariableExpense]
     let startDate: Date
     let endDate: Date
+    let onOpenPlanner: (_ initialScenarioID: UUID?) -> Void
 
     // MARK: - Store (global scenarios)
 
@@ -144,31 +143,18 @@ struct HomeWhatIfTile: View {
         .animation(.easeOut(duration: 0.12), value: isPressed)
         .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .updating($isPressed) { _, state, _ in
-                    state = true
+            LongPressGesture(minimumDuration: 0, maximumDistance: 18)
+                .updating($isPressed) { isDown, state, _ in
+                    state = isDown
                 },
             including: .gesture
         )
         .simultaneousGesture(
             TapGesture().onEnded {
-                selectedScenarioID = nil
-                isShowingPlanner = true
+                onOpenPlanner(nil)
             },
             including: .gesture
         )
-        .navigationDestination(isPresented: $isShowingPlanner) {
-            WhatIfScenarioPlannerView(
-                workspace: workspace,
-                categories: categories,
-                incomes: incomes,
-                plannedExpenses: plannedExpenses,
-                variableExpenses: variableExpenses,
-                startDate: startDate,
-                endDate: endDate,
-                initialScenarioID: selectedScenarioID
-            )
-        }
         .onReceive(
             NotificationCenter.default.publisher(
                 for: WhatIfScenarioStore.pinnedGlobalScenariosDidChangeName(workspaceID: workspace.id)
@@ -199,8 +185,7 @@ struct HomeWhatIfTile: View {
 
                 ForEach(previews.prefix(3)) { item in
                     Button {
-                        selectedScenarioID = item.id
-                        isShowingPlanner = true
+                        onOpenPlanner(item.id)
                     } label: {
                         HStack(spacing: 10) {
                             Text(item.name)

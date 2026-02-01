@@ -50,6 +50,9 @@ struct HomeView: View {
 
     @State private var pinnedItems: [HomePinnedItem] = []
 
+    @State private var isShowingWhatIfPlanner: Bool = false
+    @State private var whatIfInitialScenarioID: UUID? = nil
+
     // MARK: - Data Fixups
 
     private var plannedExpensesForHome: [PlannedExpense] {
@@ -164,6 +167,18 @@ struct HomeView: View {
                 }
             }
         }
+        .navigationDestination(isPresented: $isShowingWhatIfPlanner) {
+            WhatIfScenarioPlannerView(
+                workspace: workspace,
+                categories: categories,
+                incomes: incomes,
+                plannedExpenses: plannedExpensesForHome,
+                variableExpenses: variableExpenses,
+                startDate: appliedStartDate,
+                endDate: appliedEndDate,
+                initialScenarioID: whatIfInitialScenarioID
+            )
+        }
         .postBoardingTip(
             key: "tip.home.v1",
             title: "Home",
@@ -214,6 +229,13 @@ struct HomeView: View {
             lastSyncedDefaultBudgetingPeriodRaw = defaultBudgetingPeriodRaw
             syncDraftToApplied()
         }
+    }
+
+    // MARK: - Navigation
+
+    private func openWhatIfPlanner(_ initialScenarioID: UUID?) {
+        whatIfInitialScenarioID = initialScenarioID
+        isShowingWhatIfPlanner = true
     }
 
     // MARK: - Unified tile rendering
@@ -355,7 +377,8 @@ struct HomeView: View {
             plannedExpenses: plannedExpensesForHome,
             variableExpenses: variableExpenses,
             startDate: appliedStartDate,
-            endDate: appliedEndDate
+            endDate: appliedEndDate,
+            onOpenPlanner: openWhatIfPlanner
         )
     }
 
