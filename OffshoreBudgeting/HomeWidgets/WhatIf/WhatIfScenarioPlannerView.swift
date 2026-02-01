@@ -256,7 +256,6 @@ struct WhatIfScenarioPlannerView: View {
                             step: 10,
                             currencyCode: currencyCode
                         )
-                        .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                             Button {
                                 resetCategoryToBaseline(category.id)

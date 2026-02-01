@@ -69,14 +69,12 @@ struct WhatIfCategoryRowView: View {
                         Text(categoryName)
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(.primary)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
+                            .minimumScaleFactor(0.85)
 
                         Text("Actual: \(formatCurrency(baselineAmount))")
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
+                            .minimumScaleFactor(0.85)
                     }
                     .frame(maxHeight: .infinity, alignment: .center) // keeps the two lines centered
                 }
