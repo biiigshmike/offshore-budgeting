@@ -5,7 +5,6 @@
 //  Created by Michael Brown on 1/31/26.
 //
 
-
 import Foundation
 import SwiftData
 
@@ -91,7 +90,7 @@ enum DebugSeeder {
         let workspace = Workspace(name: "Screenshots", hexColor: "#3B82F6")
         context.insert(workspace)
 
-        // Categories (more variety for charts/tiles)
+        // Categories
         let catHousing = Category(name: "Housing", hexColor: "#6366F1", workspace: workspace)
         let catUtilities = Category(name: "Utilities", hexColor: "#14B8A6", workspace: workspace)
         let catGroceries = Category(name: "Groceries", hexColor: "#22C55E", workspace: workspace)
@@ -109,13 +108,12 @@ enum DebugSeeder {
         categories.forEach { context.insert($0) }
 
         // Cards
-        let cardChecking = Card(name: "Checking", theme: "default", effect: "none", workspace: workspace)
-        let cardVisa = Card(name: "Visa", theme: "default", effect: "none", workspace: workspace)
-        let cardAmex = Card(name: "Amex", theme: "default", effect: "none", workspace: workspace)
-
+        let cardChecking = Card(name: "Checking", theme: "sunset", effect: "plastic", workspace: workspace)
+        let cardVisa = Card(name: "Apple Card", theme: "lavender", effect: "glass", workspace: workspace)
+        let cardAmex = Card(name: "AmEx", theme: "nebula", effect: "holographic", workspace: workspace)
         [cardChecking, cardVisa, cardAmex].forEach { context.insert($0) }
 
-        // Presets (more realistic set)
+        // Presets
         let presetRent = Preset(title: "Rent", plannedAmount: 1500, workspace: workspace)
         let presetInternet = Preset(title: "Internet", plannedAmount: 80, workspace: workspace)
         let presetGym = Preset(title: "Gym", plannedAmount: 45, workspace: workspace)
@@ -126,7 +124,6 @@ enum DebugSeeder {
         presets.forEach { context.insert($0) }
 
         // Budgets
-        // Current month
         let currentMonthStart = startOfMonth(containing: now, calendar: cal)
         let currentMonthEnd = endOfMonth(containing: now, calendar: cal)
 
@@ -138,7 +135,6 @@ enum DebugSeeder {
         )
         context.insert(currentBudget)
 
-        // Past 2 months (monthly)
         let pastMonth1Date = cal.date(byAdding: .month, value: -1, to: now) ?? now
         let pastMonth2Date = cal.date(byAdding: .month, value: -2, to: now) ?? now
 
@@ -148,7 +144,6 @@ enum DebugSeeder {
         context.insert(pastBudget1)
         context.insert(pastBudget2)
 
-        // Previous year (yearly)
         let prevYearDate = cal.date(byAdding: .year, value: -1, to: now) ?? now
         let prevYearStart = startOfYear(containing: prevYearDate, calendar: cal)
         let prevYearEnd = endOfYear(containing: prevYearDate, calendar: cal)
@@ -161,7 +156,6 @@ enum DebugSeeder {
         )
         context.insert(yearlyBudget)
 
-        // Future budgets (next month monthly, next quarter quarterly)
         let nextMonthDate = cal.date(byAdding: .month, value: 1, to: now) ?? now
         let futureMonthlyBudget = makeMonthlyBudget(containing: nextMonthDate, workspace: workspace, calendar: cal)
         context.insert(futureMonthlyBudget)
@@ -181,14 +175,14 @@ enum DebugSeeder {
             currentBudget, pastBudget1, pastBudget2, yearlyBudget, futureMonthlyBudget, futureQuarterlyBudget
         ]
 
-        // Link cards to all budgets (so BudgetDetail has data without extra setup)
+        // Link cards to all budgets
         for budget in allBudgets {
             context.insert(BudgetCardLink(budget: budget, card: cardChecking))
             context.insert(BudgetCardLink(budget: budget, card: cardVisa))
             context.insert(BudgetCardLink(budget: budget, card: cardAmex))
         }
 
-        // Assign presets to the monthly budgets + quarterly (yearly gets none by design, feels realistic)
+        // Assign presets to monthly + quarterly (skip yearly)
         let presetBudgets: [Budget] = [currentBudget, pastBudget1, pastBudget2, futureMonthlyBudget, futureQuarterlyBudget]
         for budget in presetBudgets {
             context.insert(BudgetPresetLink(budget: budget, preset: presetRent))
@@ -198,20 +192,19 @@ enum DebugSeeder {
             context.insert(BudgetPresetLink(budget: budget, preset: presetStreaming))
         }
 
-        // Category limits (helps charts look “complete”)
-        // Apply to current + next month (what users are most likely to screenshot)
+        // Category limits (Double literals so Swift stays happy)
         applyCategoryLimits(
             context: context,
             budget: currentBudget,
             limits: [
-                (catGroceries, 500),
-                (catDining, 250),
-                (catServices, 220),
-                (catTransport, 180),
-                (catEntertainment, 120),
-                (catShopping, 200),
-                (catHealth, 150),
-                (catUtilities, 180)
+                (catGroceries, 500.0),
+                (catDining, 250.0),
+                (catServices, 220.0),
+                (catTransport, 180.0),
+                (catEntertainment, 120.0),
+                (catShopping, 200.0),
+                (catHealth, 150.0),
+                (catUtilities, 180.0)
             ]
         )
 
@@ -219,19 +212,18 @@ enum DebugSeeder {
             context: context,
             budget: futureMonthlyBudget,
             limits: [
-                (catGroceries, 520),
-                (catDining, 260),
-                (catServices, 220),
-                (catTransport, 180),
-                (catEntertainment, 120),
-                (catShopping, 200),
-                (catHealth, 150),
-                (catUtilities, 180)
+                (catGroceries, 520.0),
+                (catDining, 260.0),
+                (catServices, 220.0),
+                (catTransport, 180.0),
+                (catEntertainment, 120.0),
+                (catShopping, 200.0),
+                (catHealth, 150.0),
+                (catUtilities, 180.0)
             ]
         )
 
         // Planned expenses per budget
-        // Past months: actual matches planned
         seedMonthlyPlannedExpenses(
             context: context,
             budget: pastBudget2,
@@ -256,7 +248,7 @@ enum DebugSeeder {
             actualsMatchPlanned: true
         )
 
-        // Current month: some paid, some pending (actual lower than planned)
+        // Current month: a couple planned items not paid yet
         seedMonthlyPlannedExpenses(
             context: context,
             budget: currentBudget,
@@ -269,7 +261,7 @@ enum DebugSeeder {
             actualsMatchPlanned: false
         )
 
-        // Future month: planned only, actual 0
+        // Future month: planned only
         seedMonthlyPlannedExpensesFuture(
             context: context,
             budget: futureMonthlyBudget,
@@ -281,7 +273,7 @@ enum DebugSeeder {
             categories: (catHousing, catUtilities, catHealth, catEntertainment)
         )
 
-        // Quarterly budget: create 3 months worth of planned expenses (planned only)
+        // Quarterly: planned only for each month
         seedQuarterlyPlannedExpensesFuture(
             context: context,
             budget: futureQuarterlyBudget,
@@ -294,8 +286,7 @@ enum DebugSeeder {
             calendar: cal
         )
 
-        // Variable expenses across many months, per card
-        // Past months + current + next month + quarter range
+        // Variable expenses across ranges
         let variableRanges: [(start: Date, end: Date)] = [
             (pastBudget2.startDate, pastBudget2.endDate),
             (pastBudget1.startDate, pastBudget1.endDate),
@@ -318,7 +309,7 @@ enum DebugSeeder {
             )
         }
 
-        // Yearly budget: sprinkle income + variable expenses across the entire year
+        // Yearly budget: enough to make charts interesting, not thousands of rows
         seedYearlyIncomeAndSpending(
             context: context,
             workspace: workspace,
@@ -330,7 +321,7 @@ enum DebugSeeder {
             calendar: cal
         )
 
-        // Income for the visible monthly/quarterly ranges
+        // Income for visible range (more realistic amounts and a little variability)
         seedIncomeForRange(
             context: context,
             workspace: workspace,
@@ -376,7 +367,6 @@ enum DebugSeeder {
     }
 
     private static func startOfNextQuarter(after date: Date, calendar: Calendar) -> Date {
-        // Align to real quarters: Jan/Apr/Jul/Oct
         let comps = calendar.dateComponents([.year, .month], from: date)
         let year = comps.year ?? calendar.component(.year, from: date)
         let month = comps.month ?? calendar.component(.month, from: date)
@@ -443,23 +433,33 @@ enum DebugSeeder {
             ))
         }
 
-        // Paid items (rent usually hits early)
-        let rentActual = actualsMatchPlanned ? 1500 : 1500
-        addPlanned(title: "Rent", planned: 1500, actual: Double(rentActual), day: 1, category: categories.housing, card: cardChecking, presetID: presets.rent.id)
+        // Core fixed bills
+        addPlanned(title: "Rent", planned: 1500, actual: 1500, day: 1, category: categories.housing, card: cardChecking, presetID: presets.rent.id)
+        addPlanned(title: "Internet", planned: 80, actual: 80, day: 3, category: categories.utilities, card: cardChecking, presetID: presets.internet.id)
 
-        // Utilities (internet)
-        let internetActual = actualsMatchPlanned ? 80 : 80
-        addPlanned(title: "Internet", planned: 80, actual: Double(internetActual), day: 3, category: categories.utilities, card: cardChecking, presetID: presets.internet.id)
+        // A couple "non-preset" fixed-ish bills that help reduce magical savings
+        let electricActual = actualsMatchPlanned ? 112 : 112
+        addPlanned(title: "Electric", planned: 115, actual: Double(electricActual), day: 6, category: categories.utilities, card: cardChecking, presetID: nil)
 
-        // Gym and streaming may be pending in current month
+        let waterActual = actualsMatchPlanned ? 45 : 45
+        addPlanned(title: "Water", planned: 45, actual: Double(waterActual), day: 8, category: categories.utilities, card: cardChecking, presetID: nil)
+
+        let carPaymentActual = actualsMatchPlanned ? 325 : 325
+        addPlanned(title: "Car Payment", planned: 325, actual: Double(carPaymentActual), day: 10, category: categories.health, card: cardChecking, presetID: nil)
+
+        // Gym + streaming: sometimes pending in current month
         let gymActual = actualsMatchPlanned ? 45 : 0
-        addPlanned(title: "Gym", planned: 45, actual: Double(gymActual), day: 9, category: categories.health, card: cardVisa, presetID: presets.gym.id)
+        addPlanned(title: "Gym", planned: 45, actual: Double(gymActual), day: 12, category: categories.health, card: cardVisa, presetID: presets.gym.id)
 
         let insuranceActual = actualsMatchPlanned ? 120 : 120
-        addPlanned(title: "Insurance", planned: 120, actual: Double(insuranceActual), day: 12, category: categories.health, card: cardChecking, presetID: presets.insurance.id)
+        addPlanned(title: "Insurance", planned: 120, actual: Double(insuranceActual), day: 15, category: categories.health, card: cardChecking, presetID: presets.insurance.id)
 
         let streamingActual = actualsMatchPlanned ? 25 : 0
-        addPlanned(title: "Streaming", planned: 25, actual: Double(streamingActual), day: 18, category: categories.entertainment, card: cardVisa, presetID: presets.streaming.id)
+        addPlanned(title: "Streaming", planned: 25, actual: Double(streamingActual), day: 19, category: categories.entertainment, card: cardVisa, presetID: presets.streaming.id)
+
+        // One more realistic monthly obligation
+        let loanActual = actualsMatchPlanned ? 180 : 180
+        addPlanned(title: "Student Loan", planned: 180, actual: Double(loanActual), day: 22, category: categories.health, card: cardChecking, presetID: nil)
     }
 
     private static func seedMonthlyPlannedExpensesFuture(
@@ -491,9 +491,16 @@ enum DebugSeeder {
 
         addPlanned(title: "Rent", planned: 1500, day: 1, category: categories.housing, card: cardChecking, presetID: presets.rent.id)
         addPlanned(title: "Internet", planned: 80, day: 3, category: categories.utilities, card: cardChecking, presetID: presets.internet.id)
-        addPlanned(title: "Gym", planned: 45, day: 9, category: categories.health, card: cardVisa, presetID: presets.gym.id)
-        addPlanned(title: "Insurance", planned: 120, day: 12, category: categories.health, card: cardChecking, presetID: presets.insurance.id)
-        addPlanned(title: "Streaming", planned: 25, day: 18, category: categories.entertainment, card: cardVisa, presetID: presets.streaming.id)
+
+        addPlanned(title: "Electric", planned: 115, day: 6, category: categories.utilities, card: cardChecking, presetID: nil)
+        addPlanned(title: "Water", planned: 45, day: 8, category: categories.utilities, card: cardChecking, presetID: nil)
+        addPlanned(title: "Car Payment", planned: 325, day: 10, category: categories.health, card: cardChecking, presetID: nil)
+
+        addPlanned(title: "Gym", planned: 45, day: 12, category: categories.health, card: cardVisa, presetID: presets.gym.id)
+        addPlanned(title: "Insurance", planned: 120, day: 15, category: categories.health, card: cardChecking, presetID: presets.insurance.id)
+        addPlanned(title: "Streaming", planned: 25, day: 19, category: categories.entertainment, card: cardVisa, presetID: presets.streaming.id)
+
+        addPlanned(title: "Student Loan", planned: 180, day: 22, category: categories.health, card: cardChecking, presetID: nil)
     }
 
     private static func seedQuarterlyPlannedExpensesFuture(
@@ -507,7 +514,6 @@ enum DebugSeeder {
         categories: (housing: Category, utilities: Category, health: Category, entertainment: Category),
         calendar: Calendar
     ) {
-        // Create the same planned set for each month in the quarter, planned only.
         for monthOffset in 0..<3 {
             let monthDate = calendar.date(byAdding: .month, value: monthOffset, to: quarterStart) ?? quarterStart
             let monthStart = startOfMonth(containing: monthDate, calendar: calendar)
@@ -538,17 +544,8 @@ enum DebugSeeder {
         categories: (groceries: Category, dining: Category, services: Category, transport: Category, entertainment: Category, shopping: Category, health: Category, utilities: Category),
         calendar: Calendar
     ) {
-        // A realistic pattern:
-        // - groceries weekly-ish
-        // - dining a few times
-        // - transport a few times
-        // - services 1–2
-        // - shopping 1–2
-        // - entertainment 1
-        // - health occasionally
-        // - utilities occasional non-preset (phone, etc)
-
         let days = max(1, calendar.dateComponents([.day], from: rangeStart, to: rangeEnd).day ?? 28)
+        let month = calendar.component(.month, from: rangeStart)
 
         func day(_ d: Int) -> Date {
             let clamped = min(max(1, d), days)
@@ -566,38 +563,44 @@ enum DebugSeeder {
             ))
         }
 
-        // Groceries (4-ish)
-        add("Trader Joe's", 86.40, day(3), cardVisa, categories.groceries)
-        add("Safeway", 54.18, day(9), cardVisa, categories.groceries)
-        add("Costco", 132.77, day(16), cardAmex, categories.groceries)
-        add("Grocery Run", 61.25, day(24), cardVisa, categories.groceries)
+        // Baseline month spending (a bit higher than before so savings stops looking fake)
+        add("Trader Joe's", 104.65, day(3), cardVisa, categories.groceries)
+        add("Safeway", 72.40, day(9), cardVisa, categories.groceries)
+        add("Costco", 168.90, day(16), cardAmex, categories.groceries)
+        add("Grocery Run", 79.15, day(24), cardVisa, categories.groceries)
 
-        // Dining (3-ish)
-        add("Coffee", 6.35, day(5), cardVisa, categories.dining)
-        add("Lunch", 14.90, day(12), cardVisa, categories.dining)
-        add("Dinner", 32.10, day(21), cardAmex, categories.dining)
+        add("Coffee", 9.10, day(5), cardVisa, categories.dining)
+        add("Lunch", 19.75, day(12), cardVisa, categories.dining)
+        add("Dinner", 48.60, day(21), cardAmex, categories.dining)
 
-        // Transport (2–3)
-        add("Uber", 18.22, day(7), cardVisa, categories.transport)
-        add("Gas", 42.50, day(15), cardChecking, categories.transport)
-        add("Parking", 8.00, day(20), cardVisa, categories.transport)
+        add("Uber", 24.80, day(7), cardVisa, categories.transport)
+        add("Gas", 58.25, day(15), cardChecking, categories.transport)
+        add("Parking", 12.00, day(20), cardVisa, categories.transport)
 
-        // Services (1–2)
-        add("Haircut", 65.00, day(13), cardChecking, categories.services)
-        add("Car Wash", 14.00, day(26), cardChecking, categories.services)
+        add("Haircut", 75.00, day(13), cardChecking, categories.services)
+        add("Car Wash", 16.00, day(26), cardChecking, categories.services)
 
-        // Shopping (1–2)
-        add("Target", 38.44, day(10), cardAmex, categories.shopping)
-        add("Amazon", 27.99, day(19), cardVisa, categories.shopping)
+        add("Target", 62.30, day(10), cardAmex, categories.shopping)
+        add("Amazon", 49.99, day(19), cardVisa, categories.shopping)
 
-        // Entertainment (1)
-        add("Movie", 16.50, day(17), cardVisa, categories.entertainment)
+        add("Movie", 22.00, day(17), cardVisa, categories.entertainment)
+        add("Pharmacy", 28.40, day(22), cardChecking, categories.health)
 
-        // Health (0–1)
-        add("Pharmacy", 12.18, day(22), cardChecking, categories.health)
+        add("Mobile Phone", 65.00, day(8), cardChecking, categories.utilities)
 
-        // Utilities (non-preset example)
-        add("Mobile Phone", 55.00, day(8), cardChecking, categories.utilities)
+        // Month-to-month realism "hits"
+        // I keep these deterministic so screenshots are consistent.
+        if month % 2 == 0 {
+            add("Car Repair", 480.00, day(18), cardChecking, categories.services)
+        }
+
+        if month % 3 == 0 {
+            add("Medical", 220.00, day(23), cardChecking, categories.health)
+        }
+
+        if month % 5 == 0 {
+            add("Weekend Trip", 350.00, day(27), cardVisa, categories.entertainment)
+        }
     }
 
     // MARK: - Income
@@ -610,31 +613,43 @@ enum DebugSeeder {
         cardChecking: Card,
         calendar: Calendar
     ) {
-        // Two paychecks per month, consistent amounts.
-        // We seed planned + actual in a believable way:
-        // - planned at the 1st and 15th
-        // - actual recorded near those days
+        // Realistic paychecks:
+        // - lower amounts than before
+        // - small month-to-month variability
+        // - one month missing a second paycheck (life happens)
 
         var cursor = startOfMonth(containing: rangeStart, calendar: calendar)
+        let nowMonthStart = startOfMonth(containing: Date(), calendar: calendar)
+        let missingSecondPaycheckMonthStart = calendar.date(byAdding: .month, value: -1, to: nowMonthStart) ?? nowMonthStart
 
         while cursor <= rangeEnd {
             let monthStart = startOfMonth(containing: cursor, calendar: calendar)
             let monthEnd = endOfMonth(containing: cursor, calendar: calendar)
 
-            // Skip if the month is fully outside the range
             if monthEnd < rangeStart {
                 cursor = calendar.date(byAdding: .month, value: 1, to: cursor) ?? cursor
                 continue
             }
             if monthStart > rangeEnd { break }
 
+            let month = calendar.component(.month, from: monthStart)
+
+            // Base: ~3400–3600/month grossed across two checks
+            var p1Amount: Double = 1700
+            var p2Amount: Double = 1650
+
+            // Deterministic small wobble
+            if month % 2 == 0 { p1Amount -= 75 }
+            if month % 3 == 0 { p2Amount -= 100 }
+            if month % 5 == 0 { p2Amount += 60 } // tiny "bonus" month
+
             // Paycheck #1
             let p1PlannedDate = monthStart
-            let p1ActualDate = calendar.date(byAdding: .day, value: 0, to: monthStart) ?? monthStart
+            let p1ActualDate = monthStart
 
             context.insert(Income(
                 source: "Paycheck",
-                amount: 2400,
+                amount: p1Amount,
                 date: p1PlannedDate,
                 isPlanned: true,
                 workspace: workspace,
@@ -644,7 +659,7 @@ enum DebugSeeder {
 
             context.insert(Income(
                 source: "Paycheck",
-                amount: 2400,
+                amount: p1Amount,
                 date: p1ActualDate,
                 isPlanned: false,
                 workspace: workspace,
@@ -652,30 +667,35 @@ enum DebugSeeder {
                 card: cardChecking
             ))
 
-            // Paycheck #2 (15th-ish, clamped)
+            // Paycheck #2 (15th-ish)
             let midDay = min(15, calendar.component(.day, from: monthEnd))
             let p2PlannedDate = calendar.date(byAdding: .day, value: midDay - 1, to: monthStart) ?? monthStart
-            let p2ActualDate = calendar.date(byAdding: .day, value: 0, to: p2PlannedDate) ?? p2PlannedDate
+            let p2ActualDate = p2PlannedDate
 
-            context.insert(Income(
-                source: "Paycheck",
-                amount: 2400,
-                date: p2PlannedDate,
-                isPlanned: true,
-                workspace: workspace,
-                series: nil,
-                card: cardChecking
-            ))
+            // One month: second paycheck missing (makes at least one budget clearly negative)
+            let shouldSkipSecondPaycheck = (monthStart == missingSecondPaycheckMonthStart)
 
-            context.insert(Income(
-                source: "Paycheck",
-                amount: 2400,
-                date: p2ActualDate,
-                isPlanned: false,
-                workspace: workspace,
-                series: nil,
-                card: cardChecking
-            ))
+            if !shouldSkipSecondPaycheck {
+                context.insert(Income(
+                    source: "Paycheck",
+                    amount: p2Amount,
+                    date: p2PlannedDate,
+                    isPlanned: true,
+                    workspace: workspace,
+                    series: nil,
+                    card: cardChecking
+                ))
+
+                context.insert(Income(
+                    source: "Paycheck",
+                    amount: p2Amount,
+                    date: p2ActualDate,
+                    isPlanned: false,
+                    workspace: workspace,
+                    series: nil,
+                    card: cardChecking
+                ))
+            }
 
             cursor = calendar.date(byAdding: .month, value: 1, to: cursor) ?? cursor
         }
@@ -691,12 +711,6 @@ enum DebugSeeder {
         categories: (groceries: Category, dining: Category, services: Category, transport: Category, entertainment: Category, shopping: Category, health: Category, utilities: Category),
         calendar: Calendar
     ) {
-        // Make the yearly view feel “alive” without creating a ridiculous amount of data.
-        // We seed:
-        // - income per month (2 planned + 2 actual)
-        // - a light set of variable expenses per quarter month
-
-        // Income for the whole year
         seedIncomeForRange(
             context: context,
             workspace: workspace,
@@ -706,7 +720,7 @@ enum DebugSeeder {
             calendar: calendar
         )
 
-        // Variable spending: seed 4 representative months (one per quarter)
+        // Representative months per quarter
         let monthsToSeed = [1, 4, 7, 10]
         let year = calendar.component(.year, from: yearStart)
 
