@@ -12,6 +12,12 @@ import Combine
 @MainActor
 final class ExpenseCSVImportViewModel: ObservableObject {
 
+    // MARK: - Tuning
+
+    /// Duplicate window for matching already-entered expenses and planned expenses.
+    /// Keep relatively tight (±3 days) to avoid false positives while handling “clearing” delays.
+    private let duplicateDayWindow: Int = 3
+
     enum State: Equatable {
         case idle
         case loading
@@ -281,6 +287,7 @@ final class ExpenseCSVImportViewModel: ObservableObject {
     private func looksLikeDuplicateExpense(date: Date, amount: Double, merchantKey: String, categoryID: UUID?) -> Bool {
         let cal = Calendar.current
         let day = cal.startOfDay(for: date)
+        let candidateDays = candidateDaysSet(around: day, calendar: cal, windowDays: duplicateDayWindow)
 
         var dayAmountMatches: [VariableExpense] = []
         dayAmountMatches.reserveCapacity(4)
@@ -288,7 +295,7 @@ final class ExpenseCSVImportViewModel: ObservableObject {
         for e in existingExpenses {
             if abs(e.amount - amount) > 0.0001 { continue }
             let eDay = cal.startOfDay(for: e.transactionDate)
-            if eDay != day { continue }
+            if !candidateDays.contains(eDay) { continue }
 
             dayAmountMatches.append(e)
             if MerchantNormalizer.normalizeKey(e.descriptionText) == merchantKey { return true }
@@ -296,11 +303,50 @@ final class ExpenseCSVImportViewModel: ObservableObject {
 
         if dayAmountMatches.isEmpty { return false }
 
+        if dayAmountMatches.count == 1 { return true }
+
+        if looksLikeDuplicatePlannedExpense(date: date, amount: amount, merchantKey: merchantKey, categoryID: categoryID, calendar: cal) {
+            return true
+        }
+
         guard let categoryID else { return false }
         let sameCategory = dayAmountMatches.filter { $0.category?.id == categoryID }
         if sameCategory.isEmpty { return false }
 
+        if sameCategory.count == 1 { return true }
+        return false
+    }
+
+    private func looksLikeDuplicatePlannedExpense(
+        date: Date,
+        amount: Double,
+        merchantKey: String,
+        categoryID: UUID?,
+        calendar: Calendar
+    ) -> Bool {
+        let day = calendar.startOfDay(for: date)
+        let candidateDays = candidateDaysSet(around: day, calendar: calendar, windowDays: duplicateDayWindow)
+
+        var dayAmountMatches: [PlannedExpense] = []
+        dayAmountMatches.reserveCapacity(4)
+
+        for p in existingPlannedExpenses {
+            let effectiveAmount = (abs(p.actualAmount) > 0.0001) ? p.actualAmount : p.plannedAmount
+            if abs(effectiveAmount - amount) > 0.0001 { continue }
+            let pDay = calendar.startOfDay(for: p.expenseDate)
+            if !candidateDays.contains(pDay) { continue }
+
+            dayAmountMatches.append(p)
+            if MerchantNormalizer.normalizeKey(p.title) == merchantKey { return true }
+        }
+
+        if dayAmountMatches.isEmpty { return false }
+
         if dayAmountMatches.count == 1 { return true }
+
+        guard let categoryID else { return false }
+        let sameCategory = dayAmountMatches.filter { $0.category?.id == categoryID }
+        if sameCategory.isEmpty { return false }
         if sameCategory.count == 1 { return true }
         return false
     }
@@ -317,6 +363,22 @@ final class ExpenseCSVImportViewModel: ObservableObject {
         }
 
         return false
+    }
+
+    private func candidateDaysSet(around day: Date, calendar: Calendar, windowDays: Int) -> Set<Date> {
+        var days: [Date] = [day]
+        if windowDays <= 0 { return Set(days) }
+
+        for offset in 1...windowDays {
+            if let earlier = calendar.date(byAdding: .day, value: -offset, to: day) {
+                days.append(calendar.startOfDay(for: earlier))
+            }
+            if let later = calendar.date(byAdding: .day, value: offset, to: day) {
+                days.append(calendar.startOfDay(for: later))
+            }
+        }
+
+        return Set(days)
     }
 
     private func bucketForExpenseRow(_ row: ExpenseCSVImportRow) -> ExpenseCSVImportBucket {

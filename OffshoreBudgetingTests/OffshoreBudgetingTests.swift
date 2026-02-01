@@ -116,6 +116,77 @@ struct OffshoreBudgetingTests {
         #expect(rows[0].includeInImport == false)
     }
 
+    @Test func import_PutsInPossibleDuplicatesWhenNearDateMatchesPlannedExpenseEvenIfCSVCategoryDoesNotMap() {
+        let cal = Calendar(identifier: .gregorian)
+        let plannedDate = cal.date(from: DateComponents(year: 2025, month: 11, day: 10))!
+        let csvDate = cal.date(from: DateComponents(year: 2025, month: 11, day: 11))!
+
+        let bills = Category(name: "Bills & Utilities", hexColor: "#000000")
+        let planned = PlannedExpense(
+            title: "Phone Bill",
+            plannedAmount: 120.00,
+            expenseDate: plannedDate,
+            card: nil,
+            category: bills
+        )
+
+        let parsed = ParsedCSV(
+            headers: ["Date", "Description", "Amount", "Category"],
+            rows: [
+                ["11/11/2025", "T-MOBILE", "120.00", "Phone"]
+            ]
+        )
+
+        let rows = ExpenseCSVImportMapper.map(
+            csv: parsed,
+            categories: [bills],
+            existingExpenses: [],
+            existingPlannedExpenses: [planned],
+            existingIncomes: [],
+            learnedRules: [:]
+        )
+
+        #expect(rows.count == 1)
+        #expect(cal.startOfDay(for: rows[0].finalDate) == cal.startOfDay(for: csvDate))
+        #expect(rows[0].bucket == ExpenseCSVImportBucket.possibleDuplicate)
+        #expect(rows[0].includeInImport == false)
+    }
+
+    @Test func import_PutsInPossibleDuplicatesWhenNearDateMatchesExistingExpenseEvenIfMerchantDiffers() {
+        let cal = Calendar(identifier: .gregorian)
+        let existingDate = cal.date(from: DateComponents(year: 2025, month: 11, day: 10))!
+
+        let bills = Category(name: "Bills & Utilities", hexColor: "#000000")
+        let existing = VariableExpense(
+            descriptionText: "Phone Bill",
+            amount: 120.00,
+            transactionDate: existingDate,
+            workspace: nil,
+            card: nil,
+            category: bills
+        )
+
+        let parsed = ParsedCSV(
+            headers: ["Date", "Description", "Amount", "Category"],
+            rows: [
+                ["11/11/2025", "T-MOBILE", "120.00", "Phone"]
+            ]
+        )
+
+        let rows = ExpenseCSVImportMapper.map(
+            csv: parsed,
+            categories: [bills],
+            existingExpenses: [existing],
+            existingPlannedExpenses: [],
+            existingIncomes: [],
+            learnedRules: [:]
+        )
+
+        #expect(rows.count == 1)
+        #expect(rows[0].bucket == ExpenseCSVImportBucket.possibleDuplicate)
+        #expect(rows[0].includeInImport == false)
+    }
+
     @Test func import_ChaseFormatDoesNotGetTreatedAsAppleCard() {
         let parsed = ParsedCSV(
             headers: ["Transaction Date", "Post Date", "Description", "Category", "Type", "Amount", "Memo"],

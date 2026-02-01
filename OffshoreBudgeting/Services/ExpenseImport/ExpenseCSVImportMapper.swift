@@ -2,6 +2,12 @@ import Foundation
 
 struct ExpenseCSVImportMapper {
 
+    // MARK: - Tuning
+
+    /// Duplicate window for matching already-entered expenses and planned expenses.
+    /// Keep relatively tight (±3 days) to avoid false positives while handling “clearing” delays.
+    private static let duplicateDayWindow: Int = 3
+
     static func map(
         csv: ParsedCSV,
         categories: [Category],
@@ -413,16 +419,16 @@ struct ExpenseCSVImportMapper {
     ) -> Bool {
         let cal = Calendar.current
         let day = cal.startOfDay(for: date)
+        let candidateDays = candidateDaysSet(around: day, calendar: cal, windowDays: duplicateDayWindow)
         let merchantKey = MerchantNormalizer.normalizeKey(merchant)
 
-        // 1) Strict match: same day + same amount + same merchant key.
         var dayAmountMatches: [VariableExpense] = []
         dayAmountMatches.reserveCapacity(4)
 
         for e in existing {
             if abs(e.amount - amount) > 0.0001 { continue }
             let eDay = cal.startOfDay(for: e.transactionDate)
-            if eDay != day { continue }
+            if !candidateDays.contains(eDay) { continue }
 
             dayAmountMatches.append(e)
 
@@ -432,13 +438,13 @@ struct ExpenseCSVImportMapper {
 
         if dayAmountMatches.isEmpty { return false }
 
-        // 2) Fallback: same day + same amount + matching category (useful when merchant text differs).
+        if dayAmountMatches.count == 1 { return true }
+
         guard let category else { return false }
         let sameCategory = dayAmountMatches.filter { $0.category?.id == category.id }
         if sameCategory.isEmpty { return false }
 
         // Only mark as duplicate if the match is not ambiguous.
-        if dayAmountMatches.count == 1 { return true }
         if sameCategory.count == 1 { return true }
         return false
     }
@@ -468,6 +474,7 @@ struct ExpenseCSVImportMapper {
     ) -> Bool {
         let cal = Calendar.current
         let day = cal.startOfDay(for: date)
+        let candidateDays = candidateDaysSet(around: day, calendar: cal, windowDays: duplicateDayWindow)
 
         let merchantKey = MerchantNormalizer.normalizeKey(merchant)
 
@@ -478,7 +485,7 @@ struct ExpenseCSVImportMapper {
             let effectiveAmount = (abs(p.actualAmount) > 0.0001) ? p.actualAmount : p.plannedAmount
             if abs(effectiveAmount - amount) > 0.0001 { continue }
             let pDay = cal.startOfDay(for: p.expenseDate)
-            if pDay != day { continue }
+            if !candidateDays.contains(pDay) { continue }
 
             dayAmountMatches.append(p)
 
@@ -488,11 +495,12 @@ struct ExpenseCSVImportMapper {
 
         if dayAmountMatches.isEmpty { return false }
 
+        if dayAmountMatches.count == 1 { return true }
+
         // Category match: a strong duplicate signal for planned expenses.
         if let category {
             let sameCategory = dayAmountMatches.filter { $0.category?.id == category.id }
             if sameCategory.isEmpty == false {
-                if dayAmountMatches.count == 1 { return true }
                 if sameCategory.count == 1 { return true }
             }
         }
@@ -508,5 +516,21 @@ struct ExpenseCSVImportMapper {
         }
 
         return false
+    }
+
+    private static func candidateDaysSet(around day: Date, calendar: Calendar, windowDays: Int) -> Set<Date> {
+        var days: [Date] = [day]
+        if windowDays <= 0 { return Set(days) }
+
+        for offset in 1...windowDays {
+            if let earlier = calendar.date(byAdding: .day, value: -offset, to: day) {
+                days.append(calendar.startOfDay(for: earlier))
+            }
+            if let later = calendar.date(byAdding: .day, value: offset, to: day) {
+                days.append(calendar.startOfDay(for: later))
+            }
+        }
+
+        return Set(days)
     }
 }
