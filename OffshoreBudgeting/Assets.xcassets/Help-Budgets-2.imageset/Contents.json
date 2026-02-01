@@ -1,6 +1,7 @@
 {
   "images" : [
     {
+      "filename" : "Simulator Screenshot - iPhone 17 Pro Max - 2026-02-01 at 12.01.22.png",
       "idiom" : "iphone",
       "scale" : "1x"
     },
@@ -11,6 +12,7 @@
           "value" : "dark"
         }
       ],
+      "filename" : "Simulator Screenshot - iPhone 17 Pro Max - 2026-02-01 at 12.01.27.png",
       "idiom" : "iphone",
       "scale" : "1x"
     },
@@ -43,6 +45,7 @@
       "scale" : "3x"
     },
     {
+      "filename" : "Simulator Screenshot - iPad Pro 13-inch (M5) - 2026-02-01 at 11.38.09.png",
       "idiom" : "ipad",
       "scale" : "1x"
     },
@@ -53,6 +56,7 @@
           "value" : "dark"
         }
       ],
+      "filename" : "Simulator Screenshot - iPad Pro 13-inch (M5) - 2026-02-01 at 11.38.12.png",
       "idiom" : "ipad",
       "scale" : "1x"
     },
@@ -71,6 +75,7 @@
       "scale" : "2x"
     },
     {
+      "filename" : "Screenshot 2026-02-01 at 11.09.59 AM.png",
       "idiom" : "ipad",
       "scale" : "1x",
       "subtype" : "mac-catalyst"
@@ -82,6 +87,7 @@
           "value" : "dark"
         }
       ],
+      "filename" : "Screenshot 2026-02-01 at 11.10.07 AM.png",
       "idiom" : "ipad",
       "scale" : "1x",
       "subtype" : "mac-catalyst"
