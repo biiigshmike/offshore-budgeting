@@ -467,14 +467,14 @@ final class LocalNotificationService: ObservableObject {
             let remaining = max(0, total - shownCount)
 
             if total == 1 {
-                return "Preset due: \(uniqueSorted[0])"
+                return "Preset expected to set sail: \(uniqueSorted[0])"
             }
 
             if shown.isEmpty {
                 return "\(total) presets due"
             }
 
-            var body = "Presets due: \(shown.joined(separator: ", "))"
+            var body = "Presets docking from your account today: \(shown.joined(separator: ", "))"
             if remaining > 0 {
                 body += " +\(remaining) more"
             }
