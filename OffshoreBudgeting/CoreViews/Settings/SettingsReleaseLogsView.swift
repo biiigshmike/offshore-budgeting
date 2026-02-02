@@ -5,7 +5,6 @@
 //  Created by Michael Brown on 1/22/26.
 //
 
-
 import SwiftUI
 
 struct SettingsReleaseLogsView: View {
@@ -27,22 +26,38 @@ struct SettingsReleaseLogsView: View {
         var id: String { "\(systemImage)|\(title)" }
     }
 
-    // MARK: - Placeholder data (we’ll swap to AppUpdateLogs next)
+    // MARK: - Sections
 
     private let sections: [ReleaseSection] = [
         ReleaseSection(
-            version: "2.1.1",
-            build: "2",
+            version: "2.2",
+            build: "7",
             items: [
                 ReleaseItem(
-                    systemImage: "building.columns",
-                    title: "Behind the Vault Improvements",
-                    description: "Reinforced the vault for Offshore’s future. Cleared out a few barnacles to help everything run faster."
+                    systemImage: "server.rack",
+                    title: "Database Migration",
+                    description: "Upgraded Offshore’s underlying data storage for a faster, more reliable experience. If you were part of the beta, you’ll need to delete the previous version before installing 2.2. This change sets Offshore up for smoother sailing long-term."
                 ),
                 ReleaseItem(
-                    systemImage: "creditcard",
+                    systemImage: "wand.and.sparkles.inverse",
+                    title: "App-Wide Sparkle and Polish",
+                    description: "Small but noticeable app-wide improvements. The app will still feel instantly familiar, just with a more refined and timeless look."
+                )
+            ]
+        ),
+        ReleaseSection(
+            version: "2.1.1",
+            build: "1",
+            items: [
+                ReleaseItem(
+                    systemImage: "building.columns.fill",
+                    title: "Behind the Vault Improvements",
+                    description: "Reinforced the vault for Offshore’s future, and cleared out a few barnacles so everything runs a bit faster."
+                ),
+                ReleaseItem(
+                    systemImage: "tray.and.arrow.down.fill",
                     title: "Improvements to Importing Expenses",
-                    description: "Incoming transactions now come pre-loaded with cleaner names instead of long strings of bank text. You can store preferred names locally so future imports recognize the preferred name automatically."
+                    description: "Incoming transactions now come in with cleaner names instead of long strings of bank text. You can store preferred names locally so future imports recognize them automatically with the press of a toggle."
                 )
             ]
         ),
@@ -51,24 +66,51 @@ struct SettingsReleaseLogsView: View {
             build: "4",
             items: [
                 ReleaseItem(
-                    systemImage: "square.and.arrow.down",
-                    title: "Import Transactions & Card Themes",
-                    description: "Import .csv transactions directly into a card from its detail view. Select what you want and attach them instantly. Updated Card creation form with new Effects feature. Find the perfect effect to pair with your Card’s theme."
+                    systemImage: "tray.and.arrow.down.fill",
+                    title: "Import Transactions",
+                    description: "Import transactions and income (.csv only) directly into a card from its detail view. Select what you want, then attach them instantly."
                 ),
                 ReleaseItem(
-                    systemImage: "figure.walk",
+                    systemImage: "creditcard.fill",
+                    title: "Customizable Card Appearances and Effects",
+                    description: "Updated the Card creation form with a new Effects feature. Find the perfect effect to pair with your Card’s theme."
+                ),
+                ReleaseItem(
+                    systemImage: "accessibility",
                     title: "Accessibility Improvements",
-                    description: "App-wide accessibility updates, including Dynamic Type and improved contrast. The Home grid was simplified to ensure full compliance."
+                    description: "App-wide accessibility updates, including Dynamic Type support and improved contrast. The Home grid was simplified to ensure full compliance."
+                )
+            ]
+        ),
+        ReleaseSection(
+            version: "2.0",
+            build: "1",
+            items: [
+                ReleaseItem(
+                    systemImage: "building.columns.fill",
+                    title: "Offshore Released to the Public",
+                    description: "The vault is officially ready for its first Offshore account!"
                 ),
                 ReleaseItem(
-                    systemImage: "hand.raised",
-                    title: "Privacy & Security",
-                    description: "Biometric prompts now appear only on enrolled devices. You can also lock the app using your device passcode, if enabled."
+                    systemImage: "widget.large.badge.plus",
+                    title: "Widgets In and Out of the App",
+                    description: "Track the metrics you care about most. Home is your dedicated budget dashboard, pin and reorder widgets to your liking. You can also pin select metrics on your iOS/macOS Home Screen."
                 ),
                 ReleaseItem(
-                    systemImage: "lightbulb",
-                    title: "Tips & Hints",
-                    description: "Tips now appear only once per screen, or when manually reset in Settings. What’s New alerts appear only for significant updates."
+                    systemImage: "sparkles",
+                    title: "Polished the Vault Inside and Out",
+                    description: "From the early days of landing on this deserted island to now, the app has been refined and polished throughout. Identity and brand have been set to sustain."
+                )
+            ]
+        ),
+        ReleaseSection(
+            version: "1.0",
+            build: "1",
+            items: [
+                ReleaseItem(
+                    systemImage: "sailboat.fill",
+                    title: "Set Sail to Find Better Waters",
+                    description: "Embarked on a journey to create a budgeting app that values privacy, simplicity, and creative solutions. Dreamed day and night of an app that helps track and plan income, log expenses and understand spending, and build better habits to increase savings."
                 )
             ]
         )
@@ -99,7 +141,7 @@ private struct ReleaseRow: View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: item.systemImage)
                 .font(.system(size: 18))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color("AccentColor"))
                 .frame(width: 24)
 
             VStack(alignment: .leading, spacing: 4) {
