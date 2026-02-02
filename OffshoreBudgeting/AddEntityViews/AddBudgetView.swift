@@ -201,15 +201,22 @@ struct AddBudgetView: View {
             modelContext.insert(link)
         }
 
-        // Materialize: presets -> planned expenses (inside this budget window)
-        materializePlannedExpenses(
-            for: budget,
-            selectedPresets: selectedPresets,
-            selectedCardIDs: selectedCardIDs
-        )
+	        // Materialize: presets -> planned expenses (inside this budget window)
+	        materializePlannedExpenses(
+	            for: budget,
+	            selectedPresets: selectedPresets,
+	            selectedCardIDs: selectedCardIDs
+	        )
 
-        dismiss()
-    }
+	        Task {
+	            await LocalNotificationService.syncFromUserDefaultsIfPossible(
+	                modelContext: modelContext,
+	                workspaceID: workspace.id
+	            )
+	        }
+
+	        dismiss()
+	    }
 
     private func materializePlannedExpenses(
         for budget: Budget,

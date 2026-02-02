@@ -29,10 +29,38 @@ struct SettingsiCloudView: View {
 
     @Query(sort: \Workspace.name, order: .forward)
     private var workspaces: [Workspace]
+    
+    private var iCloudStorageFooter: some View {
+        Group {
+            if activeUseICloud && isICloudAvailable {
+
+                #if os(iOS)
+                Text("""
+    To manage Offshore’s iCloud storage, open the iOS Settings app and go to:
+    Apple ID → iCloud → Storage → Offshore
+    """)
+                #elseif os(macOS)
+                Text("""
+    To manage Offshore’s iCloud storage, open System Settings and go to:
+    Apple ID → iCloud → Manage Storage → Offshore
+    """)
+                #else
+                EmptyView()
+                #endif
+
+            }
+        }
+        .font(.footnote)
+        .foregroundStyle(.secondary)
+    }
+
 
     var body: some View {
         List {
-            Section("iCloud Sync") {
+            Section(
+            header: Text("iCloud Sync"),
+            footer: iCloudStorageFooter
+            ) {
                 Toggle("Use iCloud to Sync Data", isOn: Binding(
                     get: { desiredUseICloud },
                     set: { newValue in

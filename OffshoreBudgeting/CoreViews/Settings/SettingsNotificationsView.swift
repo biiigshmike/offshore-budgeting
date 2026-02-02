@@ -9,6 +9,8 @@ import SwiftUI
 
 struct SettingsNotificationsView: View {
 
+    let workspaceID: UUID
+
     // MARK: - Persisted Settings
 
     @AppStorage("notifications_enabled") private var notificationsEnabled: Bool = false
@@ -25,6 +27,8 @@ struct SettingsNotificationsView: View {
     @State private var reminderTime: Date = Date()
 
     @StateObject private var notificationService = LocalNotificationService()
+
+    @Environment(\.modelContext) private var modelContext
 
     @State private var showingErrorAlert: Bool = false
     @State private var errorMessage: String = ""
@@ -134,6 +138,24 @@ struct SettingsNotificationsView: View {
                 }
             }
             */
+
+            #if DEBUG
+            Section("Debug") {
+                Button("Print Notification Previews to Console") {
+                    Task {
+                        let lines = await notificationService.debugPendingRequestLines()
+                        print("---- Notification Previews (\(lines.count)) ----")
+                        for line in lines {
+                            print(line)
+                        }
+                    }
+                }
+
+                Text("This prints what each scheduled notification will look like (next date + title + body).")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            #endif
         }
         .listStyle(.insetGrouped)
         .navigationTitle("Notifications")
@@ -240,11 +262,13 @@ struct SettingsNotificationsView: View {
             notificationsEnabled = false
 
             // Cancel our reminder notifications when the app-level toggle is off.
-            notificationService.removeScheduledNotifications(identifiers: [
-                LocalNotificationService.NotificationID.dailyExpenseReminder,
-                LocalNotificationService.NotificationID.plannedIncomeReminder,
-                LocalNotificationService.NotificationID.presetDueReminder
-            ])
+            notificationService.cancelNotification(identifier: LocalNotificationService.NotificationID.dailyExpenseReminder)
+            await notificationService.removeScheduledNotifications(
+                matchingPrefix: LocalNotificationService.NotificationID.plannedIncomeReminder
+            )
+            await notificationService.removeScheduledNotifications(
+                matchingPrefix: LocalNotificationService.NotificationID.presetDueReminder
+            )
 
             return
         }
@@ -304,7 +328,9 @@ struct SettingsNotificationsView: View {
         guard notificationService.authorizationState == .authorized else { return }
 
         do {
-            try await notificationService.syncDailyReminders(
+            try await notificationService.syncReminders(
+                modelContext: modelContext,
+                workspaceID: workspaceID,
                 notificationsEnabled: notificationsEnabled,
                 dailyExpenseEnabled: dailyExpenseReminderEnabled,
                 plannedIncomeEnabled: plannedIncomeReminderEnabled,
@@ -339,5 +365,5 @@ struct SettingsNotificationsView: View {
 }
 
 #Preview("Notifications") {
-    NavigationStack { SettingsNotificationsView() }
+    NavigationStack { SettingsNotificationsView(workspaceID: UUID()) }
 }

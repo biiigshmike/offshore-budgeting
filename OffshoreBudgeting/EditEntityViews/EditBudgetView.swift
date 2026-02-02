@@ -214,15 +214,23 @@ struct EditBudgetView: View {
         // - selected presets
         // - selected cards
         let selectedPresets = presets.filter { selectedPresetIDs.contains($0.id) }
-        syncGeneratedPlannedExpenses(
-            for: budget,
-            selectedPresets: selectedPresets,
-            selectedCardIDs: selectedCardIDs
-        )
+	        syncGeneratedPlannedExpenses(
+	            for: budget,
+	            selectedPresets: selectedPresets,
+	            selectedCardIDs: selectedCardIDs
+	        )
 
-        try? modelContext.save()
-        dismiss()
-    }
+	        try? modelContext.save()
+
+	        Task {
+	            await LocalNotificationService.syncFromUserDefaultsIfPossible(
+	                modelContext: modelContext,
+	                workspaceID: workspace.id
+	            )
+	        }
+
+	        dismiss()
+	    }
 
     // MARK: - PlannedExpense sync (budget-local generated rows)
 

@@ -123,7 +123,7 @@ struct SettingsView: View {
             }
 
             NavigationLink {
-                SettingsNotificationsView()
+                SettingsNotificationsView(workspaceID: workspace.id)
             } label: {
                 SettingsRow(
                     title: "Notifications",

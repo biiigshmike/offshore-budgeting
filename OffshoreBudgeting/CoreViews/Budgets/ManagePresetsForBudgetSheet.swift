@@ -151,6 +151,13 @@ struct ManagePresetsForBudgetSheet: View {
             selectedPresets: [preset],
             selectedCardIDs: linkedCardIDs
         )
+
+        Task {
+            await LocalNotificationService.syncFromUserDefaultsIfPossible(
+                modelContext: modelContext,
+                workspaceID: workspace.id
+            )
+        }
     }
     
     private func unlink(_ preset: Preset) {
@@ -162,6 +169,13 @@ struct ManagePresetsForBudgetSheet: View {
         
         // 2) Delete planned expenses that were generated for THIS budget from THIS preset
         deleteGeneratedPlannedExpenses(budgetID: budget.id, presetID: preset.id)
+
+        Task {
+            await LocalNotificationService.syncFromUserDefaultsIfPossible(
+                modelContext: modelContext,
+                workspaceID: workspace.id
+            )
+        }
     }
     
     private func deleteGeneratedPlannedExpenses(budgetID: UUID, presetID: UUID) {
