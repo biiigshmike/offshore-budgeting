@@ -67,9 +67,9 @@ struct WorkspacePickerView: View {
                         .padding(.vertical, 10)
                     } else {
                         ContentUnavailableView(
-                            "No Workspaces Yet",
-                            systemImage: "person.fill",
-                            description: Text("Create a workspace to begin.")
+                            activeUseICloud ? "No iCloud Workspaces Found" : "No Workspaces Yet",
+                            systemImage: activeUseICloud ? "icloud.slash" : "person.fill",
+                            description: Text(activeUseICloud ? "Nothing was found in iCloud. Create a workspace to begin." : "Create a workspace to begin.")
                         )
                     }
                 } else {
@@ -108,6 +108,9 @@ struct WorkspacePickerView: View {
             }
         }
         .navigationTitle("Workspaces")
+        .task(id: iCloudBootstrapStartedAt) {
+            await enforceICloudBootstrapTimeoutIfNeeded()
+        }
         .onChange(of: workspaces.count) { _, newCount in
             if activeUseICloud, newCount > 0 {
                 iCloudBootstrapStartedAt = 0
@@ -184,6 +187,31 @@ struct WorkspacePickerView: View {
     }
 
     // MARK: - Actions
+
+    @MainActor
+    private func enforceICloudBootstrapTimeoutIfNeeded() async {
+        guard activeUseICloud, iCloudBootstrapStartedAt > 0 else { return }
+        guard workspaces.isEmpty else { return }
+
+        let startedAtSnapshot = iCloudBootstrapStartedAt
+        let nanoseconds = UInt64(ICloudBootstrap.maxWaitSeconds * 1_000_000_000)
+
+        do {
+            try await Task.sleep(nanoseconds: nanoseconds)
+        } catch {
+            return
+        }
+
+        guard activeUseICloud else { return }
+        guard workspaces.isEmpty else { return }
+        guard iCloudBootstrapStartedAt == startedAtSnapshot else { return }
+
+        #if DEBUG
+        print("[iCloudBootstrap] Timed out on workspace picker after \(ICloudBootstrap.maxWaitSeconds)s with 0 workspaces.")
+        #endif
+
+        iCloudBootstrapStartedAt = 0
+    }
 
     private func requestDelete(_ workspace: Workspace) {
         guard let index = workspaces.firstIndex(where: { $0.id == workspace.id }) else { return }

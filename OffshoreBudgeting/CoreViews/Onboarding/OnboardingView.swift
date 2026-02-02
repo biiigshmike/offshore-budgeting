@@ -116,6 +116,9 @@ struct OnboardingView: View {
         .onAppear {
             Task { await maybeOfferSkipIfCloudAlreadyHasData() }
         }
+        .task(id: iCloudBootstrapStartedAt) {
+            await enforceICloudBootstrapTimeoutIfNeeded()
+        }
         .onChange(of: workspaces.count) { _, newCount in
             if activeUseICloud, newCount > 0 {
                 iCloudBootstrapStartedAt = 0
@@ -252,6 +255,7 @@ struct OnboardingView: View {
         OnboardingWorkspaceStep(
             workspaces: workspaces,
             selectedWorkspaceID: $selectedWorkspaceID,
+            usesICloud: activeUseICloud,
             isICloudBootstrapping: isICloudBootstrapping,
             onCreate: createWorkspace(name:hexColor:)
         )
@@ -568,6 +572,33 @@ struct OnboardingView: View {
             // No-op for now, but this is where we'd enhance messaging later.
         }
     }
+
+    @MainActor
+    private func enforceICloudBootstrapTimeoutIfNeeded() async {
+        guard onboardingStep == 1 else { return }
+        guard activeUseICloud, iCloudBootstrapStartedAt > 0 else { return }
+        guard workspaces.isEmpty else { return }
+
+        let startedAtSnapshot = iCloudBootstrapStartedAt
+        let nanoseconds = UInt64(ICloudBootstrap.maxWaitSeconds * 1_000_000_000)
+
+        do {
+            try await Task.sleep(nanoseconds: nanoseconds)
+        } catch {
+            return
+        }
+
+        guard onboardingStep == 1 else { return }
+        guard activeUseICloud else { return }
+        guard workspaces.isEmpty else { return }
+        guard iCloudBootstrapStartedAt == startedAtSnapshot else { return }
+
+        #if DEBUG
+        print("[iCloudBootstrap] Timed out on onboarding workspace step after \(ICloudBootstrap.maxWaitSeconds)s with 0 workspaces.")
+        #endif
+
+        iCloudBootstrapStartedAt = 0
+    }
 }
 
 // MARK: - Step: Workspace Setup
@@ -576,6 +607,7 @@ struct OnboardingView: View {
 	    
 	    let workspaces: [Workspace]
 	    @Binding var selectedWorkspaceID: String
+        let usesICloud: Bool
 	    let isICloudBootstrapping: Bool
 	    let onCreate: (String, String) -> Void
     
@@ -602,9 +634,9 @@ struct OnboardingView: View {
                     .padding(.vertical, 10)
                 } else {
                     ContentUnavailableView(
-                        "No Workspaces Yet",
-                        systemImage: "person.fill",
-                        description: Text("Create at least one workspace to continue.")
+                        usesICloud ? "No iCloud Workspaces Found" : "No Workspaces Yet",
+                        systemImage: usesICloud ? "icloud.slash" : "person.fill",
+                        description: Text(usesICloud ? "Nothing was found in iCloud. Create a workspace to continue." : "Create at least one workspace to continue.")
                     )
                     .padding(.vertical, 8)
                 }

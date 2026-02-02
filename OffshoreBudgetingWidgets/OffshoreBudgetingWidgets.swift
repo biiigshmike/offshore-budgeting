@@ -80,9 +80,13 @@ extension ConfigurationAppIntent {
     }
 }
 
-#Preview(as: .systemSmall) {
-    OffshoreBudgetingWidgets()
-} timeline: {
-    SimpleEntry(date: .now, configuration: .smiley)
-    SimpleEntry(date: .now, configuration: .starEyes)
+#if DEBUG
+struct OffshoreBudgetingWidgets_Previews: PreviewProvider {
+    static var previews: some View {
+        OffshoreBudgetingWidgetsEntryView(
+            entry: SimpleEntry(date: .now, configuration: .smiley)
+        )
+        .previewContext(WidgetPreviewContext(family: .systemSmall))
+    }
 }
+#endif

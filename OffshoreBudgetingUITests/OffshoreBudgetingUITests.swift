@@ -23,12 +23,23 @@ final class OffshoreBudgetingUITests: XCTestCase {
     }
 
     @MainActor
-    func testExample() throws {
-        // UI tests must launch the application that they test.
-        let app = XCUIApplication()
+    func testOnboarding_iCloudExistingWorkspace_canSelectAndAdvance() throws {
+        let app = makeAppForUITesting(
+            scenario: "-uiTestScenarioICloudHasExistingWorkspace"
+        )
         app.launch()
 
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
+        app.buttons["Get Started"].tap()
+        app.buttons["iCloud"].tap()
+
+        let existingWorkspace = app.buttons["Existing iCloud Workspace"].firstMatch
+        XCTAssertTrue(existingWorkspace.waitForExistence(timeout: 5))
+        existingWorkspace.tap()
+
+        app.buttons["Next"].tap()
+
+        let nextStepTitle = app.staticTexts["Privacy, iCloud, and Notifications"].firstMatch
+        XCTAssertTrue(nextStepTitle.waitForExistence(timeout: 5))
     }
 
     @MainActor
@@ -37,5 +48,50 @@ final class OffshoreBudgetingUITests: XCTestCase {
         measure(metrics: [XCTApplicationLaunchMetric()]) {
             XCUIApplication().launch()
         }
+    }
+
+    @MainActor
+    func testOnboarding_iCloudTimeout_thenAddWorkspace_canAdvance() throws {
+        let app = makeAppForUITesting(
+            scenario: "-uiTestScenarioICloudEmpty"
+        )
+        app.launch()
+
+        app.buttons["Get Started"].tap()
+        app.buttons["iCloud"].tap()
+
+        let emptyStateTitle = app.staticTexts["No iCloud Workspaces Found"].firstMatch
+        XCTAssertTrue(emptyStateTitle.waitForExistence(timeout: 10))
+
+        app.buttons["Add Workspace"].tap()
+
+        let nameField = app.textFields["Name"].firstMatch
+        XCTAssertTrue(nameField.waitForExistence(timeout: 5))
+        nameField.tap()
+        nameField.typeText("Personal")
+
+        app.buttons["Save"].tap()
+
+        let createdWorkspace = app.buttons["Personal"].firstMatch
+        XCTAssertTrue(createdWorkspace.waitForExistence(timeout: 5))
+
+        app.buttons["Next"].tap()
+
+        let nextStepTitle = app.staticTexts["Privacy, iCloud, and Notifications"].firstMatch
+        XCTAssertTrue(nextStepTitle.waitForExistence(timeout: 5))
+    }
+
+    // MARK: - Helpers
+
+    private func makeAppForUITesting(scenario: String) -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-uiTesting",
+            "-uiTestingReset",
+            "-uiTestingForceICloudAvailable",
+            "-uiTestingUseLocalCloudStore",
+            scenario
+        ]
+        return app
     }
 }

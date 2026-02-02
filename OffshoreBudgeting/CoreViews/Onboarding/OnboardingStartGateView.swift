@@ -138,7 +138,12 @@ struct OnboardingStartGateView: View {
     // MARK: - Actions
 
     private var isICloudAvailable: Bool {
-        FileManager.default.ubiquityIdentityToken != nil
+        #if DEBUG
+        if UITestSupport.shouldForceICloudAvailable {
+            return true
+        }
+        #endif
+        return FileManager.default.ubiquityIdentityToken != nil
     }
 
     private func handleICloudTapped() {

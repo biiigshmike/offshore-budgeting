@@ -18,6 +18,13 @@
   },
   "testTargets" : [
     {
+      "target" : {
+        "containerPath" : "container:OffshoreBudgeting.xcodeproj",
+        "identifier" : "4C96F8672F20523900541774",
+        "name" : "OffshoreBudgetingUITests"
+      }
+    },
+    {
       "parallelizable" : true,
       "target" : {
         "containerPath" : "container:OffshoreBudgeting.xcodeproj",

@@ -25,6 +25,10 @@ struct AppBootstrapRootView: View {
 
                 modelContainer = OffshoreBudgetingApp.makeModelContainer(useICloud: useICloud)
 
+                #if DEBUG
+                UITestSupport.applyScenarioDataIfNeeded(container: modelContainer)
+                #endif
+
                 onboardingStep = max(1, onboardingStep)
                 didChooseDataSource = true
             }
@@ -33,4 +37,3 @@ struct AppBootstrapRootView: View {
         }
     }
 }
-

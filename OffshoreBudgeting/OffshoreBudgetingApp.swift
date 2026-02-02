@@ -24,6 +24,10 @@ struct OffshoreBudgetingApp: App {
     // MARK: - ModelContainer
 
     @State private var modelContainer: ModelContainer = {
+        #if DEBUG
+        UITestSupport.applyResetIfNeeded()
+        #endif
+
         let desiredUseICloud = UserDefaults.standard.bool(forKey: "icloud_useCloud")
         UserDefaults.standard.set(desiredUseICloud, forKey: "icloud_activeUseCloud")
 
@@ -109,6 +113,26 @@ struct OffshoreBudgetingApp: App {
             let configuration: ModelConfiguration
 
             if useICloud {
+                #if DEBUG
+                if UITestSupport.shouldUseLocalCloudStore {
+                    let uiTestCloudStoreURL = appSupport.appendingPathComponent("UITestCloud.store")
+                    configuration = ModelConfiguration(
+                        "Cloud-UITests",
+                        schema: schema,
+                        url: uiTestCloudStoreURL,
+                        allowsSave: true,
+                        cloudKitDatabase: .none
+                    )
+                } else {
+                    configuration = ModelConfiguration(
+                        "Cloud",
+                        schema: schema,
+                        url: cloudStoreURL,
+                        allowsSave: true,
+                        cloudKitDatabase: .private(cloudKitContainerIdentifier)
+                    )
+                }
+                #else
                 configuration = ModelConfiguration(
                     "Cloud",
                     schema: schema,
@@ -116,6 +140,7 @@ struct OffshoreBudgetingApp: App {
                     allowsSave: true,
                     cloudKitDatabase: .private(cloudKitContainerIdentifier)
                 )
+                #endif
             } else {
                 configuration = ModelConfiguration(
                     "Local",
