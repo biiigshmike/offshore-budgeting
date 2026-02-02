@@ -611,12 +611,13 @@ struct BudgetDetailView: View {
                     } label: {
                         Label("Edit Budget", systemImage: "pencil")
                     }
-
+                    .tint(Color("AccentColor"))
                     Button(role: .destructive) {
                         handleDeleteBudgetTapped()
                     } label: {
                         Label("Delete Budget", systemImage: "trash")
                     }
+                    .tint(Color("OffshoreDepth"))
                 } label: {
                     Image(systemName: "ellipsis")
                 }

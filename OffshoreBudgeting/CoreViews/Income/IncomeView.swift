@@ -273,6 +273,7 @@ struct IncomeView: View {
                                 } label: {
                                     Label("Delete", systemImage: "trash")
                                 }
+                                .tint(Color("OffshoreDepth"))
                             }
                             .swipeActions(edge: .leading) {
                                 Button {

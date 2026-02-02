@@ -521,6 +521,7 @@ struct WhatIfScenarioPlannerView: View {
             } label: {
                 Label("Rename", systemImage: "pencil")
             }
+            .tint(Color("AccentColor"))
             .disabled(selectedScenarioID == nil)
 
             Button(role: .destructive) {
@@ -528,6 +529,7 @@ struct WhatIfScenarioPlannerView: View {
             } label: {
                 Label("Delete", systemImage: "trash")
             }
+            .tint(Color("OffshoreDepth"))
             .disabled(scenarios.count <= 1 || selectedScenarioID == nil)
 
         } label: {
