@@ -125,14 +125,13 @@ struct BudgetDetailView: View {
             .reduce(0) { $0 + $1.amount }
     }
     
-    // MARK: - Expenses aggregated from linked cards (within budget window)
-    
+    // MARK: - Planned expenses (generated for this budget)
+
     private var plannedExpensesInBudget: [PlannedExpense] {
-        linkedCards
-            .flatMap { $0.plannedExpenses ?? [] }
-            .filter { isWithinBudget($0.expenseDate) }
-            .sorted { $0.expenseDate > $1.expenseDate }
+        BudgetPlannedExpenseStore.plannedExpenses(in: workspace, for: budget)
     }
+
+    // MARK: - Variable expenses aggregated from linked cards (within budget window)
     
     private var variableExpensesInBudget: [VariableExpense] {
         linkedCards
