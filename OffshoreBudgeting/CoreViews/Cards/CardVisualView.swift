@@ -28,18 +28,18 @@ enum CardEffectOption: String, CaseIterable, Identifiable {
 }
 
 enum CardThemeOption: String, CaseIterable, Identifiable {
-    case rose
-    case ocean
-    case violet
-    case graphite
-    case mint
+    case cherry
+    case aqua
+    case iris
+    case charcoal
+    case seafoam
     case sunset
     case midnight
     case forest
     case sunrise
-    case blossom
+    case orchid
     case lavender
-    case nebula
+    case eclipse
 
     var id: String { rawValue }
 
@@ -53,18 +53,18 @@ enum CardThemeOption: String, CaseIterable, Identifiable {
 enum CardThemePalette {
     static func colors(for theme: CardThemeOption) -> [Color] {
         switch theme {
-        case .rose: return [.pink, .red.opacity(0.85)]
-        case .ocean: return [.teal, .blue.opacity(0.9)]
-        case .violet: return [.purple, .indigo.opacity(0.9)]
-        case .graphite: return [.black.opacity(0.9), .gray.opacity(0.85)]
-        case .mint: return [.mint, .teal.opacity(0.9)]
+        case .cherry: return [.pink, .red.opacity(0.85)]
+        case .aqua: return [.teal, .blue.opacity(0.9)]
+        case .iris: return [.purple, .indigo.opacity(0.9)]
+        case .charcoal: return [.black.opacity(0.9), .gray.opacity(0.85)]
+        case .seafoam: return [.mint, .teal.opacity(0.9)]
         case .sunset: return [.orange, .pink.opacity(0.9)]
         case .midnight: return [.black, .indigo.opacity(0.9)]
         case .forest: return [.green, .teal.opacity(0.85)]
         case .sunrise: return [.yellow, .orange.opacity(0.95)]
-        case .blossom: return [.pink, .purple.opacity(0.8)]
+        case .orchid: return [.pink, .purple.opacity(0.8)]
         case .lavender: return [.purple.opacity(0.65), .blue.opacity(0.8)]
-        case .nebula: return [.indigo, .purple.opacity(0.95)]
+        case .eclipse: return [.indigo, .purple.opacity(0.95)]
         }
     }
 }

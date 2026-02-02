@@ -272,7 +272,7 @@ private struct CapsuleFoilBandsMask: View {
         CardFormView(
             name: .constant("New Card"),
             effect: .constant(.plastic),
-            theme: .constant(.rose)
+            theme: .constant(.cherry)
         )
         .navigationTitle("Add Card")
     }

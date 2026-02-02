@@ -830,7 +830,7 @@ struct CardDetailView: View {
         if let option = CardThemeOption(rawValue: raw) {
             return option
         }
-        return .graphite
+        return .charcoal
     }
 
     private func cardEffectOption(from raw: String) -> CardEffectOption {

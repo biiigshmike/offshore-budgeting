@@ -398,7 +398,7 @@ struct ManagePresetsView: View {
     }
 
     private func cardThemePalette(raw: String) -> [Color] {
-        let theme = CardThemeOption(rawValue: raw) ?? .graphite
+        let theme = CardThemeOption(rawValue: raw) ?? .charcoal
         return CardThemePalette.colors(for: theme)
     }
 }

@@ -30,7 +30,7 @@ struct HomeNextPlannedExpenseTile: View {
     }
 
     private var themeOption: CardThemeOption {
-        CardThemeOption(rawValue: card?.theme ?? "graphite") ?? .graphite
+        CardThemeOption(rawValue: card?.theme ?? "graphite") ?? .charcoal
     }
 
     private var effectOption: CardEffectOption {

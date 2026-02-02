@@ -19,7 +19,7 @@ struct HomeCardSummaryTile: View {
     }
 
     private var themeOption: CardThemeOption {
-        CardThemeOption(rawValue: card.theme) ?? .graphite
+        CardThemeOption(rawValue: card.theme) ?? .charcoal
     }
 
     private var effectOption: CardEffectOption {

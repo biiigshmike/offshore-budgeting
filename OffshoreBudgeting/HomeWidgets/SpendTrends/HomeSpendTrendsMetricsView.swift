@@ -341,7 +341,7 @@ private struct SpendTrendsCardTile: View {
     }
 
     private func themeOption(from raw: String) -> CardThemeOption {
-        CardThemeOption(rawValue: raw) ?? .graphite
+        CardThemeOption(rawValue: raw) ?? .charcoal
     }
 
     private func effectOption(from raw: String) -> CardEffectOption {
