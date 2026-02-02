@@ -37,12 +37,12 @@ struct SettingsiCloudView: View {
                 #if os(iOS)
                 Text("""
     To manage Offshore’s iCloud storage, open the iOS Settings app and go to:
-    Apple ID → iCloud → Storage → Offshore
+    Apple ID → iCloud → Storage → offshore-budgeting
     """)
                 #elseif os(macOS)
                 Text("""
     To manage Offshore’s iCloud storage, open System Settings and go to:
-    Apple ID → iCloud → Manage Storage → Offshore
+    Apple ID → iCloud → Manage Storage → offshore-bdugeting
     """)
                 #else
                 EmptyView()
