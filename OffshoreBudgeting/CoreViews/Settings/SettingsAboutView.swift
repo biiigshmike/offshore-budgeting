@@ -23,14 +23,11 @@ struct SettingsAboutView: View {
     var body: some View {
         List {
             Section {
-                AboutAppCard(
-                    appDisplayName: appDisplayName,
-                    shortVersion: shortVersion,
-                    buildNumber: buildNumber
-                )
-                .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
-                .listRowSeparator(.hidden)
-                .listRowBackground(Color.clear)
+                AboutAppIdentityRow(appDisplayName: appDisplayName)
+
+                LabeledContent("Version", value: shortVersion)
+
+                LabeledContent("Build", value: buildNumber)
             }
 
             Section {
@@ -56,36 +53,27 @@ struct SettingsAboutView: View {
     }
 }
 
-// MARK: - App Card
+// MARK: - App Identity Row
 
-private struct AboutAppCard: View {
+private struct AboutAppIdentityRow: View {
 
     let appDisplayName: String
-    let shortVersion: String
-    let buildNumber: String
 
     var body: some View {
-        VStack(spacing: 12) {
+        HStack(spacing: 14) {
             Image("SettingsIcon")
                 .resizable()
                 .scaledToFit()
-                .frame(width: 120, height: 120)
-                .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+                .frame(width: 44, height: 44)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
 
             Text(appDisplayName)
                 .font(.title2.weight(.semibold))
                 .foregroundStyle(.primary)
 
-            Text("Version \(shortVersion) • Build \(buildNumber)")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+            Spacer(minLength: 8)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 22)
-        .background(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(.background)
-        )
+        .padding(.vertical, 4)
     }
 }
 
