@@ -773,7 +773,7 @@ struct BudgetDetailView: View {
 
         case .variable:
             return [
-                .init(label: "Spent", value: variableExpensesTotal),
+                .init(label: "Variable Total", value: variableExpensesTotal),
             ]
 
         case .unified:
