@@ -27,9 +27,9 @@ enum AppRestartService {
         return debugMessage
         #else
         if let releaseExtraMessage {
-            return "Please close \(appName) from the app switcher, then reopen to apply this change.\n\n\(releaseExtraMessage)"
+            return "This will take effect the next time you quit and relaunch \(appName).\n\n\(releaseExtraMessage)"
         } else {
-            return "Please close \(appName) from the app switcher, then reopen to apply this change."
+            return "This will take effect the next time you quit and relaunch \(appName)."
         }
         #endif
     }

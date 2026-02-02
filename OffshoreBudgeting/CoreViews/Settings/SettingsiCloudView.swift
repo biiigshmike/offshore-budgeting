@@ -21,12 +21,11 @@ struct SettingsiCloudView: View {
     @AppStorage("icloud_activeUseCloud") private var activeUseICloud: Bool = false
     @AppStorage("selectedWorkspaceID") private var selectedWorkspaceID: String = ""
 
-    @EnvironmentObject private var dataSourceSwitchCoordinator: AppDataSourceSwitchCoordinator
-
     // MARK: - UI State
 
     @State private var showingUnavailableAlert: Bool = false
     @State private var showingEnableConfirm: Bool = false
+    @State private var showingRestartRequired: Bool = false
 
     @Query(sort: \Workspace.name, order: .forward)
     private var workspaces: [Workspace]
@@ -55,40 +54,19 @@ struct SettingsiCloudView: View {
         .foregroundStyle(.secondary)
     }
 
-    private var iCloudUnavailableFooter: some View {
-        Group {
-            if !isICloudAvailable && !activeUseICloud {
-                #if os(iOS)
-                Text("Sign into iCloud in iOS Settings to enable iCloud sync.")
-                #elseif os(macOS)
-                Text("Sign into iCloud in System Settings to enable iCloud sync.")
-                #else
-                Text("Sign into iCloud in Settings to enable iCloud sync.")
-                #endif
-            }
-        }
-        .font(.footnote)
-        .foregroundStyle(.secondary)
-    }
-
 
     var body: some View {
         List {
             Section(
             header: Text("iCloud Sync"),
-            footer: Group {
-                iCloudUnavailableFooter
-                iCloudStorageFooter
-            }
+            footer: iCloudStorageFooter
             ) {
                 Toggle("Use iCloud to Sync Data", isOn: Binding(
                     get: { desiredUseICloud },
                     set: { newValue in
                         handleToggleChange(newValue)
                     }
-                ))
-                .tint(Color("AccentColor"))
-                .disabled(!isICloudAvailable && !activeUseICloud)
+                )).tint(Color("AccentColor"))
 
                 statusRow
 
@@ -119,6 +97,17 @@ struct SettingsiCloudView: View {
             Button("Cancel", role: .cancel) { }
         } message: {
             Text("This will switch you to your iCloud data. Your on-device data stays on this device and can be accessed by switching back to On Device.")
+        }
+        .sheet(isPresented: $showingRestartRequired) {
+            RestartRequiredView(
+                title: "Restart Required",
+                message: AppRestartService.restartRequiredMessage(
+                    debugMessage: "Will take effect the next time you quit and relaunch the app."
+                ),
+                primaryButtonTitle: AppRestartService.closeAppButtonTitle,
+                onPrimary: { AppRestartService.closeAppOrDismiss { showingRestartRequired = false } }
+            )
+            .presentationDetents([.large])
         }
     }
 
@@ -177,7 +166,7 @@ struct SettingsiCloudView: View {
 
     private var statusSubtitle: String {
         if desiredUseICloud != activeUseICloud {
-            return "Close and reopen Offshore to apply this change."
+            return "Will take effect the next time you quit and relaunch the app."
         }
 
         if activeUseICloud {
@@ -208,12 +197,18 @@ struct SettingsiCloudView: View {
 
             requestEnableICloud()
         } else {
-            dataSourceSwitchCoordinator.switchDataSource(to: .onDevice)
+            desiredUseICloud = false
+            if desiredUseICloud != activeUseICloud {
+                showingRestartRequired = true
+            }
         }
     }
 
     private func requestEnableICloud() {
-        dataSourceSwitchCoordinator.switchDataSource(to: .iCloud)
+        desiredUseICloud = true
+        if desiredUseICloud != activeUseICloud {
+            showingRestartRequired = true
+        }
     }
 
     private func openSystemSettings() {

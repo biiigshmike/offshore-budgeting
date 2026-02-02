@@ -188,7 +188,7 @@ struct SettingsGeneralView: View {
             RestartRequiredView(
                 title: "Restart Required",
                 message: AppRestartService.restartRequiredMessage(
-                    debugMessage: "Switching to On Device takes effect after you close and reopen Offshore.",
+                    debugMessage: "Will take effect the next time you quit and relaunch the app.",
                     releaseExtraMessage: "After restarting, you can run Reset & Erase Content again."
                 ),
                 primaryButtonTitle: AppRestartService.closeAppButtonTitle,

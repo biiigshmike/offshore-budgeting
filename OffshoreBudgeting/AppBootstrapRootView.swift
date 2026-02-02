@@ -4,8 +4,8 @@ import SwiftData
 /// Root gate that prevents SwiftData views from being created until the user
 /// has selected a data source on first run.
 struct AppBootstrapRootView: View {
-    
-    @EnvironmentObject private var dataSourceSwitchCoordinator: AppDataSourceSwitchCoordinator
+
+    @Binding var modelContainer: ModelContainer
 
     @AppStorage("didCompleteOnboarding") private var didCompleteOnboarding: Bool = false
     @AppStorage("onboarding_didChooseDataSource") private var didChooseDataSource: Bool = false
@@ -19,10 +19,14 @@ struct AppBootstrapRootView: View {
     var body: some View {
         if didCompleteOnboarding == false, didChooseDataSource == false {
             OnboardingStartGateView { useICloud in
-                dataSourceSwitchCoordinator.activateDataSource(useICloud: useICloud)
+                desiredUseICloud = useICloud
+                activeUseICloud = useICloud
+                iCloudBootstrapStartedAt = useICloud ? Date().timeIntervalSince1970 : 0
+
+                modelContainer = OffshoreBudgetingApp.makeModelContainer(useICloud: useICloud)
 
                 #if DEBUG
-                UITestSupport.applyScenarioDataIfNeeded(container: dataSourceSwitchCoordinator.modelContainer)
+                UITestSupport.applyScenarioDataIfNeeded(container: modelContainer)
                 #endif
 
                 onboardingStep = max(1, onboardingStep)

@@ -150,7 +150,7 @@ struct OnboardingView: View {
             RestartRequiredView(
                 title: "Restart Required",
                 message: AppRestartService.restartRequiredMessage(
-                    debugMessage: "Switching to iCloud takes effect after you close and reopen Offshore."
+                    debugMessage: "Will take effect the next time you quit and relaunch the app."
                 ),
                 primaryButtonTitle: AppRestartService.nextButtonTitle,
                 onPrimary: {
@@ -826,7 +826,7 @@ private struct OnboardingPrivacySyncStep: View {
             RestartRequiredView(
                 title: "Restart Required",
                 message: AppRestartService.restartRequiredMessage(
-                    debugMessage: "Changing iCloud sync takes effect after you close and reopen Offshore."
+                    debugMessage: "Will take effect the next time you quit and relaunch the app."
                 ),
                 primaryButtonTitle: AppRestartService.closeAppButtonTitle,
                 onPrimary: { AppRestartService.closeAppOrDismiss { showingRestartRequired = false } },
