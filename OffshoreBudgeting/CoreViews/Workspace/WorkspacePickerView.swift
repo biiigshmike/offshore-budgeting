@@ -18,14 +18,11 @@ struct WorkspacePickerView: View {
     let onDelete: (IndexSet) -> Void
 
     private enum SheetRoute: Identifiable {
-        case restartRequired
         case addWorkspace
         case editWorkspace(Workspace)
 
         var id: String {
             switch self {
-            case .restartRequired:
-                return "restartRequired"
             case .addWorkspace:
                 return "addWorkspace"
             case .editWorkspace(let workspace):
@@ -37,6 +34,7 @@ struct WorkspacePickerView: View {
     @State private var sheetRoute: SheetRoute? = nil
 
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var dataSourceSwitchCoordinator: AppDataSourceSwitchCoordinator
     @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
     @AppStorage("icloud_useCloud") private var desiredUseICloud: Bool = false
     @AppStorage("icloud_activeUseCloud") private var activeUseICloud: Bool = false
@@ -162,17 +160,6 @@ struct WorkspacePickerView: View {
         }
         .sheet(item: $sheetRoute) { route in
             switch route {
-            case .restartRequired:
-                RestartRequiredView(
-                    title: "Restart Required",
-                    message: AppRestartService.restartRequiredMessage(
-                        debugMessage: "Switching between On Device and iCloud takes effect after you close and reopen Offshore."
-                    ),
-                    primaryButtonTitle: AppRestartService.closeAppButtonTitle,
-                    onPrimary: { AppRestartService.closeAppOrDismiss { sheetRoute = nil } }
-                )
-                .presentationDetents([.large])
-
             case .addWorkspace:
                 NavigationStack {
                     AddWorkspaceView(onCreate: onCreate)
@@ -253,7 +240,7 @@ struct WorkspacePickerView: View {
 extension WorkspacePickerView {
 
     private var dataSourceSection: some View {
-        Section("Data Source") {
+        Section {
             Button {
                 handleOnDeviceRowTapped()
             } label: {
@@ -271,13 +258,34 @@ extension WorkspacePickerView {
             } label: {
                 HStack(spacing: 10) {
                     Image(systemName: "icloud")
-                        .foregroundStyle(.tint)
+                        .foregroundStyle(isICloudAvailable ? Color.accentColor : .secondary)
                     Text("iCloud")
                     Spacer()
                     dataSourceTrailingIcon(isActive: activeUseICloud, isDesired: desiredUseICloud)
                 }
             }
+            .disabled(!isICloudAvailable)
+        } header: {
+            Text("Data Source")
+        } footer: {
+            iCloudUnavailableFooter
         }
+    }
+
+    private var iCloudUnavailableFooter: some View {
+        Group {
+            if !isICloudAvailable {
+                #if os(iOS)
+                Text("Sign into iCloud in iOS Settings to enable iCloud sync.")
+                #elseif os(macOS)
+                Text("Sign into iCloud in System Settings to enable iCloud sync.")
+                #else
+                Text("Sign into iCloud in Settings to enable iCloud sync.")
+                #endif
+            }
+        }
+        .font(.footnote)
+        .foregroundStyle(.secondary)
     }
 
     @ViewBuilder
@@ -312,17 +320,11 @@ extension WorkspacePickerView {
     }
 
     private func requestSwitchToICloud() {
-        desiredUseICloud = true
-        if desiredUseICloud != activeUseICloud {
-            sheetRoute = .restartRequired
-        }
+        dataSourceSwitchCoordinator.switchDataSource(to: .iCloud)
     }
 
     private func requestSwitchToOnDevice() {
-        desiredUseICloud = false
-        if desiredUseICloud != activeUseICloud {
-            sheetRoute = .restartRequired
-        }
+        dataSourceSwitchCoordinator.switchDataSource(to: .onDevice)
     }
 }
 
