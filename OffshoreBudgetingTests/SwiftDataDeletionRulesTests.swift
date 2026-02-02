@@ -11,6 +11,7 @@ import SwiftData
 import Testing
 @testable import Offshore
 
+@MainActor
 struct SwiftDataDeletionRulesTests {
 
     // MARK: - Test Store

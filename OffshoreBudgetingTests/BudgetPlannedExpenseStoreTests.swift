@@ -10,6 +10,7 @@ import SwiftData
 import Testing
 @testable import Offshore
 
+@MainActor
 struct BudgetPlannedExpenseStoreTests {
 
     // MARK: - Test Store
@@ -105,4 +106,3 @@ struct BudgetPlannedExpenseStoreTests {
         #expect(bResults.first?.sourceBudgetID == budgetB.id)
     }
 }
-
