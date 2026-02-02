@@ -30,15 +30,34 @@ struct IncomeView: View {
     @State private var calendarAvailableWidth: CGFloat = 0
     
     private var calendarMonthCount: Int {
-        #if targetEnvironment(macCatalyst)
-        if viewWidth >= 1400 { return 4 }
-        if viewWidth >= 980 { return 2 }
-        return 1
-        #else
-        if viewWidth >= 980 { return 2 }
-        return 1
-        #endif
+        if viewWidth < 500 {
+            // All iPhones, split iPad
+            return 1
+        }
+
+        if viewWidth < 980 {
+            // iPad portrait or split
+            return 1
+        }
+
+        if viewWidth < 1250 {
+            // iPad landscape, small Mac window
+            return 2
+        }
+
+        if viewWidth < 1600 {
+            // Large iPad / medium Mac
+            return 3
+        }
+
+        if viewWidth < 1900 {
+            // Large Mac
+            return 4
+        }
+
+        return 5
     }
+
 
     // MARK: - Search
 
