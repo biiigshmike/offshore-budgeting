@@ -55,7 +55,7 @@ struct CardsView: View {
                             } label: {
                                 CardVisualView(
                                     title: card.name,
-                                    theme: CardThemeOption(rawValue: card.theme) ?? .cherry,
+                                    theme: CardThemeOption(rawValue: card.theme) ?? .ruby,
                                     effect: CardEffectOption(rawValue: card.effect) ?? .plastic
                                 )
                             }

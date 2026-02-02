@@ -25,7 +25,7 @@ struct EditCardView: View {
 
         _name = State(initialValue: card.name)
         _effect = State(initialValue: CardEffectOption(rawValue: card.effect) ?? .plastic)
-        _theme = State(initialValue: CardThemeOption(rawValue: card.theme) ?? .cherry)
+        _theme = State(initialValue: CardThemeOption(rawValue: card.theme) ?? .ruby)
     }
 
     private var canSave: Bool {

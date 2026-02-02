@@ -17,7 +17,7 @@ struct AddCardView: View {
 
     @State private var name: String = ""
     @State private var effect: CardEffectOption = .plastic
-    @State private var theme: CardThemeOption = .cherry
+    @State private var theme: CardThemeOption = .ruby
 
     private var canSave: Bool {
         CardFormView.canSave(name: name)
