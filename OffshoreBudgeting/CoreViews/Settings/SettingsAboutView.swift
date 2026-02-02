@@ -18,7 +18,7 @@ struct SettingsAboutView: View {
 
     // Placeholders you can replace later
     private let appStoreURL = URL(string: "https://apps.apple.com")!
-    private let developerWebsiteURL = URL(string: "https://example.com")!
+    private let developerWebsiteURL = URL(string: "https://offshore-budgeting.notion.site/Offshore-Budgeting-295b42cd2e6c80cf817dd73a5761bb7e")!
 
     var body: some View {
         List {
