@@ -105,7 +105,7 @@ struct CategoryAvailabilityRowView: View {
         if let pct = metric.percentUsed(for: scope) {
             return min(max(pct, 0), 1)
         }
-        // Unlimited: we still render a track-only bar (nil progress)
+        // Unlimited: still render a track-only bar (nil progress)
         return nil
     }
 

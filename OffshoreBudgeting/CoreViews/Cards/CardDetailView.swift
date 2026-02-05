@@ -741,7 +741,6 @@ struct CardDetailView: View {
     private func applyQuickRange(_ range: CalendarQuickRange) {
         draftStartDate = normalizedStart(range.start)
         draftEndDate = normalizedEnd(range.end)
-        // Do not apply here, applyQuickRangePresetDeferred handles it.
     }
 
     private func normalizedStart(_ date: Date) -> Date {
@@ -754,7 +753,6 @@ struct CardDetailView: View {
     }
     
     private func refreshDateRangeIfSafe() {
-        // If the user has manually adjusted the range, do not fight them.
         guard !isDateDirty else { return }
 
         let variableDates = (card.variableExpenses ?? []).map(\.transactionDate)

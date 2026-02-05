@@ -13,7 +13,6 @@ struct SettingsGeneralView: View {
     // Store "SYSTEM" when user wants the device default currency.
     @AppStorage("general_currencyCode") private var currencyCode: String = CurrencyPickerConstants.systemTag
 
-    // Step 1.2
     @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
 
     @AppStorage("general_rememberTabSelection") private var rememberTabSelection: Bool = false
@@ -21,7 +20,6 @@ struct SettingsGeneralView: View {
     @AppStorage("general_defaultBudgetingPeriod")
     private var defaultBudgetingPeriodRaw: String = BudgetingPeriod.monthly.rawValue
 
-    // Step 1.3
     @AppStorage("tips_resetToken") private var tipsResetToken: Int = 0
     @State private var eraseResultMessage: String = ""
 
@@ -128,10 +126,6 @@ struct SettingsGeneralView: View {
                         .tint(.red)
                     }
                 }
-
-//                Text("Erase will remove all budgets, cards, categories, presets, transactions, and workspaces from this device.")
-//                    .font(.footnote)
-//                    .foregroundStyle(.secondary)
             }
         }
         .listStyle(.insetGrouped)

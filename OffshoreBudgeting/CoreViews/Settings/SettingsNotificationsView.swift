@@ -129,16 +129,6 @@ struct SettingsNotificationsView: View {
                 }
             }
 
-            /*
-            if notificationService.authorizationState == .authorized {
-                Section("Testing") {
-                    Button("Send Test Notification") {
-                        Task { await sendTestNotification() }
-                    }
-                }
-            }
-            */
-
             #if DEBUG
             Section("Debug") {
                 Button("Print Notification Previews to Console") {
@@ -344,7 +334,6 @@ struct SettingsNotificationsView: View {
         }
     }
 
-    // Keeping your helper intact for later use/testing
     private func sendTestNotification() async {
         do {
             await notificationService.refreshAuthorizationStatus()

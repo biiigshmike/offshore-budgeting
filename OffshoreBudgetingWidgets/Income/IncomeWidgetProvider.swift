@@ -39,7 +39,7 @@ struct IncomeWidgetProvider: AppIntentTimelineProvider {
             snapshot: snap
         )
 
-        // Refresh a few times a day is usually plenty for finance dashboards.
+        // Refresh a few times a day
         let nextRefresh = Calendar.current.date(byAdding: .hour, value: 3, to: .now)
             ?? .now.addingTimeInterval(3 * 3600)
 

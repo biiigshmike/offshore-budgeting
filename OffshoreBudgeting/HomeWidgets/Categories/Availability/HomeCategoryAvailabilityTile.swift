@@ -19,10 +19,8 @@ struct HomeCategoryAvailabilityTile: View {
     let startDate: Date
     let endDate: Date
 
-    /// Later: drive from Settings
     var inclusionPolicy: HomeCategoryLimitsAggregator.CategoryInclusionPolicy = .allCategoriesInfinityWhenMissing
 
-    /// Later: segmented filter
     @State private var scope: AvailabilityScope = .all
     @State private var pageIndex: Int = 0
 
@@ -100,7 +98,7 @@ struct HomeCategoryAvailabilityTile: View {
                     )
                 }
                 .onChange(of: totalPages) { _, newValue in
-                    // If data changes and we're beyond the last page, clamp.
+                    // If data changes and is beyond the last page, clamp.
                     pageIndex = min(pageIndex, max(0, newValue - 1))
                 }
             }

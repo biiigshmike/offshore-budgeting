@@ -111,12 +111,12 @@ final class ExpenseCSVImportViewModel: ObservableObject {
         guard let idx = rows.firstIndex(where: { $0.id == rowID }) else { return }
         rows[idx].selectedCategory = category
 
-        // If they manually set a category in Possible Matches, we allow them to include.
+        // If they manually set a category in Possible Matches, allow them to include.
         if rows[idx].bucket == .possibleMatch || rows[idx].bucket == .possibleDuplicate {
             // stay unchecked unless user checks it
         }
 
-        // Recompute duplicate hint since we can use category as a fallback signal.
+        // Recompute duplicate hint since category can be used as a fallback signal.
         let normalized = MerchantNormalizer.normalizeKey(rows[idx].finalMerchant)
         if rows[idx].kind == .expense {
             rows[idx].isDuplicateHint = looksLikeDuplicateExpense(

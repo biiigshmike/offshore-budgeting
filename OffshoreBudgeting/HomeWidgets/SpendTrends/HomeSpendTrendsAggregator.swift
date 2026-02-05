@@ -188,7 +188,7 @@ struct HomeSpendTrendsAggregator {
             resolvedStart: resolved.start,
             resolvedEnd: resolved.end,
             totalSpent: totalSpent,
-            buckets: bucketResults, // ✅ keep zero buckets
+            buckets: bucketResults, // keep zero buckets
             topCategoryOverall: topCategoryOverall,
             highestBucket: highestBucket,
             topCategoryInHighestBucket: topCategoryInHighest
@@ -307,7 +307,7 @@ struct HomeSpendTrendsAggregator {
         return buckets
     }
 
-    /// Wallet-ish ranges inside a month: 1–4, 5–11, 12–18, 19–25, 26–endOfMonth
+    /// ranges inside a month: 1–4, 5–11, 12–18, 19–25, 26–endOfMonth
     private static func makeMonthRangeBuckets(start: Date, end: Date) -> [(start: Date, end: Date)] {
         let calendar = Calendar.current
         var results: [(start: Date, end: Date)] = []
@@ -443,7 +443,7 @@ struct HomeSpendTrendsAggregator {
         slices.append(contentsOf: topSlices)
 
         if otherTotal > 0 {
-            // I color "Other" using the biggest contributor outside the topN.
+            // color "Other" using the biggest contributor outside the topN.
             // This avoids the "mystery gray" segment when everything is categorized.
             let otherHex: String? = {
                 guard let dominant = otherDominant else { return nil }

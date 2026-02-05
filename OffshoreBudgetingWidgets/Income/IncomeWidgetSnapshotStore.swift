@@ -30,7 +30,7 @@ enum IncomeWidgetSnapshotStore {
             let data = try JSONEncoder().encode(snapshot)
             defaults.set(data, forKey: key(workspaceID: workspaceID, periodToken: periodToken))
         } catch {
-            // Keep silent in production. If you want, you can add an os_log here.
+            // Keep silent in production
         }
     }
 

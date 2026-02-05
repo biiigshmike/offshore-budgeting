@@ -109,43 +109,6 @@ struct CardWidgetMediumView: View {
     }
 }
 
-
-
-//
-//// MARK: - Medium (no card preview)
-//
-//struct CardWidgetMediumView: View {
-//    let snapshot: CardWidgetSnapshot
-//
-//    var body: some View {
-//        VStack(alignment: .leading, spacing: 10) {
-//            Text(snapshot.title)
-//                .font(.headline.weight(.semibold))
-//                .foregroundStyle(.primary)
-//                .lineLimit(1)
-//                .minimumScaleFactor(0.82)
-//
-//            Text("\(snapshot.periodToken) • \(formattedRange(snapshot.rangeStart, snapshot.rangeEnd))")
-//                .font(.footnote)
-//                .foregroundStyle(.secondary)
-//                .lineLimit(1)
-//
-//            Text("Expenses")
-//                .font(.caption.weight(.semibold))
-//                .foregroundStyle(.secondary)
-//
-//            Text(snapshot.unifiedExpensesTotal, format: widgetCurrencyFormatStyle())
-//                .font(.title2.weight(.semibold))
-//                .foregroundStyle(.primary)
-//
-//            Spacer(minLength: 0)
-//        }
-//        .frame(maxWidth: .infinity, alignment: .leading)
-//        .padding(14)
-//
-//    }
-//}
-
 // MARK: - Large
 
 struct CardWidgetLargeView: View {

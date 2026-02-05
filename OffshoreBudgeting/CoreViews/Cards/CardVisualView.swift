@@ -237,7 +237,7 @@ struct CardVisualView: View {
                 .opacity(0.9)
 
         case .holographic:
-            // Holographic (Option A, subtle)
+            // Holographic (subtle)
             HoloLiquidOverlay(theme: theme)
                 .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                 .blendMode(.overlay)
@@ -315,7 +315,7 @@ struct BrushedMetalOverlay: View {
     }
 }
 
-// MARK: - Holographic (Option A): Liquid Blend + Highlights + Spectral Sheen
+// MARK: - Holographic Liquid Blend + Highlights + Spectral Sheen
 
 private struct HoloLiquidOverlay: View {
     let theme: CardThemeOption

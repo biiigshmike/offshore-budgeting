@@ -13,7 +13,7 @@ struct AddExpenseView: View {
     let workspace: Workspace
 
     /// Optional restriction, used when launching from BudgetDetailView.
-    /// If nil, we show all cards in the workspace.
+    /// If nil,  show all cards in the workspace.
     let allowedCards: [Card]?
 
     /// Optional default card, used when launching from CardDetailView.

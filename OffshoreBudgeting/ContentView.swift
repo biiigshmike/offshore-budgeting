@@ -123,7 +123,7 @@ struct ContentView: View {
                 Task { await syncNotificationSchedulesIfPossible() }
             }
             .onChange(of: scenePhase) { _, newPhase in
-                // This is the big fix: after SwiftData/iCloud finishes loading, the app often
+                // fter SwiftData/iCloud finishes loading, the app often
                 // becomes active with fresh data. Rebuild snapshots so the widget has options.
                 guard newPhase == .active else { return }
 
@@ -144,7 +144,7 @@ struct ContentView: View {
                     selectedWorkspaceID = workspaces.first?.id.uuidString ?? ""
                 }
 
-                // Another big fix: when the store populates (especially iCloud), rebuild widget caches.
+                // when the store populates (especially iCloud), rebuild widget caches.
                 IncomeWidgetSnapshotStore.setSelectedWorkspaceID(selectedWorkspaceID)
                 CardWidgetSnapshotStore.setSelectedWorkspaceID(selectedWorkspaceID)
 
@@ -209,7 +209,7 @@ struct ContentView: View {
                 minute: reminderMinute
             )
         } catch {
-            // I’m intentionally ignoring errors here so notifications never block app startup.
+            // intentionally ignoring errors here so notifications never block app startup.
         }
     }
 

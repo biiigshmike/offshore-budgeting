@@ -198,7 +198,7 @@ struct EditCategoryLimitView: View {
                 modelContext.delete(limit)
             }
         } else {
-            // Only create a record if we actually have at least one bound.
+            // Only create a record if actually needed to have at least one bound.
             guard min != nil || max != nil else { return }
 
             let newLimit = BudgetCategoryLimit(minAmount: min, maxAmount: max, budget: budget, category: category)

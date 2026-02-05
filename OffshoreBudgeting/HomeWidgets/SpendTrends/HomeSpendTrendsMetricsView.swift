@@ -77,7 +77,7 @@ struct HomeSpendTrendsMetricsView: View {
             .padding(.vertical, 14)
         }
         .navigationBarTitleDisplayMode(.inline)
-        .navigationTitle("") // we render a custom title + subtitle in the navigation area
+        .navigationTitle("") // render a custom title + subtitle in the navigation area
         .toolbar {
             ToolbarItem(placement: .principal) {
                 VStack(spacing: 2) {
@@ -393,7 +393,6 @@ private struct HeatMapBucketBar: View {
         )
     }
 
-    /// Wallet-y “melt” gradient:
     /// - Full-opacity stops (no transparency)
     /// - Close paired stops around boundaries for soft transitions after blur
     private func bucketMeltGradient(bucket: HomeSpendTrendsAggregator.Bucket) -> LinearGradient {

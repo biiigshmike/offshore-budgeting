@@ -5,14 +5,6 @@
 //  Created by Michael Brown on 1/22/26.
 //
 
-
-//
-//  NotificationsAppDelegate.swift
-//  OffshoreBudgeting
-//
-//  Created by Michael Brown on 1/22/26.
-//
-
 import Foundation
 import UserNotifications
 
@@ -26,7 +18,7 @@ final class NotificationsAppDelegate: NSObject, UIApplicationDelegate, UNUserNot
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
 
-        // Ensures banners/sounds can present while the app is foregrounded (great for testing).
+        // Ensures banners/sounds can present while the app is foregrounded
         UNUserNotificationCenter.current().delegate = self
         return true
     }

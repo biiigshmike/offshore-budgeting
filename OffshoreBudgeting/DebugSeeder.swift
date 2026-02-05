@@ -563,7 +563,6 @@ enum DebugSeeder {
             ))
         }
 
-        // Higher baseline spend so "actual savings" is not fantasy.
         // Groceries (5)
         add("Trader Joe's", 124.65, day(3), cardVisa, categories.groceries)
         add("Safeway", 92.40, day(8), cardVisa, categories.groceries)
@@ -584,7 +583,7 @@ enum DebugSeeder {
         add("Parking", 14.00, day(15), cardVisa, categories.transport)
         add("Gas", 64.10, day(25), cardChecking, categories.transport)
 
-        // Utilities type stuff (2, non preset overlap is fine for realism)
+        // Utilities type stuff (2)
         add("Household Supplies", 42.18, day(9), cardAmex, categories.utilities)
         add("Mobile Add-On", 18.99, day(16), cardChecking, categories.utilities)
 
@@ -636,7 +635,7 @@ enum DebugSeeder {
         // Realistic paychecks:
         // Planned: 1500.00 and 1500.00 each month
         // Actual: slightly off with cents, month-to-month wobble
-        // One month: second paycheck is delayed/missing (optional realism)
+        // One month: second paycheck is delayed/missing
 
         var cursor = startOfMonth(containing: rangeStart, calendar: calendar)
 
@@ -657,7 +656,7 @@ enum DebugSeeder {
             let year = calendar.component(.year, from: monthStart)
 
             // Deterministic cents wobble so screenshots are consistent.
-            // I derive cents from month/year so it "feels" random but never changes per run.
+            // derive cents from month/year so it "feels" random but never changes per run.
             func actualForPlanned(_ planned: Double, paycheckIndex: Int) -> Double {
                 let seed = (year * 100) + (month * 10) + paycheckIndex
                 let dollarsBump = Double((seed % 7) - 3) // -3 ... +3

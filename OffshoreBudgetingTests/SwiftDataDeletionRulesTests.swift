@@ -127,7 +127,7 @@ struct SwiftDataDeletionRulesTests {
         context.delete(card)
         try context.save()
 
-        // Budget remains, but link should be gone (this is your “unassigns itself” behavior).
+        // Budget remains, but link should be gone 
         #expect(try count(Card.self, in: context) == 0)
         #expect(try count(Budget.self, in: context) == 1)
         #expect(try count(BudgetCardLink.self, in: context) == 0)

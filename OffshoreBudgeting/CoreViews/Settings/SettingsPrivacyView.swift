@@ -16,7 +16,7 @@ struct SettingsPrivacyView: View {
     // Stored as a timestamp so AppLockGate can detect “just authenticated”.
     @AppStorage("privacy_lastSuccessfulAuthAt") private var lastSuccessfulAuthAt: Double = 0
 
-    // Toggle UI state, so we can authenticate before committing to AppStorage.
+    // Toggle UI state to authenticate before committing to AppStorage.
     @State private var requireBiometricsToggle: Bool = false
 
     @State private var showingEnableError: Bool = false

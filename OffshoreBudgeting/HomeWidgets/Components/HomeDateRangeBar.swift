@@ -12,7 +12,7 @@ struct HomeDateRangeBar: View {
     @Binding var draftStartDate: Date
     @Binding var draftEndDate: Date
 
-    /// Parent decides this (draft differs from applied, or whatever your logic is).
+    /// Parent decides this
     let isApplyEnabled: Bool
     var onApply: () -> Void
 

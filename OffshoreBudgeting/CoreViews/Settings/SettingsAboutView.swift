@@ -16,8 +16,7 @@ struct SettingsAboutView: View {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0"
     }
 
-    // Placeholders you can replace later
-    private let appStoreURL = URL(string: "https://apps.apple.com")!
+    private let appStoreURL = URL(string: "https://apps.apple.com/us/app/offshore-budgeting/id6754517095")!
     private let developerWebsiteURL = URL(string: "https://offshore-budgeting.notion.site/Offshore-Budgeting-295b42cd2e6c80cf817dd73a5761bb7e")!
 
     var body: some View {

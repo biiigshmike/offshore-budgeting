@@ -38,8 +38,8 @@ struct OffshoreBudgetingApp: App {
         }
 
         #if DEBUG
-        // If screenshot mode is enabled, we ALWAYS use a local-only container
-        // so we never touch Cloud data while staging screenshots.
+        // If screenshot mode is enabled, ALWAYS use a local-only container
+        // never touch Cloud data while staging screenshots.
         if Self.isScreenshotModeEnabled {
             UserDefaults.standard.set(false, forKey: "icloud_activeUseCloud")
             UserDefaults.standard.set(0.0, forKey: "icloud_bootstrapStartedAt")

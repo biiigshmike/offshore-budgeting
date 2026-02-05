@@ -16,11 +16,11 @@ struct CategoryMatchSuggestion {
 enum CategoryMatchingEngine {
 
     // Static synonym map (shipped with app).
-    // Keys represent "concept buckets" (normalizeName on your side will unify).
+    // Keys represent "concept buckets" (normalizeName side will unify).
     // Values are words that should map into that bucket.
     //
-    // NOTE: This does not need to match your actual category names.
-    // We use it as an assist layer for scoring.
+    // NOTE: This does not need to match actual category names.
+    // it is used as an assist layer for scoring.
     static let synonymMap: [String: [String]] = [
         "dining": ["restaurant", "restaurants", "food", "eat", "drink", "cafe", "coffee"],
         "transportation": ["fuel", "gas", "gasoline", "uber", "lyft", "transit", "parking"],
@@ -34,7 +34,7 @@ enum CategoryMatchingEngine {
         "subscriptions": ["subscription", "subscriptions", "membership"]
     ]
 
-    // Thresholds tuned to match your bucket behavior.
+    // Thresholds tuned to match bucket behavior.
     static let readyThreshold: Double = 0.86
     static let possibleThreshold: Double = 0.55
 
@@ -55,7 +55,7 @@ enum CategoryMatchingEngine {
         let csvRaw = (csvCategory ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         let csvKey = normalizeName(csvRaw)
 
-        // If CSV category is empty, we can still try merchant-based inference later (Phase 3).
+        // If CSV category is empty, still try merchant-based inference later
         if csvKey.isEmpty {
             return CategoryMatchSuggestion(category: nil, confidence: 0.0, reason: "No CSV category")
         }
@@ -73,8 +73,8 @@ enum CategoryMatchingEngine {
 
         // 3) Synonym concept bucket match
         if let concept = conceptKey(for: csvKey) {
-            // If any of your categories also sits in that concept bucket, prefer it.
-            // (Example: Your category "Food & Drink" should land in dining.)
+            // If any categories also sit in that concept bucket, prefer it.
+            // (Example: "Food & Drink" should land in dining.)
             var best: (Category, Double, String)? = nil
             for cat in availableCategories {
                 let catKey = normalizeName(cat.name)

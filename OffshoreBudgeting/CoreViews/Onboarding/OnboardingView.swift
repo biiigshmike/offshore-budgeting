@@ -550,7 +550,6 @@ struct OnboardingView: View {
     
     // MARK: - Skip prompt
     
-    /// We can't reliably enumerate SwiftData-backed CloudKit records without plumbing.
     /// This is a pragmatic check:
     /// - If iCloud is enabled AND we already have workspaces, onboarding is likely redundant.
     /// - If iCloud account is available, we explain why enabling iCloud can pull data from other devices.
@@ -565,11 +564,11 @@ struct OnboardingView: View {
             return
         }
         
-        // If user is not using iCloud yet, we can still detect whether their iCloud account is available.
-        // This helps us message the Step 3 toggle.
+        // If user is not using iCloud yet, still detect whether their iCloud account is available.
+        // This helps message the Step 3 toggle.
         let status = try? await CKContainer.default().accountStatus()
         if status == .available {
-            // No-op for now, but this is where we'd enhance messaging later.
+            // No-op for now, but this is where enhanced messaging would be handy for later.
         }
     }
 

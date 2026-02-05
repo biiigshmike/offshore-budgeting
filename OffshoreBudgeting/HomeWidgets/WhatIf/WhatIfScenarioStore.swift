@@ -268,7 +268,7 @@ struct WhatIfScenarioStore {
 
     // MARK: - Pinned scenarios (GLOBAL)
 
-    /// New behavior: multiple pinned scenarios.
+    /// multiple pinned scenarios.
     /// Migration: if the legacy single pinned ID exists, convert it into a 1-item array.
     func loadPinnedGlobalScenarioIDs() -> [UUID] {
         if let data = UserDefaults.standard.data(forKey: globalPinnedListKey()),

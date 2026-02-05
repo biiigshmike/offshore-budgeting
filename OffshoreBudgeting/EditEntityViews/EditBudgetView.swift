@@ -209,7 +209,7 @@ struct EditBudgetView: View {
             modelContext.insert(BudgetPresetLink(budget: budget, preset: preset))
         }
 
-        // ✅ Reconcile generated planned expenses based on new:
+        // Reconcile generated planned expenses based on new:
         // - budget dates
         // - selected presets
         // - selected cards

@@ -96,7 +96,7 @@ final class LocalNotificationService: ObservableObject {
                 minute: reminderMinute
             )
         } catch {
-            // I’m intentionally ignoring errors so scheduling never blocks UI flows.
+            // intentionally ignoring errors so scheduling never blocks UI flows.
         }
     }
 
@@ -190,7 +190,7 @@ final class LocalNotificationService: ObservableObject {
         minute: Int
     ) async throws {
 
-        // If app-level notifications are off, cancel our app’s reminder IDs.
+        // If app-level notifications are off, cancel app’s reminder IDs.
         guard notificationsEnabled else {
             cancelNotification(identifier: NotificationID.dailyExpenseReminder)
             await removeScheduledNotifications(matchingPrefix: NotificationID.plannedIncomeReminder)

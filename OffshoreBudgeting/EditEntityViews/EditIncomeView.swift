@@ -21,7 +21,6 @@ struct EditIncomeView: View {
     @State private var date: Date
     @State private var isPlanned: Bool
 
-    // Repeat fields (these represent either a new series to create, or edits to an existing series)
     @State private var frequencyRaw: String
     @State private var interval: Int
     @State private var weeklyWeekday: Int

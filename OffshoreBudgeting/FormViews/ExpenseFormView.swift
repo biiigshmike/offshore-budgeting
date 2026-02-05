@@ -114,38 +114,11 @@ struct ExpenseFormView: View {
             } footer: {
                 Text("If no category is set, it will default to Uncategorized.")
             }
-
-            if !canSave {
-//                Section {
-//                    VStack(alignment: .leading, spacing: 6) {
-//                        if ExpenseFormView.trimmedDescription(descriptionText).isEmpty {
-//                            Text("Enter a description.")
-//                        }
-//
-//                        let amt = ExpenseFormView.parseAmount(amountText) ?? 0
-//                        if amt <= 0 {
-//                            Text("Enter an amount greater than 0.")
-//                        }
-//
-//                        if cards.isEmpty {
-//                            Text("Create a card first.")
-//                        } else if selectedCardID == nil {
-//                            Text("Select a card.")
-//                        }
-//                    }
-//                    .foregroundStyle(.secondary)
-//                }
-            }
-
-//            Section {
-//                Text("This transaction will be saved inside “\(workspace.name)”.")
-//                    .foregroundStyle(.secondary)
-//            }
         }
     }
 }
 
-// MARK: - Card tile (now uses CardVisualView)
+// MARK: - Card tile ( uses CardVisualView)
 
 private struct CardTile: View {
     let title: String
@@ -154,7 +127,6 @@ private struct CardTile: View {
     let isSelected: Bool
     let onTap: () -> Void
 
-    // Matches your existing layout
     private let tileWidth: CGFloat = 160
 
     var body: some View {

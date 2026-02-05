@@ -106,7 +106,7 @@ struct DonutChartView: View {
     }
 
     /// Draw only the special slice(s) with a distinct fill.
-    /// We render a second chart with the same slices so the angles match,
+    /// render a second chart with the same slices so the angles match,
     /// then make non-special slices clear.
     private var specialOverlayChart: some View {
         Chart {
@@ -222,7 +222,7 @@ struct DonutChartView: View {
 
 
     private func savingsHighlight(base: Color) -> LinearGradient {
-        // A gentle diagonal highlight, reads like “special” but calm.
+        // A gentle diagonal highlight
         LinearGradient(
             gradient: Gradient(stops: [
                 .init(color: base.opacity(0.95), location: 0.00),
@@ -294,7 +294,7 @@ extension DonutChartView {
             }
         }
 
-        // Filter any zero/negative just to be safe
+        // Filter any zero/negative
         return slices.filter { $0.value > 0 }
     }
 }

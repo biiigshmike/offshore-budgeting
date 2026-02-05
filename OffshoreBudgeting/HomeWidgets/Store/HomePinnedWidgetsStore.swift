@@ -54,7 +54,6 @@ struct HomePinnedWidgetsStore {
             ]
         }
 
-        // New format
         if let decoded = try? JSONDecoder().decode([HomeWidgetID].self, from: data) {
             return normalize(decoded)
         }

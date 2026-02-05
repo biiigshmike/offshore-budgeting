@@ -92,7 +92,7 @@ struct HomeIncomeMetricsView: View {
             .padding(.vertical, 14)
         }
         .navigationBarTitleDisplayMode(.inline)
-        .navigationTitle("") // we render a custom title + subtitle in the navigation area
+        .navigationTitle("") // render a custom title + subtitle in the navigation area
         .toolbar {
             ToolbarItem(placement: .principal) {
                 VStack(spacing: 2) {
@@ -182,7 +182,7 @@ struct HomeIncomeMetricsView: View {
                         AxisGridLine()
                         AxisTick()
 
-                        // ✅ Stable: format-based axis labels (no closure overload weirdness)
+                        // Stable: format-based axis labels
                         AxisValueLabel(format: CurrencyFormatter.currencyStyle())
                     }
                 }
@@ -191,7 +191,7 @@ struct HomeIncomeMetricsView: View {
                         AxisGridLine()
                         AxisTick()
 
-                        // ✅ Stable: format-based date labels, based on granularity
+                        // Stable: format-based date labels, based on granularity
                         if granularity == .month {
                             AxisValueLabel(format: .dateTime.month(.abbreviated))
                         } else {

@@ -413,7 +413,7 @@ final class Category {
     var name: String = ""
     var hexColor: String = "#3B82F6"
 
-    // ✅ Keep this as a relationship, but do NOT specify inverse here.
+    // Keep this as a relationship, but do NOT specify inverse here.
     // The inverse is defined on ImportMerchantRule.preferredCategory.
     @Relationship
     var importMerchantRules: [ImportMerchantRule]? = nil
@@ -437,8 +437,6 @@ final class Category {
         self.workspace = workspace
     }
 }
-
-// MARK: - Preset
 
 // MARK: - Preset
 
@@ -500,8 +498,7 @@ final class Preset {
         self.frequencyRaw = frequencyRaw
         self.interval = max(1, interval)
         self.weeklyWeekday = min(7, max(1, weeklyWeekday))
-
-        // ✅ fixed typo: weeklyDayOfMonth -> monthlyDayOfMonth
+        
         self.monthlyDayOfMonth = min(31, max(1, monthlyDayOfMonth))
 
         self.monthlyIsLastDay = monthlyIsLastDay
@@ -742,7 +739,7 @@ final class ImportMerchantRule {
     @Relationship(inverse: \Workspace.importMerchantRules)
     var workspace: Workspace? = nil
 
-    // ✅ Define the inverse on the to-one side only.
+    // Define the inverse on the to-one side only.
     @Relationship(inverse: \Category.importMerchantRules)
     var preferredCategory: Category? = nil
 

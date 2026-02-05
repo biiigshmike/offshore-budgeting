@@ -186,8 +186,6 @@ struct SettingsView: View {
 
     // MARK: - Toolbar Workspace Item (Single Source of Truth)
 
-    // MARK: - Toolbar Workspace Item (Single Source of Truth)
-
     @ViewBuilder
     private var workspaceTrailingNavBarItem: some View {
         let baseMenu = Menu {

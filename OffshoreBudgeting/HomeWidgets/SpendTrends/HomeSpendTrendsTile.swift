@@ -64,7 +64,7 @@ struct HomeSpendTrendsTile: View {
         .accessibilityHint("View spending trends for this period")
     }
 
-    // MARK: - Mini chart (Wallet-y pill bars)
+    // MARK: - Mini chart
 
     private func miniChart(result: HomeSpendTrendsAggregator.Result) -> some View {
         // This tile is primarily a preview, but yearly ranges need all 12 months to read correctly.
@@ -247,7 +247,7 @@ private struct SpendTrendsScaledPillBar: View {
         // Always end at 1
         rawStops.append(.init(color: colors.last ?? firstColor, location: 1))
 
-        // 🔒 FINAL SAFETY PASS
+        // FINAL SAFETY PASS
         // Sort and remove any out-of-order / duplicate locations
         let stops = rawStops
             .sorted { $0.location < $1.location }

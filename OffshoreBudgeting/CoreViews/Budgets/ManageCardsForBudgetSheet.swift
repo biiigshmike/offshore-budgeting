@@ -213,10 +213,7 @@ struct ManageCardsForBudgetSheet: View {
         }
     }
 
-    // MARK: - Policy B: Generated Planned Expense Checks
-    //
-    // Note: SwiftData predicates can struggle with relationship keypaths like `expense.card?.id == ...`.
-    // To keep compilation stable, we predicate on sourceBudgetID + amount only, then filter by card in memory.
+    // MARK: - Generated Planned Expense Checks
 
     private func hasAnyGeneratedPlannedExpenses(for card: Card) -> Bool {
         let budgetID: UUID? = budget.id
@@ -321,13 +318,11 @@ struct ManageCardsForBudgetSheet: View {
     }
 
     private func unlinkDeleteExpensesAndDetachPresets(for card: Card) {
-        // Capture preset IDs up front, since we may delete the expenses we use to infer these.
         let presetIDs = presetIDsAffectingCard(for: card)
 
         let deletedUnspentCount = deleteUnspentGeneratedPlannedExpenses(for: card)
         let recordedCount = countRecordedGeneratedPlannedExpenses(for: card)
 
-        // User is unlinking the card, always do that.
         unlink(card)
 
         // This is the key behavior: prevent re-materialization when the card is re-linked.

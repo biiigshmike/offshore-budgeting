@@ -836,7 +836,7 @@ struct BudgetDetailView: View {
         let recordedCount = countRecordedGeneratedPlannedExpensesForBudget()
 
         if recordedCount > 0 {
-            // If everything is recorded (deletedUnspentCount == 0), we still route the user to review
+            // If everything is recorded (deletedUnspentCount == 0), still route the user to review
             // instead of showing "Nothing to delete", because there *is* something to consider.
             showingReviewRecordedBudgetPlannedExpenses = true
             return

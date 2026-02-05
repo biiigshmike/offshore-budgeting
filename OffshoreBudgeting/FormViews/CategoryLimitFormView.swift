@@ -74,8 +74,6 @@ struct CategoryLimitFormView: View {
                 }
                 .tint(tint)
             } else {
-                // No max means no meaningful gauge range.
-                // Keep the layout simple and still useful.
                 Text(totalAmount, format: CurrencyFormatter.currencyStyle())
                     .font(.title3.weight(.semibold))
             }

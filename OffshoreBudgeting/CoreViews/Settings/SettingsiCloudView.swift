@@ -74,13 +74,6 @@ struct SettingsiCloudView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
-
-//            Section("Container") {
-//                Text(cloudKitContainerIdentifier)
-//                    .font(.footnote.monospaced())
-//                    .foregroundStyle(.secondary)
-//                    .textSelection(.enabled)
-//            }
         }
         .listStyle(.insetGrouped)
         .navigationTitle("iCloud")

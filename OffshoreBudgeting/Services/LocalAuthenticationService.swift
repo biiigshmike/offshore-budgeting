@@ -49,7 +49,7 @@ enum LocalAuthenticationService {
         return BiometricAvailability(kind: kind, isAvailable: canEvaluate, errorMessage: message)
     }
 
-    /// This is what you use to unlock the app.
+    /// This is what is used to unlock the app.
     /// Uses deviceOwnerAuthentication so the system can fall back to passcode when appropriate.
     static func authenticateForUnlock(localizedReason: String) async throws -> Bool {
         let context = LAContext()

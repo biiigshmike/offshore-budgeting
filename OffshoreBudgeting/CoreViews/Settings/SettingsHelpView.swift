@@ -81,10 +81,6 @@ struct SettingsHelpView: View {
 
     // MARK: - Repeat Onboarding Button
 
-    // MARK: - Repeat Onboarding Button
-
-    // MARK: - Repeat Onboarding Button
-
     @ViewBuilder
     private var repeatOnboardingButton: some View {
         let baseButton = Button {

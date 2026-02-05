@@ -298,13 +298,11 @@ struct IncomeView: View {
                     )
                 }
             }
-            // ✅ proxy is in scope here
             .onAppear { viewWidth = proxy.size.width }
             .onChange(of: proxy.size.width) { _, newValue in
                 viewWidth = newValue
             }
 
-            // keep your existing modifiers on the List
             .postBoardingTip(
                 key: "tip.income.v1",
                 title: "Income",

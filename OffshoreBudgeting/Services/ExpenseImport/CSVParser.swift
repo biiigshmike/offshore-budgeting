@@ -21,7 +21,7 @@ struct CSVParser {
 
     static func parse(url: URL) throws -> ParsedCSV {
 
-        // 🔐 REQUIRED for fileImporter URLs
+        // REQUIRED for fileImporter URLs
         let didStartAccessing = url.startAccessingSecurityScopedResource()
         defer {
             if didStartAccessing {

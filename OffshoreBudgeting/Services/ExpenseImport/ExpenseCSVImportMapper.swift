@@ -128,7 +128,7 @@ struct ExpenseCSVImportMapper {
                 isDup = looksLikeDuplicateIncome(date: date, amount: finalAmount, merchant: finalMerchant, existing: existingIncomes)
             }
 
-            // Default bucket + check behavior matches your old flow
+            // Default bucket + check behavior
             let bucket: ExpenseCSVImportBucket
             let includeDefault: Bool
             let selectedCategory: Category?

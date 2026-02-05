@@ -71,7 +71,6 @@ struct WidgetCardVisualView: View {
 
     @ViewBuilder
     private var overlayEffect: some View {
-        // Keep effects cheap for WidgetKit.
         switch effectToken.lowercased() {
         case "glass":
             RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -109,7 +108,6 @@ struct WidgetCardVisualView: View {
                 .blendMode(.overlay)
 
         default:
-            // plastic, none, unknown
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .fill(
                     LinearGradient(
@@ -136,7 +134,7 @@ struct WidgetCardVisualView: View {
         case "blossom": return [.pink, .purple.opacity(0.8)]
         case "lavender": return [.purple.opacity(0.65), .blue.opacity(0.8)]
         case "nebula": return [.indigo, .purple.opacity(0.95)]
-        default: return [.black.opacity(0.9), .gray.opacity(0.85)] // graphite fallback
+        default: return [.black.opacity(0.9), .gray.opacity(0.85)]
         }
     }
 }
