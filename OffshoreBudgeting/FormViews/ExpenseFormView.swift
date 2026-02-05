@@ -50,13 +50,6 @@ struct ExpenseFormView: View {
     }
 
     var body: some View {
-        let canSave = ExpenseFormView.canSave(
-            descriptionText: descriptionText,
-            amountText: amountText,
-            selectedCardID: selectedCardID,
-            hasAtLeastOneCard: !cards.isEmpty
-        )
-
         Form {
             Section("Card") {
                 if cards.isEmpty {

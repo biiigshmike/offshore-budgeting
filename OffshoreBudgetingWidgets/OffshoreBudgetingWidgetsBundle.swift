@@ -13,8 +13,5 @@ struct OffshoreBudgetingWidgetsBundle: WidgetBundle {
     var body: some Widget {
         IncomeWidget()
         CardWidget()
-        OffshoreBudgetingWidgets()
-        OffshoreBudgetingWidgetsControl()
-//        OffshoreBudgetingWidgetsLiveActivity()
     }
 }

@@ -54,13 +54,6 @@ struct PresetFormView: View {
     }
     
     var body: some View {
-        let canSave = PresetFormView.canSave(
-            title: title,
-            plannedAmountText: plannedAmountText,
-            selectedCardID: selectedCardID,
-            hasAtLeastOneCard: !cards.isEmpty
-        )
-        
         Form {
             
             Section("Card") {
