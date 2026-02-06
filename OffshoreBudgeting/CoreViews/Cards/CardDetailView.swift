@@ -431,7 +431,6 @@ struct CardDetailView: View {
                                     .tint(Color("OffshoreDepth"))
                                 }
                         }
-                        .onDelete(perform: deletePlannedExpensesFiltered)
                     }
 
                 case .variable:
@@ -465,7 +464,6 @@ struct CardDetailView: View {
                                 .tint(Color("OffshoreDepth"))
                             }
                         }
-                        .onDelete(perform: deleteVariableExpensesFiltered)
                     }
 
                 case .unified:
@@ -532,7 +530,6 @@ struct CardDetailView: View {
                                 }
                             }
                         }
-                        .onDelete(perform: deleteUnifiedExpensesFiltered)
                     }
                 }
             } header: {
@@ -912,75 +909,6 @@ struct CardDetailView: View {
     }
 
 
-    private func deleteVariableExpensesFiltered(at offsets: IndexSet) {
-        // IMPORTANT: offsets are for the filtered/sorted list
-        let expensesToDelete = offsets.compactMap { index in
-            variableExpensesFiltered.indices.contains(index) ? variableExpensesFiltered[index] : nil
-        }
-
-        if confirmBeforeDeleting {
-            pendingExpenseDelete = {
-                for expense in expensesToDelete {
-                    modelContext.delete(expense)
-                }
-            }
-            showingExpenseDeleteConfirm = true
-        } else {
-            for expense in expensesToDelete {
-                modelContext.delete(expense)
-            }
-        }
-    }
-
-    private func deletePlannedExpensesFiltered(at offsets: IndexSet) {
-        // IMPORTANT: offsets are for the filtered/sorted list
-        let expensesToDelete = offsets.compactMap { index in
-            plannedExpensesFiltered.indices.contains(index) ? plannedExpensesFiltered[index] : nil
-        }
-
-        if confirmBeforeDeleting {
-            pendingExpenseDelete = {
-                for expense in expensesToDelete {
-                    modelContext.delete(expense)
-                }
-            }
-            showingExpenseDeleteConfirm = true
-        } else {
-            for expense in expensesToDelete {
-                modelContext.delete(expense)
-            }
-        }
-    }
-
-    private func deleteUnifiedExpensesFiltered(at offsets: IndexSet) {
-        // IMPORTANT: offsets are for the unified filtered/sorted list
-        let itemsToDelete = offsets.compactMap { index in
-            unifiedExpensesFiltered.indices.contains(index) ? unifiedExpensesFiltered[index] : nil
-        }
-
-        if confirmBeforeDeleting {
-            pendingExpenseDelete = {
-                for item in itemsToDelete {
-                    switch item {
-                    case .planned(let expense):
-                        modelContext.delete(expense)
-                    case .variable(let expense):
-                        modelContext.delete(expense)
-                    }
-                }
-            }
-            showingExpenseDeleteConfirm = true
-        } else {
-            for item in itemsToDelete {
-                switch item {
-                case .planned(let expense):
-                    modelContext.delete(expense)
-                case .variable(let expense):
-                    modelContext.delete(expense)
-                }
-            }
-        }
-    }
 }
 
 // MARK: - Supporting Types

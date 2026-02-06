@@ -465,8 +465,15 @@ struct BudgetDetailView: View {
                                         .tint(.orange)
                                     }
                                 }
+                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                    Button {
+                                        deletePlannedExpense(expense)
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
+                                    }
+                                    .tint(Color("OffshoreDepth"))
+                                }
                         }
-                        .onDelete(perform: deletePlannedExpensesFiltered)
                     }
 
                 case .variable:
@@ -488,8 +495,15 @@ struct BudgetDetailView: View {
                                 }
                                 .tint(Color("AccentColor"))
                             }
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button {
+                                    deleteVariableExpense(expense)
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                                .tint(Color("OffshoreDepth"))
+                            }
                         }
-                        .onDelete(perform: deleteVariableExpensesFiltered)
                     }
 
                 case .unified:
@@ -517,6 +531,14 @@ struct BudgetDetailView: View {
                                             .tint(.orange)
                                         }
                                     }
+                                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                        Button {
+                                            deletePlannedExpense(expense)
+                                        } label: {
+                                            Label("Delete", systemImage: "trash")
+                                        }
+                                        .tint(Color("OffshoreDepth"))
+                                    }
 
                             case .variable(let expense):
                                 Button {
@@ -533,9 +555,16 @@ struct BudgetDetailView: View {
                                     }
                                     .tint(Color("AccentColor"))
                                 }
+                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                    Button {
+                                        deleteVariableExpense(expense)
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
+                                    }
+                                    .tint(Color("OffshoreDepth"))
+                                }
                             }
                         }
-                        .onDelete(perform: deleteUnifiedExpensesFiltered)
                     }
                 }
             } header: {
@@ -910,6 +939,16 @@ struct BudgetDetailView: View {
         )
 
         return (try? modelContext.fetch(desc))?.first
+    }
+
+    private func deleteVariableExpense(_ expense: VariableExpense) {
+        guard let index = variableExpensesFiltered.firstIndex(where: { $0.id == expense.id }) else { return }
+        deleteVariableExpensesFiltered(at: IndexSet(integer: index))
+    }
+
+    private func deletePlannedExpense(_ expense: PlannedExpense) {
+        guard let index = plannedExpensesFiltered.firstIndex(where: { $0.id == expense.id }) else { return }
+        deletePlannedExpensesFiltered(at: IndexSet(integer: index))
     }
 
     private func deleteVariableExpensesFiltered(at offsets: IndexSet) {

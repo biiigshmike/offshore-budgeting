@@ -211,7 +211,6 @@ struct ManagePresetsView: View {
                             .tint(Color("OffshoreDepth"))
                         }
                     }
-                    .onDelete(perform: deleteActiveViaListSwipe)
                 }
 
                 // MARK: - Archived presets
@@ -257,7 +256,6 @@ struct ManagePresetsView: View {
                                 .tint(Color("OffshoreDepth"))
                             }
                         }
-                        .onDelete(perform: deleteArchivedViaListSwipe)
                     }
                 }
             }
@@ -338,39 +336,6 @@ struct ManagePresetsView: View {
         } else {
             modelContext.delete(preset)
         }
-    }
-
-    private func deletePresetsWithOptionalConfirm(_ presetsToDelete: [Preset]) {
-        if presetsToDelete.isEmpty { return }
-
-        if confirmBeforeDeleting {
-            pendingPresetDelete = {
-                for preset in presetsToDelete {
-                    modelContext.delete(preset)
-                }
-            }
-            showingPresetDeleteConfirm = true
-        } else {
-            for preset in presetsToDelete {
-                modelContext.delete(preset)
-            }
-        }
-    }
-
-    private func deleteActiveViaListSwipe(at offsets: IndexSet) {
-        let presetsToDelete = offsets.compactMap { index in
-            activePresetsWithoutHighlighted.indices.contains(index) ? activePresetsWithoutHighlighted[index] : nil
-        }
-
-        deletePresetsWithOptionalConfirm(presetsToDelete)
-    }
-
-    private func deleteArchivedViaListSwipe(at offsets: IndexSet) {
-        let presetsToDelete = offsets.compactMap { index in
-            archivedPresets.indices.contains(index) ? archivedPresets[index] : nil
-        }
-
-        deletePresetsWithOptionalConfirm(presetsToDelete)
     }
 
     // MARK: - Styling
