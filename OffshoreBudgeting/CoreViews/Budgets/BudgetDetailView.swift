@@ -427,8 +427,8 @@ struct BudgetDetailView: View {
 
                 Picker("Sort", selection: $sortMode) {
                     Text("A–Z").tag(BudgetSortMode.az)
-                    Text("$↓").tag(BudgetSortMode.amountDesc)
-                    Text("$↑").tag(BudgetSortMode.amountAsc)
+                    Text("\(CurrencyFormatter.currencySymbol)↓").tag(BudgetSortMode.amountDesc)
+                    Text("\(CurrencyFormatter.currencySymbol)↑").tag(BudgetSortMode.amountAsc)
                     Text("Date ↑").tag(BudgetSortMode.dateAsc)
                     Text("Date ↓").tag(BudgetSortMode.dateDesc)
                 }

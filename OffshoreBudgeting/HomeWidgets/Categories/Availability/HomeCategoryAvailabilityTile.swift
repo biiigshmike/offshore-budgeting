@@ -29,9 +29,6 @@ struct HomeCategoryAvailabilityTile: View {
     private let rowSpacing: CGFloat = 10
 
 
-    @AppStorage("general_currencyCode")
-    private var currencyCode: String = "USD"
-
     var body: some View {
         let result = HomeCategoryLimitsAggregator.build(
             budgets: budgets,
@@ -87,7 +84,7 @@ struct HomeCategoryAvailabilityTile: View {
                             CategoryAvailabilityRowView(
                                 metric: metric,
                                 scope: scope,
-                                currencyCode: currencyCode,
+                                currencyCode: CurrencyFormatter.currencyCode,
                                 nearThreshold: HomeCategoryLimitsAggregator.defaultNearThreshold
                             )
                         }
@@ -110,7 +107,7 @@ struct HomeCategoryAvailabilityTile: View {
     private func paginationControls(current: Int, totalPages: Int) -> some View {
         ZStack {
             // Centered page indicator
-            Text("\(current + 1) of \(totalPages)")
+            Text("\(localizedInt(current + 1)) of \(localizedInt(totalPages))")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
 
@@ -195,6 +192,10 @@ struct HomeCategoryAvailabilityTile: View {
         date.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted))
     }
 
+    private func localizedInt(_ value: Int) -> String {
+        value.formatted(.number)
+    }
+
     // MARK: - Accent
 
     private func accentColor(for result: HomeCategoryAvailabilityResult) -> Color {
@@ -229,7 +230,7 @@ private struct AvailabilityCountPill: View {
             Text(title)
                 .font(.caption.weight(.semibold))
 
-            Text("\(count)")
+            Text(localizedInt(count))
                 .font(.caption.weight(.semibold))
         }
         .padding(.horizontal, 10)
@@ -242,7 +243,7 @@ private struct AvailabilityCountPill: View {
         .foregroundStyle(foregroundColor)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(title) categories")
-        .accessibilityValue("\(count)")
+        .accessibilityValue(localizedInt(count))
     }
 
     private var backgroundColor: Color {
@@ -270,5 +271,9 @@ private struct AvailabilityCountPill: View {
         case .near:
             return .orange
         }
+    }
+
+    private func localizedInt(_ value: Int) -> String {
+        value.formatted(.number)
     }
 }

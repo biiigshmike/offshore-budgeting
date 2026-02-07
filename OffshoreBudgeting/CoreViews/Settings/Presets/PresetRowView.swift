@@ -36,7 +36,7 @@ struct PresetRowView: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
 
-                    Text("\(assignedBudgetsCount)")
+                    Text(localizedInt(assignedBudgetsCount))
                         .font(.subheadline.weight(.semibold))
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
@@ -73,8 +73,12 @@ struct PresetRowView: View {
     }
 
     private var accessibilityLabel: String {
-        let budgetPhrase = assignedBudgetsCount == 1 ? "one budget" : "\(assignedBudgetsCount) budgets"
+        let budgetPhrase = assignedBudgetsCount == 1 ? "one budget" : "\(localizedInt(assignedBudgetsCount)) budgets"
         return "\(preset.title) preset. Planned \(plannedText). Runs \(scheduleText). Assigned to \(budgetPhrase)."
+    }
+
+    private func localizedInt(_ value: Int) -> String {
+        value.formatted(.number)
     }
 }
 
@@ -92,12 +96,12 @@ private enum PresetScheduleFormatter {
 
         case .daily:
             if interval == 1 { return "Daily" }
-            return "Every \(interval) days"
+            return "Every \(localizedInt(interval)) days"
 
         case .weekly:
             let weekday = weekdayName(for: preset.weeklyWeekday)
             if interval == 1 { return "Weekly • \(weekday)" }
-            return "Every \(interval) weeks • \(weekday)"
+            return "Every \(localizedInt(interval)) weeks • \(weekday)"
 
         case .monthly:
             let anchor: String
@@ -108,7 +112,7 @@ private enum PresetScheduleFormatter {
             }
 
             if interval == 1 { return "Monthly • \(anchor)" }
-            return "Every \(interval) months • \(anchor)"
+            return "Every \(localizedInt(interval)) months • \(anchor)"
 
         case .yearly:
             let month = monthAbbreviation(for: preset.yearlyMonth)
@@ -116,7 +120,7 @@ private enum PresetScheduleFormatter {
             let anchor = "\(month) \(day)"
 
             if interval == 1 { return "Yearly • \(anchor)" }
-            return "Every \(interval) years • \(anchor)"
+            return "Every \(localizedInt(interval)) years • \(anchor)"
         }
     }
 
@@ -136,21 +140,13 @@ private enum PresetScheduleFormatter {
 
     private static func ordinalDay(_ day: Int) -> String {
         let d = max(1, min(31, day))
-        let tens = (d % 100) / 10
-        let ones = d % 10
-        let suffix: String
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .ordinal
+        formatter.locale = .current
+        return formatter.string(from: NSNumber(value: d)) ?? localizedInt(d)
+    }
 
-        if tens == 1 {
-            suffix = "th"
-        } else {
-            switch ones {
-            case 1: suffix = "st"
-            case 2: suffix = "nd"
-            case 3: suffix = "rd"
-            default: suffix = "th"
-            }
-        }
-
-        return "\(d)\(suffix)"
+    private static func localizedInt(_ value: Int) -> String {
+        value.formatted(.number)
     }
 }

@@ -271,26 +271,26 @@ struct ManagePresetsForBudgetSheet: View {
         case .none: return "This preset does not repeat."
             
         case .daily:
-            return preset.interval == 1 ? "Daily" : "Every \(preset.interval) days"
+            return preset.interval == 1 ? "Daily" : "Every \(localizedInt(preset.interval)) days"
             
         case .weekly:
             let day = weekdayName(preset.weeklyWeekday)
             if preset.interval == 1 { return "Weekly • \(day)" }
-            return "Every \(preset.interval) weeks • \(day)"
+            return "Every \(localizedInt(preset.interval)) weeks • \(day)"
             
         case .monthly:
             if preset.monthlyIsLastDay {
-                return preset.interval == 1 ? "Monthly • Last day" : "Every \(preset.interval) months • Last day"
+                return preset.interval == 1 ? "Monthly • Last day" : "Every \(localizedInt(preset.interval)) months • Last day"
             } else {
                 let day = ordinalDay(preset.monthlyDayOfMonth)
-                return preset.interval == 1 ? "Monthly • \(day)" : "Every \(preset.interval) months • \(day)"
+                return preset.interval == 1 ? "Monthly • \(day)" : "Every \(localizedInt(preset.interval)) months • \(day)"
             }
             
         case .yearly:
             let month = monthName(preset.yearlyMonth)
             let day = ordinalDay(preset.yearlyDayOfMonth)
             if preset.interval == 1 { return "Yearly • \(month) \(day)" }
-            return "Every \(preset.interval) years • \(month) \(day)"
+            return "Every \(localizedInt(preset.interval)) years • \(month) \(day)"
         }
     }
     
@@ -310,6 +310,11 @@ struct ManagePresetsForBudgetSheet: View {
         let clamped = min(31, max(1, day))
         let formatter = NumberFormatter()
         formatter.numberStyle = .ordinal
-        return formatter.string(from: NSNumber(value: clamped)) ?? "\(clamped)"
+        formatter.locale = .current
+        return formatter.string(from: NSNumber(value: clamped)) ?? localizedInt(clamped)
+    }
+
+    private func localizedInt(_ value: Int) -> String {
+        value.formatted(.number)
     }
 }

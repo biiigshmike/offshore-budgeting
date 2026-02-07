@@ -82,17 +82,17 @@ struct IncomeView: View {
 
         let today = Date()
         _displayedMonth = State(initialValue: CalendarGridHelper.startOfMonth(for: today))
-        _selectedDate = State(initialValue: CalendarGridHelper.sundayFirstCalendar.startOfDay(for: today))
+        _selectedDate = State(initialValue: CalendarGridHelper.displayCalendar.startOfDay(for: today))
     }
 
     // MARK: - Selected Day Range
 
     private var selectedDayStart: Date {
-        CalendarGridHelper.sundayFirstCalendar.startOfDay(for: selectedDate)
+        CalendarGridHelper.displayCalendar.startOfDay(for: selectedDate)
     }
 
     private var selectedDayEnd: Date {
-        CalendarGridHelper.sundayFirstCalendar.date(byAdding: .day, value: 1, to: selectedDayStart) ?? selectedDayStart
+        CalendarGridHelper.displayCalendar.date(byAdding: .day, value: 1, to: selectedDayStart) ?? selectedDayStart
     }
 
     // MARK: - Filters
@@ -134,7 +134,7 @@ struct IncomeView: View {
     }
 
     private func incomePresenceByDay(for startMonth: Date, monthCount: Int) -> [Date: DayIncomePresence] {
-        let cal = CalendarGridHelper.sundayFirstCalendar
+        let cal = CalendarGridHelper.displayCalendar
 
         let start = CalendarGridHelper.startOfMonth(for: startMonth)
         let end = CalendarGridHelper.addingMonths(monthCount, to: start)
@@ -168,12 +168,12 @@ struct IncomeView: View {
     }
 
     private var selectedWeekEndExclusive: Date {
-        CalendarGridHelper.sundayFirstCalendar.date(byAdding: .day, value: 7, to: selectedWeekStart) ?? selectedWeekStart
+        CalendarGridHelper.displayCalendar.date(byAdding: .day, value: 7, to: selectedWeekStart) ?? selectedWeekStart
     }
 
     private var selectedWeekRangeText: String {
         let startText = CalendarGridHelper.rangeDateFormatter.string(from: selectedWeekStart)
-        let endInclusive = CalendarGridHelper.sundayFirstCalendar.date(byAdding: .day, value: 6, to: selectedWeekStart) ?? selectedWeekStart
+        let endInclusive = CalendarGridHelper.displayCalendar.date(byAdding: .day, value: 6, to: selectedWeekStart) ?? selectedWeekStart
         let endText = CalendarGridHelper.rangeDateFormatter.string(from: endInclusive)
         return "\(startText) – \(endText)"
     }
@@ -206,27 +206,27 @@ struct IncomeView: View {
                         selectedDate: selectedDate,
                         incomePresenceByDay: monthPresence,
                         onStepDay: { deltaDays in
-                            let cal = CalendarGridHelper.sundayFirstCalendar
+                            let cal = CalendarGridHelper.displayCalendar
                             let newDate = cal.date(byAdding: .day, value: deltaDays, to: selectedDate) ?? selectedDate
                             let normalized = cal.startOfDay(for: newDate)
                             selectedDate = normalized
                             displayedMonth = CalendarGridHelper.startOfMonth(for: normalized)
                         },
                         onJumpToMonthStart: { deltaMonths in
-                            let cal = CalendarGridHelper.sundayFirstCalendar
+                            let cal = CalendarGridHelper.displayCalendar
                             let targetMonth = CalendarGridHelper.addingMonths(deltaMonths, to: displayedMonth)
                             let monthStart = CalendarGridHelper.startOfMonth(for: targetMonth)
                             selectedDate = cal.startOfDay(for: monthStart)
                             displayedMonth = monthStart
                         },
                         onJumpToToday: {
-                            let cal = CalendarGridHelper.sundayFirstCalendar
+                            let cal = CalendarGridHelper.displayCalendar
                             let today = cal.startOfDay(for: Date())
                             selectedDate = today
                             displayedMonth = CalendarGridHelper.startOfMonth(for: today)
                         },
                         onSelectDate: { tapped in
-                            let cal = CalendarGridHelper.sundayFirstCalendar
+                            let cal = CalendarGridHelper.displayCalendar
                             selectedDate = cal.startOfDay(for: tapped)
                             displayedMonth = CalendarGridHelper.startOfMonth(for: tapped)
                         }
@@ -586,7 +586,7 @@ private struct WeekdayHeaderView: View {
 
     var body: some View {
         LazyVGrid(columns: columns, spacing: 4) {
-            let symbols = CalendarGridHelper.weekdaySymbolsSundayFirst
+            let symbols = CalendarGridHelper.weekdaySymbolsFollowingSystem
             ForEach(Array(symbols.enumerated()), id: \.offset) { _, symbol in
                 Text(symbol)
                     .font(.caption)
@@ -619,12 +619,12 @@ private struct MonthGridView: View {
     var body: some View {
         LazyVGrid(columns: columns, spacing: 8) {
             ForEach(days) { cell in
-                let dayKey = CalendarGridHelper.sundayFirstCalendar.startOfDay(for: cell.date)
+                let dayKey = CalendarGridHelper.displayCalendar.startOfDay(for: cell.date)
                 let presence = incomePresenceByDay[dayKey]
 
                 DayCellView(
                     cell: cell,
-                    isSelected: CalendarGridHelper.sundayFirstCalendar.isDate(cell.date, inSameDayAs: selectedDate),
+                    isSelected: CalendarGridHelper.displayCalendar.isDate(cell.date, inSameDayAs: selectedDate),
                     presence: presence
                 ) {
                     onSelectDate(cell.date)
@@ -644,7 +644,7 @@ private struct DayCellView: View {
     let onTap: () -> Void
 
     private var dayNumber: String {
-        "\(CalendarGridHelper.sundayFirstCalendar.component(.day, from: cell.date))"
+        "\(CalendarGridHelper.displayCalendar.component(.day, from: cell.date))"
     }
 
     private var hasPlanned: Bool { presence?.hasPlanned == true }
@@ -755,32 +755,30 @@ private struct WidthReader: View {
 
 private enum CalendarGridHelper {
 
-    static let sundayFirstCalendar: Calendar = {
-        var cal = Calendar(identifier: .gregorian)
-        cal.firstWeekday = 1 // Sunday
-        return cal
-    }()
+    static var displayCalendar: Calendar {
+        Calendar.autoupdatingCurrent
+    }
 
     static let monthTitleFormatter: DateFormatter = {
         let df = DateFormatter()
-        df.calendar = sundayFirstCalendar
-        df.locale = .current
+        df.calendar = displayCalendar
+        df.locale = .autoupdatingCurrent
         df.setLocalizedDateFormatFromTemplate("LLLL yyyy")
         return df
     }()
 
     static let monthShortFormatter: DateFormatter = {
         let df = DateFormatter()
-        df.calendar = sundayFirstCalendar
-        df.locale = .current
+        df.calendar = displayCalendar
+        df.locale = .autoupdatingCurrent
         df.setLocalizedDateFormatFromTemplate("LLL")
         return df
     }()
 
     static let selectedDayTitleFormatter: DateFormatter = {
         let df = DateFormatter()
-        df.calendar = sundayFirstCalendar
-        df.locale = .current
+        df.calendar = displayCalendar
+        df.locale = .autoupdatingCurrent
         df.dateStyle = .full
         df.timeStyle = .none
         return df
@@ -788,8 +786,8 @@ private enum CalendarGridHelper {
 
     static let dayAccessibilityFormatter: DateFormatter = {
         let df = DateFormatter()
-        df.calendar = sundayFirstCalendar
-        df.locale = .current
+        df.calendar = displayCalendar
+        df.locale = .autoupdatingCurrent
         df.dateStyle = .full
         df.timeStyle = .none
         return df
@@ -797,8 +795,8 @@ private enum CalendarGridHelper {
 
     static let shortDateFormatter: DateFormatter = {
         let df = DateFormatter()
-        df.calendar = sundayFirstCalendar
-        df.locale = .current
+        df.calendar = displayCalendar
+        df.locale = .autoupdatingCurrent
         df.dateStyle = .medium
         df.timeStyle = .none
         return df
@@ -806,15 +804,15 @@ private enum CalendarGridHelper {
 
     static let rangeDateFormatter: DateFormatter = {
         let df = DateFormatter()
-        df.calendar = sundayFirstCalendar
-        df.locale = .current
+        df.calendar = displayCalendar
+        df.locale = .autoupdatingCurrent
         df.dateStyle = .medium
         df.timeStyle = .none
         return df
     }()
 
-    static var weekdaySymbolsSundayFirst: [String] {
-        sundayFirstCalendar.veryShortStandaloneWeekdaySymbols
+    static var weekdaySymbolsFollowingSystem: [String] {
+        displayCalendar.veryShortStandaloneWeekdaySymbols
     }
 
     struct DayCell: Identifiable, Hashable {
@@ -824,48 +822,48 @@ private enum CalendarGridHelper {
     }
 
     static func startOfMonth(for date: Date) -> Date {
-        let comps = sundayFirstCalendar.dateComponents([.year, .month], from: date)
-        return sundayFirstCalendar.date(from: comps) ?? date
+        let comps = displayCalendar.dateComponents([.year, .month], from: date)
+        return displayCalendar.date(from: comps) ?? date
     }
 
     static func addingMonths(_ months: Int, to date: Date) -> Date {
-        sundayFirstCalendar.date(byAdding: .month, value: months, to: date) ?? date
+        displayCalendar.date(byAdding: .month, value: months, to: date) ?? date
     }
 
     static func startOfWeek(for date: Date) -> Date {
-        let weekday = sundayFirstCalendar.component(.weekday, from: date) // Sunday = 1
-        let daysFromSunday = weekday - sundayFirstCalendar.firstWeekday
-        return sundayFirstCalendar.date(byAdding: .day, value: -daysFromSunday, to: sundayFirstCalendar.startOfDay(for: date)) ?? date
+        let weekday = displayCalendar.component(.weekday, from: date)
+        let daysFromFirstWeekday = weekday - displayCalendar.firstWeekday
+        return displayCalendar.date(byAdding: .day, value: -daysFromFirstWeekday, to: displayCalendar.startOfDay(for: date)) ?? date
     }
 
     static func makeMonthGrid(for monthDate: Date) -> [DayCell] {
         let monthStart = startOfMonth(for: monthDate)
 
         guard
-            let firstOfMonth = sundayFirstCalendar.date(from: sundayFirstCalendar.dateComponents([.year, .month], from: monthStart))
+            let firstOfMonth = displayCalendar.date(from: displayCalendar.dateComponents([.year, .month], from: monthStart))
         else {
             return []
         }
 
-        let weekdayOfFirst = sundayFirstCalendar.component(.weekday, from: firstOfMonth) // Sunday = 1
-        let leadingDays = (weekdayOfFirst - sundayFirstCalendar.firstWeekday + 7) % 7
+        let weekdayOfFirst = displayCalendar.component(.weekday, from: firstOfMonth)
+        let leadingDays = (weekdayOfFirst - displayCalendar.firstWeekday + 7) % 7
 
         let totalCells = 42
 
-        guard let gridStart = sundayFirstCalendar.date(byAdding: .day, value: -leadingDays, to: firstOfMonth) else {
+        guard let gridStart = displayCalendar.date(byAdding: .day, value: -leadingDays, to: firstOfMonth) else {
             return []
         }
 
-        let displayedMonth = sundayFirstCalendar.component(.month, from: firstOfMonth)
-        let displayedYear = sundayFirstCalendar.component(.year, from: firstOfMonth)
+        let displayedMonth = displayCalendar.component(.month, from: firstOfMonth)
+        let displayedYear = displayCalendar.component(.year, from: firstOfMonth)
 
         return (0..<totalCells).compactMap { offset in
-            guard let date = sundayFirstCalendar.date(byAdding: .day, value: offset, to: gridStart) else {
+            guard let date = displayCalendar.date(byAdding: .day, value: offset, to: gridStart) else {
                 return nil
             }
 
-            let cellMonth = sundayFirstCalendar.component(.month, from: date)
-            let cellYear = sundayFirstCalendar.component(.year, from: date)
+            let cellMonth = displayCalendar.component(.month, from: date)
+            let cellYear = displayCalendar.component(.year, from: date)
 
             let isInDisplayedMonth = (cellMonth == displayedMonth && cellYear == displayedYear)
             return DayCell(id: date, date: date, isInDisplayedMonth: isInDisplayedMonth)

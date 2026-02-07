@@ -67,7 +67,7 @@ struct HomeIncomeMetricsView: View {
         let ratio: Double? = plannedTotal > 0 ? (actualTotal / plannedTotal) : nil
         let percentText: String = {
             guard let ratio else { return "—" }
-            return "\(Int((ratio * 100).rounded()))%"
+            return ratio.formatted(.percent.precision(.fractionLength(0)))
         }()
 
         ScrollView {

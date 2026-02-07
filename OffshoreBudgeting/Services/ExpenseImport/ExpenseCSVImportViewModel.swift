@@ -52,7 +52,11 @@ final class ExpenseCSVImportViewModel: ObservableObject {
         let included = rows.filter { $0.includeInImport }
         let expCount = included.filter { $0.kind == .expense && !$0.isMissingRequiredData }.count
         let incCount = included.filter { $0.kind == .income && !$0.isMissingRequiredData }.count
-        return "\(expCount) expenses, \(incCount) incomes will be imported."
+        return "\(localizedInt(expCount)) expenses, \(localizedInt(incCount)) incomes will be imported."
+    }
+
+    private func localizedInt(_ value: Int) -> String {
+        value.formatted(.number)
     }
 
     // MARK: - Public

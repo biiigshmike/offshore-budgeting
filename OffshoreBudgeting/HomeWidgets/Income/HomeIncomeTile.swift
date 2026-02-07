@@ -38,8 +38,7 @@ struct HomeIncomeTile: View {
 
     private var percentText: String {
         guard let rawRatio else { return "—" }
-        let percent = Int((rawRatio * 100).rounded())
-        return "\(percent)%"
+        return rawRatio.formatted(.percent.precision(.fractionLength(0)))
     }
 
     var body: some View {
@@ -137,7 +136,7 @@ private struct HomeIncomeGaugeRow: View {
             )
             .frame(height: barHeight)
 
-            Text("100%")
+            Text(1.0, format: .percent.precision(.fractionLength(0)))
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.secondary)
                 .frame(minWidth: 44, alignment: .trailing)

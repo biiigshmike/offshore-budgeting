@@ -75,7 +75,7 @@ struct HomeSavingsOutlookTile: View {
         if projectedSavings < 0 {
             return CurrencyFormatter.string(from: 0)
         }
-        return "100%"
+        return 1.0.formatted(.percent.precision(.fractionLength(0)))
     }
 
     private var fillProgress: Double {
@@ -97,12 +97,12 @@ struct HomeSavingsOutlookTile: View {
         if projectedSavings > 0 {
             let ratio = actualSavings / projectedSavings
             let clamped = min(max(ratio, 0), 1)
-            return "\(Int((clamped * 100).rounded()))%"
+            return clamped.formatted(.percent.precision(.fractionLength(0)))
         }
 
         let raw = (actualSavings - projectedSavings) / abs(projectedSavings)
         let clamped = min(max(raw, 0), 1)
-        return "\(Int((clamped * 100).rounded()))%"
+        return clamped.formatted(.percent.precision(.fractionLength(0)))
     }
 
     var body: some View {

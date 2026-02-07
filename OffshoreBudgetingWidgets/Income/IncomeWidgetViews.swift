@@ -56,12 +56,12 @@ private extension IncomeWidgetSnapshot {
 
     var progressText: String {
         guard let pct = percent else { return "Progress —" }
-        return "Progress \(Int((pct * 100).rounded()))%"
+        let formatted = pct.formatted(.percent.precision(.fractionLength(0)))
+        return "Progress \(formatted)"
     }
 
     var deltaText: String {
-        let code = Locale.current.currency?.identifier ?? "USD"
-        let formatted = delta.formatted(.currency(code: code))
+        let formatted = delta.formatted(incomeWidgetCurrencyFormatStyle())
         if delta < 0 { return "Remaining \(formatted.replacingOccurrences(of: "-", with: ""))" }
         if delta > 0 { return "Over \(formatted)" }
         return "On target"
@@ -83,7 +83,7 @@ private struct MetricValueView: View {
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
 
-            Text(value, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
+            Text(value, format: incomeWidgetCurrencyFormatStyle())
                 .font(.headline.weight(.semibold))
                 .foregroundStyle(.primary)
                 .lineLimit(1)
@@ -114,7 +114,7 @@ struct RecentIncomeCell: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
 
-                Text(item.amount, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
+                Text(item.amount, format: incomeWidgetCurrencyFormatStyle())
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
@@ -296,7 +296,7 @@ struct IncomeWidgetExtraLargeView: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
 
-                    Text(snapshot.actualTotal, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
+                    Text(snapshot.actualTotal, format: incomeWidgetCurrencyFormatStyle())
                         .font(.headline.weight(.semibold))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
@@ -327,4 +327,11 @@ struct IncomeWidgetExtraLargeView: View {
         }
         .padding(14)
     }
+}
+
+// MARK: - Widget formatting helpers
+
+private func incomeWidgetCurrencyFormatStyle() -> FloatingPointFormatStyle<Double>.Currency {
+    let code = Locale.current.currency?.identifier ?? "USD"
+    return .currency(code: code)
 }

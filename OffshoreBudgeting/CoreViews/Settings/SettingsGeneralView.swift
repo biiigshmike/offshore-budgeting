@@ -44,7 +44,7 @@ struct SettingsGeneralView: View {
 
     var body: some View {
         List {
-            Section("Formatting") {
+            Section {
                 NavigationLink {
                     CurrencyPickerView(
                         selectedCode: $currencyCode,
@@ -56,6 +56,25 @@ struct SettingsGeneralView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+
+                LabeledContent("Date Format") {
+                    Text(systemDateFormatLabel)
+                        .foregroundStyle(.secondary)
+                }
+
+                LabeledContent("System First Weekday") {
+                    Text(systemFirstWeekdayLabel)
+                        .foregroundStyle(.secondary)
+                }
+
+                LabeledContent("Number Format") {
+                    Text(systemNumberFormatLabel)
+                        .foregroundStyle(.secondary)
+                }
+            } header: {
+                Text("Formatting")
+            } footer: {
+                Text("How to Manage: Settings app > General > Language & Region")
             }
 
             Section("Behavior") {
@@ -201,6 +220,30 @@ struct SettingsGeneralView: View {
             let name = CurrencyPickerConstants.localizedCurrencyName(for: currencyCode)
             return "\(name) • \(currencyCode)"
         }
+    }
+
+    private var systemFirstWeekdayLabel: String {
+        let calendar = Calendar.autoupdatingCurrent
+        let index = max(1, min(calendar.firstWeekday, calendar.weekdaySymbols.count)) - 1
+        return calendar.weekdaySymbols[index]
+    }
+
+    private var systemDateFormatLabel: String {
+        Date.now.formatted(date: .numeric, time: .omitted)
+    }
+
+    private var systemNumberFormatLabel: String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.locale = .current
+        formatter.minimumFractionDigits = 2
+        formatter.maximumFractionDigits = 2
+
+        if let formatted = formatter.string(from: NSNumber(value: 1_234.56)) {
+            return formatted
+        }
+
+        return 1_234.56.formatted(.number.precision(.fractionLength(2)))
     }
 
     private var defaultBudgetingPeriodBinding: Binding<BudgetingPeriod> {

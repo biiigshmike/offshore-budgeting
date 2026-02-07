@@ -36,6 +36,17 @@ enum CurrencyFormatter {
         return fallbackCurrencyCode
     }
 
+    // MARK: - Public: Currency Symbol
+
+    static var currencySymbol: String {
+        let formatter = makeCurrencyFormatter()
+        if let symbol = formatter.currencySymbol, !symbol.isEmpty {
+            return symbol
+        }
+
+        return currencyCode
+    }
+
     // MARK: - Public: SwiftUI Display Style
 
     /// SwiftUI-friendly style for `Text(amount, format: ...)`.

@@ -364,21 +364,19 @@ struct ExpenseCSVImportMapper {
 
         let isParenNegative = (trimmed.first == "(") && (trimmed.last == ")")
 
-        var stripped = trimmed
+        var normalized = trimmed
             .replacingOccurrences(of: "(", with: "")
             .replacingOccurrences(of: ")", with: "")
             .replacingOccurrences(of: "\u{00A0}", with: " ")
-            .replacingOccurrences(of: "$", with: "")
-            .replacingOccurrences(of: ",", with: "")
-            .replacingOccurrences(of: " ", with: "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
-        // Some exports use "+ $123.45" / "- $123.45" which becomes "+123.45"/"-123.45" after stripping.
-        if stripped.hasPrefix("+") {
-            stripped = String(stripped.dropFirst())
+        // Some exports use an explicit leading plus.
+        if normalized.hasPrefix("+") {
+            normalized = String(normalized.dropFirst())
         }
 
-        guard var val = Double(stripped) else { return nil }
+        // Locale-aware parsing (decimal and currency styles) using app-wide formatter behavior.
+        guard var val = CurrencyFormatter.parseAmount(normalized) else { return nil }
         if isParenNegative { val = -abs(val) }
         return val
     }

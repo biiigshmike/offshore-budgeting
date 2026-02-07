@@ -110,7 +110,7 @@ struct BudgetsView: View {
                 if !activeBudgets.isEmpty {
                     Section {
                         BucketDisclosureRow(
-                            title: "Active Budgets (\(activeBudgets.count))",
+                            title: "Active Budgets (\(localizedInt(activeBudgets.count)))",
                             isExpanded: $activeExpanded
                         )
 
@@ -125,7 +125,7 @@ struct BudgetsView: View {
                 if !upcomingBudgets.isEmpty {
                     Section {
                         BucketDisclosureRow(
-                            title: "Upcoming Budgets (\(upcomingBudgets.count))",
+                            title: "Upcoming Budgets (\(localizedInt(upcomingBudgets.count)))",
                             isExpanded: $upcomingExpanded
                         )
 
@@ -140,7 +140,7 @@ struct BudgetsView: View {
                 if !pastBudgets.isEmpty {
                     Section {
                         BucketDisclosureRow(
-                            title: "Past Budgets (\(pastBudgets.count))",
+                            title: "Past Budgets (\(localizedInt(pastBudgets.count)))",
                             isExpanded: $pastExpanded
                         )
 
@@ -198,6 +198,10 @@ struct BudgetsView: View {
         }
     }
 
+    private func localizedInt(_ value: Int) -> String {
+        value.formatted(.number)
+    }
+
     // MARK: - Row
 
     @ViewBuilder
@@ -209,11 +213,20 @@ struct BudgetsView: View {
                 Text(budget.name)
                     .font(.headline)
 
-                Text("\(budget.startDate.formatted(date: .abbreviated, time: .omitted)) to \(budget.endDate.formatted(date: .abbreviated, time: .omitted))")
+                Text(formattedDateRange(start: budget.startDate, end: budget.endDate))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
         }
+    }
+
+    private func formattedDateRange(start: Date, end: Date) -> String {
+        let formatter = DateIntervalFormatter()
+        formatter.calendar = .autoupdatingCurrent
+        formatter.locale = .autoupdatingCurrent
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        return formatter.string(from: start, to: end)
     }
 }
 

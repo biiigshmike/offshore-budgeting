@@ -42,7 +42,7 @@ enum BudgetingPeriod: String, CaseIterable, Identifiable {
             return (start: day, end: day)
 
         case .weekly:
-            let start = startOfWeekSunday(containing: day, calendar: calendar)
+            let start = startOfWeek(containing: day, calendar: calendar)
             let end = calendar.date(byAdding: DateComponents(day: 6), to: start) ?? day
             return (start: start, end: end)
 
@@ -65,19 +65,16 @@ enum BudgetingPeriod: String, CaseIterable, Identifiable {
 
     // MARK: - Period boundaries
 
-    private func startOfWeekSunday(containing date: Date, calendar: Calendar) -> Date {
-        var cal = calendar
-        cal.firstWeekday = 1 // Sunday
-
-        if let interval = cal.dateInterval(of: .weekOfYear, for: date) {
-            return cal.startOfDay(for: interval.start)
+    private func startOfWeek(containing date: Date, calendar: Calendar) -> Date {
+        if let interval = calendar.dateInterval(of: .weekOfYear, for: date) {
+            return calendar.startOfDay(for: interval.start)
         }
 
-        // Fallback: if dateInterval fails, compute the last Sunday.
-        let weekday = cal.component(.weekday, from: date) // Sunday = 1
-        let daysToSubtract = (weekday - cal.firstWeekday + 7) % 7
-        let start = cal.date(byAdding: .day, value: -daysToSubtract, to: date) ?? date
-        return cal.startOfDay(for: start)
+        // Fallback: if dateInterval fails, compute from the calendar's first weekday.
+        let weekday = calendar.component(.weekday, from: date)
+        let daysToSubtract = (weekday - calendar.firstWeekday + 7) % 7
+        let start = calendar.date(byAdding: .day, value: -daysToSubtract, to: date) ?? date
+        return calendar.startOfDay(for: start)
     }
 
     private func startOfMonth(containing date: Date, calendar: Calendar) -> Date {
@@ -114,7 +111,7 @@ enum BudgetNameSuggestion {
         let endDay = calendar.startOfDay(for: end)
 
         if startDay == endDay {
-            return formatSingleDay(startDay)
+            return formatSingleDay(startDay, calendar: calendar)
         }
 
         if isFullYear(start: startDay, end: endDay, calendar: calendar) {
@@ -129,7 +126,7 @@ enum BudgetNameSuggestion {
             return month
         }
 
-        if isFullWeekSunday(start: startDay, end: endDay, calendar: calendar) {
+        if isFullWeek(start: startDay, end: endDay, calendar: calendar) {
             return formatRange(start: startDay, end: endDay, includeYear: false, calendar: calendar)
         }
 
@@ -139,15 +136,12 @@ enum BudgetNameSuggestion {
 
     // MARK: - Period detection
 
-    private static func isFullWeekSunday(start: Date, end: Date, calendar: Calendar) -> Bool {
-        var cal = calendar
-        cal.firstWeekday = 1 // Sunday
+    private static func isFullWeek(start: Date, end: Date, calendar: Calendar) -> Bool {
+        guard let interval = calendar.dateInterval(of: .weekOfYear, for: start) else { return false }
+        let weekStart = calendar.startOfDay(for: interval.start)
+        let weekEnd = calendar.date(byAdding: .day, value: 6, to: weekStart) ?? weekStart
 
-        guard let interval = cal.dateInterval(of: .weekOfYear, for: start) else { return false }
-        let weekStart = cal.startOfDay(for: interval.start)
-        let weekEnd = cal.date(byAdding: .day, value: 6, to: weekStart) ?? weekStart
-
-        return start == weekStart && end == cal.startOfDay(for: weekEnd)
+        return start == weekStart && end == calendar.startOfDay(for: weekEnd)
     }
 
     private static func isFullYear(start: Date, end: Date, calendar: Calendar) -> Bool {
@@ -173,7 +167,7 @@ enum BudgetNameSuggestion {
         case 7...9: quarter = 3
         default: quarter = 4
         }
-        return "Q\(quarter) \(year)"
+        return "Q\(localizedInt(quarter)) \(localizedInt(year))"
     }
 
     private static func monthStringIfFullMonth(start: Date, end: Date, calendar: Calendar) -> String? {
@@ -182,24 +176,32 @@ enum BudgetNameSuggestion {
         let monthEnd = calendar.date(byAdding: .day, value: -1, to: interval.end) ?? monthStart
 
         guard start == monthStart && end == calendar.startOfDay(for: monthEnd) else { return nil }
-        return formatMonthYear(start)
+        return formatMonthYear(start, calendar: calendar)
     }
 
     // MARK: - Formatting
 
     private static func yearString(for date: Date, calendar: Calendar) -> String {
-        "\(calendar.component(.year, from: date))"
+        localizedInt(calendar.component(.year, from: date))
     }
 
-    private static func formatMonthYear(_ date: Date) -> String {
+    private static func localizedInt(_ value: Int) -> String {
+        value.formatted(.number)
+    }
+
+    private static func formatMonthYear(_ date: Date, calendar: Calendar) -> String {
         let formatter = DateFormatter()
-        formatter.dateFormat = "LLLL yyyy"
+        formatter.calendar = calendar
+        formatter.locale = .autoupdatingCurrent
+        formatter.setLocalizedDateFormatFromTemplate("yMMMM")
         return formatter.string(from: date)
     }
 
-    private static func formatSingleDay(_ date: Date) -> String {
+    private static func formatSingleDay(_ date: Date, calendar: Calendar) -> String {
         let formatter = DateFormatter()
-        formatter.dateFormat = "MMM d, yyyy"
+        formatter.calendar = calendar
+        formatter.locale = .autoupdatingCurrent
+        formatter.setLocalizedDateFormatFromTemplate("yMMMd")
         return formatter.string(from: date)
     }
 
@@ -210,15 +212,20 @@ enum BudgetNameSuggestion {
         let startFormatter = DateFormatter()
         let endFormatter = DateFormatter()
 
+        startFormatter.calendar = calendar
+        startFormatter.locale = .autoupdatingCurrent
+        endFormatter.calendar = calendar
+        endFormatter.locale = .autoupdatingCurrent
+
         if sameMonth && sameYear {
-            startFormatter.dateFormat = includeYear ? "MMM d, yyyy" : "MMM d"
-            endFormatter.dateFormat = includeYear ? "d, yyyy" : "d"
+            startFormatter.setLocalizedDateFormatFromTemplate(includeYear ? "yMMMd" : "MMMd")
+            endFormatter.setLocalizedDateFormatFromTemplate(includeYear ? "yd" : "d")
         } else if sameYear {
-            startFormatter.dateFormat = includeYear ? "MMM d, yyyy" : "MMM d"
-            endFormatter.dateFormat = includeYear ? "MMM d, yyyy" : "MMM d"
+            startFormatter.setLocalizedDateFormatFromTemplate(includeYear ? "yMMMd" : "MMMd")
+            endFormatter.setLocalizedDateFormatFromTemplate(includeYear ? "yMMMd" : "MMMd")
         } else {
-            startFormatter.dateFormat = "MMM d, yyyy"
-            endFormatter.dateFormat = "MMM d, yyyy"
+            startFormatter.setLocalizedDateFormatFromTemplate("yMMMd")
+            endFormatter.setLocalizedDateFormatFromTemplate("yMMMd")
         }
 
         return "\(startFormatter.string(from: start)) – \(endFormatter.string(from: end))"

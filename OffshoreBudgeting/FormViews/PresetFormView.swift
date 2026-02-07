@@ -112,7 +112,7 @@ struct PresetFormView: View {
                 }
                 
                 Stepper(value: $interval, in: 1...365) {
-                    Text(interval == 1 ? "Interval: 1" : "Interval: \(interval)")
+                    Text(interval == 1 ? "Interval: \(localizedInt(1))" : "Interval: \(localizedInt(interval))")
                 }
                 .disabled(frequency == .none)
                 
@@ -148,7 +148,7 @@ struct PresetFormView: View {
             if !monthlyIsLastDay {
                 Picker("Day of Month", selection: $monthlyDayOfMonth) {
                     ForEach(1...31, id: \.self) { day in
-                        Text("\(day)").tag(day)
+                        Text(localizedInt(day)).tag(day)
                     }
                 }
             }
@@ -162,7 +162,7 @@ struct PresetFormView: View {
             
             Picker("Day", selection: $yearlyDayOfMonth) {
                 ForEach(1...31, id: \.self) { day in
-                    Text("\(day)").tag(day)
+                    Text(localizedInt(day)).tag(day)
                 }
             }
         }
@@ -172,19 +172,10 @@ struct PresetFormView: View {
     
     private func ordinal(_ number: Int) -> String {
         let n = abs(number)
-        
-        // 11, 12, 13 are always "th"
-        let lastTwo = n % 100
-        if (11...13).contains(lastTwo) {
-            return "\(n)th"
-        }
-        
-        switch n % 10 {
-        case 1: return "\(n)st"
-        case 2: return "\(n)nd"
-        case 3: return "\(n)rd"
-        default: return "\(n)th"
-        }
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .ordinal
+        formatter.locale = .current
+        return formatter.string(from: NSNumber(value: n)) ?? localizedInt(n)
     }
     
     
@@ -196,24 +187,24 @@ struct PresetFormView: View {
         case .daily:
             return interval == 1
             ? "An expense that repeats daily."
-            : "An expense that repeats every \(interval) days."
+            : "An expense that repeats every \(localizedInt(interval)) days."
             
         case .weekly:
             let day = weekdayName(weeklyWeekday)
             return interval == 1
             ? "An expense that repeats weekly on \(day)."
-            : "An expense that repeats every \(interval) weeks on \(day)."
+            : "An expense that repeats every \(localizedInt(interval)) weeks on \(day)."
             
         case .monthly:
             if monthlyIsLastDay {
                 return interval == 1
                 ? "An expense that repeats on the last day of every month."
-                : "An expense that repeats on the last day of every \(interval) months."
+                : "An expense that repeats on the last day of every \(localizedInt(interval)) months."
             } else {
                 let day = ordinal(monthlyDayOfMonth)
                 return interval == 1
                 ? "An expense that repeats on the \(day) of every month."
-                : "An expense that repeats on the \(day) of every \(interval) months."
+                : "An expense that repeats on the \(day) of every \(localizedInt(interval)) months."
             }
             
         case .yearly:
@@ -221,7 +212,7 @@ struct PresetFormView: View {
             let day = ordinal(yearlyDayOfMonth)
             return interval == 1
             ? "An expense that repeats yearly on \(month) \(day)."
-            : "An expense that repeats every \(interval) years on \(month) \(day)."
+            : "An expense that repeats every \(localizedInt(interval)) years on \(month) \(day)."
         }
     }
     
@@ -237,6 +228,10 @@ struct PresetFormView: View {
         let symbols = Calendar.current.monthSymbols
         let index = clamped - 1
         return index < symbols.count ? symbols[index] : "January"
+    }
+
+    private func localizedInt(_ value: Int) -> String {
+        value.formatted(.number)
     }
 }
 

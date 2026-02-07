@@ -69,7 +69,7 @@ struct IncomeFormView: View {
                 }
                 
                 if frequency != .none {
-                    Stepper("Every: \(max(1, interval))", value: $interval, in: 1...52)
+                    Stepper("Every: \(localizedInt(max(1, interval)))", value: $interval, in: 1...52)
                     
                     switch frequency {
                     case .daily:
@@ -87,7 +87,7 @@ struct IncomeFormView: View {
                             .tint(Color("AccentColor"))
                         
                         if !monthlyIsLastDay {
-                            Stepper("Day \(monthlyDayOfMonth)", value: $monthlyDayOfMonth, in: 1...31)
+                            Stepper("Day \(localizedInt(monthlyDayOfMonth))", value: $monthlyDayOfMonth, in: 1...31)
                         }
                         
                     case .yearly:
@@ -96,7 +96,7 @@ struct IncomeFormView: View {
                                 Text(Self.monthName(for: m)).tag(m)
                             }
                         }
-                        Stepper("Day \(yearlyDayOfMonth)", value: $yearlyDayOfMonth, in: 1...31)
+                        Stepper("Day \(localizedInt(yearlyDayOfMonth))", value: $yearlyDayOfMonth, in: 1...31)
                         
                     case .none:
                         EmptyView()
@@ -129,5 +129,9 @@ struct IncomeFormView: View {
         let symbols = Calendar.current.monthSymbols
         let index = max(1, min(12, month)) - 1
         return symbols[index]
+    }
+
+    private func localizedInt(_ value: Int) -> String {
+        value.formatted(.number)
     }
 }

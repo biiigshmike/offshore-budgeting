@@ -359,24 +359,24 @@ struct EditBudgetView: View {
             return "None"
 
         case .daily:
-            return preset.interval == 1 ? "Daily" : "Every \(preset.interval) days"
+            return preset.interval == 1 ? "Daily" : "Every \(localizedInt(preset.interval)) days"
 
         case .weekly:
             let day = weekdayName(preset.weeklyWeekday)
-            return preset.interval == 1 ? "Weekly • \(day)" : "Every \(preset.interval) weeks • \(day)"
+            return preset.interval == 1 ? "Weekly • \(day)" : "Every \(localizedInt(preset.interval)) weeks • \(day)"
 
         case .monthly:
             if preset.monthlyIsLastDay {
-                return preset.interval == 1 ? "Monthly • Last day" : "Every \(preset.interval) months • Last day"
+                return preset.interval == 1 ? "Monthly • Last day" : "Every \(localizedInt(preset.interval)) months • Last day"
             } else {
                 let day = ordinalDay(preset.monthlyDayOfMonth)
-                return preset.interval == 1 ? "Monthly • \(day)" : "Every \(preset.interval) months • \(day)"
+                return preset.interval == 1 ? "Monthly • \(day)" : "Every \(localizedInt(preset.interval)) months • \(day)"
             }
 
         case .yearly:
             let month = monthName(preset.yearlyMonth)
             let day = ordinalDay(preset.yearlyDayOfMonth)
-            return preset.interval == 1 ? "Yearly • \(month) \(day)" : "Every \(preset.interval) years • \(month) \(day)"
+            return preset.interval == 1 ? "Yearly • \(month) \(day)" : "Every \(localizedInt(preset.interval)) years • \(month) \(day)"
         }
     }
 
@@ -394,6 +394,11 @@ struct EditBudgetView: View {
         let clamped = min(31, max(1, day))
         let formatter = NumberFormatter()
         formatter.numberStyle = .ordinal
-        return formatter.string(from: NSNumber(value: clamped)) ?? "\(clamped)"
+        formatter.locale = .current
+        return formatter.string(from: NSNumber(value: clamped)) ?? localizedInt(clamped)
+    }
+
+    private func localizedInt(_ value: Int) -> String {
+        value.formatted(.number)
     }
 }

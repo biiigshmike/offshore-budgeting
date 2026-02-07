@@ -471,12 +471,12 @@ final class LocalNotificationService: ObservableObject {
             }
 
             if shown.isEmpty {
-                return "\(total) presets due"
+                return "\(localizedInt(total)) presets due"
             }
 
             var body = "Presets docking from your account today: \(shown.joined(separator: ", "))"
             if remaining > 0 {
-                body += " +\(remaining) more"
+                body += " +\(localizedInt(remaining)) more"
             }
             return body
         }
@@ -488,7 +488,11 @@ final class LocalNotificationService: ObservableObject {
             }
         }
 
-        return total == 1 ? "Preset due" : "\(total) presets due"
+        return total == 1 ? "Preset due" : "\(localizedInt(total)) presets due"
+    }
+
+    private static func localizedInt(_ value: Int) -> String {
+        value.formatted(.number)
     }
 
     private func fetchNotificationSettings() async -> UNNotificationSettings {

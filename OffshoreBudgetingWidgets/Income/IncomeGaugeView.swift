@@ -32,9 +32,9 @@ struct IncomeGaugeView: View {
         VStack(alignment: .leading, spacing: 6) {
             if showsPercentEnds {
                 HStack(spacing: 8) {
-                    Text("0%")
+                    Text(0.0, format: .percent.precision(.fractionLength(0)))
                     Spacer(minLength: 0)
-                    Text("100%")
+                    Text(1.0, format: .percent.precision(.fractionLength(0)))
                 }
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(.secondary)
@@ -52,7 +52,7 @@ struct IncomeGaugeView: View {
                 }
                 .clipShape(Capsule(style: .continuous))
                 .accessibilityLabel("Income progress")
-                .accessibilityValue("\(Int((progress * 100).rounded())) percent")
+                .accessibilityValue(Double(progress).formatted(.percent.precision(.fractionLength(0))))
 
             switch footer {
             case .none:
@@ -77,14 +77,14 @@ struct IncomeGaugeView: View {
                 HStack(spacing: 6) {
                     Text("Planned")
                         .foregroundStyle(.secondary)
-                    Text(planned, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
+                    Text(planned, format: incomeGaugeCurrencyFormatStyle())
                         .foregroundStyle(.primary)
 
                     Spacer(minLength: 0)
 
                     Text("Actual")
                         .foregroundStyle(.secondary)
-                    Text(actual, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
+                    Text(actual, format: incomeGaugeCurrencyFormatStyle())
                         .foregroundStyle(.primary)
                 }
                 .font(.caption2.weight(.semibold))
@@ -105,5 +105,10 @@ struct IncomeGaugeView: View {
     private func progressColor(planned: Double, actual: Double) -> Color {
         guard planned > 0 else { return .secondary.opacity(0.35) }
         return actual >= planned ? .green.opacity(0.85) : .accentColor.opacity(0.85)
+    }
+
+    private func incomeGaugeCurrencyFormatStyle() -> FloatingPointFormatStyle<Double>.Currency {
+        let code = Locale.current.currency?.identifier ?? "USD"
+        return .currency(code: code)
     }
 }

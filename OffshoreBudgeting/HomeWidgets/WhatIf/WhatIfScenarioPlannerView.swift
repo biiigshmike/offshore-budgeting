@@ -72,9 +72,6 @@ struct WhatIfScenarioPlannerView: View {
 
     @State private var showDeleteConfirm: Bool = false
 
-    @AppStorage("general_currencyCode")
-    private var currencyCode: String = "USD"
-
     private var store: WhatIfScenarioStore {
         WhatIfScenarioStore(workspaceID: workspace.id)
     }
@@ -254,7 +251,7 @@ struct WhatIfScenarioPlannerView: View {
                             baselineAmount: baselineByCategoryID[category.id, default: 0],
                             amount: bindingForCategory(category.id),
                             step: 10,
-                            currencyCode: currencyCode
+                            currencyCode: CurrencyFormatter.currencyCode
                         )
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                             Button {

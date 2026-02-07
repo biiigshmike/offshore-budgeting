@@ -20,7 +20,12 @@ struct CategorySpotlightDetailView: View {
     @State private var showsAll: Bool = false
 
     private var subtitle: String {
-        "\(startDate.formatted(.dateTime.month().day().year())) - \(endDate.formatted(.dateTime.month().day().year()))"
+        let formatter = DateIntervalFormatter()
+        formatter.calendar = .autoupdatingCurrent
+        formatter.locale = .autoupdatingCurrent
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        return formatter.string(from: startDate, to: endDate)
     }
 
     private var result: HomeCategoryMetricsResult {
@@ -49,7 +54,7 @@ struct CategorySpotlightDetailView: View {
         if showsAll {
             return "Hide All Categories"
         } else {
-            return "Show All Categories (\(result.metrics.count))"
+            return "Show All Categories (\(localizedInt(result.metrics.count)))"
         }
     }
 
@@ -153,5 +158,9 @@ struct CategorySpotlightDetailView: View {
                 }
             }
         }
+    }
+
+    private func localizedInt(_ value: Int) -> String {
+        value.formatted(.number)
     }
 }

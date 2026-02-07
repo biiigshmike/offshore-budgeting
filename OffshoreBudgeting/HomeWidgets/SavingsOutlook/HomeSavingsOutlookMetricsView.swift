@@ -404,14 +404,14 @@ struct HomeSavingsOutlookMetricsView: View {
 
         if projected > 0 {
             let ratio = max(0, actual / projected)
-            let pct = Int((ratio * 100).rounded())
-            return (lineText: "Progress: \(pct)% of projection", percentText: "\(pct)%")
+            let percentText = ratio.formatted(.percent.precision(.fractionLength(0)))
+            return (lineText: "Progress: \(percentText) of projection", percentText: percentText)
         }
 
         // Negative projection mode, progress toward break-even (0).
         let progressToBreakeven = max(0, (actual - projected) / abs(projected))
-        let pct = Int((progressToBreakeven * 100).rounded())
-        return (lineText: "Progress: \(pct)% toward break-even", percentText: "\(pct)%")
+        let percentText = progressToBreakeven.formatted(.percent.precision(.fractionLength(0)))
+        return (lineText: "Progress: \(percentText) toward break-even", percentText: percentText)
     }
 
     private func accentColor(for projected: Double) -> Color {

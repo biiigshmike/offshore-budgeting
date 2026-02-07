@@ -382,8 +382,8 @@ struct CardDetailView: View {
                 
                 Picker("Sort", selection: $sortMode) {
                     Text("A–Z").tag(SortMode.az)
-                    Text("$↓").tag(SortMode.amountDesc)
-                    Text("$↑").tag(SortMode.amountAsc)
+                    Text("\(CurrencyFormatter.currencySymbol)↓").tag(SortMode.amountDesc)
+                    Text("\(CurrencyFormatter.currencySymbol)↑").tag(SortMode.amountAsc)
                     Text("Date ↑").tag(SortMode.dateAsc)
                     Text("Date ↓").tag(SortMode.dateDesc)
                 }

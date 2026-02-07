@@ -15,7 +15,12 @@ struct SettingsReleaseLogsView: View {
         let items: [ReleaseItem]
 
         var id: String { "\(version)-\(build)" }
-        var headerTitle: String { "What’s New • \(version) (Build \(build))" }
+        var headerTitle: String { "What’s New • \(version) (Build \(localizedBuild))" }
+
+        private var localizedBuild: String {
+            guard let value = Int(build) else { return build }
+            return value.formatted(.number)
+        }
     }
 
     struct ReleaseItem: Identifiable {
@@ -29,6 +34,28 @@ struct SettingsReleaseLogsView: View {
     // MARK: - Sections
 
     private let sections: [ReleaseSection] = [
+        ReleaseSection(
+            version: "2.3",
+            build: "9",
+            items: [
+                ReleaseItem(
+                    systemImage: "calendar",
+                    title: "Locale Settings",
+                    description: "Added an option in Settings > General > Formatting to follow the system for first day-of-week behavior. This setting is respected app-wide."
+                )
+            ]
+        ),
+        ReleaseSection(
+            version: "2.2.1",
+            build: "8",
+            items: [
+                ReleaseItem(
+                    systemImage: "ladybug.slash",
+                    title: "Swept for Bugs",
+                    description: "Cleaned around the bank and managed to squash a few bugs and improve some UI glitches in the process."
+                )
+            ]
+        ),
         ReleaseSection(
             version: "2.2",
             build: "7",
