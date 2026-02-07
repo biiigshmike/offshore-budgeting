@@ -14,5 +14,6 @@ struct OffshoreBudgetingWidgetsBundle: WidgetBundle {
         IncomeWidget()
         CardWidget()
         NextPlannedExpenseWidget()
+        SpendTrendsWidget()
     }
 }

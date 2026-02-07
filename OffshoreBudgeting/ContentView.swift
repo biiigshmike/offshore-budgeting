@@ -108,10 +108,12 @@ struct ContentView: View {
                 IncomeWidgetSnapshotStore.setSelectedWorkspaceID(selectedWorkspaceID)
                 CardWidgetSnapshotStore.setSelectedWorkspaceID(selectedWorkspaceID)
                 NextPlannedExpenseWidgetSnapshotStore.setSelectedWorkspaceID(selectedWorkspaceID)
+                SpendTrendsWidgetSnapshotStore.setSelectedWorkspaceID(selectedWorkspaceID)
 
                 refreshIncomeWidgetSnapshotsIfPossible()
                 refreshCardWidgetSnapshotsIfPossible()
                 refreshNextPlannedExpenseWidgetSnapshotsIfPossible()
+                refreshSpendTrendsWidgetSnapshotsIfPossible()
 
                 Task { await syncNotificationSchedulesIfPossible() }
             }
@@ -119,10 +121,12 @@ struct ContentView: View {
                 IncomeWidgetSnapshotStore.setSelectedWorkspaceID(newValue)
                 CardWidgetSnapshotStore.setSelectedWorkspaceID(newValue)
                 NextPlannedExpenseWidgetSnapshotStore.setSelectedWorkspaceID(newValue)
+                SpendTrendsWidgetSnapshotStore.setSelectedWorkspaceID(newValue)
 
                 refreshIncomeWidgetSnapshotsIfPossible()
                 refreshCardWidgetSnapshotsIfPossible()
                 refreshNextPlannedExpenseWidgetSnapshotsIfPossible()
+                refreshSpendTrendsWidgetSnapshotsIfPossible()
 
                 Task { await syncNotificationSchedulesIfPossible() }
             }
@@ -134,10 +138,12 @@ struct ContentView: View {
                 IncomeWidgetSnapshotStore.setSelectedWorkspaceID(selectedWorkspaceID)
                 CardWidgetSnapshotStore.setSelectedWorkspaceID(selectedWorkspaceID)
                 NextPlannedExpenseWidgetSnapshotStore.setSelectedWorkspaceID(selectedWorkspaceID)
+                SpendTrendsWidgetSnapshotStore.setSelectedWorkspaceID(selectedWorkspaceID)
 
                 refreshIncomeWidgetSnapshotsIfPossible()
                 refreshCardWidgetSnapshotsIfPossible()
                 refreshNextPlannedExpenseWidgetSnapshotsIfPossible()
+                refreshSpendTrendsWidgetSnapshotsIfPossible()
 
                 Task { await syncNotificationSchedulesIfPossible() }
             }
@@ -154,10 +160,12 @@ struct ContentView: View {
                 IncomeWidgetSnapshotStore.setSelectedWorkspaceID(selectedWorkspaceID)
                 CardWidgetSnapshotStore.setSelectedWorkspaceID(selectedWorkspaceID)
                 NextPlannedExpenseWidgetSnapshotStore.setSelectedWorkspaceID(selectedWorkspaceID)
+                SpendTrendsWidgetSnapshotStore.setSelectedWorkspaceID(selectedWorkspaceID)
 
                 refreshIncomeWidgetSnapshotsIfPossible()
                 refreshCardWidgetSnapshotsIfPossible()
                 refreshNextPlannedExpenseWidgetSnapshotsIfPossible()
+                refreshSpendTrendsWidgetSnapshotsIfPossible()
 
                 Task { await syncNotificationSchedulesIfPossible() }
             }
@@ -199,6 +207,14 @@ struct ContentView: View {
     private func refreshNextPlannedExpenseWidgetSnapshotsIfPossible() {
         guard let id = UUID(uuidString: selectedWorkspaceID) else { return }
         NextPlannedExpenseWidgetSnapshotBuilder.buildAndSaveAllPeriods(
+            modelContext: modelContext,
+            workspaceID: id
+        )
+    }
+
+    private func refreshSpendTrendsWidgetSnapshotsIfPossible() {
+        guard let id = UUID(uuidString: selectedWorkspaceID) else { return }
+        SpendTrendsWidgetSnapshotBuilder.buildAndSaveAllPeriods(
             modelContext: modelContext,
             workspaceID: id
         )

@@ -74,6 +74,9 @@
 				NextPlannedExpense/NextPlannedExpenseWidgetModels.swift,
 				NextPlannedExpense/NextPlannedExpenseWidgetPeriod.swift,
 				NextPlannedExpense/NextPlannedExpenseWidgetSnapshotStore.swift,
+				SpendTrends/SpendTrendsWidgetModels.swift,
+				SpendTrends/SpendTrendsWidgetPeriod.swift,
+				SpendTrends/SpendTrendsWidgetSnapshotStore.swift,
 			);
 			target = 4C96F8502F20523700541774 /* OffshoreBudgeting */;
 		};
