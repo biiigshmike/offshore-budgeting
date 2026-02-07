@@ -13,5 +13,6 @@ struct OffshoreBudgetingWidgetsBundle: WidgetBundle {
     var body: some Widget {
         IncomeWidget()
         CardWidget()
+        NextPlannedExpenseWidget()
     }
 }

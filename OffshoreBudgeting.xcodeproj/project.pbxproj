@@ -71,6 +71,9 @@
 				Income/IncomeWidgetPeriod.swift,
 				Income/IncomeWidgetsModel.swift,
 				Income/IncomeWidgetSnapshotStore.swift,
+				NextPlannedExpense/NextPlannedExpenseWidgetModels.swift,
+				NextPlannedExpense/NextPlannedExpenseWidgetPeriod.swift,
+				NextPlannedExpense/NextPlannedExpenseWidgetSnapshotStore.swift,
 			);
 			target = 4C96F8502F20523700541774 /* OffshoreBudgeting */;
 		};

@@ -107,18 +107,22 @@ struct ContentView: View {
                 // Ensure the widget extension can see the active workspace immediately
                 IncomeWidgetSnapshotStore.setSelectedWorkspaceID(selectedWorkspaceID)
                 CardWidgetSnapshotStore.setSelectedWorkspaceID(selectedWorkspaceID)
+                NextPlannedExpenseWidgetSnapshotStore.setSelectedWorkspaceID(selectedWorkspaceID)
 
                 refreshIncomeWidgetSnapshotsIfPossible()
                 refreshCardWidgetSnapshotsIfPossible()
+                refreshNextPlannedExpenseWidgetSnapshotsIfPossible()
 
                 Task { await syncNotificationSchedulesIfPossible() }
             }
             .onChange(of: selectedWorkspaceID) { _, newValue in
                 IncomeWidgetSnapshotStore.setSelectedWorkspaceID(newValue)
                 CardWidgetSnapshotStore.setSelectedWorkspaceID(newValue)
+                NextPlannedExpenseWidgetSnapshotStore.setSelectedWorkspaceID(newValue)
 
                 refreshIncomeWidgetSnapshotsIfPossible()
                 refreshCardWidgetSnapshotsIfPossible()
+                refreshNextPlannedExpenseWidgetSnapshotsIfPossible()
 
                 Task { await syncNotificationSchedulesIfPossible() }
             }
@@ -129,9 +133,11 @@ struct ContentView: View {
 
                 IncomeWidgetSnapshotStore.setSelectedWorkspaceID(selectedWorkspaceID)
                 CardWidgetSnapshotStore.setSelectedWorkspaceID(selectedWorkspaceID)
+                NextPlannedExpenseWidgetSnapshotStore.setSelectedWorkspaceID(selectedWorkspaceID)
 
                 refreshIncomeWidgetSnapshotsIfPossible()
                 refreshCardWidgetSnapshotsIfPossible()
+                refreshNextPlannedExpenseWidgetSnapshotsIfPossible()
 
                 Task { await syncNotificationSchedulesIfPossible() }
             }
@@ -147,9 +153,11 @@ struct ContentView: View {
                 // when the store populates (especially iCloud), rebuild widget caches.
                 IncomeWidgetSnapshotStore.setSelectedWorkspaceID(selectedWorkspaceID)
                 CardWidgetSnapshotStore.setSelectedWorkspaceID(selectedWorkspaceID)
+                NextPlannedExpenseWidgetSnapshotStore.setSelectedWorkspaceID(selectedWorkspaceID)
 
                 refreshIncomeWidgetSnapshotsIfPossible()
                 refreshCardWidgetSnapshotsIfPossible()
+                refreshNextPlannedExpenseWidgetSnapshotsIfPossible()
 
                 Task { await syncNotificationSchedulesIfPossible() }
             }
@@ -183,6 +191,14 @@ struct ContentView: View {
     private func refreshCardWidgetSnapshotsIfPossible() {
         guard let id = UUID(uuidString: selectedWorkspaceID) else { return }
         CardWidgetSnapshotBuilder.buildAndSaveAllPeriods(
+            modelContext: modelContext,
+            workspaceID: id
+        )
+    }
+
+    private func refreshNextPlannedExpenseWidgetSnapshotsIfPossible() {
+        guard let id = UUID(uuidString: selectedWorkspaceID) else { return }
+        NextPlannedExpenseWidgetSnapshotBuilder.buildAndSaveAllPeriods(
             modelContext: modelContext,
             workspaceID: id
         )

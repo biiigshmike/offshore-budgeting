@@ -16,6 +16,7 @@ struct WidgetCardVisualView: View {
     let titleFont: Font
     let titlePadding: CGFloat
     let titleOpacity: Double
+    let titleLineLimit: Int
 
     init(
         title: String,
@@ -24,7 +25,8 @@ struct WidgetCardVisualView: View {
         showsTitle: Bool = true,
         titleFont: Font = .title3.weight(.semibold),
         titlePadding: CGFloat = 16,
-        titleOpacity: Double = 0.80
+        titleOpacity: Double = 0.80,
+        titleLineLimit: Int = 1
     ) {
         self.title = title
         self.themeToken = themeToken
@@ -33,6 +35,7 @@ struct WidgetCardVisualView: View {
         self.titleFont = titleFont
         self.titlePadding = titlePadding
         self.titleOpacity = titleOpacity
+        self.titleLineLimit = titleLineLimit
     }
 
     var body: some View {
@@ -50,7 +53,7 @@ struct WidgetCardVisualView: View {
                     .font(titleFont)
                     .foregroundStyle(.white.opacity(titleOpacity))
                     .padding(titlePadding)
-                    .lineLimit(1)
+                    .lineLimit(titleLineLimit)
                     .truncationMode(.tail)
                     .minimumScaleFactor(0.72)
                     .allowsTightening(true)
