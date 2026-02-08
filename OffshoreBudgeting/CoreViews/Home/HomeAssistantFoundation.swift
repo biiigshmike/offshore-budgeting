@@ -71,10 +71,13 @@ struct HomeAssistantPanelView: View {
     @State private var answers: [HomeAnswer] = []
     @State private var promptText = ""
     @State private var hasLoadedConversation = false
+    @State private var selectedPersonaID: HomeAssistantPersonaID = HomeAssistantPersonaCatalog.defaultPersona
 
     private let engine = HomeQueryEngine()
     private let parser = HomeAssistantTextParser()
     private let conversationStore = HomeAssistantConversationStore()
+    private let personaStore = HomeAssistantPersonaStore()
+    private let personaFormatter = HomeAssistantPersonaFormatter()
 
     init(
         workspace: Workspace,
@@ -115,9 +118,13 @@ struct HomeAssistantPanelView: View {
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
 
+                    personaSummarySection
+
                     inputSection
 
                     suggestionsSection
+
+                    followUpSection
 
                     if answers.isEmpty {
                         ContentUnavailableView(
@@ -144,11 +151,8 @@ struct HomeAssistantPanelView: View {
                     .accessibilityLabel("Close Assistant")
                 }
 
-                ToolbarItem(placement: .primaryAction) {
-                    Button("Clear", role: .destructive) {
-                        clearConversation()
-                    }
-                    .disabled(answers.isEmpty)
+                ToolbarItem(placement: .topBarTrailing) {
+                    personaTrailingNavBarItem
                 }
             }
         }
@@ -162,6 +166,18 @@ struct HomeAssistantPanelView: View {
             content.frame(minWidth: 700, minHeight: 520)
         } else {
             content
+        }
+    }
+
+    private var personaSummarySection: some View {
+        let profile = HomeAssistantPersonaCatalog.profile(for: selectedPersonaID)
+
+        return VStack(alignment: .leading, spacing: 4) {
+            Text(profile.displayName)
+                .font(.subheadline.weight(.semibold))
+            Text(profile.summary)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -187,6 +203,44 @@ struct HomeAssistantPanelView: View {
                 .disabled(trimmedPromptText.isEmpty)
                 .accessibilityLabel("Submit Question")
             }
+
+            Button("Clear", role: .destructive) {
+                clearConversation()
+            }
+            .buttonStyle(.bordered)
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .disabled(answers.isEmpty)
+        }
+    }
+
+    @ViewBuilder
+    private var personaTrailingNavBarItem: some View {
+        let baseMenu = Menu {
+            ForEach(HomeAssistantPersonaCatalog.allProfiles, id: \.id) { profile in
+                Button {
+                    selectPersona(profile.id)
+                } label: {
+                    if profile.id == selectedPersonaID {
+                        Label(profile.displayName, systemImage: "checkmark")
+                    } else {
+                        Text(profile.displayName)
+                    }
+                }
+            }
+        } label: {
+            Image(systemName: "person.crop.circle")
+        }
+
+        if #available(iOS 26.0, *) {
+            baseMenu
+                .buttonStyle(.glassProminent)
+                .accessibilityLabel("Assistant Persona")
+                .accessibilityValue(HomeAssistantPersonaCatalog.profile(for: selectedPersonaID).displayName)
+        } else {
+            baseMenu
+                .buttonStyle(.plain)
+                .accessibilityLabel("Assistant Persona")
+                .accessibilityValue(HomeAssistantPersonaCatalog.profile(for: selectedPersonaID).displayName)
         }
     }
 
@@ -202,6 +256,34 @@ struct HomeAssistantPanelView: View {
                             runQuery(suggestion.query, userPrompt: suggestion.title)
                         }
                         .buttonStyle(.bordered)
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var followUpSection: some View {
+        if let latestAnswer = answers.last {
+            let followUps = personaFormatter.followUpSuggestions(
+                after: latestAnswer,
+                personaID: selectedPersonaID
+            )
+
+            if followUps.isEmpty == false {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Follow-Up")
+                        .font(.subheadline.weight(.semibold))
+
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(followUps) { suggestion in
+                                Button(suggestion.title) {
+                                    runQuery(suggestion.query, userPrompt: suggestion.title)
+                                }
+                                .buttonStyle(.bordered)
+                            }
+                        }
                     }
                 }
             }
@@ -265,16 +347,10 @@ struct HomeAssistantPanelView: View {
             variableExpenses: variableExpenses
         )
 
-        let answer = HomeAnswer(
-            id: rawAnswer.id,
-            queryID: rawAnswer.queryID,
-            kind: rawAnswer.kind,
+        let answer = personaFormatter.styledAnswer(
+            from: rawAnswer,
             userPrompt: userPrompt,
-            title: rawAnswer.title,
-            subtitle: rawAnswer.subtitle,
-            primaryValue: rawAnswer.primaryValue,
-            rows: rawAnswer.rows,
-            generatedAt: rawAnswer.generatedAt
+            personaID: selectedPersonaID
         )
 
         appendAnswer(answer)
@@ -287,17 +363,7 @@ struct HomeAssistantPanelView: View {
         defer { promptText = "" }
 
         guard let query = parser.parse(prompt) else {
-            appendAnswer(
-                HomeAnswer(
-                    queryID: UUID(),
-                    kind: .message,
-                    userPrompt: prompt,
-                    title: "I couldn't match that request yet.",
-                    subtitle: "Try a question like \"Spend this month\" or \"Top 3 categories this month.\"",
-                    primaryValue: nil,
-                    rows: []
-                )
-            )
+            appendAnswer(personaFormatter.unresolvedPromptAnswer(for: prompt, personaID: selectedPersonaID))
             return
         }
 
@@ -309,9 +375,31 @@ struct HomeAssistantPanelView: View {
         conversationStore.saveAnswers(answers, workspaceID: workspace.id)
     }
 
+    private func selectPersona(_ personaID: HomeAssistantPersonaID) {
+        guard personaID != selectedPersonaID else { return }
+
+        let previousPersonaID = selectedPersonaID
+        selectedPersonaID = personaID
+        personaStore.saveSelectedPersona(personaID)
+        appendAnswer(
+            personaFormatter.personaDidChangeAnswer(
+                from: previousPersonaID,
+                to: personaID
+            )
+        )
+    }
+
     private func loadConversationIfNeeded() {
         guard hasLoadedConversation == false else { return }
+        selectedPersonaID = personaStore.loadSelectedPersona()
         answers = conversationStore.loadAnswers(workspaceID: workspace.id)
+
+        if answers.isEmpty && conversationStore.hasGreetedPersona(selectedPersonaID, workspaceID: workspace.id) == false {
+            answers.append(personaFormatter.greetingAnswer(for: selectedPersonaID))
+            conversationStore.markPersonaAsGreeted(selectedPersonaID, workspaceID: workspace.id)
+            conversationStore.saveAnswers(answers, workspaceID: workspace.id)
+        }
+
         hasLoadedConversation = true
     }
 
