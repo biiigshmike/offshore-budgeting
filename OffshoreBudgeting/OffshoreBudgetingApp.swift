@@ -86,6 +86,7 @@ struct OffshoreBudgetingApp: App {
                 PlannedExpense.self,
                 VariableExpense.self,
                 ImportMerchantRule.self,
+                AssistantAliasRule.self,
                 IncomeSeries.self,
                 Income.self
             ])
@@ -167,6 +168,7 @@ struct OffshoreBudgetingApp: App {
                 PlannedExpense.self,
                 VariableExpense.self,
                 ImportMerchantRule.self,
+                AssistantAliasRule.self,
                 IncomeSeries.self,
                 Income.self
             ])

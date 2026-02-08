@@ -15,6 +15,12 @@ enum HomeAssistantState: Equatable {
     case presented
 }
 
+private enum HomeAssistantPlanResolutionSource: String {
+    case parser
+    case contextual
+    case entityAware
+}
+
 // MARK: - Launcher Bar (iPhone)
 
 struct HomeAssistantLauncherBar: View {
@@ -81,6 +87,7 @@ struct HomeAssistantPanelView: View {
     @Query private var cards: [Card]
     @Query private var presets: [Preset]
     @Query private var incomes: [Income]
+    @Query private var assistantAliasRules: [AssistantAliasRule]
     @Query private var plannedExpenses: [PlannedExpense]
     @Query private var variableExpenses: [VariableExpense]
 
@@ -98,9 +105,11 @@ struct HomeAssistantPanelView: View {
     private let engine = HomeQueryEngine()
     private let parser = HomeAssistantTextParser()
     private let conversationStore = HomeAssistantConversationStore()
+    private let telemetryStore = HomeAssistantTelemetryStore()
     private let personaStore = HomeAssistantPersonaStore()
     private let personaFormatter = HomeAssistantPersonaFormatter()
     private let entityMatcher = HomeAssistantEntityMatcher()
+    private let aliasMatcher = HomeAssistantAliasMatcher()
 
     private var defaultQueryPeriodUnit: HomeQueryPeriodUnit {
         let period = BudgetingPeriod(rawValue: defaultBudgetingPeriodRaw) ?? .monthly
@@ -146,6 +155,11 @@ struct HomeAssistantPanelView: View {
         _incomes = Query(
             filter: #Predicate<Income> { $0.workspace?.id == workspaceID },
             sort: [SortDescriptor(\Income.date, order: .forward)]
+        )
+
+        _assistantAliasRules = Query(
+            filter: #Predicate<AssistantAliasRule> { $0.workspace?.id == workspaceID },
+            sort: [SortDescriptor(\AssistantAliasRule.updatedAt, order: .reverse)]
         )
     }
 
@@ -484,25 +498,170 @@ struct HomeAssistantPanelView: View {
 
         defer { promptText = "" }
 
-        if let plan = parser.parsePlan(prompt, defaultPeriodUnit: defaultQueryPeriodUnit) {
-            let enrichedPlan = enrichPlanWithEntities(plan, rawPrompt: prompt)
-            handleResolvedPlan(enrichedPlan, rawPrompt: prompt, allowsBroadBundle: true)
+        if let explainPrompt = planExplainPrompt(from: prompt) {
+            appendAnswer(planExplanationAnswer(for: explainPrompt))
             return
         }
 
-        if let contextualPlan = contextualPlan(for: prompt) {
-            handleResolvedPlan(contextualPlan, rawPrompt: prompt, allowsBroadBundle: false)
-            return
-        }
-
-        if let entityPlan = entityAwarePlan(for: prompt) {
-            handleResolvedPlan(entityPlan, rawPrompt: prompt, allowsBroadBundle: false)
+        if let resolved = resolvedPlan(for: prompt) {
+            handleResolvedPlan(
+                resolved.plan,
+                rawPrompt: prompt,
+                allowsBroadBundle: resolved.source == .parser,
+                source: resolved.source
+            )
             return
         }
 
         clarificationSuggestions = []
         lastClarificationReasons = []
+        recordTelemetry(
+            for: prompt,
+            outcome: .unresolved,
+            source: nil,
+            plan: nil,
+            notes: "no_plan_resolved"
+        )
         appendAnswer(personaFormatter.unresolvedPromptAnswer(for: prompt, personaID: selectedPersonaID))
+    }
+
+    private func resolvedPlan(
+        for prompt: String
+    ) -> (plan: HomeQueryPlan, source: HomeAssistantPlanResolutionSource)? {
+        if let plan = parser.parsePlan(prompt, defaultPeriodUnit: defaultQueryPeriodUnit) {
+            return (enrichPlanWithEntities(plan, rawPrompt: prompt), .parser)
+        }
+
+        if let contextualPlan = contextualPlan(for: prompt) {
+            return (contextualPlan, .contextual)
+        }
+
+        if let entityPlan = entityAwarePlan(for: prompt) {
+            return (entityPlan, .entityAware)
+        }
+
+        return nil
+    }
+
+    private func planExplainPrompt(from prompt: String) -> String? {
+        let normalized = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        let explainPrefixes = ["/explain", "explain:"]
+
+        for prefix in explainPrefixes {
+            if normalized.lowercased().hasPrefix(prefix) {
+                let remaining = normalized.dropFirst(prefix.count).trimmingCharacters(in: .whitespacesAndNewlines)
+                return remaining.isEmpty ? nil : remaining
+            }
+        }
+
+        return nil
+    }
+
+    private func planExplanationAnswer(for prompt: String) -> HomeAnswer {
+        let normalized = normalizedPrompt(prompt)
+        let aliasCard = aliasTarget(in: prompt, entityType: .card)
+        let aliasCategory = aliasTarget(in: prompt, entityType: .category)
+        let aliasIncome = aliasTarget(in: prompt, entityType: .incomeSource)
+        let aliasPreset = aliasTarget(in: prompt, entityType: .preset)
+        let matchedCard = entityMatcher.bestCardMatch(in: prompt, cards: cards)
+        let matchedCategory = entityMatcher.bestCategoryMatch(in: prompt, categories: categories)
+        let matchedIncome = entityMatcher.bestIncomeSourceMatch(in: prompt, incomes: incomes)
+        let matchedPreset = entityMatcher.bestPresetMatch(in: prompt, presets: presets)
+
+        guard let resolved = resolvedPlan(for: prompt) else {
+            return HomeAnswer(
+                queryID: UUID(),
+                kind: .message,
+                userPrompt: prompt,
+                title: "Plan Explain",
+                subtitle: "No plan resolved from this prompt.",
+                rows: [
+                    HomeAnswerRow(title: "Normalized", value: normalized),
+                    HomeAnswerRow(title: "Matched Card", value: matchedCard ?? "None"),
+                    HomeAnswerRow(title: "Alias Card", value: aliasCard ?? "None"),
+                    HomeAnswerRow(title: "Matched Category", value: matchedCategory ?? "None"),
+                    HomeAnswerRow(title: "Alias Category", value: aliasCategory ?? "None"),
+                    HomeAnswerRow(title: "Matched Income", value: matchedIncome ?? "None"),
+                    HomeAnswerRow(title: "Alias Income", value: aliasIncome ?? "None"),
+                    HomeAnswerRow(title: "Matched Preset", value: matchedPreset ?? "None"),
+                    HomeAnswerRow(title: "Alias Preset", value: aliasPreset ?? "None")
+                ]
+            )
+        }
+
+        let plan = resolved.plan
+        let clarification = clarificationPlan(for: plan, rawPrompt: prompt)
+
+        return HomeAnswer(
+            queryID: UUID(),
+            kind: .message,
+            userPrompt: prompt,
+            title: "Plan Explain",
+            subtitle: "Resolved via \(resolved.source.rawValue).",
+            rows: [
+                HomeAnswerRow(title: "Normalized", value: normalized),
+                HomeAnswerRow(title: "Intent", value: plan.metric.intent.rawValue),
+                HomeAnswerRow(title: "Metric", value: plan.metric.rawValue),
+                HomeAnswerRow(title: "Confidence", value: plan.confidenceBand.rawValue),
+                HomeAnswerRow(title: "Target", value: plan.targetName ?? "None"),
+                HomeAnswerRow(title: "Date Range", value: debugDateRangeLabel(plan.dateRange)),
+                HomeAnswerRow(title: "Limit", value: plan.resultLimit.map(String.init) ?? "Default"),
+                HomeAnswerRow(title: "Period Unit", value: plan.periodUnit?.rawValue ?? defaultQueryPeriodUnit.rawValue),
+                HomeAnswerRow(title: "Matched Card", value: matchedCard ?? "None"),
+                HomeAnswerRow(title: "Alias Card", value: aliasCard ?? "None"),
+                HomeAnswerRow(title: "Matched Category", value: matchedCategory ?? "None"),
+                HomeAnswerRow(title: "Alias Category", value: aliasCategory ?? "None"),
+                HomeAnswerRow(title: "Matched Income", value: matchedIncome ?? "None"),
+                HomeAnswerRow(title: "Alias Income", value: aliasIncome ?? "None"),
+                HomeAnswerRow(title: "Matched Preset", value: matchedPreset ?? "None"),
+                HomeAnswerRow(title: "Alias Preset", value: aliasPreset ?? "None"),
+                HomeAnswerRow(
+                    title: "Clarification",
+                    value: clarification.map { $0.shouldRunBestEffort ? "Best-effort + chips" : "Blocked until clarified" } ?? "None"
+                )
+            ]
+        )
+    }
+
+    private func debugDateRangeLabel(_ range: HomeQueryDateRange?) -> String {
+        guard let range else { return "None" }
+
+        let formatter = DateFormatter()
+        formatter.dateStyle = .short
+        formatter.timeStyle = .none
+
+        return "\(formatter.string(from: range.startDate)) - \(formatter.string(from: range.endDate))"
+    }
+
+    private func aliasTarget(
+        in prompt: String,
+        entityType: HomeAssistantAliasEntityType
+    ) -> String? {
+        aliasMatcher.matchedTarget(
+            in: prompt,
+            entityType: entityType,
+            rules: assistantAliasRules
+        )
+    }
+
+    private func recordTelemetry(
+        for prompt: String,
+        outcome: HomeAssistantTelemetryOutcome,
+        source: HomeAssistantPlanResolutionSource?,
+        plan: HomeQueryPlan?,
+        notes: String?
+    ) {
+        let event = HomeAssistantTelemetryEvent(
+            prompt: prompt,
+            normalizedPrompt: normalizedPrompt(prompt),
+            outcome: outcome,
+            source: source?.rawValue,
+            intentRawValue: plan?.metric.intent.rawValue,
+            confidenceRawValue: plan?.confidenceBand.rawValue,
+            targetName: plan?.targetName,
+            notes: notes
+        )
+        telemetryStore.appendEvent(event, workspaceID: workspace.id)
     }
 
     private func appendAnswer(_ answer: HomeAnswer) {
@@ -549,11 +708,34 @@ struct HomeAssistantPanelView: View {
     private func handleResolvedPlan(
         _ plan: HomeQueryPlan,
         rawPrompt: String,
-        allowsBroadBundle: Bool
+        allowsBroadBundle: Bool,
+        source: HomeAssistantPlanResolutionSource
     ) {
+        if let entityDisambiguation = entityDisambiguationPlan(for: plan, rawPrompt: rawPrompt) {
+            recordTelemetry(
+                for: rawPrompt,
+                outcome: .clarification,
+                source: source,
+                plan: plan,
+                notes: "entity_disambiguation"
+            )
+            presentClarificationTurn(
+                entityDisambiguation,
+                userPrompt: rawPrompt
+            )
+            return
+        }
+
         let clarificationPlan = clarificationPlan(for: plan, rawPrompt: rawPrompt)
 
         if let clarificationPlan, clarificationPlan.shouldRunBestEffort == false {
+            recordTelemetry(
+                for: rawPrompt,
+                outcome: .clarification,
+                source: source,
+                plan: plan,
+                notes: "clarification_required"
+            )
             presentClarificationTurn(
                 clarificationPlan,
                 userPrompt: rawPrompt
@@ -563,8 +745,22 @@ struct HomeAssistantPanelView: View {
 
         if allowsBroadBundle && shouldRunBroadOverviewBundle(for: rawPrompt, plan: plan) {
             runBroadOverviewBundle(userPrompt: rawPrompt, basePlan: plan)
+            recordTelemetry(
+                for: rawPrompt,
+                outcome: .resolved,
+                source: source,
+                plan: plan,
+                notes: clarificationPlan == nil ? "broad_bundle" : "broad_bundle_with_clarification_chips"
+            )
         } else {
             runQuery(plan.query, userPrompt: rawPrompt, confidenceBand: plan.confidenceBand)
+            recordTelemetry(
+                for: rawPrompt,
+                outcome: .resolved,
+                source: source,
+                plan: plan,
+                notes: clarificationPlan == nil ? nil : "resolved_with_clarification_chips"
+            )
         }
 
         if let clarificationPlan {
@@ -573,6 +769,97 @@ struct HomeAssistantPanelView: View {
                 userPrompt: nil
             )
         }
+    }
+
+    private func entityDisambiguationPlan(
+        for plan: HomeQueryPlan,
+        rawPrompt: String
+    ) -> HomeAssistantClarificationPlan? {
+        guard plan.targetName == nil else { return nil }
+
+        let normalized = normalizedPrompt(rawPrompt)
+
+        if requiresCardTarget(plan.metric), normalized.contains("all cards") == false {
+            let candidates = entityMatcher.rankedMatches(
+                in: rawPrompt,
+                candidateNames: cards.map(\.name),
+                limit: 3
+            )
+            if candidates.count >= 2 {
+                return disambiguationPlan(
+                    for: plan,
+                    reasons: [.missingCardTarget],
+                    options: candidates,
+                    allTitle: "All cards"
+                )
+            }
+        }
+
+        if requiresCategoryTarget(plan.metric), normalized.contains("all categories") == false {
+            let candidates = entityMatcher.rankedMatches(
+                in: rawPrompt,
+                candidateNames: categories.map(\.name),
+                limit: 3
+            )
+            if candidates.count >= 2 {
+                return disambiguationPlan(
+                    for: plan,
+                    reasons: [.missingCategoryTarget],
+                    options: candidates,
+                    allTitle: "All categories"
+                )
+            }
+        }
+
+        if requiresIncomeTarget(plan.metric),
+           normalized.contains("all sources") == false,
+           normalized.contains("all income") == false
+        {
+            let uniqueSources = Array(Set(incomes.map(\.source))).sorted()
+            let candidates = entityMatcher.rankedMatches(
+                in: rawPrompt,
+                candidateNames: uniqueSources,
+                limit: 3
+            )
+            if candidates.count >= 2 {
+                return disambiguationPlan(
+                    for: plan,
+                    reasons: [.missingIncomeSourceTarget],
+                    options: candidates,
+                    allTitle: "All income sources"
+                )
+            }
+        }
+
+        return nil
+    }
+
+    private func disambiguationPlan(
+        for plan: HomeQueryPlan,
+        reasons: [HomeAssistantClarificationReason],
+        options: [String],
+        allTitle: String
+    ) -> HomeAssistantClarificationPlan {
+        var suggestions: [HomeAssistantSuggestion] = options.map { option in
+            HomeAssistantSuggestion(
+                title: option,
+                query: queryFromPlan(plan, overridingTargetName: option)
+            )
+        }
+
+        suggestions.append(
+            HomeAssistantSuggestion(
+                title: allTitle,
+                query: queryFromPlan(plan, overridingTargetName: nil)
+            )
+        )
+
+        return HomeAssistantClarificationPlan(
+            reasons: reasons,
+            subtitle: "I found a few close matches. Pick one to continue.",
+            suggestions: suggestions,
+            shouldRunBestEffort: false
+        )
     }
 
     private func clarificationPlan(
@@ -1041,7 +1328,12 @@ struct HomeAssistantPanelView: View {
         switch plan.metric {
         case .cardSpendTotal, .cardVariableSpendingHabits:
             let isAllCards = normalized.contains("all cards")
-            let card = isAllCards ? nil : entityMatcher.bestCardMatch(in: rawPrompt, cards: cards)
+            let card = isAllCards
+                ? nil
+                : (aliasTarget(
+                    in: rawPrompt,
+                    entityType: .card
+                ) ?? entityMatcher.bestCardMatch(in: rawPrompt, cards: cards))
             return HomeQueryPlan(
                 metric: plan.metric,
                 dateRange: plan.dateRange,
@@ -1053,7 +1345,12 @@ struct HomeAssistantPanelView: View {
 
         case .incomeAverageActual, .incomeSourceShare, .incomeSourceShareTrend:
             let isAllSources = normalized.contains("all sources") || normalized.contains("all income")
-            let source = isAllSources ? nil : entityMatcher.bestIncomeSourceMatch(in: rawPrompt, incomes: incomes)
+            let source = isAllSources
+                ? nil
+                : (aliasTarget(
+                    in: rawPrompt,
+                    entityType: .incomeSource
+                ) ?? entityMatcher.bestIncomeSourceMatch(in: rawPrompt, incomes: incomes))
             return HomeQueryPlan(
                 metric: plan.metric,
                 dateRange: plan.dateRange,
@@ -1067,7 +1364,10 @@ struct HomeAssistantPanelView: View {
             let isAllCategories = normalized.contains("all categories")
             let category = isAllCategories
                 ? nil
-                : (entityMatcher.bestCategoryMatch(in: rawPrompt, categories: categories) ?? {
+                : (aliasTarget(
+                    in: rawPrompt,
+                    entityType: .category
+                ) ?? entityMatcher.bestCategoryMatch(in: rawPrompt, categories: categories) ?? {
                     if normalized.contains("this category") {
                         return sessionContext.lastTargetName
                     }
@@ -1084,7 +1384,12 @@ struct HomeAssistantPanelView: View {
 
         case .presetCategorySpend:
             let isAllCategories = normalized.contains("all categories")
-            let category = isAllCategories ? nil : entityMatcher.bestCategoryMatch(in: rawPrompt, categories: categories)
+            let category = isAllCategories
+                ? nil
+                : (aliasTarget(
+                    in: rawPrompt,
+                    entityType: .category
+                ) ?? entityMatcher.bestCategoryMatch(in: rawPrompt, categories: categories))
             return HomeQueryPlan(
                 metric: plan.metric,
                 dateRange: plan.dateRange,
@@ -1111,7 +1416,10 @@ struct HomeAssistantPanelView: View {
         let range = parser.parseDateRange(rawPrompt, defaultPeriodUnit: defaultQueryPeriodUnit)
 
         if normalized.contains("income") && (normalized.contains("average") || normalized.contains("avg")) {
-            let source = entityMatcher.bestIncomeSourceMatch(in: rawPrompt, incomes: incomes)
+            let source = aliasTarget(
+                in: rawPrompt,
+                entityType: .incomeSource
+            ) ?? entityMatcher.bestIncomeSourceMatch(in: rawPrompt, incomes: incomes)
 
             return HomeQueryPlan(
                 metric: .incomeAverageActual,
@@ -1124,7 +1432,12 @@ struct HomeAssistantPanelView: View {
 
         if normalized.contains("income") && (normalized.contains("share") || normalized.contains("comes from") || normalized.contains("how much")) {
             let isAllSources = normalized.contains("all sources") || normalized.contains("all income")
-            let source = isAllSources ? nil : entityMatcher.bestIncomeSourceMatch(in: rawPrompt, incomes: incomes)
+            let source = isAllSources
+                ? nil
+                : (aliasTarget(
+                    in: rawPrompt,
+                    entityType: .incomeSource
+                ) ?? entityMatcher.bestIncomeSourceMatch(in: rawPrompt, incomes: incomes))
 
             return HomeQueryPlan(
                 metric: .incomeSourceShare,
@@ -1136,15 +1449,17 @@ struct HomeAssistantPanelView: View {
         }
 
         let spendKeywords = ["spend", "spent", "spending", "total spent", "charges"]
+        let aliasCard = aliasTarget(in: rawPrompt, entityType: .card)
         let mentionsCardContext = normalized.contains("card")
             || normalized.contains("cards")
             || normalized.contains("all cards")
+            || aliasCard != nil
             || entityMatcher.bestCardMatch(in: rawPrompt, cards: cards) != nil
 
         if spendKeywords.contains(where: { normalized.contains($0) }) && mentionsCardContext {
             let cardName = normalized.contains("all cards")
                 ? nil
-                : entityMatcher.bestCardMatch(in: rawPrompt, cards: cards)
+                : (aliasCard ?? entityMatcher.bestCardMatch(in: rawPrompt, cards: cards))
 
             return HomeQueryPlan(
                 metric: .cardSpendTotal,
@@ -1163,7 +1478,9 @@ struct HomeAssistantPanelView: View {
                 || normalized.contains("trend"))
         {
             let isAllCards = normalized.contains("all cards")
-            let cardName = isAllCards ? nil : entityMatcher.bestCardMatch(in: rawPrompt, cards: cards)
+            let cardName = isAllCards
+                ? nil
+                : (aliasCard ?? entityMatcher.bestCardMatch(in: rawPrompt, cards: cards))
 
             return HomeQueryPlan(
                 metric: .cardVariableSpendingHabits,
@@ -1179,7 +1496,12 @@ struct HomeAssistantPanelView: View {
             && (normalized.contains("share") || normalized.contains("percent") || normalized.contains("percentage") || normalized.contains("how much"))
         {
             let isAllCategories = normalized.contains("all categories")
-            let category = isAllCategories ? nil : entityMatcher.bestCategoryMatch(in: rawPrompt, categories: categories)
+            let category = isAllCategories
+                ? nil
+                : (aliasTarget(
+                    in: rawPrompt,
+                    entityType: .category
+                ) ?? entityMatcher.bestCategoryMatch(in: rawPrompt, categories: categories))
 
             return HomeQueryPlan(
                 metric: .categorySpendShare,
@@ -1200,7 +1522,10 @@ struct HomeAssistantPanelView: View {
             let isAllCategories = normalized.contains("all categories")
             let category = isAllCategories
                 ? nil
-                : (entityMatcher.bestCategoryMatch(in: rawPrompt, categories: categories) ?? {
+                : (aliasTarget(
+                    in: rawPrompt,
+                    entityType: .category
+                ) ?? entityMatcher.bestCategoryMatch(in: rawPrompt, categories: categories) ?? {
                     if normalized.contains("this category") {
                         return sessionContext.lastTargetName
                     }
@@ -1226,7 +1551,10 @@ struct HomeAssistantPanelView: View {
             let isAllCategories = normalized.contains("all categories")
             let category = isAllCategories
                 ? nil
-                : (entityMatcher.bestCategoryMatch(in: rawPrompt, categories: categories) ?? {
+                : (aliasTarget(
+                    in: rawPrompt,
+                    entityType: .category
+                ) ?? entityMatcher.bestCategoryMatch(in: rawPrompt, categories: categories) ?? {
                     if normalized.contains("this category") {
                         return sessionContext.lastTargetName
                     }
@@ -1286,7 +1614,12 @@ struct HomeAssistantPanelView: View {
                 || normalized.contains("per period"))
         {
             let isAllCategories = normalized.contains("all categories")
-            let category = isAllCategories ? nil : entityMatcher.bestCategoryMatch(in: rawPrompt, categories: categories)
+            let category = isAllCategories
+                ? nil
+                : (aliasTarget(
+                    in: rawPrompt,
+                    entityType: .category
+                ) ?? entityMatcher.bestCategoryMatch(in: rawPrompt, categories: categories))
 
             return HomeQueryPlan(
                 metric: .presetCategorySpend,

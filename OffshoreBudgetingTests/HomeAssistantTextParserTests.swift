@@ -332,7 +332,192 @@ struct HomeAssistantTextParserTests {
         #expect(plan?.confidenceBand == .low)
     }
 
+    // MARK: - Phrase Packs
+
+    @Test func phrasePack_naturalLanguageVariants_mapToExpectedIntent() throws {
+        let parser = makeParser()
+        let cases: [IntentPhraseCase] = [
+            IntentPhraseCase(prompt: "How am I doing?", expectedIntent: .periodOverview),
+            IntentPhraseCase(prompt: "Budget health check this month", expectedIntent: .periodOverview),
+            IntentPhraseCase(prompt: "Give me a quick spending summary", expectedIntent: .periodOverview),
+            IntentPhraseCase(prompt: "What did I spend this month?", expectedIntent: .spendThisMonth),
+            IntentPhraseCase(prompt: "Total expenses so far", expectedIntent: .spendThisMonth),
+            IntentPhraseCase(prompt: "Show my top 3 categories this month", expectedIntent: .topCategoriesThisMonth),
+            IntentPhraseCase(prompt: "Where do I spend the most?", expectedIntent: .topCategoriesThisMonth),
+            IntentPhraseCase(prompt: "Compare this month versus last month", expectedIntent: .compareThisMonthToPreviousMonth),
+            IntentPhraseCase(prompt: "Month over month change", expectedIntent: .compareThisMonthToPreviousMonth),
+            IntentPhraseCase(prompt: "Largest 5 purchases this month", expectedIntent: .largestRecentTransactions),
+            IntentPhraseCase(prompt: "Top transactions this month", expectedIntent: .largestRecentTransactions),
+            IntentPhraseCase(prompt: "For all cards, what was total spent this month?", expectedIntent: .cardSpendTotal),
+            IntentPhraseCase(prompt: "Help me learn my card spending patterns", expectedIntent: .cardVariableSpendingHabits),
+            IntentPhraseCase(prompt: "Average actual income each month", expectedIntent: .incomeAverageActual),
+            IntentPhraseCase(prompt: "How am I doing with savings?", expectedIntent: .savingsStatus),
+            IntentPhraseCase(prompt: "Last 6 periods average savings", expectedIntent: .savingsAverageRecentPeriods),
+            IntentPhraseCase(prompt: "What portion of income comes from salary?", expectedIntent: .incomeSourceShare),
+            IntentPhraseCase(prompt: "Over the last 4 months, what portion of income is salary?", expectedIntent: .incomeSourceShareTrend),
+            IntentPhraseCase(prompt: "What share of spending is groceries?", expectedIntent: .categorySpendShare),
+            IntentPhraseCase(prompt: "Past 3 months, what share of spending is groceries?", expectedIntent: .categorySpendShareTrend),
+            IntentPhraseCase(prompt: "Any recurring payments due soon?", expectedIntent: .presetDueSoon),
+            IntentPhraseCase(prompt: "Which recurring payment is most expensive?", expectedIntent: .presetHighestCost),
+            IntentPhraseCase(prompt: "Which category has the most recurring charges?", expectedIntent: .presetTopCategory),
+            IntentPhraseCase(prompt: "How much do I spend per month on groceries recurring payments?", expectedIntent: .presetCategorySpend),
+            IntentPhraseCase(prompt: "If I cut groceries, what could I save?", expectedIntent: .categoryPotentialSavings),
+            IntentPhraseCase(prompt: "If I reduce groceries, how should I rebalance other categories?", expectedIntent: .categoryReallocationGuidance)
+        ]
+
+        for phraseCase in cases {
+            let query = parser.parse(phraseCase.prompt)
+            #expect(query?.intent == phraseCase.expectedIntent)
+        }
+    }
+
+    @Test func phrasePack_adversarialCollisions_preferExpectedIntent() throws {
+        let parser = makeParser()
+        let cases: [IntentPhraseCase] = [
+            IntentPhraseCase(prompt: "What percentage of my income comes from salary this month?", expectedIntent: .incomeSourceShare),
+            IntentPhraseCase(prompt: "What percentage of my spending is groceries this month?", expectedIntent: .categorySpendShare),
+            IntentPhraseCase(prompt: "For all cards what was my total spent last month?", expectedIntent: .cardSpendTotal),
+            IntentPhraseCase(prompt: "Top 5 purchases this month", expectedIntent: .largestRecentTransactions),
+            IntentPhraseCase(prompt: "Top 5 categories this month", expectedIntent: .topCategoriesThisMonth),
+            IntentPhraseCase(prompt: "How am I doing this month with savings?", expectedIntent: .savingsStatus),
+            IntentPhraseCase(prompt: "Last 4 months what share of income comes from paycheck?", expectedIntent: .incomeSourceShareTrend),
+            IntentPhraseCase(prompt: "Last 4 months what share of spending is groceries?", expectedIntent: .categorySpendShareTrend),
+            IntentPhraseCase(prompt: "How much do I spend on groceries preset recurring each month?", expectedIntent: .presetCategorySpend),
+            IntentPhraseCase(prompt: "Recurring payments due soon this month", expectedIntent: .presetDueSoon)
+        ]
+
+        for phraseCase in cases {
+            let query = parser.parse(phraseCase.prompt)
+            #expect(query?.intent == phraseCase.expectedIntent)
+        }
+    }
+
+    @Test func phrasePack_timeGrammarVariants_extractExpectedRangesAndLookbacks() throws {
+        let parser = makeParser()
+        let rangeCases: [DateRangePhraseCase] = [
+            DateRangePhraseCase(
+                prompt: "How did I do in December?",
+                expectedIntent: .periodOverview,
+                expectedStart: date(2025, 12, 1, 0, 0, 0),
+                expectedEnd: date(2025, 12, 31, 23, 59, 59)
+            ),
+            DateRangePhraseCase(
+                prompt: "How did I do from 2026-01-01 to 2026-01-31?",
+                expectedIntent: .periodOverview,
+                expectedStart: date(2026, 1, 1, 0, 0, 0),
+                expectedEnd: date(2026, 1, 31, 23, 59, 59)
+            ),
+            DateRangePhraseCase(
+                prompt: "What did I spend on 2026-02-05?",
+                expectedIntent: .spendThisMonth,
+                expectedStart: date(2026, 2, 5, 0, 0, 0),
+                expectedEnd: date(2026, 2, 5, 23, 59, 59)
+            )
+        ]
+
+        for phraseCase in rangeCases {
+            let query = parser.parse(phraseCase.prompt)
+            #expect(query?.intent == phraseCase.expectedIntent)
+            #expect(query?.dateRange?.startDate == phraseCase.expectedStart)
+            #expect(query?.dateRange?.endDate == phraseCase.expectedEnd)
+        }
+
+        let lookbackCases: [LookbackPhraseCase] = [
+            LookbackPhraseCase(
+                prompt: "For the last 6 periods, what is my average savings?",
+                expectedIntent: .savingsAverageRecentPeriods,
+                expectedLimit: 6
+            ),
+            LookbackPhraseCase(
+                prompt: "For the past 4 months, what share of my income comes from salary?",
+                expectedIntent: .incomeSourceShareTrend,
+                expectedLimit: 4
+            ),
+            LookbackPhraseCase(
+                prompt: "Over the last 3 months, what share of spending is groceries?",
+                expectedIntent: .categorySpendShareTrend,
+                expectedLimit: 3
+            )
+        ]
+
+        for phraseCase in lookbackCases {
+            let query = parser.parse(phraseCase.prompt)
+            #expect(query?.intent == phraseCase.expectedIntent)
+            #expect(query?.resultLimit == phraseCase.expectedLimit)
+        }
+    }
+
+    @Test func phrasePack_noisyFormattingAndCase_stillMapsToExpectedIntent() throws {
+        let parser = makeParser()
+        let cases: [IntentPhraseCase] = [
+            IntentPhraseCase(prompt: "hOw Am I dOiNg???", expectedIntent: .periodOverview),
+            IntentPhraseCase(prompt: "TOP categories THIS month!!!", expectedIntent: .topCategoriesThisMonth),
+            IntentPhraseCase(prompt: "compare THIS month VS last month...", expectedIntent: .compareThisMonthToPreviousMonth),
+            IntentPhraseCase(prompt: "largest purchases -- this month", expectedIntent: .largestRecentTransactions),
+            IntentPhraseCase(prompt: "any recurring payments due soon???", expectedIntent: .presetDueSoon)
+        ]
+
+        for phraseCase in cases {
+            let query = parser.parse(phraseCase.prompt)
+            #expect(query?.intent == phraseCase.expectedIntent)
+        }
+    }
+
+    @Test func phrasePack_noisyTyposAndShorthand_stillMapsToExpectedIntent() throws {
+        let parser = makeParser()
+        let cases: [IntentPhraseCase] = [
+            IntentPhraseCase(prompt: "wht did i spnd last month", expectedIntent: .spendThisMonth),
+            IntentPhraseCase(prompt: "what % of my incom comes from salery", expectedIntent: .incomeSourceShare),
+            IntentPhraseCase(prompt: "what % of my spnding is groceries", expectedIntent: .categorySpendShare),
+            IntentPhraseCase(prompt: "any recuring paymnts due soon", expectedIntent: .presetDueSoon),
+            IntentPhraseCase(prompt: "if i cut grocereis what can i save", expectedIntent: .categoryPotentialSavings)
+        ]
+
+        for phraseCase in cases {
+            let query = parser.parse(phraseCase.prompt)
+            #expect(query?.intent == phraseCase.expectedIntent)
+        }
+    }
+
+    @Test func phrasePack_noisyAmbiguousLanguage_setsLowConfidencePlan() throws {
+        let parser = makeParser()
+        let cases: [PlanConfidenceCase] = [
+            PlanConfidenceCase(prompt: "maybe top categories this month i guess", expectedMetric: .topCategories),
+            PlanConfidenceCase(prompt: "roughly how am i doing", expectedMetric: .overview),
+            PlanConfidenceCase(prompt: "kind of what % of my income is salary", expectedMetric: .incomeSourceShare)
+        ]
+
+        for confidenceCase in cases {
+            let plan = parser.parsePlan(confidenceCase.prompt)
+            #expect(plan?.metric == confidenceCase.expectedMetric)
+            #expect(plan?.confidenceBand == .low)
+        }
+    }
+
     // MARK: - Helpers
+
+    private struct IntentPhraseCase {
+        let prompt: String
+        let expectedIntent: HomeQueryIntent
+    }
+
+    private struct DateRangePhraseCase {
+        let prompt: String
+        let expectedIntent: HomeQueryIntent
+        let expectedStart: Date
+        let expectedEnd: Date
+    }
+
+    private struct LookbackPhraseCase {
+        let prompt: String
+        let expectedIntent: HomeQueryIntent
+        let expectedLimit: Int
+    }
+
+    private struct PlanConfidenceCase {
+        let prompt: String
+        let expectedMetric: HomeQueryMetric
+    }
 
     private var fixedNow: Date {
         date(2026, 2, 15, 12, 0, 0)

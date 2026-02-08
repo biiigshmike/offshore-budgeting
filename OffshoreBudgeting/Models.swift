@@ -301,6 +301,9 @@ final class Workspace {
     @Relationship(deleteRule: .cascade)
     var importMerchantRules: [ImportMerchantRule]? = nil
 
+    @Relationship(deleteRule: .cascade)
+    var assistantAliasRules: [AssistantAliasRule]? = nil
+
     init(id: UUID = UUID(), name: String, hexColor: String) {
         self.id = id
         self.name = name
@@ -766,6 +769,55 @@ final class ImportMerchantRule {
         self.merchantKey = merchantKey
         self.preferredName = preferredName
         self.preferredCategory = preferredCategory
+        self.workspace = workspace
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+}
+
+// MARK: - Assistant Alias Rule
+
+enum HomeAssistantAliasEntityType: String, Codable, CaseIterable, Identifiable {
+    case card
+    case category
+    case incomeSource
+    case preset
+
+    var id: String { rawValue }
+}
+
+@Model
+final class AssistantAliasRule {
+
+    var id: UUID = UUID()
+    var aliasKey: String = ""
+    var targetValue: String = ""
+    var entityTypeRaw: String = HomeAssistantAliasEntityType.category.rawValue
+
+    @Relationship(inverse: \Workspace.assistantAliasRules)
+    var workspace: Workspace? = nil
+
+    var createdAt: Date = Date.now
+    var updatedAt: Date = Date.now
+
+    var entityType: HomeAssistantAliasEntityType {
+        get { HomeAssistantAliasEntityType(rawValue: entityTypeRaw) ?? .category }
+        set { entityTypeRaw = newValue.rawValue }
+    }
+
+    init(
+        id: UUID = UUID(),
+        aliasKey: String,
+        targetValue: String,
+        entityType: HomeAssistantAliasEntityType,
+        workspace: Workspace? = nil,
+        createdAt: Date = Date.now,
+        updatedAt: Date = Date.now
+    ) {
+        self.id = id
+        self.aliasKey = aliasKey
+        self.targetValue = targetValue
+        self.entityTypeRaw = entityType.rawValue
         self.workspace = workspace
         self.createdAt = createdAt
         self.updatedAt = updatedAt

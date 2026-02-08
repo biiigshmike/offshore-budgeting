@@ -96,6 +96,7 @@ enum UITestSupport {
         deleteAll(Budget.self, context: context)
 
         deleteAll(ImportMerchantRule.self, context: context)
+        deleteAll(AssistantAliasRule.self, context: context)
         deleteAll(Workspace.self, context: context)
     }
 
@@ -111,4 +112,3 @@ enum UITestSupport {
     }
 }
 #endif
-

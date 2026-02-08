@@ -215,6 +215,7 @@ struct HomeAssistantTextParser {
         if text.contains("where am i spending most")
             || text.contains("where am i spending the most")
             || text.contains("where do i spend most")
+            || text.contains("where do i spend the most")
             || (text.contains("where") && containsAny(text, keywords: ["spend most", "spending most", "most spending"])) {
             return true
         }
@@ -383,10 +384,11 @@ struct HomeAssistantTextParser {
         let categoryKeywords = ["category", "categories", "this category", "other categories", "groceries", "shopping", "dining", "transportation", "utilities", "rent", "travel", "entertainment"]
         let allocationKeywords = ["realistically spend", "what could i spend", "what can i spend", "other categories", "reallocate", "allocation", "rebalance", "redistribute"]
         let spendKeywords = ["spend", "spending"]
+        let reductionKeywords = ["reduce", "cut", "lower", "decrease"]
 
         return containsAny(text, keywords: categoryKeywords)
             && containsAny(text, keywords: allocationKeywords)
-            && containsAny(text, keywords: spendKeywords)
+            && (containsAny(text, keywords: spendKeywords) || containsAny(text, keywords: reductionKeywords))
     }
 
     private func containsAny(_ text: String, keywords: [String]) -> Bool {
@@ -410,11 +412,41 @@ struct HomeAssistantTextParser {
     }
 
     private func normalize(_ rawText: String) -> String {
-        rawText
+        var text = rawText
+            .replacingOccurrences(of: "%", with: " percent ")
             .lowercased()
             .replacingOccurrences(of: "[^a-z0-9\\s\\-/]", with: " ", options: .regularExpression)
             .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let typoReplacements: [(from: String, to: String)] = [
+            ("spnd", "spend"),
+            ("spnding", "spending"),
+            ("spnt", "spent"),
+            ("spening", "spending"),
+            ("expnse", "expense"),
+            ("expnses", "expenses"),
+            ("catgory", "category"),
+            ("catgories", "categories"),
+            ("grocereis", "groceries"),
+            ("incom", "income"),
+            ("salery", "salary"),
+            ("paychek", "paycheck"),
+            ("paymnt", "payment"),
+            ("recuring", "recurring"),
+            ("recurrng", "recurring"),
+            ("budjet", "budget")
+        ]
+
+        for replacement in typoReplacements {
+            text = text.replacingOccurrences(
+                of: "\\b\(replacement.from)\\b",
+                with: replacement.to,
+                options: .regularExpression
+            )
+        }
+
+        return text
     }
 
     // MARK: - Range Extraction
