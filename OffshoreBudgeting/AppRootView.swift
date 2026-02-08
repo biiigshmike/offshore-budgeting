@@ -47,8 +47,21 @@ struct AppRootView: View {
     @State private var incomePath = NavigationPath()
     @State private var cardsPath = NavigationPath()
     @State private var settingsPath = NavigationPath()
+    @State private var splitViewVisibility: NavigationSplitViewVisibility = .automatic
 
     @State private var didApplyInitialSection: Bool = false
+    @State private var assistantRoute: AssistantPresentationRoute? = nil
+    @State private var containerWidth: CGFloat = 0
+
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    private enum AssistantPresentationRoute: Equatable {
+        case inspector
+        case sheet
+        case fullScreen
+    }
 
     private var isPhone: Bool {
         #if os(iOS)
@@ -87,6 +100,54 @@ struct AppRootView: View {
                 splitView
             }
         }
+        .sheet(
+            isPresented: assistantSheetPresentedBinding,
+            onDismiss: dismissAssistant
+        ) {
+            HomeAssistantPanelView(
+                onDismiss: dismissAssistant,
+                shouldUseLargeMinimumSize: assistantPresentationPlan.usesExpandedPanelSizing
+            )
+            .presentationDetents(assistantPresentationPlan.detents)
+            .presentationDragIndicator(.visible)
+        }
+        .applyAssistantInspectorIfNeeded(
+            isEnabled: shouldMountInspectorPresenter,
+            isPresented: assistantInspectorPresentedBinding
+        ) {
+            HomeAssistantPanelView(
+                onDismiss: dismissAssistant,
+                shouldUseLargeMinimumSize: false
+            )
+            .inspectorColumnWidth(min: 340, ideal: 420, max: 520)
+        }
+        .fullScreenCover(
+            isPresented: assistantFullScreenPresentedBinding,
+            onDismiss: dismissAssistant
+        ) {
+            HomeAssistantPanelView(
+                onDismiss: dismissAssistant,
+                shouldUseLargeMinimumSize: false
+            )
+        }
+        .safeAreaInset(edge: .bottom) {
+            if assistantPresentationPlan.showsBottomLauncher {
+                HomeAssistantLauncherBar(onTap: presentAssistant)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 8)
+            }
+        }
+        .background {
+            GeometryReader { proxy in
+                Color.clear
+                    .onAppear {
+                        updateContainerWidth(proxy.size.width)
+                    }
+                    .onChange(of: proxy.size.width) { _, newWidth in
+                        updateContainerWidth(newWidth)
+                    }
+            }
+        }
         .onAppear {
             guard didApplyInitialSection == false else { return }
             didApplyInitialSection = true
@@ -108,30 +169,35 @@ struct AppRootView: View {
             NavigationStack {
                 HomeView(workspace: workspace)
             }
+            .toolbar { assistantToolbarContent }
             .tabItem { Label(AppSection.home.rawValue, systemImage: AppSection.home.systemImage) }
             .tag(AppSection.home)
 
             NavigationStack {
                 BudgetsView(workspace: workspace)
             }
+            .toolbar { assistantToolbarContent }
             .tabItem { Label(AppSection.budgets.rawValue, systemImage: AppSection.budgets.systemImage) }
             .tag(AppSection.budgets)
 
             NavigationStack {
                 IncomeView(workspace: workspace)
             }
+            .toolbar { assistantToolbarContent }
             .tabItem { Label(AppSection.income.rawValue, systemImage: AppSection.income.systemImage) }
             .tag(AppSection.income)
 
             NavigationStack {
                 CardsView(workspace: workspace)
             }
+            .toolbar { assistantToolbarContent }
             .tabItem { Label(AppSection.cards.rawValue, systemImage: AppSection.cards.systemImage) }
             .tag(AppSection.cards)
 
             NavigationStack {
                 SettingsView(workspace: workspace, selectedWorkspaceID: $selectedWorkspaceID)
             }
+            .toolbar { assistantToolbarContent }
             .tabItem { Label(AppSection.settings.rawValue, systemImage: AppSection.settings.systemImage) }
             .tag(AppSection.settings)
         }
@@ -140,7 +206,7 @@ struct AppRootView: View {
     // MARK: - iPad + Mac
 
     private var splitView: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $splitViewVisibility) {
             List(selection: selectedSectionForSidebar) {
                 ForEach(AppSection.allCases) { section in
                     Label(section.rawValue, systemImage: section.systemImage)
@@ -153,6 +219,7 @@ struct AppRootView: View {
             NavigationStack(path: selectedSectionPath) {
                 sectionRootView
             }
+            .toolbar { assistantToolbarContent }
             .id(selectedSection)
         }
     }
@@ -172,6 +239,111 @@ struct AppRootView: View {
         }
     }
 
+    // MARK: - Assistant
+
+    @ToolbarContentBuilder
+    private var assistantToolbarContent: some ToolbarContent {
+        if assistantPresentationPlan.showsToolbarButton || assistantRoute != nil {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    if assistantRoute == nil {
+                        presentAssistant()
+                    } else {
+                        dismissAssistant()
+                    }
+                } label: {
+                    Image(systemName: assistantRoute == nil ? "message" : "xmark")
+                }
+                .accessibilityLabel(assistantRoute == nil ? "Open Assistant" : "Close Assistant")
+            }
+        }
+    }
+
+    private var assistantSheetPresentedBinding: Binding<Bool> {
+        Binding(
+            get: { assistantRoute == .sheet },
+            set: { isPresented in
+                assistantRoute = isPresented ? .sheet : nil
+            }
+        )
+    }
+
+    private var assistantInspectorPresentedBinding: Binding<Bool> {
+        Binding(
+            get: { assistantRoute == .inspector },
+            set: { isPresented in
+                assistantRoute = isPresented ? .inspector : nil
+            }
+        )
+    }
+
+    private var assistantFullScreenPresentedBinding: Binding<Bool> {
+        Binding(
+            get: { assistantRoute == .fullScreen },
+            set: { isPresented in
+                assistantRoute = isPresented ? .fullScreen : nil
+            }
+        )
+    }
+
+    private func presentAssistant() {
+        if supportsInlineInspector {
+            splitViewVisibility = .detailOnly
+        }
+        assistantRoute = route(for: assistantPresentationPlan.mode)
+    }
+
+    private func dismissAssistant() {
+        assistantRoute = nil
+    }
+
+    private func route(for mode: HomeAssistantPresentationMode) -> AssistantPresentationRoute {
+        switch mode {
+        case .inspector:
+            return .inspector
+        case .sheet:
+            return .sheet
+        case .fullScreen:
+            return .fullScreen
+        }
+    }
+
+    private var assistantPresentationPlan: HomeAssistantPresentationPlan {
+        HomeAssistantPresentationResolver.resolve(
+            containerWidth: containerWidth,
+            supportsInlineInspector: supportsInlineInspector,
+            dynamicTypeSize: dynamicTypeSize,
+            voiceOverEnabled: voiceOverEnabled
+        )
+    }
+
+    private var supportsInlineInspector: Bool {
+        isPhone == false && horizontalSizeClass != .compact
+    }
+
+    private var shouldMountInspectorPresenter: Bool {
+        supportsInlineInspector && (
+            assistantRoute == .inspector ||
+            assistantPresentationPlan.mode == .inspector
+        )
+    }
+
+    private func updateContainerWidth(_ rawWidth: CGFloat) {
+        let width = max(0, rawWidth)
+        let previousBand = widthBand(for: containerWidth)
+        let nextBand = widthBand(for: width)
+
+        if containerWidth == 0 || previousBand != nextBand {
+            containerWidth = width
+        }
+    }
+
+    private func widthBand(for width: CGFloat) -> Int {
+        if width < 540 { return 0 }
+        if width < 900 { return 1 }
+        return 2
+    }
+
     // MARK: - Detail Root
 
     @ViewBuilder
@@ -187,6 +359,21 @@ struct AppRootView: View {
             CardsView(workspace: workspace)
         case .settings:
             SettingsView(workspace: workspace, selectedWorkspaceID: $selectedWorkspaceID)
+        }
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func applyAssistantInspectorIfNeeded<InspectorContent: View>(
+        isEnabled: Bool,
+        isPresented: Binding<Bool>,
+        @ViewBuilder content: @escaping () -> InspectorContent
+    ) -> some View {
+        if isEnabled {
+            self.inspector(isPresented: isPresented, content: content)
+        } else {
+            self
         }
     }
 }
