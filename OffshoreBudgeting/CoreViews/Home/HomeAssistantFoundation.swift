@@ -19,6 +19,8 @@ enum HomeAssistantState: Equatable {
 
 struct HomeAssistantLauncherBar: View {
     let onTap: () -> Void
+    @AppStorage(HomeAssistantPersonaStore.defaultStorageKey)
+    private var assistantPersonaRaw: String = HomeAssistantPersonaCatalog.defaultPersona.rawValue
 
     var body: some View {
         if #available(iOS 26.0, *) {
@@ -30,7 +32,11 @@ struct HomeAssistantLauncherBar: View {
         } else {
             Button(action: onTap) {
                 launcherLabel
-                    .background(.thinMaterial, in: Capsule())
+                    .background(Color(uiColor: .secondarySystemBackground), in: Capsule())
+                    .overlay {
+                        Capsule()
+                            .stroke(Color(uiColor: .separator).opacity(0.2), lineWidth: 1)
+                    }
             }
             .buttonStyle(.plain)
         }
@@ -41,7 +47,7 @@ struct HomeAssistantLauncherBar: View {
             Image(systemName: "message")
                 .font(.subheadline.weight(.semibold))
 
-            Text("Ask about your budget")
+            Text("\(selectedPersonaName)")
                 .font(.subheadline.weight(.semibold))
                 .lineLimit(1)
 
@@ -54,6 +60,13 @@ struct HomeAssistantLauncherBar: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var selectedPersonaName: String {
+        let selectedPersona = HomeAssistantPersonaID(rawValue: assistantPersonaRaw)
+            ?? HomeAssistantPersonaCatalog.defaultPersona
+
+        return HomeAssistantPersonaCatalog.profile(for: selectedPersona).displayName
     }
 }
 
@@ -72,6 +85,7 @@ struct HomeAssistantPanelView: View {
     @State private var promptText = ""
     @State private var hasLoadedConversation = false
     @State private var selectedPersonaID: HomeAssistantPersonaID = HomeAssistantPersonaCatalog.defaultPersona
+    @State private var isShowingClearConversationAlert = false
 
     private let engine = HomeQueryEngine()
     private let parser = HomeAssistantTextParser()
@@ -110,18 +124,6 @@ struct HomeAssistantPanelView: View {
         let content = NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
-                    Text("Assistant")
-                        .font(.headline)
-
-                    Text("Quick answers from your budgeting data.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    personaSummarySection
-
-                    inputSection
-
                     suggestionsSection
 
                     followUpSection
@@ -138,9 +140,13 @@ struct HomeAssistantPanelView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(20)
+                .padding(.bottom, 96)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .navigationTitle("Assistant")
+            .safeAreaInset(edge: .bottom) {
+                inputSection
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(action: onDismiss) {
@@ -156,8 +162,16 @@ struct HomeAssistantPanelView: View {
                 }
             }
         }
+        .background(conversationBackdrop)
+        .tint(Color("AccentColor"))
         .toolbarBackground(panelHeaderBackgroundStyle, for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarBackground(navigationBarVisibility, for: .navigationBar)
+        .alert("Are you sure you want to clear your chat history?", isPresented: $isShowingClearConversationAlert) {
+            Button("Cancel", role: .cancel) {}
+            Button("Clear", role: .destructive) {
+                clearConversation()
+            }
+        }
         .onAppear {
             loadConversationIfNeeded()
         }
@@ -169,47 +183,61 @@ struct HomeAssistantPanelView: View {
         }
     }
 
-    private var personaSummarySection: some View {
-        let profile = HomeAssistantPersonaCatalog.profile(for: selectedPersonaID)
-
-        return VStack(alignment: .leading, spacing: 4) {
-            Text(profile.displayName)
-                .font(.subheadline.weight(.semibold))
-            Text(profile.summary)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-        }
-    }
-
     private var inputSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Ask a Question")
-                .font(.subheadline.weight(.semibold))
-
+        return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                TextField("Try: Top 3 categories this month", text: $promptText)
-                    .textFieldStyle(.roundedBorder)
-                    .onSubmit {
-                        submitPrompt()
-                    }
+                Button {
+                    isShowingClearConversationAlert = true
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(width: 33, height: 33)
+                }
+                .modifier(AssistantIconButtonModifier())
+                .disabled(answers.isEmpty)
+                .accessibilityLabel("Clear Chat")
+
+                promptTextField
 
                 Button {
                     submitPrompt()
                 } label: {
                     Image(systemName: "paperplane.fill")
                         .font(.subheadline.weight(.semibold))
+                        .frame(width: 33, height: 33)
                 }
-                .buttonStyle(.borderedProminent)
+                .modifier(AssistantIconButtonModifier())
                 .disabled(trimmedPromptText.isEmpty)
                 .accessibilityLabel("Submit Question")
             }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+        .padding(.bottom, 10)
+    }
 
-            Button("Clear", role: .destructive) {
-                clearConversation()
-            }
-            .buttonStyle(.bordered)
-            .frame(maxWidth: .infinity, minHeight: 44)
-            .disabled(answers.isEmpty)
+    @ViewBuilder
+    private var promptTextField: some View {
+        if #available(iOS 26.0, *) {
+            TextField("Try: Top 3 categories this month", text: $promptText)
+                .textFieldStyle(.plain)
+                .padding(.horizontal, 12)
+                .frame(minHeight: 44)
+                .background(Color.white.opacity(0.28), in: Capsule())
+                .overlay {
+                    Capsule()
+                        .stroke(Color.gray.opacity(0.25), lineWidth: 1)
+                }
+                .onSubmit {
+                    submitPrompt()
+                }
+        } else {
+            TextField("Try: Top 3 categories this month", text: $promptText)
+                .textFieldStyle(.roundedBorder)
+                .frame(minHeight: 44)
+                .onSubmit {
+                    submitPrompt()
+                }
         }
     }
 
@@ -220,10 +248,17 @@ struct HomeAssistantPanelView: View {
                 Button {
                     selectPersona(profile.id)
                 } label: {
-                    if profile.id == selectedPersonaID {
-                        Label(profile.displayName, systemImage: "checkmark")
-                    } else {
-                        Text(profile.displayName)
+                    HStack(alignment: .center, spacing: 8) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(profile.displayName)
+                            Text(profile.summary)
+                                .font(.caption)
+                        }
+
+                        if profile.id == selectedPersonaID {
+                            Spacer(minLength: 8)
+                            Image(systemName: "checkmark")
+                        }
                     }
                 }
             }
@@ -250,12 +285,17 @@ struct HomeAssistantPanelView: View {
                 .font(.subheadline.weight(.semibold))
 
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
+                HStack(spacing: 10) {
                     ForEach(engine.defaultSuggestions()) { suggestion in
-                        Button(suggestion.title) {
+                        Button {
                             runQuery(suggestion.query, userPrompt: suggestion.title)
+                        } label: {
+                            Text(suggestion.title)
+                                .lineLimit(1)
+                                .padding(.horizontal, 12)
+                                .frame(height: 33)
                         }
-                        .buttonStyle(.bordered)
+                        .modifier(AssistantChipButtonModifier())
                     }
                 }
             }
@@ -276,12 +316,17 @@ struct HomeAssistantPanelView: View {
                         .font(.subheadline.weight(.semibold))
 
                     ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
+                        HStack(spacing: 10) {
                             ForEach(followUps) { suggestion in
-                                Button(suggestion.title) {
+                                Button {
                                     runQuery(suggestion.query, userPrompt: suggestion.title)
+                                } label: {
+                                    Text(suggestion.title)
+                                        .lineLimit(1)
+                                        .padding(.horizontal, 12)
+                                        .frame(height: 33)
                                 }
-                                .buttonStyle(.bordered)
+                                .modifier(AssistantChipButtonModifier())
                             }
                         }
                     }
@@ -291,51 +336,81 @@ struct HomeAssistantPanelView: View {
     }
 
     private var answersSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            ForEach(answers.reversed()) { answer in
-                VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 16) {
+            ForEach(answers) { answer in
+                VStack(alignment: .leading, spacing: 10) {
                     if let userPrompt = answer.userPrompt, userPrompt.isEmpty == false {
-                        HStack {
-                            Spacer(minLength: 0)
-                            Text(userPrompt)
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                                .multilineTextAlignment(.trailing)
-                        }
+                        userMessageBubble(text: userPrompt, generatedAt: answer.generatedAt)
                     }
 
-                    GroupBox {
-                        VStack(alignment: .leading, spacing: 8) {
-                            if let primaryValue = answer.primaryValue {
-                                Text(primaryValue)
-                                    .font(.title3.weight(.semibold))
-                            }
+                    assistantMessageBubble(for: answer)
+                }
+            }
+        }
+    }
 
-                            if let subtitle = answer.subtitle {
-                                Text(subtitle)
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                            }
+    private func userMessageBubble(text: String, generatedAt: Date) -> some View {
+        VStack(alignment: .trailing, spacing: 4) {
+            HStack {
+                Spacer(minLength: 24)
+                Text(text)
+                    .font(.subheadline)
+                    .foregroundStyle(.white)
+                    .multilineTextAlignment(.leading)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(.tint, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            }
 
-                            if answer.rows.isEmpty == false {
-                                ForEach(answer.rows) { row in
-                                    HStack {
-                                        Text(row.title)
-                                            .foregroundStyle(.primary)
-                                        Spacer()
-                                        Text(row.value)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                    .font(.subheadline)
-                                }
-                            }
+            Text(timestampText(for: generatedAt))
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+        }
+    }
+
+    private func assistantMessageBubble(for answer: HomeAnswer) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(answer.title)
+                    .font(.headline)
+
+                if let primaryValue = answer.primaryValue {
+                    Text(primaryValue)
+                        .font(.title3.weight(.semibold))
+                }
+
+                if let subtitle = answer.subtitle {
+                    Text(subtitle)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+
+                if answer.rows.isEmpty == false {
+                    ForEach(answer.rows) { row in
+                        HStack {
+                            Text(row.title)
+                                .foregroundStyle(.primary)
+                            Spacer()
+                            Text(row.value)
+                                .foregroundStyle(.secondary)
                         }
-                    } label: {
-                        Text(answer.title)
-                            .font(.headline)
+                        .font(.subheadline)
                     }
                 }
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(assistantBubbleBackground, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(assistantBubbleStroke, lineWidth: 1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Text(timestampText(for: answer.generatedAt))
+                .font(.caption2)
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -415,10 +490,100 @@ struct HomeAssistantPanelView: View {
     private var panelHeaderBackgroundStyle: AnyShapeStyle {
         #if os(iOS)
         if #available(iOS 26.0, *) {
-            return AnyShapeStyle(.bar)
+            return AnyShapeStyle(.clear)
         }
         #endif
 
-        return AnyShapeStyle(.thinMaterial)
+        return AnyShapeStyle(.clear)
+    }
+
+    private var navigationBarVisibility: Visibility {
+        #if os(iOS)
+        if #available(iOS 26.0, *) {
+            return .hidden
+        }
+        #endif
+
+        return .visible
+    }
+
+    private var conversationBackdrop: some View {
+        HomeBackgroundView()
+            .opacity(0.3)
+            .overlay {
+                if #available(iOS 26.0, *) {
+                    Color.black.opacity(0.02)
+                } else {
+                    Color(uiColor: .systemBackground).opacity(0.5)
+                }
+            }
+    }
+
+    private var assistantBubbleBackground: Color {
+        Color(uiColor: .systemGray5)
+    }
+
+    private var assistantBubbleStroke: Color {
+        Color.clear
+    }
+
+    private func timestampText(for date: Date) -> String {
+        date.formatted(date: .omitted, time: .shortened)
+    }
+}
+
+// MARK: - Assistant Button Modifiers
+
+private struct AssistantChipButtonModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content
+                .buttonStyle(.glass)
+                .buttonBorderShape(.capsule)
+                .compositingGroup()
+                .clipShape(Capsule())
+        } else {
+            content
+                .buttonStyle(.bordered)
+        }
+    }
+}
+
+private struct AssistantActionButtonModifier: ViewModifier {
+    let prominent: Bool
+
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            if prominent {
+                content
+                    .buttonStyle(.glassProminent)
+                    .buttonBorderShape(.capsule)
+            } else {
+                content
+                    .buttonStyle(.glass)
+                    .buttonBorderShape(.capsule)
+            }
+        } else {
+            if prominent {
+                content
+                    .buttonStyle(.borderedProminent)
+            } else {
+                content
+                    .buttonStyle(.bordered)
+            }
+        }
+    }
+}
+
+private struct AssistantIconButtonModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content
+                .buttonStyle(.glassProminent)
+                .buttonBorderShape(.circle)
+        } else {
+            content
+                .buttonStyle(.borderedProminent)
+        }
     }
 }

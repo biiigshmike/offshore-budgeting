@@ -205,6 +205,13 @@ struct AppRootView: View {
             .tabItem { Label(AppSection.settings.rawValue, systemImage: AppSection.settings.systemImage) }
             .tag(AppSection.settings)
         }
+        .overlay(alignment: .bottomTrailing) {
+            if shouldShowCompactLandscapeLauncher {
+                compactLandscapeAssistantButton
+                    .padding(.trailing, 24)
+                    .padding(.bottom, 8)
+            }
+        }
     }
 
     // MARK: - iPad + Mac
@@ -352,6 +359,35 @@ struct AppRootView: View {
         selectedSection == .home &&
         assistantRoute == nil &&
         assistantPresentationPlan.showsToolbarButton
+    }
+
+    private var shouldShowCompactLandscapeLauncher: Bool {
+        selectedSection == .home &&
+        assistantRoute == nil &&
+        usesCompactPhoneHeight
+    }
+
+    @ViewBuilder
+    private var compactLandscapeAssistantButton: some View {
+        if #available(iOS 26.0, *) {
+            Button(action: presentAssistant) {
+                Image(systemName: "message")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(width: 30, height: 30)
+            }
+            .buttonStyle(.glassProminent)
+            .buttonBorderShape(.circle)
+            .accessibilityLabel("Open Assistant")
+        } else {
+            Button(action: presentAssistant) {
+                Image(systemName: "message")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(width: 30, height: 30)
+            }
+            .buttonStyle(.borderedProminent)
+            .clipShape(Circle())
+            .accessibilityLabel("Open Assistant")
+        }
     }
 
     private var shouldMountInspectorPresenter: Bool {
