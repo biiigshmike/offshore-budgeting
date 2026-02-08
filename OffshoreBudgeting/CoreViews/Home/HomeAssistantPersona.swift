@@ -244,6 +244,86 @@ struct HomeAssistantPersonaFormatter {
         personaID: HomeAssistantPersonaID
     ) -> [HomeAssistantSuggestion] {
         let prefix = followUpPrefix(for: personaID)
+        let confidenceCue = confidenceCue(for: answer)
+
+        switch confidenceCue {
+        case .low:
+            return [
+                HomeAssistantSuggestion(
+                    title: "\(prefix) Spend this month",
+                    query: HomeQuery(intent: .spendThisMonth)
+                ),
+                HomeAssistantSuggestion(
+                    title: "Top categories this month",
+                    query: HomeQuery(intent: .topCategoriesThisMonth, resultLimit: 3)
+                )
+            ]
+        case .medium:
+            return [
+                HomeAssistantSuggestion(
+                    title: "\(prefix) Top 3 categories this month",
+                    query: HomeQuery(intent: .topCategoriesThisMonth, resultLimit: 3)
+                ),
+                HomeAssistantSuggestion(
+                    title: "Compare with last month",
+                    query: HomeQuery(intent: .compareThisMonthToPreviousMonth)
+                )
+            ]
+        case .high:
+            break
+        }
+
+        if answer.title.localizedCaseInsensitiveContains("Savings") {
+            return [
+                HomeAssistantSuggestion(
+                    title: "\(prefix) Compare with last month",
+                    query: HomeQuery(intent: .compareThisMonthToPreviousMonth)
+                ),
+                HomeAssistantSuggestion(
+                    title: "Average savings for last 6 months",
+                    query: HomeQuery(intent: .savingsAverageRecentPeriods, resultLimit: 6)
+                )
+            ]
+        }
+
+        if answer.title.localizedCaseInsensitiveContains("Income Share") {
+            return [
+                HomeAssistantSuggestion(
+                    title: "\(prefix) Income share this month",
+                    query: HomeQuery(intent: .incomeSourceShare)
+                ),
+                HomeAssistantSuggestion(
+                    title: "Average actual income this year",
+                    query: HomeQuery(intent: .incomeAverageActual)
+                )
+            ]
+        }
+
+        if answer.title.localizedCaseInsensitiveContains("Category Spend Share") {
+            return [
+                HomeAssistantSuggestion(
+                    title: "\(prefix) Top categories this month",
+                    query: HomeQuery(intent: .topCategoriesThisMonth, resultLimit: 5)
+                ),
+                HomeAssistantSuggestion(
+                    title: "Largest transactions this month",
+                    query: HomeQuery(intent: .largestRecentTransactions, resultLimit: 5)
+                )
+            ]
+        }
+
+        if answer.title.localizedCaseInsensitiveContains("Budget Overview") {
+            return [
+                HomeAssistantSuggestion(
+                    title: "\(prefix) Variable spending habits by card",
+                    query: HomeQuery(intent: .cardVariableSpendingHabits)
+                ),
+                HomeAssistantSuggestion(
+                    title: "Top categories this month",
+                    query: HomeQuery(intent: .topCategoriesThisMonth, resultLimit: 5)
+                )
+            ]
+        }
 
         switch answer.kind {
         case .metric:
@@ -374,4 +454,24 @@ struct HomeAssistantPersonaFormatter {
             return "Dataset is empty for this range."
         }
     }
+
+    private func confidenceCue(for answer: HomeAnswer) -> ConfidenceCue {
+        let subtitle = answer.subtitle ?? ""
+
+        if subtitle.localizedCaseInsensitiveContains("best-effort") {
+            return .low
+        }
+
+        if subtitle.localizedCaseInsensitiveContains("likely match") {
+            return .medium
+        }
+
+        return .high
+    }
+}
+
+private enum ConfidenceCue {
+    case high
+    case medium
+    case low
 }

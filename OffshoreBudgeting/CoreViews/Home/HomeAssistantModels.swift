@@ -24,11 +24,201 @@ struct HomeQueryDateRange: Codable, Equatable {
     }
 }
 
+enum HomeQueryPeriodUnit: String, Codable, Equatable {
+    case day
+    case week
+    case month
+    case quarter
+    case year
+}
+
 enum HomeQueryIntent: String, CaseIterable, Codable, Equatable {
+    case periodOverview
     case spendThisMonth
     case topCategoriesThisMonth
     case compareThisMonthToPreviousMonth
     case largestRecentTransactions
+    case cardSpendTotal
+    case cardVariableSpendingHabits
+    case incomeAverageActual
+    case savingsStatus
+    case savingsAverageRecentPeriods
+    case incomeSourceShare
+    case categorySpendShare
+    case incomeSourceShareTrend
+    case categorySpendShareTrend
+    case presetDueSoon
+    case presetHighestCost
+    case presetTopCategory
+    case presetCategorySpend
+    case categoryPotentialSavings
+    case categoryReallocationGuidance
+}
+
+enum HomeQueryMetric: String, Codable, Equatable {
+    case overview
+    case spendTotal
+    case topCategories
+    case monthComparison
+    case largestTransactions
+    case cardSpendTotal
+    case cardVariableSpendingHabits
+    case incomeAverageActual
+    case savingsStatus
+    case savingsAverageRecentPeriods
+    case incomeSourceShare
+    case categorySpendShare
+    case incomeSourceShareTrend
+    case categorySpendShareTrend
+    case presetDueSoon
+    case presetHighestCost
+    case presetTopCategory
+    case presetCategorySpend
+    case categoryPotentialSavings
+    case categoryReallocationGuidance
+}
+
+enum HomeQueryConfidenceBand: String, Codable, Equatable {
+    case high
+    case medium
+    case low
+}
+
+struct HomeQueryPlan: Equatable {
+    let metric: HomeQueryMetric
+    let dateRange: HomeQueryDateRange?
+    let resultLimit: Int?
+    let confidenceBand: HomeQueryConfidenceBand
+    let targetName: String?
+    let periodUnit: HomeQueryPeriodUnit?
+
+    init(
+        metric: HomeQueryMetric,
+        dateRange: HomeQueryDateRange?,
+        resultLimit: Int?,
+        confidenceBand: HomeQueryConfidenceBand,
+        targetName: String? = nil,
+        periodUnit: HomeQueryPeriodUnit? = nil
+    ) {
+        self.metric = metric
+        self.dateRange = dateRange
+        self.resultLimit = resultLimit
+        self.confidenceBand = confidenceBand
+        self.targetName = targetName
+        self.periodUnit = periodUnit
+    }
+
+    var query: HomeQuery {
+        HomeQuery(
+            intent: metric.intent,
+            dateRange: dateRange,
+            resultLimit: resultLimit,
+            targetName: targetName,
+            periodUnit: periodUnit
+        )
+    }
+}
+
+extension HomeQueryMetric {
+    var intent: HomeQueryIntent {
+        switch self {
+        case .overview:
+            return .periodOverview
+        case .spendTotal:
+            return .spendThisMonth
+        case .topCategories:
+            return .topCategoriesThisMonth
+        case .monthComparison:
+            return .compareThisMonthToPreviousMonth
+        case .largestTransactions:
+            return .largestRecentTransactions
+        case .cardSpendTotal:
+            return .cardSpendTotal
+        case .cardVariableSpendingHabits:
+            return .cardVariableSpendingHabits
+        case .incomeAverageActual:
+            return .incomeAverageActual
+        case .savingsStatus:
+            return .savingsStatus
+        case .savingsAverageRecentPeriods:
+            return .savingsAverageRecentPeriods
+        case .incomeSourceShare:
+            return .incomeSourceShare
+        case .categorySpendShare:
+            return .categorySpendShare
+        case .incomeSourceShareTrend:
+            return .incomeSourceShareTrend
+        case .categorySpendShareTrend:
+            return .categorySpendShareTrend
+        case .presetDueSoon:
+            return .presetDueSoon
+        case .presetHighestCost:
+            return .presetHighestCost
+        case .presetTopCategory:
+            return .presetTopCategory
+        case .presetCategorySpend:
+            return .presetCategorySpend
+        case .categoryPotentialSavings:
+            return .categoryPotentialSavings
+        case .categoryReallocationGuidance:
+            return .categoryReallocationGuidance
+        }
+    }
+}
+
+extension HomeQueryIntent {
+    var metric: HomeQueryMetric {
+        switch self {
+        case .periodOverview:
+            return .overview
+        case .spendThisMonth:
+            return .spendTotal
+        case .topCategoriesThisMonth:
+            return .topCategories
+        case .compareThisMonthToPreviousMonth:
+            return .monthComparison
+        case .largestRecentTransactions:
+            return .largestTransactions
+        case .cardSpendTotal:
+            return .cardSpendTotal
+        case .cardVariableSpendingHabits:
+            return .cardVariableSpendingHabits
+        case .incomeAverageActual:
+            return .incomeAverageActual
+        case .savingsStatus:
+            return .savingsStatus
+        case .savingsAverageRecentPeriods:
+            return .savingsAverageRecentPeriods
+        case .incomeSourceShare:
+            return .incomeSourceShare
+        case .categorySpendShare:
+            return .categorySpendShare
+        case .incomeSourceShareTrend:
+            return .incomeSourceShareTrend
+        case .categorySpendShareTrend:
+            return .categorySpendShareTrend
+        case .presetDueSoon:
+            return .presetDueSoon
+        case .presetHighestCost:
+            return .presetHighestCost
+        case .presetTopCategory:
+            return .presetTopCategory
+        case .presetCategorySpend:
+            return .presetCategorySpend
+        case .categoryPotentialSavings:
+            return .categoryPotentialSavings
+        case .categoryReallocationGuidance:
+            return .categoryReallocationGuidance
+        }
+    }
+}
+
+struct HomeAssistantSessionContext {
+    var lastMetric: HomeQueryMetric?
+    var lastDateRange: HomeQueryDateRange?
+    var lastResultLimit: Int?
+    var lastTargetName: String?
+    var lastPeriodUnit: HomeQueryPeriodUnit?
 }
 
 struct HomeQuery: Identifiable, Codable, Equatable {
@@ -40,32 +230,67 @@ struct HomeQuery: Identifiable, Codable, Equatable {
     let intent: HomeQueryIntent
     let dateRange: HomeQueryDateRange?
     let resultLimit: Int
+    let targetName: String?
+    let periodUnit: HomeQueryPeriodUnit?
 
     init(
         id: UUID = UUID(),
         intent: HomeQueryIntent,
         dateRange: HomeQueryDateRange? = nil,
-        resultLimit: Int? = nil
+        resultLimit: Int? = nil,
+        targetName: String? = nil,
+        periodUnit: HomeQueryPeriodUnit? = nil
     ) {
         self.id = id
         self.intent = intent
         self.dateRange = dateRange
         self.resultLimit = HomeQuery.sanitizedResultLimit(intent: intent, requestedLimit: resultLimit)
+        self.targetName = targetName
+        self.periodUnit = periodUnit
     }
 
     private static func sanitizedResultLimit(intent: HomeQueryIntent, requestedLimit: Int?) -> Int {
         let baseline: Int
         switch intent {
+        case .periodOverview:
+            baseline = 1
         case .topCategoriesThisMonth:
             baseline = defaultTopCategoryLimit
         case .largestRecentTransactions:
             baseline = defaultRecentTransactionsLimit
-        case .spendThisMonth, .compareThisMonthToPreviousMonth:
+        case .cardVariableSpendingHabits:
+            baseline = 3
+        case .savingsAverageRecentPeriods, .incomeSourceShareTrend, .categorySpendShareTrend:
+            baseline = 3
+        case .presetDueSoon, .presetHighestCost, .presetTopCategory:
+            baseline = 3
+        case .presetCategorySpend:
+            baseline = 1
+        case .categoryPotentialSavings, .categoryReallocationGuidance:
+            baseline = 3
+        case .spendThisMonth, .compareThisMonthToPreviousMonth, .cardSpendTotal, .incomeAverageActual, .savingsStatus, .incomeSourceShare, .categorySpendShare:
             baseline = 1
         }
 
         guard let requestedLimit else { return baseline }
         return min(max(1, requestedLimit), maxResultLimit)
+    }
+}
+
+extension BudgetingPeriod {
+    var queryPeriodUnit: HomeQueryPeriodUnit {
+        switch self {
+        case .daily:
+            return .day
+        case .weekly:
+            return .week
+        case .monthly:
+            return .month
+        case .quarterly:
+            return .quarter
+        case .yearly:
+            return .year
+        }
     }
 }
 

@@ -188,6 +188,53 @@ struct HomeAssistantPersonaTests {
         #expect(marina[0].title != captain[0].title)
     }
 
+    @Test func formatter_followUpSuggestions_budgetOverview_returnsNarrowingCardsFlow() throws {
+        let formatter = HomeAssistantPersonaFormatter()
+        let overview = HomeAnswer(queryID: UUID(), kind: .list, title: "Budget Overview", subtitle: nil, primaryValue: nil, rows: [])
+
+        let followUps = formatter.followUpSuggestions(after: overview, personaID: .marina)
+
+        #expect(followUps.count == 2)
+        #expect(followUps[0].query.intent == .cardVariableSpendingHabits)
+        #expect(followUps[1].query.intent == .topCategoriesThisMonth)
+    }
+
+    @Test func formatter_followUpSuggestions_lowConfidence_returnsClarifyingChips() throws {
+        let formatter = HomeAssistantPersonaFormatter()
+        let lowConfidenceAnswer = HomeAnswer(
+            queryID: UUID(),
+            kind: .list,
+            title: "Budget Check-In",
+            subtitle: "Best-effort summary. Use follow-up chips to narrow this.",
+            primaryValue: "$1,234",
+            rows: []
+        )
+
+        let followUps = formatter.followUpSuggestions(after: lowConfidenceAnswer, personaID: .captainCash)
+
+        #expect(followUps.count == 2)
+        #expect(followUps[0].query.intent == .spendThisMonth)
+        #expect(followUps[1].query.intent == .topCategoriesThisMonth)
+    }
+
+    @Test func formatter_followUpSuggestions_mediumConfidence_returnsNarrowingChips() throws {
+        let formatter = HomeAssistantPersonaFormatter()
+        let mediumConfidenceAnswer = HomeAnswer(
+            queryID: UUID(),
+            kind: .list,
+            title: "Budget Check-In",
+            subtitle: "Likely match for your request.",
+            primaryValue: "$1,234",
+            rows: []
+        )
+
+        let followUps = formatter.followUpSuggestions(after: mediumConfidenceAnswer, personaID: .marina)
+
+        #expect(followUps.count == 2)
+        #expect(followUps[0].query.intent == .topCategoriesThisMonth)
+        #expect(followUps[1].query.intent == .compareThisMonthToPreviousMonth)
+    }
+
     @Test func formatter_personaDidChangeAnswer_containsOldAndNewPersona() throws {
         let formatter = HomeAssistantPersonaFormatter()
         let answer = formatter.personaDidChangeAnswer(from: .finn, to: .harper)

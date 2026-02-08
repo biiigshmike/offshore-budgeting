@@ -37,13 +37,45 @@ struct HomeAssistantModelsTests {
     // MARK: - HomeQuery limits
 
     @Test func query_defaultLimit_matchesIntentDefaults() throws {
+        let overview = HomeQuery(intent: .periodOverview)
         let topCategories = HomeQuery(intent: .topCategoriesThisMonth)
         let recentTransactions = HomeQuery(intent: .largestRecentTransactions)
+        let cardSpend = HomeQuery(intent: .cardSpendTotal)
+        let cardHabits = HomeQuery(intent: .cardVariableSpendingHabits)
+        let incomeAverage = HomeQuery(intent: .incomeAverageActual)
+        let savingsStatus = HomeQuery(intent: .savingsStatus)
+        let savingsAverage = HomeQuery(intent: .savingsAverageRecentPeriods)
+        let incomeShare = HomeQuery(intent: .incomeSourceShare)
+        let categoryShare = HomeQuery(intent: .categorySpendShare)
+        let incomeShareTrend = HomeQuery(intent: .incomeSourceShareTrend)
+        let categoryShareTrend = HomeQuery(intent: .categorySpendShareTrend)
+        let presetDueSoon = HomeQuery(intent: .presetDueSoon)
+        let presetHighestCost = HomeQuery(intent: .presetHighestCost)
+        let presetTopCategory = HomeQuery(intent: .presetTopCategory)
+        let presetCategorySpend = HomeQuery(intent: .presetCategorySpend)
+        let categoryPotentialSavings = HomeQuery(intent: .categoryPotentialSavings)
+        let categoryReallocationGuidance = HomeQuery(intent: .categoryReallocationGuidance)
         let spend = HomeQuery(intent: .spendThisMonth)
         let comparison = HomeQuery(intent: .compareThisMonthToPreviousMonth)
 
+        #expect(overview.resultLimit == 1)
         #expect(topCategories.resultLimit == HomeQuery.defaultTopCategoryLimit)
         #expect(recentTransactions.resultLimit == HomeQuery.defaultRecentTransactionsLimit)
+        #expect(cardSpend.resultLimit == 1)
+        #expect(cardHabits.resultLimit == 3)
+        #expect(incomeAverage.resultLimit == 1)
+        #expect(savingsStatus.resultLimit == 1)
+        #expect(savingsAverage.resultLimit == 3)
+        #expect(incomeShare.resultLimit == 1)
+        #expect(categoryShare.resultLimit == 1)
+        #expect(incomeShareTrend.resultLimit == 3)
+        #expect(categoryShareTrend.resultLimit == 3)
+        #expect(presetDueSoon.resultLimit == 3)
+        #expect(presetHighestCost.resultLimit == 3)
+        #expect(presetTopCategory.resultLimit == 3)
+        #expect(presetCategorySpend.resultLimit == 1)
+        #expect(categoryPotentialSavings.resultLimit == 3)
+        #expect(categoryReallocationGuidance.resultLimit == 3)
         #expect(spend.resultLimit == 1)
         #expect(comparison.resultLimit == 1)
     }
@@ -56,6 +88,37 @@ struct HomeAssistantModelsTests {
         #expect(low.resultLimit == 1)
         #expect(high.resultLimit == HomeQuery.maxResultLimit)
         #expect(valid.resultLimit == 12)
+    }
+
+    // MARK: - HomeQueryPlan
+
+    @Test func queryPlan_mapsMetricToIntentAndLimit() throws {
+        let range = HomeQueryDateRange(
+            startDate: Date(timeIntervalSince1970: 1_000),
+            endDate: Date(timeIntervalSince1970: 2_000)
+        )
+
+        let topCategoriesPlan = HomeQueryPlan(
+            metric: .topCategories,
+            dateRange: range,
+            resultLimit: 4,
+            confidenceBand: .high
+        )
+
+        let overviewPlan = HomeQueryPlan(
+            metric: .overview,
+            dateRange: nil,
+            resultLimit: nil,
+            confidenceBand: .medium
+        )
+
+        #expect(topCategoriesPlan.query.intent == .topCategoriesThisMonth)
+        #expect(topCategoriesPlan.query.resultLimit == 4)
+        #expect(topCategoriesPlan.query.dateRange == range)
+
+        #expect(overviewPlan.query.intent == .periodOverview)
+        #expect(overviewPlan.query.resultLimit == 1)
+        #expect(overviewPlan.query.dateRange == nil)
     }
 
     // MARK: - Codable
