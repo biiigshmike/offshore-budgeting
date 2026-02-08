@@ -56,6 +56,7 @@ struct AppRootView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     private enum AssistantPresentationRoute: Equatable {
         case inspector
@@ -105,6 +106,7 @@ struct AppRootView: View {
             onDismiss: dismissAssistant
         ) {
             HomeAssistantPanelView(
+                workspace: workspace,
                 onDismiss: dismissAssistant,
                 shouldUseLargeMinimumSize: assistantPresentationPlan.usesExpandedPanelSizing
             )
@@ -116,6 +118,7 @@ struct AppRootView: View {
             isPresented: assistantInspectorPresentedBinding
         ) {
             HomeAssistantPanelView(
+                workspace: workspace,
                 onDismiss: dismissAssistant,
                 shouldUseLargeMinimumSize: false
             )
@@ -126,16 +129,10 @@ struct AppRootView: View {
             onDismiss: dismissAssistant
         ) {
             HomeAssistantPanelView(
+                workspace: workspace,
                 onDismiss: dismissAssistant,
                 shouldUseLargeMinimumSize: false
             )
-        }
-        .safeAreaInset(edge: .bottom) {
-            if assistantPresentationPlan.showsBottomLauncher {
-                HomeAssistantLauncherBar(onTap: presentAssistant)
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 8)
-            }
         }
         .background {
             GeometryReader { proxy in
@@ -170,6 +167,13 @@ struct AppRootView: View {
                 HomeView(workspace: workspace)
             }
             .toolbar { assistantToolbarContent }
+            .safeAreaInset(edge: .bottom) {
+                if shouldShowBottomLauncher {
+                    HomeAssistantLauncherBar(onTap: presentAssistant)
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 8)
+                }
+            }
             .tabItem { Label(AppSection.home.rawValue, systemImage: AppSection.home.systemImage) }
             .tag(AppSection.home)
 
@@ -243,7 +247,7 @@ struct AppRootView: View {
 
     @ToolbarContentBuilder
     private var assistantToolbarContent: some ToolbarContent {
-        if assistantPresentationPlan.showsToolbarButton, assistantRoute == nil {
+        if shouldShowToolbarButton {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     presentAssistant()
@@ -305,16 +309,49 @@ struct AppRootView: View {
     }
 
     private var assistantPresentationPlan: HomeAssistantPresentationPlan {
-        HomeAssistantPresentationResolver.resolve(
+        let basePlan = HomeAssistantPresentationResolver.resolve(
             containerWidth: containerWidth,
             supportsInlineInspector: supportsInlineInspector,
             dynamicTypeSize: dynamicTypeSize,
             voiceOverEnabled: voiceOverEnabled
         )
+
+        guard usesCompactPhoneHeight == false else {
+            return HomeAssistantPresentationPlan(
+                mode: basePlan.mode,
+                showsBottomLauncher: false,
+                showsToolbarButton: true,
+                detents: basePlan.detents,
+                usesExpandedPanelSizing: basePlan.usesExpandedPanelSizing,
+                prefersInlineInspectorWhenAvailable: basePlan.prefersInlineInspectorWhenAvailable
+            )
+        }
+
+        return basePlan
     }
 
     private var supportsInlineInspector: Bool {
         isPhone == false && horizontalSizeClass != .compact
+    }
+
+    private var usesCompactPhoneHeight: Bool {
+        #if os(iOS)
+        isPhone && verticalSizeClass == .compact
+        #else
+        false
+        #endif
+    }
+
+    private var shouldShowBottomLauncher: Bool {
+        selectedSection == .home &&
+        assistantRoute == nil &&
+        assistantPresentationPlan.showsBottomLauncher
+    }
+
+    private var shouldShowToolbarButton: Bool {
+        selectedSection == .home &&
+        assistantRoute == nil &&
+        assistantPresentationPlan.showsToolbarButton
     }
 
     private var shouldMountInspectorPresenter: Bool {
