@@ -243,18 +243,14 @@ struct AppRootView: View {
 
     @ToolbarContentBuilder
     private var assistantToolbarContent: some ToolbarContent {
-        if assistantPresentationPlan.showsToolbarButton || assistantRoute != nil {
+        if assistantPresentationPlan.showsToolbarButton, assistantRoute == nil {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
-                    if assistantRoute == nil {
-                        presentAssistant()
-                    } else {
-                        dismissAssistant()
-                    }
+                    presentAssistant()
                 } label: {
-                    Image(systemName: assistantRoute == nil ? "message" : "xmark")
+                    Image(systemName: "message")
                 }
-                .accessibilityLabel(assistantRoute == nil ? "Open Assistant" : "Close Assistant")
+                .accessibilityLabel("Open Assistant")
             }
         }
     }

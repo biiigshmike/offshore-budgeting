@@ -76,6 +76,16 @@ struct HomeAssistantPanelView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .padding(20)
             .navigationTitle("Assistant")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(action: onDismiss) {
+                        Image(systemName: "xmark")
+                            .font(.body.weight(.semibold))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Close Assistant")
+                }
+            }
         }
         .toolbarBackground(panelHeaderBackgroundStyle, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
