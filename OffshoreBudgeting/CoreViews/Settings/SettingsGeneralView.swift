@@ -20,9 +20,6 @@ struct SettingsGeneralView: View {
     @AppStorage("general_defaultBudgetingPeriod")
     private var defaultBudgetingPeriodRaw: String = BudgetingPeriod.monthly.rawValue
 
-    @AppStorage(HomeAssistantPersonaStore.defaultStorageKey)
-    private var assistantPersonaRaw: String = HomeAssistantPersonaCatalog.defaultPersona.rawValue
-
     @AppStorage("tips_resetToken") private var tipsResetToken: Int = 0
     @State private var eraseResultMessage: String = ""
 
@@ -97,17 +94,6 @@ struct SettingsGeneralView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
 
-                Picker("Assistant", selection: assistantPersonaBinding) {
-                    ForEach(HomeAssistantPersonaCatalog.allProfiles, id: \.id) { profile in
-                        Text(profile.displayName)
-                            .tag(profile.id)
-                    }
-                }
-                .pickerStyle(.menu)
-
-                Text(assistantPersonaSummary)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
             }
 
             Section("Budgets") {
@@ -266,20 +252,6 @@ struct SettingsGeneralView: View {
             get: { BudgetingPeriod(rawValue: defaultBudgetingPeriodRaw) ?? .monthly },
             set: { defaultBudgetingPeriodRaw = $0.rawValue }
         )
-    }
-
-    private var assistantPersonaBinding: Binding<HomeAssistantPersonaID> {
-        Binding(
-            get: {
-                HomeAssistantPersonaID(rawValue: assistantPersonaRaw) ?? HomeAssistantPersonaCatalog.defaultPersona
-            },
-            set: { assistantPersonaRaw = $0.rawValue }
-        )
-    }
-
-    private var assistantPersonaSummary: String {
-        let selected = HomeAssistantPersonaID(rawValue: assistantPersonaRaw) ?? HomeAssistantPersonaCatalog.defaultPersona
-        return HomeAssistantPersonaCatalog.profile(for: selected).summary
     }
 
     // MARK: - Erase

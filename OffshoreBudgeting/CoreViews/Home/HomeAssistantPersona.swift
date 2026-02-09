@@ -11,10 +11,6 @@ import Foundation
 
 enum HomeAssistantPersonaID: String, CaseIterable, Codable, Identifiable {
     case marina
-    case coral
-    case captainCash
-    case finn
-    case harper
 
     var id: String { rawValue }
 }
@@ -57,107 +53,11 @@ enum HomeAssistantPersonaCatalog {
                     "Top category is Dining at $420. Let's keep it cute and grounded."
                 ]
             )
-        case .coral:
-            return HomeAssistantPersonaProfile(
-                id: .coral,
-                displayName: "Coral",
-                summary: "Calm and supportive with clear guidance.",
-                greetingTitle: "Hi, I’m Coral.",
-                greetingSubtitle: "I can summarize your spending and trends quickly.",
-                noDataTitle: "I couldn’t find spending for that range.",
-                noDataSubtitle: "Try another time window to compare activity.",
-                unresolvedPromptTitle: "I can answer that with a more specific budgeting request.",
-                unresolvedPromptSubtitle: "Try a prompt like \"Top 3 categories this month\" or \"Compare this month to last month.\"",
-                previewLines: [
-                    "This month is tracking 8% lower than last month.",
-                    "Groceries and Transport are your two largest categories."
-                ]
-            )
-        case .captainCash:
-            return HomeAssistantPersonaProfile(
-                id: .captainCash,
-                displayName: "Captain Cash",
-                summary: "No fluff and fast.",
-                greetingTitle: "Captain Cash reporting.",
-                greetingSubtitle: "Issue a budget command and I’ll return the numbers.",
-                noDataTitle: "No entries found in this range.",
-                noDataSubtitle: "Adjust the range and run it again.",
-                unresolvedPromptTitle: "Command not recognized for budget analysis.",
-                unresolvedPromptSubtitle: "Issue a concrete request: spend total, category ranking, month comparison, or largest transactions.",
-                previewLines: [
-                    "Total spend is $1,350. Stay on course.",
-                    "Dining is running hot. Set a cap before it drifts higher."
-                ]
-            )
-        case .finn:
-            return HomeAssistantPersonaProfile(
-                id: .finn,
-                displayName: "Finn",
-                summary: "Simple, quick, plain-language guidance.",
-                greetingTitle: "Hey, I’m Finn.",
-                greetingSubtitle: "I’ll keep budget answers simple and fast.",
-                noDataTitle: "Nothing showed up for that range.",
-                noDataSubtitle: "Try another date range and I’ll rerun it.",
-                unresolvedPromptTitle: "I didn’t catch that one yet.",
-                unresolvedPromptSubtitle: "Try a short prompt like \"Spend this month\" or \"Largest 5 transactions.\"",
-                previewLines: [
-                    "Short version: You spent $1,350 this month.",
-                    "Top 3 categories are Dining, Groceries, and Transport. Easy first focus."
-                ]
-            )
-        case .harper:
-            return HomeAssistantPersonaProfile(
-                id: .harper,
-                displayName: "Harper",
-                summary: "Concise, disciplined, data-first analysis.",
-                greetingTitle: "Hello, I’m Harper.",
-                greetingSubtitle: "I’ll provide concise, data-driven budget snapshots.",
-                noDataTitle: "The selected range has no matching records.",
-                noDataSubtitle: "Expand or shift the date range to continue analysis.",
-                unresolvedPromptTitle: "That request needs tighter budgeting scope.",
-                unresolvedPromptSubtitle: "Ask for a measurable result, date range, and optional limit to continue.",
-                previewLines: [
-                    "Variance is +4.2% month over month.",
-                    "Largest transaction: $285.40 in Utilities."
-                ]
-            )
         }
     }
 
     nonisolated static var allProfiles: [HomeAssistantPersonaProfile] {
         HomeAssistantPersonaID.allCases.map(profile(for:))
-    }
-}
-
-// MARK: - Persona Store
-
-final class HomeAssistantPersonaStore {
-    nonisolated static let defaultStorageKey = "assistant.persona.id"
-
-    private let userDefaults: UserDefaults
-    private let storageKey: String
-
-    init(
-        userDefaults: UserDefaults = .standard,
-        storageKey: String = HomeAssistantPersonaStore.defaultStorageKey
-    ) {
-        self.userDefaults = userDefaults
-        self.storageKey = storageKey
-    }
-
-    func loadSelectedPersona() -> HomeAssistantPersonaID {
-        guard
-            let rawValue = userDefaults.string(forKey: storageKey),
-            let persona = HomeAssistantPersonaID(rawValue: rawValue)
-        else {
-            return HomeAssistantPersonaCatalog.defaultPersona
-        }
-
-        return persona
-    }
-
-    func saveSelectedPersona(_ persona: HomeAssistantPersonaID) {
-        userDefaults.set(persona.rawValue, forKey: storageKey)
     }
 }
 
@@ -207,28 +107,6 @@ struct HomeAssistantPersonaFormatter {
 
     func greetingAnswer(for personaID: HomeAssistantPersonaID) -> HomeAnswer {
         personaIntroductionAnswer(for: personaID)
-    }
-
-    func personaDidChangeAnswer(
-        from previousPersonaID: HomeAssistantPersonaID,
-        to newPersonaID: HomeAssistantPersonaID
-    ) -> HomeAnswer {
-        let previousName = HomeAssistantPersonaCatalog.profile(for: previousPersonaID).displayName
-        let base = personaIntroductionAnswer(for: newPersonaID)
-        let transitionLine = "Switched from \(previousName)."
-        let subtitle = mergedSentencePair(base.subtitle, transitionLine)
-
-        return HomeAnswer(
-            id: base.id,
-            queryID: base.queryID,
-            kind: base.kind,
-            userPrompt: base.userPrompt,
-            title: base.title,
-            subtitle: subtitle,
-            primaryValue: base.primaryValue,
-            rows: base.rows,
-            generatedAt: base.generatedAt
-        )
     }
 
     func unresolvedPromptAnswer(

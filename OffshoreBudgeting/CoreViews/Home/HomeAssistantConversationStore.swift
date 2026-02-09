@@ -14,18 +14,15 @@ final class HomeAssistantConversationStore {
 
     private let userDefaults: UserDefaults
     private let storageKeyPrefix: String
-    private let greetedPersonasKeyPrefix: String
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
 
     init(
         userDefaults: UserDefaults = .standard,
-        storageKeyPrefix: String = "home.assistant.answers",
-        greetedPersonasKeyPrefix: String = "home.assistant.greetedPersonas"
+        storageKeyPrefix: String = "home.assistant.answers"
     ) {
         self.userDefaults = userDefaults
         self.storageKeyPrefix = storageKeyPrefix
-        self.greetedPersonasKeyPrefix = greetedPersonasKeyPrefix
     }
 
     func loadAnswers(workspaceID: UUID) -> [HomeAnswer] {
@@ -51,37 +48,10 @@ final class HomeAssistantConversationStore {
         }
     }
 
-    func hasGreetedPersona(_ personaID: HomeAssistantPersonaID, workspaceID: UUID) -> Bool {
-        loadGreetedPersonas(workspaceID: workspaceID).contains(personaID)
-    }
-
-    func markPersonaAsGreeted(_ personaID: HomeAssistantPersonaID, workspaceID: UUID) {
-        var personas = loadGreetedPersonas(workspaceID: workspaceID)
-        personas.insert(personaID)
-        saveGreetedPersonas(personas, workspaceID: workspaceID)
-    }
-
     // MARK: - Helpers
 
     private func storageKey(for workspaceID: UUID) -> String {
         "\(storageKeyPrefix).\(workspaceID.uuidString)"
-    }
-
-    private func greetedPersonasKey(for workspaceID: UUID) -> String {
-        "\(greetedPersonasKeyPrefix).\(workspaceID.uuidString)"
-    }
-
-    private func loadGreetedPersonas(workspaceID: UUID) -> Set<HomeAssistantPersonaID> {
-        let key = greetedPersonasKey(for: workspaceID)
-        guard let rawValues = userDefaults.array(forKey: key) as? [String] else { return [] }
-
-        let personas = rawValues.compactMap(HomeAssistantPersonaID.init(rawValue:))
-        return Set(personas)
-    }
-
-    private func saveGreetedPersonas(_ personas: Set<HomeAssistantPersonaID>, workspaceID: UUID) {
-        let key = greetedPersonasKey(for: workspaceID)
-        userDefaults.set(personas.map(\.rawValue).sorted(), forKey: key)
     }
 
     private func trimmed(_ answers: [HomeAnswer]) -> [HomeAnswer] {

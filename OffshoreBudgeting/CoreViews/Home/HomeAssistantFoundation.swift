@@ -25,8 +25,6 @@ private enum HomeAssistantPlanResolutionSource: String {
 
 struct HomeAssistantLauncherBar: View {
     let onTap: () -> Void
-    @AppStorage(HomeAssistantPersonaStore.defaultStorageKey)
-    private var assistantPersonaRaw: String = HomeAssistantPersonaCatalog.defaultPersona.rawValue
 
     var body: some View {
         if #available(iOS 26.0, *) {
@@ -53,7 +51,7 @@ struct HomeAssistantLauncherBar: View {
             Image(systemName: "figure.wave")
                 .font(.subheadline.weight(.semibold))
 
-            Text("\(selectedPersonaName)")
+            Text("Marina")
                 .font(.subheadline.weight(.semibold))
                 .lineLimit(1)
 
@@ -66,13 +64,6 @@ struct HomeAssistantLauncherBar: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var selectedPersonaName: String {
-        let selectedPersona = HomeAssistantPersonaID(rawValue: assistantPersonaRaw)
-            ?? HomeAssistantPersonaCatalog.defaultPersona
-
-        return HomeAssistantPersonaCatalog.profile(for: selectedPersona).displayName
     }
 }
 
@@ -143,7 +134,7 @@ struct HomeAssistantPanelView: View {
     @State private var answers: [HomeAnswer] = []
     @State private var promptText = ""
     @State private var hasLoadedConversation = false
-    @State private var selectedPersonaID: HomeAssistantPersonaID = HomeAssistantPersonaCatalog.defaultPersona
+    private let selectedPersonaID: HomeAssistantPersonaID = .marina
     @State private var isShowingClearConversationAlert = false
     @State private var sessionContext = HomeAssistantSessionContext()
     @State private var clarificationSuggestions: [HomeAssistantSuggestion] = []
@@ -158,7 +149,6 @@ struct HomeAssistantPanelView: View {
     private let parser = HomeAssistantTextParser()
     private let conversationStore = HomeAssistantConversationStore()
     private let telemetryStore = HomeAssistantTelemetryStore()
-    private let personaStore = HomeAssistantPersonaStore()
     private let entityMatcher = HomeAssistantEntityMatcher()
     private let aliasMatcher = HomeAssistantAliasMatcher()
 
@@ -227,7 +217,7 @@ struct HomeAssistantPanelView: View {
                             ContentUnavailableView(
                                 selectedPersonaProfile.displayName,
                                 systemImage: "figure.wave",
-                                description: Text(personaTransitionDescription(for: selectedPersonaID))
+                                description: Text(personaTransitionDescription)
                             )
                         } else {
                             answersSection
@@ -273,10 +263,6 @@ struct HomeAssistantPanelView: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Close Assistant")
-                }
-
-                ToolbarItem(placement: .topBarTrailing) {
-                    personaTrailingNavBarItem
                 }
             }
         }
@@ -355,44 +341,6 @@ struct HomeAssistantPanelView: View {
                 .onSubmit {
                     submitPrompt()
                 }
-        }
-    }
-
-    @ViewBuilder
-    private var personaTrailingNavBarItem: some View {
-        let baseMenu = Menu {
-            ForEach(HomeAssistantPersonaCatalog.allProfiles, id: \.id) { profile in
-                Button {
-                    selectPersona(profile.id)
-                } label: {
-                    HStack(alignment: .center, spacing: 8) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(profile.displayName)
-                            Text(profile.summary)
-                                .font(.caption)
-                        }
-
-                        if profile.id == selectedPersonaID {
-                            Spacer(minLength: 8)
-                            Image(systemName: "checkmark")
-                        }
-                    }
-                }
-            }
-        } label: {
-            Image(systemName: "figure.wave")
-        }
-
-        if #available(iOS 26.0, *) {
-            baseMenu
-                .buttonStyle(.glassProminent)
-                .accessibilityLabel("Assistant Persona")
-                .accessibilityValue(HomeAssistantPersonaCatalog.profile(for: selectedPersonaID).displayName)
-        } else {
-            baseMenu
-                .buttonStyle(.plain)
-                .accessibilityLabel("Assistant Persona")
-                .accessibilityValue(HomeAssistantPersonaCatalog.profile(for: selectedPersonaID).displayName)
         }
     }
 
@@ -559,22 +507,11 @@ struct HomeAssistantPanelView: View {
     }
 
     private var emptyStatePersonaIntroduction: String {
-        personaTransitionDescription(for: selectedPersonaID)
+        personaTransitionDescription
     }
 
-    private func personaTransitionDescription(for personaID: HomeAssistantPersonaID) -> String {
-        switch personaID {
-        case .marina:
-            return "I’ll help you stay encouraged and grounded with quick, practical reads on your spending and trends."
-        case .coral:
-            return "I’ll keep things calm and clear with supportive summaries, comparisons, and next-step guidance."
-        case .captainCash:
-            return "Give me a budget command and I’ll return direct numbers, fast, with no fluff."
-        case .finn:
-            return "I’ll keep it simple and quick so you can check totals, categories, and trends at a glance."
-        case .harper:
-            return "I’ll give you concise, data-first analysis so you can make disciplined budgeting decisions."
-        }
+    private var personaTransitionDescription: String {
+        "I’ll help you stay encouraged and grounded with quick, practical reads on your spending and trends."
     }
 
     private func dismissEmptySuggestionDrawer() {
@@ -590,11 +527,7 @@ struct HomeAssistantPanelView: View {
                         userMessageBubble(text: userPrompt, generatedAt: answer.generatedAt)
                     }
 
-                    if isPersonaIntroductionAnswer(answer) {
-                        personaTransitionCard(for: answer)
-                    } else {
-                        assistantMessageBubble(for: answer)
-                    }
+                    assistantMessageBubble(for: answer)
                 }
             }
         }
@@ -623,12 +556,6 @@ struct HomeAssistantPanelView: View {
     private func assistantMessageBubble(for answer: HomeAnswer) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             VStack(alignment: .leading, spacing: 8) {
-                if isPersonaIntroductionAnswer(answer) {
-                    Image(systemName: "figure.wave")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                }
-
                 Text(answer.title)
                     .font(.headline)
 
@@ -669,63 +596,6 @@ struct HomeAssistantPanelView: View {
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }
-    }
-
-    private func personaTransitionCard(for answer: HomeAnswer) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            VStack(spacing: 10) {
-                HStack {
-                    Button {
-                        dismissPersonaTransitionAnswer(answer.id)
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                            .frame(width: 22, height: 22)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Dismiss persona switch message")
-
-                    Spacer()
-                }
-
-                Image(systemName: "figure.wave")
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(.secondary)
-
-                Text(answer.title)
-                    .font(.title3.weight(.semibold))
-                    .multilineTextAlignment(.center)
-
-                if let subtitle = answer.subtitle {
-                    Text(subtitle)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 12)
-            .frame(maxWidth: .infinity, alignment: .center)
-            .background(assistantBubbleBackground, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(Color.primary.opacity(0.12), lineWidth: 1)
-            }
-
-            Text(timestampText(for: answer.generatedAt))
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-        }
-    }
-
-    private func isPersonaIntroductionAnswer(_ answer: HomeAnswer) -> Bool {
-        let personaNames = Set(HomeAssistantPersonaCatalog.allProfiles.map(\.displayName))
-        return answer.kind == .message
-            && answer.userPrompt == nil
-            && answer.primaryValue == nil
-            && answer.rows.isEmpty
-            && personaNames.contains(answer.title)
     }
 
     private func runQuery(
@@ -954,36 +824,8 @@ struct HomeAssistantPanelView: View {
         }
     }
 
-    private func selectPersona(_ personaID: HomeAssistantPersonaID) {
-        guard personaID != selectedPersonaID else { return }
-
-        selectedPersonaID = personaID
-        personaStore.saveSelectedPersona(personaID)
-
-        guard answers.isEmpty == false else { return }
-
-        let transitionAnswer = HomeAnswer(
-            queryID: UUID(),
-            kind: .message,
-            userPrompt: nil,
-            title: selectedPersonaProfile.displayName,
-            subtitle: emptyStatePersonaIntroduction,
-            primaryValue: nil,
-            rows: []
-        )
-
-        if let lastAnswer = answers.last, isPersonaIntroductionAnswer(lastAnswer) {
-            answers[answers.count - 1] = transitionAnswer
-        } else {
-            answers.append(transitionAnswer)
-        }
-
-        conversationStore.saveAnswers(answers, workspaceID: workspace.id)
-    }
-
     private func loadConversationIfNeeded() {
         guard hasLoadedConversation == false else { return }
-        selectedPersonaID = personaStore.loadSelectedPersona()
         answers = conversationStore.loadAnswers(workspaceID: workspace.id)
         hasLoadedConversation = true
     }
@@ -994,11 +836,6 @@ struct HomeAssistantPanelView: View {
         clarificationSuggestions = []
         lastClarificationReasons = []
         conversationStore.saveAnswers([], workspaceID: workspace.id)
-    }
-
-    private func dismissPersonaTransitionAnswer(_ answerID: UUID) {
-        answers.removeAll { $0.id == answerID }
-        conversationStore.saveAnswers(answers, workspaceID: workspace.id)
     }
 
     private func handleResolvedPlan(

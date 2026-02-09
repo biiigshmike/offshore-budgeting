@@ -80,35 +80,6 @@ struct HomeAssistantConversationStoreTests {
         #expect(loadedB == answersB)
     }
 
-    // MARK: - Persona Greeting
-
-    @Test func greetedPersonaFlag_defaultsToFalse_thenPersistsPerWorkspace() throws {
-        let setup = makeStore()
-        defer { clearDefaults(setup.suiteName) }
-
-        let workspaceID = UUID()
-
-        #expect(setup.store.hasGreetedPersona(.marina, workspaceID: workspaceID) == false)
-
-        setup.store.markPersonaAsGreeted(.marina, workspaceID: workspaceID)
-
-        #expect(setup.store.hasGreetedPersona(.marina, workspaceID: workspaceID))
-        #expect(setup.store.hasGreetedPersona(.harper, workspaceID: workspaceID) == false)
-    }
-
-    @Test func greetedPersonaFlag_isolatedAcrossWorkspaces() throws {
-        let setup = makeStore()
-        defer { clearDefaults(setup.suiteName) }
-
-        let workspaceA = UUID()
-        let workspaceB = UUID()
-
-        setup.store.markPersonaAsGreeted(.captainCash, workspaceID: workspaceA)
-
-        #expect(setup.store.hasGreetedPersona(.captainCash, workspaceID: workspaceA))
-        #expect(setup.store.hasGreetedPersona(.captainCash, workspaceID: workspaceB) == false)
-    }
-
     // MARK: - Helpers
 
     private func makeStore() -> (store: HomeAssistantConversationStore, suiteName: String) {
