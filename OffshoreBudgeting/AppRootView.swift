@@ -259,7 +259,7 @@ struct AppRootView: View {
                 Button {
                     presentAssistant()
                 } label: {
-                    Image(systemName: "message")
+                    Image(systemName: "figure.wave")
                 }
                 .accessibilityLabel("Open Assistant")
             }
@@ -382,7 +382,7 @@ struct AppRootView: View {
     private var compactLandscapeAssistantButton: some View {
         if #available(iOS 26.0, *) {
             Button(action: presentAssistant) {
-                Image(systemName: "message")
+                Image(systemName: "figure.wave")
                     .font(.subheadline.weight(.semibold))
                     .frame(width: 30, height: 30)
             }
@@ -391,7 +391,7 @@ struct AppRootView: View {
             .accessibilityLabel("Open Assistant")
         } else {
             Button(action: presentAssistant) {
-                Image(systemName: "message")
+                Image(systemName: "figure.wave")
                     .font(.subheadline.weight(.semibold))
                     .frame(width: 30, height: 30)
             }

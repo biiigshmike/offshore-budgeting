@@ -50,7 +50,7 @@ struct HomeAssistantLauncherBar: View {
 
     private var launcherLabel: some View {
         HStack(spacing: 10) {
-            Image(systemName: "message")
+            Image(systemName: "figure.wave")
                 .font(.subheadline.weight(.semibold))
 
             Text("\(selectedPersonaName)")
@@ -223,7 +223,7 @@ struct HomeAssistantPanelView: View {
                             ContentUnavailableView(
                                 selectedPersonaProfile.displayName,
                                 systemImage: "figure.wave",
-                                description: Text(emptyStatePersonaIntroduction)
+                                description: Text(personaTransitionDescription(for: selectedPersonaID))
                             )
                         } else {
                             answersSection
@@ -555,7 +555,11 @@ struct HomeAssistantPanelView: View {
     }
 
     private var emptyStatePersonaIntroduction: String {
-        switch selectedPersonaID {
+        personaTransitionDescription(for: selectedPersonaID)
+    }
+
+    private func personaTransitionDescription(for personaID: HomeAssistantPersonaID) -> String {
+        switch personaID {
         case .marina:
             return "I’ll help you stay encouraged and grounded with quick, practical reads on your spending and trends."
         case .coral:
@@ -582,7 +586,11 @@ struct HomeAssistantPanelView: View {
                         userMessageBubble(text: userPrompt, generatedAt: answer.generatedAt)
                     }
 
-                    assistantMessageBubble(for: answer)
+                    if isPersonaIntroductionAnswer(answer) {
+                        personaTransitionCard(for: answer)
+                    } else {
+                        assistantMessageBubble(for: answer)
+                    }
                 }
             }
         }
@@ -652,6 +660,54 @@ struct HomeAssistantPanelView: View {
                     .stroke(assistantBubbleStroke, lineWidth: 1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+
+            Text(timestampText(for: answer.generatedAt))
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func personaTransitionCard(for answer: HomeAnswer) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            VStack(spacing: 10) {
+                HStack {
+                    Button {
+                        dismissPersonaTransitionAnswer(answer.id)
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 22, height: 22)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Dismiss persona switch message")
+
+                    Spacer()
+                }
+
+                Image(systemName: "figure.wave")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.secondary)
+
+                Text(answer.title)
+                    .font(.title3.weight(.semibold))
+                    .multilineTextAlignment(.center)
+
+                if let subtitle = answer.subtitle {
+                    Text(subtitle)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .background(assistantBubbleBackground, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(Color.primary.opacity(0.12), lineWidth: 1)
+            }
 
             Text(timestampText(for: answer.generatedAt))
                 .font(.caption2)
@@ -897,15 +953,28 @@ struct HomeAssistantPanelView: View {
     private func selectPersona(_ personaID: HomeAssistantPersonaID) {
         guard personaID != selectedPersonaID else { return }
 
-        let previousPersonaID = selectedPersonaID
         selectedPersonaID = personaID
         personaStore.saveSelectedPersona(personaID)
-        appendAnswer(
-            personaFormatter.personaDidChangeAnswer(
-                from: previousPersonaID,
-                to: personaID
-            )
+
+        guard answers.isEmpty == false else { return }
+
+        let transitionAnswer = HomeAnswer(
+            queryID: UUID(),
+            kind: .message,
+            userPrompt: nil,
+            title: selectedPersonaProfile.displayName,
+            subtitle: emptyStatePersonaIntroduction,
+            primaryValue: nil,
+            rows: []
         )
+
+        if let lastAnswer = answers.last, isPersonaIntroductionAnswer(lastAnswer) {
+            answers[answers.count - 1] = transitionAnswer
+        } else {
+            answers.append(transitionAnswer)
+        }
+
+        conversationStore.saveAnswers(answers, workspaceID: workspace.id)
     }
 
     private func loadConversationIfNeeded() {
@@ -921,6 +990,11 @@ struct HomeAssistantPanelView: View {
         clarificationSuggestions = []
         lastClarificationReasons = []
         conversationStore.saveAnswers([], workspaceID: workspace.id)
+    }
+
+    private func dismissPersonaTransitionAnswer(_ answerID: UUID) {
+        answers.removeAll { $0.id == answerID }
+        conversationStore.saveAnswers(answers, workspaceID: workspace.id)
     }
 
     private func handleResolvedPlan(
