@@ -320,7 +320,7 @@ struct HomeAssistantPanelView: View {
     @ViewBuilder
     private var promptTextField: some View {
         if #available(iOS 26.0, *) {
-            TextField("Try: Top 3 categories this month", text: $promptText)
+            TextField("Message Marina", text: $promptText)
                 .textFieldStyle(.plain)
                 .focused($isPromptFieldFocused)
                 .padding(.horizontal, 12)
@@ -334,7 +334,7 @@ struct HomeAssistantPanelView: View {
                     submitPrompt()
                 }
         } else {
-            TextField("Try: Top 3 categories this month", text: $promptText)
+            TextField("Message Marina", text: $promptText)
                 .textFieldStyle(.roundedBorder)
                 .focused($isPromptFieldFocused)
                 .frame(minHeight: 44)
