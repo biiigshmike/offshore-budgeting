@@ -39,6 +39,11 @@ struct SettingsReleaseLogsView: View {
             build: "9",
             items: [
                 ReleaseItem(
+                    systemImage: "figure.wave",
+                    title: "Welcome Aboard, Marina!",
+                    description: "Marina is Offshore’s new on-device financial assistant on the Home tab. She’s just getting her sea legs, so please be patient as she learns her way around. Marina runs entirely on your device and will only improve with time. Try chatting with her to explore savings goals and simple insights."
+                ),
+                ReleaseItem(
                     systemImage: "calendar",
                     title: "Locale Settings",
                     description: "Added an option in Settings > General > Formatting to follow the system for first day-of-week behavior. This setting is respected app-wide."
