@@ -323,6 +323,17 @@ struct AppRootView: View {
             voiceOverEnabled: voiceOverEnabled
         )
 
+        guard isPhone == false else {
+            return HomeAssistantPresentationPlan(
+                mode: .fullScreen,
+                showsBottomLauncher: true,
+                showsToolbarButton: false,
+                detents: [.large],
+                usesExpandedPanelSizing: false,
+                prefersInlineInspectorWhenAvailable: false
+            )
+        }
+
         guard usesCompactPhoneHeight == false else {
             return HomeAssistantPresentationPlan(
                 mode: basePlan.mode,
