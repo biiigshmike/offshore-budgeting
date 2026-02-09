@@ -65,7 +65,7 @@ struct HomeAssistantPersonaTests {
     // MARK: - Formatter
 
     @Test func formatter_unresolvedPromptAnswer_usesPersonaSpecificCopy() throws {
-        let formatter = HomeAssistantPersonaFormatter()
+        let formatter = HomeAssistantPersonaFormatter(variantIndexPicker: { _, _ in 0 })
         let answer = formatter.unresolvedPromptAnswer(
             for: "can you find my leaks?",
             personaID: .captainCash
@@ -79,7 +79,7 @@ struct HomeAssistantPersonaTests {
     }
 
     @Test func formatter_styledAnswer_preservesMetricsAndRows() throws {
-        let formatter = HomeAssistantPersonaFormatter()
+        let formatter = HomeAssistantPersonaFormatter(variantIndexPicker: { _, _ in 0 })
         let raw = HomeAnswer(
             id: UUID(uuidString: "AAAAAAAA-1111-2222-3333-BBBBBBBBBBBB")!,
             queryID: UUID(uuidString: "CCCCCCCC-1111-2222-3333-DDDDDDDDDDDD")!,
@@ -112,7 +112,7 @@ struct HomeAssistantPersonaTests {
     }
 
     @Test func formatter_styledAnswer_changesPersonaCopyOnly() throws {
-        let formatter = HomeAssistantPersonaFormatter()
+        let formatter = HomeAssistantPersonaFormatter(variantIndexPicker: { _, _ in 0 })
         let raw = HomeAnswer(
             queryID: UUID(),
             kind: .comparison,
@@ -136,7 +136,7 @@ struct HomeAssistantPersonaTests {
     }
 
     @Test func formatter_greetingAnswer_returnsPersonaGreeting() throws {
-        let formatter = HomeAssistantPersonaFormatter()
+        let formatter = HomeAssistantPersonaFormatter(variantIndexPicker: { _, _ in 0 })
         let greeting = formatter.greetingAnswer(for: .marina)
 
         #expect(greeting.kind == .message)
@@ -146,7 +146,7 @@ struct HomeAssistantPersonaTests {
     }
 
     @Test func formatter_styledAnswer_noDataMessage_usesPersonaNoDataCopy() throws {
-        let formatter = HomeAssistantPersonaFormatter()
+        let formatter = HomeAssistantPersonaFormatter(variantIndexPicker: { _, _ in 0 })
         let raw = HomeAnswer(
             queryID: UUID(),
             kind: .message,
@@ -159,13 +159,14 @@ struct HomeAssistantPersonaTests {
         let styled = formatter.styledAnswer(from: raw, userPrompt: "largest transactions", personaID: .harper)
 
         #expect(styled.title == "The selected range has no matching records.")
+        #expect(styled.subtitle?.contains("Sources:") == true)
         #expect(styled.subtitle?.contains("Expand or shift the date range") == true)
         #expect(styled.primaryValue == nil)
         #expect(styled.rows.isEmpty)
     }
 
     @Test func formatter_followUpSuggestions_returnDeterministicQueryIntents() throws {
-        let formatter = HomeAssistantPersonaFormatter()
+        let formatter = HomeAssistantPersonaFormatter(variantIndexPicker: { _, _ in 0 })
 
         let metricAnswer = HomeAnswer(queryID: UUID(), kind: .metric, title: "Spend", subtitle: nil, primaryValue: "$1", rows: [])
         let followUps = formatter.followUpSuggestions(after: metricAnswer, personaID: .marina)
@@ -176,7 +177,7 @@ struct HomeAssistantPersonaTests {
     }
 
     @Test func formatter_followUpSuggestions_personaPrefixChangesCopyNotIntent() throws {
-        let formatter = HomeAssistantPersonaFormatter()
+        let formatter = HomeAssistantPersonaFormatter(variantIndexPicker: { _, _ in 0 })
         let listAnswer = HomeAnswer(queryID: UUID(), kind: .list, title: "Top Categories", subtitle: nil, primaryValue: nil, rows: [])
 
         let marina = formatter.followUpSuggestions(after: listAnswer, personaID: .marina)
@@ -189,7 +190,7 @@ struct HomeAssistantPersonaTests {
     }
 
     @Test func formatter_followUpSuggestions_budgetOverview_returnsNarrowingCardsFlow() throws {
-        let formatter = HomeAssistantPersonaFormatter()
+        let formatter = HomeAssistantPersonaFormatter(variantIndexPicker: { _, _ in 0 })
         let overview = HomeAnswer(queryID: UUID(), kind: .list, title: "Budget Overview", subtitle: nil, primaryValue: nil, rows: [])
 
         let followUps = formatter.followUpSuggestions(after: overview, personaID: .marina)
@@ -200,7 +201,7 @@ struct HomeAssistantPersonaTests {
     }
 
     @Test func formatter_followUpSuggestions_lowConfidence_returnsClarifyingChips() throws {
-        let formatter = HomeAssistantPersonaFormatter()
+        let formatter = HomeAssistantPersonaFormatter(variantIndexPicker: { _, _ in 0 })
         let lowConfidenceAnswer = HomeAnswer(
             queryID: UUID(),
             kind: .list,
@@ -218,7 +219,7 @@ struct HomeAssistantPersonaTests {
     }
 
     @Test func formatter_followUpSuggestions_mediumConfidence_returnsNarrowingChips() throws {
-        let formatter = HomeAssistantPersonaFormatter()
+        let formatter = HomeAssistantPersonaFormatter(variantIndexPicker: { _, _ in 0 })
         let mediumConfidenceAnswer = HomeAnswer(
             queryID: UUID(),
             kind: .list,
@@ -236,7 +237,7 @@ struct HomeAssistantPersonaTests {
     }
 
     @Test func formatter_personaDidChangeAnswer_containsOldAndNewPersona() throws {
-        let formatter = HomeAssistantPersonaFormatter()
+        let formatter = HomeAssistantPersonaFormatter(variantIndexPicker: { _, _ in 0 })
         let answer = formatter.personaDidChangeAnswer(from: .finn, to: .harper)
 
         #expect(answer.kind == .message)
@@ -244,6 +245,74 @@ struct HomeAssistantPersonaTests {
         #expect(answer.subtitle?.contains("Finn") == true)
         #expect(answer.primaryValue == nil)
         #expect(answer.rows.isEmpty)
+    }
+
+    @Test func formatter_styledAnswer_randomizesPersonaToneLines() throws {
+        var nextIndex = 0
+        let formatter = HomeAssistantPersonaFormatter(variantIndexPicker: { upperBound, _ in
+            guard upperBound > 0 else { return 0 }
+            defer { nextIndex += 1 }
+            return nextIndex % upperBound
+        })
+
+        let raw = HomeAnswer(
+            queryID: UUID(),
+            kind: .metric,
+            title: "Spend This Month",
+            subtitle: "February 2026",
+            primaryValue: "$1,350.00",
+            rows: []
+        )
+
+        var uniqueSubtitles = Set<String>()
+        for _ in 0..<5 {
+            let styled = formatter.styledAnswer(from: raw, userPrompt: "spend this month", personaID: .marina)
+            if let subtitle = styled.subtitle {
+                uniqueSubtitles.insert(subtitle)
+            }
+        }
+
+        #expect(uniqueSubtitles.count == 5)
+    }
+
+    @Test func formatter_followUpSuggestions_randomizesTitleLeadButKeepsIntent() throws {
+        var nextIndex = 0
+        let formatter = HomeAssistantPersonaFormatter(variantIndexPicker: { upperBound, _ in
+            guard upperBound > 0 else { return 0 }
+            defer { nextIndex += 1 }
+            return nextIndex % upperBound
+        })
+
+        let metricAnswer = HomeAnswer(queryID: UUID(), kind: .metric, title: "Spend", subtitle: nil, primaryValue: "$1", rows: [])
+
+        let first = formatter.followUpSuggestions(after: metricAnswer, personaID: .captainCash)
+        let second = formatter.followUpSuggestions(after: metricAnswer, personaID: .captainCash)
+
+        #expect(first[0].query.intent == second[0].query.intent)
+        #expect(first[1].query.intent == second[1].query.intent)
+        #expect(first[0].title != second[0].title)
+    }
+
+    @Test func formatter_followUpSuggestions_sessionSeedKeepsTitlesStableForSameAnswer() throws {
+        let formatter = HomeAssistantPersonaFormatter(sessionSeed: 42)
+        let metricAnswer = HomeAnswer(
+            id: UUID(uuidString: "11111111-2222-3333-4444-555555555555")!,
+            queryID: UUID(),
+            kind: .metric,
+            title: "Spend",
+            subtitle: nil,
+            primaryValue: "$1",
+            rows: []
+        )
+
+        let first = formatter.followUpSuggestions(after: metricAnswer, personaID: .captainCash)
+        let second = formatter.followUpSuggestions(after: metricAnswer, personaID: .captainCash)
+
+        #expect(first.count == second.count)
+        #expect(first[0].query.intent == second[0].query.intent)
+        #expect(first[1].query.intent == second[1].query.intent)
+        #expect(first[0].title == second[0].title)
+        #expect(first[1].title == second[1].title)
     }
 
     // MARK: - Helpers

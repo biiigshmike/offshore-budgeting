@@ -149,6 +149,7 @@ struct HomeAssistantPanelView: View {
     @State private var clarificationSuggestions: [HomeAssistantSuggestion] = []
     @State private var lastClarificationReasons: [HomeAssistantClarificationReason] = []
     @State private var selectedEmptySuggestionGroup: EmptySuggestionGroup?
+    @State private var personaSessionSeed: UInt64 = UInt64.random(in: UInt64.min...UInt64.max)
     @FocusState private var isPromptFieldFocused: Bool
     @AppStorage("general_defaultBudgetingPeriod")
     private var defaultBudgetingPeriodRaw: String = BudgetingPeriod.monthly.rawValue
@@ -158,9 +159,12 @@ struct HomeAssistantPanelView: View {
     private let conversationStore = HomeAssistantConversationStore()
     private let telemetryStore = HomeAssistantTelemetryStore()
     private let personaStore = HomeAssistantPersonaStore()
-    private let personaFormatter = HomeAssistantPersonaFormatter()
     private let entityMatcher = HomeAssistantEntityMatcher()
     private let aliasMatcher = HomeAssistantAliasMatcher()
+
+    private var personaFormatter: HomeAssistantPersonaFormatter {
+        HomeAssistantPersonaFormatter(sessionSeed: personaSessionSeed)
+    }
 
     private var defaultQueryPeriodUnit: HomeQueryPeriodUnit {
         let period = BudgetingPeriod(rawValue: defaultBudgetingPeriodRaw) ?? .monthly
