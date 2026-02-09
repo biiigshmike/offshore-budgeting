@@ -8,8 +8,6 @@
 import SwiftUI
 
 struct HomeWhatIfTile: View {
-	    
-    @GestureState private var isPressed: Bool = false
     @State private var pinnedRefreshTick: Int = 0
 
 
@@ -138,23 +136,10 @@ struct HomeWhatIfTile: View {
                 pinnedPreviews
             }
         }
-        .scaleEffect(isPressed ? 0.99 : 1.0)
-        .opacity(isPressed ? 0.96 : 1.0)
-        .animation(.easeOut(duration: 0.12), value: isPressed)
         .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .simultaneousGesture(
-            LongPressGesture(minimumDuration: 0, maximumDistance: 18)
-                .updating($isPressed) { isDown, state, _ in
-                    state = isDown
-                },
-            including: .gesture
-        )
-        .simultaneousGesture(
-            TapGesture().onEnded {
-                onOpenPlanner(nil)
-            },
-            including: .gesture
-        )
+        .onTapGesture {
+            onOpenPlanner(nil)
+        }
         .onReceive(
             NotificationCenter.default.publisher(
                 for: WhatIfScenarioStore.pinnedGlobalScenariosDidChangeName(workspaceID: workspace.id)

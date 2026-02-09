@@ -60,9 +60,9 @@ struct SettingsReleaseLogsView: View {
                     description: "Marina is Offshore’s new on-device financial assistant on the Home tab. She’s just getting her sea legs, so please be patient as she learns her way around. Marina runs entirely on your device and will only improve with time. Try chatting with her to explore savings goals and simple insights."
                 ),
                 ReleaseItem(
-                    systemImage: "calendar",
-                    title: "Locale Settings",
-                    description: "Added an option in Settings > General > Formatting to follow the system for first day-of-week behavior. This setting is respected app-wide."
+                    systemImage: "globe",
+                    title: "More Formatting Implemented",
+                    description: "Added safeguards to ensure that locale settings that are shared globally by the device are respected in Offshore, such as number formatting, first day of the week, and date formatting."
                 )
             ]
         ),
