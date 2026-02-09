@@ -164,36 +164,30 @@ final class HomeAssistantPersonaStore {
 // MARK: - Persona Formatter
 
 struct HomeAssistantPersonaFormatter {
-    func greetingAnswer(for personaID: HomeAssistantPersonaID) -> HomeAnswer {
+    func personaIntroductionAnswer(for personaID: HomeAssistantPersonaID) -> HomeAnswer {
         let profile = HomeAssistantPersonaCatalog.profile(for: personaID)
 
         return HomeAnswer(
             queryID: UUID(),
             kind: .message,
             userPrompt: nil,
-            title: profile.greetingTitle,
-            subtitle: profile.greetingSubtitle,
+            title: profile.displayName,
+            subtitle: "\(profile.summary) \(profile.greetingSubtitle)",
             primaryValue: nil,
             rows: []
         )
+    }
+
+    func greetingAnswer(for personaID: HomeAssistantPersonaID) -> HomeAnswer {
+        personaIntroductionAnswer(for: personaID)
     }
 
     func personaDidChangeAnswer(
         from previousPersonaID: HomeAssistantPersonaID,
         to newPersonaID: HomeAssistantPersonaID
     ) -> HomeAnswer {
-        let previous = HomeAssistantPersonaCatalog.profile(for: previousPersonaID)
-        let current = HomeAssistantPersonaCatalog.profile(for: newPersonaID)
-
-        return HomeAnswer(
-            queryID: UUID(),
-            kind: .message,
-            userPrompt: nil,
-            title: "Assistant switched to \(current.displayName).",
-            subtitle: "Changed from \(previous.displayName). \(current.summary)",
-            primaryValue: nil,
-            rows: []
-        )
+        _ = previousPersonaID
+        return personaIntroductionAnswer(for: newPersonaID)
     }
 
     func unresolvedPromptAnswer(
