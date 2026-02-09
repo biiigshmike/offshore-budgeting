@@ -101,6 +101,7 @@ struct AppRootView: View {
                 splitView
             }
         }
+        .whatsNewForCurrentRelease()
         .sheet(
             isPresented: assistantSheetPresentedBinding,
             onDismiss: dismissAssistant

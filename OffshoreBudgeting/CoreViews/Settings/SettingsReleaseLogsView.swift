@@ -31,9 +31,25 @@ struct SettingsReleaseLogsView: View {
         var id: String { "\(systemImage)|\(title)" }
     }
 
+    // MARK: - App Version
+
+    static var appVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.0"
+    }
+
+    static var appBuild: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0"
+    }
+
+    static var currentReleaseSection: ReleaseSection? {
+        releaseSections.first {
+            $0.version == appVersion && $0.build == appBuild
+        }
+    }
+
     // MARK: - Sections
 
-    private let sections: [ReleaseSection] = [
+    static let releaseSections: [ReleaseSection] = [
         ReleaseSection(
             version: "2.3",
             build: "9",
@@ -150,7 +166,7 @@ struct SettingsReleaseLogsView: View {
 
     var body: some View {
         List {
-            ForEach(sections) { section in
+            ForEach(Self.releaseSections) { section in
                 Section(section.headerTitle) {
                     ForEach(section.items) { item in
                         ReleaseRow(item: item)
