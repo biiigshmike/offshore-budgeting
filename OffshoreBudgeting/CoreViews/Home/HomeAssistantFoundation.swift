@@ -271,7 +271,10 @@ struct HomeAssistantPanelView: View {
                 }
             }
         }
-        .background(conversationBackdrop)
+        .background {
+            conversationBackdrop
+                .ignoresSafeArea(.container, edges: .top)
+        }
         .tint(Color("AccentColor"))
         .toolbarBackground(panelHeaderBackgroundStyle, for: .navigationBar)
         .toolbarBackground(navigationBarVisibility, for: .navigationBar)
