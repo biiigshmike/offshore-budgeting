@@ -75,6 +75,35 @@ struct HomeQueryEngineTests {
         #expect(answer.rows.contains(where: { $0.title == "Largest variable transaction" && $0.value.filter(\.isNumber).contains("120") }))
     }
 
+    @Test func cardVariableSpendingHabits_allCards_usesReadableRowValueFormat() throws {
+        let engine = makeEngine()
+        let range = HomeQueryDateRange(startDate: date(2026, 2, 1), endDate: date(2026, 2, 28))
+        let query = HomeQuery(intent: .cardVariableSpendingHabits, dateRange: range)
+
+        let category = Category(name: "General", hexColor: "#00AA00")
+        let blueCard = Card(name: "Blue Card")
+        let redCard = Card(name: "Red Card")
+
+        let variable: [VariableExpense] = [
+            VariableExpense(descriptionText: "Blue #1", amount: 120, transactionDate: date(2026, 2, 8), card: blueCard, category: category),
+            VariableExpense(descriptionText: "Blue #2", amount: 80, transactionDate: date(2026, 2, 10), card: blueCard, category: category),
+            VariableExpense(descriptionText: "Red #1", amount: 300, transactionDate: date(2026, 2, 9), card: redCard, category: category)
+        ]
+
+        let answer = engine.execute(
+            query: query,
+            categories: [category],
+            plannedExpenses: [],
+            variableExpenses: variable,
+            now: date(2026, 2, 15)
+        )
+
+        #expect(answer.kind == .list)
+        #expect(answer.rows.contains(where: { $0.value.contains(" total | ") }))
+        #expect(answer.rows.contains(where: { $0.value.contains(" txns | ") }))
+        #expect(answer.rows.contains(where: { $0.value.contains(" avg") }))
+    }
+
     // MARK: - Income
 
     @Test func incomeAverageActual_returnsMonthlyAverage() throws {

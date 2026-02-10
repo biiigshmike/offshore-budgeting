@@ -141,9 +141,12 @@ struct HomeAssistantPanelView: View {
     @State private var lastClarificationReasons: [HomeAssistantClarificationReason] = []
     @State private var selectedEmptySuggestionGroup: EmptySuggestionGroup?
     @State private var personaSessionSeed: UInt64 = UInt64.random(in: UInt64.min...UInt64.max)
+    @State private var personaCooldownSessionID: String = UUID().uuidString
     @FocusState private var isPromptFieldFocused: Bool
     @AppStorage("general_defaultBudgetingPeriod")
     private var defaultBudgetingPeriodRaw: String = BudgetingPeriod.monthly.rawValue
+    @AppStorage("assistant_marinaResponseRulesV2Enabled")
+    private var marinaResponseRulesV2Enabled: Bool = false
 
     private let engine = HomeQueryEngine()
     private let parser = HomeAssistantTextParser()
@@ -153,7 +156,15 @@ struct HomeAssistantPanelView: View {
     private let aliasMatcher = HomeAssistantAliasMatcher()
 
     private var personaFormatter: HomeAssistantPersonaFormatter {
-        HomeAssistantPersonaFormatter(sessionSeed: personaSessionSeed)
+        HomeAssistantPersonaFormatter(
+            sessionSeed: personaSessionSeed,
+            responseRules: marinaResponseRules,
+            cooldownSessionID: personaCooldownSessionID
+        )
+    }
+
+    private var marinaResponseRules: HomeAssistantPersonaResponseRules {
+        marinaResponseRulesV2Enabled ? .marinaV2 : .legacy
     }
 
     private var defaultQueryPeriodUnit: HomeQueryPeriodUnit {
@@ -236,7 +247,7 @@ struct HomeAssistantPanelView: View {
                     dismissEmptySuggestionDrawer()
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .navigationTitle("Assistant")
+                .navigationTitle("Marina")
                 .safeAreaInset(edge: .bottom) {
                     VStack(alignment: .leading, spacing: 8) {
                         bottomSuggestionRail
@@ -346,33 +357,7 @@ struct HomeAssistantPanelView: View {
 
     @ViewBuilder
     private var bottomSuggestionRail: some View {
-        if answers.isEmpty {
-            emptyStateSuggestionRail
-        } else if activeSuggestions.isEmpty == false {
-            VStack(alignment: .leading, spacing: 8) {
-                Text(activeSuggestionHeaderTitle)
-                    .font(.subheadline.weight(.semibold))
-                    .padding(.horizontal, 16)
-
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 10) {
-                        ForEach(activeSuggestions) { suggestion in
-                            Button {
-                                runQuery(suggestion.query, userPrompt: suggestion.title)
-                            } label: {
-                                Text(suggestion.title)
-                                    .lineLimit(1)
-                                    .padding(.horizontal, 12)
-                                    .frame(height: 33)
-                            }
-                            .modifier(AssistantChipButtonModifier())
-                        }
-                    }
-                    .padding(.horizontal, 16)
-                }
-            }
-            .padding(.top, 10)
-        }
+        emptyStateSuggestionRail
     }
 
     private var emptyStateSuggestionRail: some View {
@@ -401,6 +386,7 @@ struct HomeAssistantPanelView: View {
                         .padding(.horizontal, 16)
                     }
                 }
+                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
 
             HStack(spacing: 0) {
@@ -421,24 +407,23 @@ struct HomeAssistantPanelView: View {
             .padding(.horizontal, 16)
         }
         .padding(.top, 10)
+        .animation(.easeInOut(duration: 0.2), value: selectedEmptySuggestionGroup)
     }
 
-    private var activeSuggestions: [HomeAssistantSuggestion] {
+    private func inlineConversationSuggestions(for answer: HomeAnswer) -> [HomeAssistantSuggestion] {
         if clarificationSuggestions.isEmpty == false {
             return clarificationSuggestions
         }
 
-        if let latestAnswer = answers.last {
-            let followUps = personaFormatter.followUpSuggestions(
-                after: latestAnswer,
-                personaID: selectedPersonaID
-            )
-            if followUps.isEmpty == false {
-                return followUps
-            }
+        let followUps = personaFormatter.followUpSuggestions(
+            after: answer,
+            personaID: selectedPersonaID
+        )
+        if followUps.isEmpty == false {
+            return followUps
         }
 
-        return engine.defaultSuggestions()
+        return []
     }
 
     private func emptyStateSuggestions(for group: EmptySuggestionGroup) -> [HomeAssistantSuggestion] {
@@ -515,19 +500,49 @@ struct HomeAssistantPanelView: View {
     }
 
     private func dismissEmptySuggestionDrawer() {
-        guard answers.isEmpty, selectedEmptySuggestionGroup != nil else { return }
+        guard selectedEmptySuggestionGroup != nil else { return }
         selectedEmptySuggestionGroup = nil
     }
 
     private var answersSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            ForEach(answers) { answer in
+            ForEach(Array(answers.enumerated()), id: \.element.id) { index, answer in
                 VStack(alignment: .leading, spacing: 10) {
                     if let userPrompt = answer.userPrompt, userPrompt.isEmpty == false {
                         userMessageBubble(text: userPrompt, generatedAt: answer.generatedAt)
                     }
 
                     assistantMessageBubble(for: answer)
+
+                    if index == answers.count - 1, selectedEmptySuggestionGroup == nil {
+                        let followUps = inlineConversationSuggestions(for: answer)
+                        if followUps.isEmpty == false {
+                            assistantFollowUpRail(suggestions: followUps)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func assistantFollowUpRail(suggestions: [HomeAssistantSuggestion]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(activeSuggestionHeaderTitle)
+                .font(.subheadline.weight(.semibold))
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(suggestions) { suggestion in
+                        Button {
+                            runQuery(suggestion.query, userPrompt: suggestion.title)
+                        } label: {
+                            Text(suggestion.title)
+                                .lineLimit(1)
+                                .padding(.horizontal, 12)
+                                .frame(height: 33)
+                        }
+                        .modifier(AssistantChipButtonModifier())
+                    }
                 }
             }
         }
@@ -620,7 +635,10 @@ struct HomeAssistantPanelView: View {
         let answer = personaFormatter.styledAnswer(
             from: rawAnswer,
             userPrompt: userPrompt,
-            personaID: selectedPersonaID
+            personaID: selectedPersonaID,
+            seedContext: personaSeedContext(for: query),
+            footerContext: personaFooterContext(for: [query]),
+            echoContext: personaEchoContext(for: query)
         )
 
         updateSessionContext(after: query)
@@ -1936,7 +1954,17 @@ struct HomeAssistantPanelView: View {
         let styled = personaFormatter.styledAnswer(
             from: bundled,
             userPrompt: userPrompt,
-            personaID: selectedPersonaID
+            personaID: selectedPersonaID,
+            seedContext: personaSeedContext(for: overviewQuery),
+            footerContext: personaFooterContext(
+                for: [
+                    overviewQuery,
+                    savingsQuery,
+                    categoriesQuery,
+                    cardsQuery
+                ]
+            ),
+            echoContext: nil
         )
 
         updateSessionContext(after: overviewQuery)
@@ -1974,6 +2002,86 @@ struct HomeAssistantPanelView: View {
 
     private var trimmedPromptText: String {
         promptText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func personaSeedContext(for query: HomeQuery) -> HomeAssistantPersonaSeedContext {
+        let referenceDate = query.dateRange?.endDate ?? Date()
+        return HomeAssistantPersonaSeedContext.from(
+            actorID: workspace.id.uuidString,
+            intentKey: query.intent.rawValue,
+            referenceDate: referenceDate
+        )
+    }
+
+    private func personaFooterContext(for queries: [HomeQuery]) -> HomeAssistantPersonaFooterContext {
+        let dateRange = queries.compactMap(\.dateRange).first
+        let queryLabels = queries.map { "\($0.intent.rawValue)#\(shortQueryID($0.id))" }
+        return HomeAssistantPersonaFooterContext(
+            dataWindow: personaDateWindowLabel(dateRange),
+            sources: personaSourceLabels(),
+            queries: queryLabels
+        )
+    }
+
+    private func personaDateWindowLabel(_ dateRange: HomeQueryDateRange?) -> String {
+        guard let dateRange else { return "Not specified" }
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar.current
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone.current
+        formatter.dateFormat = "yyyy-MM-dd"
+        let start = formatter.string(from: dateRange.startDate)
+        let end = formatter.string(from: dateRange.endDate)
+        return "\(start)–\(end)"
+    }
+
+    private func personaSourceLabels() -> [String] {
+        var labels: [String] = []
+        if categories.isEmpty == false { labels.append("Categories") }
+        if presets.isEmpty == false { labels.append("Presets") }
+        if plannedExpenses.isEmpty == false { labels.append("Planned expenses") }
+        if variableExpenses.isEmpty == false { labels.append("Variable expenses") }
+        if incomes.isEmpty == false { labels.append("Income") }
+
+        if labels.isEmpty {
+            return ["On-device budgeting data"]
+        }
+
+        return labels
+    }
+
+    private func shortQueryID(_ id: UUID) -> String {
+        let raw = id.uuidString.replacingOccurrences(of: "-", with: "")
+        return String(raw.prefix(8)).uppercased()
+    }
+
+    private func personaEchoContext(for query: HomeQuery) -> HomeAssistantPersonaEchoContext? {
+        guard let targetName = query.targetName?.trimmingCharacters(in: .whitespacesAndNewlines), targetName.isEmpty == false else {
+            return nil
+        }
+
+        switch query.intent {
+        case .cardSpendTotal, .cardVariableSpendingHabits:
+            return HomeAssistantPersonaEchoContext(
+                cardName: targetName,
+                categoryName: nil,
+                incomeSourceName: nil
+            )
+        case .categorySpendShare, .categorySpendShareTrend, .categoryPotentialSavings, .categoryReallocationGuidance, .presetCategorySpend:
+            return HomeAssistantPersonaEchoContext(
+                cardName: nil,
+                categoryName: targetName,
+                incomeSourceName: nil
+            )
+        case .incomeAverageActual, .incomeSourceShare, .incomeSourceShareTrend:
+            return HomeAssistantPersonaEchoContext(
+                cardName: nil,
+                categoryName: nil,
+                incomeSourceName: targetName
+            )
+        default:
+            return nil
+        }
     }
 
     private var panelHeaderBackgroundStyle: AnyShapeStyle {

@@ -3,32 +3,54 @@
     "marina": {
       "response": {
         "metric": [
-          "Bestie, this number is cute, and yes, we can work with it.",
-          "Quick check: you are doing fine, just keep this grounded.",
-          "You are not off track. This is a solid read for right now.",
-          "Love this visibility. This is how you stay in charge.",
-          "Main-character energy with responsible choices. We love to see it."
+          "Quick practical read: this is where your month stands right now.",
+          "You are doing better than you think. This is a solid checkpoint.",
+          "Bestie, this number is workable and you are still in control.",
+          "Grounded status check: you are close enough to adjust early.",
+          "You are showing consistency here, and that matters.",
+          "Cute progress, responsible decisions. I support this lane.",
+          "Money reality check: this is a clean base for your next move.",
+          "You are not behind, you are informed. That is a win.",
+          "This read is calm, clear, and very fixable where needed.",
+          "Practical momentum: your data is giving useful direction.",
+          "You are keeping your footing. Let us protect that rhythm.",
+          "Bestie checkpoint complete: you have real visibility now."
         ],
         "list": [
-          "These are the spots eating your budget first.",
-          "Here is the tea: this is where most of your money is going.",
-          "If we tighten anything, start with these lines.",
-          "These rows are your real spend story, no guesswork.",
-          "This list gives us the exact places to clean up next."
+          "These are the first places to review if you want quick impact.",
+          "You are seeing the pattern clearly, and that is useful.",
+          "Here is the tea: these lines are driving most of the spend.",
+          "Start here if you want the cleanest trim with least friction.",
+          "You already did the hard part by pulling this view.",
+          "Bestie, this list is the exact cleanup map.",
+          "Most of the movement is concentrated here, not everywhere.",
+          "You can tune these rows and feel it fast.",
+          "These entries tell the real spend story without guessing.",
+          "This ranking gives you a practical order of operations."
         ],
         "comparison": [
-          "This trend is giving us a clear signal for next month.",
-          "You can absolutely use this change to plan your next move.",
-          "The month-over-month shift is clear, and it is manageable.",
-          "This comparison is honest and useful. Great checkpoint.",
-          "We can work with this trend and keep you grounded."
+          "The direction is clear, and it gives you a concrete next step.",
+          "You can use this shift to plan with less stress.",
+          "Trend check, bestie: this is manageable and actionable.",
+          "Month-over-month signal is clear and actionable.",
+          "This is a useful checkpoint, and you are reading it at the right time.",
+          "The change is noticeable, but still inside your control window.",
+          "Comparison says adjust, not panic.",
+          "You can carry this trend into a smarter next month.",
+          "This movement is real, and now you can respond early.",
+          "Grounded comparison: this tells us exactly where to steer."
         ],
         "message": [
-          "No panic, bestie. We just need a little more activity.",
-          "This window is quiet right now, but we can rerun in seconds.",
-          "As soon as data lands, I will give you the full rundown.",
-          "You are early in the range. Totally normal.",
-          "Give me a bit more data and I will map this out cleanly."
+          "Quick status: we need a little more activity to call this cleanly.",
+          "You are early in the range, so this quiet window is normal.",
+          "No panic, bestie. We are just waiting on a bit more data.",
+          "Current data is light, but your setup is fine.",
+          "As soon as entries land, I can give you the full read.",
+          "This window is quiet right now, and that happens.",
+          "Give me one more batch and I can map this properly.",
+          "You are not missing anything, we just need more signal.",
+          "Once this fills in, your trends will be much clearer.",
+          "Short version: not enough data yet, but we are close."
         ]
       },
       "noData": [
@@ -43,21 +65,30 @@
         "Start simple and I will build with you: metric plus timeframe.",
         "Try a direct prompt and I will return a clear answer.",
         "If you include the date range, I can be much sharper.",
-        "Ask the question you would text your money bestie, and I will translate it to numbers."
+        "Ask the question you would text your money bestie, and I will translate it to numbers.",
+        "If you tell me month plus topic, I can give a precise answer fast.",
+        "Give me what and when, and I will do the rest.",
+        "Try this format: what you want, for which period, with optional card or category."
       ],
       "greeting": [
         "I am your budget bestie: fun vibes, grounded decisions.",
         "We can keep this practical and still let you live your life.",
         "I will give quick answers and honest direction.",
         "You bring the goals, I will bring the numbers.",
-        "Ask me anything budget-related and we will sort it fast."
+        "Ask me anything budget-related and we will sort it fast.",
+        "I keep this simple: clear numbers, grounded next steps.",
+        "If you ask it like a text, I can still return structured answers.",
+        "My job is quick money clarity without judgment."
       ],
       "followUpLeads": [
         "Bestie next step:",
         "Want to check:",
         "Let's look at:",
         "Try this with me:",
-        "Next move:"
+        "Next move:",
+        "Practical next:",
+        "Keep momentum:",
+        "Grounded follow-up:"
       ]
     }
   }

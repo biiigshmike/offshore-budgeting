@@ -32,7 +32,7 @@ struct HomeAssistantPersonaTests {
     // MARK: - Formatter
 
     @Test func formatter_unresolvedPromptAnswer_usesMarinaCopy() throws {
-        let formatter = HomeAssistantPersonaFormatter(variantIndexPicker: { _, _ in 0 })
+        let formatter = makeFixedFormatter()
         let answer = formatter.unresolvedPromptAnswer(
             for: "can you find my leaks?",
             personaID: .marina
@@ -46,20 +46,8 @@ struct HomeAssistantPersonaTests {
     }
 
     @Test func formatter_styledAnswer_preservesMetricsAndRows() throws {
-        let formatter = HomeAssistantPersonaFormatter(variantIndexPicker: { _, _ in 0 })
-        let raw = HomeAnswer(
-            id: UUID(uuidString: "AAAAAAAA-1111-2222-3333-BBBBBBBBBBBB")!,
-            queryID: UUID(uuidString: "CCCCCCCC-1111-2222-3333-DDDDDDDDDDDD")!,
-            kind: .metric,
-            title: "Spend This Month",
-            subtitle: "February 2026",
-            primaryValue: "$1,350.00",
-            rows: [
-                HomeAnswerRow(title: "Planned", value: "$1,100.00"),
-                HomeAnswerRow(title: "Variable", value: "$250.00")
-            ],
-            generatedAt: Date(timeIntervalSince1970: 1_700_000_000)
-        )
+        let formatter = makeFixedFormatter()
+        let raw = metricRawAnswer()
 
         let styled = formatter.styledAnswer(
             from: raw,
@@ -79,7 +67,7 @@ struct HomeAssistantPersonaTests {
     }
 
     @Test func formatter_greetingAnswer_returnsMarinaGreeting() throws {
-        let formatter = HomeAssistantPersonaFormatter(variantIndexPicker: { _, _ in 0 })
+        let formatter = makeFixedFormatter()
         let greeting = formatter.greetingAnswer(for: .marina)
 
         #expect(greeting.kind == .message)
@@ -89,7 +77,7 @@ struct HomeAssistantPersonaTests {
     }
 
     @Test func formatter_styledAnswer_noDataMessage_usesMarinaNoDataCopy() throws {
-        let formatter = HomeAssistantPersonaFormatter(variantIndexPicker: { _, _ in 0 })
+        let formatter = makeFixedFormatter()
         let raw = HomeAnswer(
             queryID: UUID(),
             kind: .message,
@@ -108,8 +96,10 @@ struct HomeAssistantPersonaTests {
         #expect(styled.rows.isEmpty)
     }
 
+    // MARK: - Follow-Up
+
     @Test func formatter_followUpSuggestions_returnDeterministicQueryIntents() throws {
-        let formatter = HomeAssistantPersonaFormatter(variantIndexPicker: { _, _ in 0 })
+        let formatter = makeFixedFormatter()
 
         let metricAnswer = HomeAnswer(queryID: UUID(), kind: .metric, title: "Spend", subtitle: nil, primaryValue: "$1", rows: [])
         let followUps = formatter.followUpSuggestions(after: metricAnswer, personaID: .marina)
@@ -120,7 +110,7 @@ struct HomeAssistantPersonaTests {
     }
 
     @Test func formatter_followUpSuggestions_budgetOverview_returnsNarrowingCardsFlow() throws {
-        let formatter = HomeAssistantPersonaFormatter(variantIndexPicker: { _, _ in 0 })
+        let formatter = makeFixedFormatter()
         let overview = HomeAnswer(queryID: UUID(), kind: .list, title: "Budget Overview", subtitle: nil, primaryValue: nil, rows: [])
 
         let followUps = formatter.followUpSuggestions(after: overview, personaID: .marina)
@@ -129,6 +119,22 @@ struct HomeAssistantPersonaTests {
         #expect(followUps[0].query.intent == .cardVariableSpendingHabits)
         #expect(followUps[1].query.intent == .topCategoriesThisMonth)
     }
+
+    @Test func formatter_followUpSuggestions_v2_usesPlainActionTitles() throws {
+        let formatter = HomeAssistantPersonaFormatter(
+            variantIndexPicker: { _, _ in 0 },
+            responseRules: .marinaV2
+        )
+        let metricAnswer = HomeAnswer(queryID: UUID(), kind: .metric, title: "Spend", subtitle: nil, primaryValue: "$1", rows: [])
+
+        let followUps = formatter.followUpSuggestions(after: metricAnswer, personaID: .marina)
+
+        #expect(followUps.count == 2)
+        #expect(followUps[0].title == "Top 3 categories this month")
+        #expect(followUps[1].title == "Compare with last month")
+    }
+
+    // MARK: - Variation
 
     @Test func formatter_styledAnswer_randomizesPersonaToneLines() throws {
         var nextIndex = 0
@@ -156,5 +162,27 @@ struct HomeAssistantPersonaTests {
         }
 
         #expect(uniqueSubtitles.count == 5)
+    }
+
+    // MARK: - Helpers
+
+    private func makeFixedFormatter() -> HomeAssistantPersonaFormatter {
+        HomeAssistantPersonaFormatter(variantIndexPicker: { _, _ in 0 })
+    }
+
+    private func metricRawAnswer() -> HomeAnswer {
+        HomeAnswer(
+            id: UUID(uuidString: "AAAAAAAA-1111-2222-3333-BBBBBBBBBBBB")!,
+            queryID: UUID(uuidString: "CCCCCCCC-1111-2222-3333-DDDDDDDDDDDD")!,
+            kind: .metric,
+            title: "Spend This Month",
+            subtitle: "February 2026",
+            primaryValue: "$1,350.00",
+            rows: [
+                HomeAnswerRow(title: "Planned", value: "$1,100.00"),
+                HomeAnswerRow(title: "Variable", value: "$250.00")
+            ],
+            generatedAt: Date(timeIntervalSince1970: 1_700_000_000)
+        )
     }
 }

@@ -257,6 +257,11 @@ struct HomeQueryEngine {
             range: previousRange
         )
         let delta = total - previousTotal
+        let status = periodStatusLabel(
+            total: total,
+            previousTotal: previousTotal,
+            delta: delta
+        )
 
         let metrics = HomeCategoryMetricsCalculator.calculate(
             categories: categories,
@@ -283,7 +288,8 @@ struct HomeQueryEngine {
             HomeAnswerRow(title: "Total spend", value: currency(total)),
             HomeAnswerRow(title: "Planned", value: currency(plannedTotal)),
             HomeAnswerRow(title: "Variable", value: currency(variableTotal)),
-            HomeAnswerRow(title: "Change vs previous period", value: deltaSummary(delta))
+            HomeAnswerRow(title: "Change vs previous period", value: deltaSummary(delta)),
+            HomeAnswerRow(title: "Status", value: status)
         ]
 
         if let topCategory = metrics.first {
@@ -609,7 +615,7 @@ struct HomeQueryEngine {
             .map { item in
                 HomeAnswerRow(
                     title: item.card,
-                    value: "\(currency(item.total)) • \(item.count)x • avg \(currency(item.average))"
+                    value: "\(currency(item.total)) total | \(item.count) txns | \(currency(item.average)) avg"
                 )
             }
 
@@ -1688,6 +1694,20 @@ struct HomeQueryEngine {
         let start = calendar.date(from: calendar.dateComponents([.year, .month], from: date)) ?? date
         let end = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: start) ?? start
         return HomeQueryDateRange(startDate: start, endDate: end)
+    }
+
+    private func periodStatusLabel(total: Double, previousTotal: Double, delta: Double) -> String {
+        guard total > 0 else { return "No activity yet" }
+        guard previousTotal > 0 else { return "Baseline period (no prior comparison)" }
+
+        let changeRatio = delta / previousTotal
+        if changeRatio <= -0.05 {
+            return "Good: spending improved vs previous period"
+        }
+        if changeRatio <= 0.10 {
+            return "OK: spending is relatively stable"
+        }
+        return "Watch: spending is above previous period"
     }
 
     private func weekRange(containing date: Date) -> HomeQueryDateRange {
