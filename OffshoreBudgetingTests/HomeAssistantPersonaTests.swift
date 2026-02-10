@@ -120,10 +120,10 @@ struct HomeAssistantPersonaTests {
         #expect(followUps[1].query.intent == .topCategoriesThisMonth)
     }
 
-    @Test func formatter_followUpSuggestions_v2_usesPlainActionTitles() throws {
+    @Test func formatter_followUpSuggestions_usesPlainActionTitles() throws {
         let formatter = HomeAssistantPersonaFormatter(
             variantIndexPicker: { _, _ in 0 },
-            responseRules: .marinaV2
+            responseRules: .marina
         )
         let metricAnswer = HomeAnswer(queryID: UUID(), kind: .metric, title: "Spend", subtitle: nil, primaryValue: "$1", rows: [])
 

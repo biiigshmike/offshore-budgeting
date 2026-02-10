@@ -145,8 +145,6 @@ struct HomeAssistantPanelView: View {
     @FocusState private var isPromptFieldFocused: Bool
     @AppStorage("general_defaultBudgetingPeriod")
     private var defaultBudgetingPeriodRaw: String = BudgetingPeriod.monthly.rawValue
-    @AppStorage("assistant_marinaResponseRulesV2Enabled")
-    private var marinaResponseRulesV2Enabled: Bool = false
 
     private let engine = HomeQueryEngine()
     private let parser = HomeAssistantTextParser()
@@ -158,13 +156,9 @@ struct HomeAssistantPanelView: View {
     private var personaFormatter: HomeAssistantPersonaFormatter {
         HomeAssistantPersonaFormatter(
             sessionSeed: personaSessionSeed,
-            responseRules: marinaResponseRules,
+            responseRules: .marina,
             cooldownSessionID: personaCooldownSessionID
         )
-    }
-
-    private var marinaResponseRules: HomeAssistantPersonaResponseRules {
-        marinaResponseRulesV2Enabled ? .marinaV2 : .legacy
     }
 
     private var defaultQueryPeriodUnit: HomeQueryPeriodUnit {

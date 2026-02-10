@@ -1,0 +1,48 @@
+Marina Test Matrix (Current)
+
+This matrix tracks implemented Marina behavior and test coverage in `MarinaResponseDraftTests.swift`.
+
+Canonical Fixture
+- personaID: .marina
+- prompt: "how am I doing this month?"
+- raw answer kind: .metric
+- raw title: "Spend This Month"
+- raw subtitle: "February 2026"
+- raw primaryValue: "$1,350.00"
+- raw rows: [Planned: $1,100.00, Variable: $250.00]
+
+Core Contract (Implemented)
+1. personaIntroductionAnswer_includesDisplayNameAndSummary
+2. styledAnswer_metric_containsPersonaLeadAndSourcesBlock
+3. styledAnswer_noDataMessage_usesNoDataTitleAndSources
+4. styledAnswer_preservesIdentityPayloadAndRows
+5. greetingAnswer_returnsMessageWithMarinaIdentity
+6. followUpSuggestions_metric_returnsTopCategoriesThenComparison
+7. styledAnswer_withStablePicker_isDeterministicForSameInput
+8. styledAnswer_withRotatingPicker_increasesSubtitleDiversity
+9. unresolvedPromptAnswer_preservesPromptAndClarifiesIntent
+10. styledAnswer_containsExactlyOneSourcesMarker
+
+Marina Behavior (Implemented)
+1. Footer includes Data window, Sources, Queries, Rules/Model.
+2. Seeded randomness by {actor|yyyyMM|intent} is deterministic.
+3. Cooldown blocks reusing last phrase indexes.
+4. Adjacent turns avoid immediate opener repetition.
+5. Numeric facts remain stable when phrase variant changes.
+6. User echo extraction appears for month/card/category/income and canonical context.
+7. Supportive line composition remains bounded (single composed persona lead block).
+8. Recommendation/status branch switches for ahead vs behind states.
+9. Provenance footer references only provided/executed query IDs.
+10. No placeholder leakage ({income}, {month}, etc).
+
+Additional Marina Coverage (Implemented)
+1. Canonical echo + structured footer compose end-to-end.
+2. Bundle footer preserves query order and separator formatting.
+3. Facts lead line appears before Sources in Marina.
+4. Echo text varies across repeated calls for same prompt.
+5. Snippet echoes are not locked to a single "You asked:" template.
+6. Status lanes route top-line tone for Good / OK / Watch.
+
+Residual Notes
+1. Keep phrase-ID/behavior assertions preferred over full subtitle snapshots.
+2. Keep strict string checks only for footer/provenance formatting.

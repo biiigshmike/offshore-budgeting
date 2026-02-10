@@ -64,17 +64,17 @@ enum HomeAssistantPersonaCatalog {
 // MARK: - Persona Formatter
 
 struct HomeAssistantPersonaResponseRules: Equatable {
-    let isMarinaV2Enabled: Bool
+    let isMarinaEnabled: Bool
     let rulesFooterLine: String
 
     static let legacy = HomeAssistantPersonaResponseRules(
-        isMarinaV2Enabled: false,
+        isMarinaEnabled: false,
         rulesFooterLine: ""
     )
 
-    static let marinaV2 = HomeAssistantPersonaResponseRules(
-        isMarinaV2Enabled: true,
-        rulesFooterLine: "Rules/Model: MarinaResponseRules v2.0 (non-LLM)"
+    static let marina = HomeAssistantPersonaResponseRules(
+        isMarinaEnabled: true,
+        rulesFooterLine: "Rules/Model: MarinaResponseRules v1.0 (non-LLM)"
     )
 }
 
@@ -220,12 +220,12 @@ struct HomeAssistantPersonaFormatter {
         let subtitle = composedSubtitle(
             personaLine: personaLine,
             factualSubtitle: factualSubtitle,
-            factualLeadLine: responseRules.isMarinaV2Enabled
+            factualLeadLine: responseRules.isMarinaEnabled
                 ? factsLeadLine(for: rawAnswer.kind, personaID: personaID, seedContext: seedContext, answerID: rawAnswer.id)
                 : nil,
-            rulesFooterLine: responseRules.isMarinaV2Enabled ? responseRules.rulesFooterLine : nil,
-            footerContext: responseRules.isMarinaV2Enabled ? footerContext : nil,
-            userEchoLine: responseRules.isMarinaV2Enabled
+            rulesFooterLine: responseRules.isMarinaEnabled ? responseRules.rulesFooterLine : nil,
+            footerContext: responseRules.isMarinaEnabled ? footerContext : nil,
+            userEchoLine: responseRules.isMarinaEnabled
                 ? userEchoLine(from: userPrompt, seedContext: seedContext, echoContext: echoContext)
                 : nil
         )
@@ -332,7 +332,7 @@ struct HomeAssistantPersonaFormatter {
         personaID: HomeAssistantPersonaID,
         seedContext: HomeAssistantPersonaSeedContext?
     ) -> String? {
-        if responseRules.isMarinaV2Enabled, let statusBand = statusBand(from: answer) {
+        if responseRules.isMarinaEnabled, let statusBand = statusBand(from: answer) {
             let statusLine = randomLine(
                 from: statusResponseLines(for: statusBand),
                 key: statusResponseLineKey(
@@ -387,7 +387,7 @@ struct HomeAssistantPersonaFormatter {
         guard lines.isEmpty == false else { return nil }
         let preferredIndex = min(max(0, variantIndexPicker(lines.count, key)), lines.count - 1)
 
-        guard responseRules.isMarinaV2Enabled, shouldApplyCooldown(for: key) else {
+        guard responseRules.isMarinaEnabled, shouldApplyCooldown(for: key) else {
             return lines[preferredIndex]
         }
 
@@ -418,7 +418,7 @@ struct HomeAssistantPersonaFormatter {
         answerID: UUID,
         seedContext: HomeAssistantPersonaSeedContext?
     ) -> String {
-        guard responseRules.isMarinaV2Enabled, let seedContext else {
+        guard responseRules.isMarinaEnabled, let seedContext else {
             return "response.\(personaID.rawValue).\(answerKind.rawValue).\(answerID.uuidString)"
         }
 
@@ -431,7 +431,7 @@ struct HomeAssistantPersonaFormatter {
         answerID: UUID,
         seedContext: HomeAssistantPersonaSeedContext?
     ) -> String {
-        guard responseRules.isMarinaV2Enabled, let seedContext else {
+        guard responseRules.isMarinaEnabled, let seedContext else {
             return "response.\(personaID.rawValue).status.\(statusBand.rawValue).\(answerID.uuidString)"
         }
 
@@ -439,7 +439,7 @@ struct HomeAssistantPersonaFormatter {
     }
 
     private func statusBand(from answer: HomeAnswer) -> PersonaStatusBand? {
-        guard responseRules.isMarinaV2Enabled else { return nil }
+        guard responseRules.isMarinaEnabled else { return nil }
         guard let statusRow = answer.rows.first(where: { $0.title.caseInsensitiveCompare("Status") == .orderedSame }) else {
             return nil
         }
@@ -525,7 +525,7 @@ struct HomeAssistantPersonaFormatter {
         }
 
         guard
-            let rulesFooter = v2FooterText(footerContext: footerContext, rulesFooterLine: rulesFooterLine),
+            let rulesFooter = rulesFooterText(footerContext: footerContext, rulesFooterLine: rulesFooterLine),
             rulesFooter.isEmpty == false
         else {
             return subtitleBody
@@ -814,7 +814,7 @@ struct HomeAssistantPersonaFormatter {
         return randomLine(from: lines, key: key)
     }
 
-    private func v2FooterText(
+    private func rulesFooterText(
         footerContext: HomeAssistantPersonaFooterContext?,
         rulesFooterLine: String?
     ) -> String? {

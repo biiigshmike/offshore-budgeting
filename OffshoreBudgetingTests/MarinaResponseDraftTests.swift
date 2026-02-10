@@ -1,5 +1,5 @@
 //
-//  MarinaV2ResponseDraftTests.swift
+//  MarinaResponseDraftTests.swift
 //  OffshoreBudgetingTests
 //
 //  Created by Codex on 2/10/26.
@@ -10,7 +10,7 @@ import Testing
 @testable import Offshore
 
 @MainActor
-struct MarinaV2ResponseDraftTests {
+struct MarinaResponseDraftTests {
 
     // MARK: - Contract Baseline
 
@@ -146,19 +146,19 @@ struct MarinaV2ResponseDraftTests {
         #expect(MarinaResponseAssertions.hasSingleSourcesMarker(styled))
     }
 
-    // MARK: - V2 Footer
+    // MARK: - Marina Footer
 
-    @Test func styledAnswer_whenV2RulesEnabled_appendsRulesModelFooter() throws {
-        let formatter = makeV2Formatter()
+    @Test func styledAnswer_whenMarinaRulesEnabled_appendsRulesModelFooter() throws {
+        let formatter = makeMarinaFormatter()
         let raw = MarinaResponseFixtures.metricRawAnswer()
 
         let styled = formatter.styledAnswer(from: raw, userPrompt: "spend this month", personaID: .marina)
 
-        #expect(styled.subtitle?.contains("Rules/Model: MarinaResponseRules v2.0 (non-LLM)") == true)
+        #expect(styled.subtitle?.contains("Rules/Model: MarinaResponseRules v1.0 (non-LLM)") == true)
     }
 
-    @Test func styledAnswer_whenV2RulesEnabled_includesStructuredFooterFields() throws {
-        let formatter = makeV2Formatter()
+    @Test func styledAnswer_whenMarinaRulesEnabled_includesStructuredFooterFields() throws {
+        let formatter = makeMarinaFormatter()
         let raw = MarinaResponseFixtures.metricRawAnswer()
         let footerContext = HomeAssistantPersonaFooterContext(
             dataWindow: "2026-02-01–2026-02-10",
@@ -173,7 +173,7 @@ struct MarinaV2ResponseDraftTests {
             footerContext: footerContext
         )
 
-        expectV2Footer(
+        expectMarinaFooter(
             in: styled.subtitle,
             dataWindow: "2026-02-01–2026-02-10",
             sourcesCSV: "PlannedExpense, VariableExpense, Income",
@@ -181,10 +181,10 @@ struct MarinaV2ResponseDraftTests {
         )
     }
 
-    // MARK: - V2 Cooldown
+    // MARK: - Marina Cooldown
 
-    @Test func styledAnswer_whenV2RulesEnabled_avoidsImmediateRepeatWithFixedPicker() throws {
-        let formatter = makeV2Formatter()
+    @Test func styledAnswer_whenMarinaRulesEnabled_avoidsImmediateRepeatWithFixedPicker() throws {
+        let formatter = makeMarinaFormatter()
         let raw = MarinaResponseFixtures.metricRawAnswer()
 
         let first = formatter.styledAnswer(from: raw, userPrompt: "spend this month", personaID: .marina)
@@ -193,8 +193,8 @@ struct MarinaV2ResponseDraftTests {
         #expect(first.subtitle != second.subtitle)
     }
 
-    @Test func styledAnswer_whenV2RulesEnabled_blocksLastTwoPhraseIndexes() throws {
-        let formatter = makeV2Formatter()
+    @Test func styledAnswer_whenMarinaRulesEnabled_blocksLastTwoPhraseIndexes() throws {
+        let formatter = makeMarinaFormatter()
         let raw = MarinaResponseFixtures.metricRawAnswer()
 
         let first = formatter.styledAnswer(from: raw, userPrompt: "spend this month", personaID: .marina)
@@ -205,16 +205,16 @@ struct MarinaV2ResponseDraftTests {
         #expect(unique.count == 3)
     }
 
-    // MARK: - V2 Seed
+    // MARK: - Marina Seed
 
-    @Test func styledAnswer_whenV2RulesEnabled_sameSeedContextIgnoresAnswerIDAcrossSessions() throws {
+    @Test func styledAnswer_whenMarinaRulesEnabled_sameSeedContextIgnoresAnswerIDAcrossSessions() throws {
         let firstFormatter = HomeAssistantPersonaFormatter(
             sessionSeed: 42,
-            responseRules: .marinaV2
+            responseRules: .marina
         )
         let secondFormatter = HomeAssistantPersonaFormatter(
             sessionSeed: 42,
-            responseRules: .marinaV2
+            responseRules: .marina
         )
         let seedContext = HomeAssistantPersonaSeedContext.from(
             actorID: "workspace-123",
@@ -246,14 +246,14 @@ struct MarinaV2ResponseDraftTests {
         #expect(first.subtitle == second.subtitle)
     }
 
-    @Test func styledAnswer_whenV2RulesEnabled_seedKeyIncludesActorIntentAndMonth() throws {
+    @Test func styledAnswer_whenMarinaRulesEnabled_seedKeyIncludesActorIntentAndMonth() throws {
         var observedKeys: [String] = []
         let formatter = HomeAssistantPersonaFormatter(
             variantIndexPicker: { _, key in
                 observedKeys.append(key)
                 return 0
             },
-            responseRules: .marinaV2
+            responseRules: .marina
         )
         let seedContext = HomeAssistantPersonaSeedContext.from(
             actorID: "workspace-abc",
@@ -276,10 +276,10 @@ struct MarinaV2ResponseDraftTests {
         #expect(responseKey?.contains(raw.id.uuidString) == false)
     }
 
-    // MARK: - V2 Echo
+    // MARK: - Marina Echo
 
-    @Test func styledAnswer_whenV2RulesEnabled_includesPromptEchoLine() throws {
-        let formatter = makeV2Formatter()
+    @Test func styledAnswer_whenMarinaRulesEnabled_includesPromptEchoLine() throws {
+        let formatter = makeMarinaFormatter()
         let raw = MarinaResponseFixtures.metricRawAnswer()
 
         let styled = formatter.styledAnswer(
@@ -291,8 +291,8 @@ struct MarinaV2ResponseDraftTests {
         #expect(styled.subtitle?.contains("You asked about this month") == true)
     }
 
-    @Test func styledAnswer_whenV2RulesEnabled_blankPromptDoesNotIncludeEchoLine() throws {
-        let formatter = makeV2Formatter()
+    @Test func styledAnswer_whenMarinaRulesEnabled_blankPromptDoesNotIncludeEchoLine() throws {
+        let formatter = makeMarinaFormatter()
         let raw = MarinaResponseFixtures.metricRawAnswer()
 
         let styled = formatter.styledAnswer(
@@ -305,8 +305,8 @@ struct MarinaV2ResponseDraftTests {
         #expect(styled.subtitle?.contains("You asked about this month") == false)
     }
 
-    @Test func styledAnswer_whenV2RulesEnabled_cardPromptEchoesCardName() throws {
-        let formatter = makeV2Formatter()
+    @Test func styledAnswer_whenMarinaRulesEnabled_cardPromptEchoesCardName() throws {
+        let formatter = makeMarinaFormatter()
         let raw = MarinaResponseFixtures.metricRawAnswer()
 
         let styled = formatter.styledAnswer(
@@ -318,8 +318,8 @@ struct MarinaV2ResponseDraftTests {
         #expect(styled.subtitle?.contains("blue card") == true)
     }
 
-    @Test func styledAnswer_whenV2RulesEnabled_incomePromptEchoesSource() throws {
-        let formatter = makeV2Formatter()
+    @Test func styledAnswer_whenMarinaRulesEnabled_incomePromptEchoesSource() throws {
+        let formatter = makeMarinaFormatter()
         let raw = MarinaResponseFixtures.metricRawAnswer()
 
         let styled = formatter.styledAnswer(
@@ -331,8 +331,8 @@ struct MarinaV2ResponseDraftTests {
         #expect(styled.subtitle?.contains("income from salary") == true)
     }
 
-    @Test func styledAnswer_whenV2RulesEnabled_intentFallbackUsesCategoryEcho() throws {
-        let formatter = makeV2Formatter()
+    @Test func styledAnswer_whenMarinaRulesEnabled_intentFallbackUsesCategoryEcho() throws {
+        let formatter = makeMarinaFormatter()
         let raw = MarinaResponseFixtures.metricRawAnswer()
         let seedContext = HomeAssistantPersonaSeedContext.from(
             actorID: "workspace-abc",
@@ -350,8 +350,8 @@ struct MarinaV2ResponseDraftTests {
         #expect(styled.subtitle?.contains("category-level spending") == true)
     }
 
-    @Test func styledAnswer_whenV2RulesEnabled_echoContextUsesCanonicalCardName() throws {
-        let formatter = makeV2Formatter()
+    @Test func styledAnswer_whenMarinaRulesEnabled_echoContextUsesCanonicalCardName() throws {
+        let formatter = makeMarinaFormatter()
         let raw = MarinaResponseFixtures.metricRawAnswer()
         let echoContext = HomeAssistantPersonaEchoContext(
             cardName: "Chase Sapphire Reserve",
@@ -369,8 +369,8 @@ struct MarinaV2ResponseDraftTests {
         #expect(styled.subtitle?.contains("Chase Sapphire Reserve") == true)
     }
 
-    @Test func styledAnswer_whenV2RulesEnabled_echoContextUsesCanonicalCategoryName() throws {
-        let formatter = makeV2Formatter()
+    @Test func styledAnswer_whenMarinaRulesEnabled_echoContextUsesCanonicalCategoryName() throws {
+        let formatter = makeMarinaFormatter()
         let raw = MarinaResponseFixtures.metricRawAnswer()
         let echoContext = HomeAssistantPersonaEchoContext(
             cardName: nil,
@@ -388,8 +388,8 @@ struct MarinaV2ResponseDraftTests {
         #expect(styled.subtitle?.contains("Groceries") == true)
     }
 
-    @Test func styledAnswer_whenV2RulesEnabled_echoContextUsesCanonicalIncomeSourceName() throws {
-        let formatter = makeV2Formatter()
+    @Test func styledAnswer_whenMarinaRulesEnabled_echoContextUsesCanonicalIncomeSourceName() throws {
+        let formatter = makeMarinaFormatter()
         let raw = MarinaResponseFixtures.metricRawAnswer()
         let echoContext = HomeAssistantPersonaEchoContext(
             cardName: nil,
@@ -407,8 +407,8 @@ struct MarinaV2ResponseDraftTests {
         #expect(styled.subtitle?.contains("income from Salary") == true)
     }
 
-    @Test func styledAnswer_whenV2RulesEnabled_includesFactsLeadLineBeforeSources() throws {
-        let formatter = makeV2Formatter()
+    @Test func styledAnswer_whenMarinaRulesEnabled_includesFactsLeadLineBeforeSources() throws {
+        let formatter = makeMarinaFormatter()
         let raw = MarinaResponseFixtures.metricRawAnswer()
 
         let styled = formatter.styledAnswer(
@@ -420,10 +420,10 @@ struct MarinaV2ResponseDraftTests {
         #expect(styled.subtitle?.contains("Here is the direct read:\nSources:") == true)
     }
 
-    @Test func styledAnswer_whenV2RulesEnabled_repeatedMonthPromptVariesEchoLine() throws {
+    @Test func styledAnswer_whenMarinaRulesEnabled_repeatedMonthPromptVariesEchoLine() throws {
         let formatter = HomeAssistantPersonaFormatter(
             variantIndexPicker: { _, _ in 0 },
-            responseRules: .marinaV2,
+            responseRules: .marina,
             cooldownSessionID: "echo-variation-session"
         )
         let raw = MarinaResponseFixtures.metricRawAnswer()
@@ -444,10 +444,10 @@ struct MarinaV2ResponseDraftTests {
         #expect(firstPersona != secondPersona)
     }
 
-    @Test func styledAnswer_whenV2RulesEnabled_metricResponsesCoverMultipleToneLanes() throws {
+    @Test func styledAnswer_whenMarinaRulesEnabled_metricResponsesCoverMultipleToneLanes() throws {
         let formatter = HomeAssistantPersonaFormatter(
             variantIndexPicker: { _, _ in 0 },
-            responseRules: .marinaV2,
+            responseRules: .marina,
             cooldownSessionID: "lane-balance-session"
         )
         let raw = MarinaResponseFixtures.metricRawAnswer()
@@ -469,7 +469,7 @@ struct MarinaV2ResponseDraftTests {
         #expect(personaLines.contains(where: { $0.contains("bestie") || $0.contains("cute progress") }))
     }
 
-    @Test func styledAnswer_whenV2RulesEnabled_snippetEchoDoesNotAlwaysUseYouAskedPrefix() throws {
+    @Test func styledAnswer_whenMarinaRulesEnabled_snippetEchoDoesNotAlwaysUseYouAskedPrefix() throws {
         var counters: [String: Int] = [:]
         let formatter = HomeAssistantPersonaFormatter(
             variantIndexPicker: { upperBound, key in
@@ -478,7 +478,7 @@ struct MarinaV2ResponseDraftTests {
                 counters[key] = current + 1
                 return current % upperBound
             },
-            responseRules: .marinaV2,
+            responseRules: .marina,
             cooldownSessionID: "snippet-diversity-session"
         )
         let raw = MarinaResponseFixtures.metricRawAnswer()
@@ -500,8 +500,8 @@ struct MarinaV2ResponseDraftTests {
         #expect(personaLines.contains(where: { $0.contains("You asked:") == false }))
     }
 
-    @Test func styledAnswer_whenV2RulesEnabled_statusGood_usesGoodStatusToneLane() throws {
-        let formatter = makeV2Formatter()
+    @Test func styledAnswer_whenMarinaRulesEnabled_statusGood_usesGoodStatusToneLane() throws {
+        let formatter = makeMarinaFormatter()
         let raw = HomeAnswer(
             queryID: UUID(),
             kind: .list,
@@ -522,8 +522,8 @@ struct MarinaV2ResponseDraftTests {
         #expect(styled.subtitle?.contains("You made progress against last period. Keep this exact energy.") == true)
     }
 
-    @Test func styledAnswer_whenV2RulesEnabled_statusOk_usesOkStatusToneLane() throws {
-        let formatter = makeV2Formatter()
+    @Test func styledAnswer_whenMarinaRulesEnabled_statusOk_usesOkStatusToneLane() throws {
+        let formatter = makeMarinaFormatter()
         let raw = HomeAnswer(
             queryID: UUID(),
             kind: .list,
@@ -544,8 +544,8 @@ struct MarinaV2ResponseDraftTests {
         #expect(styled.subtitle?.contains("You are steady right now, which is a solid base.") == true)
     }
 
-    @Test func styledAnswer_whenV2RulesEnabled_statusWatch_usesWatchStatusToneLane() throws {
-        let formatter = makeV2Formatter()
+    @Test func styledAnswer_whenMarinaRulesEnabled_statusWatch_usesWatchStatusToneLane() throws {
+        let formatter = makeMarinaFormatter()
         let raw = HomeAnswer(
             queryID: UUID(),
             kind: .list,
@@ -564,6 +564,40 @@ struct MarinaV2ResponseDraftTests {
         )
 
         #expect(styled.subtitle?.contains("This month needs a tighter pass, and we can do that quickly.") == true)
+    }
+
+    @Test func styledAnswer_whenMarinaRulesEnabled_recommendationBranch_switchesForAheadVsBehindStatus() throws {
+        let formatter = makeMarinaFormatter()
+        let aheadRaw = HomeAnswer(
+            queryID: UUID(),
+            kind: .list,
+            title: "Budget Overview",
+            subtitle: "February 2026",
+            primaryValue: "$1,200.00",
+            rows: [HomeAnswerRow(title: "Status", value: "Good: spending improved vs previous period")]
+        )
+        let behindRaw = HomeAnswer(
+            queryID: UUID(),
+            kind: .list,
+            title: "Budget Overview",
+            subtitle: "February 2026",
+            primaryValue: "$1,600.00",
+            rows: [HomeAnswerRow(title: "Status", value: "Watch: spending is above previous period")]
+        )
+
+        let ahead = formatter.styledAnswer(
+            from: aheadRaw,
+            userPrompt: "how am I doing this month?",
+            personaID: .marina
+        )
+        let behind = formatter.styledAnswer(
+            from: behindRaw,
+            userPrompt: "how am I doing this month?",
+            personaID: .marina
+        )
+
+        #expect(ahead.subtitle?.contains("Keep this exact energy") == true)
+        #expect(behind.subtitle?.contains("tighter pass") == true)
     }
 
     @Test func copyLibrary_marinaResponsePoolsAreExpandedForVariety() throws {
@@ -599,12 +633,12 @@ struct MarinaV2ResponseDraftTests {
         #expect(listSubtitles.count >= 8)
     }
 
-    // MARK: - V2 Integration
+    // MARK: - Marina Integration
 
-    @Test func styledAnswer_whenV2RulesEnabled_composesCanonicalEchoAndStructuredFooterEndToEnd() throws {
+    @Test func styledAnswer_whenMarinaRulesEnabled_composesCanonicalEchoAndStructuredFooterEndToEnd() throws {
         let formatter = HomeAssistantPersonaFormatter(
             sessionSeed: 99,
-            responseRules: .marinaV2,
+            responseRules: .marina,
             cooldownSessionID: "integration-session"
         )
         let raw = MarinaResponseFixtures.metricRawAnswer(
@@ -637,7 +671,7 @@ struct MarinaV2ResponseDraftTests {
         )
 
         #expect(styled.subtitle?.contains("Chase Sapphire Reserve") == true)
-        expectV2Footer(
+        expectMarinaFooter(
             in: styled.subtitle,
             dataWindow: "2026-02-01–2026-02-10",
             sourcesCSV: "Category, PlannedExpense, VariableExpense",
@@ -645,10 +679,10 @@ struct MarinaV2ResponseDraftTests {
         )
     }
 
-    @Test func styledAnswer_whenV2RulesEnabled_bundleFooterKeepsMultiQueryOrderAndSeparator() throws {
+    @Test func styledAnswer_whenMarinaRulesEnabled_bundleFooterKeepsMultiQueryOrderAndSeparator() throws {
         let formatter = HomeAssistantPersonaFormatter(
             variantIndexPicker: { _, _ in 0 },
-            responseRules: .marinaV2,
+            responseRules: .marina,
             cooldownSessionID: "bundle-footer-session"
         )
         let raw = HomeAnswer(
@@ -684,16 +718,58 @@ struct MarinaV2ResponseDraftTests {
         #expect(styled.subtitle?.contains("Queries: periodOverview#Q1, savingsStatus#Q2, topCategoriesThisMonth#Q3, cardVariableSpendingHabits#Q4") == true)
     }
 
+    @Test func styledAnswer_whenMarinaRulesEnabled_provenanceReferencesOnlyExecutedQueryIDs() throws {
+        let formatter = makeMarinaFormatter()
+        let raw = MarinaResponseFixtures.metricRawAnswer()
+        let executedQueryID = "spendThisMonth#Q-ONLY"
+        let unexecutedQueryID = "topCategoriesThisMonth#Q-NOT-RUN"
+        let footerContext = HomeAssistantPersonaFooterContext(
+            dataWindow: "2026-02-01–2026-02-10",
+            sources: ["Categories", "Variable expenses"],
+            queries: [executedQueryID]
+        )
+
+        let styled = formatter.styledAnswer(
+            from: raw,
+            userPrompt: "spend this month",
+            personaID: .marina,
+            footerContext: footerContext
+        )
+
+        #expect(styled.subtitle?.contains("Queries: \(executedQueryID)") == true)
+        #expect(styled.subtitle?.contains(unexecutedQueryID) == false)
+    }
+
+    @Test func styledAnswer_whenMarinaRulesEnabled_hasNoPlaceholderLeakage() throws {
+        let formatter = makeMarinaFormatter()
+        let raw = MarinaResponseFixtures.metricRawAnswer()
+        let footerContext = HomeAssistantPersonaFooterContext(
+            dataWindow: "2026-02-01–2026-02-10",
+            sources: ["Categories", "Income"],
+            queries: ["periodOverview#Q1"]
+        )
+
+        let styled = formatter.styledAnswer(
+            from: raw,
+            userPrompt: "how am I doing this month?",
+            personaID: .marina,
+            footerContext: footerContext
+        )
+
+        #expect(styled.subtitle?.contains("{") == false)
+        #expect(styled.subtitle?.contains("}") == false)
+    }
+
     // MARK: - Helpers
 
-    private func makeV2Formatter() -> HomeAssistantPersonaFormatter {
+    private func makeMarinaFormatter() -> HomeAssistantPersonaFormatter {
         HomeAssistantPersonaFormatter(
             variantIndexPicker: { _, _ in 0 },
-            responseRules: .marinaV2
+            responseRules: .marina
         )
     }
 
-    private func expectV2Footer(
+    private func expectMarinaFooter(
         in subtitle: String?,
         dataWindow: String,
         sourcesCSV: String,
@@ -702,6 +778,6 @@ struct MarinaV2ResponseDraftTests {
         #expect(subtitle?.contains("Data window: \(dataWindow)") == true)
         #expect(subtitle?.contains("Sources: \(sourcesCSV)") == true)
         #expect(subtitle?.contains("Queries: \(queriesCSV)") == true)
-        #expect(subtitle?.contains("Rules/Model: MarinaResponseRules v2.0 (non-LLM)") == true)
+        #expect(subtitle?.contains("Rules/Model: MarinaResponseRules v1.0 (non-LLM)") == true)
     }
 }
