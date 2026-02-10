@@ -13,10 +13,7 @@ enum IncomeWidgetPeriod: String, CaseIterable, Identifiable, Codable, Hashable, 
     case oneWeek = "1W"
     case oneMonth = "1M"
     case oneYear = "1Y"
-    case q1 = "Q1"
-    case q2 = "Q2"
-    case q3 = "Q3"
-    case q4 = "Q4"
+    case q = "Q"
 
     var id: String { rawValue }
 }

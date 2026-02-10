@@ -15,6 +15,8 @@ struct ContentView: View {
     @AppStorage("selectedWorkspaceID") private var selectedWorkspaceID: String = ""
     @AppStorage("didSeedDefaultWorkspaces") private var didSeedDefaultWorkspaces: Bool = false
     @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
+    @AppStorage("general_defaultBudgetingPeriod")
+    private var defaultBudgetingPeriodRaw: String = BudgetingPeriod.monthly.rawValue
 
     // MARK: - Notifications
 
@@ -109,6 +111,7 @@ struct ContentView: View {
                 CardWidgetSnapshotStore.setSelectedWorkspaceID(selectedWorkspaceID)
                 NextPlannedExpenseWidgetSnapshotStore.setSelectedWorkspaceID(selectedWorkspaceID)
                 SpendTrendsWidgetSnapshotStore.setSelectedWorkspaceID(selectedWorkspaceID)
+                syncDefaultBudgetingPeriodToWidgets()
 
                 refreshIncomeWidgetSnapshotsIfPossible()
                 refreshCardWidgetSnapshotsIfPossible()
@@ -129,6 +132,13 @@ struct ContentView: View {
                 refreshSpendTrendsWidgetSnapshotsIfPossible()
 
                 Task { await syncNotificationSchedulesIfPossible() }
+            }
+            .onChange(of: defaultBudgetingPeriodRaw) { _, _ in
+                syncDefaultBudgetingPeriodToWidgets()
+                refreshIncomeWidgetSnapshotsIfPossible()
+                refreshCardWidgetSnapshotsIfPossible()
+                refreshNextPlannedExpenseWidgetSnapshotsIfPossible()
+                refreshSpendTrendsWidgetSnapshotsIfPossible()
             }
             .onChange(of: scenePhase) { _, newPhase in
                 // fter SwiftData/iCloud finishes loading, the app often
@@ -218,6 +228,11 @@ struct ContentView: View {
             modelContext: modelContext,
             workspaceID: id
         )
+    }
+
+    private func syncDefaultBudgetingPeriodToWidgets() {
+        guard let defaults = UserDefaults(suiteName: IncomeWidgetSnapshotStore.appGroupID) else { return }
+        defaults.set(defaultBudgetingPeriodRaw, forKey: "general_defaultBudgetingPeriod")
     }
 
     // MARK: - Notification Sync

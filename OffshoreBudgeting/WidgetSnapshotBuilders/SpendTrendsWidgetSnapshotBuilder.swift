@@ -13,6 +13,7 @@ enum SpendTrendsWidgetSnapshotBuilder {
     private enum Granularity {
         case day
         case month
+        case quarter
         case monthRanges
     }
 
@@ -85,8 +86,6 @@ enum SpendTrendsWidgetSnapshotBuilder {
         topN: Int
     ) -> SpendTrendsWidgetSnapshot? {
         let resolved = resolvedRange(
-            modelContext: modelContext,
-            workspaceID: workspaceID,
             period: period,
             now: now
         )
@@ -249,8 +248,6 @@ enum SpendTrendsWidgetSnapshotBuilder {
     // MARK: - Range resolution
 
     private static func resolvedRange(
-        modelContext: ModelContext,
-        workspaceID: UUID,
         period: SpendTrendsWidgetPeriod,
         now: Date
     ) -> (start: Date, end: Date, granularity: Granularity) {
@@ -258,27 +255,10 @@ enum SpendTrendsWidgetSnapshotBuilder {
 
         switch period {
         case .period:
-            let wid = workspaceID
-            let descriptor = FetchDescriptor<Budget>(
-                predicate: #Predicate<Budget> { budget in
-                    budget.workspace?.id == wid
-                    && budget.startDate <= now
-                    && budget.endDate >= now
-                },
-                sortBy: [SortDescriptor(\Budget.startDate, order: .reverse)]
-            )
-
-            let baseStart: Date
-            let baseEnd: Date
-
-            if let active = (try? modelContext.fetch(descriptor))?.first {
-                baseStart = active.startDate
-                baseEnd = active.endDate
-            } else {
-                let fallbackStart = cal.date(byAdding: .day, value: -29, to: now) ?? now
-                baseStart = startOfDay(fallbackStart)
-                baseEnd = endOfDay(now)
-            }
+            let defaultBudgetingPeriod = defaultBudgetingPeriodFromSharedDefaults()
+            let range = defaultBudgetingPeriod.defaultRange(containing: now, calendar: cal)
+            let baseStart = startOfDay(range.start)
+            let baseEnd = endOfDay(range.end)
 
             let days = max(1, cal.dateComponents([.day], from: baseStart, to: baseEnd).day ?? 1)
             let granularity: Granularity
@@ -293,38 +273,28 @@ enum SpendTrendsWidgetSnapshotBuilder {
             return (startOfDay(baseStart), endOfDay(baseEnd), granularity)
 
         case .oneWeek:
-            let start = cal.date(byAdding: .day, value: -6, to: now) ?? now
-            return (startOfDay(start), endOfDay(now), .day)
+            let interval = cal.dateInterval(of: .weekOfYear, for: now)
+            let start = interval?.start ?? startOfDay(now)
+            let end = cal.date(byAdding: DateComponents(day: 6), to: start) ?? now
+            return (startOfDay(start), endOfDay(end), .day)
 
         case .oneMonth:
-            let start = cal.date(byAdding: .day, value: -29, to: now) ?? now
-            return (startOfDay(start), endOfDay(now), .monthRanges)
+            let interval = cal.dateInterval(of: .month, for: now)
+            let start = interval?.start ?? startOfDay(now)
+            let end = cal.date(byAdding: DateComponents(month: 1, day: -1), to: start) ?? now
+            return (startOfDay(start), endOfDay(end), .monthRanges)
 
         case .oneYear:
-            let start = cal.date(byAdding: .month, value: -11, to: now) ?? now
-            let monthStart = cal.date(from: cal.dateComponents([.year, .month], from: start)) ?? start
-            return (startOfDay(monthStart), endOfDay(now), .month)
-
-        case .q1, .q2, .q3, .q4:
-            let year = cal.component(.year, from: now)
-
-            let quarterIndex: Int
-            switch period {
-            case .q1: quarterIndex = 0
-            case .q2: quarterIndex = 1
-            case .q3: quarterIndex = 2
-            case .q4: quarterIndex = 3
-            default: quarterIndex = 0
-            }
-
-            let startMonth = (quarterIndex * 3) + 1
-            let start = cal.date(from: DateComponents(year: year, month: startMonth, day: 1)) ?? now
-
-            let endMonth = startMonth + 2
-            let endStart = cal.date(from: DateComponents(year: year, month: endMonth, day: 1)) ?? now
-            let end = cal.date(byAdding: DateComponents(month: 1, day: -1), to: endStart) ?? now
-
+            let interval = cal.dateInterval(of: .year, for: now)
+            let start = interval?.start ?? startOfDay(now)
+            let end = cal.date(byAdding: DateComponents(year: 1, day: -1), to: start) ?? now
             return (startOfDay(start), endOfDay(end), .month)
+
+        case .q:
+            let interval = cal.dateInterval(of: .year, for: now)
+            let start = interval?.start ?? startOfDay(now)
+            let end = cal.date(byAdding: DateComponents(year: 1, day: -1), to: start) ?? now
+            return (startOfDay(start), endOfDay(end), .quarter)
         }
     }
 
@@ -454,6 +424,8 @@ enum SpendTrendsWidgetSnapshotBuilder {
             return makeDayBuckets(start: start, end: end)
         case .month:
             return makeMonthBuckets(start: start, end: end)
+        case .quarter:
+            return makeQuarterBuckets(start: start, end: end)
         case .monthRanges:
             return makeMonthRangeBuckets(start: start, end: end)
         }
@@ -481,6 +453,22 @@ enum SpendTrendsWidgetSnapshotBuilder {
         var cursor = startOfMonth(containing: start)
         while cursor <= end {
             let next = cal.date(byAdding: .month, value: 1, to: cursor) ?? cursor
+            let bucketStart = max(cursor, start)
+            let bucketEnd = min(endOfDay(cal.date(byAdding: DateComponents(second: -1), to: next) ?? cursor), end)
+            buckets.append((start: bucketStart, end: bucketEnd))
+            cursor = next
+        }
+
+        return buckets
+    }
+
+    private static func makeQuarterBuckets(start: Date, end: Date) -> [(start: Date, end: Date)] {
+        let cal = Calendar.current
+        var buckets: [(start: Date, end: Date)] = []
+
+        var cursor = startOfQuarter(containing: start)
+        while cursor <= end {
+            let next = cal.date(byAdding: .month, value: 3, to: cursor) ?? cursor
             let bucketStart = max(cursor, start)
             let bucketEnd = min(endOfDay(cal.date(byAdding: DateComponents(second: -1), to: next) ?? cursor), end)
             buckets.append((start: bucketStart, end: bucketEnd))
@@ -545,6 +533,10 @@ enum SpendTrendsWidgetSnapshotBuilder {
             return start.formatted(.dateTime.month(.abbreviated).day())
         case .month:
             return start.formatted(.dateTime.month(.abbreviated))
+        case .quarter:
+            let month = cal.component(.month, from: start)
+            let quarter = ((month - 1) / 3) + 1
+            return "Q\(quarter)"
         case .monthRanges:
             let startDay = cal.component(.day, from: start)
             let endDay = cal.component(.day, from: end)
@@ -573,5 +565,19 @@ enum SpendTrendsWidgetSnapshotBuilder {
     private static func startOfMonth(containing date: Date) -> Date {
         let cal = Calendar.current
         return cal.date(from: cal.dateComponents([.year, .month], from: date)) ?? date
+    }
+
+    private static func startOfQuarter(containing date: Date) -> Date {
+        let cal = Calendar.current
+        let year = cal.component(.year, from: date)
+        let month = cal.component(.month, from: date)
+        let quarterStartMonth = ((month - 1) / 3) * 3 + 1
+        return cal.date(from: DateComponents(year: year, month: quarterStartMonth, day: 1)) ?? date
+    }
+
+    private static func defaultBudgetingPeriodFromSharedDefaults() -> BudgetingPeriod {
+        let defaults = UserDefaults(suiteName: SpendTrendsWidgetSnapshotStore.appGroupID)
+        let raw = defaults?.string(forKey: "general_defaultBudgetingPeriod") ?? BudgetingPeriod.monthly.rawValue
+        return BudgetingPeriod(rawValue: raw) ?? .monthly
     }
 }

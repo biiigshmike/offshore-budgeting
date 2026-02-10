@@ -63,6 +63,11 @@ struct SettingsReleaseLogsView: View {
                     systemImage: "globe",
                     title: "More Formatting Implemented",
                     description: "Added safeguards to ensure that locale settings that are shared globally by the device are respected in Offshore, such as number formatting, first day of the week, and date formatting."
+                ),
+                ReleaseItem(
+                    systemImage: "widget.large.badge.plus",
+                    title: "Two New Home Screen Widgets",
+                    description: "Next Planned Expense Widget and Spend Trends Widget are now available for the Home Screen. Spend Trends Large and XXL-sized incorporate flavors of Category Spotlight to show a percentage of spending by category."
                 )
             ]
         ),

@@ -15,10 +15,7 @@ struct HomeIncomeMetricsView: View {
         case oneWeek = "1W"
         case oneMonth = "1M"
         case oneYear = "1Y"
-        case q1 = "Q1"
-        case q2 = "Q2"
-        case q3 = "Q3"
-        case q4 = "Q4"
+        case q = "Q"
 
         var id: String { rawValue }
     }
@@ -27,6 +24,7 @@ struct HomeIncomeMetricsView: View {
         case day
         case week
         case month
+        case quarter
     }
 
     private struct IncomeBarPoint: Identifiable {
@@ -192,7 +190,7 @@ struct HomeIncomeMetricsView: View {
                         AxisTick()
 
                         // Stable: format-based date labels, based on granularity
-                        if granularity == .month {
+                        if granularity == .month || granularity == .quarter {
                             AxisValueLabel(format: .dateTime.month(.abbreviated))
                         } else {
                             AxisValueLabel(format: .dateTime.month().day())
@@ -211,6 +209,7 @@ struct HomeIncomeMetricsView: View {
         case .day: return .day
         case .week: return .weekOfYear
         case .month: return .month
+        case .quarter: return .month
         }
     }
 
@@ -218,7 +217,7 @@ struct HomeIncomeMetricsView: View {
 
     private func resolvedRange(for period: Period) -> (start: Date, end: Date, granularity: BucketGranularity) {
         let calendar = Calendar.current
-        let anchorEnd = endDate
+        let now = Date()
 
         switch period {
         case .period:
@@ -229,36 +228,28 @@ struct HomeIncomeMetricsView: View {
             return (startDate, endDate, .week)
 
         case .oneWeek:
-            let start = calendar.date(byAdding: .day, value: -6, to: anchorEnd) ?? anchorEnd
-            return (startOfDay(start), endOfDay(anchorEnd), .day)
+            let interval = calendar.dateInterval(of: .weekOfYear, for: now)
+            let start = interval?.start ?? startOfWeek(containing: now)
+            let end = calendar.date(byAdding: DateComponents(day: 6), to: start) ?? now
+            return (startOfDay(start), endOfDay(end), .day)
 
         case .oneMonth:
-            let start = calendar.date(byAdding: .day, value: -29, to: anchorEnd) ?? anchorEnd
-            return (startOfDay(start), endOfDay(anchorEnd), .day)
+            let interval = calendar.dateInterval(of: .month, for: now)
+            let start = interval?.start ?? startOfMonth(containing: now)
+            let end = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: start) ?? now
+            return (startOfDay(start), endOfDay(end), .day)
 
         case .oneYear:
-            let start = calendar.date(byAdding: .month, value: -11, to: anchorEnd) ?? anchorEnd
-            let monthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: start)) ?? start
-            return (monthStart, endOfDay(anchorEnd), .month)
-
-        case .q1, .q2, .q3, .q4:
-            let year = calendar.component(.year, from: anchorEnd)
-            let quarterIndex: Int = {
-                switch period {
-                case .q1: return 0
-                case .q2: return 1
-                case .q3: return 2
-                case .q4: return 3
-                default: return 0
-                }
-            }()
-
-            let startMonth = (quarterIndex * 3) + 1
-            let start = calendar.date(from: DateComponents(year: year, month: startMonth, day: 1)) ?? anchorEnd
-            let endMonth = startMonth + 2
-            let endStart = calendar.date(from: DateComponents(year: year, month: endMonth, day: 1)) ?? anchorEnd
-            let end = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: endStart) ?? anchorEnd
+            let interval = calendar.dateInterval(of: .year, for: now)
+            let start = interval?.start ?? startOfMonth(containing: now)
+            let end = calendar.date(byAdding: DateComponents(year: 1, day: -1), to: start) ?? now
             return (startOfDay(start), endOfDay(end), .month)
+
+        case .q:
+            let interval = calendar.dateInterval(of: .year, for: now)
+            let start = interval?.start ?? startOfMonth(containing: now)
+            let end = calendar.date(byAdding: DateComponents(year: 1, day: -1), to: start) ?? now
+            return (startOfDay(start), endOfDay(end), .quarter)
         }
     }
 
@@ -296,6 +287,8 @@ struct HomeIncomeMetricsView: View {
             current = startOfWeek(containing: start)
         case .month:
             current = startOfMonth(containing: start)
+        case .quarter:
+            current = startOfQuarter(containing: start)
         }
 
         while current <= end {
@@ -307,6 +300,8 @@ struct HomeIncomeMetricsView: View {
                 next = calendar.date(byAdding: .day, value: 7, to: current) ?? current
             case .month:
                 next = calendar.date(byAdding: .month, value: 1, to: current) ?? current
+            case .quarter:
+                next = calendar.date(byAdding: .month, value: 3, to: current) ?? current
             }
 
             let bucketEnd = min(endOfDay(calendar.date(byAdding: .second, value: -1, to: next) ?? current), end)
@@ -355,6 +350,14 @@ struct HomeIncomeMetricsView: View {
     private func startOfMonth(containing date: Date) -> Date {
         let calendar = Calendar.current
         return calendar.date(from: calendar.dateComponents([.year, .month], from: date)) ?? date
+    }
+
+    private func startOfQuarter(containing date: Date) -> Date {
+        let calendar = Calendar.current
+        let year = calendar.component(.year, from: date)
+        let month = calendar.component(.month, from: date)
+        let quarterStartMonth = ((month - 1) / 3) * 3 + 1
+        return calendar.date(from: DateComponents(year: year, month: quarterStartMonth, day: 1)) ?? date
     }
 }
 

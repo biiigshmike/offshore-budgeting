@@ -40,7 +40,7 @@ enum CardWidgetSnapshotBuilder {
         CardWidgetSnapshotStore.saveCardOptions(options, workspaceID: workspaceIDString)
 
         let allPeriods: [CardWidgetPeriod] = [
-            .period, .oneWeek, .oneMonth, .oneYear, .q1, .q2, .q3, .q4
+            .period, .oneWeek, .oneMonth, .oneYear, .q
         ]
 
         for card in cards {
@@ -78,8 +78,6 @@ enum CardWidgetSnapshotBuilder {
     ) -> CardWidgetSnapshot? {
 
         let range = resolvedRange(
-            modelContext: modelContext,
-            workspaceID: workspaceID,
             period: period,
             now: now
         )
@@ -175,8 +173,6 @@ enum CardWidgetSnapshotBuilder {
     // MARK: - Range Resolution (mirrors Income widget rules)
 
     private static func resolvedRange(
-        modelContext: ModelContext,
-        workspaceID: UUID,
         period: CardWidgetPeriod,
         now: Date
     ) -> (start: Date, end: Date) {
@@ -185,64 +181,44 @@ enum CardWidgetSnapshotBuilder {
 
         switch period {
         case .oneWeek:
-            let start = cal.date(byAdding: .day, value: -6, to: now) ?? now
-            return (cal.startOfDay(for: start), now)
+            let interval = cal.dateInterval(of: .weekOfYear, for: now)
+            let start = interval?.start ?? cal.startOfDay(for: now)
+            let end = cal.date(byAdding: DateComponents(day: 6), to: start) ?? now
+            return (cal.startOfDay(for: start), endOfDay(end, calendar: cal))
 
         case .oneMonth:
-            let start = cal.date(byAdding: .day, value: -29, to: now) ?? now
-            return (cal.startOfDay(for: start), now)
+            let interval = cal.dateInterval(of: .month, for: now)
+            let start = interval?.start ?? cal.startOfDay(for: now)
+            let end = cal.date(byAdding: DateComponents(month: 1, day: -1), to: start) ?? now
+            return (cal.startOfDay(for: start), endOfDay(end, calendar: cal))
 
         case .oneYear:
-            let start = cal.date(byAdding: .day, value: -364, to: now) ?? now
-            return (cal.startOfDay(for: start), now)
+            let interval = cal.dateInterval(of: .year, for: now)
+            let start = interval?.start ?? cal.startOfDay(for: now)
+            let end = cal.date(byAdding: DateComponents(year: 1, day: -1), to: start) ?? now
+            return (cal.startOfDay(for: start), endOfDay(end, calendar: cal))
 
-        case .q1, .q2, .q3, .q4:
-            let year = cal.component(.year, from: now)
-            let quarterIndex: Int
-            switch period {
-            case .q1: quarterIndex = 0
-            case .q2: quarterIndex = 1
-            case .q3: quarterIndex = 2
-            case .q4: quarterIndex = 3
-            default: quarterIndex = 0
-            }
-
-            let startMonth = (quarterIndex * 3) + 1
-            var startComponents = DateComponents()
-            startComponents.year = year
-            startComponents.month = startMonth
-            startComponents.day = 1
-            let start = cal.date(from: startComponents) ?? now
-
-            var endComponents = DateComponents()
-            endComponents.year = year
-            endComponents.month = startMonth + 3
-            endComponents.day = 1
-            let quarterEndStart = cal.date(from: endComponents) ?? now
-            let end = cal.date(byAdding: .day, value: -1, to: quarterEndStart) ?? now
-
-            return (
-                cal.startOfDay(for: start),
-                cal.date(bySettingHour: 23, minute: 59, second: 59, of: end) ?? end
-            )
+        case .q:
+            let interval = cal.dateInterval(of: .year, for: now)
+            let start = interval?.start ?? cal.startOfDay(for: now)
+            let end = cal.date(byAdding: DateComponents(year: 1, day: -1), to: start) ?? now
+            return (cal.startOfDay(for: start), endOfDay(end, calendar: cal))
 
         case .period:
-            let wid = workspaceID
-            let descriptor = FetchDescriptor<Budget>(
-                predicate: #Predicate<Budget> { budget in
-                    budget.workspace?.id == wid &&
-                    budget.startDate <= now &&
-                    budget.endDate >= now
-                },
-                sortBy: [SortDescriptor(\Budget.startDate, order: .reverse)]
-            )
-
-            if let active = (try? modelContext.fetch(descriptor))?.first {
-                return (active.startDate, active.endDate)
-            }
-
-            let start = cal.date(byAdding: .day, value: -29, to: now) ?? now
-            return (cal.startOfDay(for: start), now)
+            let period = defaultBudgetingPeriodFromSharedDefaults()
+            let range = period.defaultRange(containing: now, calendar: cal)
+            return (cal.startOfDay(for: range.start), endOfDay(range.end, calendar: cal))
         }
+    }
+
+    private static func defaultBudgetingPeriodFromSharedDefaults() -> BudgetingPeriod {
+        let defaults = UserDefaults(suiteName: CardWidgetSnapshotStore.appGroupID)
+        let raw = defaults?.string(forKey: "general_defaultBudgetingPeriod") ?? BudgetingPeriod.monthly.rawValue
+        return BudgetingPeriod(rawValue: raw) ?? .monthly
+    }
+
+    private static func endOfDay(_ date: Date, calendar: Calendar) -> Date {
+        let start = calendar.startOfDay(for: date)
+        return calendar.date(byAdding: DateComponents(day: 1, second: -1), to: start) ?? date
     }
 }
