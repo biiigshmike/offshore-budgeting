@@ -13,10 +13,17 @@ struct CardsView: View {
     @Environment(\.modelContext) private var modelContext
 
     @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
+    @AppStorage(AppShortcutNavigationStore.pendingActionKey) private var pendingShortcutActionRaw: String = ""
+    @AppStorage(AppShortcutNavigationStore.pendingImportClipboardTextKey) private var pendingImportClipboardText: String = ""
+    @AppStorage(AppShortcutNavigationStore.pendingImportCardIDKey) private var pendingImportCardID: String = ""
 
+    @State private var showingAddExpenseSheet: Bool = false
+    @State private var showingImportExpensesSheet: Bool = false
     @State private var showingAddCard: Bool = false
     @State private var showingEditCard: Bool = false
     @State private var editingCard: Card? = nil
+    @State private var shortcutImportCard: Card? = nil
+    @State private var shortcutImportClipboardText: String? = nil
 
     @State private var showingCardDeleteConfirm: Bool = false
     @State private var pendingCardDelete: (() -> Void)? = nil
@@ -125,6 +132,31 @@ struct CardsView: View {
                 AddCardView(workspace: workspace)
             }
         }
+        .sheet(isPresented: $showingAddExpenseSheet) {
+            NavigationStack {
+                AddExpenseView(workspace: workspace)
+            }
+        }
+        .sheet(isPresented: $showingImportExpensesSheet, onDismiss: {
+            shortcutImportCard = nil
+            shortcutImportClipboardText = nil
+        }) {
+            NavigationStack {
+                if let shortcutImportCard {
+                    ExpenseCSVImportFlowView(
+                        workspace: workspace,
+                        card: shortcutImportCard,
+                        initialClipboardText: shortcutImportClipboardText
+                    )
+                } else {
+                    ContentUnavailableView(
+                        "Card Unavailable",
+                        systemImage: "creditcard",
+                        description: Text("The selected card for this shortcut import could not be found.")
+                    )
+                }
+            }
+        }
         .sheet(isPresented: $showingEditCard, onDismiss: { editingCard = nil }) {
             NavigationStack {
                 if let editingCard {
@@ -133,6 +165,12 @@ struct CardsView: View {
                     EmptyView()
                 }
             }
+        }
+        .onAppear {
+            consumePendingShortcutActionIfNeeded()
+        }
+        .onChange(of: pendingShortcutActionRaw) { _, _ in
+            consumePendingShortcutActionIfNeeded()
         }
     }
 
@@ -172,6 +210,26 @@ struct CardsView: View {
         }
 
         modelContext.delete(card)
+    }
+
+    private func consumePendingShortcutActionIfNeeded() {
+        let pending = pendingShortcutActionRaw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !pending.isEmpty else { return }
+
+        if pending == AppShortcutNavigationStore.PendingAction.openQuickAddExpense.rawValue {
+            showingAddExpenseSheet = true
+        } else if pending == AppShortcutNavigationStore.PendingAction.openCardImportReview.rawValue {
+            let cardID = pendingImportCardID.trimmingCharacters(in: .whitespacesAndNewlines)
+            shortcutImportCard = cards.first { $0.id.uuidString == cardID }
+
+            let clipboard = pendingImportClipboardText.trimmingCharacters(in: .whitespacesAndNewlines)
+            shortcutImportClipboardText = clipboard.isEmpty ? nil : clipboard
+            showingImportExpensesSheet = shortcutImportCard != nil
+        }
+
+        pendingShortcutActionRaw = ""
+        pendingImportClipboardText = ""
+        pendingImportCardID = ""
     }
 }
 

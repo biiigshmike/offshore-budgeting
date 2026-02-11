@@ -8,6 +8,7 @@ struct ExpenseCSVImportFlowView: View {
     let workspace: Workspace
     let card: Card?
     let mode: ExpenseCSVImportViewModel.ImportMode
+    let initialClipboardText: String?
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -19,17 +20,19 @@ struct ExpenseCSVImportFlowView: View {
     @State private var selectedPhotoItem: PhotosPickerItem? = nil
     @State private var selectedFileName: String? = nil
 
-    init(workspace: Workspace, card: Card) {
+    init(workspace: Workspace, card: Card, initialClipboardText: String? = nil) {
         self.workspace = workspace
         self.card = card
         self.mode = .cardTransactions
+        self.initialClipboardText = initialClipboardText
         _vm = StateObject(wrappedValue: ExpenseCSVImportViewModel(mode: .cardTransactions))
     }
 
-    init(workspace: Workspace) {
+    init(workspace: Workspace, initialClipboardText: String? = nil) {
         self.workspace = workspace
         self.card = nil
         self.mode = .incomeOnly
+        self.initialClipboardText = initialClipboardText
         _vm = StateObject(wrappedValue: ExpenseCSVImportViewModel(mode: .incomeOnly))
     }
 
@@ -183,6 +186,18 @@ struct ExpenseCSVImportFlowView: View {
         }
         .onAppear {
             vm.prepare(workspace: workspace, modelContext: modelContext)
+
+            let clipboard = (initialClipboardText ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            if !clipboard.isEmpty, vm.state == .idle {
+                selectedFileName = "Clipboard"
+                vm.loadClipboard(
+                    text: clipboard,
+                    workspace: workspace,
+                    card: card,
+                    modelContext: modelContext,
+                    referenceDate: .now
+                )
+            }
         }
     }
 

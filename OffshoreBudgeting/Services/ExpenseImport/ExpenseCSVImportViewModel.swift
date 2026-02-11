@@ -163,6 +163,76 @@ final class ExpenseCSVImportViewModel: ObservableObject {
         }
     }
 
+    func loadClipboard(
+        text: String,
+        workspace: Workspace,
+        card: Card?,
+        modelContext: ModelContext,
+        referenceDate: Date? = nil
+    ) {
+        state = .loading
+
+        do {
+            switch mode {
+            case .cardTransactions:
+                guard let card else {
+                    throw ImportLoadError.missingCardForCardTransactions
+                }
+                existingExpenses = card.variableExpenses ?? []
+                existingPlannedExpenses = card.plannedExpenses ?? []
+                existingIncomes = card.incomes ?? []
+
+            case .incomeOnly:
+                existingExpenses = []
+                existingPlannedExpenses = []
+                existingIncomes = workspace.incomes ?? []
+            }
+
+            let normalized = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !normalized.isEmpty else {
+                throw ShortcutImportPreviewError.emptyClipboard
+            }
+
+            let parsed: ParsedCSV
+            if let csvParsed = try parseAsCSVIfPossible(from: normalized) {
+                parsed = csvParsed
+            } else {
+                let lines = normalized
+                    .split(whereSeparator: \.isNewline)
+                    .map(String.init)
+                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                    .filter { !$0.isEmpty }
+
+                guard !lines.isEmpty else {
+                    throw ShortcutImportPreviewError.emptyClipboard
+                }
+
+                parsed = try ExpenseImageImportParser.parse(
+                    recognizedLines: lines,
+                    referenceDate: referenceDate ?? .now
+                )
+            }
+
+            let mapped = ExpenseCSVImportMapper.map(
+                csv: parsed,
+                categories: categories,
+                existingExpenses: existingExpenses,
+                existingPlannedExpenses: existingPlannedExpenses,
+                existingIncomes: existingIncomes,
+                learnedRules: learnedRules
+            )
+            let adjusted = Self.applyImportModeRules(mapped, mode: mode)
+            if mode == .incomeOnly && !adjusted.contains(where: { !$0.isBlocked && $0.kind == .income }) {
+                throw ImportLoadError.noIncomeRowsFound
+            }
+
+            rows = adjusted
+            state = .loaded
+        } catch {
+            state = .failed(errorMessage(for: error))
+        }
+    }
+
     func toggleInclude(rowID: UUID) {
         guard let idx = rows.firstIndex(where: { $0.id == rowID }) else { return }
         if rows[idx].isBlocked {
@@ -574,5 +644,23 @@ final class ExpenseCSVImportViewModel: ObservableObject {
             return message
         }
         return (error as NSError).localizedDescription
+    }
+
+    private func parseAsCSVIfPossible(from text: String) throws -> ParsedCSV? {
+        let firstLine = text
+            .split(whereSeparator: \.isNewline)
+            .map(String.init)
+            .first?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+
+        let separators = [",", "\t", ";"]
+        guard separators.contains(where: { firstLine.contains($0) }) else { return nil }
+
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("offshore-shortcuts-clipboard-\(UUID().uuidString).csv")
+        try text.write(to: tempURL, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: tempURL) }
+
+        return try CSVParser.parse(url: tempURL)
     }
 }

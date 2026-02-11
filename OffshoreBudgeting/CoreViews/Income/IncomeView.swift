@@ -14,6 +14,8 @@ struct IncomeView: View {
     @Query private var incomes: [Income]
 
     @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
+    @AppStorage(AppShortcutNavigationStore.pendingActionKey) private var pendingShortcutActionRaw: String = ""
+    @AppStorage(AppShortcutNavigationStore.pendingImportClipboardTextKey) private var pendingImportClipboardText: String = ""
 
     @Environment(\.modelContext) private var modelContext
 
@@ -68,6 +70,7 @@ struct IncomeView: View {
 
     @State private var addIncomeSheet: AddIncomeSheet? = nil
     @State private var showingImportIncomeSheet: Bool = false
+    @State private var shortcutImportClipboardText: String? = nil
 
     @State private var showingEditIncome: Bool = false
     @State private var editingIncome: Income? = nil
@@ -355,7 +358,10 @@ struct IncomeView: View {
             }
             .sheet(isPresented: $showingImportIncomeSheet) {
                 NavigationStack {
-                    ExpenseCSVImportFlowView(workspace: workspace)
+                    ExpenseCSVImportFlowView(
+                        workspace: workspace,
+                        initialClipboardText: shortcutImportClipboardText
+                    )
                 }
             }
             .sheet(isPresented: $showingEditIncome, onDismiss: { editingIncome = nil }) {
@@ -366,6 +372,12 @@ struct IncomeView: View {
                         EmptyView()
                     }
                 }
+            }
+            .onAppear {
+                consumePendingShortcutActionIfNeeded()
+            }
+            .onChange(of: pendingShortcutActionRaw) { _, _ in
+                consumePendingShortcutActionIfNeeded()
             }
         }
     }
@@ -378,6 +390,22 @@ struct IncomeView: View {
             showingEditIncome = false
             editingIncome = nil
         }
+    }
+
+    private func consumePendingShortcutActionIfNeeded() {
+        let pending = pendingShortcutActionRaw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !pending.isEmpty else { return }
+
+        if pending == AppShortcutNavigationStore.PendingAction.openIncomeImportReview.rawValue {
+            let clipboard = pendingImportClipboardText.trimmingCharacters(in: .whitespacesAndNewlines)
+            shortcutImportClipboardText = clipboard.isEmpty ? nil : clipboard
+            showingImportIncomeSheet = true
+        } else if pending == AppShortcutNavigationStore.PendingAction.openQuickAddIncome.rawValue {
+            addIncomeSheet = AddIncomeSheet(initialDate: selectedDayStart)
+        }
+
+        pendingShortcutActionRaw = ""
+        pendingImportClipboardText = ""
     }
 }
 

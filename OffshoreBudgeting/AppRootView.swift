@@ -38,6 +38,7 @@ struct AppRootView: View {
     @Binding var selectedWorkspaceID: String
 
     @AppStorage("general_rememberTabSelection") private var rememberTabSelection: Bool = false
+    @AppStorage(AppShortcutNavigationStore.pendingSectionKey) private var pendingShortcutSectionRaw: String = ""
 
     @SceneStorage("AppRootView.selectedSection")
     private var selectedSectionRaw: String = AppSection.home.rawValue
@@ -149,6 +150,7 @@ struct AppRootView: View {
         .onAppear {
             guard didApplyInitialSection == false else { return }
             didApplyInitialSection = true
+            consumePendingShortcutSectionIfNeeded()
 
             guard rememberTabSelection == false else { return }
             selectedSectionRaw = AppSection.home.rawValue
@@ -156,6 +158,9 @@ struct AppRootView: View {
         .onChange(of: rememberTabSelection) { _, newValue in
             guard newValue == false else { return }
             selectedSectionRaw = AppSection.home.rawValue
+        }
+        .onChange(of: pendingShortcutSectionRaw) { _, _ in
+            consumePendingShortcutSectionIfNeeded()
         }
     }
 
@@ -417,6 +422,17 @@ struct AppRootView: View {
         if containerWidth == 0 || previousBand != nextBand {
             containerWidth = width
         }
+    }
+
+    private func consumePendingShortcutSectionIfNeeded() {
+        let pending = pendingShortcutSectionRaw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !pending.isEmpty else { return }
+
+        if let section = AppSection(rawValue: pending) {
+            selectedSectionRaw = section.rawValue
+        }
+
+        pendingShortcutSectionRaw = ""
     }
 
     private func widthBand(for width: CGFloat) -> Int {
