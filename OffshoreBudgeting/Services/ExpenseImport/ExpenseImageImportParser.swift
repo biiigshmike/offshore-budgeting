@@ -145,21 +145,12 @@ struct ExpenseImageImportParser {
     // MARK: - Paycheck screenshot
 
     private static func parsePaycheckScreenshot(lines: [String], referenceDate: Date) -> ImportRow? {
-        let hasPaycheck = lines.contains { $0.lowercased().contains("paycheck") }
-        let hasTakeHome = lines.contains { $0.lowercased().contains("take home pay") }
-        guard hasPaycheck || hasTakeHome else { return nil }
+        let lowerLines = lines.map { $0.lowercased() }
+        guard paycheckSignalScore(fromLowerLines: lowerLines) >= 3 else { return nil }
 
-        let amountLine = lines.first(where: { $0.lowercased().contains("take home pay") })
-            ?? lines.first(where: { $0.lowercased().contains("earned this period") })
-            ?? lines.first(where: { amountRegex.firstMatch(in: $0, options: [], range: NSRange(location: 0, length: ($0 as NSString).length)) != nil })
-
-        guard let amountLine,
-              let amountMatch = amountRegex.firstMatch(in: amountLine, options: [], range: NSRange(location: 0, length: (amountLine as NSString).length)) else {
+        guard let amount = preferredPaycheckAmount(from: lines) else {
             return nil
         }
-
-        let amountText = substring(from: amountLine, nsRange: amountMatch.range(at: 0))
-        guard let amount = normalizeAmountToken(amountText) else { return nil }
 
         let rangeLine = lines.first(where: { rangeDateRegex.firstMatch(in: $0, options: [], range: NSRange(location: 0, length: ($0 as NSString).length)) != nil })
 
@@ -184,6 +175,84 @@ struct ExpenseImageImportParser {
             category: "",
             type: "income"
         )
+    }
+
+    private static func paycheckSignalScore(fromLowerLines lowerLines: [String]) -> Int {
+        var score = 0
+
+        if lowerLines.contains(where: { normalizedKeywordKey($0).contains("paycheck") }) { score += 3 }
+        if lowerLines.contains(where: { $0.contains("take home") }) { score += 3 }
+        if lowerLines.contains(where: { $0.contains("earned this period") }) { score += 2 }
+        if lowerLines.contains(where: { $0.contains("paycheck breakdown") }) { score += 2 }
+
+        let taxMarkers = lowerLines.filter {
+            $0.contains("federal income tax")
+                || $0.contains("state and local taxes")
+                || $0.contains("social security and medicare")
+                || $0.contains("deductions")
+        }.count
+        if taxMarkers >= 2 { score += 2 }
+
+        if lowerLines.contains(where: { $0.contains("regular") })
+            && lowerLines.contains(where: { $0.contains("overtime") }) {
+            score += 1
+        }
+
+        if lowerLines.contains(where: { $0.contains("double ot") || $0.contains("holiday") }) { score += 1 }
+
+        return score
+    }
+
+    private static func normalizedKeywordKey(_ text: String) -> String {
+        text
+            .lowercased()
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { !$0.isEmpty }
+            .joined()
+    }
+
+    private static func preferredPaycheckAmount(from lines: [String]) -> String? {
+        // Strongest signal: explicit take-home line.
+        if let takeHomeLine = lines.first(where: { $0.lowercased().contains("take home") }),
+           let amount = firstPositiveNormalizedAmount(in: takeHomeLine) {
+            return amount
+        }
+
+        // Next: prominent amount near the top of the screenshot (before breakdown/tax lines).
+        for line in lines.prefix(12) {
+            let lower = line.lowercased()
+            if lower.contains("earned this period") { continue }
+            if lower.contains("federal income tax") { continue }
+            if lower.contains("state and local taxes") { continue }
+            if lower.contains("social security and medicare") { continue }
+            if lower.contains("other (deductions") { continue }
+            if let amount = firstPositiveNormalizedAmount(in: line) {
+                return amount
+            }
+        }
+
+        // Fallback: gross amount line.
+        if let earnedLine = lines.first(where: { $0.lowercased().contains("earned this period") }),
+           let amount = firstPositiveNormalizedAmount(in: earnedLine) {
+            return amount
+        }
+
+        return nil
+    }
+
+    private static func firstPositiveNormalizedAmount(in line: String) -> String? {
+        let nsRange = NSRange(location: 0, length: (line as NSString).length)
+        let matches = amountRegex.matches(in: line, options: [], range: nsRange)
+        for match in matches {
+            let token = substring(from: line, nsRange: match.range(at: 0))
+            guard let normalized = normalizeAmountToken(token),
+                  let value = Double(normalized),
+                  value > 0 else {
+                continue
+            }
+            return normalized
+        }
+        return nil
     }
 
     // MARK: - Bank-like list parser
@@ -907,7 +976,7 @@ struct ExpenseImageImportParser {
     private static let shortNumericDateRegex = regex(#"\b(\d{1,2})/(\d{1,2})(?:/\d{2,4})?\b"#)
     private static let monthDayYearRegex = regex(#"\b(?:Jan|January|Feb|February|Mar|March|Apr|April|May|Jun|June|Jul|July|Aug|August|Sep|Sept|September|Oct|October|Nov|November|Dec|December)\s+\d{1,2},\s+\d{2,4}\b"#)
     private static let monthYearHeaderRegex = regex(#"^(Jan|January|Feb|February|Mar|March|Apr|April|May|Jun|June|Jul|July|Aug|August|Sep|Sept|September|Oct|October|Nov|November|Dec|December)\s+(\d{4})$"#)
-    private static let rangeDateRegex = regex(#"(?i)(Jan|January|Feb|February|Mar|March|Apr|April|May|Jun|June|Jul|July|Aug|August|Sep|Sept|September|Oct|October|Nov|November|Dec|December)\s+(\d{1,2})\s*-\s*(Jan|January|Feb|February|Mar|March|Apr|April|May|Jun|June|Jul|July|Aug|August|Sep|Sept|September|Oct|October|Nov|November|Dec|December)\s+(\d{1,2})"#)
+    private static let rangeDateRegex = regex(#"(?i)(Jan|January|Feb|February|Mar|March|Apr|April|May|Jun|June|Jul|July|Aug|August|Sep|Sept|September|Oct|October|Nov|November|Dec|December)\s+(\d{1,2})\s*[-–—]\s*(Jan|January|Feb|February|Mar|March|Apr|April|May|Jun|June|Jul|July|Aug|August|Sep|Sept|September|Oct|October|Nov|November|Dec|December)\s+(\d{1,2})"#)
     private static let todayRegex = regex(#"(?i)\btoday\b"#)
     private static let yesterdayRegex = regex(#"(?i)\byesterday\b"#)
     private static let relativeAgoRegex = regex(#"(?i)\b(\d+)\s*(hour|hours|hr|hrs|minute|minutes|min|mins)\s+ago\b"#)
@@ -960,37 +1029,20 @@ struct ExpenseImageImportParser {
     // MARK: - Debug
 
     private static func debugLog(_ message: String) {
-#if DEBUG
-        print("[ImageImportOCR] \(message)")
-#endif
+        _ = message
     }
 
     private static func debugLogLines(_ lines: [String], title: String) {
-#if DEBUG
-        debugLog("\(title):")
-        for (idx, line) in lines.enumerated() {
-            debugLog("  [\(idx + 1)] \(line)")
-        }
-#endif
+        _ = lines
+        _ = title
     }
 
     private static func debugAnalyzeLines(_ lines: [String], context: ImageDateContext) {
-#if DEBUG
-        debugLog("Line analysis:")
-        for (idx, line) in lines.enumerated() {
-            let nsRange = NSRange(location: 0, length: (line as NSString).length)
-            let hasAmount = amountRegex.firstMatch(in: line, options: [], range: nsRange) != nil
-            let detectedDate = normalizeDate(from: line, context: context) ?? "-"
-            let monthHeader = normalizeMonthYearHeader(line, context: context) ?? "-"
-            let descriptionCandidate = isDescriptionCandidateLine(line, context: context)
-            debugLog("  [\(idx + 1)] amount=\(hasAmount) date=\(detectedDate) monthHeader=\(monthHeader) descCandidate=\(descriptionCandidate) text=\(line)")
-        }
-#endif
+        _ = lines
+        _ = context
     }
 
     private static func debugLogRow(_ row: ImportRow) {
-#if DEBUG
-        debugLog("  row date=\(row.date) desc=\(row.description) amount=\(row.amount) type=\(row.type)")
-#endif
+        _ = row
     }
 }

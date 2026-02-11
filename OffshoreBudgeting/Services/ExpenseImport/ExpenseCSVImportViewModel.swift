@@ -13,6 +13,11 @@ import UniformTypeIdentifiers
 @MainActor
 final class ExpenseCSVImportViewModel: ObservableObject {
 
+    enum ImportMode: Equatable {
+        case cardTransactions
+        case incomeOnly
+    }
+
     // MARK: - Tuning
 
     /// Duplicate window for matching already-entered expenses and planned expenses.
@@ -35,14 +40,22 @@ final class ExpenseCSVImportViewModel: ObservableObject {
 
     private enum ImportLoadError: LocalizedError {
         case unsupportedFileType
+        case missingCardForCardTransactions
+        case noIncomeRowsFound
 
         var errorDescription: String? {
             switch self {
             case .unsupportedFileType:
                 return "Unsupported file type. Choose a CSV, PDF, or image."
+            case .missingCardForCardTransactions:
+                return "No card was selected for this import."
+            case .noIncomeRowsFound:
+                return "No income rows were found in this file."
             }
         }
     }
+
+    let mode: ImportMode
 
     @Published var state: State = .idle
     @Published private(set) var rows: [ExpenseCSVImportRow] = []
@@ -55,23 +68,38 @@ final class ExpenseCSVImportViewModel: ObservableObject {
     private var existingPlannedExpenses: [PlannedExpense] = []
     private var existingIncomes: [Income] = []
 
+    init(mode: ImportMode = .cardTransactions) {
+        self.mode = mode
+    }
+
     // MARK: - Grouped rows
 
-    var readyRows: [ExpenseCSVImportRow] { rows.filter { $0.bucket == .ready }.sorted { $0.sourceLine < $1.sourceLine } }
-    var possibleMatchRows: [ExpenseCSVImportRow] { rows.filter { $0.bucket == .possibleMatch }.sorted { $0.sourceLine < $1.sourceLine } }
-    var paymentRows: [ExpenseCSVImportRow] { rows.filter { $0.bucket == .payment }.sorted { $0.sourceLine < $1.sourceLine } }
-    var possibleDuplicateRows: [ExpenseCSVImportRow] { rows.filter { $0.bucket == .possibleDuplicate }.sorted { $0.sourceLine < $1.sourceLine } }
-    var needsMoreDataRows: [ExpenseCSVImportRow] { rows.filter { $0.bucket == .needsMoreData }.sorted { $0.sourceLine < $1.sourceLine } }
+    var blockedRows: [ExpenseCSVImportRow] { rows.filter { $0.isBlocked }.sorted { $0.sourceLine < $1.sourceLine } }
+    var readyRows: [ExpenseCSVImportRow] { rows.filter { !$0.isBlocked && $0.bucket == .ready }.sorted { $0.sourceLine < $1.sourceLine } }
+    var possibleMatchRows: [ExpenseCSVImportRow] { rows.filter { !$0.isBlocked && $0.bucket == .possibleMatch }.sorted { $0.sourceLine < $1.sourceLine } }
+    var paymentRows: [ExpenseCSVImportRow] { rows.filter { !$0.isBlocked && $0.bucket == .payment }.sorted { $0.sourceLine < $1.sourceLine } }
+    var possibleDuplicateRows: [ExpenseCSVImportRow] { rows.filter { !$0.isBlocked && $0.bucket == .possibleDuplicate }.sorted { $0.sourceLine < $1.sourceLine } }
+    var needsMoreDataRows: [ExpenseCSVImportRow] { rows.filter { !$0.isBlocked && $0.bucket == .needsMoreData }.sorted { $0.sourceLine < $1.sourceLine } }
 
     var canCommit: Bool {
-        rows.contains { $0.includeInImport && !$0.isMissingRequiredData }
+        rows.contains { !$0.isBlocked && $0.includeInImport && !$0.isMissingRequiredData }
     }
 
     var commitSummaryText: String {
         let included = rows.filter { $0.includeInImport }
         let expCount = included.filter { $0.kind == .expense && !$0.isMissingRequiredData }.count
         let incCount = included.filter { $0.kind == .income && !$0.isMissingRequiredData }.count
-        return "\(localizedInt(expCount)) expenses, \(localizedInt(incCount)) incomes will be imported."
+        let blockedCount = blockedRows.count
+
+        switch mode {
+        case .cardTransactions:
+            return "\(localizedInt(expCount)) expenses, \(localizedInt(incCount)) incomes will be imported."
+        case .incomeOnly:
+            if blockedCount > 0 {
+                return "\(localizedInt(incCount)) incomes will be imported. \(localizedInt(blockedCount)) expense rows were skipped."
+            }
+            return "\(localizedInt(incCount)) incomes will be imported."
+        }
     }
 
     private func localizedInt(_ value: Int) -> String {
@@ -93,16 +121,27 @@ final class ExpenseCSVImportViewModel: ObservableObject {
     func load(
         url: URL,
         workspace: Workspace,
-        card: Card,
+        card: Card?,
         modelContext: ModelContext,
         referenceDate: Date? = nil
     ) {
         state = .loading
 
         do {
-            existingExpenses = card.variableExpenses ?? []
-            existingPlannedExpenses = card.plannedExpenses ?? []
-            existingIncomes = card.incomes ?? []
+            switch mode {
+            case .cardTransactions:
+                guard let card else {
+                    throw ImportLoadError.missingCardForCardTransactions
+                }
+                existingExpenses = card.variableExpenses ?? []
+                existingPlannedExpenses = card.plannedExpenses ?? []
+                existingIncomes = card.incomes ?? []
+
+            case .incomeOnly:
+                existingExpenses = []
+                existingPlannedExpenses = []
+                existingIncomes = workspace.incomes ?? []
+            }
 
             let parsed = try parseImportedDocument(url: url, referenceDate: referenceDate)
             let mapped = ExpenseCSVImportMapper.map(
@@ -113,7 +152,11 @@ final class ExpenseCSVImportViewModel: ObservableObject {
                 existingIncomes: existingIncomes,
                 learnedRules: learnedRules
             )
-            rows = mapped
+            let adjusted = Self.applyImportModeRules(mapped, mode: mode)
+            if mode == .incomeOnly && !adjusted.contains(where: { !$0.isBlocked && $0.kind == .income }) {
+                throw ImportLoadError.noIncomeRowsFound
+            }
+            rows = adjusted
             state = .loaded
         } catch {
             state = .failed(errorMessage(for: error))
@@ -122,6 +165,10 @@ final class ExpenseCSVImportViewModel: ObservableObject {
 
     func toggleInclude(rowID: UUID) {
         guard let idx = rows.firstIndex(where: { $0.id == rowID }) else { return }
+        if rows[idx].isBlocked {
+            rows[idx].includeInImport = false
+            return
+        }
 
         // If the row is missing required data, do not allow checking.
         if rows[idx].finalMerchant.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -206,6 +253,7 @@ final class ExpenseCSVImportViewModel: ObservableObject {
     }
 
     func setKind(rowID: UUID, kind: ExpenseCSVImportKind) {
+        if mode == .incomeOnly { return }
         guard let idx = rows.firstIndex(where: { $0.id == rowID }) else { return }
         if rows[idx].kind == kind { return }
 
@@ -244,15 +292,17 @@ final class ExpenseCSVImportViewModel: ObservableObject {
 
     func toggleRemember(rowID: UUID) {
         guard let idx = rows.firstIndex(where: { $0.id == rowID }) else { return }
+        if rows[idx].isBlocked { return }
         rows[idx].rememberMapping.toggle()
     }
 
-    func commitImport(workspace: Workspace, card: Card, modelContext: ModelContext) {
-        let importable = rows.filter { $0.includeInImport && !$0.isMissingRequiredData }
+    func commitImport(workspace: Workspace, card: Card?, modelContext: ModelContext) {
+        let importable = rows.filter { !$0.isBlocked && $0.includeInImport && !$0.isMissingRequiredData }
 
         for row in importable {
             switch row.kind {
             case .expense:
+                guard let card else { continue }
                 let category = row.selectedCategory
                 let exp = VariableExpense(
                     descriptionText: row.finalMerchant,
@@ -335,6 +385,32 @@ final class ExpenseCSVImportViewModel: ObservableObject {
     }
 
     // MARK: - Duplicate hints
+
+    nonisolated static func applyImportModeRules(_ rows: [ExpenseCSVImportRow], mode: ImportMode) -> [ExpenseCSVImportRow] {
+        switch mode {
+        case .cardTransactions:
+            return rows.map { row in
+                var updated = row
+                updated.blockedReason = nil
+                return updated
+            }
+
+        case .incomeOnly:
+            return rows.map { row in
+                var updated = row
+
+                if updated.kind == .expense {
+                    updated.blockedReason = "Expense rows are skipped when importing from Income."
+                    updated.includeInImport = false
+                    updated.rememberMapping = false
+                    return updated
+                }
+
+                updated.blockedReason = nil
+                return updated
+            }
+        }
+    }
 
     private func looksLikeDuplicateExpense(date: Date, amount: Double, merchantKey: String, categoryID: UUID?) -> Bool {
         let cal = Calendar.current

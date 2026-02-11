@@ -6,26 +6,50 @@ import UniformTypeIdentifiers
 
 struct ExpenseCSVImportFlowView: View {
     let workspace: Workspace
-    let card: Card
+    let card: Card?
+    let mode: ExpenseCSVImportViewModel.ImportMode
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
 
-    @StateObject private var vm = ExpenseCSVImportViewModel()
+    @StateObject private var vm: ExpenseCSVImportViewModel
 
     @State private var showingFileImporter: Bool = false
     @State private var showingPhotoPicker: Bool = false
     @State private var selectedPhotoItem: PhotosPickerItem? = nil
     @State private var selectedFileName: String? = nil
 
+    init(workspace: Workspace, card: Card) {
+        self.workspace = workspace
+        self.card = card
+        self.mode = .cardTransactions
+        _vm = StateObject(wrappedValue: ExpenseCSVImportViewModel(mode: .cardTransactions))
+    }
+
+    init(workspace: Workspace) {
+        self.workspace = workspace
+        self.card = nil
+        self.mode = .incomeOnly
+        _vm = StateObject(wrappedValue: ExpenseCSVImportViewModel(mode: .incomeOnly))
+    }
+
     var body: some View {
         List {
             Section {
-                HStack {
-                    Text("Card")
-                    Spacer()
-                    Text(card.name)
-                        .foregroundStyle(.secondary)
+                if let card {
+                    HStack {
+                        Text("Card")
+                        Spacer()
+                        Text(card.name)
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    HStack {
+                        Text("Destination")
+                        Spacer()
+                        Text("Income")
+                            .foregroundStyle(.secondary)
+                    }
                 }
 
                 HStack {
@@ -55,13 +79,13 @@ struct ExpenseCSVImportFlowView: View {
                 Text("Import")
             } footer: {
                 Text(selectedFileName == nil
-                     ? "You can import one file at a time (CSV, PDF, or image) from Files or Photos. You will review everything before saving."
+                     ? importHintText
                      : "Use the toggle switch for any row you want to save and have automatically recognized next time. It will help make future imports faster.")
             }
 
             if vm.state == .idle {
                 Section {
-                    Text("Choose a CSV, PDF, or image from Files or Photos to begin.")
+                    Text(idlePromptText)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -95,7 +119,7 @@ struct ExpenseCSVImportFlowView: View {
                 }
 
                 if !vm.paymentRows.isEmpty {
-                    sectionView(title: "Income / Payments", rows: vm.paymentRows)
+                    sectionView(title: paymentSectionTitle, rows: vm.paymentRows)
                 }
 
                 if !vm.possibleDuplicateRows.isEmpty {
@@ -106,13 +130,17 @@ struct ExpenseCSVImportFlowView: View {
                     sectionView(title: "Needs More Data", rows: vm.needsMoreDataRows)
                 }
 
+                if !vm.blockedRows.isEmpty {
+                    sectionView(title: "Skipped (Expenses)", rows: vm.blockedRows)
+                }
+
                 Section {
                     Text(vm.commitSummaryText)
                         .foregroundStyle(.secondary)
                 }
             }
         }
-        .navigationTitle("Import Expenses")
+        .navigationTitle(navigationTitle)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button("Cancel") { dismiss() }
@@ -211,6 +239,10 @@ struct ExpenseCSVImportFlowView: View {
                 ExpenseCSVImportRowView(
                     row: row,
                     allCategories: vm.categories,
+                    allowKindEditing: mode == .cardTransactions,
+                    incomeHelperText: mode == .cardTransactions
+                        ? "Imports as Income (linked to this card)"
+                        : "Imports as standalone Income",
                     onToggleInclude: { vm.toggleInclude(rowID: row.id) },
                     onSetDate: { date in vm.setDate(rowID: row.id, date: date) },
                     onSetMerchant: { text in vm.setMerchant(rowID: row.id, merchant: text) },
@@ -222,5 +254,25 @@ struct ExpenseCSVImportFlowView: View {
         } header: {
             Text(title)
         }
+    }
+
+    private var navigationTitle: String {
+        mode == .cardTransactions ? "Import Expenses" : "Import Income"
+    }
+
+    private var paymentSectionTitle: String {
+        mode == .cardTransactions ? "Income / Payments" : "Income"
+    }
+
+    private var idlePromptText: String {
+        mode == .cardTransactions
+            ? "Choose a CSV, PDF, or image from Files or Photos to begin."
+            : "Choose a CSV, PDF, or image from Files or Photos to begin. Expense rows will be skipped."
+    }
+
+    private var importHintText: String {
+        mode == .cardTransactions
+            ? "You can import one file at a time (CSV, PDF, or image) from Files or Photos. You will review everything before saving."
+            : "You can import one file at a time (CSV, PDF, or image) from Files or Photos. Expense rows are skipped in Income import."
     }
 }

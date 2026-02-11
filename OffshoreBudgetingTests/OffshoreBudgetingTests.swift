@@ -208,4 +208,67 @@ struct OffshoreBudgetingTests {
         #expect(rows[0].finalAmount == 41.31)
         #expect(rows[0].kind == .expense)
     }
+
+    @Test func importMode_IncomeOnlyBlocksExpenseRows() {
+        let parsed = ParsedCSV(
+            headers: ["Date", "Description", "Amount", "Category", "Type"],
+            rows: [
+                ["02/10/2026", "Safeway", "50.00", "Groceries", "expense"],
+                ["02/10/2026", "Direct Deposit", "2817.83", "", "income"]
+            ]
+        )
+
+        let mapped = ExpenseCSVImportMapper.map(
+            csv: parsed,
+            categories: [],
+            existingExpenses: [],
+            existingPlannedExpenses: [],
+            existingIncomes: [],
+            learnedRules: [:]
+        )
+        let adjusted = ExpenseCSVImportViewModel.applyImportModeRules(
+            mapped,
+            mode: .incomeOnly
+        )
+
+        #expect(adjusted.count == 2)
+
+        let expenseRow = adjusted.first { $0.kind == .expense }
+        let incomeRow = adjusted.first { $0.kind == .income }
+
+        #expect(expenseRow?.isBlocked == true)
+        #expect(expenseRow?.includeInImport == false)
+        #expect(expenseRow?.blockedReason?.contains("skipped") == true)
+
+        #expect(incomeRow?.isBlocked == false)
+        #expect(incomeRow?.includeInImport == true)
+    }
+
+    @Test func importMode_CardTransactionsDoesNotBlockExpenseRows() {
+        let parsed = ParsedCSV(
+            headers: ["Date", "Description", "Amount", "Category", "Type"],
+            rows: [
+                ["02/10/2026", "Safeway", "50.00", "Groceries", "expense"]
+            ]
+        )
+
+        let category = Category(name: "Groceries", hexColor: "#000000")
+        let mapped = ExpenseCSVImportMapper.map(
+            csv: parsed,
+            categories: [category],
+            existingExpenses: [],
+            existingPlannedExpenses: [],
+            existingIncomes: [],
+            learnedRules: [:]
+        )
+        let adjusted = ExpenseCSVImportViewModel.applyImportModeRules(
+            mapped,
+            mode: .cardTransactions
+        )
+
+        #expect(adjusted.count == 1)
+        #expect(adjusted[0].kind == .expense)
+        #expect(adjusted[0].isBlocked == false)
+        #expect(adjusted[0].blockedReason == nil)
+    }
 }

@@ -67,6 +67,7 @@ struct IncomeView: View {
     // MARK: - Sheets
 
     @State private var addIncomeSheet: AddIncomeSheet? = nil
+    @State private var showingImportIncomeSheet: Bool = false
 
     @State private var showingEditIncome: Bool = false
     @State private var editingIncome: Income? = nil
@@ -322,8 +323,18 @@ struct IncomeView: View {
             )
             .searchFocused($searchFocused)
             .toolbar {
-                Button {
-                    addIncomeSheet = AddIncomeSheet(initialDate: selectedDayStart)
+                Menu {
+                    Button {
+                        addIncomeSheet = AddIncomeSheet(initialDate: selectedDayStart)
+                    } label: {
+                        Label("Add Income", systemImage: "plus")
+                    }
+
+                    Button {
+                        showingImportIncomeSheet = true
+                    } label: {
+                        Label("Import Income", systemImage: "tray.and.arrow.down")
+                    }
                 } label: {
                     Image(systemName: "plus")
                 }
@@ -340,6 +351,11 @@ struct IncomeView: View {
             .sheet(item: $addIncomeSheet) { sheet in
                 NavigationStack {
                     AddIncomeView(workspace: workspace, initialDate: sheet.initialDate)
+                }
+            }
+            .sheet(isPresented: $showingImportIncomeSheet) {
+                NavigationStack {
+                    ExpenseCSVImportFlowView(workspace: workspace)
                 }
             }
             .sheet(isPresented: $showingEditIncome, onDismiss: { editingIncome = nil }) {

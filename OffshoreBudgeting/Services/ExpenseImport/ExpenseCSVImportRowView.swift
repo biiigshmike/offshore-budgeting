@@ -11,6 +11,8 @@ import SwiftUI
 struct ExpenseCSVImportRowView: View {
     let row: ExpenseCSVImportRow
     let allCategories: [Category]
+    let allowKindEditing: Bool
+    let incomeHelperText: String
     let onToggleInclude: () -> Void
     let onSetDate: (Date) -> Void
     let onSetMerchant: (String) -> Void
@@ -30,6 +32,7 @@ struct ExpenseCSVImportRowView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(row.includeInImport ? "Included" : "Excluded")
+                .disabled(row.isBlocked)
 
                 VStack(alignment: .leading, spacing: 2) {
                     TextField(
@@ -63,19 +66,33 @@ struct ExpenseCSVImportRowView: View {
                     Text(row.finalAmount, format: CurrencyFormatter.currencyStyle())
                         .font(.headline)
 
-                    Picker("Type", selection: Binding(
-                        get: { row.kind },
-                        set: { onSetKind($0) }
-                    )) {
-                        Text("Expense").tag(ExpenseCSVImportKind.expense)
-                        Text("Income").tag(ExpenseCSVImportKind.income)
+                    if allowKindEditing {
+                        Picker("Type", selection: Binding(
+                            get: { row.kind },
+                            set: { onSetKind($0) }
+                        )) {
+                            Text("Expense").tag(ExpenseCSVImportKind.expense)
+                            Text("Income").tag(ExpenseCSVImportKind.income)
+                        }
+                        .pickerStyle(.menu)
+                        .labelsHidden()
+                    } else {
+                        Text(row.kind == .income ? "Income" : "Expense")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
-                    .pickerStyle(.menu)
-                    .labelsHidden()
                 }
             }
 
-            if row.kind == .expense {
+            if row.isBlocked, let blockedReason = row.blockedReason {
+                HStack(spacing: 10) {
+                    Text(blockedReason)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+
+                    Spacer(minLength: 0)
+                }
+            } else if row.kind == .expense {
                 HStack(spacing: 10) {
                     Picker("Category", selection: Binding(
                         get: { row.selectedCategory?.id },
@@ -110,7 +127,7 @@ struct ExpenseCSVImportRowView: View {
                 }
             } else {
                 HStack(spacing: 10) {
-                    Text("Imports as Income (linked to this card)")
+                    Text(incomeHelperText)
                         .font(.caption)
                         .foregroundStyle(.secondary)
 

@@ -392,6 +392,28 @@ struct ExpenseImageAndPaystubImportParserTests {
         #expect(rows[0].type == "income")
     }
 
+    @Test func imagePayrollSignalsWithoutExactPaycheckWord_StillParsesIncome() throws {
+        let lines = [
+            "Pay check",
+            "Dec 8 - Dec 21",
+            "$2,817.83",
+            "Paycheck breakdown",
+            "Earned this period $4,284.00",
+            "Federal income tax -$553.97",
+            "State and local taxes -$284.60",
+            "Social Security and Medicare -$327.72"
+        ]
+
+        let parsed = try ExpenseImageImportParser.parse(recognizedLines: lines, referenceDate: fixedNow)
+        let rows = parsed.rows.compactMap { ParsedRow(fields: $0) }
+
+        #expect(rows.count == 1)
+        #expect(rows[0].date == "12/21/2025")
+        #expect(rows[0].description == "Paycheck")
+        #expect(rows[0].amount == "2817.83")
+        #expect(rows[0].type == "income")
+    }
+
     // MARK: - Paystub PDF
 
     @Test func paystubPDF_ParsesNetPayAndDate() throws {

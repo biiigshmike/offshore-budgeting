@@ -72,6 +72,7 @@ struct ExpenseCSVImportMapper {
                     matchReason: "Missing required data",
                     selectedCategory: nil,
                     rememberMapping: false,
+                    blockedReason: nil,
                     includeInImport: false,
                     isDuplicateHint: false,
                     bucket: .needsMoreData
@@ -179,6 +180,7 @@ struct ExpenseCSVImportMapper {
                 matchReason: suggestion.reason,
                 selectedCategory: selectedCategory,
                 rememberMapping: false,
+                blockedReason: nil,
                 includeInImport: includeDefault,
                 isDuplicateHint: isDup,
                 bucket: bucket

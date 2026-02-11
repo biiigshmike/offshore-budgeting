@@ -52,10 +52,18 @@ struct ExpenseCSVImportRow: Identifiable {
     // Learning
     var rememberMapping: Bool = false
 
+    // Import mode enforcement
+    var blockedReason: String? = nil
+
     // Flags
     var includeInImport: Bool
     var isDuplicateHint: Bool
     var bucket: ExpenseCSVImportBucket
+
+    var isBlocked: Bool {
+        guard let blockedReason else { return false }
+        return !blockedReason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
 
     var isMissingRequiredData: Bool {
         if finalMerchant.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return true }
@@ -64,6 +72,11 @@ struct ExpenseCSVImportRow: Identifiable {
     }
 
     mutating func recomputeBucket() {
+        if isBlocked {
+            includeInImport = false
+            return
+        }
+
         // Keep bucket stable while the user edits fields to avoid list shuffling.
         // Use `isMissingRequiredData` + `includeInImport` to control what can be imported.
         if finalMerchant.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
