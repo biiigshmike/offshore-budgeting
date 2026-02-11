@@ -202,6 +202,8 @@ struct ExpenseCSVImportMapper {
         let t = (typeText ?? "").lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
 
         if !t.isEmpty {
+            if t.contains("expense") { return .expense }
+            if t.contains("income") { return .income }
             if t.contains("purchase") || t.contains("debit") { return .expense }
             if t.contains("payment") || t.contains("credit") { return .income }
             if t.contains("refund") || t.contains("reversal") { return .income }
@@ -216,7 +218,9 @@ struct ExpenseCSVImportMapper {
         let cat = (categoryText ?? "").lowercased()
 
         if desc.contains("payment") || desc.contains("autopay") || desc.contains("online payment") { return .income }
+        if desc.contains("deposit") || desc.contains("direct deposit") { return .income }
         if cat.contains("payment") { return .income }
+        if cat.contains("income") || cat.contains("deposit") { return .income }
 
         if desc.contains("refund") || desc.contains("reversal") { return .income }
         if cat.contains("refund") || cat.contains("reversal") { return .income }

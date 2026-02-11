@@ -12,6 +12,7 @@ struct ExpenseCSVImportRowView: View {
     let row: ExpenseCSVImportRow
     let allCategories: [Category]
     let onToggleInclude: () -> Void
+    let onSetDate: (Date) -> Void
     let onSetMerchant: (String) -> Void
     let onSetCategory: (Category?) -> Void
     let onSetKind: (ExpenseCSVImportKind) -> Void
@@ -42,9 +43,18 @@ struct ExpenseCSVImportRowView: View {
                     .textInputAutocapitalization(.words)
                     .autocorrectionDisabled()
 
-                    Text(row.finalDate, style: .date)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    HStack(spacing: 6) {
+                        DatePicker(
+                            "",
+                            selection: Binding(
+                                get: { row.finalDate },
+                                set: { onSetDate($0) }
+                            ),
+                            displayedComponents: [.date]
+                        )
+                        .datePickerStyle(.compact)
+                        .labelsHidden()
+                    }
                 }
 
                 Spacer(minLength: 0)
@@ -123,7 +133,7 @@ struct ExpenseCSVImportRowView: View {
                 }
             }
 
-            Text(csvSummary)
+            Text(importSummary)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .lineLimit(2)
@@ -131,10 +141,10 @@ struct ExpenseCSVImportRowView: View {
         .padding(.vertical, 4)
     }
 
-    private var csvSummary: String {
+    private var importSummary: String {
         if let csvCategory = row.originalCategoryText, !csvCategory.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return "CSV: \(row.originalDescriptionText) • \(row.originalAmountText) • \(csvCategory)"
+            return "Imported: \(row.originalDescriptionText) • \(row.originalAmountText) • \(csvCategory)"
         }
-        return "CSV: \(row.originalDescriptionText) • \(row.originalAmountText)"
+        return "Imported: \(row.originalDescriptionText) • \(row.originalAmountText)"
     }
 }

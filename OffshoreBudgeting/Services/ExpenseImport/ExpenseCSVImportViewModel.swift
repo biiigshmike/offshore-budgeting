@@ -8,6 +8,7 @@
 import Foundation
 import SwiftData
 import Combine
+import UniformTypeIdentifiers
 
 @MainActor
 final class ExpenseCSVImportViewModel: ObservableObject {
@@ -23,6 +24,24 @@ final class ExpenseCSVImportViewModel: ObservableObject {
         case loading
         case loaded
         case failed(String)
+    }
+
+    private enum ImportDocumentKind {
+        case csv
+        case pdf
+        case image
+        case unsupported
+    }
+
+    private enum ImportLoadError: LocalizedError {
+        case unsupportedFileType
+
+        var errorDescription: String? {
+            switch self {
+            case .unsupportedFileType:
+                return "Unsupported file type. Choose a CSV, PDF, or image."
+            }
+        }
     }
 
     @Published var state: State = .idle
@@ -71,7 +90,13 @@ final class ExpenseCSVImportViewModel: ObservableObject {
         learnedRules = ImportLearningStore.fetchRules(for: workspace, modelContext: modelContext)
     }
 
-    func load(url: URL, workspace: Workspace, card: Card, modelContext: ModelContext) {
+    func load(
+        url: URL,
+        workspace: Workspace,
+        card: Card,
+        modelContext: ModelContext,
+        referenceDate: Date? = nil
+    ) {
         state = .loading
 
         do {
@@ -79,7 +104,7 @@ final class ExpenseCSVImportViewModel: ObservableObject {
             existingPlannedExpenses = card.plannedExpenses ?? []
             existingIncomes = card.incomes ?? []
 
-            let parsed = try CSVParser.parse(url: url)
+            let parsed = try parseImportedDocument(url: url, referenceDate: referenceDate)
             let mapped = ExpenseCSVImportMapper.map(
                 csv: parsed,
                 categories: categories,
@@ -91,7 +116,7 @@ final class ExpenseCSVImportViewModel: ObservableObject {
             rows = mapped
             state = .loaded
         } catch {
-            state = .failed(error.localizedDescription)
+            state = .failed(errorMessage(for: error))
         }
     }
 
@@ -152,6 +177,29 @@ final class ExpenseCSVImportViewModel: ObservableObject {
             )
         } else {
             rows[idx].isDuplicateHint = looksLikeDuplicateIncome(date: rows[idx].finalDate, amount: rows[idx].finalAmount, merchantKey: normalized)
+        }
+
+        rows[idx].recomputeBucket()
+    }
+
+    func setDate(rowID: UUID, date: Date) {
+        guard let idx = rows.firstIndex(where: { $0.id == rowID }) else { return }
+        rows[idx].finalDate = Calendar.current.startOfDay(for: date)
+
+        let normalized = MerchantNormalizer.normalizeKey(rows[idx].finalMerchant)
+        if rows[idx].kind == .expense {
+            rows[idx].isDuplicateHint = looksLikeDuplicateExpense(
+                date: rows[idx].finalDate,
+                amount: rows[idx].finalAmount,
+                merchantKey: normalized,
+                categoryID: rows[idx].selectedCategory?.id
+            )
+        } else {
+            rows[idx].isDuplicateHint = looksLikeDuplicateIncome(
+                date: rows[idx].finalDate,
+                amount: rows[idx].finalAmount,
+                merchantKey: normalized
+            )
         }
 
         rows[idx].recomputeBucket()
@@ -396,5 +444,59 @@ final class ExpenseCSVImportViewModel: ObservableObject {
         }
 
         return .ready
+    }
+
+    // MARK: - Import document routing
+
+    private func parseImportedDocument(url: URL, referenceDate: Date?) throws -> ParsedCSV {
+        switch detectDocumentKind(for: url) {
+        case .csv:
+            return try CSVParser.parse(url: url)
+        case .pdf:
+            if let paystubParsed = try? PaystubPDFImportParser.parse(url: url) {
+                return paystubParsed
+            }
+            return try StatementPDFImportParser.parse(url: url)
+        case .image:
+            return try ExpenseImageImportParser.parse(url: url, referenceDate: referenceDate ?? .now)
+        case .unsupported:
+            throw ImportLoadError.unsupportedFileType
+        }
+    }
+
+    private func detectDocumentKind(for url: URL) -> ImportDocumentKind {
+        let ext = url.pathExtension.lowercased()
+        if ext == "csv" {
+            return .csv
+        }
+        if ext == "pdf" {
+            return .pdf
+        }
+
+        let imageExtensions: Set<String> = ["png", "jpg", "jpeg", "heic", "heif", "gif", "tif", "tiff", "bmp", "webp"]
+        if imageExtensions.contains(ext) {
+            return .image
+        }
+
+        if let type = UTType(filenameExtension: ext), type.conforms(to: .image) {
+            return .image
+        }
+        if let type = UTType(filenameExtension: ext), type.conforms(to: .commaSeparatedText) {
+            return .csv
+        }
+        if let type = UTType(filenameExtension: ext), type.conforms(to: .pdf) {
+            return .pdf
+        }
+
+        return .unsupported
+    }
+
+    private func errorMessage(for error: Error) -> String {
+        if let localized = error as? LocalizedError,
+           let message = localized.errorDescription,
+           !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return message
+        }
+        return (error as NSError).localizedDescription
     }
 }

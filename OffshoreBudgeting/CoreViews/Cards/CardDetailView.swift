@@ -558,7 +558,7 @@ struct CardDetailView: View {
                 PostBoardingTipItem(
                     systemImage: "tray.and.arrow.down.fill",
                     title: "Import Expenses",
-                    detail: "Using the plus button in the top right, choose Import Expenses (.csv) and import expenses easily to your card."
+                    detail: "Using the plus button in the top right, choose Import Expenses and import from CSV, PDF statements, or screenshots."
                 )
             ]
         )
@@ -583,7 +583,7 @@ struct CardDetailView: View {
                     Button {
                         showingImportExpensesSheet = true
                     } label: {
-                        Label("Import Expenses (.csv)", systemImage: "tray.and.arrow.down")
+                        Label("Import Expenses", systemImage: "tray.and.arrow.down")
                     }
                 } label: {
                     Image(systemName: "plus")

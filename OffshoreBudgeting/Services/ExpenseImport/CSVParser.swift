@@ -12,16 +12,23 @@ struct ParsedCSV {
     let rows: [[String]]
 }
 
-enum CSVParserError: Error {
+enum CSVParserError: LocalizedError {
     case unreadableFile
     case empty
+
+    var errorDescription: String? {
+        switch self {
+        case .unreadableFile:
+            return "The selected CSV could not be read."
+        case .empty:
+            return "The selected CSV is empty."
+        }
+    }
 }
 
 struct CSVParser {
 
     static func parse(url: URL) throws -> ParsedCSV {
-
-        // REQUIRED for fileImporter URLs
         let didStartAccessing = url.startAccessingSecurityScopedResource()
         defer {
             if didStartAccessing {
@@ -69,7 +76,6 @@ struct CSVParser {
         return arr + Array(repeating: "", count: count - arr.count)
     }
 
-    // Handles commas + quoted fields
     private static func splitCSVLine(_ line: String) -> [String] {
         var result: [String] = []
         var current = ""
