@@ -19,7 +19,9 @@ final class NotificationsAppDelegate: NSObject, UIApplicationDelegate, UNUserNot
     ) -> Bool {
 
         // Ensures banners/sounds can present while the app is foregrounded
-        UNUserNotificationCenter.current().delegate = self
+        let center = UNUserNotificationCenter.current()
+        center.delegate = self
+        center.setNotificationCategories(Self.notificationCategories)
         return true
     }
 
@@ -37,19 +39,59 @@ final class NotificationsAppDelegate: NSObject, UIApplicationDelegate, UNUserNot
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
         let userInfo = response.notification.request.content.userInfo
-        if let actionRaw = userInfo[LocalNotificationService.UserInfoKey.action] as? String,
-           actionRaw == LocalNotificationService.NotificationAction.openQuickAddExpenseFromShoppingMode.rawValue {
-            UserDefaults.standard.set(
-                AppSection.cards.rawValue,
-                forKey: AppShortcutNavigationStore.pendingSectionKey
-            )
-            UserDefaults.standard.set(
-                AppShortcutNavigationStore.PendingAction.openQuickAddExpenseFromShoppingMode.rawValue,
-                forKey: AppShortcutNavigationStore.pendingActionKey
-            )
+        guard let actionRaw = userInfo[LocalNotificationService.UserInfoKey.action] as? String,
+              actionRaw == LocalNotificationService.NotificationAction.openQuickAddExpenseFromShoppingMode.rawValue else {
+            completionHandler()
+            return
         }
 
+        Self.routeToQuickAdd(userInfo: userInfo)
         completionHandler()
     }
+
+    // MARK: - Notification Actions
+
+    private static var notificationCategories: Set<UNNotificationCategory> {
+        let openAction = UNNotificationAction(
+            identifier: LocalNotificationService.NotificationAction.openQuickAddExpenseFromShoppingMode.rawValue,
+            title: "Add Expense",
+            options: [.foreground]
+        )
+
+        let shoppingSuggestionCategory = UNNotificationCategory(
+            identifier: LocalNotificationService.NotificationCategory.shoppingModeSuggestion,
+            actions: [openAction],
+            intentIdentifiers: [],
+            options: []
+        )
+
+        return [shoppingSuggestionCategory]
+    }
+
+    // MARK: - Routing
+
+    private static func routeToQuickAdd(userInfo: [AnyHashable: Any]) {
+        let merchantName = (userInfo[LocalNotificationService.UserInfoKey.merchantName] as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        UserDefaults.standard.set(
+            AppSection.cards.rawValue,
+            forKey: AppShortcutNavigationStore.pendingSectionKey
+        )
+        UserDefaults.standard.set(
+            AppShortcutNavigationStore.PendingAction.openQuickAddExpenseFromShoppingMode.rawValue,
+            forKey: AppShortcutNavigationStore.pendingActionKey
+        )
+
+        if let merchantName, !merchantName.isEmpty {
+            UserDefaults.standard.set(
+                merchantName,
+                forKey: AppShortcutNavigationStore.pendingExpenseDescriptionKey
+            )
+        } else {
+            UserDefaults.standard.removeObject(forKey: AppShortcutNavigationStore.pendingExpenseDescriptionKey)
+        }
+    }
+
 }
 #endif

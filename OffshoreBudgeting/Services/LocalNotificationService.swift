@@ -31,6 +31,10 @@ final class LocalNotificationService: ObservableObject {
         case openQuickAddExpenseFromShoppingMode = "open_quick_add_expense_from_shopping_mode"
     }
 
+    enum NotificationCategory {
+        static let shoppingModeSuggestion = "shopping_mode_suggestion_category"
+    }
+
     enum UserInfoKey {
         static let action = "offshore_action"
         static let merchantName = "offshore_merchant_name"
@@ -191,6 +195,7 @@ final class LocalNotificationService: ObservableObject {
         content.title = "Offshore Budgeting"
         content.body = "Want to log your \(trimmed) purchase to keep your books tidy?"
         content.sound = .default
+        content.categoryIdentifier = NotificationCategory.shoppingModeSuggestion
         content.userInfo = [
             UserInfoKey.action: NotificationAction.openQuickAddExpenseFromShoppingMode.rawValue,
             UserInfoKey.merchantName: trimmed

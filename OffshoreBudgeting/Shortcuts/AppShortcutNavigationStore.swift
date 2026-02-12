@@ -7,6 +7,7 @@ enum AppShortcutNavigationStore {
     static let pendingActionKey = "shortcuts_pendingAction"
     static let pendingImportClipboardTextKey = "shortcuts_pendingImportClipboardText"
     static let pendingImportCardIDKey = "shortcuts_pendingImportCardID"
+    static let pendingExpenseDescriptionKey = "shortcuts_pendingExpenseDescription"
 
     enum PendingAction: String {
         case openIncomeImportReview = "open_income_import_review"

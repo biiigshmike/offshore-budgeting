@@ -19,6 +19,9 @@ struct AddExpenseView: View {
     /// Optional default card, used when launching from CardDetailView.
     let defaultCard: Card?
 
+    /// Optional prefilled description, used when launching from notification shortcuts.
+    let prefilledDescription: String?
+
     let defaultDate: Date
 
     @Environment(\.modelContext) private var modelContext
@@ -44,11 +47,13 @@ struct AddExpenseView: View {
         workspace: Workspace,
         allowedCards: [Card]? = nil,
         defaultCard: Card? = nil,
+        prefilledDescription: String? = nil,
         defaultDate: Date = .now
     ) {
         self.workspace = workspace
         self.allowedCards = allowedCards
         self.defaultCard = defaultCard
+        self.prefilledDescription = prefilledDescription
         self.defaultDate = defaultDate
         _transactionDate = State(initialValue: defaultDate)
 
@@ -125,6 +130,13 @@ struct AddExpenseView: View {
             Text("Choose a card for this transaction.")
         }
         .onAppear {
+            if descriptionText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                let text = (prefilledDescription ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                if !text.isEmpty {
+                    descriptionText = text
+                }
+            }
+
             // Preselect card when launched from CardDetailView.
             if selectedCardID == nil {
                 if let defaultCard {

@@ -16,6 +16,7 @@ struct CardsView: View {
     @AppStorage(AppShortcutNavigationStore.pendingActionKey) private var pendingShortcutActionRaw: String = ""
     @AppStorage(AppShortcutNavigationStore.pendingImportClipboardTextKey) private var pendingImportClipboardText: String = ""
     @AppStorage(AppShortcutNavigationStore.pendingImportCardIDKey) private var pendingImportCardID: String = ""
+    @AppStorage(AppShortcutNavigationStore.pendingExpenseDescriptionKey) private var pendingExpenseDescription: String = ""
 
     @State private var showingAddExpenseSheet: Bool = false
     @State private var showingImportExpensesSheet: Bool = false
@@ -24,6 +25,7 @@ struct CardsView: View {
     @State private var editingCard: Card? = nil
     @State private var shortcutImportCard: Card? = nil
     @State private var shortcutImportClipboardText: String? = nil
+    @State private var shortcutExpenseDescription: String? = nil
 
     @State private var showingCardDeleteConfirm: Bool = false
     @State private var pendingCardDelete: (() -> Void)? = nil
@@ -134,7 +136,13 @@ struct CardsView: View {
         }
         .sheet(isPresented: $showingAddExpenseSheet) {
             NavigationStack {
-                AddExpenseView(workspace: workspace)
+                AddExpenseView(
+                    workspace: workspace,
+                    prefilledDescription: shortcutExpenseDescription
+                )
+            }
+            .onDisappear {
+                shortcutExpenseDescription = nil
             }
         }
         .sheet(isPresented: $showingImportExpensesSheet, onDismiss: {
@@ -218,6 +226,8 @@ struct CardsView: View {
 
         if pending == AppShortcutNavigationStore.PendingAction.openQuickAddExpense.rawValue
             || pending == AppShortcutNavigationStore.PendingAction.openQuickAddExpenseFromShoppingMode.rawValue {
+            let prefill = pendingExpenseDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+            shortcutExpenseDescription = prefill.isEmpty ? nil : prefill
             showingAddExpenseSheet = true
         } else if pending == AppShortcutNavigationStore.PendingAction.openCardImportReview.rawValue {
             let cardID = pendingImportCardID.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -231,6 +241,7 @@ struct CardsView: View {
         pendingShortcutActionRaw = ""
         pendingImportClipboardText = ""
         pendingImportCardID = ""
+        pendingExpenseDescription = ""
     }
 }
 
