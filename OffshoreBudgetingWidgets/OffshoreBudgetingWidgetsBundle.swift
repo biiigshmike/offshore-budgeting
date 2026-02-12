@@ -15,5 +15,8 @@ struct OffshoreBudgetingWidgetsBundle: WidgetBundle {
         CardWidget()
         NextPlannedExpenseWidget()
         SpendTrendsWidget()
+        #if canImport(ActivityKit)
+        ShoppingModeLiveActivity()
+        #endif
     }
 }

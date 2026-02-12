@@ -216,7 +216,8 @@ struct CardsView: View {
         let pending = pendingShortcutActionRaw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !pending.isEmpty else { return }
 
-        if pending == AppShortcutNavigationStore.PendingAction.openQuickAddExpense.rawValue {
+        if pending == AppShortcutNavigationStore.PendingAction.openQuickAddExpense.rawValue
+            || pending == AppShortcutNavigationStore.PendingAction.openQuickAddExpenseFromShoppingMode.rawValue {
             showingAddExpenseSheet = true
         } else if pending == AppShortcutNavigationStore.PendingAction.openCardImportReview.rawValue {
             let cardID = pendingImportCardID.trimmingCharacters(in: .whitespacesAndNewlines)

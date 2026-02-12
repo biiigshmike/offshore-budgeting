@@ -50,10 +50,18 @@ struct OffshoreBudgetingApp: App {
         return Self.makeModelContainer(useICloud: desiredUseICloud)
     }()
 
+    @Environment(\.scenePhase) private var scenePhase
+
     var body: some Scene {
         WindowGroup {
             AppBootstrapRootView(modelContainer: $modelContainer)
                 .id(rootResetToken)
+                .onAppear {
+                    ShoppingModeManager.shared.refreshIfExpired()
+                    if ShoppingModeManager.shared.status.isActive {
+                        ShoppingModeLocationService.shared.startMonitoringIfPossible()
+                    }
+                }
                 .task {
                     #if DEBUG
                     if Self.isScreenshotModeEnabled {
@@ -63,6 +71,16 @@ struct OffshoreBudgetingApp: App {
                         )
                     }
                     #endif
+                }
+                .onChange(of: scenePhase) { _, newValue in
+                    guard newValue == .active else { return }
+                    ShoppingModeManager.shared.refreshIfExpired()
+                    if ShoppingModeManager.shared.status.isActive {
+                        ShoppingModeLocationService.shared.startMonitoringIfPossible()
+                    }
+                }
+                .onOpenURL { url in
+                    _ = ShoppingModeManager.shared.handleDeepLink(url)
                 }
         }
         .modelContainer(modelContainer)

@@ -8,7 +8,7 @@ enum SpendingSessionDuration: Int, AppEnum {
     case twoHours = 2
     case fourHours = 4
 
-    static var typeDisplayRepresentation: TypeDisplayRepresentation = "Spending Session Duration"
+    static var typeDisplayRepresentation: TypeDisplayRepresentation = "Excursion Mode Duration"
 
     static var caseDisplayRepresentations: [SpendingSessionDuration: DisplayRepresentation] = [
         .oneHour: "1 hour",
@@ -21,9 +21,9 @@ enum SpendingSessionDuration: Int, AppEnum {
 
 // MARK: - EnableSpendingSessionIntent
 
-struct EnableSpendingSessionIntent: AppIntent {
-    static var title: LocalizedStringResource = "Enable Spending Session"
-    static var description = IntentDescription("Start a focused spending session for a fixed time.")
+struct EnableSpendingSessionIntent: AppIntent, LiveActivityIntent {
+    static var title: LocalizedStringResource = "Start Excursion Mode"
+    static var description = IntentDescription("Start a focused excursion mode session for a fixed time.")
     static var openAppWhenRun: Bool = false
 
     @Parameter(title: "Duration")
@@ -35,11 +35,11 @@ struct EnableSpendingSessionIntent: AppIntent {
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let expirationDate = await MainActor.run { () -> Date in
-            SpendingSessionStore.activate(hours: duration.hours)
-            return SpendingSessionStore.expirationDate() ?? Date.now
+            ShoppingModeManager.shared.start(hours: duration.hours)
+            return ShoppingModeManager.shared.status.expiresAt ?? Date.now
         }
 
         let timeText = expirationDate.formatted(date: .omitted, time: .shortened)
-        return .result(dialog: IntentDialog(stringLiteral: "Spending session enabled until \(timeText)."))
+        return .result(dialog: IntentDialog(stringLiteral: "Excursion mode is active until \(timeText)."))
     }
 }

@@ -30,5 +30,26 @@ final class NotificationsAppDelegate: NSObject, UIApplicationDelegate, UNUserNot
     ) {
         completionHandler([.banner, .sound, .badge])
     }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        let userInfo = response.notification.request.content.userInfo
+        if let actionRaw = userInfo[LocalNotificationService.UserInfoKey.action] as? String,
+           actionRaw == LocalNotificationService.NotificationAction.openQuickAddExpenseFromShoppingMode.rawValue {
+            UserDefaults.standard.set(
+                AppSection.cards.rawValue,
+                forKey: AppShortcutNavigationStore.pendingSectionKey
+            )
+            UserDefaults.standard.set(
+                AppShortcutNavigationStore.PendingAction.openQuickAddExpenseFromShoppingMode.rawValue,
+                forKey: AppShortcutNavigationStore.pendingActionKey
+            )
+        }
+
+        completionHandler()
+    }
 }
 #endif

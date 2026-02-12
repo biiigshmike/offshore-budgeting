@@ -23,7 +23,17 @@ final class LocalNotificationService: ObservableObject {
         static let dailyExpenseReminder = "daily_expense_reminder"
         static let plannedIncomeReminder = "planned_income_reminder"
         static let presetDueReminder = "preset_due_reminder"
+        static let shoppingModeSuggestion = "shopping_mode_suggestion"
         static let testNotification = "local_test_notification"
+    }
+
+    enum NotificationAction: String {
+        case openQuickAddExpenseFromShoppingMode = "open_quick_add_expense_from_shopping_mode"
+    }
+
+    enum UserInfoKey {
+        static let action = "offshore_action"
+        static let merchantName = "offshore_merchant_name"
     }
 
     // MARK: - Constants
@@ -171,6 +181,25 @@ final class LocalNotificationService: ObservableObject {
     /// Cancels a scheduled daily reminder by identifier.
     func cancelNotification(identifier: String) {
         removeScheduledNotifications(identifiers: [identifier])
+    }
+
+    func scheduleShoppingModeSuggestionNotification(merchantName: String) async throws {
+        let trimmed = merchantName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
+        let content = UNMutableNotificationContent()
+        content.title = "Offshore Budgeting"
+        content.body = "Want to log your \(trimmed) purchase to keep your books tidy?"
+        content.sound = .default
+        content.userInfo = [
+            UserInfoKey.action: NotificationAction.openQuickAddExpenseFromShoppingMode.rawValue,
+            UserInfoKey.merchantName: trimmed
+        ]
+
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+        let identifier = "\(NotificationID.shoppingModeSuggestion)_\(UUID().uuidString)"
+        let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
+        try await addNotificationRequest(request)
     }
 
     /// Syncs the three reminder types based on toggles + reminder time + SwiftData.

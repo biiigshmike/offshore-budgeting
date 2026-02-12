@@ -2,8 +2,27 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.mb.offshore-budgeting</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>offshore</string>
+			</array>
+		</dict>
+	</array>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Offshore uses photos you select to import transactions from screenshots and receipts.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Offshore uses your location during Excursion Mode to detect nearby stores and suggest quick expense logging.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Offshore uses your location in Excursion Mode to suggest logging purchases when you enter saved store areas, even in the background.</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>

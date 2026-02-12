@@ -26,11 +26,15 @@ struct OffshoreAppShortcuts: AppShortcutsProvider {
         AppShortcut(
             intent: EnableSpendingSessionIntent(),
             phrases: [
+                "Start excursion mode in \(.applicationName)",
+                "Enable excursion mode in \(.applicationName)",
+                "Start shopping mode in \(.applicationName)",
+                "Enable shopping mode in \(.applicationName)",
                 "Enable spending session in \(.applicationName)",
                 "Start spending mode in \(.applicationName)"
             ],
-            shortTitle: "Spending Session",
-            systemImageName: "timer"
+            shortTitle: "Excursion Mode",
+            systemImageName: "cart.badge.plus"
         )
         AppShortcut(
             intent: ReviewTodaysSpendingIntent(),

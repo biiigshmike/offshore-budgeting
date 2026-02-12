@@ -7,6 +7,10 @@
 
 import SwiftUI
 
+#if canImport(CoreLocation)
+import CoreLocation
+#endif
+
 struct SettingsNotificationsView: View {
 
     let workspaceID: UUID
@@ -27,6 +31,7 @@ struct SettingsNotificationsView: View {
     @State private var reminderTime: Date = Date()
 
     @StateObject private var notificationService = LocalNotificationService()
+    @StateObject private var shoppingModeManager = ShoppingModeManager.shared
 
     @Environment(\.modelContext) private var modelContext
 
@@ -113,6 +118,46 @@ struct SettingsNotificationsView: View {
                     .foregroundStyle(.secondary)
             }
 
+            // MARK: - Excursion Mode
+
+            Section("Excursion Mode") {
+                if shoppingModeManager.status.isActive, let expiresAt = shoppingModeManager.status.expiresAt {
+                    LabeledContent("Status") {
+                        Text("Active")
+                            .foregroundStyle(.green)
+                    }
+
+                    LabeledContent("Ends") {
+                        Text(expiresAt, format: .dateTime.hour().minute())
+                    }
+
+                    Button("Stop Excursion Mode", role: .destructive) {
+                        shoppingModeManager.end()
+                    }
+                } else {
+                    LabeledContent("Status") {
+                        Text("Inactive")
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Menu("Start Excursion Mode") {
+                        Button("1 hour") {
+                            shoppingModeManager.start(hours: 1)
+                        }
+                        Button("2 hours") {
+                            shoppingModeManager.start(hours: 2)
+                        }
+                        Button("4 hours") {
+                            shoppingModeManager.start(hours: 4)
+                        }
+                    }
+                }
+
+                Text(locationStatusText)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
             // MARK: - Denied
 
             if notificationService.authorizationState == .denied {
@@ -150,6 +195,7 @@ struct SettingsNotificationsView: View {
         .listStyle(.insetGrouped)
         .navigationTitle("Notifications")
         .task {
+            shoppingModeManager.refreshIfExpired()
             await notificationService.refreshAuthorizationStatus()
             syncUIFromCurrentState()
 
@@ -350,6 +396,28 @@ struct SettingsNotificationsView: View {
                 return
             }
         }
+    }
+
+    private var locationStatusText: String {
+        #if canImport(CoreLocation)
+        let status = ShoppingModeLocationService.shared.currentAuthorizationStatus()
+        switch status {
+        case .authorizedAlways:
+            return "Location access is set to Always Allow, so store-entry suggestions can run while the app is in the background."
+        case .authorizedWhenInUse:
+            return "Location access is While Using. Excursion Mode will work best after upgrading this to Always Allow in System Settings."
+        case .denied:
+            return "Location access is denied. Enable Location in System Settings to get Excursion Mode store suggestions."
+        case .restricted:
+            return "Location access is restricted on this device."
+        case .notDetermined:
+            return "Start Excursion Mode to request Location permission for store-entry suggestions."
+        @unknown default:
+            return "Location permission status is unknown."
+        }
+        #else
+        return "Location status is unavailable on this platform."
+        #endif
     }
 }
 
