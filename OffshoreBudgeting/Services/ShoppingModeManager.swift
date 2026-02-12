@@ -32,6 +32,7 @@ struct ShoppingModeStatus: Equatable {
 @MainActor
 final class ShoppingModeManager: ObservableObject {
     static let shared = ShoppingModeManager()
+    private static let liveActivityRelevanceScore: Double = 80
 
     @Published private(set) var status: ShoppingModeStatus = .inactive
 
@@ -138,7 +139,8 @@ final class ShoppingModeManager: ObservableObject {
                 await existing.update(
                     ActivityContent(
                         state: state,
-                        staleDate: expiresAt
+                        staleDate: expiresAt,
+                        relevanceScore: Self.liveActivityRelevanceScore
                     )
                 )
             } else {
@@ -147,7 +149,8 @@ final class ShoppingModeManager: ObservableObject {
                         attributes: attributes,
                         content: ActivityContent(
                             state: state,
-                            staleDate: expiresAt
+                            staleDate: expiresAt,
+                            relevanceScore: Self.liveActivityRelevanceScore
                         )
                     )
                 } catch {

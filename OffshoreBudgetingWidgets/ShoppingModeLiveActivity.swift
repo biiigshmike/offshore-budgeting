@@ -120,14 +120,12 @@ struct ShoppingModeLiveActivity: Widget {
                     .padding(.top, 4)
                 }
             } compactLeading: {
-                HStack(spacing: 3) {
-                    Image(systemName: "sailboat.fill")
-                        .font(.caption.weight(.semibold))
-                    CompactCountdownText(endDate: context.state.endDate)
-                }
-                .foregroundStyle(.white)
+                Image(systemName: "sailboat.fill")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.white)
             } compactTrailing: {
-                EmptyView()
+                CompactCountdownText(endDate: context.state.endDate)
+                    .foregroundStyle(.white)
             } minimal: {
                 ViewThatFits {
                     HStack(spacing: 2) {
@@ -139,8 +137,6 @@ struct ShoppingModeLiveActivity: Widget {
 
                     Image(systemName: "sailboat.fill")
                         .foregroundStyle(.white)
-
-                    MinimalCountdownText(endDate: context.state.endDate)
                 }
             }
         }
@@ -212,15 +208,20 @@ private struct MinimalCountdownText: View {
 
     private func shortRemainingText(now: Date) -> String {
         let remaining = max(0, endDate.timeIntervalSince(now))
+        if remaining <= 0 {
+            return "0m"
+        }
         let totalMinutes = max(0, Int(ceil(remaining / 60)))
         let hours = totalMinutes / 60
         let minutes = totalMinutes % 60
 
         if hours > 0 {
-            let minuteText = minutes < 10 ? "0\(minutes)" : "\(minutes)"
-            return "\(hours):\(minuteText)"
+            if minutes >= 30 {
+                return "\(hours + 1)h"
+            }
+            return "\(hours)h"
         }
-        return "\(minutes)m"
+        return "\(max(1, minutes))m"
     }
 }
 
