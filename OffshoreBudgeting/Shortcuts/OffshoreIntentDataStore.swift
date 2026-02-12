@@ -13,9 +13,10 @@ final class OffshoreIntentDataStore {
 
     // MARK: - Errors
 
-    enum IntentDataError: LocalizedError {
+    enum IntentDataError: LocalizedError, Equatable {
         case workspaceUnavailable
         case cardUnavailable
+        case ambiguousCardName
         case categoryUnavailable
 
         var errorDescription: String? {
@@ -24,6 +25,8 @@ final class OffshoreIntentDataStore {
                 return "No workspace is selected. Open Offshore and pick a workspace first."
             case .cardUnavailable:
                 return "The selected card was not found in your active workspace."
+            case .ambiguousCardName:
+                return "More than one card matched that Wallet card name. Rename cards so each one is unique."
             case .categoryUnavailable:
                 return "The selected category was not found in your active workspace."
             }
@@ -97,6 +100,44 @@ final class OffshoreIntentDataStore {
         return card
     }
 
+    func resolveCard(
+        id: String?,
+        name: String?,
+        in workspace: Workspace,
+        modelContext: ModelContext
+    ) throws -> Card {
+        let trimmedID = (id ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedID.isEmpty {
+            return try resolveCard(id: trimmedID, in: workspace, modelContext: modelContext)
+        }
+
+        let normalizedName = normalizeLookupText(name)
+        guard !normalizedName.isEmpty else {
+            throw IntentDataError.cardUnavailable
+        }
+
+        let workspaceID = workspace.id
+        let descriptor = FetchDescriptor<Card>(
+            predicate: #Predicate<Card> { card in
+                card.workspace?.id == workspaceID
+            }
+        )
+        let cards = try modelContext.fetch(descriptor)
+        let matches = cards.filter {
+            normalizeLookupText($0.name) == normalizedName
+        }
+
+        guard let first = matches.first else {
+            throw IntentDataError.cardUnavailable
+        }
+
+        if matches.count > 1 {
+            throw IntentDataError.ambiguousCardName
+        }
+
+        return first
+    }
+
     func resolveCategory(id: String?, in workspace: Workspace, modelContext: ModelContext) throws -> Category? {
         guard let id, let uuid = UUID(uuidString: id) else {
             return nil
@@ -110,6 +151,31 @@ final class OffshoreIntentDataStore {
         )
 
         return try modelContext.fetch(descriptor).first
+    }
+
+    func resolveCategory(
+        id: String?,
+        merchant: String?,
+        in workspace: Workspace,
+        modelContext: ModelContext
+    ) throws -> Category? {
+        if let resolvedByID = try resolveCategory(id: id, in: workspace, modelContext: modelContext) {
+            return resolvedByID
+        }
+
+        let trimmedMerchant = (merchant ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedMerchant.isEmpty {
+            let merchantKey = MerchantNormalizer.normalizeKey(trimmedMerchant)
+            if !merchantKey.isEmpty {
+                let rulesByKey = ImportLearningStore.fetchRules(for: workspace, modelContext: modelContext)
+                let matcher = ImportMerchantRuleMatcher(rulesByKey: rulesByKey)
+                if let match = matcher.match(for: merchantKey),
+                   let preferredCategory = match.rule.preferredCategory {
+                    return preferredCategory
+                }
+            }
+        }
+        return nil
     }
 
     // MARK: - Private
@@ -156,5 +222,17 @@ final class OffshoreIntentDataStore {
             container = created
         }
         return ModelContext(container)
+    }
+
+    private func normalizeLookupText(_ value: String?) -> String {
+        let trimmed = (value ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { return "" }
+
+        let collapsed = trimmed.replacingOccurrences(
+            of: "\\s+",
+            with: " ",
+            options: .regularExpression
+        )
+        return collapsed.uppercased()
     }
 }

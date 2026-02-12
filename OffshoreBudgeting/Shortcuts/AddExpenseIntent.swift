@@ -27,23 +27,23 @@ struct AddExpenseIntent: AppIntent {
     var category: OffshoreCategoryEntity?
 
     @Parameter(
+        title: "Merchant",
+        requestValueDialog: IntentDialog("What merchant should I use for category matching?")
+    )
+    var merchant: String?
+
+    @Parameter(
         title: "Date",
         requestValueDialog: IntentDialog("What date should I use for this expense?")
     )
     var date: Date?
 
-    @Parameter(
-        title: "Notes",
-        requestValueDialog: IntentDialog("What should I use for notes or description?")
-    )
-    var notes: String?
-
     init() {
         self.amountText = nil
         self.card = nil
         self.category = nil
+        self.merchant = nil
         self.date = nil
-        self.notes = nil
     }
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
@@ -58,25 +58,17 @@ struct AddExpenseIntent: AppIntent {
             throw $amountText.needsValueError("Amount must be greater than 0.")
         }
 
-        guard let card else {
+        let trimmedMerchant = (merchant ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedCardID = (card?.id ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if trimmedCardID.isEmpty {
             throw $card.needsValueError("Please choose a card.")
         }
 
-        if card.id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            throw $card.needsValueError("Please choose a card.")
-        }
-
-        guard let category else {
-            throw $category.needsValueError("Please choose a category.")
-        }
-
-        if category.id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            throw $category.needsValueError("Please choose a valid category.")
-        }
-
-        let trimmedNotes = (notes ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmedNotes.isEmpty {
-            throw $notes.needsValueError("Please provide notes or a description for the expense.")
+        if trimmedMerchant.isEmpty {
+            throw $merchant.needsValueError("Please provide a merchant or description for the expense.")
         }
 
         guard let date else {
@@ -89,14 +81,16 @@ struct AddExpenseIntent: AppIntent {
                 let service = TransactionEntryService()
 
                 return try dataStore.performWrite { modelContext, workspace in
-                    let resolvedCard = try dataStore.resolveCard(id: card.id, in: workspace, modelContext: modelContext)
-                    let resolvedCategory = try dataStore.resolveCategory(id: category.id, in: workspace, modelContext: modelContext)
-                    guard let resolvedCategory else {
-                        throw OffshoreIntentDataStore.IntentDataError.categoryUnavailable
-                    }
+                    let resolvedCard = try dataStore.resolveCard(id: trimmedCardID, in: workspace, modelContext: modelContext)
+                    let resolvedCategory = try dataStore.resolveCategory(
+                        id: category?.id,
+                        merchant: trimmedMerchant,
+                        in: workspace,
+                        modelContext: modelContext
+                    )
 
                     _ = try service.addExpense(
-                        notes: trimmedNotes,
+                        notes: trimmedMerchant,
                         amount: parsedAmount,
                         date: date,
                         workspace: workspace,
@@ -106,7 +100,8 @@ struct AddExpenseIntent: AppIntent {
                     )
 
                     let amountText = CurrencyFormatter.string(from: parsedAmount)
-                    return "Logged \(amountText) to \(resolvedCard.name) in \(resolvedCategory.name)."
+                    let categoryName = resolvedCategory?.name ?? "Uncategorized"
+                    return "Logged \(amountText) to \(resolvedCard.name) in \(categoryName)."
                 }
             }
 
