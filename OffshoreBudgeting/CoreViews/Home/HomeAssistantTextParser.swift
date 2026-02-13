@@ -555,7 +555,7 @@ struct HomeAssistantTextParser {
     private func extractedSingleDateRange(from text: String) -> HomeQueryDateRange? {
         guard
             let range = text.range(
-                of: "\\b(on|for)\\s+([a-z0-9\\-/ ]{3,40})\\b",
+                of: "\\b(on|for)\\s+([a-z0-9\\-/ ]{3,40}?)(?=\\s+(from|to|and|through|thru|at|using|with)\\b|$)",
                 options: .regularExpression
             )
         else {
@@ -855,5 +855,466 @@ struct HomeAssistantTextParser {
         default:
             return nil
         }
+    }
+}
+
+// MARK: - Command Parser
+
+struct HomeAssistantCommandParser {
+    private let parser: HomeAssistantTextParser
+
+    init(
+        parser: HomeAssistantTextParser = HomeAssistantTextParser()
+    ) {
+        self.parser = parser
+    }
+
+    func parse(
+        _ rawText: String,
+        defaultPeriodUnit: HomeQueryPeriodUnit = .month
+    ) -> HomeAssistantCommandPlan? {
+        let trimmed = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.isEmpty == false else { return nil }
+
+        let normalized = normalizedText(trimmed)
+        guard let intent = resolvedIntent(from: normalized) else { return nil }
+
+        let parsedRange = parser.parseDateRange(trimmed, defaultPeriodUnit: defaultPeriodUnit)
+        let date = parsedRange?.startDate
+        let amounts = extractedAmounts(from: trimmed)
+        let amountPair = extractedFromToAmounts(from: trimmed)
+
+        let amount: Double?
+        let originalAmount: Double?
+        switch intent {
+        case .editExpense, .editIncome:
+            originalAmount = amountPair?.from ?? amounts.first
+            amount = amountPair?.to ?? amounts.last
+        case .addExpense, .addIncome, .addPreset:
+            originalAmount = nil
+            amount = amounts.first
+        case .deleteExpense, .deleteIncome:
+            originalAmount = nil
+            amount = amounts.first
+        case .addBudget, .addCard, .addCategory:
+            originalAmount = nil
+            amount = nil
+        }
+
+        let notes = extractedExpenseNotes(from: trimmed)
+        let source = extractedIncomeSource(from: trimmed)
+        let cardName = extractedCardName(from: trimmed)
+        let categoryName = extractedCategoryName(from: trimmed)
+        let entityName = extractedEntityName(from: trimmed, intent: intent)
+        let incomeKind = extractedIncomeKind(from: normalized)
+        let categoryColor = extractedCategoryColor(from: trimmed)
+        let cardTheme = extractedCardTheme(from: normalized)
+        let cardEffect = extractedCardEffect(from: normalized)
+        let attachAllCards = extractedAttachAllCards(from: normalized)
+        let attachAllPresets = extractedAttachAllPresets(from: normalized)
+
+        return HomeAssistantCommandPlan(
+            intent: intent,
+            confidenceBand: .high,
+            rawPrompt: trimmed,
+            amount: amount,
+            originalAmount: originalAmount,
+            date: date,
+            dateRange: parsedRange,
+            notes: notes,
+            source: source,
+            cardName: cardName,
+            categoryName: categoryName,
+            entityName: entityName,
+            isPlannedIncome: incomeKind,
+            categoryColorHex: categoryColor.hex,
+            categoryColorName: categoryColor.name,
+            cardThemeRaw: cardTheme?.rawValue,
+            cardEffectRaw: cardEffect?.rawValue,
+            attachAllCards: attachAllCards,
+            attachAllPresets: attachAllPresets
+        )
+    }
+
+    func isCardCrudPrompt(_ rawText: String) -> Bool {
+        let normalized = normalizedText(rawText)
+        let hasMutationVerb = normalized.contains("delete") || normalized.contains("edit") || normalized.contains("add")
+        return hasMutationVerb && normalized.contains("card")
+    }
+
+    private func resolvedIntent(from normalized: String) -> HomeAssistantCommandIntent? {
+        if matchesCreateEntityIntent(in: normalized, entityKeyword: "budget") {
+            return .addBudget
+        }
+
+        if matchesCreateEntityIntent(in: normalized, entityKeyword: "preset") {
+            return .addPreset
+        }
+
+        if matchesCreateEntityIntent(in: normalized, entityKeyword: "card")
+            && normalized.contains("expense") == false
+            && normalized.contains("transaction") == false
+        {
+            return .addCard
+        }
+
+        if matchesCreateEntityIntent(in: normalized, entityKeyword: "category") {
+            return .addCategory
+        }
+
+        if normalized.contains("income") {
+            if normalized.contains("delete") || normalized.contains("remove") {
+                return .deleteIncome
+            }
+            if normalized.contains("edit") || normalized.contains("update") || normalized.contains("change") {
+                return .editIncome
+            }
+            if normalized.contains("add") || normalized.contains("log") || normalized.contains("create") {
+                return .addIncome
+            }
+        }
+
+        if normalized.contains("expense")
+            || normalized.contains("transaction")
+            || normalized.contains("purchase")
+            || normalized.contains("charge")
+            || normalized.contains("$")
+        {
+            if normalized.contains("delete") || normalized.contains("remove") {
+                return .deleteExpense
+            }
+            if normalized.contains("edit") || normalized.contains("update") || normalized.contains("change") {
+                return .editExpense
+            }
+            if normalized.contains("add") || normalized.contains("log") || normalized.contains("create") {
+                return .addExpense
+            }
+        }
+
+        return nil
+    }
+
+    private func matchesCreateEntityIntent(in normalized: String, entityKeyword: String) -> Bool {
+        let creationVerbs = ["add", "create", "new", "make"]
+        let hasVerb = creationVerbs.contains { normalized.contains($0) }
+        return hasVerb && normalized.contains(entityKeyword)
+    }
+
+    private func extractedFromToAmounts(from text: String) -> (from: Double, to: Double)? {
+        guard
+            let range = text.range(
+                of: "\\bfrom\\s+\\$?[-]?[0-9][0-9,]*(?:\\.[0-9]{1,2})?\\s+to\\s+\\$?[-]?[0-9][0-9,]*(?:\\.[0-9]{1,2})?\\b",
+                options: .regularExpression
+            )
+        else {
+            return nil
+        }
+
+        let phrase = String(text[range])
+        let parts = phrase.split(separator: " ")
+        guard parts.count == 4 else { return nil }
+
+        guard
+            let from = parseAmountToken(String(parts[1])),
+            let to = parseAmountToken(String(parts[3]))
+        else {
+            return nil
+        }
+
+        return (from: from, to: to)
+    }
+
+    private func extractedAmounts(from text: String) -> [Double] {
+        guard let regex = try? NSRegularExpression(pattern: "\\$?[-]?[0-9][0-9,]*(?:\\.[0-9]{1,2})?") else {
+            return []
+        }
+
+        let range = NSRange(text.startIndex..<text.endIndex, in: text)
+        let matches = regex.matches(in: text, options: [], range: range)
+
+        return matches.compactMap { match -> Double? in
+            guard let r = Range(match.range, in: text) else { return nil }
+            return parseAmountToken(String(text[r]))
+        }
+    }
+
+    private func parseAmountToken(_ token: String) -> Double? {
+        let cleaned = token
+            .replacingOccurrences(of: "$", with: "")
+            .replacingOccurrences(of: ",", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return CurrencyFormatter.parseAmount(cleaned)
+    }
+
+    private func extractedExpenseNotes(from text: String) -> String? {
+        if let forRange = text.range(of: "\\bfor\\s+(.+)$", options: .regularExpression) {
+            let value = String(text[forRange]).replacingOccurrences(of: "for", with: "")
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty == false {
+                return stripTrailingPunctuation(trimmed)
+            }
+        }
+
+        if let merchantRange = text.range(of: "\\bat\\s+(.+)$", options: .regularExpression) {
+            let value = String(text[merchantRange]).replacingOccurrences(of: "at", with: "")
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty == false {
+                return stripTrailingPunctuation(trimmed)
+            }
+        }
+
+        return nil
+    }
+
+    private func extractedIncomeSource(from text: String) -> String? {
+        if let fromRange = text.range(of: "\\bfrom\\s+(.+)$", options: .regularExpression) {
+            let value = String(text[fromRange]).replacingOccurrences(of: "from", with: "")
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty == false {
+                return sanitizeCreationPhrase(stripTrailingPunctuation(trimmed))
+            }
+        }
+
+        if let forRange = text.range(of: "\\bfor\\s+(.+)$", options: .regularExpression) {
+            let value = String(text[forRange]).replacingOccurrences(of: "for", with: "")
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty == false {
+                return sanitizeCreationPhrase(stripTrailingPunctuation(trimmed))
+            }
+        }
+
+        return nil
+    }
+
+    private func extractedCardName(from text: String) -> String? {
+        let patterns = [
+            "\\bon\\s+([A-Za-z0-9 '\\-]+?)\\s+card\\b",
+            "\\bto\\s+([A-Za-z0-9 '\\-]+?)\\s+card\\b",
+            "\\busing\\s+([A-Za-z0-9 '\\-]+?)\\s+card\\b"
+        ]
+
+        for pattern in patterns {
+            guard
+                let range = text.range(of: pattern, options: .regularExpression)
+            else {
+                continue
+            }
+
+            var value = String(text[range])
+            value = value
+                .replacingOccurrences(of: "on ", with: "")
+                .replacingOccurrences(of: "to ", with: "")
+                .replacingOccurrences(of: "using ", with: "")
+                .replacingOccurrences(of: " card", with: "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+
+            if value.isEmpty == false {
+                return stripTrailingPunctuation(value)
+            }
+        }
+
+        return nil
+    }
+
+    private func extractedCategoryName(from text: String) -> String? {
+        guard let range = text.range(of: "\\bcategory\\s+([A-Za-z0-9 '&\\-]+)\\b", options: .regularExpression) else {
+            return nil
+        }
+
+        let phrase = String(text[range]).replacingOccurrences(of: "category", with: "")
+        let trimmed = phrase.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : stripTrailingPunctuation(trimmed)
+    }
+
+    private func extractedEntityName(
+        from text: String,
+        intent: HomeAssistantCommandIntent
+    ) -> String? {
+        let compactText = text
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let patterns: [String]
+        switch intent {
+        case .addCard:
+            patterns = [
+                "\\b(?:called|named)\\s+([A-Za-z0-9 '&\\-]+)$",
+                "\\bcard\\s+([A-Za-z0-9 '&\\-]+)$"
+            ]
+        case .addCategory:
+            patterns = [
+                "\\b(?:called|named)\\s+([A-Za-z0-9 '&\\-]+)$",
+                "\\bcategory\\s+([A-Za-z0-9 '&\\-]+)$"
+            ]
+        case .addPreset:
+            patterns = [
+                "\\b(?:called|named)\\s+([A-Za-z0-9 '&\\-]+)$",
+                "\\bpreset\\s+([A-Za-z0-9 '&\\-]+)$"
+            ]
+        case .addBudget:
+            patterns = [
+                "\\b(?:called|named)\\s+([A-Za-z0-9 '&\\-]+)$",
+                "\\bbudget\\s+([A-Za-z0-9 '&\\-]+)$"
+            ]
+        case .addExpense, .addIncome, .editExpense, .deleteExpense, .editIncome, .deleteIncome:
+            return nil
+        }
+
+        for pattern in patterns {
+            guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else {
+                continue
+            }
+            let nsrange = NSRange(compactText.startIndex..<compactText.endIndex, in: compactText)
+            guard let match = regex.firstMatch(in: compactText, options: [], range: nsrange),
+                  match.numberOfRanges > 1,
+                  let range = Range(match.range(at: 1), in: compactText)
+            else {
+                continue
+            }
+
+            var raw = String(compactText[range]).trimmingCharacters(in: .whitespacesAndNewlines)
+            raw = stripTrailingPunctuation(raw)
+            if intent == .addPreset {
+                raw = raw.replacingOccurrences(
+                    of: "\\s+\\$?[-]?[0-9][0-9,]*(?:\\.[0-9]{1,2})?$",
+                    with: "",
+                    options: .regularExpression
+                ).trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            raw = sanitizeCreationPhrase(raw)
+            if raw.isEmpty == false {
+                return raw
+            }
+        }
+
+        return nil
+    }
+
+    private func extractedCategoryColor(from text: String) -> (hex: String?, name: String?) {
+        let lowered = normalizedText(text)
+
+        let extractedName: String? = {
+            if let range = lowered.range(of: "\\b(?:color|colour)\\s+([a-z\\s]{3,30})\\b", options: .regularExpression) {
+                let phrase = String(lowered[range])
+                    .replacingOccurrences(of: "color", with: "")
+                    .replacingOccurrences(of: "colour", with: "")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                return phrase.isEmpty ? nil : phrase
+            }
+            return marinaColorAliases.keys.first(where: { lowered.contains($0) })
+        }()
+
+        guard let extractedName else { return (nil, nil) }
+        if let hex = marinaColorAliases[extractedName] {
+            return (hex, extractedName)
+        }
+
+        let compact = extractedName.replacingOccurrences(of: " ", with: "")
+        if let key = marinaColorAliases.keys.first(where: { $0.replacingOccurrences(of: " ", with: "") == compact }),
+           let hex = marinaColorAliases[key] {
+            return (hex, key)
+        }
+
+        return (nil, extractedName)
+    }
+
+    private func extractedCardTheme(from normalized: String) -> CardThemeOption? {
+        for option in CardThemeOption.allCases where normalized.contains(option.rawValue) {
+            return option
+        }
+        return nil
+    }
+
+    private func extractedCardEffect(from normalized: String) -> CardEffectOption? {
+        for option in CardEffectOption.allCases where normalized.contains(option.rawValue) {
+            return option
+        }
+        return nil
+    }
+
+    private func extractedAttachAllCards(from normalized: String) -> Bool? {
+        if normalized.contains("all cards") || normalized.contains("attach every card") {
+            return true
+        }
+        if normalized.contains("no cards") || normalized.contains("without cards") || normalized.contains("skip cards") {
+            return false
+        }
+        return nil
+    }
+
+    private func extractedAttachAllPresets(from normalized: String) -> Bool? {
+        if normalized.contains("all presets") || normalized.contains("attach every preset") {
+            return true
+        }
+        if normalized.contains("no presets") || normalized.contains("without presets") || normalized.contains("skip presets") {
+            return false
+        }
+        return nil
+    }
+
+    private func sanitizeCreationPhrase(_ input: String) -> String {
+        var phrase = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard phrase.isEmpty == false else { return phrase }
+
+        let removalPatterns = [
+            "\\b(actual|planned)\\b$",
+            "\\bon\\s+[a-z0-9 '&\\-]+\\s+card\\b$",
+            "\\bcategory\\s+[a-z0-9 '&\\-]+\\b$"
+        ]
+
+        for pattern in removalPatterns {
+            phrase = phrase.replacingOccurrences(
+                of: pattern,
+                with: "",
+                options: [.regularExpression, .caseInsensitive]
+            ).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        return stripTrailingPunctuation(phrase)
+    }
+
+    private var marinaColorAliases: [String: String] {
+        [
+            "blue": "#3B82F6",
+            "green": "#22C55E",
+            "forest green": "#228B22",
+            "red": "#EF4444",
+            "orange": "#F97316",
+            "yellow": "#EAB308",
+            "purple": "#8B5CF6",
+            "pink": "#EC4899",
+            "mauve": "#B784A7",
+            "periwinkle": "#8FA6FF",
+            "perriwinkle": "#8FA6FF",
+            "cafe": "#6F4E37",
+            "brown": "#8B5A2B",
+            "teal": "#14B8A6",
+            "mint": "#10B981",
+            "gray": "#6B7280",
+            "grey": "#6B7280",
+            "black": "#111827",
+            "white": "#E5E7EB"
+        ]
+    }
+
+    private func extractedIncomeKind(from normalized: String) -> Bool? {
+        if normalized.contains("planned") {
+            return true
+        }
+        if normalized.contains("actual") {
+            return false
+        }
+        return nil
+    }
+
+    private func normalizedText(_ rawText: String) -> String {
+        rawText
+            .lowercased()
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func stripTrailingPunctuation(_ value: String) -> String {
+        value.trimmingCharacters(in: CharacterSet(charactersIn: " .,!?"))
     }
 }

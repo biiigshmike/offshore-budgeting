@@ -494,6 +494,73 @@ struct HomeAssistantTextParserTests {
         }
     }
 
+    // MARK: - Command Parsing
+
+    @Test func commandParser_addExpensePrompt_extractsAmountAndNotes() throws {
+        let command = makeCommandParser().parse("Marina, log $25 for Starbucks")
+
+        #expect(command?.intent == .addExpense)
+        #expect(command?.amount == 25)
+        #expect(command?.notes == "Starbucks")
+    }
+
+    @Test func commandParser_editIncomeFromToPrompt_extractsAmountsAndDate() throws {
+        let command = makeCommandParser().parse("edit my income entry on 2/1/2026 from 1,000 to 1,250")
+
+        #expect(command?.intent == .editIncome)
+        #expect(command?.originalAmount == 1000)
+        #expect(command?.amount == 1250)
+        #expect(command?.date == date(2026, 2, 1, 0, 0, 0))
+    }
+
+    @Test func commandParser_deleteCardPrompt_flaggedAsCardCrud() throws {
+        let parser = makeCommandParser()
+        #expect(parser.isCardCrudPrompt("delete my card Apple Card") == true)
+    }
+
+    @Test func commandParser_addCardPrompt_extractsCardIntentAndName() throws {
+        let command = makeCommandParser().parse("create card named Apple Card")
+        #expect(command?.intent == .addCard)
+        #expect(command?.entityName == "Apple Card")
+    }
+
+    @Test func commandParser_addCategoryPrompt_extractsCategoryIntentAndName() throws {
+        let command = makeCommandParser().parse("add category groceries")
+        #expect(command?.intent == .addCategory)
+        #expect(command?.entityName == "groceries")
+    }
+
+    @Test func commandParser_addPresetPrompt_extractsPresetIntentAmount() throws {
+        let command = makeCommandParser().parse("create preset rent 1500")
+        #expect(command?.intent == .addPreset)
+        #expect(command?.amount == 1500)
+        #expect(command?.entityName == "rent")
+    }
+
+    @Test func commandParser_addPresetPrompt_withCardPhrase_staysPresetIntent() throws {
+        let command = makeCommandParser().parse("create preset rent 1500 on Apple Card")
+        #expect(command?.intent == .addPreset)
+        #expect(command?.cardName != nil)
+    }
+
+    @Test func commandParser_addBudgetPrompt_extractsBudgetIntent() throws {
+        let command = makeCommandParser().parse("create budget for March 2026")
+        #expect(command?.intent == .addBudget)
+    }
+
+    @Test func commandParser_addIncomePrompt_stripsIncomeKindFromSource() throws {
+        let command = makeCommandParser().parse("log income $1250 from paycheck actual")
+        #expect(command?.intent == .addIncome)
+        #expect(command?.source == "paycheck")
+        #expect(command?.isPlannedIncome == false)
+    }
+
+    @Test func commandParser_addCategoryPrompt_extractsMappedColor() throws {
+        let command = makeCommandParser().parse("add category cafes color perriwinkle")
+        #expect(command?.intent == .addCategory)
+        #expect(command?.categoryColorHex == "#8FA6FF")
+    }
+
     // MARK: - Helpers
 
     private struct IntentPhraseCase {
@@ -531,6 +598,18 @@ struct HomeAssistantTextParserTests {
             calendar: calendar,
             nowProvider: { fixedNow }
         )
+    }
+
+    private func makeCommandParser() -> HomeAssistantCommandParser {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .current
+
+        let queryParser = HomeAssistantTextParser(
+            calendar: calendar,
+            nowProvider: { fixedNow }
+        )
+
+        return HomeAssistantCommandParser(parser: queryParser)
     }
 
     private func date(

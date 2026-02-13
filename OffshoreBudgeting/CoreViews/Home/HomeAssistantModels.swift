@@ -362,3 +362,100 @@ struct HomeAssistantSuggestion: Identifiable, Equatable {
         self.query = query
     }
 }
+
+// MARK: - Command Models
+
+enum HomeAssistantCommandIntent: String, Equatable {
+    case addExpense
+    case addIncome
+    case addBudget
+    case addCard
+    case addPreset
+    case addCategory
+    case editExpense
+    case deleteExpense
+    case editIncome
+    case deleteIncome
+}
+
+enum HomeAssistantCommandConfidenceBand: String, Equatable {
+    case high
+    case medium
+    case low
+}
+
+struct HomeAssistantCommandPlan: Equatable {
+    let intent: HomeAssistantCommandIntent
+    let confidenceBand: HomeAssistantCommandConfidenceBand
+    let rawPrompt: String
+    let amount: Double?
+    let originalAmount: Double?
+    let date: Date?
+    let dateRange: HomeQueryDateRange?
+    let notes: String?
+    let source: String?
+    let cardName: String?
+    let categoryName: String?
+    let entityName: String?
+    let isPlannedIncome: Bool?
+    let categoryColorHex: String?
+    let categoryColorName: String?
+    let cardThemeRaw: String?
+    let cardEffectRaw: String?
+    let attachAllCards: Bool?
+    let attachAllPresets: Bool?
+    let selectedCardNames: [String]
+    let selectedPresetTitles: [String]
+
+    init(
+        intent: HomeAssistantCommandIntent,
+        confidenceBand: HomeAssistantCommandConfidenceBand,
+        rawPrompt: String,
+        amount: Double? = nil,
+        originalAmount: Double? = nil,
+        date: Date? = nil,
+        dateRange: HomeQueryDateRange? = nil,
+        notes: String? = nil,
+        source: String? = nil,
+        cardName: String? = nil,
+        categoryName: String? = nil,
+        entityName: String? = nil,
+        isPlannedIncome: Bool? = nil,
+        categoryColorHex: String? = nil,
+        categoryColorName: String? = nil,
+        cardThemeRaw: String? = nil,
+        cardEffectRaw: String? = nil,
+        attachAllCards: Bool? = nil,
+        attachAllPresets: Bool? = nil,
+        selectedCardNames: [String] = [],
+        selectedPresetTitles: [String] = []
+    ) {
+        self.intent = intent
+        self.confidenceBand = confidenceBand
+        self.rawPrompt = rawPrompt
+        self.amount = amount
+        self.originalAmount = originalAmount
+        self.date = date
+        self.dateRange = dateRange
+        self.notes = notes
+        self.source = source
+        self.cardName = cardName
+        self.categoryName = categoryName
+        self.entityName = entityName
+        self.isPlannedIncome = isPlannedIncome
+        self.categoryColorHex = categoryColorHex
+        self.categoryColorName = categoryColorName
+        self.cardThemeRaw = cardThemeRaw
+        self.cardEffectRaw = cardEffectRaw
+        self.attachAllCards = attachAllCards
+        self.attachAllPresets = attachAllPresets
+        self.selectedCardNames = selectedCardNames
+        self.selectedPresetTitles = selectedPresetTitles
+    }
+}
+
+struct HomeAssistantMutationResult {
+    let title: String
+    let subtitle: String?
+    let rows: [HomeAnswerRow]
+}
