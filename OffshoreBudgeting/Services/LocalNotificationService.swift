@@ -28,15 +28,29 @@ final class LocalNotificationService: ObservableObject {
     }
 
     enum NotificationAction: String {
+        case openCards = "open_cards"
+        case openBudgets = "open_budgets"
+        case openQuickAddIncome = "open_quick_add_income"
         case openQuickAddExpenseFromShoppingMode = "open_quick_add_expense_from_shopping_mode"
     }
 
     enum NotificationCategory {
+        static let dailyExpenseReminder = "daily_expense_reminder_category"
+        static let plannedIncomeReminder = "planned_income_reminder_category"
+        static let presetDueReminder = "preset_due_reminder_category"
         static let shoppingModeSuggestion = "shopping_mode_suggestion_category"
+    }
+
+    enum NotificationKind: String {
+        case dailyExpenseReminder = "daily_expense_reminder"
+        case plannedIncomeReminder = "planned_income_reminder"
+        case presetDueReminder = "preset_due_reminder"
+        case shoppingModeSuggestion = "shopping_mode_suggestion"
     }
 
     enum UserInfoKey {
         static let action = "offshore_action"
+        static let notificationKind = "offshore_notification_kind"
         static let merchantName = "offshore_merchant_name"
     }
 
@@ -156,7 +170,9 @@ final class LocalNotificationService: ObservableObject {
         title: String,
         body: String,
         hour: Int,
-        minute: Int
+        minute: Int,
+        categoryIdentifier: String? = nil,
+        userInfo: [AnyHashable: Any] = [:]
     ) async throws {
 
         // Replace any existing pending request with the same identifier.
@@ -166,6 +182,10 @@ final class LocalNotificationService: ObservableObject {
         content.title = title
         content.body = body
         content.sound = .default
+        if let categoryIdentifier {
+            content.categoryIdentifier = categoryIdentifier
+        }
+        content.userInfo = userInfo
 
         var components = DateComponents()
         components.hour = hour
@@ -197,6 +217,7 @@ final class LocalNotificationService: ObservableObject {
         content.sound = .default
         content.categoryIdentifier = NotificationCategory.shoppingModeSuggestion
         content.userInfo = [
+            UserInfoKey.notificationKind: NotificationKind.shoppingModeSuggestion.rawValue,
             UserInfoKey.action: NotificationAction.openQuickAddExpenseFromShoppingMode.rawValue,
             UserInfoKey.merchantName: trimmed
         ]
@@ -238,7 +259,9 @@ final class LocalNotificationService: ObservableObject {
                 title: "Offshore Budgeting",
                 body: "Keep the books tidy and balanced. Log any variable expenses today.",
                 hour: hour,
-                minute: minute
+                minute: minute,
+                categoryIdentifier: NotificationCategory.dailyExpenseReminder,
+                userInfo: [UserInfoKey.notificationKind: NotificationKind.dailyExpenseReminder.rawValue]
             )
         } else {
             cancelNotification(identifier: NotificationID.dailyExpenseReminder)
@@ -258,6 +281,8 @@ final class LocalNotificationService: ObservableObject {
                 identifierPrefix: NotificationID.plannedIncomeReminder,
                 title: "Offshore Budgeting",
                 body: "Income is planned to arrive offshore today. Verify any deposits and log actual income.",
+                categoryIdentifier: NotificationCategory.plannedIncomeReminder,
+                userInfo: [UserInfoKey.notificationKind: NotificationKind.plannedIncomeReminder.rawValue],
                 hour: hour,
                 minute: minute
             )
@@ -284,6 +309,8 @@ final class LocalNotificationService: ObservableObject {
                         maxCharacters: Scheduling.maxNotificationBodyCharacters
                     )
                 },
+                categoryIdentifier: NotificationCategory.presetDueReminder,
+                userInfo: [UserInfoKey.notificationKind: NotificationKind.presetDueReminder.rawValue],
                 hour: hour,
                 minute: minute
             )
@@ -297,6 +324,8 @@ final class LocalNotificationService: ObservableObject {
         identifierPrefix: String,
         title: String,
         body: String,
+        categoryIdentifier: String? = nil,
+        userInfo: [AnyHashable: Any] = [:],
         hour: Int,
         minute: Int
     ) async throws {
@@ -305,6 +334,8 @@ final class LocalNotificationService: ObservableObject {
             identifierPrefix: identifierPrefix,
             title: title,
             bodyForDay: { _ in body },
+            categoryIdentifier: categoryIdentifier,
+            userInfo: userInfo,
             hour: hour,
             minute: minute
         )
@@ -315,6 +346,8 @@ final class LocalNotificationService: ObservableObject {
         identifierPrefix: String,
         title: String,
         bodyForDay: (Date) -> String,
+        categoryIdentifier: String? = nil,
+        userInfo: [AnyHashable: Any] = [:],
         hour: Int,
         minute: Int
     ) async throws {
@@ -331,6 +364,8 @@ final class LocalNotificationService: ObservableObject {
                 identifier: identifier,
                 title: title,
                 body: bodyForDay(day),
+                categoryIdentifier: categoryIdentifier,
+                userInfo: userInfo,
                 fireDate: fireDate
             )
         }
@@ -340,6 +375,8 @@ final class LocalNotificationService: ObservableObject {
         identifier: String,
         title: String,
         body: String,
+        categoryIdentifier: String? = nil,
+        userInfo: [AnyHashable: Any] = [:],
         fireDate: Date
     ) async throws {
 
@@ -349,6 +386,10 @@ final class LocalNotificationService: ObservableObject {
         content.title = title
         content.body = body
         content.sound = .default
+        if let categoryIdentifier {
+            content.categoryIdentifier = categoryIdentifier
+        }
+        content.userInfo = userInfo
 
         var components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: fireDate)
         components.second = 0

@@ -39,23 +39,57 @@ final class NotificationsAppDelegate: NSObject, UIApplicationDelegate, UNUserNot
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
         let userInfo = response.notification.request.content.userInfo
-        guard let actionRaw = userInfo[LocalNotificationService.UserInfoKey.action] as? String,
-              actionRaw == LocalNotificationService.NotificationAction.openQuickAddExpenseFromShoppingMode.rawValue else {
-            completionHandler()
-            return
-        }
-
-        Self.routeToQuickAdd(userInfo: userInfo)
+        let actionIdentifier = response.actionIdentifier
+        Self.routeNotificationResponse(actionIdentifier: actionIdentifier, userInfo: userInfo)
         completionHandler()
     }
 
     // MARK: - Notification Actions
 
     private static var notificationCategories: Set<UNNotificationCategory> {
+        let openCardsAction = UNNotificationAction(
+            identifier: LocalNotificationService.NotificationAction.openCards.rawValue,
+            title: "Open Cards",
+            options: [.foreground]
+        )
+
+        let openBudgetsAction = UNNotificationAction(
+            identifier: LocalNotificationService.NotificationAction.openBudgets.rawValue,
+            title: "Open Budgets",
+            options: [.foreground]
+        )
+
+        let openQuickAddIncomeAction = UNNotificationAction(
+            identifier: LocalNotificationService.NotificationAction.openQuickAddIncome.rawValue,
+            title: "Add Income",
+            options: [.foreground]
+        )
+
         let openAction = UNNotificationAction(
             identifier: LocalNotificationService.NotificationAction.openQuickAddExpenseFromShoppingMode.rawValue,
             title: "Add Expense",
             options: [.foreground]
+        )
+
+        let dailyExpenseCategory = UNNotificationCategory(
+            identifier: LocalNotificationService.NotificationCategory.dailyExpenseReminder,
+            actions: [openCardsAction],
+            intentIdentifiers: [],
+            options: []
+        )
+
+        let plannedIncomeCategory = UNNotificationCategory(
+            identifier: LocalNotificationService.NotificationCategory.plannedIncomeReminder,
+            actions: [openQuickAddIncomeAction],
+            intentIdentifiers: [],
+            options: []
+        )
+
+        let presetDueCategory = UNNotificationCategory(
+            identifier: LocalNotificationService.NotificationCategory.presetDueReminder,
+            actions: [openBudgetsAction],
+            intentIdentifiers: [],
+            options: []
         )
 
         let shoppingSuggestionCategory = UNNotificationCategory(
@@ -65,12 +99,91 @@ final class NotificationsAppDelegate: NSObject, UIApplicationDelegate, UNUserNot
             options: []
         )
 
-        return [shoppingSuggestionCategory]
+        return [
+            dailyExpenseCategory,
+            plannedIncomeCategory,
+            presetDueCategory,
+            shoppingSuggestionCategory
+        ]
     }
 
     // MARK: - Routing
 
-    private static func routeToQuickAdd(userInfo: [AnyHashable: Any]) {
+    private static func routeNotificationResponse(actionIdentifier: String, userInfo: [AnyHashable: Any]) {
+        if let explicitAction = LocalNotificationService.NotificationAction(rawValue: actionIdentifier) {
+            route(for: explicitAction, userInfo: userInfo)
+            return
+        }
+
+        guard actionIdentifier == UNNotificationDefaultActionIdentifier else { return }
+
+        if let userInfoAction = userInfo[LocalNotificationService.UserInfoKey.action] as? String,
+           let explicitAction = LocalNotificationService.NotificationAction(rawValue: userInfoAction) {
+            route(for: explicitAction, userInfo: userInfo)
+            return
+        }
+
+        guard let kindRaw = userInfo[LocalNotificationService.UserInfoKey.notificationKind] as? String,
+              let kind = LocalNotificationService.NotificationKind(rawValue: kindRaw) else {
+            return
+        }
+
+        switch kind {
+        case .dailyExpenseReminder:
+            routeToCards()
+        case .plannedIncomeReminder:
+            routeToQuickAddIncome()
+        case .presetDueReminder:
+            routeToBudgets()
+        case .shoppingModeSuggestion:
+            routeToQuickAddExpense(userInfo: userInfo)
+        }
+    }
+
+    private static func route(for action: LocalNotificationService.NotificationAction, userInfo: [AnyHashable: Any]) {
+        switch action {
+        case .openCards:
+            routeToCards()
+        case .openBudgets:
+            routeToBudgets()
+        case .openQuickAddIncome:
+            routeToQuickAddIncome()
+        case .openQuickAddExpenseFromShoppingMode:
+            routeToQuickAddExpense(userInfo: userInfo)
+        }
+    }
+
+    private static func routeToCards() {
+        UserDefaults.standard.set(
+            AppSection.cards.rawValue,
+            forKey: AppShortcutNavigationStore.pendingSectionKey
+        )
+        UserDefaults.standard.set("", forKey: AppShortcutNavigationStore.pendingActionKey)
+        UserDefaults.standard.removeObject(forKey: AppShortcutNavigationStore.pendingExpenseDescriptionKey)
+    }
+
+    private static func routeToBudgets() {
+        UserDefaults.standard.set(
+            AppSection.budgets.rawValue,
+            forKey: AppShortcutNavigationStore.pendingSectionKey
+        )
+        UserDefaults.standard.set("", forKey: AppShortcutNavigationStore.pendingActionKey)
+        UserDefaults.standard.removeObject(forKey: AppShortcutNavigationStore.pendingExpenseDescriptionKey)
+    }
+
+    private static func routeToQuickAddIncome() {
+        UserDefaults.standard.set(
+            AppSection.income.rawValue,
+            forKey: AppShortcutNavigationStore.pendingSectionKey
+        )
+        UserDefaults.standard.set(
+            AppShortcutNavigationStore.PendingAction.openQuickAddIncome.rawValue,
+            forKey: AppShortcutNavigationStore.pendingActionKey
+        )
+        UserDefaults.standard.removeObject(forKey: AppShortcutNavigationStore.pendingExpenseDescriptionKey)
+    }
+
+    private static func routeToQuickAddExpense(userInfo: [AnyHashable: Any]) {
         let merchantName = (userInfo[LocalNotificationService.UserInfoKey.merchantName] as? String)?
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
