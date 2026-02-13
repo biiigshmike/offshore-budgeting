@@ -95,6 +95,11 @@ struct HomeAssistantPanelView: View {
         case effectSelection
     }
 
+    private struct AssistantSubtitlePresentation {
+        let narrative: String?
+        let sources: String?
+    }
+
     private enum EmptySuggestionGroup: String, CaseIterable, Identifiable {
         case budget
         case income
@@ -318,8 +323,11 @@ struct HomeAssistantPanelView: View {
                 }
 
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Clear") {
+                    Button {
                         isShowingClearConversationAlert = true
+                    } label: {
+                        Text("Clear")
+                            .padding()
                     }
                     .buttonStyle(.plain)
                     .disabled(answers.isEmpty)
@@ -713,18 +721,20 @@ struct HomeAssistantPanelView: View {
     }
 
     private func assistantMessageBubble(for answer: HomeAnswer) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+        let subtitlePresentation = assistantSubtitlePresentation(for: answer.subtitle)
+
+        return VStack(alignment: .leading, spacing: 4) {
             VStack(alignment: .leading, spacing: 8) {
                 Text(answer.title)
-                    .font(.headline)
+                    .font(.subheadline.weight(.semibold))
 
                 if let primaryValue = answer.primaryValue {
                     Text(primaryValue)
-                        .font(.title3.weight(.semibold))
+                        .font(.title2.weight(.bold))
                 }
 
-                if let subtitle = answer.subtitle {
-                    Text(subtitle)
+                if let narrative = subtitlePresentation.narrative {
+                    Text(narrative)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -733,13 +743,22 @@ struct HomeAssistantPanelView: View {
                     ForEach(answer.rows) { row in
                         HStack {
                             Text(row.title)
+                                .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(.primary)
                             Spacer()
                             Text(row.value)
+                                .font(.subheadline)
                                 .foregroundStyle(.secondary)
                         }
-                        .font(.subheadline)
                     }
+                }
+
+                if let sources = subtitlePresentation.sources {
+                    Divider()
+                        .padding(.top, 2)
+                    Text("Sources: \(sources)")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
             }
             .padding(.horizontal, 12)
@@ -755,6 +774,38 @@ struct HomeAssistantPanelView: View {
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }
+    }
+
+    private func assistantSubtitlePresentation(for subtitle: String?) -> AssistantSubtitlePresentation {
+        guard let subtitle else {
+            return AssistantSubtitlePresentation(narrative: nil, sources: nil)
+        }
+
+        let bodyWithoutTechnicalFooter = subtitle
+            .components(separatedBy: "\n\n---\n")
+            .first?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+
+        guard bodyWithoutTechnicalFooter.isEmpty == false else {
+            return AssistantSubtitlePresentation(narrative: nil, sources: nil)
+        }
+
+        guard let sourcesRange = bodyWithoutTechnicalFooter.range(of: "Sources:", options: .backwards) else {
+            return AssistantSubtitlePresentation(
+                narrative: bodyWithoutTechnicalFooter,
+                sources: nil
+            )
+        }
+
+        let narrative = String(bodyWithoutTechnicalFooter[..<sourcesRange.lowerBound])
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let sources = String(bodyWithoutTechnicalFooter[sourcesRange.upperBound...])
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        return AssistantSubtitlePresentation(
+            narrative: narrative.isEmpty ? nil : narrative,
+            sources: sources.isEmpty ? nil : sources
+        )
     }
 
     private func runQuery(
