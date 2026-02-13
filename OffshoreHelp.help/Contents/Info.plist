@@ -17,7 +17,7 @@
     <key>CFBundleVersion</key>
     <string>1</string>
     <key>HPDBookAccessPath</key>
-    <string>index.html</string>
+    <string>en.lproj/index.html</string>
     <key>HPDBookTitle</key>
     <string>Offshore Help</string>
     <key>HPDBookType</key>

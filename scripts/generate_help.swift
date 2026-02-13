@@ -214,7 +214,7 @@ private func writeHelpInfoPlist(manifest: HelpManifest) throws {
         <key>CFBundleVersion</key>
         <string>1</string>
         <key>HPDBookAccessPath</key>
-        <string>index.html</string>
+        <string>en.lproj/index.html</string>
         <key>HPDBookTitle</key>
         <string>\(xmlEscape(manifest.bookTitle))</string>
         <key>HPDBookType</key>
@@ -228,54 +228,38 @@ private func writeHelpInfoPlist(manifest: HelpManifest) throws {
 
 private func writeCSS() throws {
     let css = """
-    :root {
-      color-scheme: light dark;
-      --page-max-width: 900px;
-      --surface: color-mix(in srgb, canvas 96%, currentColor 4%);
-      --border: color-mix(in srgb, currentColor 14%, transparent);
-      --muted: color-mix(in srgb, currentColor 65%, transparent);
-      --accent: #0a84ff;
-    }
-
     body {
       margin: 0;
-      padding: 28px 20px 44px;
-      font: 16px/1.55 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
-      background: canvas;
-      color: canvasText;
+      padding: 20px;
+      font: 14px/1.5 -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif;
+      background-color: #ffffff;
+      color: #111111;
     }
 
-    main {
-      max-width: var(--page-max-width);
+    #content {
+      max-width: 920px;
       margin: 0 auto;
     }
 
-    h1 { font-size: 2rem; margin: 0 0 0.8rem; }
-    h2 { font-size: 1.3rem; margin: 1.4rem 0 0.5rem; }
-    p { margin: 0.4rem 0 0.8rem; }
-
-    .lede { color: var(--muted); margin-bottom: 1.2rem; }
+    h1 { font-size: 28px; margin: 0 0 12px; }
+    h2 { font-size: 20px; margin: 20px 0 8px; }
+    p { margin: 8px 0 12px; }
 
     .topic-list {
       list-style: none;
       margin: 0;
       padding: 0;
-      display: grid;
-      gap: 10px;
     }
 
     .topic-list a {
       display: block;
-      padding: 10px 12px;
-      border-radius: 10px;
-      border: 1px solid var(--border);
-      background: var(--surface);
-      color: inherit;
+      padding: 8px 0;
+      color: #0b63c9;
       text-decoration: none;
     }
 
     .topic-list a:hover {
-      border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+      text-decoration: underline;
     }
 
     .screenshot {
@@ -286,23 +270,25 @@ private func writeCSS() throws {
       width: 100%;
       height: auto;
       display: block;
-      border-radius: 16px;
-      border: 1px solid var(--border);
-      background: var(--surface);
+      border: 1px solid #d8d8d8;
     }
 
     ul {
-      margin: 0.3rem 0 1.1rem 1.25rem;
+      margin: 6px 0 14px 20px;
       padding: 0;
     }
 
-    li { margin: 0.22rem 0; }
+    li { margin: 4px 0; }
 
     .back-link {
-      margin-top: 20px;
+      margin-top: 18px;
       display: inline-block;
-      color: var(--accent);
+      color: #0b63c9;
       text-decoration: none;
+    }
+
+    .back-link:hover {
+      text-decoration: underline;
     }
     """
 
@@ -317,23 +303,22 @@ private func writeIndexHTML(manifest: HelpManifest, parsedTopics: [ParsedTopic])
     }.joined(separator: "\n")
 
     let html = """
-    <!doctype html>
-    <html lang="en">
+    <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+    <html>
     <head>
-      <meta charset="utf-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
       <meta name="AppleTitle" content="\(htmlEscape(manifest.bookTitle))">
       <title>\(htmlEscape(manifest.bookTitle))</title>
       <link rel="stylesheet" href="style.css">
     </head>
     <body>
-      <main>
+      <div id="content">
         <h1>\(htmlEscape(manifest.bookTitle))</h1>
-        <p class="lede">Browse topics to learn the core workflows and calculations in Offshore.</p>
+        <p>Browse topics to learn the core workflows and calculations in Offshore.</p>
         <ul class="topic-list">
           \(topicLinks)
         </ul>
-      </main>
+      </div>
     </body>
     </html>
     """
@@ -347,20 +332,20 @@ private func writeTopicHTML(topic: ParsedTopic) throws {
     }.joined(separator: "\n")
 
     let html = """
-    <!doctype html>
-    <html lang="en">
+    <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+    <html>
     <head>
-      <meta charset="utf-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+      <meta name="AppleTitle" content="\(htmlEscape(topic.manifest.title))">
       <title>\(htmlEscape(topic.manifest.title)) - Offshore Help</title>
       <link rel="stylesheet" href="style.css">
     </head>
     <body>
-      <main>
+      <div id="content">
         <h1>\(htmlEscape(topic.manifest.title))</h1>
         \(bodySections)
         <a class="back-link" href="index.html">Back to help topics</a>
-      </main>
+      </div>
     </body>
     </html>
     """

@@ -153,6 +153,7 @@ private struct AppMenuCommandItem: Identifiable {
 
 struct OffshoreAppCommands: Commands {
     @ObservedObject var commandHub: AppCommandHub
+    let showsCustomHelpCommand: Bool
 
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
@@ -167,9 +168,11 @@ struct OffshoreAppCommands: Commands {
             }
         }
 
-        CommandGroup(after: .help) {
-            ForEach(helpItems) { item in
-                commandButton(for: item)
+        if showsCustomHelpCommand {
+            CommandGroup(after: .help) {
+                ForEach(helpItems) { item in
+                    commandButton(for: item)
+                }
             }
         }
 
