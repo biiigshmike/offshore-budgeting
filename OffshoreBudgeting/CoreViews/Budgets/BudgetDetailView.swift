@@ -1391,8 +1391,63 @@ private struct BudgetVariableExpenseRow: View {
     let expense: VariableExpense
     let showsCardName: Bool
 
-    private var amountToShow: Double {
-        expense.amount
+    private enum SharedBalancePresentation {
+        case none
+        case split
+        case offset
+    }
+
+    private var offsetAmount: Double {
+        max(0, -(expense.offsetSettlement?.amount ?? 0))
+    }
+
+    private var splitAmount: Double {
+        max(0, expense.allocation?.allocatedAmount ?? 0)
+    }
+
+    private var originalChargeAmount: Double {
+        max(0, expense.amount + offsetAmount)
+    }
+
+    private var presentation: SharedBalancePresentation {
+        if offsetAmount > 0 { return .offset }
+        if splitAmount > 0 { return .split }
+        return .none
+    }
+
+    private var indicatorSymbolName: String? {
+        switch presentation {
+        case .none:
+            return nil
+        case .split:
+            return "arrow.trianglehead.branch"
+        case .offset:
+            return "text.append"
+        }
+    }
+
+    private var indicatorAccessibilityLabel: String {
+        switch presentation {
+        case .none:
+            return ""
+        case .split:
+            return "Shared balance split"
+        case .offset:
+            return "Shared balance offset"
+        }
+    }
+
+    private var secondaryAmountSummary: String? {
+        switch presentation {
+        case .none:
+            return nil
+        case .split:
+            return "Split \(CurrencyFormatter.string(from: splitAmount))"
+        case .offset:
+            let net = CurrencyFormatter.string(from: expense.amount)
+            let offset = CurrencyFormatter.string(from: offsetAmount)
+            return "Net \(net) • Offset \(offset)"
+        }
     }
 
     private var categoryColor: Color {
@@ -1405,10 +1460,20 @@ private struct BudgetVariableExpenseRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
 
-            Circle()
-                .fill(categoryColor)
-                .frame(width: 10, height: 10)
-                .padding(.top, 6)
+            VStack(spacing: 4) {
+                Circle()
+                    .fill(categoryColor)
+                    .frame(width: 10, height: 10)
+
+                if let indicatorSymbolName {
+                    Image(systemName: indicatorSymbolName)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .accessibilityLabel(indicatorAccessibilityLabel)
+                }
+            }
+            .frame(width: 12)
+            .padding(.top, 6)
 
             // LEFT SIDE
             VStack(alignment: .leading, spacing: 4) {
@@ -1430,10 +1495,19 @@ private struct BudgetVariableExpenseRow: View {
             Spacer(minLength: 0)
 
             // RIGHT SIDE (CardDetailView styling)
-            Text(amountToShow, format: CurrencyFormatter.currencyStyle())
-                .font(.headline.weight(.semibold))
-                .foregroundStyle(.primary)
-                .multilineTextAlignment(.trailing)
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(originalChargeAmount, format: CurrencyFormatter.currencyStyle())
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .multilineTextAlignment(.trailing)
+
+                if let secondaryAmountSummary {
+                    Text(secondaryAmountSummary)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.trailing)
+                }
+            }
         }
         .padding(.vertical, 4)
     }
