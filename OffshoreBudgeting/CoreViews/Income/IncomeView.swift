@@ -18,6 +18,7 @@ struct IncomeView: View {
     @AppStorage(AppShortcutNavigationStore.pendingImportClipboardTextKey) private var pendingImportClipboardText: String = ""
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.appCommandHub) private var commandHub
 
     @State private var displayedMonth: Date
     @State private var selectedDate: Date
@@ -75,6 +76,10 @@ struct IncomeView: View {
     @State private var showingEditIncome: Bool = false
     @State private var editingIncome: Income? = nil
 
+    @State private var showingShortcutDeletePicker: Bool = false
+    @State private var shortcutDeleteCandidates: [Income] = []
+    @State private var shortcutDeleteKind: IncomeDeleteKind? = nil
+
     init(workspace: Workspace) {
         self.workspace = workspace
 
@@ -87,6 +92,24 @@ struct IncomeView: View {
         let today = Date()
         _displayedMonth = State(initialValue: CalendarGridHelper.startOfMonth(for: today))
         _selectedDate = State(initialValue: CalendarGridHelper.displayCalendar.startOfDay(for: today))
+    }
+
+    private enum IncomeDeleteKind {
+        case actual
+        case planned
+
+        var isPlanned: Bool {
+            self == .planned
+        }
+
+        var title: String {
+            switch self {
+            case .actual:
+                return "Actual Income"
+            case .planned:
+                return "Planned Income"
+            }
+        }
     }
 
     // MARK: - Selected Day Range
@@ -128,6 +151,14 @@ struct IncomeView: View {
 
     private var selectedDayTitle: String {
         CalendarGridHelper.selectedDayTitleFormatter.string(from: selectedDayStart)
+    }
+
+    private var actualIncomesForSelectedDay: [Income] {
+        incomesForSelectedDay.filter { !$0.isPlanned }
+    }
+
+    private var plannedIncomesForSelectedDay: [Income] {
+        incomesForSelectedDay.filter { $0.isPlanned }
     }
 
     // MARK: - Month indicators (planned vs actual per day)
@@ -266,14 +297,7 @@ struct IncomeView: View {
                             .buttonStyle(.plain)
                             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                 Button(role: .destructive) {
-                                    if confirmBeforeDeleting {
-                                        pendingIncomeDelete = {
-                                            deleteIncome(income)
-                                        }
-                                        showingIncomeDeleteConfirm = true
-                                    } else {
-                                        deleteIncome(income)
-                                    }
+                                    requestDeleteIncome(income)
                                 } label: {
                                     Label("Delete", systemImage: "trash")
                                 }
@@ -328,7 +352,7 @@ struct IncomeView: View {
             .toolbar {
                 Menu {
                     Button {
-                        addIncomeSheet = AddIncomeSheet(initialDate: selectedDayStart)
+                        addIncomeSheet = AddIncomeSheet(initialDate: selectedDayStart, initialIsPlanned: false)
                     } label: {
                         Label("Add Income", systemImage: "plus")
                     }
@@ -351,9 +375,30 @@ struct IncomeView: View {
                     pendingIncomeDelete = nil
                 }
             }
+            .confirmationDialog(
+                shortcutDeletePickerTitle,
+                isPresented: $showingShortcutDeletePicker,
+                titleVisibility: .visible
+            ) {
+                ForEach(shortcutDeleteCandidates) { income in
+                    Button(shortcutDeleteCandidateLabel(for: income), role: .destructive) {
+                        clearShortcutDeletePicker()
+                        requestDeleteIncome(income)
+                    }
+                }
+                Button("Cancel", role: .cancel) {
+                    clearShortcutDeletePicker()
+                }
+            } message: {
+                Text(shortcutDeletePickerMessage)
+            }
             .sheet(item: $addIncomeSheet) { sheet in
                 NavigationStack {
-                    AddIncomeView(workspace: workspace, initialDate: sheet.initialDate)
+                    AddIncomeView(
+                        workspace: workspace,
+                        initialDate: sheet.initialDate,
+                        initialIsPlanned: sheet.initialIsPlanned
+                    )
                 }
             }
             .sheet(isPresented: $showingImportIncomeSheet) {
@@ -375,14 +420,125 @@ struct IncomeView: View {
             }
             .onAppear {
                 consumePendingShortcutActionIfNeeded()
+                commandHub.activate(.income)
+                updateIncomeCommandAvailability()
+            }
+            .onDisappear {
+                commandHub.deactivate(.income)
+                commandHub.setIncomeDeletionAvailability(canDeleteActual: false, canDeletePlanned: false)
             }
             .onChange(of: pendingShortcutActionRaw) { _, _ in
                 consumePendingShortcutActionIfNeeded()
+            }
+            .onChange(of: selectedDayStart) { _, _ in
+                updateIncomeCommandAvailability()
+            }
+            .onChange(of: actualIncomesForSelectedDay.count) { _, _ in
+                updateIncomeCommandAvailability()
+            }
+            .onChange(of: plannedIncomesForSelectedDay.count) { _, _ in
+                updateIncomeCommandAvailability()
+            }
+            .onReceive(commandHub.$sequence) { _ in
+                guard commandHub.surface == .income else { return }
+                handleCommand(commandHub.latestCommandID)
             }
         }
     }
 
     // MARK: - Actions
+
+    private func openNewActualIncome() {
+        addIncomeSheet = AddIncomeSheet(initialDate: selectedDayStart, initialIsPlanned: false)
+    }
+
+    private func openNewPlannedIncome() {
+        addIncomeSheet = AddIncomeSheet(initialDate: selectedDayStart, initialIsPlanned: true)
+    }
+
+    private func deleteActualIncomeFromCommand() {
+        handleDeleteShortcut(for: .actual)
+    }
+
+    private func deletePlannedIncomeFromCommand() {
+        handleDeleteShortcut(for: .planned)
+    }
+
+    private func handleCommand(_ commandID: String) {
+        switch commandID {
+        case AppCommandID.Income.newActual:
+            openNewActualIncome()
+        case AppCommandID.Income.newPlanned:
+            openNewPlannedIncome()
+        case AppCommandID.Income.deleteActual:
+            deleteActualIncomeFromCommand()
+        case AppCommandID.Income.deletePlanned:
+            deletePlannedIncomeFromCommand()
+        default:
+            break
+        }
+    }
+
+    private func updateIncomeCommandAvailability() {
+        commandHub.setIncomeDeletionAvailability(
+            canDeleteActual: !actualIncomesForSelectedDay.isEmpty,
+            canDeletePlanned: !plannedIncomesForSelectedDay.isEmpty
+        )
+    }
+
+    private func handleDeleteShortcut(for kind: IncomeDeleteKind) {
+        let candidates = deleteCandidates(for: kind)
+        guard !candidates.isEmpty else { return }
+
+        if candidates.count == 1 {
+            requestDeleteIncome(candidates[0])
+            return
+        }
+
+        shortcutDeleteKind = kind
+        shortcutDeleteCandidates = candidates
+        showingShortcutDeletePicker = true
+    }
+
+    private func deleteCandidates(for kind: IncomeDeleteKind) -> [Income] {
+        incomesForSelectedDay.filter { $0.isPlanned == kind.isPlanned }
+    }
+
+    private var shortcutDeletePickerTitle: String {
+        if let kind = shortcutDeleteKind {
+            return "Delete \(kind.title)"
+        }
+        return "Delete Income"
+    }
+
+    private var shortcutDeletePickerMessage: String {
+        if let kind = shortcutDeleteKind {
+            return "Select which \(kind.title.lowercased()) entry to delete for \(selectedDayTitle)."
+        }
+        return "Select which income entry to delete."
+    }
+
+    private func shortcutDeleteCandidateLabel(for income: Income) -> String {
+        let amount = income.amount.formatted(CurrencyFormatter.currencyStyle())
+        return "\(income.source) • \(amount)"
+    }
+
+    private func clearShortcutDeletePicker() {
+        showingShortcutDeletePicker = false
+        shortcutDeleteCandidates = []
+        shortcutDeleteKind = nil
+    }
+
+    private func requestDeleteIncome(_ income: Income) {
+        if confirmBeforeDeleting {
+            pendingIncomeDelete = {
+                deleteIncome(income)
+            }
+            showingIncomeDeleteConfirm = true
+        } else {
+            deleteIncome(income)
+        }
+    }
 
     private func deleteIncome(_ income: Income) {
         modelContext.delete(income)
@@ -401,7 +557,7 @@ struct IncomeView: View {
             shortcutImportClipboardText = clipboard.isEmpty ? nil : clipboard
             showingImportIncomeSheet = true
         } else if pending == AppShortcutNavigationStore.PendingAction.openQuickAddIncome.rawValue {
-            addIncomeSheet = AddIncomeSheet(initialDate: selectedDayStart)
+            addIncomeSheet = AddIncomeSheet(initialDate: selectedDayStart, initialIsPlanned: false)
         }
 
         pendingShortcutActionRaw = ""
@@ -414,6 +570,7 @@ struct IncomeView: View {
 private struct AddIncomeSheet: Identifiable {
     let id = UUID()
     let initialDate: Date
+    let initialIsPlanned: Bool
 }
 
 // MARK: - Row Views

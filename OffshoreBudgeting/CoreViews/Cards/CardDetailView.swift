@@ -18,6 +18,7 @@ struct CardDetailView: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.appCommandHub) private var commandHub
 
     // MARK: - Sheets
 
@@ -382,8 +383,9 @@ struct CardDetailView: View {
                 
                 Picker("Sort", selection: $sortMode) {
                     Text("A–Z").tag(SortMode.az)
-                    Text("\(CurrencyFormatter.currencySymbol)↓").tag(SortMode.amountDesc)
+                    Text("Z–A").tag(SortMode.za)
                     Text("\(CurrencyFormatter.currencySymbol)↑").tag(SortMode.amountAsc)
+                    Text("\(CurrencyFormatter.currencySymbol)↓").tag(SortMode.amountDesc)
                     Text("Date ↑").tag(SortMode.dateAsc)
                     Text("Date ↓").tag(SortMode.dateDesc)
                 }
@@ -678,7 +680,15 @@ struct CardDetailView: View {
             }
         }
         .onAppear {
+            commandHub.activate(.cardDetail)
             initializeDateRangeIfNeeded()
+        }
+        .onDisappear {
+            commandHub.deactivate(.cardDetail)
+        }
+        .onReceive(commandHub.$sequence) { _ in
+            guard commandHub.surface == .cardDetail else { return }
+            handleCommand(commandHub.latestCommandID)
         }
         .onChange(of: defaultBudgetingPeriodRaw) { _, _ in
             applyDefaultPeriodRange()
@@ -774,6 +784,8 @@ struct CardDetailView: View {
         switch mode {
         case .az:
             return expenses.sorted { $0.descriptionText.localizedCaseInsensitiveCompare($1.descriptionText) == .orderedAscending }
+        case .za:
+            return expenses.sorted { $0.descriptionText.localizedCaseInsensitiveCompare($1.descriptionText) == .orderedDescending }
         case .amountAsc:
             return expenses.sorted { $0.amount < $1.amount }
         case .amountDesc:
@@ -793,6 +805,8 @@ struct CardDetailView: View {
         switch mode {
         case .az:
             return expenses.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+        case .za:
+            return expenses.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedDescending }
         case .amountAsc:
             return expenses.sorted { plannedEffectiveAmount($0) < plannedEffectiveAmount($1) }
         case .amountDesc:
@@ -808,6 +822,8 @@ struct CardDetailView: View {
         switch mode {
         case .az:
             return items.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+        case .za:
+            return items.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedDescending }
         case .amountAsc:
             return items.sorted { $0.amount < $1.amount }
         case .amountDesc:
@@ -871,6 +887,50 @@ struct CardDetailView: View {
         }
     }
 
+    private func openNewTransaction() {
+        showingAddExpenseSheet = true
+    }
+
+    private func openEditCard() {
+        showingEditCardSheet = true
+    }
+
+    private func deleteCardWithConfirmation() {
+        if confirmBeforeDeleting {
+            pendingCardDelete = {
+                deleteCard()
+            }
+            showingCardDeleteConfirm = true
+        } else {
+            deleteCard()
+        }
+    }
+
+    private func handleCommand(_ commandID: String) {
+        switch commandID {
+        case AppCommandID.CardDetail.newTransaction:
+            openNewTransaction()
+        case AppCommandID.CardDetail.editCard:
+            openEditCard()
+        case AppCommandID.CardDetail.deleteCard:
+            deleteCardWithConfirmation()
+        case AppCommandID.CardDetail.sortAZ:
+            sortMode = .az
+        case AppCommandID.CardDetail.sortZA:
+            sortMode = .za
+        case AppCommandID.CardDetail.sortAmountAsc:
+            sortMode = .amountAsc
+        case AppCommandID.CardDetail.sortAmountDesc:
+            sortMode = .amountDesc
+        case AppCommandID.CardDetail.sortDateAsc:
+            sortMode = .dateAsc
+        case AppCommandID.CardDetail.sortDateDesc:
+            sortMode = .dateDesc
+        default:
+            break
+        }
+    }
+
     private func deleteCard() {
         let cardID = card.id
         let workspaceID = workspace.id
@@ -914,6 +974,7 @@ struct CardDetailView: View {
 // MARK: - Supporting Types
 private enum SortMode: String, Identifiable {
     case az
+    case za
     case amountAsc
     case amountDesc
     case dateAsc

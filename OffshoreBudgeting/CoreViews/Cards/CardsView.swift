@@ -11,6 +11,7 @@ import SwiftData
 struct CardsView: View {
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.appCommandHub) private var commandHub
 
     @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
     @AppStorage(AppShortcutNavigationStore.pendingActionKey) private var pendingShortcutActionRaw: String = ""
@@ -176,9 +177,17 @@ struct CardsView: View {
         }
         .onAppear {
             consumePendingShortcutActionIfNeeded()
+            commandHub.activate(.cards)
+        }
+        .onDisappear {
+            commandHub.deactivate(.cards)
         }
         .onChange(of: pendingShortcutActionRaw) { _, _ in
             consumePendingShortcutActionIfNeeded()
+        }
+        .onReceive(commandHub.$sequence) { _ in
+            guard commandHub.surface == .cards else { return }
+            handleCommand(commandHub.latestCommandID)
         }
     }
 
@@ -242,6 +251,16 @@ struct CardsView: View {
         pendingImportClipboardText = ""
         pendingImportCardID = ""
         pendingExpenseDescription = ""
+    }
+
+    private func openNewCard() {
+        showingAddCard = true
+    }
+
+    private func handleCommand(_ commandID: String) {
+        if commandID == AppCommandID.Cards.newCard {
+            openNewCard()
+        }
     }
 }
 

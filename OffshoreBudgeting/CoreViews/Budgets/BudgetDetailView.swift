@@ -17,6 +17,7 @@ struct BudgetDetailView: View {
     
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.appCommandHub) private var commandHub
     
     // MARK: - Budget Delete Flow
     
@@ -290,6 +291,8 @@ struct BudgetDetailView: View {
         switch sortMode {
         case .az:
             return items.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+        case .za:
+            return items.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedDescending }
         case .amountAsc:
             return items.sorted { plannedAmountForSort($0) < plannedAmountForSort($1) }
         case .amountDesc:
@@ -305,6 +308,8 @@ struct BudgetDetailView: View {
         switch sortMode {
         case .az:
             return items.sorted { $0.descriptionText.localizedCaseInsensitiveCompare($1.descriptionText) == .orderedAscending }
+        case .za:
+            return items.sorted { $0.descriptionText.localizedCaseInsensitiveCompare($1.descriptionText) == .orderedDescending }
         case .amountAsc:
             return items.sorted { $0.amount < $1.amount }
         case .amountDesc:
@@ -320,6 +325,8 @@ struct BudgetDetailView: View {
         switch sortMode {
         case .az:
             return items.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+        case .za:
+            return items.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedDescending }
         case .amountAsc:
             return items.sorted { $0.amount < $1.amount }
         case .amountDesc:
@@ -334,7 +341,7 @@ struct BudgetDetailView: View {
     private func plannedAmountForSort(_ expense: PlannedExpense) -> Double {
         expense.effectiveAmount()
     }
-    
+
     // MARK: - List title (reacts to type)
     
     private var expensesTitleText: Text {
@@ -354,6 +361,25 @@ struct BudgetDetailView: View {
     // MARK: - Body
     
     var body: some View {
+        mainContent
+            .onAppear {
+                commandHub.activate(.budgetDetail)
+                updateBudgetDetailCommandAvailability()
+            }
+            .onDisappear {
+                commandHub.deactivate(.budgetDetail)
+                commandHub.setBudgetDetailCanCreateTransaction(false)
+            }
+            .onChange(of: linkedCards.count) { _, _ in
+                updateBudgetDetailCommandAvailability()
+            }
+            .onReceive(commandHub.$sequence) { _ in
+                guard commandHub.surface == .budgetDetail else { return }
+                handleCommand(commandHub.latestCommandID)
+            }
+    }
+
+    private var mainContent: some View {
         List {
             // MARK: - Summary (3 equal-height rows)
             
@@ -427,8 +453,9 @@ struct BudgetDetailView: View {
 
                 Picker("Sort", selection: $sortMode) {
                     Text("A–Z").tag(BudgetSortMode.az)
-                    Text("\(CurrencyFormatter.currencySymbol)↓").tag(BudgetSortMode.amountDesc)
+                    Text("Z–A").tag(BudgetSortMode.za)
                     Text("\(CurrencyFormatter.currencySymbol)↑").tag(BudgetSortMode.amountAsc)
+                    Text("\(CurrencyFormatter.currencySymbol)↓").tag(BudgetSortMode.amountDesc)
                     Text("Date ↑").tag(BudgetSortMode.dateAsc)
                     Text("Date ↓").tag(BudgetSortMode.dateDesc)
                 }
@@ -1033,6 +1060,47 @@ struct BudgetDetailView: View {
             .filter { $0.category?.id == category.id }
             .reduce(0) { $0 + $1.amount }
     }
+
+    private func updateBudgetDetailCommandAvailability() {
+        commandHub.setBudgetDetailCanCreateTransaction(!linkedCards.isEmpty)
+    }
+
+    private func openNewTransaction() {
+        showingAddExpenseSheet = true
+    }
+
+    private func openEditBudget() {
+        showingEditBudgetSheet = true
+    }
+
+    private func deleteBudget() {
+        handleDeleteBudgetTapped()
+    }
+
+    private func handleCommand(_ commandID: String) {
+        switch commandID {
+        case AppCommandID.BudgetDetail.newTransaction:
+            openNewTransaction()
+        case AppCommandID.BudgetDetail.editBudget:
+            openEditBudget()
+        case AppCommandID.BudgetDetail.deleteBudget:
+            deleteBudget()
+        case AppCommandID.BudgetDetail.sortAZ:
+            sortMode = .az
+        case AppCommandID.BudgetDetail.sortZA:
+            sortMode = .za
+        case AppCommandID.BudgetDetail.sortAmountAsc:
+            sortMode = .amountAsc
+        case AppCommandID.BudgetDetail.sortAmountDesc:
+            sortMode = .amountDesc
+        case AppCommandID.BudgetDetail.sortDateAsc:
+            sortMode = .dateAsc
+        case AppCommandID.BudgetDetail.sortDateDesc:
+            sortMode = .dateDesc
+        default:
+            break
+        }
+    }
 }
 
 
@@ -1040,6 +1108,7 @@ struct BudgetDetailView: View {
 
 enum BudgetSortMode: String, Identifiable {
     case az
+    case za
     case amountAsc
     case amountDesc
     case dateAsc

@@ -13,6 +13,7 @@ struct BudgetsView: View {
     let workspace: Workspace
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.appCommandHub) private var commandHub
 
     @Query private var budgets: [Budget]
 
@@ -196,10 +197,30 @@ struct BudgetsView: View {
                 AddBudgetView(workspace: workspace)
             }
         }
+        .onAppear {
+            commandHub.activate(.budgets)
+        }
+        .onDisappear {
+            commandHub.deactivate(.budgets)
+        }
+        .onReceive(commandHub.$sequence) { _ in
+            guard commandHub.surface == .budgets else { return }
+            handleCommand(commandHub.latestCommandID)
+        }
     }
 
     private func localizedInt(_ value: Int) -> String {
         value.formatted(.number)
+    }
+
+    private func openNewBudget() {
+        showingAddBudget = true
+    }
+
+    private func handleCommand(_ commandID: String) {
+        if commandID == AppCommandID.Budgets.newBudget {
+            openNewBudget()
+        }
     }
 
     // MARK: - Row

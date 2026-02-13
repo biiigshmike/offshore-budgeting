@@ -6,6 +6,9 @@
 
 import SwiftUI
 import SwiftData
+#if canImport(UIKit)
+import UIKit
+#endif
 
 @main
 struct OffshoreBudgetingApp: App {
@@ -51,10 +54,12 @@ struct OffshoreBudgetingApp: App {
     }()
 
     @Environment(\.scenePhase) private var scenePhase
+    @StateObject private var commandHub: AppCommandHub = AppCommandHub()
 
     var body: some Scene {
         WindowGroup {
             AppBootstrapRootView(modelContainer: $modelContainer)
+                .environment(\.appCommandHub, commandHub)
                 .id(rootResetToken)
                 .onAppear {
                     ShoppingModeManager.shared.refreshIfExpired()
@@ -84,6 +89,21 @@ struct OffshoreBudgetingApp: App {
                 }
         }
         .modelContainer(modelContainer)
+        .commands {
+            if shouldInstallMenuCommands {
+                OffshoreAppCommands(commandHub: commandHub)
+            }
+        }
+    }
+
+    private var shouldInstallMenuCommands: Bool {
+        #if targetEnvironment(macCatalyst)
+        return true
+        #elseif canImport(UIKit)
+        return UIDevice.current.userInterfaceIdiom == .pad
+        #else
+        return false
+        #endif
     }
 
     // MARK: - Container Factory

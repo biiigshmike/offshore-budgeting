@@ -12,6 +12,7 @@ struct AddIncomeView: View {
 
     let workspace: Workspace
     let initialDate: Date
+    let initialIsPlanned: Bool
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -34,10 +35,12 @@ struct AddIncomeView: View {
     @State private var showingInvalidAmountAlert: Bool = false
     @State private var showingInvalidRepeatAlert: Bool = false
 
-    init(workspace: Workspace, initialDate: Date) {
+    init(workspace: Workspace, initialDate: Date, initialIsPlanned: Bool = false) {
         self.workspace = workspace
         self.initialDate = initialDate
+        self.initialIsPlanned = initialIsPlanned
         _date = State(initialValue: initialDate)
+        _isPlanned = State(initialValue: initialIsPlanned)
     }
 
     var body: some View {
