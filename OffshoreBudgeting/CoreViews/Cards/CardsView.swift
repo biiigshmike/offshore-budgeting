@@ -63,27 +63,30 @@ struct CardsView: View {
         [GridItem(.adaptive(minimum: 260), spacing: 16)]
     }
 
-    var body: some View {
-        VStack(spacing: 0) {
-            Picker("View", selection: $selectedSegment) {
-                Text("Cards").tag(CardsSegment.cards)
-                Text("Shared Balances").tag(CardsSegment.sharedBalances)
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal)
-            .padding(.top, 8)
-            .padding(.bottom, 4)
+    private var navigationTitleText: String {
+        selectedSegment == .cards ? "Cards" : "Shared Balances"
+    }
 
-            Group {
-                if selectedSegment == .cards {
-                    if cards.isEmpty {
-                        ContentUnavailableView(
-                            "No Cards Yet",
-                            systemImage: "creditcard",
-                            description: Text("Create a card to start tracking expenses.")
-                        )
-                    } else {
-                        ScrollView {
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                Picker("View", selection: $selectedSegment) {
+                    Text("Cards").tag(CardsSegment.cards)
+                    Text("Shared Balances").tag(CardsSegment.sharedBalances)
+                }
+                .pickerStyle(.segmented)
+                .padding(.top, 8)
+
+                Group {
+                    if selectedSegment == .cards {
+                        if cards.isEmpty {
+                            ContentUnavailableView(
+                                "No Cards Yet",
+                                systemImage: "creditcard",
+                                description: Text("Create a card to start tracking expenses.")
+                            )
+                            .frame(maxWidth: .infinity)
+                        } else {
                             LazyVGrid(columns: columns, spacing: 16) {
                                 ForEach(cards) { card in
                                     NavigationLink {
@@ -121,18 +124,16 @@ struct CardsView: View {
                                     }
                                 }
                             }
-                            .padding()
                         }
-                    }
-                } else {
-                    if allocationAccounts.isEmpty {
-                        ContentUnavailableView(
-                            "No Shared Balances Yet",
-                            systemImage: "person.2",
-                            description: Text("Create an account to track shared expenses and settlements.")
-                        )
                     } else {
-                        ScrollView {
+                        if allocationAccounts.isEmpty {
+                            ContentUnavailableView(
+                                "No Shared Balances Yet",
+                                systemImage: "person.2",
+                                description: Text("Create an account to track shared expenses and settlements.")
+                            )
+                            .frame(maxWidth: .infinity)
+                        } else {
                             LazyVGrid(columns: columns, spacing: 16) {
                                 ForEach(allocationAccounts) { account in
                                     NavigationLink {
@@ -160,11 +161,12 @@ struct CardsView: View {
                                     }
                                 }
                             }
-                            .padding()
                         }
                     }
                 }
             }
+            .padding(.horizontal)
+            .padding(.bottom, 8)
         }
         .postBoardingTip(
             key: "tip.cards.v1",
@@ -177,7 +179,7 @@ struct CardsView: View {
                 )
             ]
         )
-        .navigationTitle("Cards")
+        .navigationTitle(navigationTitleText)
         .toolbar {
             Button {
                 handleAddAction()
