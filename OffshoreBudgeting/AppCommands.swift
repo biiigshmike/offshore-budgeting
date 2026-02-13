@@ -11,6 +11,10 @@ import Combine
 // MARK: - Command IDs
 
 enum AppCommandID {
+    enum Help {
+        static let openHelp = "help.open_help"
+    }
+
     enum Budgets {
         static let newBudget = "budgets.new_budget"
     }
@@ -163,6 +167,12 @@ struct OffshoreAppCommands: Commands {
             }
         }
 
+        CommandGroup(after: .help) {
+            ForEach(helpItems) { item in
+                commandButton(for: item)
+            }
+        }
+
         CommandGroup(after: .pasteboard) {
             if !editItems.isEmpty {
                 Divider()
@@ -180,6 +190,15 @@ struct OffshoreAppCommands: Commands {
                 }
             }
         }
+    }
+
+    private var helpItems: [AppMenuCommandItem] {
+        [
+            AppMenuCommandItem(
+                id: AppCommandID.Help.openHelp,
+                title: "Offshore Help"
+            )
+        ]
     }
 
     private var fileItems: [AppMenuCommandItem] {

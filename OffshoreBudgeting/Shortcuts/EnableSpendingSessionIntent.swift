@@ -1,6 +1,10 @@
 import AppIntents
 import Foundation
 
+#if canImport(ActivityKit) && !targetEnvironment(macCatalyst)
+import ActivityKit
+#endif
+
 // MARK: - SpendingSessionDuration
 
 enum SpendingSessionDuration: Int, AppEnum {
@@ -21,7 +25,7 @@ enum SpendingSessionDuration: Int, AppEnum {
 
 // MARK: - EnableSpendingSessionIntent
 
-struct EnableSpendingSessionIntent: AppIntent, LiveActivityIntent {
+struct EnableSpendingSessionIntent: AppIntent {
     static var title: LocalizedStringResource = "Start Excursion Mode"
     static var description = IntentDescription("Start a focused excursion mode session for a fixed time.")
     static var openAppWhenRun: Bool = false
@@ -43,3 +47,7 @@ struct EnableSpendingSessionIntent: AppIntent, LiveActivityIntent {
         return .result(dialog: IntentDialog(stringLiteral: "Excursion mode is active until \(timeText)."))
     }
 }
+
+#if canImport(ActivityKit) && !targetEnvironment(macCatalyst)
+extension EnableSpendingSessionIntent: LiveActivityIntent { }
+#endif

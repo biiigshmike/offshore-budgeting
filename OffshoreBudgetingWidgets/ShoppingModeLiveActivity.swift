@@ -1,7 +1,7 @@
 import SwiftUI
 import WidgetKit
 
-#if canImport(ActivityKit)
+#if canImport(ActivityKit) && !targetEnvironment(macCatalyst)
 import ActivityKit
 
 // MARK: - ShoppingModeLiveActivity

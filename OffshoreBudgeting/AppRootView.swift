@@ -53,11 +53,13 @@ struct AppRootView: View {
     @State private var didApplyInitialSection: Bool = false
     @State private var assistantRoute: AssistantPresentationRoute? = nil
     @State private var containerWidth: CGFloat = 0
+    @State private var showingHelpSheet: Bool = false
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @Environment(\.appCommandHub) private var commandHub
 
     private enum AssistantPresentationRoute: Equatable {
         case inspector
@@ -161,6 +163,21 @@ struct AppRootView: View {
         }
         .onChange(of: pendingShortcutSectionRaw) { _, _ in
             consumePendingShortcutSectionIfNeeded()
+        }
+        .onReceive(commandHub.$sequence) { _ in
+            handleCommand(commandHub.latestCommandID)
+        }
+        .sheet(isPresented: $showingHelpSheet) {
+            NavigationStack {
+                SettingsHelpView()
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Done") {
+                                showingHelpSheet = false
+                            }
+                        }
+                    }
+            }
         }
     }
 
@@ -439,6 +456,12 @@ struct AppRootView: View {
         if width < 540 { return 0 }
         if width < 900 { return 1 }
         return 2
+    }
+
+    private func handleCommand(_ commandID: String) {
+        if commandID == AppCommandID.Help.openHelp {
+            showingHelpSheet = true
+        }
     }
 
     // MARK: - Detail Root

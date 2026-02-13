@@ -3,7 +3,7 @@ import Foundation
 #if canImport(UIKit)
 import UIKit
 #endif
-#if canImport(AppKit)
+#if canImport(AppKit) && !targetEnvironment(macCatalyst)
 import AppKit
 #endif
 
@@ -167,7 +167,7 @@ struct ImportFromClipboardIntent: AppIntent {
         }
         #endif
 
-        #if canImport(AppKit)
+        #if canImport(AppKit) && !targetEnvironment(macCatalyst)
         if let fromPasteboard = NSPasteboard.general.string(forType: .string)?
             .trimmingCharacters(in: .whitespacesAndNewlines),
            !fromPasteboard.isEmpty {

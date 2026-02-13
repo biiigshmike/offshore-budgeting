@@ -1,7 +1,7 @@
 import Foundation
 import Combine
 
-#if canImport(ActivityKit)
+#if canImport(ActivityKit) && !targetEnvironment(macCatalyst)
 import ActivityKit
 #endif
 
@@ -109,7 +109,7 @@ final class ShoppingModeManager: ObservableObject {
     // MARK: - Live Activity
 
     private func startOrRefreshLiveActivity() {
-        #if canImport(ActivityKit)
+        #if canImport(ActivityKit) && !targetEnvironment(macCatalyst)
         guard status.isActive, let expiresAt = status.expiresAt, let sessionID = status.sessionID else {
             return
         }
@@ -162,7 +162,7 @@ final class ShoppingModeManager: ObservableObject {
     }
 
     private func endLiveActivity() {
-        #if canImport(ActivityKit)
+        #if canImport(ActivityKit) && !targetEnvironment(macCatalyst)
         Task {
             for activity in Activity<ShoppingModeActivityAttributes>.activities {
                 await activity.end(nil, dismissalPolicy: .immediate)

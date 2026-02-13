@@ -18,7 +18,7 @@ import CoreLocation
 import Photos
 #endif
 
-#if canImport(ActivityKit)
+#if canImport(ActivityKit) && !targetEnvironment(macCatalyst)
 import ActivityKit
 #endif
 
@@ -255,7 +255,7 @@ struct SettingsPrivacyView: View {
     }
 
     private var liveActivitiesStatus: String {
-        #if canImport(ActivityKit)
+        #if canImport(ActivityKit) && !targetEnvironment(macCatalyst)
         if #available(iOS 16.1, *) {
             return ActivityAuthorizationInfo().areActivitiesEnabled ? "Allowed" : "Off"
         } else {

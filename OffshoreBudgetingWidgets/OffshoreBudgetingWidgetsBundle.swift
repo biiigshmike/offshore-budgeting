@@ -15,7 +15,7 @@ struct OffshoreBudgetingWidgetsBundle: WidgetBundle {
         CardWidget()
         NextPlannedExpenseWidget()
         SpendTrendsWidget()
-        #if canImport(ActivityKit)
+        #if canImport(ActivityKit) && !targetEnvironment(macCatalyst)
         ShoppingModeLiveActivity()
         #endif
     }

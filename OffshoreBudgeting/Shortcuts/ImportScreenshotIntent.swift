@@ -4,7 +4,7 @@ import UniformTypeIdentifiers
 #if canImport(UIKit)
 import UIKit
 #endif
-#if canImport(AppKit)
+#if canImport(AppKit) && !targetEnvironment(macCatalyst)
 import AppKit
 #endif
 
@@ -116,7 +116,7 @@ struct ImportScreenshotIntent: AppIntent {
         }
         #endif
 
-        #if canImport(AppKit)
+        #if canImport(AppKit) && !targetEnvironment(macCatalyst)
         if let data = NSPasteboard.general.data(forType: .tiff),
            !data.isEmpty {
             return try writeTempImageData(data, fileExtension: "tiff")

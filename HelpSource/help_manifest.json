@@ -1,0 +1,69 @@
+{
+  "bookTitle": "Offshore Help",
+  "bookIdentifier": "com.mb.offshore.help",
+  "topics": [
+    {
+      "id": "introduction",
+      "title": "Introduction",
+      "group": "getting_started",
+      "iconSystemName": "exclamationmark.bubble",
+      "iconStyle": "blue",
+      "markdownFile": "introduction.md",
+      "showsScreenshots": false
+    },
+    {
+      "id": "home",
+      "title": "Home",
+      "group": "core_screens",
+      "iconSystemName": "house.fill",
+      "iconStyle": "purple",
+      "markdownFile": "home.md",
+      "showsScreenshots": true
+    },
+    {
+      "id": "budgets",
+      "title": "Budgets",
+      "group": "core_screens",
+      "iconSystemName": "chart.pie.fill",
+      "iconStyle": "blue",
+      "markdownFile": "budgets.md",
+      "showsScreenshots": true
+    },
+    {
+      "id": "income",
+      "title": "Income",
+      "group": "core_screens",
+      "iconSystemName": "calendar",
+      "iconStyle": "red",
+      "markdownFile": "income.md",
+      "showsScreenshots": true
+    },
+    {
+      "id": "cards",
+      "title": "Cards",
+      "group": "core_screens",
+      "iconSystemName": "creditcard.fill",
+      "iconStyle": "green",
+      "markdownFile": "cards.md",
+      "showsScreenshots": true
+    },
+    {
+      "id": "presets",
+      "title": "Presets",
+      "group": "core_screens",
+      "iconSystemName": "list.bullet.rectangle",
+      "iconStyle": "orange",
+      "markdownFile": "presets.md",
+      "showsScreenshots": true
+    },
+    {
+      "id": "settings",
+      "title": "Settings",
+      "group": "core_screens",
+      "iconSystemName": "gear",
+      "iconStyle": "gray",
+      "markdownFile": "settings.md",
+      "showsScreenshots": true
+    }
+  ]
+}
