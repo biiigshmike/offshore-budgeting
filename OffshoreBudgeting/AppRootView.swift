@@ -349,7 +349,7 @@ struct AppRootView: View {
         guard isPhone == false else {
             return HomeAssistantPresentationPlan(
                 mode: .fullScreen,
-                showsBottomLauncher: true,
+                showsBottomLauncher: usesCompactPhoneHeight == false,
                 showsToolbarButton: false,
                 detents: [.large],
                 usesExpandedPanelSizing: false,

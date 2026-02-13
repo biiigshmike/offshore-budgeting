@@ -62,7 +62,7 @@ struct HomeAssistantLauncherBar: View {
         }
         .foregroundStyle(.primary)
         .padding(.horizontal, 14)
-        .padding(.vertical, 12)
+        .padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
