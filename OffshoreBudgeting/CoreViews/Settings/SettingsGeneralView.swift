@@ -107,44 +107,14 @@ struct SettingsGeneralView: View {
             }
 
             Section("Maintenance") {
-                HStack(spacing: 12) {
-                    if #available(iOS 26.0, *) {
-                        Button {
-                            activeAlert = .tipsResetConfirm
-                        } label: {
-                            Text("Reset Tips & Hints")
-                                .frame(maxWidth: .infinity, minHeight: 44)
-                        }
-                        .buttonStyle(.glassProminent)
-                        .tint(.orange)
-                        
-                        Button {
-                            activeAlert = .eraseConfirm
-                        } label: {
-                            Text("Reset & Erase Content")
-                                .frame(maxWidth: .infinity, minHeight: 44)
-                        }
-                        .buttonStyle(.glassProminent)
-                        .tint(.red)
-                    } else {
-                        Button {
-                            activeAlert = .tipsResetConfirm
-                        } label: {
-                            Text("Reset Tips & Hints")
-                                .frame(maxWidth: .infinity, minHeight: 44)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(.orange)
-                        
-                        Button {
-                            activeAlert = .eraseConfirm
-                        } label: {
-                            Text("Reset & Erase Content")
-                                .frame(maxWidth: .infinity, minHeight: 44)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(.red)
-                    }
+                NavigationLink {
+                    SettingsMaintenanceView(
+                        onResetTips: { activeAlert = .tipsResetConfirm },
+                        onRepeatOnboarding: { activeAlert = .repeatOnboardingConfirm },
+                        onEraseContent: { activeAlert = .eraseConfirm }
+                    )
+                } label: {
+                    Text("Maintenance")
                 }
             }
         }
@@ -169,6 +139,18 @@ struct SettingsGeneralView: View {
                     title: Text("Tips & Hints Reset"),
                     message: Text("Tips and hints will be shown again."),
                     dismissButton: .default(Text("OK"))
+                )
+            case .repeatOnboardingConfirm:
+                Alert(
+                    title: Text("Repeat Onboarding?"),
+                    message: Text("You can restart onboarding at any time."),
+                    primaryButton: .destructive(Text("Go")) {
+                        onboardingStep = 0
+                        didPressGetStarted = false
+                        didChooseDataSource = false
+                        didCompleteOnboarding = false
+                    },
+                    secondaryButton: .cancel()
                 )
             case .eraseConfirm:
                 if activeUseICloud {
@@ -301,6 +283,7 @@ struct SettingsGeneralView: View {
 private enum ActiveAlert: Identifiable {
     case tipsResetConfirm
     case tipsResetResult
+    case repeatOnboardingConfirm
     case eraseConfirm
     case eraseResult
 
@@ -308,8 +291,66 @@ private enum ActiveAlert: Identifiable {
         switch self {
         case .tipsResetConfirm: return 1
         case .tipsResetResult: return 2
-        case .eraseConfirm: return 3
-        case .eraseResult: return 4
+        case .repeatOnboardingConfirm: return 3
+        case .eraseConfirm: return 4
+        case .eraseResult: return 5
+        }
+    }
+}
+
+// MARK: - Maintenance Screen
+
+private struct SettingsMaintenanceView: View {
+
+    let onResetTips: () -> Void
+    let onRepeatOnboarding: () -> Void
+    let onEraseContent: () -> Void
+
+    var body: some View {
+        List {
+            Section {
+                maintenanceButton(
+                    title: "Reset Tips & Hints",
+                    tint: .orange,
+                    action: onResetTips
+                )
+                .listRowSeparator(.hidden)
+
+                maintenanceButton(
+                    title: "Repeat Onboarding",
+                    tint: Color("AccentColor"),
+                    action: onRepeatOnboarding
+                )
+                .listRowSeparator(.hidden)
+
+                maintenanceButton(
+                    title: "Reset & Erase Content",
+                    tint: .red,
+                    action: onEraseContent
+                )
+                .listRowSeparator(.hidden)
+            }
+        }
+        .listStyle(.insetGrouped)
+        .navigationTitle("Maintenance")
+    }
+
+    @ViewBuilder
+    private func maintenanceButton(title: String, tint: Color, action: @escaping () -> Void) -> some View {
+        if #available(iOS 26.0, *) {
+            Button(action: action) {
+                Text(title)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+            }
+            .buttonStyle(.glassProminent)
+            .tint(tint)
+        } else {
+            Button(action: action) {
+                Text(title)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(tint)
         }
     }
 }

@@ -195,9 +195,12 @@ struct OnboardingView: View {
             
         case 4:
             cardsStep
-            
-        default:
+
+        case 5:
             presetsStep
+
+        default:
+            quickActionsStep
         }
     }
     
@@ -335,6 +338,13 @@ struct OnboardingView: View {
         }
         .frame(maxWidth: 760)
     }
+
+    // MARK: - Step 7: Quick Actions
+
+    private var quickActionsStep: some View {
+        QuickActionsInstallView(isOnboarding: true)
+            .frame(maxWidth: 760)
+    }
     
     private var iCloudRestorePlaceholder: some View {
         VStack(spacing: 12) {
@@ -399,7 +409,7 @@ struct OnboardingView: View {
     
     
     private var primaryButtonTitle: String {
-        onboardingStep >= 5 ? "Done" : "Next"
+        onboardingStep >= 6 ? "Done" : "Next"
     }
     
     private func primaryActionTapped() {
@@ -429,7 +439,7 @@ struct OnboardingView: View {
             break
         }
         
-        if onboardingStep >= 5 {
+        if onboardingStep >= 6 {
             completeOnboarding()
         } else {
             goNext()
@@ -457,7 +467,7 @@ struct OnboardingView: View {
     }
     
     private func goNext() {
-        onboardingStep = min(5, onboardingStep + 1)
+        onboardingStep = min(6, onboardingStep + 1)
     }
     
     // MARK: - Get Started

@@ -37,6 +37,7 @@ struct SettingsView: View {
         List {
             aboutSection
             systemSection
+            quickActionsSection
             managementCategoriesSection
             managementPresetsSection
         }
@@ -139,6 +140,24 @@ struct SettingsView: View {
                     title: "iCloud",
                     systemImage: "icloud",
                     tint: Color(.systemBlue)
+                )
+            }
+        } header: {
+            EmptyView()
+        } footer: {
+            EmptyView()
+        }
+    }
+
+    private var quickActionsSection: some View {
+        Section {
+            NavigationLink {
+                QuickActionsInstallView()
+            } label: {
+                SettingsRow(
+                    title: "Install Quick Actions",
+                    systemImage: "bolt.circle",
+                    tint: .green
                 )
             }
         } header: {

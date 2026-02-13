@@ -1,13 +1,6 @@
 import SwiftUI
 
 struct SettingsHelpView: View {
-
-    @AppStorage("didCompleteOnboarding") private var didCompleteOnboarding: Bool = true
-    @AppStorage("onboarding_step") private var onboardingStep: Int = 0
-    @AppStorage("onboarding_didPressGetStarted") private var didPressGetStarted: Bool = false
-    @AppStorage("onboarding_didChooseDataSource") private var didChooseDataSource: Bool = false
-
-    @State private var showOnboardingAlert: Bool = false
     @State private var searchText: String = ""
 
     private var normalizedSearchText: String {
@@ -46,10 +39,6 @@ struct SettingsHelpView: View {
                     }
                 }
 
-                Section {
-                    repeatOnboardingButton
-                }
-
                 Section("Core Screens") {
                     ForEach(GeneratedHelpContent.coreScreenTopics) { topic in
                         topicNavigationLink(topic)
@@ -60,39 +49,6 @@ struct SettingsHelpView: View {
         .listStyle(.insetGrouped)
         .navigationTitle("Help")
         .searchable(text: $searchText, prompt: "Search Help")
-        .alert("Repeat Onboarding?", isPresented: $showOnboardingAlert) {
-            Button("Go", role: .destructive) {
-                onboardingStep = 0
-                didPressGetStarted = false
-                didChooseDataSource = false
-                didCompleteOnboarding = false
-            }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("You can restart onboarding at any time.")
-        }
-    }
-
-    // MARK: - Repeat Onboarding Button
-
-    @ViewBuilder
-    private var repeatOnboardingButton: some View {
-        let baseButton = Button {
-            showOnboardingAlert = true
-        } label: {
-            Text("Repeat Onboarding")
-                .font(.subheadline.weight(.semibold))
-                .frame(maxWidth: .infinity)
-                .frame(minHeight: 44)
-        }
-        .tint(.accentColor)
-        .listRowInsets(EdgeInsets())
-
-        if #available(iOS 26.0, *) {
-            baseButton.buttonStyle(.glassProminent)
-        } else {
-            baseButton.buttonStyle(.borderedProminent)
-        }
     }
 
     // MARK: - Navigation
