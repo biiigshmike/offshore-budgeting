@@ -11,6 +11,7 @@ import SwiftUI
 struct ExpenseCSVImportRowView: View {
     let row: ExpenseCSVImportRow
     let allCategories: [Category]
+    let allAllocationAccounts: [AllocationAccount]
     let allowKindEditing: Bool
     let incomeHelperText: String
     let onToggleInclude: () -> Void
@@ -18,6 +19,8 @@ struct ExpenseCSVImportRowView: View {
     let onSetMerchant: (String) -> Void
     let onSetCategory: (Category?) -> Void
     let onSetKind: (ExpenseCSVImportKind) -> Void
+    let onSetAllocationAccount: (AllocationAccount?) -> Void
+    let onSetAllocationAmount: (String) -> Void
     let onToggleRemember: () -> Void
 
     var body: some View {
@@ -116,6 +119,34 @@ struct ExpenseCSVImportRowView: View {
                     }
                     .labelsHidden()
                     .tint(Color("AccentColor"))
+                }
+
+                HStack(spacing: 10) {
+                    Picker("Shared Balance", selection: Binding(
+                        get: { row.selectedAllocationAccount?.id },
+                        set: { newID in
+                            let match = allAllocationAccounts.first(where: { $0.id == newID })
+                            onSetAllocationAccount(match)
+                        }
+                    )) {
+                        Text("None").tag(UUID?.none)
+                        ForEach(allAllocationAccounts, id: \.id) { account in
+                            Text(account.name).tag(Optional(account.id))
+                        }
+                    }
+                    .pickerStyle(.menu)
+
+                    TextField(
+                        "Split",
+                        text: Binding(
+                            get: { row.allocationAmountText },
+                            set: { onSetAllocationAmount($0) }
+                        )
+                    )
+                    .keyboardType(.decimalPad)
+                    .multilineTextAlignment(.trailing)
+                    .disabled(row.selectedAllocationAccount == nil)
+                    .frame(maxWidth: 110)
                 }
 
                 if row.isMissingRequiredData {

@@ -38,12 +38,26 @@ struct AddExpenseIntent: AppIntent {
     )
     var date: Date?
 
+    @Parameter(
+        title: "Shared Balance",
+        requestValueDialog: IntentDialog("Which Shared Balance should receive this split?")
+    )
+    var allocationAccount: OffshoreAllocationAccountEntity?
+
+    @Parameter(
+        title: "Split Amount",
+        requestValueDialog: IntentDialog("How much should be allocated to that Shared Balance?")
+    )
+    var allocationAmountText: String?
+
     init() {
         self.amountText = nil
         self.card = nil
         self.category = nil
         self.merchant = nil
         self.date = nil
+        self.allocationAccount = nil
+        self.allocationAmountText = nil
     }
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
@@ -75,6 +89,27 @@ struct AddExpenseIntent: AppIntent {
             throw $date.needsValueError("Please provide a date.")
         }
 
+        let parsedAllocationAmount: Double?
+        let trimmedSplit = (allocationAmountText ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedSplit.isEmpty {
+            parsedAllocationAmount = nil
+        } else {
+            let parsedSplit: Double? = await MainActor.run {
+                CurrencyFormatter.parseAmount(trimmedSplit)
+            }
+            guard let parsed = parsedSplit else {
+                throw $allocationAmountText.needsValueError("Please provide a valid split amount.")
+            }
+            if parsed <= 0 || parsed > parsedAmount {
+                throw $allocationAmountText.needsValueError("Split amount must be greater than 0 and cannot exceed the expense amount.")
+            }
+            parsedAllocationAmount = parsed
+        }
+
+        if parsedAllocationAmount != nil && allocationAccount == nil {
+            throw $allocationAccount.needsValueError("Please choose a Shared Balance for the split amount.")
+        }
+
         do {
             let addedSummary = try await MainActor.run {
                 let dataStore = OffshoreIntentDataStore.shared
@@ -88,6 +123,11 @@ struct AddExpenseIntent: AppIntent {
                         in: workspace,
                         modelContext: modelContext
                     )
+                    let resolvedAllocationAccount = try dataStore.resolveAllocationAccount(
+                        id: allocationAccount?.id,
+                        in: workspace,
+                        modelContext: modelContext
+                    )
 
                     _ = try service.addExpense(
                         notes: trimmedMerchant,
@@ -96,6 +136,8 @@ struct AddExpenseIntent: AppIntent {
                         workspace: workspace,
                         card: resolvedCard,
                         category: resolvedCategory,
+                        allocationAccount: resolvedAllocationAccount,
+                        allocationAmount: parsedAllocationAmount,
                         modelContext: modelContext
                     )
 

@@ -18,6 +18,7 @@ final class OffshoreIntentDataStore {
         case cardUnavailable
         case ambiguousCardName
         case categoryUnavailable
+        case allocationAccountUnavailable
 
         var errorDescription: String? {
             switch self {
@@ -29,6 +30,8 @@ final class OffshoreIntentDataStore {
                 return "More than one card matched that Wallet card name. Rename cards so each one is unique."
             case .categoryUnavailable:
                 return "The selected category was not found in your active workspace."
+            case .allocationAccountUnavailable:
+                return "The selected Shared Balance was not found in your active workspace."
             }
         }
     }
@@ -66,6 +69,23 @@ final class OffshoreIntentDataStore {
 
         return try context.fetch(descriptor).map {
             OffshoreCategoryEntity(id: $0.id.uuidString, name: $0.name)
+        }
+    }
+
+    func fetchAllocationAccountEntitiesForSelectedWorkspace() throws -> [OffshoreAllocationAccountEntity] {
+        guard let workspace = try selectedWorkspace() else { return [] }
+        let context = try makeModelContext()
+
+        let workspaceID = workspace.id
+        let descriptor = FetchDescriptor<AllocationAccount>(
+            predicate: #Predicate<AllocationAccount> { account in
+                account.workspace?.id == workspaceID && account.isArchived == false
+            },
+            sortBy: [SortDescriptor(\AllocationAccount.name, order: .forward)]
+        )
+
+        return try context.fetch(descriptor).map {
+            OffshoreAllocationAccountEntity(id: $0.id.uuidString, name: $0.name)
         }
     }
 
@@ -176,6 +196,24 @@ final class OffshoreIntentDataStore {
             }
         }
         return nil
+    }
+
+    func resolveAllocationAccount(id: String?, in workspace: Workspace, modelContext: ModelContext) throws -> AllocationAccount? {
+        guard let id, let uuid = UUID(uuidString: id) else {
+            return nil
+        }
+
+        let workspaceID = workspace.id
+        let descriptor = FetchDescriptor<AllocationAccount>(
+            predicate: #Predicate<AllocationAccount> { account in
+                account.id == uuid && account.workspace?.id == workspaceID && account.isArchived == false
+            }
+        )
+
+        guard let account = try modelContext.fetch(descriptor).first else {
+            throw IntentDataError.allocationAccountUnavailable
+        }
+        return account
     }
 
     // MARK: - Private

@@ -35,6 +35,8 @@ final class TransactionEntryService {
         workspace: Workspace,
         card: Card,
         category: Category?,
+        allocationAccount: AllocationAccount? = nil,
+        allocationAmount: Double? = nil,
         modelContext: ModelContext
     ) throws -> VariableExpense {
 
@@ -57,6 +59,22 @@ final class TransactionEntryService {
         )
 
         modelContext.insert(expense)
+
+        if let allocationAccount,
+           let allocationAmount,
+           allocationAmount > 0 {
+            let allocation = ExpenseAllocation(
+                allocatedAmount: AllocationLedgerService.cappedAllocationAmount(allocationAmount, expenseAmount: amount),
+                createdAt: .now,
+                updatedAt: .now,
+                workspace: workspace,
+                account: allocationAccount,
+                expense: expense
+            )
+            modelContext.insert(allocation)
+            expense.allocation = allocation
+        }
+
         try modelContext.save()
         return expense
     }

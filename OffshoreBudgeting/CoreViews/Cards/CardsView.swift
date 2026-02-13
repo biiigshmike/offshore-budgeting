@@ -22,6 +22,7 @@ struct CardsView: View {
     @State private var showingAddExpenseSheet: Bool = false
     @State private var showingImportExpensesSheet: Bool = false
     @State private var showingAddCard: Bool = false
+    @State private var showingAddAllocationAccount: Bool = false
     @State private var showingEditCard: Bool = false
     @State private var editingCard: Card? = nil
     @State private var shortcutImportCard: Card? = nil
@@ -30,9 +31,16 @@ struct CardsView: View {
 
     @State private var showingCardDeleteConfirm: Bool = false
     @State private var pendingCardDelete: (() -> Void)? = nil
+    @State private var showingSharedBalanceDeleteConfirm: Bool = false
+    @State private var pendingSharedBalanceDelete: (() -> Void)? = nil
+    @State private var showingSharedBalanceArchiveConfirm: Bool = false
+    @State private var pendingSharedBalanceArchive: (() -> Void)? = nil
+
+    @State private var selectedSegment: CardsSegment = .cards
 
     let workspace: Workspace
     @Query private var cards: [Card]
+    @Query private var allocationAccounts: [AllocationAccount]
 
     init(workspace: Workspace) {
         self.workspace = workspace
@@ -42,6 +50,13 @@ struct CardsView: View {
             filter: #Predicate<Card> { $0.workspace?.id == workspaceID },
             sort: [SortDescriptor(\Card.name, order: .forward)]
         )
+
+        _allocationAccounts = Query(
+            filter: #Predicate<AllocationAccount> {
+                $0.workspace?.id == workspaceID && $0.isArchived == false
+            },
+            sort: [SortDescriptor(\AllocationAccount.name, order: .forward)]
+        )
     }
 
     private var columns: [GridItem] {
@@ -49,53 +64,105 @@ struct CardsView: View {
     }
 
     var body: some View {
-        Group {
-            if cards.isEmpty {
-                ContentUnavailableView(
-                    "No Cards Yet",
-                    systemImage: "creditcard",
-                    description: Text("Create a card to start tracking expenses.")
-                )
-            } else {
-                ScrollView {
-                    LazyVGrid(columns: columns, spacing: 16) {
-                        ForEach(cards) { card in
-                            NavigationLink {
-                                CardDetailView(workspace: workspace, card: card)
-                            } label: {
-                                CardVisualView(
-                                    title: card.name,
-                                    theme: CardThemeOption(rawValue: card.theme) ?? .ruby,
-                                    effect: CardEffectOption(rawValue: card.effect) ?? .plastic
-                                )
-                            }
-                            .buttonStyle(.plain)
-                            .contextMenu {
-                                Button {
-                                    editingCard = card
-                                    showingEditCard = true
-                                } label: {
-                                    Label("Edit", systemImage: "pencil")
-                                }
-                                .tint(Color("AccentColor"))
+        VStack(spacing: 0) {
+            Picker("View", selection: $selectedSegment) {
+                Text("Cards").tag(CardsSegment.cards)
+                Text("Shared Balances").tag(CardsSegment.sharedBalances)
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal)
+            .padding(.top, 8)
+            .padding(.bottom, 4)
 
-                                Button(role: .destructive) {
-                                    if confirmBeforeDeleting {
-                                        pendingCardDelete = {
-                                            delete(card)
-                                        }
-                                        showingCardDeleteConfirm = true
-                                    } else {
-                                        delete(card)
+            Group {
+                if selectedSegment == .cards {
+                    if cards.isEmpty {
+                        ContentUnavailableView(
+                            "No Cards Yet",
+                            systemImage: "creditcard",
+                            description: Text("Create a card to start tracking expenses.")
+                        )
+                    } else {
+                        ScrollView {
+                            LazyVGrid(columns: columns, spacing: 16) {
+                                ForEach(cards) { card in
+                                    NavigationLink {
+                                        CardDetailView(workspace: workspace, card: card)
+                                    } label: {
+                                        CardVisualView(
+                                            title: card.name,
+                                            theme: CardThemeOption(rawValue: card.theme) ?? .ruby,
+                                            effect: CardEffectOption(rawValue: card.effect) ?? .plastic
+                                        )
                                     }
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
+                                    .buttonStyle(.plain)
+                                    .contextMenu {
+                                        Button {
+                                            editingCard = card
+                                            showingEditCard = true
+                                        } label: {
+                                            Label("Edit", systemImage: "pencil")
+                                        }
+                                        .tint(Color("AccentColor"))
+
+                                        Button(role: .destructive) {
+                                            if confirmBeforeDeleting {
+                                                pendingCardDelete = {
+                                                    delete(card)
+                                                }
+                                                showingCardDeleteConfirm = true
+                                            } else {
+                                                delete(card)
+                                            }
+                                        } label: {
+                                            Label("Delete", systemImage: "trash")
+                                        }
+                                        .tint(Color("OffshoreDepth"))
+                                    }
                                 }
-                                .tint(Color("OffshoreDepth"))
                             }
+                            .padding()
                         }
                     }
-                    .padding()
+                } else {
+                    if allocationAccounts.isEmpty {
+                        ContentUnavailableView(
+                            "No Shared Balances Yet",
+                            systemImage: "person.2",
+                            description: Text("Create an account to track shared expenses and settlements.")
+                        )
+                    } else {
+                        ScrollView {
+                            LazyVGrid(columns: columns, spacing: 16) {
+                                ForEach(allocationAccounts) { account in
+                                    NavigationLink {
+                                        AllocationAccountDetailView(workspace: workspace, account: account)
+                                    } label: {
+                                        AllocationAccountTileView(account: account)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .contextMenu {
+                                        if hasSharedBalanceHistory(account) {
+                                            Button(role: .destructive) {
+                                                requestArchiveSharedBalance(account)
+                                            } label: {
+                                                Label("Archive", systemImage: "archivebox")
+                                            }
+                                            .tint(Color("OffshoreDepth"))
+                                        } else if canDeleteSharedBalance(account) {
+                                            Button(role: .destructive) {
+                                                requestDeleteSharedBalance(account)
+                                            } label: {
+                                                Label("Delete", systemImage: "trash")
+                                            }
+                                            .tint(Color("OffshoreDepth"))
+                                        }
+                                    }
+                                }
+                            }
+                            .padding()
+                        }
+                    }
                 }
             }
         }
@@ -113,11 +180,11 @@ struct CardsView: View {
         .navigationTitle("Cards")
         .toolbar {
             Button {
-                showingAddCard = true
+                handleAddAction()
             } label: {
                 Image(systemName: "plus")
             }
-            .accessibilityLabel("Add Card")
+            .accessibilityLabel(selectedSegment == .cards ? "Add Card" : "Add Shared Balance")
         }
         .alert("Delete Card?", isPresented: $showingCardDeleteConfirm) {
             Button("Delete", role: .destructive) {
@@ -130,9 +197,36 @@ struct CardsView: View {
         } message: {
             Text("This deletes the card and all of its expenses.")
         }
+        .alert("Delete Shared Balance?", isPresented: $showingSharedBalanceDeleteConfirm) {
+            Button("Delete", role: .destructive) {
+                pendingSharedBalanceDelete?()
+                pendingSharedBalanceDelete = nil
+            }
+            Button("Cancel", role: .cancel) {
+                pendingSharedBalanceDelete = nil
+            }
+        } message: {
+            Text("This deletes the Shared Balance permanently.")
+        }
+        .alert("Archive Shared Balance?", isPresented: $showingSharedBalanceArchiveConfirm) {
+            Button("Archive", role: .destructive) {
+                pendingSharedBalanceArchive?()
+                pendingSharedBalanceArchive = nil
+            }
+            Button("Cancel", role: .cancel) {
+                pendingSharedBalanceArchive = nil
+            }
+        } message: {
+            Text("Archived Shared Balances stay in history but are hidden from new allocation choices.")
+        }
         .sheet(isPresented: $showingAddCard) {
             NavigationStack {
                 AddCardView(workspace: workspace)
+            }
+        }
+        .sheet(isPresented: $showingAddAllocationAccount) {
+            NavigationStack {
+                AddAllocationAccountView(workspace: workspace)
             }
         }
         .sheet(isPresented: $showingAddExpenseSheet) {
@@ -210,6 +304,14 @@ struct CardsView: View {
 
         if let variable = card.variableExpenses {
             for expense in variable {
+                if let allocation = expense.allocation {
+                    expense.allocation = nil
+                    modelContext.delete(allocation)
+                }
+                if let offsetSettlement = expense.offsetSettlement {
+                    expense.offsetSettlement = nil
+                    modelContext.delete(offsetSettlement)
+                }
                 modelContext.delete(expense)
             }
         }
@@ -254,13 +356,106 @@ struct CardsView: View {
     }
 
     private func openNewCard() {
-        showingAddCard = true
+        handleAddAction()
+    }
+
+    private func handleAddAction() {
+        if selectedSegment == .cards {
+            showingAddCard = true
+        } else {
+            showingAddAllocationAccount = true
+        }
+    }
+
+    private func hasSharedBalanceHistory(_ account: AllocationAccount) -> Bool {
+        !(account.expenseAllocations ?? []).isEmpty || !(account.settlements ?? []).isEmpty
+    }
+
+    private func canDeleteSharedBalance(_ account: AllocationAccount) -> Bool {
+        !hasSharedBalanceHistory(account)
+    }
+
+    private func requestDeleteSharedBalance(_ account: AllocationAccount) {
+        let action = { deleteSharedBalance(account) }
+
+        if confirmBeforeDeleting {
+            pendingSharedBalanceDelete = action
+            showingSharedBalanceDeleteConfirm = true
+        } else {
+            action()
+        }
+    }
+
+    private func deleteSharedBalance(_ account: AllocationAccount) {
+        guard canDeleteSharedBalance(account) else { return }
+        modelContext.delete(account)
+    }
+
+    private func requestArchiveSharedBalance(_ account: AllocationAccount) {
+        let action = { archiveSharedBalance(account) }
+
+        if confirmBeforeDeleting {
+            pendingSharedBalanceArchive = action
+            showingSharedBalanceArchiveConfirm = true
+        } else {
+            action()
+        }
+    }
+
+    private func archiveSharedBalance(_ account: AllocationAccount) {
+        guard hasSharedBalanceHistory(account) else { return }
+        account.isArchived = true
+        account.archivedAt = .now
     }
 
     private func handleCommand(_ commandID: String) {
         if commandID == AppCommandID.Cards.newCard {
             openNewCard()
         }
+    }
+}
+
+private enum CardsSegment: String, CaseIterable, Identifiable {
+    case cards
+    case sharedBalances
+
+    var id: String { rawValue }
+}
+
+private struct AllocationAccountTileView: View {
+    let account: AllocationAccount
+
+    private var balance: Double {
+        AllocationLedgerService.balance(for: account)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(account.name)
+                    .font(.headline)
+                    .lineLimit(2)
+
+                Spacer(minLength: 8)
+
+                Text("Shared Balance")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Text(balance, format: CurrencyFormatter.currencyStyle())
+                .font(.title3.weight(.semibold))
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, minHeight: 120, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill((Color(hex: account.hexColor) ?? .blue).opacity(0.25))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke((Color(hex: account.hexColor) ?? .blue).opacity(0.6), lineWidth: 1)
+        )
     }
 }
 

@@ -29,6 +29,7 @@ struct AddExpenseView: View {
 
     @Query private var cardsInWorkspace: [Card]
     @Query private var categories: [Category]
+    @Query private var allocationAccounts: [AllocationAccount]
 
     // MARK: - Form State
 
@@ -37,11 +38,17 @@ struct AddExpenseView: View {
     @State private var transactionDate: Date
     @State private var selectedCardID: UUID? = nil
     @State private var selectedCategoryID: UUID? = nil
+    @State private var selectedAllocationAccountID: UUID? = nil
+    @State private var allocationAmountText: String = ""
+    @State private var selectedOffsetAccountID: UUID? = nil
+    @State private var offsetAmountText: String = ""
 
     // MARK: - Alerts
 
     @State private var showingInvalidAmountAlert: Bool = false
     @State private var showingMissingCardAlert: Bool = false
+    @State private var showingInvalidAllocationAlert: Bool = false
+    @State private var showingInvalidOffsetAlert: Bool = false
 
     init(
         workspace: Workspace,
@@ -67,6 +74,13 @@ struct AddExpenseView: View {
             filter: #Predicate<Category> { $0.workspace?.id == workspaceID },
             sort: [SortDescriptor(\Category.name, order: .forward)]
         )
+
+        _allocationAccounts = Query(
+            filter: #Predicate<AllocationAccount> {
+                $0.workspace?.id == workspaceID && $0.isArchived == false
+            },
+            sort: [SortDescriptor(\AllocationAccount.name, order: .forward)]
+        )
     }
 
     private var visibleCards: [Card] {
@@ -90,11 +104,17 @@ struct AddExpenseView: View {
             workspace: workspace,
             cards: visibleCards,
             categories: categories,
+            allocationAccounts: allocationAccounts,
             descriptionText: $descriptionText,
             amountText: $amountText,
             transactionDate: $transactionDate,
             selectedCardID: $selectedCardID,
-            selectedCategoryID: $selectedCategoryID
+            selectedCategoryID: $selectedCategoryID,
+            selectedAllocationAccountID: $selectedAllocationAccountID,
+            allocationAmountText: $allocationAmountText,
+            selectedOffsetAccountID: $selectedOffsetAccountID,
+            offsetAmountText: $offsetAmountText,
+            onSharedBalanceChanged: nil
         )
         .navigationTitle("Add Transaction")
         .toolbar {
@@ -128,6 +148,16 @@ struct AddExpenseView: View {
             Button("OK", role: .cancel) { }
         } message: {
             Text("Choose a card for this transaction.")
+        }
+        .alert("Invalid Split Amount", isPresented: $showingInvalidAllocationAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("Split amount must be 0 or greater and cannot exceed the transaction amount.")
+        }
+        .alert("Invalid Offset Amount", isPresented: $showingInvalidOffsetAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("Offset amount must be 0 or greater, cannot exceed the transaction amount, and cannot exceed the selected account balance.")
         }
         .onAppear {
             if descriptionText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -163,10 +193,51 @@ struct AddExpenseView: View {
         }
 
         let selectedCategory = categories.first(where: { $0.id == selectedCategoryID })
+        let selectedAllocationAccount = allocationAccounts.first(where: { $0.id == selectedAllocationAccountID })
+        let selectedOffsetAccount = allocationAccounts.first(where: { $0.id == selectedOffsetAccountID })
+
+        let offsetAmount: Double
+        if let selectedOffsetAccount {
+            let trimmed = offsetAmountText.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty {
+                offsetAmount = 0
+            } else {
+                guard let parsed = CurrencyFormatter.parseAmount(trimmed), parsed >= 0, parsed <= amt else {
+                    showingInvalidOffsetAlert = true
+                    return
+                }
+                let available = max(0, AllocationLedgerService.balance(for: selectedOffsetAccount))
+                guard parsed <= available else {
+                    showingInvalidOffsetAlert = true
+                    return
+                }
+                offsetAmount = parsed
+            }
+        } else {
+            offsetAmount = 0
+        }
+
+        let netAmount = max(0, amt - offsetAmount)
+
+        let allocationAmount: Double
+        if selectedAllocationAccount != nil {
+            let trimmed = allocationAmountText.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty {
+                allocationAmount = 0
+            } else {
+                guard let parsed = CurrencyFormatter.parseAmount(trimmed), parsed >= 0, parsed <= netAmount else {
+                    showingInvalidAllocationAlert = true
+                    return
+                }
+                allocationAmount = parsed
+            }
+        } else {
+            allocationAmount = 0
+        }
 
         let expense = VariableExpense(
             descriptionText: trimmedDesc,
-            amount: amt,
+            amount: netAmount,
             transactionDate: transactionDate,
             workspace: workspace,
             card: selectedCard,
@@ -174,6 +245,37 @@ struct AddExpenseView: View {
         )
 
         modelContext.insert(expense)
+
+        if let selectedAllocationAccount, allocationAmount > 0 {
+            let allocation = ExpenseAllocation(
+                allocatedAmount: AllocationLedgerService.cappedAllocationAmount(allocationAmount, expenseAmount: netAmount),
+                createdAt: .now,
+                updatedAt: .now,
+                workspace: workspace,
+                account: selectedAllocationAccount,
+                expense: expense
+            )
+            modelContext.insert(allocation)
+            expense.allocation = allocation
+        }
+
+        if let selectedOffsetAccount, offsetAmount > 0 {
+            let settlement = AllocationSettlement(
+                date: transactionDate,
+                note: offsetNote(for: trimmedDesc),
+                amount: -offsetAmount,
+                workspace: workspace,
+                account: selectedOffsetAccount,
+                expense: expense
+            )
+            modelContext.insert(settlement)
+            expense.offsetSettlement = settlement
+        }
+
         dismiss()
+    }
+
+    private func offsetNote(for description: String) -> String {
+        "Offset applied to \(description)"
     }
 }

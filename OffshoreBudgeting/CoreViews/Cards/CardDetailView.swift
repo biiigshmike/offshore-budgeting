@@ -315,383 +315,378 @@ struct CardDetailView: View {
     // MARK: - Body
 
     var body: some View {
+        listContent
+            .postBoardingTip(
+                key: "tip.carddetail.v1",
+                title: "Card Detail Overview",
+                items: [
+                    PostBoardingTipItem(
+                        systemImage: "list.bullet.below.rectangle",
+                        title: "Detailed Overview",
+                        detail: "Review expenses with advanced filtering."
+                    ),
+                    PostBoardingTipItem(
+                        systemImage: "magnifyingglass",
+                        title: "Search for Expenses",
+                        detail: "Search by name, category, or date using the search bar."
+                    ),
+                    PostBoardingTipItem(
+                        systemImage: "tag",
+                        title: "Categories",
+                        detail: "Tap a category to filter expenses by that category alone, then tap the same category again to clear your selection."
+                    ),
+                    PostBoardingTipItem(
+                        systemImage: "tray.and.arrow.down.fill",
+                        title: "Import Expenses",
+                        detail: "Using the plus button in the top right, choose Import Expenses and import from CSV, PDF statements, or screenshots."
+                    )
+                ]
+            )
+            .listStyle(.insetGrouped)
+            .navigationTitle(card.name)
+            .searchable(
+                text: $searchText,
+                placement: .navigationBarDrawer(displayMode: .always),
+                prompt: "Search"
+            )
+            .searchFocused($searchFocused)
+            .toolbar {
+                toolbarContent
+            }
+            .alert("Delete Card?", isPresented: $showingCardDeleteConfirm) {
+                Button("Delete", role: .destructive) {
+                    pendingCardDelete?()
+                    pendingCardDelete = nil
+                }
+                Button("Cancel", role: .cancel) {
+                    pendingCardDelete = nil
+                }
+            } message: {
+                Text("This deletes the card and all of its expenses.")
+            }
+            .alert("Delete Expense?", isPresented: $showingExpenseDeleteConfirm) {
+                Button("Delete", role: .destructive) {
+                    pendingExpenseDelete?()
+                    pendingExpenseDelete = nil
+                }
+                Button("Cancel", role: .cancel) {
+                    pendingExpenseDelete = nil
+                }
+            }
+            .sheet(isPresented: $showingAddExpenseSheet) {
+                NavigationStack {
+                    AddExpenseView(workspace: workspace, defaultCard: card)
+                }
+            }
+            .sheet(isPresented: $showingImportExpensesSheet) {
+                NavigationStack {
+                    ExpenseCSVImportFlowView(workspace: workspace, card: card)
+                }
+            }
+            .sheet(isPresented: $showingEditCardSheet) {
+                NavigationStack {
+                    EditCardView(workspace: workspace, card: card)
+                }
+            }
+            .sheet(isPresented: $showingEditExpenseSheet, onDismiss: { editingExpense = nil }) {
+                NavigationStack {
+                    if let editingExpense {
+                        EditExpenseView(workspace: workspace, expense: editingExpense)
+                    } else {
+                        EmptyView()
+                    }
+                }
+            }
+            .sheet(isPresented: $showingEditPlannedExpenseSheet, onDismiss: { editingPlannedExpense = nil }) {
+                NavigationStack {
+                    if let editingPlannedExpense {
+                        EditPlannedExpenseView(workspace: workspace, plannedExpense: editingPlannedExpense)
+                    } else {
+                        EmptyView()
+                    }
+                }
+            }
+            .sheet(isPresented: $showingEditPresetSheet, onDismiss: { editingPreset = nil }) {
+                NavigationStack {
+                    if let editingPreset {
+                        EditPresetView(workspace: workspace, preset: editingPreset)
+                    } else {
+                        EmptyView()
+                    }
+                }
+            }
+            .onAppear {
+                commandHub.activate(.cardDetail)
+                initializeDateRangeIfNeeded()
+            }
+            .onDisappear {
+                commandHub.deactivate(.cardDetail)
+            }
+            .onReceive(commandHub.$sequence) { _ in
+                guard commandHub.surface == .cardDetail else { return }
+                handleCommand(commandHub.latestCommandID)
+            }
+            .onChange(of: defaultBudgetingPeriodRaw) { _, _ in
+                applyDefaultPeriodRange()
+            }
+    }
+
+    @ViewBuilder
+    private var listContent: some View {
         List {
-
-            // MARK: - Hero Card
-
-            Section {
-                HeroCardRow(
-                    title: card.name,
-                    theme: cardThemeOption(from: card.theme),
-                    effect: cardEffectOption(from: card.effect)
-                )
-                .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
-                .listRowSeparator(.hidden)
-            }
-
-            // MARK: - Date Filter Row
-
-            Section {
-                DateFilterRow(
-                    draftStartDate: $draftStartDate,
-                    draftEndDate: $draftEndDate,
-                    isGoEnabled: isDateDirty && !isApplyingQuickRange,
-                    onTapGo: { applyDraftDates() },
-                    onSelectQuickRange: { applyQuickRangePresetDeferred($0) }
-                )
-            } header: {
-                Text("Date Range")
-            }
-
-            // MARK: - Total Spent (Statement)
-
-            Section {
-                TotalSpentStatementRow(
-                    total: displayTotal,
-                    heatMapStops: heatMapStops
-                )
-                .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
-            } header: {
-                Text("Total Spent")
-            }
-
-            // MARK: - Category Chips
+            heroSection
+            dateRangeSection
+            totalSpentSection
 
             if !availableCategoriesForChips.isEmpty {
-                Section {
-                    CategoryChipsRow(
-                        categories: availableCategoriesForChips,
-                        selectedID: $selectedCategoryID
-                    )
-                } header: {
-                    Text("Categories")
-                } footer: {
-                    Text(selectedCategoryID == nil ? "Single-press a category to filter expenses." : "Make another selection or tap the selected chip again to clear.")
-                }
+                categorySection
             }
 
-            // MARK: - Sort
+            sortSection
+            expensesSection
+        }
+    }
 
-            Section {
-                
-                Picker("Scope", selection: $expenseScope) {
-                    Text("Planned").tag(ExpenseScope.planned)
-                    Text("Unified").tag(ExpenseScope.unified)
-                    Text("Variable").tag(ExpenseScope.variable)
-                }
-                .pickerStyle(.segmented)
-                
-                Picker("Sort", selection: $sortMode) {
-                    Text("A–Z").tag(SortMode.az)
-                    Text("Z–A").tag(SortMode.za)
-                    Text("\(CurrencyFormatter.currencySymbol)↑").tag(SortMode.amountAsc)
-                    Text("\(CurrencyFormatter.currencySymbol)↓").tag(SortMode.amountDesc)
-                    Text("Date ↑").tag(SortMode.dateAsc)
-                    Text("Date ↓").tag(SortMode.dateDesc)
-                }
-                .pickerStyle(.segmented)
-            } header: {
-                Text("Sort")
+    private var heroSection: some View {
+        Section {
+            HeroCardRow(
+                title: card.name,
+                theme: cardThemeOption(from: card.theme),
+                effect: cardEffectOption(from: card.effect)
+            )
+            .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
+            .listRowSeparator(.hidden)
+        }
+    }
+
+    private var dateRangeSection: some View {
+        Section {
+            DateFilterRow(
+                draftStartDate: $draftStartDate,
+                draftEndDate: $draftEndDate,
+                isGoEnabled: isDateDirty && !isApplyingQuickRange,
+                onTapGo: { applyDraftDates() },
+                onSelectQuickRange: { applyQuickRangePresetDeferred($0) }
+            )
+        } header: {
+            Text("Date Range")
+        }
+    }
+
+    private var totalSpentSection: some View {
+        Section {
+            TotalSpentStatementRow(
+                total: displayTotal,
+                heatMapStops: heatMapStops
+            )
+            .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+        } header: {
+            Text("Total Spent")
+        }
+    }
+
+    private var categorySection: some View {
+        Section {
+            CategoryChipsRow(
+                categories: availableCategoriesForChips,
+                selectedID: $selectedCategoryID
+            )
+        } header: {
+            Text("Categories")
+        } footer: {
+            Text(
+                selectedCategoryID == nil
+                ? "Single-press a category to filter expenses."
+                : "Make another selection or tap the selected chip again to clear."
+            )
+        }
+    }
+
+    private var sortSection: some View {
+        Section {
+            Picker("Scope", selection: $expenseScope) {
+                Text("Planned").tag(ExpenseScope.planned)
+                Text("Unified").tag(ExpenseScope.unified)
+                Text("Variable").tag(ExpenseScope.variable)
             }
-            // MARK: - Expenses
+            .pickerStyle(.segmented)
 
-            Section {
-                switch expenseScope {
+            Picker("Sort", selection: $sortMode) {
+                Text("A–Z").tag(SortMode.az)
+                Text("Z–A").tag(SortMode.za)
+                Text("\(CurrencyFormatter.currencySymbol)↑").tag(SortMode.amountAsc)
+                Text("\(CurrencyFormatter.currencySymbol)↓").tag(SortMode.amountDesc)
+                Text("Date ↑").tag(SortMode.dateAsc)
+                Text("Date ↓").tag(SortMode.dateDesc)
+            }
+            .pickerStyle(.segmented)
+        } header: {
+            Text("Sort")
+        }
+    }
 
-                case .planned:
-                    if plannedExpensesFiltered.isEmpty {
-                        Text(emptyMessage())
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(plannedExpensesFiltered, id: \.id) { expense in
-                            PlannedExpenseRow(expense: expense)
-                                .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                                    Button {
-                                        openEdit(expense)
-                                    } label: {
-                                        Label("Edit", systemImage: "pencil")
-                                    }
-                                    .tint(Color("AccentColor"))
+    private var expensesSection: some View {
+        Section {
+            expensesSectionRows
+        } header: {
+            expensesTitleText
+        }
+    }
 
-                                    if let preset = presetForPlannedExpense(expense) {
-                                        Button {
-                                            openEditPreset(preset)
-                                        } label: {
-                                            Label("Edit Preset", systemImage: "list.bullet.rectangle")
-                                        }
-                                        .tint(Color("OffshoreSand"))
-                                    }
-                                }
-                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                    Button(role: .destructive) {
-                                        deleteWithOptionalConfirm {
-                                            modelContext.delete(expense)
-                                        }
-                                    } label: {
-                                        Label("Delete", systemImage: "trash")
-                                    }
-                                    .tint(Color("OffshoreDepth"))
-                                }
-                        }
-                    }
+    @ViewBuilder
+    private var expensesSectionRows: some View {
+        switch expenseScope {
+        case .planned:
+            plannedExpensesRows
+        case .variable:
+            variableExpensesRows
+        case .unified:
+            unifiedExpensesRows
+        }
+    }
 
-                case .variable:
-                    if variableExpensesFiltered.isEmpty {
-                        Text(emptyMessage())
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(variableExpensesFiltered, id: \.id) { expense in
-                            Button {
-                                openEdit(expense)
-                            } label: {
-                                VariableExpenseRow(expense: expense)
-                            }
-                            .buttonStyle(.plain)
-                            .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                                Button {
-                                    openEdit(expense)
-                                } label: {
-                                    Label("Edit", systemImage: "pencil")
-                                }
-                                .tint(Color("AccentColor"))
-                            }
-                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                Button(role: .destructive) {
-                                    deleteWithOptionalConfirm {
-                                        modelContext.delete(expense)
-                                    }
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
-                                }
-                                .tint(Color("OffshoreDepth"))
-                            }
-                        }
-                    }
-
-                case .unified:
-                    if unifiedExpensesFiltered.isEmpty {
-                        Text(emptyMessage())
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(unifiedExpensesFiltered, id: \.id) { item in
-                            switch item {
-                            case .planned(let expense):
-                                PlannedExpenseRow(expense: expense)
-                                    .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                                        Button {
-                                            openEdit(expense)
-                                        } label: {
-                                            Label("Edit", systemImage: "pencil")
-                                        }
-                                        .tint(Color("AccentColor"))
-
-                                        if let preset = presetForPlannedExpense(expense) {
-                                            Button {
-                                                openEditPreset(preset)
-                                            } label: {
-                                                Label("Edit Preset", systemImage: "list.bullet.rectangle")
-                                            }
-                                            .tint(Color("OffshoreSand"))
-                                        }
-                                    }
-                                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                        Button(role: .destructive) {
-                                            deleteWithOptionalConfirm {
-                                                modelContext.delete(expense)
-                                            }
-                                        } label: {
-                                            Label("Delete", systemImage: "trash")
-                                        }
-                                        .tint(Color("OffshoreDepth"))
-                                    }
-
-                            case .variable(let expense):
-                                Button {
-                                    openEdit(expense)
-                                } label: {
-                                    VariableExpenseRow(expense: expense)
-                                }
-                                .buttonStyle(.plain)
-                                .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                                    Button {
-                                        openEdit(expense)
-                                    } label: {
-                                        Label("Edit", systemImage: "pencil")
-                                    }
-                                    .tint(Color("AccentColor"))
-                                }
-                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                    Button(role: .destructive) {
-                                        deleteWithOptionalConfirm {
-                                            modelContext.delete(expense)
-                                        }
-                                    } label: {
-                                        Label("Delete", systemImage: "trash")
-                                    }
-                                    .tint(Color("OffshoreDepth"))
-                                }
-                            }
-                        }
-                    }
-                }
-            } header: {
-                expensesTitleText
+    @ViewBuilder
+    private var plannedExpensesRows: some View {
+        if plannedExpensesFiltered.isEmpty {
+            Text(emptyMessage())
+                .foregroundStyle(.secondary)
+        } else {
+            ForEach(plannedExpensesFiltered, id: \.id) { expense in
+                plannedExpenseRow(expense)
             }
         }
-        .postBoardingTip(
-            key: "tip.carddetail.v1",
-            title: "Card Detail Overview",
-            items: [
-                PostBoardingTipItem(
-                    systemImage: "list.bullet.below.rectangle",
-                    title: "Detailed Overview",
-                    detail: "Review expenses with advanced filtering."
-                ),
-                PostBoardingTipItem(
-                    systemImage: "magnifyingglass",
-                    title: "Search for Expenses",
-                    detail: "Search by name, category, or date using the search bar."
-                ),
-                PostBoardingTipItem(
-                    systemImage: "tag",
-                    title: "Categories",
-                    detail: "Tap a category to filter expenses by that category alone, then tap the same category again to clear your selection."
-                ),
-                PostBoardingTipItem(
-                    systemImage: "tray.and.arrow.down.fill",
-                    title: "Import Expenses",
-                    detail: "Using the plus button in the top right, choose Import Expenses and import from CSV, PDF statements, or screenshots."
-                )
-            ]
-        )
-        .listStyle(.insetGrouped)
-        .navigationTitle(card.name)
-        .searchable(
-            text: $searchText,
-            placement: .navigationBarDrawer(displayMode: .always),
-            prompt: "Search"
-        )
-        .searchFocused($searchFocused)
-        .toolbar {
-            ToolbarItemGroup(placement: .topBarTrailing) {
+    }
 
-                Menu {
+    private func plannedExpenseRow(_ expense: PlannedExpense) -> some View {
+        PlannedExpenseRow(expense: expense)
+            .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                Button {
+                    openEdit(expense)
+                } label: {
+                    Label("Edit", systemImage: "pencil")
+                }
+                .tint(Color("AccentColor"))
+
+                if let preset = presetForPlannedExpense(expense) {
                     Button {
-                        showingAddExpenseSheet = true
+                        openEditPreset(preset)
                     } label: {
-                        Label("Add Transaction", systemImage: "plus")
+                        Label("Edit Preset", systemImage: "list.bullet.rectangle")
                     }
-
-                    Button {
-                        showingImportExpensesSheet = true
-                    } label: {
-                        Label("Import Expenses", systemImage: "tray.and.arrow.down")
+                    .tint(Color("OffshoreSand"))
+                }
+            }
+            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                Button(role: .destructive) {
+                    deleteWithOptionalConfirm {
+                        modelContext.delete(expense)
                     }
                 } label: {
-                    Image(systemName: "plus")
+                    Label("Delete", systemImage: "trash")
                 }
-                .accessibilityLabel("Add")
-                
-                Menu {
-                    Button {
-                        showingEditCardSheet = true
-                    } label: {
-                        Label("Edit Card", systemImage: "pencil")
-                    }
+                .tint(Color("OffshoreDepth"))
+            }
+    }
 
-                    Button(role: .destructive) {
-                        if confirmBeforeDeleting {
-                            pendingCardDelete = {
-                                deleteCard()
-                            }
-                            showingCardDeleteConfirm = true
-                        } else {
+    @ViewBuilder
+    private var variableExpensesRows: some View {
+        if variableExpensesFiltered.isEmpty {
+            Text(emptyMessage())
+                .foregroundStyle(.secondary)
+        } else {
+            ForEach(variableExpensesFiltered, id: \.id) { expense in
+                variableExpenseRow(expense)
+            }
+        }
+    }
+
+    private func variableExpenseRow(_ expense: VariableExpense) -> some View {
+        Button {
+            openEdit(expense)
+        } label: {
+            VariableExpenseRow(expense: expense)
+        }
+        .buttonStyle(.plain)
+        .swipeActions(edge: .leading, allowsFullSwipe: true) {
+            Button {
+                openEdit(expense)
+            } label: {
+                Label("Edit", systemImage: "pencil")
+            }
+            .tint(Color("AccentColor"))
+        }
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            Button(role: .destructive) {
+                deleteWithOptionalConfirm {
+                    deleteVariableExpense(expense)
+                }
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+            .tint(Color("OffshoreDepth"))
+        }
+    }
+
+    @ViewBuilder
+    private var unifiedExpensesRows: some View {
+        if unifiedExpensesFiltered.isEmpty {
+            Text(emptyMessage())
+                .foregroundStyle(.secondary)
+        } else {
+            ForEach(unifiedExpensesFiltered, id: \.id) { item in
+                switch item {
+                case .planned(let expense):
+                    plannedExpenseRow(expense)
+                case .variable(let expense):
+                    variableExpenseRow(expense)
+                }
+            }
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        ToolbarItemGroup(placement: .topBarTrailing) {
+            Menu {
+                Button {
+                    showingAddExpenseSheet = true
+                } label: {
+                    Label("Add Transaction", systemImage: "plus")
+                }
+
+                Button {
+                    showingImportExpensesSheet = true
+                } label: {
+                    Label("Import Expenses", systemImage: "tray.and.arrow.down")
+                }
+            } label: {
+                Image(systemName: "plus")
+            }
+            .accessibilityLabel("Add")
+
+            Menu {
+                Button {
+                    showingEditCardSheet = true
+                } label: {
+                    Label("Edit Card", systemImage: "pencil")
+                }
+
+                Button(role: .destructive) {
+                    if confirmBeforeDeleting {
+                        pendingCardDelete = {
                             deleteCard()
                         }
-                    } label: {
-                        Label("Delete Card", systemImage: "trash")
+                        showingCardDeleteConfirm = true
+                    } else {
+                        deleteCard()
                     }
                 } label: {
-                    Image(systemName: "ellipsis")
+                    Label("Delete Card", systemImage: "trash")
                 }
-                .accessibilityLabel("Card Actions")
+            } label: {
+                Image(systemName: "ellipsis")
             }
-        }
-        .alert("Delete Card?", isPresented: $showingCardDeleteConfirm) {
-            Button("Delete", role: .destructive) {
-                pendingCardDelete?()
-                pendingCardDelete = nil
-            }
-            Button("Cancel", role: .cancel) {
-                pendingCardDelete = nil
-            }
-        } message: {
-            Text("This deletes the card and all of its expenses.")
-        }
-        .alert("Delete Expense?", isPresented: $showingExpenseDeleteConfirm) {
-            Button("Delete", role: .destructive) {
-                pendingExpenseDelete?()
-                pendingExpenseDelete = nil
-            }
-            Button("Cancel", role: .cancel) {
-                pendingExpenseDelete = nil
-            }
-        }
-        .sheet(isPresented: $showingAddExpenseSheet) {
-            NavigationStack {
-                AddExpenseView(workspace: workspace, defaultCard: card)
-            }
-        }
-        .sheet(isPresented: $showingImportExpensesSheet) {
-            NavigationStack {
-                ExpenseCSVImportFlowView(workspace: workspace, card: card)
-            }
-        }
-        .sheet(isPresented: $showingEditCardSheet) {
-            NavigationStack {
-                EditCardView(workspace: workspace, card: card)
-            }
-        }
-        .sheet(isPresented: $showingEditExpenseSheet, onDismiss: { editingExpense = nil }) {
-            NavigationStack {
-                if let editingExpense {
-                    EditExpenseView(workspace: workspace, expense: editingExpense)
-                } else {
-                    EmptyView()
-                }
-            }
-        }
-        .sheet(isPresented: $showingEditPlannedExpenseSheet, onDismiss: { editingPlannedExpense = nil }) {
-            NavigationStack {
-                if let editingPlannedExpense {
-                    EditPlannedExpenseView(workspace: workspace, plannedExpense: editingPlannedExpense)
-                } else {
-                    EmptyView()
-                }
-            }
-        }
-        .sheet(isPresented: $showingEditPresetSheet, onDismiss: { editingPreset = nil }) {
-            NavigationStack {
-                if let editingPreset {
-                    EditPresetView(workspace: workspace, preset: editingPreset)
-                } else {
-                    EmptyView()
-                }
-            }
-        }
-        .onAppear {
-            commandHub.activate(.cardDetail)
-            initializeDateRangeIfNeeded()
-        }
-        .onDisappear {
-            commandHub.deactivate(.cardDetail)
-        }
-        .onReceive(commandHub.$sequence) { _ in
-            guard commandHub.surface == .cardDetail else { return }
-            handleCommand(commandHub.latestCommandID)
-        }
-        .onChange(of: defaultBudgetingPeriodRaw) { _, _ in
-            applyDefaultPeriodRange()
+            .accessibilityLabel("Card Actions")
         }
     }
 
@@ -948,7 +943,7 @@ struct CardDetailView: View {
 
         if let variable = card.variableExpenses {
             for expense in variable {
-                modelContext.delete(expense)
+                deleteVariableExpense(expense)
             }
         }
 
@@ -966,6 +961,18 @@ struct CardDetailView: View {
 
         modelContext.delete(card)
         dismiss()
+    }
+
+    private func deleteVariableExpense(_ expense: VariableExpense) {
+        if let allocation = expense.allocation {
+            expense.allocation = nil
+            modelContext.delete(allocation)
+        }
+        if let offsetSettlement = expense.offsetSettlement {
+            expense.offsetSettlement = nil
+            modelContext.delete(offsetSettlement)
+        }
+        modelContext.delete(expense)
     }
 
 

@@ -55,3 +55,31 @@ struct OffshoreCategoryEntityQuery: EntityQuery {
         return all.filter { set.contains($0.id) }
     }
 }
+
+// MARK: - Shared Balance Entity
+
+struct OffshoreAllocationAccountEntity: AppEntity, Identifiable, Hashable {
+    static var typeDisplayRepresentation: TypeDisplayRepresentation = "Shared Balance"
+    static var defaultQuery = OffshoreAllocationAccountEntityQuery()
+
+    let id: String
+    let name: String
+
+    var displayRepresentation: DisplayRepresentation {
+        DisplayRepresentation(title: "\(name)")
+    }
+}
+
+struct OffshoreAllocationAccountEntityQuery: EntityQuery {
+    func suggestedEntities() async throws -> [OffshoreAllocationAccountEntity] {
+        try await MainActor.run {
+            try OffshoreIntentDataStore.shared.fetchAllocationAccountEntitiesForSelectedWorkspace()
+        }
+    }
+
+    func entities(for identifiers: [OffshoreAllocationAccountEntity.ID]) async throws -> [OffshoreAllocationAccountEntity] {
+        let all = try await suggestedEntities()
+        let set = Set(identifiers)
+        return all.filter { set.contains($0.id) }
+    }
+}

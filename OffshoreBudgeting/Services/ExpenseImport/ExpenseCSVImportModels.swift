@@ -48,6 +48,8 @@ struct ExpenseCSVImportRow: Identifiable {
 
     // Category selection (expenses only)
     var selectedCategory: Category?
+    var selectedAllocationAccount: AllocationAccount? = nil
+    var allocationAmountText: String = ""
 
     // Learning
     var rememberMapping: Bool = false
@@ -69,6 +71,13 @@ struct ExpenseCSVImportRow: Identifiable {
         if finalMerchant.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return true }
         if kind == .expense, selectedCategory == nil { return true }
         return false
+    }
+
+    func parsedAllocationAmount(cappedTo total: Double) -> Double? {
+        let trimmed = allocationAmountText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        guard let parsed = CurrencyFormatter.parseAmount(trimmed), parsed > 0 else { return nil }
+        return AllocationLedgerService.cappedAllocationAmount(parsed, expenseAmount: total)
     }
 
     mutating func recomputeBucket() {

@@ -60,6 +60,7 @@ final class ExpenseCSVImportViewModel: ObservableObject {
     @Published var state: State = .idle
     @Published private(set) var rows: [ExpenseCSVImportRow] = []
     @Published private(set) var categories: [Category] = []
+    @Published private(set) var allocationAccounts: [AllocationAccount] = []
 
     // Option 1 memory dictionary keyed by merchantKey.
     private var learnedRules: [String: ImportMerchantRule] = [:]
@@ -113,6 +114,11 @@ final class ExpenseCSVImportViewModel: ObservableObject {
         let cats = (workspace.categories ?? [])
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         categories = cats
+
+        let accounts = (workspace.allocationAccounts ?? [])
+            .filter { !$0.isArchived }
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        allocationAccounts = accounts
 
         // Learned rules (Option 1)
         learnedRules = ImportLearningStore.fetchRules(for: workspace, modelContext: modelContext)
@@ -332,6 +338,8 @@ final class ExpenseCSVImportViewModel: ObservableObject {
 
         if kind == .income {
             rows[idx].selectedCategory = nil
+            rows[idx].selectedAllocationAccount = nil
+            rows[idx].allocationAmountText = ""
             rows[idx].bucket = .payment
         } else {
             if rows[idx].selectedCategory == nil {
@@ -366,6 +374,19 @@ final class ExpenseCSVImportViewModel: ObservableObject {
         rows[idx].rememberMapping.toggle()
     }
 
+    func setAllocationAccount(rowID: UUID, account: AllocationAccount?) {
+        guard let idx = rows.firstIndex(where: { $0.id == rowID }) else { return }
+        rows[idx].selectedAllocationAccount = account
+        if account == nil {
+            rows[idx].allocationAmountText = ""
+        }
+    }
+
+    func setAllocationAmount(rowID: UUID, amountText: String) {
+        guard let idx = rows.firstIndex(where: { $0.id == rowID }) else { return }
+        rows[idx].allocationAmountText = amountText
+    }
+
     func commitImport(workspace: Workspace, card: Card?, modelContext: ModelContext) {
         let importable = rows.filter { !$0.isBlocked && $0.includeInImport && !$0.isMissingRequiredData }
 
@@ -383,6 +404,21 @@ final class ExpenseCSVImportViewModel: ObservableObject {
                     category: category
                 )
                 modelContext.insert(exp)
+
+                if let account = row.selectedAllocationAccount,
+                   let allocationAmount = row.parsedAllocationAmount(cappedTo: row.finalAmount),
+                   allocationAmount > 0 {
+                    let allocation = ExpenseAllocation(
+                        allocatedAmount: allocationAmount,
+                        createdAt: .now,
+                        updatedAt: .now,
+                        workspace: workspace,
+                        account: account,
+                        expense: exp
+                    )
+                    modelContext.insert(allocation)
+                    exp.allocation = allocation
+                }
 
                 if row.rememberMapping {
                     let preferredName = row.finalMerchant.trimmingCharacters(in: .whitespacesAndNewlines)

@@ -986,13 +986,13 @@ struct BudgetDetailView: View {
         if confirmBeforeDeleting {
             pendingExpenseDelete = {
                 for expense in expensesToDelete {
-                    modelContext.delete(expense)
+                    deleteVariableExpenseRecord(expense)
                 }
             }
             showingExpenseDeleteConfirm = true
         } else {
             for expense in expensesToDelete {
-                modelContext.delete(expense)
+                deleteVariableExpenseRecord(expense)
             }
         }
     }
@@ -1028,7 +1028,7 @@ struct BudgetDetailView: View {
                     case .planned(let expense):
                         modelContext.delete(expense)
                     case .variable(let expense):
-                        modelContext.delete(expense)
+                        deleteVariableExpenseRecord(expense)
                     }
                 }
             }
@@ -1039,10 +1039,22 @@ struct BudgetDetailView: View {
                 case .planned(let expense):
                     modelContext.delete(expense)
                 case .variable(let expense):
-                    modelContext.delete(expense)
+                    deleteVariableExpenseRecord(expense)
                 }
             }
         }
+    }
+
+    private func deleteVariableExpenseRecord(_ expense: VariableExpense) {
+        if let allocation = expense.allocation {
+            expense.allocation = nil
+            modelContext.delete(allocation)
+        }
+        if let offsetSettlement = expense.offsetSettlement {
+            expense.offsetSettlement = nil
+            modelContext.delete(offsetSettlement)
+        }
+        modelContext.delete(expense)
     }
 
     // MARK: - Category Limit Math

@@ -28,6 +28,9 @@ struct SwiftDataCRUDTests {
             BudgetCategoryLimit.self,
             PlannedExpense.self,
             VariableExpense.self,
+            AllocationAccount.self,
+            ExpenseAllocation.self,
+            AllocationSettlement.self,
             IncomeSeries.self,
             ImportMerchantRule.self,
             Income.self
@@ -253,5 +256,117 @@ struct SwiftDataCRUDTests {
         #expect(try fetchAll(Income.self, in: context).isEmpty)
         #expect(try fetchAll(PlannedExpense.self, in: context).isEmpty)
         #expect(try fetchAll(VariableExpense.self, in: context).isEmpty)
+    }
+
+    // MARK: - Linked settlement integrity
+
+    @Test func deletingLinkedSettlement_restoresExpenseAmountAndUnlinks() throws {
+        let context = try makeContext()
+
+        let ws = Workspace(name: "WS", hexColor: "#3B82F6")
+        let card = Card(name: "Visa", workspace: ws)
+        let cat = Category(name: "Food", hexColor: "#FF0000", workspace: ws)
+        let account = AllocationAccount(name: "Partner", workspace: ws)
+        let date = Calendar.current.date(from: DateComponents(year: 2026, month: 1, day: 10))!
+
+        let expense = VariableExpense(
+            descriptionText: "Groceries",
+            amount: 60,
+            transactionDate: date,
+            workspace: ws,
+            card: card,
+            category: cat
+        )
+
+        let settlement = AllocationSettlement(
+            date: date,
+            note: "Offset applied",
+            amount: -20,
+            workspace: ws,
+            account: account,
+            expense: expense
+        )
+        expense.offsetSettlement = settlement
+
+        context.insert(ws)
+        context.insert(card)
+        context.insert(cat)
+        context.insert(account)
+        context.insert(expense)
+        context.insert(settlement)
+        try context.save()
+
+        let oldOffset = max(0, -settlement.amount)
+        expense.amount = max(0, expense.amount + oldOffset)
+        expense.offsetSettlement = nil
+        context.delete(settlement)
+        try context.save()
+
+        let fetchedExpense = try fetchAll(VariableExpense.self, in: context).first
+        let settlements = try fetchAll(AllocationSettlement.self, in: context)
+
+        #expect(settlements.isEmpty)
+        #expect(fetchedExpense?.amount == 80)
+        #expect(fetchedExpense?.offsetSettlement == nil)
+    }
+
+    @Test func editingLinkedSettlement_updatesExpenseAmountAndDate() throws {
+        let context = try makeContext()
+
+        let ws = Workspace(name: "WS", hexColor: "#3B82F6")
+        let card = Card(name: "Visa", workspace: ws)
+        let cat = Category(name: "Food", hexColor: "#FF0000", workspace: ws)
+        let account = AllocationAccount(name: "Partner", workspace: ws)
+
+        let originalDate = Calendar.current.date(from: DateComponents(year: 2026, month: 1, day: 10))!
+        let updatedDate = Calendar.current.date(from: DateComponents(year: 2026, month: 1, day: 12))!
+
+        let expense = VariableExpense(
+            descriptionText: "Groceries",
+            amount: 60,
+            transactionDate: originalDate,
+            workspace: ws,
+            card: card,
+            category: cat
+        )
+
+        let settlement = AllocationSettlement(
+            date: originalDate,
+            note: "Offset applied",
+            amount: -20,
+            workspace: ws,
+            account: account,
+            expense: expense
+        )
+        expense.offsetSettlement = settlement
+
+        context.insert(ws)
+        context.insert(card)
+        context.insert(cat)
+        context.insert(account)
+        context.insert(expense)
+        context.insert(settlement)
+        try context.save()
+
+        let oldOffset = max(0, -settlement.amount)
+        let gross = max(0, expense.amount + oldOffset)
+        let newOffset = 10.0
+
+        settlement.amount = -newOffset
+        settlement.date = updatedDate
+        settlement.note = "Updated offset"
+
+        expense.amount = max(0, gross - newOffset)
+        expense.transactionDate = updatedDate
+
+        try context.save()
+
+        let fetchedExpense = try fetchAll(VariableExpense.self, in: context).first
+        let fetchedSettlement = try fetchAll(AllocationSettlement.self, in: context).first
+
+        #expect(fetchedExpense?.amount == 70)
+        #expect(fetchedExpense?.transactionDate == updatedDate)
+        #expect(fetchedSettlement?.amount == -10)
+        #expect(fetchedSettlement?.date == updatedDate)
     }
 }

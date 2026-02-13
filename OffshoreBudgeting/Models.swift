@@ -299,6 +299,15 @@ final class Workspace {
     var variableExpenses: [VariableExpense]? = nil
 
     @Relationship(deleteRule: .cascade)
+    var allocationAccounts: [AllocationAccount]? = nil
+
+    @Relationship(deleteRule: .cascade)
+    var expenseAllocations: [ExpenseAllocation]? = nil
+
+    @Relationship(deleteRule: .cascade)
+    var allocationSettlements: [AllocationSettlement]? = nil
+
+    @Relationship(deleteRule: .cascade)
     var importMerchantRules: [ImportMerchantRule]? = nil
 
     @Relationship(deleteRule: .cascade)
@@ -648,6 +657,16 @@ final class VariableExpense {
     @Relationship(inverse: \Category.variableExpenses)
     var category: Category? = nil
 
+    // IMPORTANT:
+    // Keep this un-annotated on this toolchain to avoid circular macro expansion.
+    // The inverse is declared on ExpenseAllocation.expense.
+    var allocation: ExpenseAllocation? = nil
+
+    // IMPORTANT:
+    // Keep this un-annotated on this toolchain to avoid circular macro expansion.
+    // The inverse is declared on AllocationSettlement.expense.
+    var offsetSettlement: AllocationSettlement? = nil
+
     init(
         id: UUID = UUID(),
         descriptionText: String,
@@ -664,6 +683,120 @@ final class VariableExpense {
         self.workspace = workspace
         self.card = card
         self.category = category
+    }
+}
+
+// MARK: - AllocationAccount
+
+@Model
+final class AllocationAccount {
+
+    var id: UUID = UUID()
+    var name: String = ""
+    var hexColor: String = "#3B82F6"
+    var isArchived: Bool = false
+    var archivedAt: Date? = nil
+
+    @Relationship(inverse: \Workspace.allocationAccounts)
+    var workspace: Workspace? = nil
+
+    // IMPORTANT:
+    // Keep these un-annotated on this toolchain.
+    // The inverse is declared on ExpenseAllocation.account / AllocationSettlement.account.
+    var expenseAllocations: [ExpenseAllocation]? = nil
+
+    var settlements: [AllocationSettlement]? = nil
+
+    init(
+        id: UUID = UUID(),
+        name: String,
+        hexColor: String = "#3B82F6",
+        isArchived: Bool = false,
+        archivedAt: Date? = nil,
+        workspace: Workspace? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.hexColor = hexColor
+        self.isArchived = isArchived
+        self.archivedAt = archivedAt
+        self.workspace = workspace
+    }
+}
+
+// MARK: - ExpenseAllocation
+
+@Model
+final class ExpenseAllocation {
+
+    var id: UUID = UUID()
+    var allocatedAmount: Double = 0
+    var createdAt: Date = Date.now
+    var updatedAt: Date = Date.now
+
+    @Relationship(inverse: \Workspace.expenseAllocations)
+    var workspace: Workspace? = nil
+
+    @Relationship(inverse: \AllocationAccount.expenseAllocations)
+    var account: AllocationAccount? = nil
+
+    @Relationship(inverse: \VariableExpense.allocation)
+    var expense: VariableExpense? = nil
+
+    init(
+        id: UUID = UUID(),
+        allocatedAmount: Double,
+        createdAt: Date = .now,
+        updatedAt: Date = .now,
+        workspace: Workspace? = nil,
+        account: AllocationAccount? = nil,
+        expense: VariableExpense? = nil
+    ) {
+        self.id = id
+        self.allocatedAmount = allocatedAmount
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.workspace = workspace
+        self.account = account
+        self.expense = expense
+    }
+}
+
+// MARK: - AllocationSettlement
+
+@Model
+final class AllocationSettlement {
+
+    var id: UUID = UUID()
+    var date: Date = Date.now
+    var note: String = ""
+    var amount: Double = 0
+
+    @Relationship(inverse: \Workspace.allocationSettlements)
+    var workspace: Workspace? = nil
+
+    @Relationship(inverse: \AllocationAccount.settlements)
+    var account: AllocationAccount? = nil
+
+    @Relationship(inverse: \VariableExpense.offsetSettlement)
+    var expense: VariableExpense? = nil
+
+    init(
+        id: UUID = UUID(),
+        date: Date,
+        note: String,
+        amount: Double,
+        workspace: Workspace? = nil,
+        account: AllocationAccount? = nil,
+        expense: VariableExpense? = nil
+    ) {
+        self.id = id
+        self.date = date
+        self.note = note
+        self.amount = amount
+        self.workspace = workspace
+        self.account = account
+        self.expense = expense
     }
 }
 

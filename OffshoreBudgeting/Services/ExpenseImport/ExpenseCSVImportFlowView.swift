@@ -254,6 +254,7 @@ struct ExpenseCSVImportFlowView: View {
                 ExpenseCSVImportRowView(
                     row: row,
                     allCategories: vm.categories,
+                    allAllocationAccounts: vm.allocationAccounts,
                     allowKindEditing: mode == .cardTransactions,
                     incomeHelperText: mode == .cardTransactions
                         ? "Imports as Income (linked to this card)"
@@ -263,6 +264,8 @@ struct ExpenseCSVImportFlowView: View {
                     onSetMerchant: { text in vm.setMerchant(rowID: row.id, merchant: text) },
                     onSetCategory: { category in vm.setCategory(rowID: row.id, category: category) },
                     onSetKind: { kind in vm.setKind(rowID: row.id, kind: kind) },
+                    onSetAllocationAccount: { account in vm.setAllocationAccount(rowID: row.id, account: account) },
+                    onSetAllocationAmount: { text in vm.setAllocationAmount(rowID: row.id, amountText: text) },
                     onToggleRemember: { vm.toggleRemember(rowID: row.id) }
                 )
             }

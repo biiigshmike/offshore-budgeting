@@ -27,6 +27,9 @@ struct BudgetPlannedExpenseStoreTests {
             BudgetCategoryLimit.self,
             PlannedExpense.self,
             VariableExpense.self,
+            AllocationAccount.self,
+            ExpenseAllocation.self,
+            AllocationSettlement.self,
             IncomeSeries.self,
             ImportMerchantRule.self,
             Income.self
