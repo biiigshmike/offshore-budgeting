@@ -52,59 +52,25 @@ struct WorkspacePickerView: View {
             dataSourceSection
 
             Section("Workspaces") {
-                if workspaces.isEmpty {
-                    if ICloudBootstrap.isBootstrapping(useICloud: activeUseICloud, startedAt: iCloudBootstrapStartedAt) {
-                        VStack(spacing: 12) {
-                            ContentUnavailableView(
-                                "Setting Up iCloud Sync",
-                                systemImage: "icloud.and.arrow.down",
-                                description: Text("Looking for existing workspaces on this Apple ID.")
-                            )
-
-                            ProgressView()
-                                .padding(.bottom, 6)
-                        }
-                        .padding(.vertical, 10)
-                    } else {
-                        ContentUnavailableView(
-                            activeUseICloud ? "No iCloud Workspaces Found" : "No Workspaces Yet",
-                            systemImage: activeUseICloud ? "icloud.slash" : "person.fill",
-                            description: Text(activeUseICloud ? "Nothing was found in iCloud. Create a workspace to begin." : "Create a workspace to begin.")
-                        )
+                WorkspaceListRows(
+                    workspaces: workspaces,
+                    selectedWorkspaceID: selectedWorkspaceID,
+                    usesICloud: activeUseICloud,
+                    isICloudBootstrapping: ICloudBootstrap.isBootstrapping(
+                        useICloud: activeUseICloud,
+                        startedAt: iCloudBootstrapStartedAt
+                    ),
+                    showsSelectionHint: true,
+                    onSelect: { workspace in
+                        selectedWorkspaceID = workspace.id.uuidString
+                    },
+                    onEdit: { workspace in
+                        sheetRoute = .editWorkspace(workspace)
+                    },
+                    onDelete: { workspace in
+                        requestDelete(workspace)
                     }
-                } else {
-                    ForEach(workspaces) { workspace in
-                        Button {
-                            selectedWorkspaceID = workspace.id.uuidString
-                        } label: {
-                            row(workspace)
-                        }
-                        .buttonStyle(.plain)
-
-                        // Swipe right (leading) -> Edit
-                        .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                            Button {
-                                sheetRoute = .editWorkspace(workspace)
-                            } label: {
-                                Label("Edit", systemImage: "pencil")
-                            }
-                            .tint(Color("AccentColor"))
-                        }
-
-                        // Swipe left (trailing) -> Delete
-                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                            Button(role: .destructive) {
-                                requestDelete(workspace)
-                            } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
-                            .tint(Color("OffshoreDepth"))
-                        }
-                    }
-                    Text("Choose a Workspace to switch contexts.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
+                )
             }
         }
         .navigationTitle("Workspaces")
@@ -226,26 +192,6 @@ struct WorkspacePickerView: View {
         }
     }
 
-    // MARK: - Row
-
-    @ViewBuilder
-    private func row(_ workspace: Workspace) -> some View {
-        HStack {
-            Circle()
-                .fill(Color(hex: workspace.hexColor) ?? .secondary)
-                .frame(width: 14, height: 14)
-
-            Text(workspace.name)
-
-            Spacer()
-
-            if selectedWorkspaceID == workspace.id.uuidString {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(.tint)
-            }
-        }
-        .contentShape(Rectangle())
-    }
 }
 
 // MARK: - Data Source

@@ -40,6 +40,8 @@ struct OnboardingView: View {
     private var workspaces: [Workspace]
     
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     
     // MARK: - Local Notifications
     
@@ -74,41 +76,32 @@ struct OnboardingView: View {
         ICloudBootstrap.isBootstrapping(useICloud: activeUseICloud, startedAt: iCloudBootstrapStartedAt)
     }
     
-    // MARK: - Layout
-
-    private var stepMaxWidth: CGFloat {
-        switch onboardingStep {
-        case 0:
-            return 680
-        case 1, 2, 3, 4:
-            return 680
-        default:
-            return 680
-        }
-    }
-    
     var body: some View {
-        ZStack {
-            if onboardingStep == 0 {
-                WaveBackdrop(isExiting: isExitingWelcome)
-                    .ignoresSafeArea()
-            }
+        GeometryReader { proxy in
+            let layout = OnboardingLayoutProfile.resolve(
+                containerWidth: proxy.size.width,
+                horizontalSizeClass: horizontalSizeClass,
+                dynamicTypeSize: dynamicTypeSize
+            )
 
-            VStack(spacing: 0) {
+            ZStack {
+                if onboardingStep == 0 {
+                    WaveBackdrop(isExiting: isExitingWelcome)
+                        .ignoresSafeArea()
+                }
 
-                stepBody
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .padding(.horizontal, 18)
+                VStack(spacing: 0) {
+                    stepBody
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(.horizontal, layout.horizontalPadding)
                     .padding(.top, 18)
-                    .frame(maxWidth: stepMaxWidth)
-                    .frame(maxWidth: .infinity, alignment: .center)
 
-                if onboardingStep != 0 {
-                    bottomNavBar
-                        .padding(.horizontal, 18)
-                        .padding(.vertical, 14)
-                        .frame(maxWidth: stepMaxWidth)
-                        .frame(maxWidth: .infinity, alignment: .center)
+                    if onboardingStep != 0 {
+                        bottomNavBar
+                            .padding(.horizontal, layout.horizontalPadding)
+                            .padding(.vertical, 14)
+                            .frame(maxWidth: .infinity)
+                    }
                 }
             }
         }
@@ -249,7 +242,7 @@ struct OnboardingView: View {
                 Spacer(minLength: 18)
             }
         }
-        .frame(maxWidth: 560, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
     
     // MARK: - Step 2: Workspaces
@@ -262,7 +255,6 @@ struct OnboardingView: View {
             isICloudBootstrapping: isICloudBootstrapping,
             onCreate: createWorkspace(name:hexColor:)
         )
-        .frame(maxWidth: 680)
     }
     
     // MARK: - Step 3: Privacy + Sync + Notifications
@@ -273,7 +265,6 @@ struct OnboardingView: View {
             hasExistingDataInCurrentStore: !workspaces.isEmpty,
             notificationService: notificationService
         )
-        .frame(maxWidth: 680)
     }
     
     // MARK: - Step 4: Categories
@@ -294,7 +285,6 @@ struct OnboardingView: View {
                 }
             }
         }
-        .frame(maxWidth: 760)
     }
     
     // MARK: - Step 5: Cards
@@ -315,7 +305,6 @@ struct OnboardingView: View {
                 }
             }
         }
-        .frame(maxWidth: 760)
     }
     
     // MARK: - Step 6: Presets
@@ -336,14 +325,12 @@ struct OnboardingView: View {
                 }
             }
         }
-        .frame(maxWidth: 760)
     }
 
     // MARK: - Step 7: Quick Actions
 
     private var quickActionsStep: some View {
         QuickActionsInstallView(isOnboarding: true)
-            .frame(maxWidth: 760)
     }
     
     private var iCloudRestorePlaceholder: some View {
@@ -612,76 +599,71 @@ struct OnboardingView: View {
 
 // MARK: - Step: Workspace Setup
 
-	private struct OnboardingWorkspaceStep: View {
-	    
-	    let workspaces: [Workspace]
-	    @Binding var selectedWorkspaceID: String
-        let usesICloud: Bool
-	    let isICloudBootstrapping: Bool
-	    let onCreate: (String, String) -> Void
-    
-    @State private var showingAddWorkspace: Bool = false
-    
-	    var body: some View {
-	        VStack(alignment: .leading, spacing: 14) {
-            
+private struct OnboardingWorkspaceStep: View {
+
+    let workspaces: [Workspace]
+    @Binding var selectedWorkspaceID: String
+    let usesICloud: Bool
+    let isICloudBootstrapping: Bool
+    let onCreate: (String, String) -> Void
+
+    @Environment(\.modelContext) private var modelContext
+
+    @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
+
+    private enum SheetRoute: Identifiable {
+        case add
+        case edit(Workspace)
+
+        var id: String {
+            switch self {
+            case .add:
+                return "add"
+            case .edit(let workspace):
+                return "edit-\(workspace.id.uuidString)"
+            }
+        }
+    }
+
+    @State private var sheetRoute: SheetRoute? = nil
+    @State private var showingWorkspaceDeleteConfirm: Bool = false
+    @State private var pendingWorkspaceDeleteName: String = ""
+    @State private var pendingWorkspaceDelete: (() -> Void)? = nil
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+
             header(
                 title: "Workspaces",
                 subtitle: "A Workspace is where your all of your budgeting data lives. You can create multiple workspaces for different budgeting purposes."
             )
-            
-            if workspaces.isEmpty {
-                if isICloudBootstrapping {
-                    VStack(spacing: 12) {
-                        ContentUnavailableView(
-                            "Restoring from iCloud",
-                            systemImage: "icloud.and.arrow.down",
-                            description: Text("Checking for existing workspaces…")
-                        )
-                        ProgressView()
+
+            List {
+                WorkspaceListRows(
+                    workspaces: workspaces,
+                    selectedWorkspaceID: selectedWorkspaceID,
+                    usesICloud: usesICloud,
+                    isICloudBootstrapping: isICloudBootstrapping,
+                    showsSelectionHint: false,
+                    onSelect: { workspace in
+                        selectedWorkspaceID = workspace.id.uuidString
+                    },
+                    onEdit: { workspace in
+                        sheetRoute = .edit(workspace)
+                    },
+                    onDelete: { workspace in
+                        requestDelete(workspace)
                     }
-                    .padding(.vertical, 10)
-                } else {
-                    ContentUnavailableView(
-                        usesICloud ? "No iCloud Workspaces Found" : "No Workspaces Yet",
-                        systemImage: usesICloud ? "icloud.slash" : "person.fill",
-                        description: Text(usesICloud ? "Nothing was found in iCloud. Create a workspace to continue." : "Create at least one workspace to continue.")
-                    )
-                    .padding(.vertical, 8)
-                }
-            } else {
-                List {
-                    ForEach(workspaces) { ws in
-                        Button {
-                            selectedWorkspaceID = ws.id.uuidString
-                        } label: {
-                            HStack(spacing: 12) {
-                                Circle()
-                                    .fill(Color(hex: ws.hexColor) ?? .secondary)
-                                    .frame(width: 12, height: 12)
-                                
-                                Text(ws.name)
-                                
-                                Spacer(minLength: 0)
-                                
-                                if selectedWorkspaceID == ws.id.uuidString {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .listStyle(.insetGrouped)
-                .scrollContentBackground(.hidden)
-                .background(Color(.systemBackground))
-                .frame(minHeight: 220)
+                )
             }
+            .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .background(Color(.systemBackground))
+            .frame(minHeight: 220)
+
             if #available(iOS 26.0, *) {
                 Button {
-                    showingAddWorkspace = true
+                    sheetRoute = .add
                 } label: {
                     Label("Add Workspace", systemImage: "plus")
                         .frame(maxWidth: .infinity, minHeight: 44)
@@ -690,7 +672,7 @@ struct OnboardingView: View {
                 .tint(.accentColor)
             } else {
                 Button {
-                    showingAddWorkspace = true
+                    sheetRoute = .add
                 } label: {
                     Label("Add Workspace", systemImage: "plus")
                         .frame(maxWidth: .infinity, minHeight: 44)
@@ -698,41 +680,88 @@ struct OnboardingView: View {
                 .buttonStyle(.borderedProminent)
                 .tint(.accentColor)
             }
-            
-	            Text("Tip: Try starting with a workspace called Personal. You can always add more later.")
-	                .font(.footnote)
-	                .foregroundStyle(.secondary)
-	            
-	            Spacer(minLength: 0)
-	        }
-	        .onAppear {
-	            ensureInitialSelection()
-	        }
-	        .onChange(of: workspaces.count) { _, _ in
-	            ensureInitialSelection()
-	        }
-	        .sheet(isPresented: $showingAddWorkspace) {
-	            NavigationStack {
-	                AddWorkspaceView(onCreate: onCreate)
-	            }
-	        }
-	    }
-	    
-	    private func ensureInitialSelection() {
-	        guard selectedWorkspaceID.isEmpty else { return }
-	        selectedWorkspaceID = workspaces.first?.id.uuidString ?? ""
-	    }
-	    
-	    @ViewBuilder
-	    private func header(title: String, subtitle: String) -> some View {
-	        VStack(alignment: .leading, spacing: 6) {
-	            Text(title)
-	                .font(.title2.weight(.bold))
-	            Text(subtitle)
-	                .foregroundStyle(.secondary)
-	        }
-	    }
-	}
+
+            Text("Tip: Try starting with a workspace called Personal. You can always add more later.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+
+            Spacer(minLength: 0)
+        }
+        .onAppear {
+            ensureInitialSelection()
+        }
+        .onChange(of: workspaces.count) { _, _ in
+            ensureInitialSelection()
+        }
+        .sheet(item: $sheetRoute) { route in
+            switch route {
+            case .add:
+                NavigationStack {
+                    AddWorkspaceView(onCreate: onCreate)
+                }
+            case .edit(let workspace):
+                NavigationStack {
+                    EditWorkspaceView(workspace: workspace)
+                }
+            }
+        }
+        .alert("Delete Workspace?", isPresented: $showingWorkspaceDeleteConfirm) {
+            Button("Delete", role: .destructive) {
+                pendingWorkspaceDelete?()
+                pendingWorkspaceDelete = nil
+                pendingWorkspaceDeleteName = ""
+            }
+            Button("Cancel", role: .cancel) {
+                pendingWorkspaceDelete = nil
+                pendingWorkspaceDeleteName = ""
+            }
+        } message: {
+            if pendingWorkspaceDeleteName.isEmpty {
+                Text("This workspace will be deleted.")
+            } else {
+                Text("“\(pendingWorkspaceDeleteName)” will be deleted.")
+            }
+        }
+    }
+
+    private func requestDelete(_ workspace: Workspace) {
+        if confirmBeforeDeleting {
+            pendingWorkspaceDeleteName = workspace.name
+            pendingWorkspaceDelete = {
+                delete(workspace)
+            }
+            showingWorkspaceDeleteConfirm = true
+        } else {
+            delete(workspace)
+        }
+    }
+
+    private func delete(_ workspace: Workspace) {
+        let fallbackWorkspaceID = workspaces.first(where: { $0.id != workspace.id })?.id.uuidString ?? ""
+        let willDeleteSelected = selectedWorkspaceID == workspace.id.uuidString
+
+        modelContext.delete(workspace)
+
+        if willDeleteSelected {
+            selectedWorkspaceID = fallbackWorkspaceID
+        }
+    }
+
+    private func ensureInitialSelection() {
+        guard selectedWorkspaceID.isEmpty else { return }
+        selectedWorkspaceID = workspaces.first?.id.uuidString ?? ""
+    }
+
+    @ViewBuilder
+    private func header(title: String, subtitle: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.title2.weight(.bold))
+            Text(subtitle)
+                .foregroundStyle(.secondary)
+        }
+    }
+}
 
 // MARK: - Step: Privacy + iCloud + Notifications
 
@@ -938,9 +967,28 @@ private struct OnboardingCategoriesStep: View {
     
     let workspace: Workspace
     
+    @Environment(\.modelContext) private var modelContext
+    @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
+
     @Query private var categories: [Category]
     
-    @State private var showingAddCategory: Bool = false
+    private enum SheetRoute: Identifiable {
+        case add
+        case edit(Category)
+
+        var id: String {
+            switch self {
+            case .add:
+                return "add"
+            case .edit(let category):
+                return "edit-\(category.id.uuidString)"
+            }
+        }
+    }
+
+    @State private var sheetRoute: SheetRoute? = nil
+    @State private var showingCategoryDeleteConfirm: Bool = false
+    @State private var pendingCategoryDelete: (() -> Void)? = nil
     
     init(workspace: Workspace) {
         self.workspace = workspace
@@ -960,22 +1008,15 @@ private struct OnboardingCategoriesStep: View {
             )
             
             List {
-                if categories.isEmpty {
-                    ContentUnavailableView(
-                        "No Categories Yet",
-                        systemImage: "tag",
-                        description: Text("Add a few categories to get started. You can add more later.")
-                    )
-                } else {
-                    ForEach(categories) { cat in
-                        HStack(spacing: 12) {
-                            Circle()
-                                .fill(Color(hex: cat.hexColor) ?? .secondary)
-                                .frame(width: 10, height: 10)
-                            Text(cat.name)
-                        }
+                CategoryListRows(
+                    categories: categories,
+                    onEdit: { category in
+                        sheetRoute = .edit(category)
+                    },
+                    onDelete: { category in
+                        deleteCategoryWithOptionalConfirm(category)
                     }
-                }
+                )
             }
             .listStyle(.insetGrouped)
             .scrollContentBackground(.hidden)
@@ -983,7 +1024,7 @@ private struct OnboardingCategoriesStep: View {
             .frame(minHeight: 260)
             if #available(iOS 26.0, *) {
                 Button {
-                    showingAddCategory = true
+                    sheetRoute = .add
                 } label: {
                     Label("Add Category", systemImage: "plus")
                         .frame(maxWidth: .infinity, minHeight: 44)
@@ -992,7 +1033,7 @@ private struct OnboardingCategoriesStep: View {
                 .tint(.accentColor)
             } else {
                 Button {
-                    showingAddCategory = true
+                    sheetRoute = .add
                 } label: {
                     Label("Add Category", systemImage: "plus")
                         .frame(maxWidth: .infinity, minHeight: 44)
@@ -1002,10 +1043,37 @@ private struct OnboardingCategoriesStep: View {
             }
             Spacer(minLength: 0)
         }
-        .sheet(isPresented: $showingAddCategory) {
-            NavigationStack {
-                AddCategoryView(workspace: workspace)
+        .sheet(item: $sheetRoute) { route in
+            switch route {
+            case .add:
+                NavigationStack {
+                    AddCategoryView(workspace: workspace)
+                }
+            case .edit(let category):
+                NavigationStack {
+                    EditCategoryView(workspace: workspace, category: category)
+                }
             }
+        }
+        .alert("Delete?", isPresented: $showingCategoryDeleteConfirm) {
+            Button("Delete", role: .destructive) {
+                pendingCategoryDelete?()
+                pendingCategoryDelete = nil
+            }
+            Button("Cancel", role: .cancel) {
+                pendingCategoryDelete = nil
+            }
+        }
+    }
+
+    private func deleteCategoryWithOptionalConfirm(_ category: Category) {
+        if confirmBeforeDeleting {
+            pendingCategoryDelete = {
+                modelContext.delete(category)
+            }
+            showingCategoryDeleteConfirm = true
+        } else {
+            modelContext.delete(category)
         }
     }
     
@@ -1026,8 +1094,28 @@ private struct OnboardingCardsStep: View {
     
     let workspace: Workspace
     
+    @Environment(\.modelContext) private var modelContext
+    @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
+
     @Query private var cards: [Card]
-    @State private var showingAddCard: Bool = false
+
+    private enum SheetRoute: Identifiable {
+        case add
+        case edit(Card)
+
+        var id: String {
+            switch self {
+            case .add:
+                return "add"
+            case .edit(let card):
+                return "edit-\(card.id.uuidString)"
+            }
+        }
+    }
+
+    @State private var sheetRoute: SheetRoute? = nil
+    @State private var showingCardDeleteConfirm: Bool = false
+    @State private var pendingCardDelete: (() -> Void)? = nil
     
     init(workspace: Workspace) {
         self.workspace = workspace
@@ -1060,6 +1148,23 @@ private struct OnboardingCardsStep: View {
                                 .foregroundStyle(.secondary)
                             Text(card.name)
                         }
+                        .padding(.vertical, 6)
+                        .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                            Button {
+                                sheetRoute = .edit(card)
+                            } label: {
+                                Label("Edit", systemImage: "pencil")
+                            }
+                            .tint(Color("AccentColor"))
+                        }
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            Button(role: .destructive) {
+                                deleteCardWithOptionalConfirm(card)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                            .tint(Color("OffshoreDepth"))
+                        }
                     }
                 }
             }
@@ -1069,7 +1174,7 @@ private struct OnboardingCardsStep: View {
             .frame(minHeight: 260)
             if #available(iOS 26.0, *) {
                 Button {
-                    showingAddCard = true
+                    sheetRoute = .add
                 } label: {
                     Label("Add Card", systemImage: "plus")
                         .frame(maxWidth: .infinity, minHeight: 44)
@@ -1078,7 +1183,7 @@ private struct OnboardingCardsStep: View {
                 .tint(.accentColor)
             } else {
                 Button {
-                    showingAddCard = true
+                    sheetRoute = .add
                 } label: {
                     Label("Add Card", systemImage: "plus")
                         .frame(maxWidth: .infinity, minHeight: 44)
@@ -1089,11 +1194,76 @@ private struct OnboardingCardsStep: View {
             
             Spacer(minLength: 0)
         }
-        .sheet(isPresented: $showingAddCard) {
-            NavigationStack {
-                AddCardView(workspace: workspace)
+        .sheet(item: $sheetRoute) { route in
+            switch route {
+            case .add:
+                NavigationStack {
+                    AddCardView(workspace: workspace)
+                }
+            case .edit(let card):
+                NavigationStack {
+                    EditCardView(workspace: workspace, card: card)
+                }
             }
         }
+        .alert("Delete Card?", isPresented: $showingCardDeleteConfirm) {
+            Button("Delete", role: .destructive) {
+                pendingCardDelete?()
+                pendingCardDelete = nil
+            }
+            Button("Cancel", role: .cancel) {
+                pendingCardDelete = nil
+            }
+        } message: {
+            Text("This deletes the card and all of its expenses.")
+        }
+    }
+
+    private func deleteCardWithOptionalConfirm(_ card: Card) {
+        if confirmBeforeDeleting {
+            pendingCardDelete = {
+                delete(card)
+            }
+            showingCardDeleteConfirm = true
+        } else {
+            delete(card)
+        }
+    }
+
+    private func delete(_ card: Card) {
+        let cardID = card.id
+        let workspaceID = workspace.id
+
+        HomePinnedItemsStore(workspaceID: workspaceID).removePinnedCard(id: cardID)
+        HomePinnedCardsStore(workspaceID: workspaceID).removePinnedCardID(cardID)
+
+        // I prefer being explicit here even though SwiftData delete rules are set to cascade.
+        // This keeps behavior predictable if those rules ever change.
+        if let planned = card.plannedExpenses {
+            for expense in planned {
+                modelContext.delete(expense)
+            }
+        }
+
+        if let variable = card.variableExpenses {
+            for expense in variable {
+                modelContext.delete(expense)
+            }
+        }
+
+        if let incomes = card.incomes {
+            for income in incomes {
+                modelContext.delete(income)
+            }
+        }
+
+        if let links = card.budgetLinks {
+            for link in links {
+                modelContext.delete(link)
+            }
+        }
+
+        modelContext.delete(card)
     }
     
     @ViewBuilder
@@ -1113,8 +1283,29 @@ private struct OnboardingPresetsStep: View {
     
     let workspace: Workspace
     
+    @Environment(\.modelContext) private var modelContext
+    @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
+
     @Query private var presets: [Preset]
-    @State private var showingAddPreset: Bool = false
+    @Query private var presetLinks: [BudgetPresetLink]
+
+    private enum SheetRoute: Identifiable {
+        case add
+        case edit(Preset)
+
+        var id: String {
+            switch self {
+            case .add:
+                return "add"
+            case .edit(let preset):
+                return "edit-\(preset.id.uuidString)"
+            }
+        }
+    }
+
+    @State private var sheetRoute: SheetRoute? = nil
+    @State private var showingPresetDeleteConfirm: Bool = false
+    @State private var pendingPresetDelete: (() -> Void)? = nil
     
     init(workspace: Workspace) {
         self.workspace = workspace
@@ -1123,6 +1314,9 @@ private struct OnboardingPresetsStep: View {
             filter: #Predicate<Preset> { $0.workspace?.id == workspaceID },
             sort: [SortDescriptor(\Preset.title, order: .forward)]
         )
+
+        // Avoid deep relationship chains in the predicate.
+        _presetLinks = Query()
     }
     
     var body: some View {
@@ -1143,13 +1337,34 @@ private struct OnboardingPresetsStep: View {
                 } else {
                     ForEach(presets) { preset in
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(preset.title)
-                                .font(.subheadline.weight(.semibold))
-                            Text(preset.frequency.displayName)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                            PresetRowView(
+                                preset: preset,
+                                assignedBudgetsCount: assignedBudgetCountsByPresetID[preset.id, default: 0]
+                            )
+
+                            if presetIDsMissingLinkedCards.contains(preset.id) {
+                                Text(presetRequiresCardFootnoteText)
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                         .padding(.vertical, 4)
+                        .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                            Button {
+                                sheetRoute = .edit(preset)
+                            } label: {
+                                Label("Edit", systemImage: "pencil")
+                            }
+                            .tint(Color("AccentColor"))
+                        }
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            Button(role: .destructive) {
+                                deletePresetWithOptionalConfirm(preset)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                            .tint(Color("OffshoreDepth"))
+                        }
                     }
                 }
             }
@@ -1159,7 +1374,7 @@ private struct OnboardingPresetsStep: View {
             .frame(minHeight: 260)
             if #available(iOS 26.0, *) {
                 Button {
-                    showingAddPreset = true
+                    sheetRoute = .add
                 } label: {
                     Label("Add Preset", systemImage: "plus")
                         .frame(maxWidth: .infinity, minHeight: 44)
@@ -1168,7 +1383,7 @@ private struct OnboardingPresetsStep: View {
                 .tint(.accentColor)
             } else {
                 Button {
-                    showingAddPreset = true
+                    sheetRoute = .add
                 } label: {
                     Label("Add Preset", systemImage: "plus")
                         .frame(maxWidth: .infinity, minHeight: 44)
@@ -1179,10 +1394,70 @@ private struct OnboardingPresetsStep: View {
             
             Spacer(minLength: 0)
         }
-        .sheet(isPresented: $showingAddPreset) {
-            NavigationStack {
-                AddPresetView(workspace: workspace)
+        .sheet(item: $sheetRoute) { route in
+            switch route {
+            case .add:
+                NavigationStack {
+                    AddPresetView(workspace: workspace)
+                }
+            case .edit(let preset):
+                NavigationStack {
+                    EditPresetView(workspace: workspace, preset: preset)
+                }
             }
+        }
+        .alert("Delete?", isPresented: $showingPresetDeleteConfirm) {
+            Button("Delete", role: .destructive) {
+                pendingPresetDelete?()
+                pendingPresetDelete = nil
+            }
+            Button("Cancel", role: .cancel) {
+                pendingPresetDelete = nil
+            }
+        }
+    }
+
+    private var assignedBudgetCountsByPresetID: [UUID: Int] {
+        var counts: [UUID: Int] = [:]
+
+        for link in presetLinks {
+            guard link.budget?.workspace?.id == workspace.id else { continue }
+            guard let presetID = link.preset?.id else { continue }
+            counts[presetID, default: 0] += 1
+        }
+
+        return counts
+    }
+
+    private var presetIDsMissingLinkedCards: Set<UUID> {
+        var ids = Set<UUID>()
+
+        for link in presetLinks {
+            guard link.budget?.workspace?.id == workspace.id else { continue }
+            guard let presetID = link.preset?.id else { continue }
+
+            let budgetHasCards = ((link.budget?.cardLinks ?? []).isEmpty == false)
+            if !budgetHasCards {
+                ids.insert(presetID)
+            }
+        }
+
+        return ids
+    }
+
+    private var presetRequiresCardFootnoteText: String {
+        let hasAnyCardsInSystem = (workspace.cards ?? []).isEmpty == false
+        return hasAnyCardsInSystem ? "Card Unassigned" : "No Cards Available"
+    }
+
+    private func deletePresetWithOptionalConfirm(_ preset: Preset) {
+        if confirmBeforeDeleting {
+            pendingPresetDelete = {
+                modelContext.delete(preset)
+            }
+            showingPresetDeleteConfirm = true
+        } else {
+            modelContext.delete(preset)
         }
     }
     

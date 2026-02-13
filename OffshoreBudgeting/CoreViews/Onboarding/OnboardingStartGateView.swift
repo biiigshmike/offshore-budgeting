@@ -10,19 +10,29 @@ struct OnboardingStartGateView: View {
 
     @State private var path: [Route] = []
     @State private var showingICloudUnavailable: Bool = false
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     // Drives the “wake up” motion when transitioning away.
     @State private var isExitingWelcome: Bool = false
 
     var body: some View {
         NavigationStack(path: $path) {
-            welcomeScreen
-                .navigationDestination(for: Route.self) { route in
-                    switch route {
-                    case .dataSource:
-                        dataSourceScreen
+            GeometryReader { proxy in
+                let layout = OnboardingLayoutProfile.resolve(
+                    containerWidth: proxy.size.width,
+                    horizontalSizeClass: horizontalSizeClass,
+                    dynamicTypeSize: dynamicTypeSize
+                )
+
+                welcomeScreen(layout: layout)
+                    .navigationDestination(for: Route.self) { route in
+                        switch route {
+                        case .dataSource:
+                            dataSourceScreen
+                        }
                     }
-                }
+            }
         }
         .onAppear {
             if didPressGetStarted, path.isEmpty {
@@ -38,7 +48,7 @@ struct OnboardingStartGateView: View {
 
     // MARK: - Screens
 
-    private var welcomeScreen: some View {
+    private func welcomeScreen(layout: OnboardingLayoutProfile) -> some View {
         ZStack {
             WaveBackdrop(isExiting: isExitingWelcome)
                 .ignoresSafeArea()
@@ -81,9 +91,9 @@ struct OnboardingStartGateView: View {
                     .tint(.accentColor)
                 }
             }
-            .padding(.horizontal, 18)
+            .padding(.horizontal, layout.horizontalPadding)
             .padding(.vertical, 18)
-            .frame(maxWidth: 560, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .navigationBarBackButtonHidden(true)
     }

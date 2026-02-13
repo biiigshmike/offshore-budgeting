@@ -48,47 +48,22 @@ struct ManageCategoriesView: View {
 
     var body: some View {
         List {
-            if categories.isEmpty {
-                ContentUnavailableView(
-                    "No Categories Yet",
-                    systemImage: "tag",
-                    description: Text("Create categories to organize transactions and presets.")
-                )
-            } else {
-                ForEach(categories) { category in
-                    HStack(spacing: 12) {
-                        Circle()
-                            .fill(Color(hex: category.hexColor) ?? .secondary)
-                            .frame(width: 10, height: 10)
-
-                        Text(category.name)
-                    }
-                    .padding(.vertical, 6)
-                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                        Button(role: .destructive) {
-                            if confirmBeforeDeleting {
-                                pendingCategoryDelete = {
-                                    delete(category)
-                                }
-                                showingCategoryDeleteConfirm = true
-                            } else {
-                                delete(category)
-                            }
-                        } label: {
-                            Label("Delete", systemImage: "trash")
+            CategoryListRows(
+                categories: categories,
+                onEdit: { category in
+                    sheetRoute = .edit(category)
+                },
+                onDelete: { category in
+                    if confirmBeforeDeleting {
+                        pendingCategoryDelete = {
+                            delete(category)
                         }
-                        .tint(Color("OffshoreDepth"))
-                    }
-                    .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                        Button {
-                            sheetRoute = .edit(category)
-                        } label: {
-                            Label("Edit", systemImage: "pencil")
-                        }
-                        .tint(Color("AccentColor"))
+                        showingCategoryDeleteConfirm = true
+                    } else {
+                        delete(category)
                     }
                 }
-            }
+            )
         }
         .postBoardingTip(
             key: "tip.categories.v1",
