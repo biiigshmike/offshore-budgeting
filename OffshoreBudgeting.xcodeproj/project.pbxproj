@@ -7,10 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		A1B2C3D42F40000100550011 /* OffshoreHelp.help in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D52F40000100550011 /* OffshoreHelp.help */; };
 		4CAD3C3F2F28AF7D001E3F5B /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4CAD3C3E2F28AF7C001E3F5B /* WidgetKit.framework */; };
 		4CAD3C412F28AF7D001E3F5B /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4CAD3C402F28AF7D001E3F5B /* SwiftUI.framework */; };
 		4CAD3C522F28AF7F001E3F5B /* OffshoreBudgetingWidgetsExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 4CAD3C3C2F28AF7C001E3F5B /* OffshoreBudgetingWidgetsExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		A1B2C3D42F40000100550011 /* OffshoreHelp.help in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D52F40000100550011 /* OffshoreHelp.help */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -52,7 +52,6 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		A1B2C3D52F40000100550011 /* OffshoreHelp.help */ = {isa = PBXFileReference; lastKnownFileType = folder; name = OffshoreHelp.help; path = OffshoreHelp.help; sourceTree = "<group>"; };
 		4C198A392F298962005D2D0D /* OffshoreBudgetingWidgetsExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = OffshoreBudgetingWidgetsExtension.entitlements; sourceTree = "<group>"; };
 		4C8C82152F247DA50024DBD0 /* OffshoreBudgeting.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = OffshoreBudgeting.xctestplan; sourceTree = "<group>"; };
 		4C96F8512F20523700541774 /* Offshore.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Offshore.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -61,6 +60,7 @@
 		4CAD3C3C2F28AF7C001E3F5B /* OffshoreBudgetingWidgetsExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = OffshoreBudgetingWidgetsExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		4CAD3C3E2F28AF7C001E3F5B /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		4CAD3C402F28AF7D001E3F5B /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		A1B2C3D52F40000100550011 /* OffshoreHelp.help */ = {isa = PBXFileReference; lastKnownFileType = folder; path = OffshoreHelp.help; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */

@@ -46,24 +46,6 @@ struct OffshoreAppShortcuts: AppShortcutsProvider {
             systemImageName: "list.bullet.clipboard"
         )
         AppShortcut(
-            intent: ImportFromClipboardIntent(),
-            phrases: [
-                "Import from clipboard in \(.applicationName)",
-                "Parse clipboard transactions in \(.applicationName)"
-            ],
-            shortTitle: "Import Clipboard",
-            systemImageName: "doc.on.clipboard"
-        )
-        AppShortcut(
-            intent: ImportScreenshotIntent(),
-            phrases: [
-                "Import screenshot in \(.applicationName)",
-                "Parse screenshot transactions in \(.applicationName)"
-            ],
-            shortTitle: "Import Screenshot",
-            systemImageName: "photo.on.rectangle"
-        )
-        AppShortcut(
             intent: WhatCanISpendTodayIntent(),
             phrases: [
                 "What can I spend today in \(.applicationName)",
