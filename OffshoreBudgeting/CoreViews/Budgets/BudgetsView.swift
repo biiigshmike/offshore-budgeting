@@ -15,6 +15,8 @@ struct BudgetsView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.appCommandHub) private var commandHub
 
+    @AppStorage("sort.budgets.mode") private var sortModeRaw: String = BudgetsListSortMode.dateDesc.rawValue
+
     @Query private var budgets: [Budget]
 
     // MARK: - UI State
@@ -71,21 +73,15 @@ struct BudgetsView: View {
     }
 
     private var upcomingBudgets: [Budget] {
-        filteredBudgets
-            .filter { isUpcoming($0) }
-            .sorted { $0.startDate < $1.startDate } // soonest first
+        sortBudgets(filteredBudgets.filter { isUpcoming($0) })
     }
 
     private var activeBudgets: [Budget] {
-        filteredBudgets
-            .filter { isActive($0) }
-            .sorted { $0.startDate > $1.startDate } // most recent first
+        sortBudgets(filteredBudgets.filter { isActive($0) })
     }
 
     private var pastBudgets: [Budget] {
-        filteredBudgets
-            .filter { isPast($0) }
-            .sorted { $0.startDate > $1.startDate } // most recent first
+        sortBudgets(filteredBudgets.filter { isPast($0) })
     }
 
     // MARK: - View
@@ -183,13 +179,24 @@ struct BudgetsView: View {
         )
         .searchFocused($searchFocused)
         .toolbar {
-            ToolbarItemGroup(placement: .topBarTrailing) {
-                Button {
-                    showingAddBudget = true
-                } label: {
-                    Image(systemName: "plus")
+            if #available(iOS 26.0, macCatalyst 26.0, *) {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    sortToolbarButton
                 }
-                .accessibilityLabel("Add Budget")
+
+                ToolbarSpacer(.flexible, placement: .primaryAction)
+
+                ToolbarItemGroup(placement: .primaryAction) {
+                    addToolbarButton
+                }
+            } else {
+                ToolbarItem(placement: .topBarTrailing) {
+                    addToolbarButton
+                }
+
+                ToolbarItem(placement: .primaryAction) {
+                    sortToolbarButton
+                }
             }
         }
         .sheet(isPresented: $showingAddBudget) {
@@ -209,6 +216,78 @@ struct BudgetsView: View {
         }
     }
 
+    private var sortMode: BudgetsListSortMode {
+        BudgetsListSortMode(rawValue: sortModeRaw) ?? .dateDesc
+    }
+
+    private func setSortMode(_ mode: BudgetsListSortMode) {
+        sortModeRaw = mode.rawValue
+    }
+
+    @ViewBuilder
+    private var addToolbarButton: some View {
+        Button {
+            showingAddBudget = true
+        } label: {
+            Image(systemName: "plus")
+        }
+        .accessibilityLabel("Add Budget")
+    }
+
+    @ViewBuilder
+    private var sortToolbarButton: some View {
+        Menu {
+            sortMenuButton(title: "A-Z", mode: .az)
+            sortMenuButton(title: "Z-A", mode: .za)
+            sortMenuButton(title: "Date ↑", mode: .dateAsc)
+            sortMenuButton(title: "Date ↓", mode: .dateDesc)
+        } label: {
+            Image(systemName: "arrow.up.arrow.down")
+        }
+        .accessibilityLabel("Sort")
+    }
+
+    private func sortMenuButton(title: String, mode: BudgetsListSortMode) -> some View {
+        Button {
+            setSortMode(mode)
+        } label: {
+            HStack {
+                Text(title)
+                if sortMode == mode {
+                    Spacer()
+                    Image(systemName: "checkmark")
+                }
+            }
+        }
+    }
+
+    private func sortBudgets(_ source: [Budget]) -> [Budget] {
+        switch sortMode {
+        case .az:
+            return source.sorted { lhs, rhs in
+                lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+            }
+        case .za:
+            return source.sorted { lhs, rhs in
+                lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedDescending
+            }
+        case .dateAsc:
+            return source.sorted { lhs, rhs in
+                if lhs.startDate == rhs.startDate {
+                    return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+                }
+                return lhs.startDate < rhs.startDate
+            }
+        case .dateDesc:
+            return source.sorted { lhs, rhs in
+                if lhs.startDate == rhs.startDate {
+                    return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+                }
+                return lhs.startDate > rhs.startDate
+            }
+        }
+    }
+
     private func localizedInt(_ value: Int) -> String {
         AppNumberFormat.integer(value)
     }
@@ -220,6 +299,20 @@ struct BudgetsView: View {
     private func handleCommand(_ commandID: String) {
         if commandID == AppCommandID.Budgets.newBudget {
             openNewBudget()
+            return
+        }
+
+        switch commandID {
+        case AppCommandID.Budgets.sortAZ:
+            setSortMode(.az)
+        case AppCommandID.Budgets.sortZA:
+            setSortMode(.za)
+        case AppCommandID.Budgets.sortDateAsc:
+            setSortMode(.dateAsc)
+        case AppCommandID.Budgets.sortDateDesc:
+            setSortMode(.dateDesc)
+        default:
+            break
         }
     }
 
@@ -249,6 +342,13 @@ struct BudgetsView: View {
         formatter.timeStyle = .none
         return formatter.string(from: start, to: end)
     }
+}
+
+private enum BudgetsListSortMode: String {
+    case az
+    case za
+    case dateAsc
+    case dateDesc
 }
 
 private struct BucketDisclosureRow: View {

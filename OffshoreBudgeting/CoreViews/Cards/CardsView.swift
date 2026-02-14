@@ -14,6 +14,8 @@ struct CardsView: View {
     @Environment(\.appCommandHub) private var commandHub
 
     @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
+    @AppStorage("sort.cards.mode") private var cardsSortModeRaw: String = CardsSortMode.az.rawValue
+    @AppStorage("sort.sharedBalances.mode") private var sharedBalancesSortModeRaw: String = SharedBalancesSortMode.az.rawValue
     @AppStorage(AppShortcutNavigationStore.pendingActionKey) private var pendingShortcutActionRaw: String = ""
     @AppStorage(AppShortcutNavigationStore.pendingImportClipboardTextKey) private var pendingImportClipboardText: String = ""
     @AppStorage(AppShortcutNavigationStore.pendingImportCardIDKey) private var pendingImportCardID: String = ""
@@ -69,6 +71,66 @@ struct CardsView: View {
         selectedSegment == .cards ? "Cards" : "Shared Balances"
     }
 
+    private var cardsSortMode: CardsSortMode {
+        CardsSortMode(rawValue: cardsSortModeRaw) ?? .az
+    }
+
+    private var sharedBalancesSortMode: SharedBalancesSortMode {
+        SharedBalancesSortMode(rawValue: sharedBalancesSortModeRaw) ?? .az
+    }
+
+    private func setCardsSortMode(_ mode: CardsSortMode) {
+        cardsSortModeRaw = mode.rawValue
+    }
+
+    private func setSharedBalancesSortMode(_ mode: SharedBalancesSortMode) {
+        sharedBalancesSortModeRaw = mode.rawValue
+    }
+
+    private var sortedCards: [Card] {
+        switch cardsSortMode {
+        case .az:
+            return cards.sorted { lhs, rhs in
+                lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+            }
+        case .za:
+            return cards.sorted { lhs, rhs in
+                lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedDescending
+            }
+        }
+    }
+
+    private var sortedAllocationAccounts: [AllocationAccount] {
+        switch sharedBalancesSortMode {
+        case .az:
+            return allocationAccounts.sorted { lhs, rhs in
+                lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+            }
+        case .za:
+            return allocationAccounts.sorted { lhs, rhs in
+                lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedDescending
+            }
+        case .amountAsc:
+            return allocationAccounts.sorted { lhs, rhs in
+                let left = AllocationLedgerService.balance(for: lhs)
+                let right = AllocationLedgerService.balance(for: rhs)
+                if left == right {
+                    return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+                }
+                return left < right
+            }
+        case .amountDesc:
+            return allocationAccounts.sorted { lhs, rhs in
+                let left = AllocationLedgerService.balance(for: lhs)
+                let right = AllocationLedgerService.balance(for: rhs)
+                if left == right {
+                    return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+                }
+                return left > right
+            }
+        }
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
@@ -90,7 +152,7 @@ struct CardsView: View {
                             .frame(maxWidth: .infinity)
                         } else {
                             LazyVGrid(columns: columns, spacing: 16) {
-                                ForEach(cards) { card in
+                                ForEach(sortedCards) { card in
                                     NavigationLink {
                                         CardDetailView(workspace: workspace, card: card)
                                     } label: {
@@ -137,7 +199,7 @@ struct CardsView: View {
                             .frame(maxWidth: .infinity)
                         } else {
                             LazyVGrid(columns: columns, spacing: 16) {
-                                ForEach(allocationAccounts) { account in
+                                ForEach(sortedAllocationAccounts) { account in
                                     NavigationLink {
                                         AllocationAccountDetailView(workspace: workspace, account: account)
                                     } label: {
@@ -191,12 +253,25 @@ struct CardsView: View {
         )
         .navigationTitle(navigationTitleText)
         .toolbar {
-            Button {
-                handleAddAction()
-            } label: {
-                Image(systemName: "plus")
+            if #available(iOS 26.0, macCatalyst 26.0, *) {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    sortToolbarButton
+                }
+
+                ToolbarSpacer(.flexible, placement: .primaryAction)
+
+                ToolbarItemGroup(placement: .primaryAction) {
+                    addToolbarButton
+                }
+            } else {
+                ToolbarItem(placement: .topBarTrailing) {
+                    addToolbarButton
+                }
+
+                ToolbarItem(placement: .primaryAction) {
+                    sortToolbarButton
+                }
             }
-            .accessibilityLabel(selectedSegment == .cards ? "Add Card" : "Add Shared Balance")
         }
         .alert("Delete Card?", isPresented: $showingCardDeleteConfirm) {
             Button("Delete", role: .destructive) {
@@ -293,9 +368,13 @@ struct CardsView: View {
         .onAppear {
             consumePendingShortcutActionIfNeeded()
             commandHub.activate(.cards)
+            updateCardsSortCommandContext()
         }
         .onDisappear {
             commandHub.deactivate(.cards)
+        }
+        .onChange(of: selectedSegment) { _, _ in
+            updateCardsSortCommandContext()
         }
         .onChange(of: pendingShortcutActionRaw) { _, _ in
             consumePendingShortcutActionIfNeeded()
@@ -303,6 +382,62 @@ struct CardsView: View {
         .onReceive(commandHub.$sequence) { _ in
             guard commandHub.surface == .cards else { return }
             handleCommand(commandHub.latestCommandID)
+        }
+    }
+
+    @ViewBuilder
+    private var addToolbarButton: some View {
+        Button {
+            handleAddAction()
+        } label: {
+            Image(systemName: "plus")
+        }
+        .accessibilityLabel(selectedSegment == .cards ? "Add Card" : "Add Shared Balance")
+    }
+
+    @ViewBuilder
+    private var sortToolbarButton: some View {
+        Menu {
+            if selectedSegment == .cards {
+                cardsSortMenuButton(title: "A-Z", mode: .az)
+                cardsSortMenuButton(title: "Z-A", mode: .za)
+            } else {
+                sharedBalancesSortMenuButton(title: "A-Z", mode: .az)
+                sharedBalancesSortMenuButton(title: "Z-A", mode: .za)
+                sharedBalancesSortMenuButton(title: "$ ↑", mode: .amountAsc)
+                sharedBalancesSortMenuButton(title: "$ ↓", mode: .amountDesc)
+            }
+        } label: {
+            Image(systemName: "arrow.up.arrow.down")
+        }
+        .accessibilityLabel("Sort")
+    }
+
+    private func cardsSortMenuButton(title: String, mode: CardsSortMode) -> some View {
+        Button {
+            setCardsSortMode(mode)
+        } label: {
+            HStack {
+                Text(title)
+                if cardsSortMode == mode {
+                    Spacer()
+                    Image(systemName: "checkmark")
+                }
+            }
+        }
+    }
+
+    private func sharedBalancesSortMenuButton(title: String, mode: SharedBalancesSortMode) -> some View {
+        Button {
+            setSharedBalancesSortMode(mode)
+        } label: {
+            HStack {
+                Text(title)
+                if sharedBalancesSortMode == mode {
+                    Spacer()
+                    Image(systemName: "checkmark")
+                }
+            }
         }
     }
 
@@ -429,9 +564,32 @@ struct CardsView: View {
         account.archivedAt = .now
     }
 
+    private func updateCardsSortCommandContext() {
+        let context: AppCardsSortCommandContext = selectedSegment == .cards ? .cards : .sharedBalances
+        commandHub.setCardsSortContext(context)
+    }
+
     private func handleCommand(_ commandID: String) {
         if commandID == AppCommandID.Cards.newCard {
             openNewCard()
+            return
+        }
+
+        switch commandID {
+        case AppCommandID.Cards.sortAZ:
+            setCardsSortMode(.az)
+        case AppCommandID.Cards.sortZA:
+            setCardsSortMode(.za)
+        case AppCommandID.SharedBalances.sortAZ:
+            setSharedBalancesSortMode(.az)
+        case AppCommandID.SharedBalances.sortZA:
+            setSharedBalancesSortMode(.za)
+        case AppCommandID.SharedBalances.sortAmountAsc:
+            setSharedBalancesSortMode(.amountAsc)
+        case AppCommandID.SharedBalances.sortAmountDesc:
+            setSharedBalancesSortMode(.amountDesc)
+        default:
+            break
         }
     }
 }
@@ -441,6 +599,18 @@ private enum CardsSegment: String, CaseIterable, Identifiable {
     case sharedBalances
 
     var id: String { rawValue }
+}
+
+private enum CardsSortMode: String {
+    case az
+    case za
+}
+
+private enum SharedBalancesSortMode: String {
+    case az
+    case za
+    case amountAsc
+    case amountDesc
 }
 
 private struct AllocationAccountTileView: View {

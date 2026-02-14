@@ -14,8 +14,10 @@ struct ManagePresetsView: View {
     let highlightedPresetID: UUID?
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.appCommandHub) private var commandHub
 
     @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
+    @AppStorage("sort.presets.mode") private var sortModeRaw: String = PresetSortMode.az.rawValue
 
     @Query private var presets: [Preset]
 
@@ -95,11 +97,11 @@ struct ManagePresetsView: View {
     // MARK: - Active vs archived
 
     private var activePresets: [Preset] {
-        presets.filter { $0.isArchived == false }
+        sortedPresets(presets.filter { $0.isArchived == false })
     }
 
     private var archivedPresets: [Preset] {
-        presets.filter { $0.isArchived }
+        sortedPresets(presets.filter { $0.isArchived })
     }
 
     private var highlightedPreset: Preset? {
@@ -283,13 +285,24 @@ struct ManagePresetsView: View {
         )
         .navigationTitle("Presets")
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    sheetRoute = .add
-                } label: {
-                    Image(systemName: "plus")
+            if #available(iOS 26.0, macCatalyst 26.0, *) {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    sortToolbarButton
                 }
-                .accessibilityLabel("Add Preset")
+
+                ToolbarSpacer(.flexible, placement: .primaryAction)
+
+                ToolbarItemGroup(placement: .primaryAction) {
+                    addToolbarButton
+                }
+            } else {
+                ToolbarItem(placement: .topBarTrailing) {
+                    addToolbarButton
+                }
+
+                ToolbarItem(placement: .primaryAction) {
+                    sortToolbarButton
+                }
             }
         }
         .sheet(item: $sheetRoute) { route in
@@ -313,9 +326,164 @@ struct ManagePresetsView: View {
                 pendingPresetDelete = nil
             }
         }
+        .onAppear {
+            commandHub.activate(.presets)
+        }
+        .onDisappear {
+            commandHub.deactivate(.presets)
+        }
+        .onReceive(commandHub.$sequence) { _ in
+            guard commandHub.surface == .presets else { return }
+            handleCommand(commandHub.latestCommandID)
+        }
     }
 
     // MARK: - Actions
+
+    private var sortMode: PresetSortMode {
+        PresetSortMode(rawValue: sortModeRaw) ?? .az
+    }
+
+    private func setSortMode(_ mode: PresetSortMode) {
+        sortModeRaw = mode.rawValue
+    }
+
+    @ViewBuilder
+    private var addToolbarButton: some View {
+        Button {
+            sheetRoute = .add
+        } label: {
+            Image(systemName: "plus")
+        }
+        .accessibilityLabel("Add Preset")
+    }
+
+    @ViewBuilder
+    private var sortToolbarButton: some View {
+        Menu {
+            sortMenuButton(title: "A-Z", mode: .az)
+            sortMenuButton(title: "Z-A", mode: .za)
+            sortMenuButton(title: "Date ↑", mode: .dateAsc)
+            sortMenuButton(title: "Date ↓", mode: .dateDesc)
+            sortMenuButton(title: "$ ↑", mode: .amountAsc)
+            sortMenuButton(title: "$ ↓", mode: .amountDesc)
+        } label: {
+            Image(systemName: "arrow.up.arrow.down")
+        }
+        .accessibilityLabel("Sort")
+    }
+
+    private func sortMenuButton(title: String, mode: PresetSortMode) -> some View {
+        Button {
+            setSortMode(mode)
+        } label: {
+            HStack {
+                Text(title)
+                if sortMode == mode {
+                    Spacer()
+                    Image(systemName: "checkmark")
+                }
+            }
+        }
+    }
+
+    private func sortedPresets(_ source: [Preset]) -> [Preset] {
+        let now = Calendar.current.startOfDay(for: Date())
+        let nextDatesByID: [UUID: Date?] = Dictionary(
+            uniqueKeysWithValues: source.map { preset in
+                (preset.id, nextOccurrenceDate(for: preset, from: now))
+            }
+        )
+
+        switch sortMode {
+        case .az:
+            return source.sorted { lhs, rhs in
+                lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
+            }
+        case .za:
+            return source.sorted { lhs, rhs in
+                lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedDescending
+            }
+        case .amountAsc:
+            return source.sorted { lhs, rhs in
+                if lhs.plannedAmount == rhs.plannedAmount {
+                    return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
+                }
+                return lhs.plannedAmount < rhs.plannedAmount
+            }
+        case .amountDesc:
+            return source.sorted { lhs, rhs in
+                if lhs.plannedAmount == rhs.plannedAmount {
+                    return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
+                }
+                return lhs.plannedAmount > rhs.plannedAmount
+            }
+        case .dateAsc:
+            return source.sorted { lhs, rhs in
+                comparePresetDate(lhs: lhs, rhs: rhs, ascending: true, nextDatesByID: nextDatesByID)
+            }
+        case .dateDesc:
+            return source.sorted { lhs, rhs in
+                comparePresetDate(lhs: lhs, rhs: rhs, ascending: false, nextDatesByID: nextDatesByID)
+            }
+        }
+    }
+
+    private func comparePresetDate(
+        lhs: Preset,
+        rhs: Preset,
+        ascending: Bool,
+        nextDatesByID: [UUID: Date?]
+    ) -> Bool {
+        let lhsDate = nextDatesByID[lhs.id] ?? nil
+        let rhsDate = nextDatesByID[rhs.id] ?? nil
+
+        switch (lhsDate, rhsDate) {
+        case let (left?, right?):
+            if left == right {
+                return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
+            }
+            return ascending ? (left < right) : (left > right)
+        case (.some, .none):
+            return true
+        case (.none, .some):
+            return false
+        case (.none, .none):
+            return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
+        }
+    }
+
+    private func nextOccurrenceDate(for preset: Preset, from date: Date) -> Date? {
+        guard preset.frequency != .none else { return nil }
+
+        let calendar = Calendar.current
+        let start = calendar.startOfDay(for: date)
+        guard let horizon = calendar.date(byAdding: .year, value: 10, to: start) else { return nil }
+
+        let probe = Budget(name: "Sort Probe", startDate: start, endDate: horizon)
+        return PresetScheduleEngine
+            .occurrences(for: preset, in: probe, calendar: calendar)
+            .first(where: { $0 >= start })
+    }
+
+    private func handleCommand(_ commandID: String) {
+        switch commandID {
+        case AppCommandID.Presets.sortAZ:
+            setSortMode(.az)
+        case AppCommandID.Presets.sortZA:
+            setSortMode(.za)
+        case AppCommandID.Presets.sortDateAsc:
+            setSortMode(.dateAsc)
+        case AppCommandID.Presets.sortDateDesc:
+            setSortMode(.dateDesc)
+        case AppCommandID.Presets.sortAmountAsc:
+            setSortMode(.amountAsc)
+        case AppCommandID.Presets.sortAmountDesc:
+            setSortMode(.amountDesc)
+        default:
+            break
+        }
+    }
 
     private func archive(_ preset: Preset) {
         preset.isArchived = true
@@ -366,6 +534,15 @@ struct ManagePresetsView: View {
         let theme = CardThemeOption(rawValue: raw) ?? .charcoal
         return CardThemePalette.colors(for: theme)
     }
+}
+
+private enum PresetSortMode: String {
+    case az
+    case za
+    case dateAsc
+    case dateDesc
+    case amountAsc
+    case amountDesc
 }
 
 #Preview("Manage Presets") {

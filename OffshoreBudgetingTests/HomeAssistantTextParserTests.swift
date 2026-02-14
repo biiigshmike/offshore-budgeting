@@ -548,6 +548,9 @@ struct HomeAssistantTextParserTests {
     @Test func commandParser_deleteCardPrompt_flaggedAsCardCrud() throws {
         let parser = makeCommandParser()
         #expect(parser.isCardCrudPrompt("delete my card Apple Card") == true)
+        let command = parser.parse("delete my card Apple Card")
+        #expect(command?.intent == .deleteCard)
+        #expect(command?.entityName == "Apple Card")
     }
 
     @Test func commandParser_addCardPrompt_extractsCardIntentAndName() throws {
@@ -556,10 +559,46 @@ struct HomeAssistantTextParserTests {
         #expect(command?.entityName == "Apple Card")
     }
 
+    @Test func commandParser_addCardPrompt_withThemeAndEffect_stopsNameBeforeStyleTokens() throws {
+        let command = makeCommandParser().parse("Create card named New Account theme sunset effect glass")
+        #expect(command?.intent == .addCard)
+        #expect(command?.entityName == "New Account")
+        #expect(command?.cardThemeRaw == "sunset")
+        #expect(command?.cardEffectRaw == "glass")
+    }
+
+    @Test func commandParser_addCardPrompt_withQuotedName_preservesStyleWordsInsideName() throws {
+        let command = makeCommandParser().parse("create card named \"Sunset Glass\" theme ruby effect metal")
+        #expect(command?.intent == .addCard)
+        #expect(command?.entityName == "Sunset Glass")
+        #expect(command?.cardThemeRaw == "ruby")
+        #expect(command?.cardEffectRaw == "metal")
+    }
+
+    @Test func commandParser_editCardPrompt_extractsCardIntentAndStyle() throws {
+        let command = makeCommandParser().parse("edit card named New Account theme aqua")
+        #expect(command?.intent == .editCard)
+        #expect(command?.entityName == "New Account")
+        #expect(command?.cardThemeRaw == "aqua")
+    }
+
+    @Test func commandParser_deleteCardPrompt_extractsDeleteIntent() throws {
+        let command = makeCommandParser().parse("remove card named New Account")
+        #expect(command?.intent == .deleteCard)
+        #expect(command?.entityName == "New Account")
+    }
+
     @Test func commandParser_addCategoryPrompt_extractsCategoryIntentAndName() throws {
         let command = makeCommandParser().parse("add category groceries")
         #expect(command?.intent == .addCategory)
         #expect(command?.entityName == "groceries")
+    }
+
+    @Test func commandParser_addCategoryPrompt_withColor_stopsNameBeforeColor() throws {
+        let command = makeCommandParser().parse("add category named Dining color green")
+        #expect(command?.intent == .addCategory)
+        #expect(command?.entityName == "Dining")
+        #expect(command?.categoryColorHex == "#22C55E")
     }
 
     @Test func commandParser_addPresetPrompt_extractsPresetIntentAmount() throws {
@@ -573,6 +612,34 @@ struct HomeAssistantTextParserTests {
         let command = makeCommandParser().parse("create preset rent 1500 on Apple Card")
         #expect(command?.intent == .addPreset)
         #expect(command?.cardName != nil)
+    }
+
+    @Test func commandParser_addPresetPrompt_withWeeklySchedule_extractsRecurrenceFields() throws {
+        let command = makeCommandParser().parse("create preset rent 1500 weekly on friday on Apple Card")
+        #expect(command?.intent == .addPreset)
+        #expect(command?.recurrenceFrequencyRaw == RecurrenceFrequency.weekly.rawValue)
+        #expect(command?.weeklyWeekday == 6)
+    }
+
+    @Test func commandParser_addPresetPrompt_withIntervalSchedule_extractsIntervalAndFrequency() throws {
+        let command = makeCommandParser().parse("create preset gym 45 every 2 weeks on Apple Card")
+        #expect(command?.intent == .addPreset)
+        #expect(command?.recurrenceFrequencyRaw == RecurrenceFrequency.weekly.rawValue)
+        #expect(command?.recurrenceInterval == 2)
+    }
+
+    @Test func commandParser_addPresetPrompt_withBiweeklySchedule_extractsIntervalAndFrequency() throws {
+        let command = makeCommandParser().parse("create preset daycare 400 biweekly on Apple Card")
+        #expect(command?.intent == .addPreset)
+        #expect(command?.recurrenceFrequencyRaw == RecurrenceFrequency.weekly.rawValue)
+        #expect(command?.recurrenceInterval == 2)
+    }
+
+    @Test func commandParser_addPresetPrompt_withEveryOtherWeekSchedule_extractsIntervalAndFrequency() throws {
+        let command = makeCommandParser().parse("create preset tutoring 120 every other week on Apple Card")
+        #expect(command?.intent == .addPreset)
+        #expect(command?.recurrenceFrequencyRaw == RecurrenceFrequency.weekly.rawValue)
+        #expect(command?.recurrenceInterval == 2)
     }
 
     @Test func commandParser_addBudgetPrompt_extractsBudgetIntent() throws {
@@ -603,6 +670,39 @@ struct HomeAssistantTextParserTests {
         let command = makeCommandParser().parse("Add income work $1250")
         #expect(command?.intent == .addIncome)
         #expect(command?.source == "work")
+        #expect(command?.amount == 1250)
+    }
+
+    @Test func commandParser_addIncomePrompt_fromPhrase_withPlannedAndDate_stopsSourceBeforeAttributes() throws {
+        let command = makeCommandParser().parse("create income from paycheck planned on 2/1/2026 $1250")
+        #expect(command?.intent == .addIncome)
+        #expect(command?.source == "paycheck")
+        #expect(command?.isPlannedIncome == true)
+        #expect(command?.date == date(2026, 2, 1, 0, 0, 0))
+        #expect(command?.amount == 1250)
+    }
+
+    @Test func commandParser_addIncomePrompt_withQuotedSource_preservesKeywordWords() throws {
+        let command = makeCommandParser().parse("create income from \"Planned Growth Fund\" actual $900")
+        #expect(command?.intent == .addIncome)
+        #expect(command?.source == "Planned Growth Fund")
+        #expect(command?.isPlannedIncome == false)
+        #expect(command?.amount == 900)
+    }
+
+    @Test func commandParser_addIncomePrompt_forPhrase_stopsSourceBeforeDate() throws {
+        let command = makeCommandParser().parse("log income $700 for Side Hustle on 2026-02-01")
+        #expect(command?.intent == .addIncome)
+        #expect(command?.source == "Side Hustle")
+        #expect(command?.date == date(2026, 2, 1, 0, 0, 0))
+        #expect(command?.amount == 700)
+    }
+
+    @Test func commandParser_addIncomePrompt_fallbackPath_stopsSourceBeforeAttributes() throws {
+        let command = makeCommandParser().parse("add income side gig planned 1250")
+        #expect(command?.intent == .addIncome)
+        #expect(command?.source == "side gig")
+        #expect(command?.isPlannedIncome == true)
         #expect(command?.amount == 1250)
     }
 

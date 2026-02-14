@@ -174,13 +174,17 @@ struct HomeAssistantPanelView: View {
     @State private var pendingExpenseCardPlan: HomeAssistantCommandPlan? = nil
     @State private var pendingExpenseCardOptions: [Card] = []
     @State private var pendingPresetCardPlan: HomeAssistantCommandPlan? = nil
+    @State private var pendingPresetRecurrencePlan: HomeAssistantCommandPlan? = nil
     @State private var pendingIncomeKindPlan: HomeAssistantCommandPlan? = nil
     @State private var pendingExpenseDisambiguationPlan: HomeAssistantCommandPlan? = nil
     @State private var pendingIncomeDisambiguationPlan: HomeAssistantCommandPlan? = nil
+    @State private var pendingCardDisambiguationPlan: HomeAssistantCommandPlan? = nil
     @State private var pendingExpenseCandidates: [VariableExpense] = []
     @State private var pendingIncomeCandidates: [Income] = []
+    @State private var pendingCardCandidates: [Card] = []
     @State private var pendingDeleteExpense: VariableExpense? = nil
     @State private var pendingDeleteIncome: Income? = nil
+    @State private var pendingDeleteCard: Card? = nil
     @State private var pendingBudgetCreationPlan: HomeAssistantCommandPlan? = nil
     @State private var pendingBudgetCreationStep: HomeAssistantBudgetCreationStep? = nil
     @State private var pendingBudgetSelectedCardIDs: Set<UUID> = []
@@ -954,15 +958,6 @@ struct HomeAssistantPanelView: View {
             return
         }
 
-        if commandParser.isCardCrudPrompt(prompt) {
-            appendMutationMessage(
-                title: "Card CRUD is not in this phase",
-                subtitle: "For now, I can perform expense and income CRUD from Home. Card edits/deletes still run through Cards.",
-                rows: []
-            )
-            return
-        }
-
         if let command = commandParser.parse(prompt, defaultPeriodUnit: defaultQueryPeriodUnit) {
             handleCommandPlan(command, rawPrompt: prompt)
             return
@@ -1053,6 +1048,10 @@ struct HomeAssistantPanelView: View {
             handleAddBudgetCommand(command)
         case .addCard:
             handleAddCardCommand(command)
+        case .editCard:
+            handleEditCardCommand(command)
+        case .deleteCard:
+            handleDeleteCardCommand(command)
         case .addPreset:
             handleAddPresetCommand(command)
         case .addCategory:
@@ -1102,8 +1101,13 @@ struct HomeAssistantPanelView: View {
             return true
         }
 
-        if pendingDeleteExpense != nil || pendingDeleteIncome != nil {
+        if pendingDeleteExpense != nil || pendingDeleteIncome != nil || pendingDeleteCard != nil {
             resolveDeleteConfirmation(with: prompt)
+            return true
+        }
+
+        if pendingCardCandidates.isEmpty == false {
+            resolveCardDisambiguation(with: prompt)
             return true
         }
 
@@ -1124,6 +1128,11 @@ struct HomeAssistantPanelView: View {
 
         if pendingExpenseCardPlan != nil {
             resolveExpenseCardSelection(with: prompt)
+            return true
+        }
+
+        if pendingPresetRecurrencePlan != nil {
+            resolvePresetRecurrenceSelection(with: prompt)
             return true
         }
 
@@ -1294,6 +1303,12 @@ struct HomeAssistantPanelView: View {
             return
         }
 
+        if command.recurrenceFrequencyRaw == nil {
+            pendingPresetRecurrencePlan = command
+            presentPresetRecurrencePrompt()
+            return
+        }
+
         if let cardName = command.cardName,
            resolveCard(from: cardName) != nil {
             executeAddPreset(command)
@@ -1349,6 +1364,57 @@ struct HomeAssistantPanelView: View {
                 rows: []
             )
         }
+    }
+
+    private func handleEditCardCommand(_ command: HomeAssistantCommandPlan) {
+        guard command.cardThemeRaw != nil || command.cardEffectRaw != nil else {
+            appendMutationMessage(
+                title: "Need card edit details",
+                subtitle: "Tell me the theme or effect to update for the card.",
+                rows: []
+            )
+            return
+        }
+
+        let matches = matchedCards(for: command)
+        guard matches.isEmpty == false else {
+            appendMutationMessage(
+                title: "No matching card found",
+                subtitle: "Try adding the card name so I can update it.",
+                rows: []
+            )
+            return
+        }
+
+        if matches.count > 1 {
+            pendingCardDisambiguationPlan = command
+            pendingCardCandidates = Array(matches.prefix(3))
+            presentCardDisambiguationPrompt(action: "edit")
+            return
+        }
+
+        executeCardEdit(matches[0], using: command)
+    }
+
+    private func handleDeleteCardCommand(_ command: HomeAssistantCommandPlan) {
+        let matches = matchedCards(for: command)
+        guard matches.isEmpty == false else {
+            appendMutationMessage(
+                title: "No matching card found",
+                subtitle: "Try adding the card name so I can delete it.",
+                rows: []
+            )
+            return
+        }
+
+        if matches.count > 1 {
+            pendingCardDisambiguationPlan = command
+            pendingCardCandidates = Array(matches.prefix(3))
+            presentCardDisambiguationPrompt(action: "delete")
+            return
+        }
+
+        executeCardDelete(matches[0])
     }
 
     private func handleEditExpenseCommand(_ command: HomeAssistantCommandPlan) {
@@ -1707,11 +1773,26 @@ struct HomeAssistantPanelView: View {
         }
 
         let category = resolveCategory(from: command.categoryName)
+        let recurrenceFrequency = RecurrenceFrequency(rawValue: command.recurrenceFrequencyRaw ?? "")
+            ?? .monthly
+        let recurrenceInterval = max(1, command.recurrenceInterval ?? 1)
+        let weeklyWeekday = min(7, max(1, command.weeklyWeekday ?? 6))
+        let monthlyDayOfMonth = min(31, max(1, command.monthlyDayOfMonth ?? 15))
+        let monthlyIsLastDay = command.monthlyIsLastDay ?? false
+        let yearlyMonth = min(12, max(1, command.yearlyMonth ?? 1))
+        let yearlyDayOfMonth = min(31, max(1, command.yearlyDayOfMonth ?? 15))
 
         do {
             let result = try mutationService.addPreset(
                 title: title,
                 plannedAmount: amount,
+                frequencyRaw: recurrenceFrequency.rawValue,
+                interval: recurrenceInterval,
+                weeklyWeekday: weeklyWeekday,
+                monthlyDayOfMonth: monthlyDayOfMonth,
+                monthlyIsLastDay: monthlyIsLastDay,
+                yearlyMonth: yearlyMonth,
+                yearlyDayOfMonth: yearlyDayOfMonth,
                 card: card,
                 category: category,
                 workspace: workspace,
@@ -1765,6 +1846,25 @@ struct HomeAssistantPanelView: View {
         }
     }
 
+    private func executeCardEdit(_ card: Card, using command: HomeAssistantCommandPlan) {
+        do {
+            let result = try mutationService.editCardStyle(
+                card: card,
+                themeRaw: command.cardThemeRaw,
+                effectRaw: command.cardEffectRaw,
+                modelContext: modelContext
+            )
+            clearMutationPendingState()
+            appendMutationMessage(title: result.title, subtitle: result.subtitle, rows: result.rows)
+        } catch {
+            appendMutationMessage(
+                title: "Could not edit card",
+                subtitle: error.localizedDescription,
+                rows: []
+            )
+        }
+    }
+
     private func executeExpenseDelete(_ expense: VariableExpense) {
         if confirmBeforeDeleting {
             pendingDeleteExpense = expense
@@ -1802,6 +1902,26 @@ struct HomeAssistantPanelView: View {
             appendMutationMessage(title: result.title, subtitle: result.subtitle, rows: result.rows)
         } catch {
             appendMutationMessage(title: "Could not delete income", subtitle: error.localizedDescription, rows: [])
+        }
+    }
+
+    private func executeCardDelete(_ card: Card) {
+        if confirmBeforeDeleting {
+            pendingDeleteCard = card
+            appendMutationMessage(
+                title: "Confirm delete",
+                subtitle: "Delete this card and all of its transactions? Reply with yes to confirm or no to cancel.",
+                rows: [HomeAnswerRow(title: "Card", value: cardDisplayLabel(card))]
+            )
+            return
+        }
+
+        do {
+            let result = try mutationService.deleteCard(card, workspace: workspace, modelContext: modelContext)
+            clearMutationPendingState()
+            appendMutationMessage(title: result.title, subtitle: result.subtitle, rows: result.rows)
+        } catch {
+            appendMutationMessage(title: "Could not delete card", subtitle: error.localizedDescription, rows: [])
         }
     }
 
@@ -1928,7 +2048,24 @@ struct HomeAssistantPanelView: View {
             cardName: selected.name,
             categoryName: plan.categoryName,
             entityName: plan.entityName,
-            isPlannedIncome: plan.isPlannedIncome
+            isPlannedIncome: plan.isPlannedIncome,
+            categoryColorHex: plan.categoryColorHex,
+            categoryColorName: plan.categoryColorName,
+            cardThemeRaw: plan.cardThemeRaw,
+            cardEffectRaw: plan.cardEffectRaw,
+            recurrenceFrequencyRaw: plan.recurrenceFrequencyRaw,
+            recurrenceInterval: plan.recurrenceInterval,
+            weeklyWeekday: plan.weeklyWeekday,
+            monthlyDayOfMonth: plan.monthlyDayOfMonth,
+            monthlyIsLastDay: plan.monthlyIsLastDay,
+            yearlyMonth: plan.yearlyMonth,
+            yearlyDayOfMonth: plan.yearlyDayOfMonth,
+            recurrenceEndDate: plan.recurrenceEndDate,
+            plannedExpenseAmountTarget: plan.plannedExpenseAmountTarget,
+            attachAllCards: plan.attachAllCards,
+            attachAllPresets: plan.attachAllPresets,
+            selectedCardNames: plan.selectedCardNames,
+            selectedPresetTitles: plan.selectedPresetTitles
         )
 
         pendingExpenseCardPlan = nil
@@ -1974,11 +2111,87 @@ struct HomeAssistantPanelView: View {
             cardName: plan.cardName,
             categoryName: plan.categoryName,
             entityName: plan.entityName,
-            isPlannedIncome: resolved
+            isPlannedIncome: resolved,
+            categoryColorHex: plan.categoryColorHex,
+            categoryColorName: plan.categoryColorName,
+            cardThemeRaw: plan.cardThemeRaw,
+            cardEffectRaw: plan.cardEffectRaw,
+            recurrenceFrequencyRaw: plan.recurrenceFrequencyRaw,
+            recurrenceInterval: plan.recurrenceInterval,
+            weeklyWeekday: plan.weeklyWeekday,
+            monthlyDayOfMonth: plan.monthlyDayOfMonth,
+            monthlyIsLastDay: plan.monthlyIsLastDay,
+            yearlyMonth: plan.yearlyMonth,
+            yearlyDayOfMonth: plan.yearlyDayOfMonth,
+            recurrenceEndDate: plan.recurrenceEndDate,
+            plannedExpenseAmountTarget: plan.plannedExpenseAmountTarget,
+            attachAllCards: plan.attachAllCards,
+            attachAllPresets: plan.attachAllPresets,
+            selectedCardNames: plan.selectedCardNames,
+            selectedPresetTitles: plan.selectedPresetTitles
         )
 
         pendingIncomeKindPlan = nil
         executeAddIncome(plan)
+    }
+
+    private func resolvePresetRecurrenceSelection(with prompt: String) {
+        guard var plan = pendingPresetRecurrencePlan else { return }
+
+        let normalized = prompt.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        let resolvedFrequency: RecurrenceFrequency?
+        if normalized == "1" || normalized.contains("daily") {
+            resolvedFrequency = .daily
+        } else if normalized == "2" || normalized.contains("weekly") {
+            resolvedFrequency = .weekly
+        } else if normalized == "3" || normalized.contains("monthly") {
+            resolvedFrequency = .monthly
+        } else if normalized == "4" || normalized.contains("yearly") || normalized.contains("annual") {
+            resolvedFrequency = .yearly
+        } else {
+            resolvedFrequency = nil
+        }
+
+        guard let resolvedFrequency else {
+            presentPresetRecurrencePrompt()
+            return
+        }
+
+        plan = HomeAssistantCommandPlan(
+            intent: plan.intent,
+            confidenceBand: plan.confidenceBand,
+            rawPrompt: plan.rawPrompt,
+            amount: plan.amount,
+            originalAmount: plan.originalAmount,
+            date: plan.date,
+            dateRange: plan.dateRange,
+            notes: plan.notes,
+            source: plan.source,
+            cardName: plan.cardName,
+            categoryName: plan.categoryName,
+            entityName: plan.entityName,
+            isPlannedIncome: plan.isPlannedIncome,
+            categoryColorHex: plan.categoryColorHex,
+            categoryColorName: plan.categoryColorName,
+            cardThemeRaw: plan.cardThemeRaw,
+            cardEffectRaw: plan.cardEffectRaw,
+            recurrenceFrequencyRaw: resolvedFrequency.rawValue,
+            recurrenceInterval: plan.recurrenceInterval ?? 1,
+            weeklyWeekday: plan.weeklyWeekday,
+            monthlyDayOfMonth: plan.monthlyDayOfMonth,
+            monthlyIsLastDay: plan.monthlyIsLastDay,
+            yearlyMonth: plan.yearlyMonth,
+            yearlyDayOfMonth: plan.yearlyDayOfMonth,
+            recurrenceEndDate: plan.recurrenceEndDate,
+            plannedExpenseAmountTarget: plan.plannedExpenseAmountTarget,
+            attachAllCards: plan.attachAllCards,
+            attachAllPresets: plan.attachAllPresets,
+            selectedCardNames: plan.selectedCardNames,
+            selectedPresetTitles: plan.selectedPresetTitles
+        )
+
+        pendingPresetRecurrencePlan = nil
+        handleAddPresetCommand(plan)
     }
 
     private func resolvePresetCardSelection(with prompt: String) {
@@ -2018,7 +2231,24 @@ struct HomeAssistantPanelView: View {
             cardName: selected.name,
             categoryName: plan.categoryName,
             entityName: plan.entityName,
-            isPlannedIncome: plan.isPlannedIncome
+            isPlannedIncome: plan.isPlannedIncome,
+            categoryColorHex: plan.categoryColorHex,
+            categoryColorName: plan.categoryColorName,
+            cardThemeRaw: plan.cardThemeRaw,
+            cardEffectRaw: plan.cardEffectRaw,
+            recurrenceFrequencyRaw: plan.recurrenceFrequencyRaw,
+            recurrenceInterval: plan.recurrenceInterval,
+            weeklyWeekday: plan.weeklyWeekday,
+            monthlyDayOfMonth: plan.monthlyDayOfMonth,
+            monthlyIsLastDay: plan.monthlyIsLastDay,
+            yearlyMonth: plan.yearlyMonth,
+            yearlyDayOfMonth: plan.yearlyDayOfMonth,
+            recurrenceEndDate: plan.recurrenceEndDate,
+            plannedExpenseAmountTarget: plan.plannedExpenseAmountTarget,
+            attachAllCards: plan.attachAllCards,
+            attachAllPresets: plan.attachAllPresets,
+            selectedCardNames: plan.selectedCardNames,
+            selectedPresetTitles: plan.selectedPresetTitles
         )
 
         pendingPresetCardPlan = nil
@@ -2490,6 +2720,24 @@ struct HomeAssistantPanelView: View {
         }
     }
 
+    private func resolveCardDisambiguation(with prompt: String) {
+        guard pendingCardCandidates.isEmpty == false else { return }
+        guard let command = pendingCardDisambiguationPlan else { return }
+
+        let selected = selectedCardCandidate(from: prompt, candidates: pendingCardCandidates)
+        guard let selected else {
+            let action = command.intent == .deleteCard ? "delete" : "edit"
+            presentCardDisambiguationPrompt(action: action)
+            return
+        }
+
+        if command.intent == .deleteCard {
+            executeCardDelete(selected)
+        } else {
+            executeCardEdit(selected, using: command)
+        }
+    }
+
     private func resolveDeleteConfirmation(with prompt: String) {
         let normalized = prompt.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
         let confirms = ["yes", "y", "delete", "confirm", "proceed"].contains(normalized)
@@ -2516,6 +2764,18 @@ struct HomeAssistantPanelView: View {
                     appendMutationMessage(title: result.title, subtitle: result.subtitle, rows: result.rows)
                 } catch {
                     appendMutationMessage(title: "Could not delete income", subtitle: error.localizedDescription, rows: [])
+                }
+                return
+            }
+
+            if let card = pendingDeleteCard {
+                pendingDeleteCard = nil
+                do {
+                    let result = try mutationService.deleteCard(card, workspace: workspace, modelContext: modelContext)
+                    clearMutationPendingState()
+                    appendMutationMessage(title: result.title, subtitle: result.subtitle, rows: result.rows)
+                } catch {
+                    appendMutationMessage(title: "Could not delete card", subtitle: error.localizedDescription, rows: [])
                 }
                 return
             }
@@ -2583,6 +2843,19 @@ struct HomeAssistantPanelView: View {
         )
     }
 
+    private func presentPresetRecurrencePrompt() {
+        appendMutationMessage(
+            title: "Need preset schedule",
+            subtitle: "How often should this preset repeat?",
+            rows: [
+                HomeAnswerRow(title: "1", value: "Daily"),
+                HomeAnswerRow(title: "2", value: "Weekly"),
+                HomeAnswerRow(title: "3", value: "Monthly"),
+                HomeAnswerRow(title: "4", value: "Yearly")
+            ]
+        )
+    }
+
     private func presentIncomeDisambiguationPrompt() {
         let rows = pendingIncomeCandidates.enumerated().map { index, income in
             HomeAnswerRow(title: "\(index + 1)", value: incomeDisplayLabel(income))
@@ -2590,6 +2863,17 @@ struct HomeAssistantPanelView: View {
         appendMutationMessage(
             title: "Quick clarification",
             subtitle: "I found multiple matching income entries. Pick one by number.",
+            rows: rows
+        )
+    }
+
+    private func presentCardDisambiguationPrompt(action: String) {
+        let rows = pendingCardCandidates.enumerated().map { index, card in
+            HomeAnswerRow(title: "\(index + 1)", value: cardDisplayLabel(card))
+        }
+        appendMutationMessage(
+            title: "Quick clarification",
+            subtitle: "I found multiple matching cards. Pick one to \(action).",
             rows: rows
         )
     }
@@ -2629,6 +2913,23 @@ struct HomeAssistantPanelView: View {
             candidateNames: candidates.map(\.source)
         ) {
             return candidates.first { $0.source == match }
+        }
+
+        return nil
+    }
+
+    private func selectedCardCandidate(
+        from prompt: String,
+        candidates: [Card]
+    ) -> Card? {
+        if let index = Int(prompt.trimmingCharacters(in: .whitespacesAndNewlines)),
+           index >= 1,
+           index <= candidates.count {
+            return candidates[index - 1]
+        }
+
+        if let match = entityMatcher.bestCardMatch(in: prompt, cards: candidates) {
+            return candidates.first { $0.name == match }
         }
 
         return nil
@@ -2675,16 +2976,20 @@ struct HomeAssistantPanelView: View {
         pendingExpenseCardPlan = nil
         pendingExpenseCardOptions = []
         pendingPresetCardPlan = nil
+        pendingPresetRecurrencePlan = nil
         pendingIncomeKindPlan = nil
         pendingExpenseDisambiguationPlan = nil
         pendingIncomeDisambiguationPlan = nil
+        pendingCardDisambiguationPlan = nil
         pendingExpenseCandidates = []
         pendingPlannedExpenseAmountPlan = nil
         pendingPlannedExpenseAmountExpense = nil
         pendingPlannedExpenseCandidates = []
         pendingIncomeCandidates = []
+        pendingCardCandidates = []
         pendingDeleteExpense = nil
         pendingDeleteIncome = nil
+        pendingDeleteCard = nil
         pendingBudgetCreationPlan = nil
         pendingBudgetCreationStep = nil
         pendingBudgetSelectedCardIDs = []
@@ -2696,6 +3001,27 @@ struct HomeAssistantPanelView: View {
         pendingCardStyleCardName = nil
         pendingCardStyleStep = nil
         pendingCardStyleTheme = nil
+    }
+
+    private func matchedCards(for command: HomeAssistantCommandPlan) -> [Card] {
+        guard cards.isEmpty == false else { return [] }
+        let candidateNames = cards.map(\.name)
+
+        let explicitName = (command.entityName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if explicitName.isEmpty == false {
+            let exactMatches = cards.filter { $0.name.compare(explicitName, options: .caseInsensitive) == .orderedSame }
+            if exactMatches.isEmpty == false {
+                return exactMatches
+            }
+
+            let ranked = entityMatcher.rankedMatches(in: explicitName, candidateNames: candidateNames, limit: 3)
+            if ranked.isEmpty == false {
+                return ranked.compactMap { name in cards.first(where: { $0.name == name }) }
+            }
+        }
+
+        let rankedFromPrompt = entityMatcher.rankedMatches(in: command.rawPrompt, candidateNames: candidateNames, limit: 3)
+        return rankedFromPrompt.compactMap { name in cards.first(where: { $0.name == name }) }
     }
 
     private func resolveCard(from cardName: String?) -> Card? {
@@ -2723,6 +3049,12 @@ struct HomeAssistantPanelView: View {
     private func incomeDisplayLabel(_ income: Income) -> String {
         let label = income.isPlanned ? "Planned" : "Actual"
         return "\(CurrencyFormatter.string(from: income.amount)) • \(income.source) • \(shortDate(income.date)) • \(label)"
+    }
+
+    private func cardDisplayLabel(_ card: Card) -> String {
+        let theme = CardThemeOption(rawValue: card.theme)?.displayName ?? "Ruby"
+        let effect = CardEffectOption(rawValue: card.effect)?.displayName ?? "Plastic"
+        return "\(card.name) • \(theme) • \(effect)"
     }
 
     private func shortDate(_ date: Date) -> String {
@@ -4522,6 +4854,13 @@ private final class HomeAssistantMutationService {
     func addPreset(
         title: String,
         plannedAmount: Double,
+        frequencyRaw: String,
+        interval: Int,
+        weeklyWeekday: Int,
+        monthlyDayOfMonth: Int,
+        monthlyIsLastDay: Bool,
+        yearlyMonth: Int,
+        yearlyDayOfMonth: Int,
         card: Card,
         category: Category?,
         workspace: Workspace,
@@ -4539,6 +4878,13 @@ private final class HomeAssistantMutationService {
         let preset = Preset(
             title: trimmed,
             plannedAmount: plannedAmount,
+            frequencyRaw: frequencyRaw,
+            interval: interval,
+            weeklyWeekday: weeklyWeekday,
+            monthlyDayOfMonth: monthlyDayOfMonth,
+            monthlyIsLastDay: monthlyIsLastDay,
+            yearlyMonth: yearlyMonth,
+            yearlyDayOfMonth: yearlyDayOfMonth,
             workspace: workspace,
             defaultCard: card,
             defaultCategory: category
@@ -4551,7 +4897,8 @@ private final class HomeAssistantMutationService {
             subtitle: "Saved preset \(trimmed).",
             rows: [
                 HomeAnswerRow(title: "Amount", value: CurrencyFormatter.string(from: plannedAmount)),
-                HomeAnswerRow(title: "Card", value: card.name)
+                HomeAnswerRow(title: "Card", value: card.name),
+                HomeAnswerRow(title: "Frequency", value: RecurrenceFrequency(rawValue: frequencyRaw)?.displayName ?? "Monthly")
             ]
         )
     }
@@ -4648,6 +4995,36 @@ private final class HomeAssistantMutationService {
         return HomeAssistantMutationResult(
             title: "Card style updated",
             subtitle: "Updated \(trimmed) with your selected theme and effect.",
+            rows: [
+                HomeAnswerRow(title: "Theme", value: CardThemeOption(rawValue: card.theme)?.displayName ?? "Ruby"),
+                HomeAnswerRow(title: "Effect", value: CardEffectOption(rawValue: card.effect)?.displayName ?? "Plastic")
+            ]
+        )
+    }
+
+    func editCardStyle(
+        card: Card,
+        themeRaw: String?,
+        effectRaw: String?,
+        modelContext: ModelContext
+    ) throws -> HomeAssistantMutationResult {
+        guard themeRaw != nil || effectRaw != nil else {
+            throw TransactionEntryService.ValidationError.missingDescription
+        }
+
+        if let themeRaw, let theme = CardThemeOption(rawValue: themeRaw) {
+            card.theme = theme.rawValue
+        }
+
+        if let effectRaw, let effect = CardEffectOption(rawValue: effectRaw) {
+            card.effect = effect.rawValue
+        }
+
+        try modelContext.save()
+
+        return HomeAssistantMutationResult(
+            title: "Card updated",
+            subtitle: "Updated \(card.name).",
             rows: [
                 HomeAnswerRow(title: "Theme", value: CardThemeOption(rawValue: card.theme)?.displayName ?? "Ruby"),
                 HomeAnswerRow(title: "Effect", value: CardEffectOption(rawValue: card.effect)?.displayName ?? "Plastic")
@@ -4861,6 +5238,51 @@ private final class HomeAssistantMutationService {
         )
     }
 
+    func deleteCard(
+        _ card: Card,
+        workspace: Workspace,
+        modelContext: ModelContext
+    ) throws -> HomeAssistantMutationResult {
+        let workspaceID = workspace.id
+        let cardID = card.id
+
+        HomePinnedItemsStore(workspaceID: workspaceID).removePinnedCard(id: cardID)
+        HomePinnedCardsStore(workspaceID: workspaceID).removePinnedCardID(cardID)
+
+        if let planned = card.plannedExpenses {
+            for expense in planned {
+                modelContext.delete(expense)
+            }
+        }
+
+        if let variable = card.variableExpenses {
+            for expense in variable {
+                deleteVariableExpense(expense, modelContext: modelContext)
+            }
+        }
+
+        if let incomes = card.incomes {
+            for income in incomes {
+                modelContext.delete(income)
+            }
+        }
+
+        if let links = card.budgetLinks {
+            for link in links {
+                modelContext.delete(link)
+            }
+        }
+
+        modelContext.delete(card)
+        try modelContext.save()
+
+        return HomeAssistantMutationResult(
+            title: "Card deleted",
+            subtitle: "Removed \(card.name) and its linked entries.",
+            rows: []
+        )
+    }
+
     func matchedExpenses(
         for command: HomeAssistantCommandPlan,
         expenses: [VariableExpense]
@@ -4909,6 +5331,21 @@ private final class HomeAssistantMutationService {
                 return lhs.1 > rhs.1
             }
             .map(\.0)
+    }
+
+    private func deleteVariableExpense(
+        _ expense: VariableExpense,
+        modelContext: ModelContext
+    ) {
+        if let allocation = expense.allocation {
+            expense.allocation = nil
+            modelContext.delete(allocation)
+        }
+        if let offsetSettlement = expense.offsetSettlement {
+            expense.offsetSettlement = nil
+            modelContext.delete(offsetSettlement)
+        }
+        modelContext.delete(expense)
     }
 
     func matchedIncomes(

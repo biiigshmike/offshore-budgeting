@@ -17,6 +17,24 @@ enum AppCommandID {
 
     enum Budgets {
         static let newBudget = "budgets.new_budget"
+        static let sortAZ = "budgets.sort.az"
+        static let sortZA = "budgets.sort.za"
+        static let sortDateAsc = "budgets.sort.date_asc"
+        static let sortDateDesc = "budgets.sort.date_desc"
+    }
+
+    enum Presets {
+        static let sortAZ = "presets.sort.az"
+        static let sortZA = "presets.sort.za"
+        static let sortDateAsc = "presets.sort.date_asc"
+        static let sortDateDesc = "presets.sort.date_desc"
+        static let sortAmountAsc = "presets.sort.amount_asc"
+        static let sortAmountDesc = "presets.sort.amount_desc"
+    }
+
+    enum Categories {
+        static let sortAZ = "categories.sort.az"
+        static let sortZA = "categories.sort.za"
     }
 
     enum BudgetDetail {
@@ -40,6 +58,15 @@ enum AppCommandID {
 
     enum Cards {
         static let newCard = "cards.new_card"
+        static let sortAZ = "cards.sort.az"
+        static let sortZA = "cards.sort.za"
+    }
+
+    enum SharedBalances {
+        static let sortAZ = "shared_balances.sort.az"
+        static let sortZA = "shared_balances.sort.za"
+        static let sortAmountAsc = "shared_balances.sort.amount_asc"
+        static let sortAmountDesc = "shared_balances.sort.amount_desc"
     }
 
     enum CardDetail {
@@ -60,10 +87,17 @@ enum AppCommandID {
 enum AppCommandSurface: Equatable {
     case none
     case budgets
+    case presets
+    case categories
     case budgetDetail
     case income
     case cards
     case cardDetail
+}
+
+enum AppCardsSortCommandContext: String, Equatable {
+    case cards
+    case sharedBalances
 }
 
 // MARK: - Availability
@@ -72,6 +106,7 @@ struct AppCommandAvailability: Equatable {
     var budgetDetailCanCreateTransaction: Bool = false
     var incomeCanDeleteActual: Bool = false
     var incomeCanDeletePlanned: Bool = false
+    var cardsSortContext: AppCardsSortCommandContext = .cards
 }
 
 // MARK: - Hub
@@ -104,6 +139,11 @@ final class AppCommandHub: ObservableObject {
 
         availability.incomeCanDeleteActual = canDeleteActual
         availability.incomeCanDeletePlanned = canDeletePlanned
+    }
+
+    func setCardsSortContext(_ context: AppCardsSortCommandContext) {
+        guard availability.cardsSortContext != context else { return }
+        availability.cardsSortContext = context
     }
 
     func dispatch(_ commandID: String) {
@@ -252,7 +292,7 @@ struct OffshoreAppCommands: Commands {
                     shortcut: KeyboardShortcut("n", modifiers: [.command])
                 )
             ]
-        case .none:
+        case .none, .presets, .categories:
             return []
         }
     }
@@ -304,13 +344,121 @@ struct OffshoreAppCommands: Commands {
                     role: .destructive
                 )
             ]
-        case .none, .budgets, .cards:
+        case .none, .budgets, .presets, .categories, .cards:
             return []
         }
     }
 
     private var viewItems: [AppMenuCommandItem] {
         switch commandHub.surface {
+        case .budgets:
+            return [
+                AppMenuCommandItem(
+                    id: AppCommandID.Budgets.sortAZ,
+                    title: "Sort A-Z",
+                    shortcut: KeyboardShortcut("1", modifiers: [.command, .option])
+                ),
+                AppMenuCommandItem(
+                    id: AppCommandID.Budgets.sortZA,
+                    title: "Sort Z-A",
+                    shortcut: KeyboardShortcut("2", modifiers: [.command, .option])
+                ),
+                AppMenuCommandItem(
+                    id: AppCommandID.Budgets.sortDateAsc,
+                    title: "Sort Date ↑",
+                    shortcut: KeyboardShortcut("3", modifiers: [.command, .option])
+                ),
+                AppMenuCommandItem(
+                    id: AppCommandID.Budgets.sortDateDesc,
+                    title: "Sort Date ↓",
+                    shortcut: KeyboardShortcut("4", modifiers: [.command, .option])
+                )
+            ]
+        case .presets:
+            return [
+                AppMenuCommandItem(
+                    id: AppCommandID.Presets.sortAZ,
+                    title: "Sort A-Z",
+                    shortcut: KeyboardShortcut("1", modifiers: [.command, .option])
+                ),
+                AppMenuCommandItem(
+                    id: AppCommandID.Presets.sortZA,
+                    title: "Sort Z-A",
+                    shortcut: KeyboardShortcut("2", modifiers: [.command, .option])
+                ),
+                AppMenuCommandItem(
+                    id: AppCommandID.Presets.sortDateAsc,
+                    title: "Sort Date ↑",
+                    shortcut: KeyboardShortcut("3", modifiers: [.command, .option])
+                ),
+                AppMenuCommandItem(
+                    id: AppCommandID.Presets.sortDateDesc,
+                    title: "Sort Date ↓",
+                    shortcut: KeyboardShortcut("4", modifiers: [.command, .option])
+                ),
+                AppMenuCommandItem(
+                    id: AppCommandID.Presets.sortAmountAsc,
+                    title: "Sort $↑",
+                    shortcut: KeyboardShortcut("5", modifiers: [.command, .option])
+                ),
+                AppMenuCommandItem(
+                    id: AppCommandID.Presets.sortAmountDesc,
+                    title: "Sort $↓",
+                    shortcut: KeyboardShortcut("6", modifiers: [.command, .option])
+                )
+            ]
+        case .categories:
+            return [
+                AppMenuCommandItem(
+                    id: AppCommandID.Categories.sortAZ,
+                    title: "Sort A-Z",
+                    shortcut: KeyboardShortcut("1", modifiers: [.command, .option])
+                ),
+                AppMenuCommandItem(
+                    id: AppCommandID.Categories.sortZA,
+                    title: "Sort Z-A",
+                    shortcut: KeyboardShortcut("2", modifiers: [.command, .option])
+                )
+            ]
+        case .cards:
+            switch commandHub.availability.cardsSortContext {
+            case .cards:
+                return [
+                    AppMenuCommandItem(
+                        id: AppCommandID.Cards.sortAZ,
+                        title: "Sort A-Z",
+                        shortcut: KeyboardShortcut("1", modifiers: [.command, .option])
+                    ),
+                    AppMenuCommandItem(
+                        id: AppCommandID.Cards.sortZA,
+                        title: "Sort Z-A",
+                        shortcut: KeyboardShortcut("2", modifiers: [.command, .option])
+                    )
+                ]
+            case .sharedBalances:
+                return [
+                    AppMenuCommandItem(
+                        id: AppCommandID.SharedBalances.sortAZ,
+                        title: "Sort A-Z",
+                        shortcut: KeyboardShortcut("1", modifiers: [.command, .option])
+                    ),
+                    AppMenuCommandItem(
+                        id: AppCommandID.SharedBalances.sortZA,
+                        title: "Sort Z-A",
+                        shortcut: KeyboardShortcut("2", modifiers: [.command, .option])
+                    ),
+                    AppMenuCommandItem(
+                        id: AppCommandID.SharedBalances.sortAmountAsc,
+                        title: "Sort $↑",
+                        shortcut: KeyboardShortcut("3", modifiers: [.command, .option])
+                    ),
+                    AppMenuCommandItem(
+                        id: AppCommandID.SharedBalances.sortAmountDesc,
+                        title: "Sort $↓",
+                        shortcut: KeyboardShortcut("4", modifiers: [.command, .option])
+                    )
+                ]
+            }
         case .budgetDetail:
             return [
                 AppMenuCommandItem(
@@ -377,7 +525,7 @@ struct OffshoreAppCommands: Commands {
                     shortcut: KeyboardShortcut("6", modifiers: [.command, .option])
                 )
             ]
-        case .none, .budgets, .income, .cards:
+        case .none, .income:
             return []
         }
     }

@@ -13,8 +13,10 @@ struct ManageCategoriesView: View {
     let workspace: Workspace
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.appCommandHub) private var commandHub
 
     @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
+    @AppStorage("sort.categories.mode") private var sortModeRaw: String = CategorySortMode.az.rawValue
 
     @Query private var categories: [Category]
 
@@ -49,7 +51,7 @@ struct ManageCategoriesView: View {
     var body: some View {
         List {
             CategoryListRows(
-                categories: categories,
+                categories: sortedCategories,
                 onEdit: { category in
                     sheetRoute = .edit(category)
                 },
@@ -78,11 +80,23 @@ struct ManageCategoriesView: View {
         )
         .navigationTitle("Categories")
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    sheetRoute = .add
-                } label: {
-                    Image(systemName: "plus")
+            if #available(iOS 26.0, macCatalyst 26.0, *) {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    sortToolbarButton
+                }
+
+                ToolbarSpacer(.flexible, placement: .primaryAction)
+
+                ToolbarItemGroup(placement: .primaryAction) {
+                    addToolbarButton
+                }
+            } else {
+                ToolbarItem(placement: .topBarTrailing) {
+                    addToolbarButton
+                }
+
+                ToolbarItem(placement: .primaryAction) {
+                    sortToolbarButton
                 }
             }
         }
@@ -107,11 +121,93 @@ struct ManageCategoriesView: View {
                 pendingCategoryDelete = nil
             }
         }
+        .onAppear {
+            commandHub.activate(.categories)
+        }
+        .onDisappear {
+            commandHub.deactivate(.categories)
+        }
+        .onReceive(commandHub.$sequence) { _ in
+            guard commandHub.surface == .categories else { return }
+            handleCommand(commandHub.latestCommandID)
+        }
+    }
+
+    private var sortMode: CategorySortMode {
+        CategorySortMode(rawValue: sortModeRaw) ?? .az
+    }
+
+    private func setSortMode(_ mode: CategorySortMode) {
+        sortModeRaw = mode.rawValue
+    }
+
+    private var sortedCategories: [Category] {
+        switch sortMode {
+        case .az:
+            return categories.sorted { lhs, rhs in
+                lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+            }
+        case .za:
+            return categories.sorted { lhs, rhs in
+                lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedDescending
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var addToolbarButton: some View {
+        Button {
+            sheetRoute = .add
+        } label: {
+            Image(systemName: "plus")
+        }
+        .accessibilityLabel("Add Category")
+    }
+
+    @ViewBuilder
+    private var sortToolbarButton: some View {
+        Menu {
+            sortMenuButton(title: "A-Z", mode: .az)
+            sortMenuButton(title: "Z-A", mode: .za)
+        } label: {
+            Image(systemName: "arrow.up.arrow.down")
+        }
+        .accessibilityLabel("Sort")
+    }
+
+    private func sortMenuButton(title: String, mode: CategorySortMode) -> some View {
+        Button {
+            setSortMode(mode)
+        } label: {
+            HStack {
+                Text(title)
+                if sortMode == mode {
+                    Spacer()
+                    Image(systemName: "checkmark")
+                }
+            }
+        }
+    }
+
+    private func handleCommand(_ commandID: String) {
+        switch commandID {
+        case AppCommandID.Categories.sortAZ:
+            setSortMode(.az)
+        case AppCommandID.Categories.sortZA:
+            setSortMode(.za)
+        default:
+            break
+        }
     }
 
     private func delete(_ category: Category) {
         modelContext.delete(category)
     }
+}
+
+private enum CategorySortMode: String {
+    case az
+    case za
 }
 
 #Preview("Manage Categories") {

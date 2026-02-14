@@ -591,9 +591,23 @@ struct HomeAssistantTextParser {
     }
 
     private func extractedSingleDateRange(from text: String) -> HomeQueryDateRange? {
+        if let onRange = text.range(
+            of: "\\bon\\s+([a-z0-9\\-/ ]{3,40}?)(?=\\s+\\$?[-]?[0-9]|\\s+(from|to|and|through|thru|at|using|with)\\b|$)",
+            options: .regularExpression
+        ) {
+            let phrase = String(text[onRange])
+            let candidate = phrase
+                .replacingOccurrences(of: "on ", with: "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+
+            if let date = parsedDateCandidate(candidate) {
+                return dayRange(for: date)
+            }
+        }
+
         guard
             let range = text.range(
-                of: "\\b(on|for)\\s+([a-z0-9\\-/ ]{3,40}?)(?=\\s+(from|to|and|through|thru|at|using|with)\\b|$)",
+                of: "\\b(on|for)\\s+([a-z0-9\\-/ ]{3,40}?)(?=\\s+(from|to|and|through|thru|at|using|with)\\b|\\s+\\$?[-]?[0-9]|$)",
                 options: .regularExpression
             )
         else {
@@ -934,7 +948,7 @@ struct HomeAssistantCommandParser {
         case .deleteExpense, .deleteIncome, .moveExpenseCategory, .deleteLastExpense, .deleteLastIncome:
             originalAmount = nil
             amount = amounts.first
-        case .addBudget, .addCard, .addCategory:
+        case .addBudget, .addCard, .editCard, .deleteCard, .addCategory:
             originalAmount = nil
             amount = nil
         }
@@ -948,6 +962,9 @@ struct HomeAssistantCommandParser {
         let categoryColor = extractedCategoryColor(from: trimmed)
         let cardTheme = extractedCardTheme(from: normalized)
         let cardEffect = extractedCardEffect(from: normalized)
+        let recurrence = (intent == .addPreset || intent == .addIncome)
+            ? extractedRecurrence(from: normalized, rawText: trimmed)
+            : RecurrenceParseResult()
         let plannedExpenseAmountTarget = extractedPlannedExpenseAmountTarget(from: normalized)
         let attachAllCards = extractedAttachAllCards(from: normalized)
         let attachAllPresets = extractedAttachAllPresets(from: normalized)
@@ -970,6 +987,14 @@ struct HomeAssistantCommandParser {
             categoryColorName: categoryColor.name,
             cardThemeRaw: cardTheme?.rawValue,
             cardEffectRaw: cardEffect?.rawValue,
+            recurrenceFrequencyRaw: recurrence.frequencyRaw,
+            recurrenceInterval: recurrence.interval,
+            weeklyWeekday: recurrence.weeklyWeekday,
+            monthlyDayOfMonth: recurrence.monthlyDayOfMonth,
+            monthlyIsLastDay: recurrence.monthlyIsLastDay,
+            yearlyMonth: recurrence.yearlyMonth,
+            yearlyDayOfMonth: recurrence.yearlyDayOfMonth,
+            recurrenceEndDate: recurrence.endDate,
             plannedExpenseAmountTarget: plannedExpenseAmountTarget,
             attachAllCards: attachAllCards,
             attachAllPresets: attachAllPresets
@@ -980,6 +1005,118 @@ struct HomeAssistantCommandParser {
         let normalized = normalizedText(rawText)
         let hasMutationVerb = normalized.contains("delete") || normalized.contains("edit") || normalized.contains("add")
         return hasMutationVerb && normalized.contains("card")
+    }
+
+    private struct RecurrenceParseResult {
+        var frequencyRaw: String? = nil
+        var interval: Int? = nil
+        var weeklyWeekday: Int? = nil
+        var monthlyDayOfMonth: Int? = nil
+        var monthlyIsLastDay: Bool? = nil
+        var yearlyMonth: Int? = nil
+        var yearlyDayOfMonth: Int? = nil
+        var endDate: Date? = nil
+    }
+
+    private func extractedRecurrence(from normalized: String, rawText: String) -> RecurrenceParseResult {
+        var result = RecurrenceParseResult()
+        let frequencyByUnit = [
+            "day": RecurrenceFrequency.daily.rawValue,
+            "days": RecurrenceFrequency.daily.rawValue,
+            "week": RecurrenceFrequency.weekly.rawValue,
+            "weeks": RecurrenceFrequency.weekly.rawValue,
+            "month": RecurrenceFrequency.monthly.rawValue,
+            "months": RecurrenceFrequency.monthly.rawValue,
+            "year": RecurrenceFrequency.yearly.rawValue,
+            "years": RecurrenceFrequency.yearly.rawValue
+        ]
+
+        if normalized.contains("biweekly") || normalized.contains("every other week") {
+            result.frequencyRaw = RecurrenceFrequency.weekly.rawValue
+            result.interval = 2
+        } else if normalized.contains("daily") || normalized.contains("every day") {
+            result.frequencyRaw = RecurrenceFrequency.daily.rawValue
+        } else if normalized.contains("weekly") || normalized.contains("every week") {
+            result.frequencyRaw = RecurrenceFrequency.weekly.rawValue
+        } else if normalized.contains("monthly") || normalized.contains("every month") {
+            result.frequencyRaw = RecurrenceFrequency.monthly.rawValue
+        } else if normalized.contains("yearly") || normalized.contains("annually") || normalized.contains("every year") {
+            result.frequencyRaw = RecurrenceFrequency.yearly.rawValue
+        }
+
+        if let intervalRange = normalized.range(
+            of: "\\bevery\\s+(\\d{1,3})\\s+(day|days|week|weeks|month|months|year|years)\\b",
+            options: .regularExpression
+        ) {
+            let phrase = String(normalized[intervalRange])
+            let parts = phrase.split(separator: " ")
+            if parts.count == 3, let interval = Int(parts[1]) {
+                result.interval = max(1, interval)
+                let unit = String(parts[2])
+                if result.frequencyRaw == nil {
+                    result.frequencyRaw = frequencyByUnit[unit]
+                }
+            }
+        }
+
+        let weekdayByName: [String: Int] = [
+            "sunday": 1, "monday": 2, "tuesday": 3, "wednesday": 4,
+            "thursday": 5, "friday": 6, "saturday": 7
+        ]
+        if result.frequencyRaw == RecurrenceFrequency.weekly.rawValue,
+           let dayMatch = weekdayByName.first(where: { normalized.contains($0.key) }) {
+            result.weeklyWeekday = dayMatch.value
+        }
+
+        if result.frequencyRaw == RecurrenceFrequency.monthly.rawValue {
+            if normalized.contains("last day") {
+                result.monthlyIsLastDay = true
+            } else if let dayRange = normalized.range(
+                of: "\\bon\\s+([0-9]{1,2})(?:st|nd|rd|th)?\\b",
+                options: .regularExpression
+            ) {
+                let phrase = String(normalized[dayRange])
+                if let day = Int(phrase.replacingOccurrences(of: "[^0-9]", with: "", options: .regularExpression)) {
+                    result.monthlyDayOfMonth = min(31, max(1, day))
+                }
+            }
+        }
+
+        if result.frequencyRaw == RecurrenceFrequency.yearly.rawValue {
+            let monthByName: [String: Int] = [
+                "january": 1, "february": 2, "march": 3, "april": 4, "may": 5, "june": 6,
+                "july": 7, "august": 8, "september": 9, "october": 10, "november": 11, "december": 12
+            ]
+            if let monthMatch = monthByName.first(where: { normalized.contains($0.key) }) {
+                result.yearlyMonth = monthMatch.value
+                if let dayRange = normalized.range(
+                    of: "\\b\(monthMatch.key)\\s+([0-9]{1,2})(?:st|nd|rd|th)?\\b",
+                    options: .regularExpression
+                ) {
+                    let phrase = String(normalized[dayRange])
+                    if let day = Int(phrase.replacingOccurrences(of: "[^0-9]", with: "", options: .regularExpression)) {
+                        result.yearlyDayOfMonth = min(31, max(1, day))
+                    }
+                }
+            }
+        }
+
+        if let endRange = rawText.range(
+            of: "\\b(?:until|through|ending on|ending)\\s+([A-Za-z0-9\\-/ ]{3,40})\\b",
+            options: .regularExpression
+        ) {
+            let phrase = String(rawText[endRange])
+                .replacingOccurrences(of: "until", with: "")
+                .replacingOccurrences(of: "through", with: "")
+                .replacingOccurrences(of: "ending on", with: "")
+                .replacingOccurrences(of: "ending", with: "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if let endDate = parser.parseDateRange("on \(phrase)")?.startDate {
+                result.endDate = endDate
+            }
+        }
+
+        return result
     }
 
     private func resolvedIntent(from normalized: String) -> HomeAssistantCommandIntent? {
@@ -1022,11 +1159,22 @@ struct HomeAssistantCommandParser {
             return .addPreset
         }
 
-        if matchesCreateEntityIntent(in: normalized, entityKeyword: "card")
+        if normalized.contains("card")
             && normalized.contains("expense") == false
             && normalized.contains("transaction") == false
         {
-            return .addCard
+            if normalized.contains("delete") || normalized.contains("remove") {
+                return .deleteCard
+            }
+            if normalized.contains("edit") || normalized.contains("update") || normalized.contains("change") {
+                return .editCard
+            }
+            if matchesCreateEntityIntent(in: normalized, entityKeyword: "card") {
+                return .addCard
+            }
+            if normalized.contains("theme") || normalized.contains("effect") || normalized.contains("style") {
+                return .editCard
+            }
         }
 
         if matchesCreateEntityIntent(in: normalized, entityKeyword: "category") {
@@ -1096,16 +1244,28 @@ struct HomeAssistantCommandParser {
     }
 
     private func extractedAmounts(from text: String) -> [Double] {
+        let scrubbed = text
+            .replacingOccurrences(
+                of: "\\b[0-9]{1,2}/[0-9]{1,2}(?:/[0-9]{2,4})?\\b",
+                with: " ",
+                options: .regularExpression
+            )
+            .replacingOccurrences(
+                of: "\\b[0-9]{4}-[0-9]{2}-[0-9]{2}\\b",
+                with: " ",
+                options: .regularExpression
+            )
+
         guard let regex = try? NSRegularExpression(pattern: "\\$?[-]?[0-9][0-9,]*(?:\\.[0-9]{1,2})?") else {
             return []
         }
 
-        let range = NSRange(text.startIndex..<text.endIndex, in: text)
-        let matches = regex.matches(in: text, options: [], range: range)
+        let range = NSRange(scrubbed.startIndex..<scrubbed.endIndex, in: scrubbed)
+        let matches = regex.matches(in: scrubbed, options: [], range: range)
 
         return matches.compactMap { match -> Double? in
-            guard let r = Range(match.range, in: text) else { return nil }
-            return parseAmountToken(String(text[r]))
+            guard let r = Range(match.range, in: scrubbed) else { return nil }
+            return parseAmountToken(String(scrubbed[r]))
         }
     }
 
@@ -1142,7 +1302,10 @@ struct HomeAssistantCommandParser {
             let value = String(text[fromRange]).replacingOccurrences(of: "from", with: "")
             let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmed.isEmpty == false {
-                return sanitizedIncomeSource(trimmed)
+                if let quoted = extractQuotedEntityName(from: trimmed) {
+                    return stripTrailingPunctuation(quoted)
+                }
+                return sanitizedIncomeSource(trimIncomeSourceAtAttributeBoundaries(trimmed))
             }
         }
 
@@ -1150,7 +1313,10 @@ struct HomeAssistantCommandParser {
             let value = String(text[forRange]).replacingOccurrences(of: "for", with: "")
             let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmed.isEmpty == false {
-                return sanitizedIncomeSource(trimmed)
+                if let quoted = extractQuotedEntityName(from: trimmed) {
+                    return stripTrailingPunctuation(quoted)
+                }
+                return sanitizedIncomeSource(trimIncomeSourceAtAttributeBoundaries(trimmed))
             }
         }
 
@@ -1165,6 +1331,11 @@ struct HomeAssistantCommandParser {
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
         guard value.isEmpty == false else { return nil }
+        if let quoted = extractQuotedEntityName(from: value) {
+            return stripTrailingPunctuation(quoted)
+        } else {
+            value = trimIncomeSourceAtAttributeBoundaries(value)
+        }
         value = sanitizedIncomeSource(value) ?? ""
         return value.isEmpty ? nil : value
     }
@@ -1178,6 +1349,28 @@ struct HomeAssistantCommandParser {
 
         source = sanitizeCreationPhrase(stripTrailingPunctuation(source))
         return source.isEmpty ? nil : source
+    }
+
+    private func trimIncomeSourceAtAttributeBoundaries(_ text: String) -> String {
+        let patterns = [
+            "\\s+\\b(?:planned|actual)\\b.*$",
+            "\\s+\\b(?:on|at)\\s+(?:[0-9]{1,2}/[0-9]{1,2}(?:/[0-9]{2,4})?|[0-9]{4}-[0-9]{2}-[0-9]{2})\\b.*$",
+            "\\s+\\b(?:entry|income)\\b$"
+        ]
+
+        var earliest: Range<String.Index>? = nil
+        for pattern in patterns {
+            guard let range = text.range(of: pattern, options: [.regularExpression, .caseInsensitive]) else {
+                continue
+            }
+            if let earliest, range.lowerBound >= earliest.lowerBound {
+                continue
+            }
+            earliest = range
+        }
+
+        guard let earliest else { return text }
+        return String(text[..<earliest.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private func extractedCardName(from text: String) -> String? {
@@ -1243,25 +1436,25 @@ struct HomeAssistantCommandParser {
 
         let patterns: [String]
         switch intent {
-        case .addCard:
+        case .addCard, .editCard, .deleteCard:
             patterns = [
-                "\\b(?:called|named)\\s+([A-Za-z0-9 '&\\-]+)$",
-                "\\bcard\\s+([A-Za-z0-9 '&\\-]+)$"
+                "\\b(?:called|named)\\s+(.+)$",
+                "\\bcard\\s+(?:named\\s+|called\\s+)?(.+)$"
             ]
         case .addCategory:
             patterns = [
-                "\\b(?:called|named)\\s+([A-Za-z0-9 '&\\-]+)$",
-                "\\bcategory\\s+([A-Za-z0-9 '&\\-]+)$"
+                "\\b(?:called|named)\\s+(.+)$",
+                "\\bcategory\\s+(.+)$"
             ]
         case .addPreset:
             patterns = [
-                "\\b(?:called|named)\\s+([A-Za-z0-9 '&\\-]+)$",
-                "\\bpreset\\s+([A-Za-z0-9 '&\\-]+)$"
+                "\\b(?:called|named)\\s+(.+)$",
+                "\\bpreset\\s+(.+)$"
             ]
         case .addBudget:
             patterns = [
-                "\\b(?:called|named)\\s+([A-Za-z0-9 '&\\-]+)$",
-                "\\bbudget\\s+([A-Za-z0-9 '&\\-]+)$"
+                "\\b(?:called|named)\\s+(.+)$",
+                "\\bbudget\\s+(.+)$"
             ]
         case .addExpense, .addIncome, .editExpense, .deleteExpense, .editIncome, .deleteIncome, .markIncomeReceived, .moveExpenseCategory, .updatePlannedExpenseAmount, .deleteLastExpense, .deleteLastIncome:
             return nil
@@ -1280,6 +1473,11 @@ struct HomeAssistantCommandParser {
             }
 
             var raw = String(compactText[range]).trimmingCharacters(in: .whitespacesAndNewlines)
+            if let quoted = extractQuotedEntityName(from: raw) {
+                raw = quoted
+            } else {
+                raw = trimEntityNameAtAttributeBoundaries(raw, intent: intent)
+            }
             raw = stripTrailingPunctuation(raw)
             if intent == .addPreset {
                 raw = raw.replacingOccurrences(
@@ -1295,6 +1493,64 @@ struct HomeAssistantCommandParser {
         }
 
         return nil
+    }
+
+    private func extractQuotedEntityName(from text: String) -> String? {
+        guard let range = text.range(of: "\"([^\"]+)\"", options: .regularExpression) else {
+            return nil
+        }
+        let quoted = String(text[range]).trimmingCharacters(in: CharacterSet(charactersIn: "\" "))
+        return quoted.isEmpty ? nil : quoted
+    }
+
+    private func trimEntityNameAtAttributeBoundaries(
+        _ text: String,
+        intent: HomeAssistantCommandIntent
+    ) -> String {
+        let boundaries = attributeBoundaryPatterns(for: intent)
+        guard boundaries.isEmpty == false else { return text }
+
+        var earliest: Range<String.Index>? = nil
+
+        for pattern in boundaries {
+            guard let range = text.range(of: pattern, options: [.regularExpression, .caseInsensitive]) else {
+                continue
+            }
+            if let earliest, range.lowerBound >= earliest.lowerBound {
+                continue
+            }
+            earliest = range
+        }
+
+        guard let earliest else { return text }
+        return String(text[..<earliest.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func attributeBoundaryPatterns(for intent: HomeAssistantCommandIntent) -> [String] {
+        switch intent {
+        case .addCard, .editCard, .deleteCard:
+            let cardStyleTokens = (CardThemeOption.allCases.map(\.rawValue) + CardEffectOption.allCases.map(\.rawValue))
+                .joined(separator: "|")
+            return [
+                "\\s+\\b(?:theme|effect|style)\\b.*$",
+                "\\s+\\b(?:with|using)\\s+\\b(?:theme|effect|style)\\b.*$",
+                "\\s+\\b(?:with|using)\\s+\\b(?:\(cardStyleTokens))\\b.*$"
+            ]
+        case .addCategory:
+            return ["\\s+\\b(?:color|colour)\\b.*$"]
+        case .addPreset:
+            return [
+                "\\s+\\$?[-]?[0-9][0-9,]*(?:\\.[0-9]{1,2})?\\b.*$",
+                "\\s+\\bon\\s+.+\\s+card\\b.*$"
+            ]
+        case .addBudget:
+            return [
+                "\\s+\\bfor\\b.*$",
+                "\\s+\\bfrom\\b.*$"
+            ]
+        case .addExpense, .addIncome, .editExpense, .deleteExpense, .editIncome, .deleteIncome, .markIncomeReceived, .moveExpenseCategory, .updatePlannedExpenseAmount, .deleteLastExpense, .deleteLastIncome:
+            return []
+        }
     }
 
     private func extractedCategoryColor(from text: String) -> (hex: String?, name: String?) {
@@ -1443,10 +1699,16 @@ struct HomeAssistantCommandParser {
     }
 
     private func extractedIncomeKind(from normalized: String) -> Bool? {
-        if normalized.contains("planned") {
+        let normalizedWithoutQuoted = normalized.replacingOccurrences(
+            of: "\"[^\"]+\"",
+            with: " ",
+            options: .regularExpression
+        )
+
+        if normalizedWithoutQuoted.contains("planned") {
             return true
         }
-        if normalized.contains("actual") {
+        if normalizedWithoutQuoted.contains("actual") {
             return false
         }
         return nil

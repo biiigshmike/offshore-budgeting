@@ -370,6 +370,8 @@ enum HomeAssistantCommandIntent: String, Equatable {
     case addIncome
     case addBudget
     case addCard
+    case editCard
+    case deleteCard
     case addPreset
     case addCategory
     case editExpense
@@ -412,6 +414,14 @@ struct HomeAssistantCommandPlan: Equatable {
     let categoryColorName: String?
     let cardThemeRaw: String?
     let cardEffectRaw: String?
+    let recurrenceFrequencyRaw: String?
+    let recurrenceInterval: Int?
+    let weeklyWeekday: Int?
+    let monthlyDayOfMonth: Int?
+    let monthlyIsLastDay: Bool?
+    let yearlyMonth: Int?
+    let yearlyDayOfMonth: Int?
+    let recurrenceEndDate: Date?
     let plannedExpenseAmountTarget: HomeAssistantPlannedExpenseAmountTarget?
     let attachAllCards: Bool?
     let attachAllPresets: Bool?
@@ -436,6 +446,14 @@ struct HomeAssistantCommandPlan: Equatable {
         categoryColorName: String? = nil,
         cardThemeRaw: String? = nil,
         cardEffectRaw: String? = nil,
+        recurrenceFrequencyRaw: String? = nil,
+        recurrenceInterval: Int? = nil,
+        weeklyWeekday: Int? = nil,
+        monthlyDayOfMonth: Int? = nil,
+        monthlyIsLastDay: Bool? = nil,
+        yearlyMonth: Int? = nil,
+        yearlyDayOfMonth: Int? = nil,
+        recurrenceEndDate: Date? = nil,
         plannedExpenseAmountTarget: HomeAssistantPlannedExpenseAmountTarget? = nil,
         attachAllCards: Bool? = nil,
         attachAllPresets: Bool? = nil,
@@ -459,6 +477,14 @@ struct HomeAssistantCommandPlan: Equatable {
         self.categoryColorName = categoryColorName
         self.cardThemeRaw = cardThemeRaw
         self.cardEffectRaw = cardEffectRaw
+        self.recurrenceFrequencyRaw = recurrenceFrequencyRaw
+        self.recurrenceInterval = recurrenceInterval
+        self.weeklyWeekday = weeklyWeekday
+        self.monthlyDayOfMonth = monthlyDayOfMonth
+        self.monthlyIsLastDay = monthlyIsLastDay
+        self.yearlyMonth = yearlyMonth
+        self.yearlyDayOfMonth = yearlyDayOfMonth
+        self.recurrenceEndDate = recurrenceEndDate
         self.plannedExpenseAmountTarget = plannedExpenseAmountTarget
         self.attachAllCards = attachAllCards
         self.attachAllPresets = attachAllPresets
