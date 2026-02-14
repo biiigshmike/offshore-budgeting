@@ -257,8 +257,8 @@ struct ExpenseCSVImportFlowView: View {
                     allAllocationAccounts: vm.allocationAccounts,
                     allowKindEditing: mode == .cardTransactions,
                     incomeHelperText: mode == .cardTransactions
-                        ? "Imports as Income (linked to this card)"
-                        : "Imports as standalone Income",
+                        ? "Imports as Actual Income (linked to this card)"
+                        : "Imports as Actual Income",
                     onToggleInclude: { vm.toggleInclude(rowID: row.id) },
                     onSetDate: { date in vm.setDate(rowID: row.id, date: date) },
                     onSetMerchant: { text in vm.setMerchant(rowID: row.id, merchant: text) },
