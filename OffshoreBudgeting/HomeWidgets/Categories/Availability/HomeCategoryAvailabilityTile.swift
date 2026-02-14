@@ -8,6 +8,10 @@
 import SwiftUI
 
 struct HomeCategoryAvailabilityTile: View {
+    enum LayoutMode {
+        case small
+        case wide
+    }
 
     let workspace: Workspace
 
@@ -18,7 +22,7 @@ struct HomeCategoryAvailabilityTile: View {
 
     let startDate: Date
     let endDate: Date
-    var previewRowCount: Int = 3
+    var layoutMode: LayoutMode = .small
 
     var inclusionPolicy: HomeCategoryLimitsAggregator.CategoryInclusionPolicy = .allCategoriesInfinityWhenMissing
 
@@ -27,7 +31,15 @@ struct HomeCategoryAvailabilityTile: View {
 
     private let rowHeight: CGFloat = 76
     private let rowSpacing: CGFloat = 10
-    private var pageSize: Int { max(1, previewRowCount) }
+    private let pageSize: Int = 6
+    private var rowsPerPage: Int {
+        switch layoutMode {
+        case .small:
+            return 6
+        case .wide:
+            return 3
+        }
+    }
 
 
     var body: some View {
@@ -68,7 +80,7 @@ struct HomeCategoryAvailabilityTile: View {
                 let pageItems: [CategoryAvailabilityMetric] = (start < end) ? Array(result.metrics[start..<end]) : []
                 
                 let reservedRowsHeight =
-                    CGFloat(pageSize) * rowHeight + CGFloat(pageSize - 1) * rowSpacing
+                    CGFloat(rowsPerPage) * rowHeight + CGFloat(max(0, rowsPerPage - 1)) * rowSpacing
 
                 VStack(alignment: .leading, spacing: 12) {
                     HStack(spacing: 10) {
@@ -80,20 +92,45 @@ struct HomeCategoryAvailabilityTile: View {
 
                     Divider().opacity(0.35)
 
-                    VStack(spacing: rowSpacing) {
-                        ForEach(pageItems) { metric in
-                            CategoryAvailabilityRowView(
-                                metric: metric,
-                                scope: scope,
-                                currencyCode: CurrencyFormatter.currencyCode,
-                                nearThreshold: HomeCategoryLimitsAggregator.defaultNearThreshold
-                            )
+                    switch layoutMode {
+                    case .small:
+                        VStack(spacing: rowSpacing) {
+                            ForEach(pageItems) { metric in
+                                CategoryAvailabilityRowView(
+                                    metric: metric,
+                                    scope: scope,
+                                    currencyCode: CurrencyFormatter.currencyCode,
+                                    nearThreshold: HomeCategoryLimitsAggregator.defaultNearThreshold
+                                )
+                            }
                         }
+                        .frame(
+                            minHeight: reservedRowsHeight,
+                            alignment: .top
+                        )
+                    case .wide:
+                        LazyVGrid(
+                            columns: [
+                                GridItem(.flexible(minimum: 0), spacing: rowSpacing),
+                                GridItem(.flexible(minimum: 0), spacing: rowSpacing)
+                            ],
+                            alignment: .leading,
+                            spacing: rowSpacing
+                        ) {
+                            ForEach(pageItems) { metric in
+                                CategoryAvailabilityRowView(
+                                    metric: metric,
+                                    scope: scope,
+                                    currencyCode: CurrencyFormatter.currencyCode,
+                                    nearThreshold: HomeCategoryLimitsAggregator.defaultNearThreshold
+                                )
+                            }
+                        }
+                        .frame(
+                            minHeight: reservedRowsHeight,
+                            alignment: .top
+                        )
                     }
-                    .frame(
-                        minHeight: reservedRowsHeight,
-                        alignment: .top
-                    )
                 }
                 .onChange(of: totalPages) { _, newValue in
                     // If data changes and is beyond the last page, clamp.

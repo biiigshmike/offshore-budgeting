@@ -300,7 +300,7 @@ struct HomeView: View {
 
         case .categoryAvailability:
             categoryAvailabilityWidget(
-                previewRowCount: categoryAvailabilityPreviewRowCount(for: displaySize)
+                displaySize: displaySize
             )
 
         case .spendTrends:
@@ -501,7 +501,7 @@ struct HomeView: View {
     }
 
     @ViewBuilder
-    private func categoryAvailabilityWidget(previewRowCount: Int) -> some View {
+    private func categoryAvailabilityWidget(displaySize: HomeTileDisplaySize) -> some View {
         HomeCategoryAvailabilityTile(
             workspace: workspace,
             budgets: budgets,
@@ -510,16 +510,22 @@ struct HomeView: View {
             variableExpenses: variableExpenses,
             startDate: appliedStartDate,
             endDate: appliedEndDate,
-            previewRowCount: previewRowCount
+            layoutMode: categoryAvailabilityLayoutMode(for: displaySize)
         )
     }
 
-    private func categoryAvailabilityPreviewRowCount(for displaySize: HomeTileDisplaySize) -> Int {
+    private func categoryAvailabilityLayoutMode(
+        for displaySize: HomeTileDisplaySize
+    ) -> HomeCategoryAvailabilityTile.LayoutMode {
+        if usesStackedAccessibilityLayout {
+            return .small
+        }
+
         switch displaySize {
-        case .wideTall:
-            return 5
-        default:
-            return 3
+        case .small:
+            return .small
+        case .wide, .wideTall:
+            return .wide
         }
     }
 
@@ -591,6 +597,7 @@ struct HomeView: View {
             let width = tileWidth(span: span, columns: columns, usableWidth: usableWidth)
             let height = resolvedMasonryHeight(
                 for: cell.id,
+                item: cell.item,
                 displaySize: cell.displaySize
             )
             let y = masonryYOrigin(
@@ -663,14 +670,32 @@ struct HomeView: View {
         return CGFloat(max(0, column)) * (unitWidth + gridSpacing)
     }
 
-    private func resolvedMasonryHeight(for id: String, displaySize: HomeTileDisplaySize) -> CGFloat {
+    private func resolvedMasonryHeight(
+        for id: String,
+        item: HomePinnedItem,
+        displaySize: HomeTileDisplaySize
+    ) -> CGFloat {
         if let measured = masonryMeasuredHeights[id], measured > 1 {
             return measured
         }
-        return estimatedMasonryHeight(for: displaySize)
+        return estimatedMasonryHeight(for: item, displaySize: displaySize)
     }
 
-    private func estimatedMasonryHeight(for displaySize: HomeTileDisplaySize) -> CGFloat {
+    private func estimatedMasonryHeight(
+        for item: HomePinnedItem,
+        displaySize: HomeTileDisplaySize
+    ) -> CGFloat {
+        if case .widget(.categoryAvailability, _) = item {
+            switch displaySize {
+            case .small:
+                return 620
+            case .wide:
+                return 390
+            case .wideTall:
+                return 620
+            }
+        }
+
         switch displaySize {
         case .small:
             return 220
@@ -695,10 +720,6 @@ struct HomeView: View {
         guard isPhone == false else { return baseDisplaySize(for: item.tileSize) }
         guard voiceOverEnabled == false else { return baseDisplaySize(for: item.tileSize) }
         guard dynamicTypeSize.isAccessibilitySize == false else { return baseDisplaySize(for: item.tileSize) }
-
-        if case .widget(.categoryAvailability, _) = item {
-            return .wideTall
-        }
 
         return baseDisplaySize(for: item.tileSize)
     }
