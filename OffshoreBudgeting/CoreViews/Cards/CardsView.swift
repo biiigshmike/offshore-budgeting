@@ -451,24 +451,18 @@ private struct AllocationAccountTileView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(account.name)
-                    .font(.headline)
-                    .lineLimit(2)
-
-                Spacer(minLength: 8)
-
-                Text("Shared Balance")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
+        ZStack(alignment: .bottomLeading) {
             Text(balance, format: CurrencyFormatter.currencyStyle())
-                .font(.title3.weight(.semibold))
+                .font(.title2.weight(.semibold))
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+
+            Text(account.name)
+                .font(.headline)
+                .lineLimit(2)
+                .padding(16)
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, minHeight: 120, alignment: .leading)
+        .aspectRatio(1.586, contentMode: .fit)
+        .frame(maxWidth: .infinity, minHeight: 155, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .fill((Color(hex: account.hexColor) ?? .blue).opacity(0.25))
