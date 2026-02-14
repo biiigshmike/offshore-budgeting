@@ -57,17 +57,32 @@ struct SettingsReleaseLogsView: View {
                 ReleaseItem(
                     systemImage: "figure.wave",
                     title: "Welcome Aboard, Marina!",
-                    description: "Marina is Offshore’s new on-device financial assistant on the Home tab. She’s just getting her sea legs, so please be patient as she learns her way around. Marina runs entirely on your device and will only improve with time. Try chatting with her to explore savings goals and simple insights."
+                    description: "Marina is Offshore’s new on-device financial assistant, available on the Home tab. She’s just getting her sea legs, so please be patient as she learns her way around. Marina runs entirely on your device and will improve with time. Try chatting with her to add income or expenses, explore savings goals, or gain quick insights into your finances."
                 ),
                 ReleaseItem(
-                    systemImage: "globe",
-                    title: "More Formatting Implemented",
-                    description: "Added safeguards to ensure that locale settings that are shared globally by the device are respected in Offshore, such as number formatting, first day of the week, and date formatting."
+                    systemImage: "cart.fill",
+                    title: "Excursion Mode",
+                    description: "Heading out shopping? Activate Excursion Mode to receive gentle reminders to log expenses when you’re near relevant points of interest. All processing happens on-device and can be turned on or off anytime."
+                ),
+                ReleaseItem(
+                    systemImage: "creditcard.fill",
+                    title: "Shared Balances: Now on the Cards Tab",
+                    description: "You can now split expenses and track shared balances. When adding or editing an expense, choose to split or offset it against a Shared Balance. View the running total and full transaction history in Cards > Shared Balance."
+                ),
+                ReleaseItem(
+                    systemImage: "square.2.layers.3d.top.filled",
+                    title: "Quick Actions",
+                    description: "Optional Quick Actions are now available through Shortcuts and Automations. You’ll see them during Onboarding and in Settings > Install Quick Actions.\n\nThese are completely optional and can help automate adding income from SMS or email notifications, as well as logging expenses from Apple Wallet taps. Offshore works perfectly without them."
+                ),
+                ReleaseItem(
+                    systemImage: "filemenu.and.selection",
+                    title: "Screen-Aware Keyboard Shortcuts",
+                    description: "The iPad and Mac menu bar has been refined with screen-aware keyboard shortcuts. Shortcuts now appear only where relevant and are organized into the appropriate menu sections."
                 ),
                 ReleaseItem(
                     systemImage: "widget.large.badge.plus",
                     title: "Two New Home Screen Widgets",
-                    description: "Next Planned Expense Widget and Spend Trends Widget are now available for the Home Screen. Spend Trends Large and XXL-sized incorporate flavors of Category Spotlight to show a percentage of spending by category."
+                    description: "Next Planned Expense and Spend Trends widgets are now available for the Home Screen. The Large and XXL Spend Trends widgets also incorporate Category Spotlight elements, showing spending by category as a percentage."
                 )
             ]
         ),
