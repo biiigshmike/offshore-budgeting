@@ -376,12 +376,22 @@ enum HomeAssistantCommandIntent: String, Equatable {
     case deleteExpense
     case editIncome
     case deleteIncome
+    case markIncomeReceived
+    case moveExpenseCategory
+    case updatePlannedExpenseAmount
+    case deleteLastExpense
+    case deleteLastIncome
 }
 
 enum HomeAssistantCommandConfidenceBand: String, Equatable {
     case high
     case medium
     case low
+}
+
+enum HomeAssistantPlannedExpenseAmountTarget: String, Equatable {
+    case planned
+    case actual
 }
 
 struct HomeAssistantCommandPlan: Equatable {
@@ -402,6 +412,7 @@ struct HomeAssistantCommandPlan: Equatable {
     let categoryColorName: String?
     let cardThemeRaw: String?
     let cardEffectRaw: String?
+    let plannedExpenseAmountTarget: HomeAssistantPlannedExpenseAmountTarget?
     let attachAllCards: Bool?
     let attachAllPresets: Bool?
     let selectedCardNames: [String]
@@ -425,6 +436,7 @@ struct HomeAssistantCommandPlan: Equatable {
         categoryColorName: String? = nil,
         cardThemeRaw: String? = nil,
         cardEffectRaw: String? = nil,
+        plannedExpenseAmountTarget: HomeAssistantPlannedExpenseAmountTarget? = nil,
         attachAllCards: Bool? = nil,
         attachAllPresets: Bool? = nil,
         selectedCardNames: [String] = [],
@@ -447,6 +459,7 @@ struct HomeAssistantCommandPlan: Equatable {
         self.categoryColorName = categoryColorName
         self.cardThemeRaw = cardThemeRaw
         self.cardEffectRaw = cardEffectRaw
+        self.plannedExpenseAmountTarget = plannedExpenseAmountTarget
         self.attachAllCards = attachAllCards
         self.attachAllPresets = attachAllPresets
         self.selectedCardNames = selectedCardNames

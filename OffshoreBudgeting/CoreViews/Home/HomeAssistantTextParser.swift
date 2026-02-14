@@ -185,6 +185,11 @@ struct HomeAssistantTextParser {
             || text.contains("how are my finances looking")
             || text.contains("budget check in")
             || text.contains("budget checkin")
+            || text.contains("total available")
+            || text.contains("projected savings")
+            || text.contains("left after planned expenses")
+            || text.contains("current balance")
+            || text.contains("over budget")
         {
             return true
         }
@@ -287,7 +292,7 @@ struct HomeAssistantTextParser {
 
     private func matchesIncomeSourceShareIntent(in text: String) -> Bool {
         let incomeKeywords = ["income", "paycheck", "paychecks", "source", "sources", "salary", "wages"]
-        let shareKeywords = ["how much", "share", "comes from", "from", "percent", "percentage", "portion", "split", "contribution"]
+        let shareKeywords = ["how much", "share", "comes from", "from", "percent", "percentage", "portion", "split", "contribution", "received", "scheduled", "recurring", "planned income", "total income"]
 
         return containsAny(text, keywords: incomeKeywords)
             && containsAny(text, keywords: shareKeywords)
@@ -331,14 +336,14 @@ struct HomeAssistantTextParser {
 
     private func matchesPresetDueIntent(in text: String) -> Bool {
         let presetKeywords = ["preset", "presets", "recurring", "autopay", "auto pay", "scheduled payment", "scheduled payments"]
-        let dueKeywords = ["due", "coming up", "upcoming", "due soon", "next due"]
+        let dueKeywords = ["due", "coming up", "upcoming", "due soon", "next due", "planned expenses are coming up", "owe in planned expenses", "overdue"]
 
         return containsAny(text, keywords: presetKeywords)
             && containsAny(text, keywords: dueKeywords)
     }
 
     private func matchesPresetHighestCostIntent(in text: String) -> Bool {
-        let presetKeywords = ["preset", "presets", "recurring", "autopay", "auto pay"]
+        let presetKeywords = ["preset", "presets", "recurring", "autopay", "auto pay", "planned expense", "planned expenses"]
         let costKeywords = ["costs me the most", "most expensive", "highest cost", "costliest", "cost me the most"]
 
         return containsAny(text, keywords: presetKeywords)
@@ -887,13 +892,13 @@ struct HomeAssistantCommandParser {
         let amount: Double?
         let originalAmount: Double?
         switch intent {
-        case .editExpense, .editIncome:
+        case .editExpense, .editIncome, .updatePlannedExpenseAmount:
             originalAmount = amountPair?.from ?? amounts.first
             amount = amountPair?.to ?? amounts.last
-        case .addExpense, .addIncome, .addPreset:
+        case .addExpense, .addIncome, .addPreset, .markIncomeReceived:
             originalAmount = nil
             amount = amounts.first
-        case .deleteExpense, .deleteIncome:
+        case .deleteExpense, .deleteIncome, .moveExpenseCategory, .deleteLastExpense, .deleteLastIncome:
             originalAmount = nil
             amount = amounts.first
         case .addBudget, .addCard, .addCategory:
@@ -910,6 +915,7 @@ struct HomeAssistantCommandParser {
         let categoryColor = extractedCategoryColor(from: trimmed)
         let cardTheme = extractedCardTheme(from: normalized)
         let cardEffect = extractedCardEffect(from: normalized)
+        let plannedExpenseAmountTarget = extractedPlannedExpenseAmountTarget(from: normalized)
         let attachAllCards = extractedAttachAllCards(from: normalized)
         let attachAllPresets = extractedAttachAllPresets(from: normalized)
 
@@ -931,6 +937,7 @@ struct HomeAssistantCommandParser {
             categoryColorName: categoryColor.name,
             cardThemeRaw: cardTheme?.rawValue,
             cardEffectRaw: cardEffect?.rawValue,
+            plannedExpenseAmountTarget: plannedExpenseAmountTarget,
             attachAllCards: attachAllCards,
             attachAllPresets: attachAllPresets
         )
@@ -943,6 +950,37 @@ struct HomeAssistantCommandParser {
     }
 
     private func resolvedIntent(from normalized: String) -> HomeAssistantCommandIntent? {
+        if normalized.contains("mark")
+            && normalized.contains("income")
+            && (normalized.contains("received") || normalized.contains("as received"))
+        {
+            return .markIncomeReceived
+        }
+
+        if (normalized.contains("delete last expense")
+            || normalized.contains("delete my last expense")
+            || normalized.contains("remove my last expense"))
+        {
+            return .deleteLastExpense
+        }
+
+        if (normalized.contains("delete last income")
+            || normalized.contains("delete my last income")
+            || normalized.contains("remove my last income"))
+        {
+            return .deleteLastIncome
+        }
+
+        if (normalized.contains("move this expense") || normalized.contains("move expense"))
+            && normalized.contains("category")
+        {
+            return .moveExpenseCategory
+        }
+
+        if matchesPlannedExpenseAmountUpdateIntent(in: normalized) {
+            return .updatePlannedExpenseAmount
+        }
+
         if matchesCreateEntityIntent(in: normalized, entityKeyword: "budget") {
             return .addBudget
         }
@@ -1071,7 +1109,7 @@ struct HomeAssistantCommandParser {
             let value = String(text[fromRange]).replacingOccurrences(of: "from", with: "")
             let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmed.isEmpty == false {
-                return sanitizeCreationPhrase(stripTrailingPunctuation(trimmed))
+                return sanitizedIncomeSource(trimmed)
             }
         }
 
@@ -1079,11 +1117,34 @@ struct HomeAssistantCommandParser {
             let value = String(text[forRange]).replacingOccurrences(of: "for", with: "")
             let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmed.isEmpty == false {
-                return sanitizeCreationPhrase(stripTrailingPunctuation(trimmed))
+                return sanitizedIncomeSource(trimmed)
             }
         }
 
-        return nil
+        return extractedIncomeSourceFallback(from: text)
+    }
+
+    private func extractedIncomeSourceFallback(from text: String) -> String? {
+        var value = text
+            .replacingOccurrences(of: "\\$?[-]?[0-9][0-9,]*(?:\\.[0-9]{1,2})?", with: " ", options: .regularExpression)
+            .replacingOccurrences(of: "\\b(add|log|create|income|mark|as|received|entry|new|my|an|a)\\b", with: " ", options: [.regularExpression, .caseInsensitive])
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard value.isEmpty == false else { return nil }
+        value = sanitizedIncomeSource(value) ?? ""
+        return value.isEmpty ? nil : value
+    }
+
+    private func sanitizedIncomeSource(_ raw: String) -> String? {
+        var source = raw
+            .replacingOccurrences(of: "\\$?[-]?[0-9][0-9,]*(?:\\.[0-9]{1,2})?", with: " ", options: .regularExpression)
+            .replacingOccurrences(of: "\\b(planned|actual|income|received)\\b", with: " ", options: [.regularExpression, .caseInsensitive])
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        source = sanitizeCreationPhrase(stripTrailingPunctuation(source))
+        return source.isEmpty ? nil : source
     }
 
     private func extractedCardName(from text: String) -> String? {
@@ -1117,13 +1178,26 @@ struct HomeAssistantCommandParser {
     }
 
     private func extractedCategoryName(from text: String) -> String? {
-        guard let range = text.range(of: "\\bcategory\\s+([A-Za-z0-9 '&\\-]+)\\b", options: .regularExpression) else {
-            return nil
+        let patterns = [
+            "\\bcategory\\s+([A-Za-z0-9 '&\\-]+)\\b",
+            "\\bto\\s+([A-Za-z0-9 '&\\-]+)\\s+category\\b"
+        ]
+
+        for pattern in patterns {
+            guard let range = text.range(of: pattern, options: .regularExpression) else {
+                continue
+            }
+
+            let phrase = String(text[range])
+                .replacingOccurrences(of: "category", with: "")
+                .replacingOccurrences(of: "to", with: "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if phrase.isEmpty == false {
+                return stripTrailingPunctuation(phrase)
+            }
         }
 
-        let phrase = String(text[range]).replacingOccurrences(of: "category", with: "")
-        let trimmed = phrase.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : stripTrailingPunctuation(trimmed)
+        return nil
     }
 
     private func extractedEntityName(
@@ -1156,7 +1230,7 @@ struct HomeAssistantCommandParser {
                 "\\b(?:called|named)\\s+([A-Za-z0-9 '&\\-]+)$",
                 "\\bbudget\\s+([A-Za-z0-9 '&\\-]+)$"
             ]
-        case .addExpense, .addIncome, .editExpense, .deleteExpense, .editIncome, .deleteIncome:
+        case .addExpense, .addIncome, .editExpense, .deleteExpense, .editIncome, .deleteIncome, .markIncomeReceived, .moveExpenseCategory, .updatePlannedExpenseAmount, .deleteLastExpense, .deleteLastIncome:
             return nil
         }
 
@@ -1248,6 +1322,44 @@ struct HomeAssistantCommandParser {
         }
         if normalized.contains("no presets") || normalized.contains("without presets") || normalized.contains("skip presets") {
             return false
+        }
+        return nil
+    }
+
+    private func matchesPlannedExpenseAmountUpdateIntent(in normalized: String) -> Bool {
+        let hasUpdateVerb = normalized.contains("update")
+            || normalized.contains("edit")
+            || normalized.contains("change")
+            || normalized.contains("set")
+        guard hasUpdateVerb else { return false }
+
+        guard normalized.range(of: "\\$?[-]?[0-9][0-9,]*(?:\\.[0-9]{1,2})?", options: .regularExpression) != nil else {
+            return false
+        }
+
+        if normalized.contains("income") {
+            return false
+        }
+
+        if normalized.contains("planned expense")
+            || normalized.contains("planned")
+            || normalized.contains("preset")
+            || normalized.contains("rent")
+            || normalized.contains("mortgage")
+            || normalized.contains("subscription")
+        {
+            return true
+        }
+
+        return normalized.contains(" to ")
+    }
+
+    private func extractedPlannedExpenseAmountTarget(from normalized: String) -> HomeAssistantPlannedExpenseAmountTarget? {
+        if normalized.contains("actual") || normalized.contains("effective") {
+            return .actual
+        }
+        if normalized.contains("planned") {
+            return .planned
         }
         return nil
     }

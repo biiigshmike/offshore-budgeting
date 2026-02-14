@@ -561,6 +561,53 @@ struct HomeAssistantTextParserTests {
         #expect(command?.categoryColorHex == "#8FA6FF")
     }
 
+    @Test func commandParser_addIncomePrompt_fromPhrase_stripsAmountFromSource() throws {
+        let command = makeCommandParser().parse("Add income from Paycheck $1250")
+        #expect(command?.intent == .addIncome)
+        #expect(command?.source == "Paycheck")
+    }
+
+    @Test func commandParser_addIncomePrompt_infersSourceWithoutFromKeyword() throws {
+        let command = makeCommandParser().parse("Add income work $1250")
+        #expect(command?.intent == .addIncome)
+        #expect(command?.source == "work")
+        #expect(command?.amount == 1250)
+    }
+
+    @Test func commandParser_markIncomeReceivedPrompt_mapsToIntent() throws {
+        let command = makeCommandParser().parse("Mark income as received")
+        #expect(command?.intent == .markIncomeReceived)
+    }
+
+    @Test func commandParser_moveExpenseCategoryPrompt_mapsToIntentAndCategory() throws {
+        let command = makeCommandParser().parse("Move expense $45 to groceries category")
+        #expect(command?.intent == .moveExpenseCategory)
+        #expect(command?.categoryName == "groceries")
+    }
+
+    @Test func commandParser_updatePlannedExpenseAmountPrompt_mapsToIntent() throws {
+        let command = makeCommandParser().parse("Update rent to $1450")
+        #expect(command?.intent == .updatePlannedExpenseAmount)
+        #expect(command?.amount == 1450)
+        #expect(command?.plannedExpenseAmountTarget == nil)
+    }
+
+    @Test func commandParser_updatePlannedExpenseAmountPrompt_withActualTarget_extractsTarget() throws {
+        let command = makeCommandParser().parse("Update planned expense rent actual to $1450")
+        #expect(command?.intent == .updatePlannedExpenseAmount)
+        #expect(command?.plannedExpenseAmountTarget == .actual)
+    }
+
+    @Test func commandParser_deleteLastExpensePrompt_mapsToIntent() throws {
+        let command = makeCommandParser().parse("Delete my last expense")
+        #expect(command?.intent == .deleteLastExpense)
+    }
+
+    @Test func commandParser_deleteLastIncomePrompt_mapsToIntent() throws {
+        let command = makeCommandParser().parse("Delete my last income")
+        #expect(command?.intent == .deleteLastIncome)
+    }
+
     // MARK: - Helpers
 
     private struct IntentPhraseCase {
