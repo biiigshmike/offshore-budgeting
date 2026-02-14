@@ -61,6 +61,7 @@ struct OffshoreBudgetingApp: App {
             AppBootstrapRootView(modelContainer: $modelContainer)
                 .environment(\.appCommandHub, commandHub)
                 .id(rootResetToken)
+                .hideCatalystWindowTitlebarText()
                 .onAppear {
                     ShoppingModeManager.shared.refreshIfExpired()
                     if ShoppingModeManager.shared.status.isActive {
