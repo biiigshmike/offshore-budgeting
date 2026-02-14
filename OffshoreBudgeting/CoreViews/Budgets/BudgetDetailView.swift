@@ -468,7 +468,7 @@ struct BudgetDetailView: View {
                 } header: {
                     Text("Categories")
                 } footer: {
-                    Text("Single-press a category to filter expenses by that category alone, then tap the same category again to clear your selection. Long-press a category to edit its spending limit for this budget.")
+                    Text("Single-press a category filter expenses; long-press to edit its spending limit.")
                 }
             }
 
