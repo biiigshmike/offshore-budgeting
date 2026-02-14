@@ -60,7 +60,7 @@ struct SettingsReleaseLogsView: View {
                     description: "Marina is Offshore’s new on-device financial assistant, available on the Home tab. She’s just getting her sea legs, so please be patient as she learns her way around. Marina runs entirely on your device and will improve with time. Try chatting with her to add income or expenses, explore savings goals, or gain quick insights into your finances."
                 ),
                 ReleaseItem(
-                    systemImage: "cart.fill",
+                    systemImage: "sailboat.fill",
                     title: "Excursion Mode",
                     description: "Heading out shopping? Activate Excursion Mode to receive gentle reminders to log expenses when you’re near relevant points of interest. All processing happens on-device and can be turned on or off anytime."
                 ),
