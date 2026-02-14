@@ -60,10 +60,10 @@ struct OnboardingStartGateView: View {
                     .font(.system(size: 46, weight: .semibold))
                     .foregroundStyle(.tint)
 
-                Text("Welcome to Offshore Budgeting!")
+                Text("Welcome to Offshore!")
                     .font(.largeTitle.weight(.bold))
 
-                Text("Press the button below to get started setting up your budgeting workspace.")
+                Text("A private, manual-first way to plan your money.\nNo bank connections or accounts required.")
                     .font(.body)
                     .foregroundStyle(.secondary)
 
