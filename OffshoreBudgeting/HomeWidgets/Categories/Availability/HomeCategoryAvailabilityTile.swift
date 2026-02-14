@@ -18,15 +18,16 @@ struct HomeCategoryAvailabilityTile: View {
 
     let startDate: Date
     let endDate: Date
+    var previewRowCount: Int = 3
 
     var inclusionPolicy: HomeCategoryLimitsAggregator.CategoryInclusionPolicy = .allCategoriesInfinityWhenMissing
 
     @State private var scope: AvailabilityScope = .all
     @State private var pageIndex: Int = 0
 
-    private let pageSize: Int = 3
     private let rowHeight: CGFloat = 76
     private let rowSpacing: CGFloat = 10
+    private var pageSize: Int { max(1, previewRowCount) }
 
 
     var body: some View {

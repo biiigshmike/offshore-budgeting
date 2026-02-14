@@ -51,6 +51,7 @@ struct HomeView: View {
     @State private var isEditingWidgets: Bool = false
 
     @State private var pinnedItems: [HomePinnedItem] = []
+    @State private var masonryMeasuredHeights: [String: CGFloat] = [:]
 
     @State private var isShowingWhatIfPlanner: Bool = false
     @State private var whatIfInitialScenarioID: UUID? = nil
@@ -250,10 +251,10 @@ struct HomeView: View {
     // MARK: - Unified tile rendering
 
     @ViewBuilder
-    private func pinnedItemView(_ item: HomePinnedItem) -> some View {
+    private func pinnedItemView(_ item: HomePinnedItem, displaySize: HomeTileDisplaySize) -> some View {
         switch item {
         case .widget(let widget, _):
-            widgetView(for: widget)
+            widgetView(for: widget, displaySize: displaySize)
 
         case .card(let id, _):
             if let card = cards.first(where: { $0.id == id }) {
@@ -280,7 +281,7 @@ struct HomeView: View {
     }
 
     @ViewBuilder
-    private func widgetView(for widget: HomeWidgetID) -> some View {
+    private func widgetView(for widget: HomeWidgetID, displaySize: HomeTileDisplaySize) -> some View {
         switch widget {
         case .income:
             incomeWidget
@@ -298,7 +299,9 @@ struct HomeView: View {
             categorySpotlightWidget
 
         case .categoryAvailability:
-            categoryAvailabilityWidget
+            categoryAvailabilityWidget(
+                previewRowCount: categoryAvailabilityPreviewRowCount(for: displaySize)
+            )
 
         case .spendTrends:
             spendTrendsWidget
@@ -307,51 +310,118 @@ struct HomeView: View {
 
     // MARK: - Pinned Items Layout
 
-    private enum PinnedItemsRowKind {
-        case smallRow
-        case wideRow
-    }
+    private enum HomeTileDisplaySize {
+        case small
+        case wide
+        case wideTall
 
-    private struct PinnedItemsRow: Identifiable {
-        let id: UUID
-        let kind: PinnedItemsRowKind
-        let items: [HomePinnedItem]
+        func columnSpan(for columns: Int) -> Int {
+            let columns = max(1, columns)
 
-        init(kind: PinnedItemsRowKind, items: [HomePinnedItem]) {
-            self.id = UUID()
-            self.kind = kind
-            self.items = items
+            switch self {
+            case .small:
+                return 1
+            case .wide, .wideTall:
+                if columns >= 3 {
+                    return 2
+                }
+                return columns
+            }
         }
     }
 
+    private struct PinnedLayoutCell: Identifiable {
+        let id: String
+        let item: HomePinnedItem
+        let displaySize: HomeTileDisplaySize
+        let span: Int
+    }
+
+    private struct MasonryPlacement: Identifiable {
+        let id: String
+        let item: HomePinnedItem
+        let displaySize: HomeTileDisplaySize
+        let sourceIndex: Int
+        let x: CGFloat
+        let y: CGFloat
+        let width: CGFloat
+        let estimatedHeight: CGFloat
+
+        var maxY: CGFloat {
+            y + estimatedHeight
+        }
+    }
+
+    private var usesStackedAccessibilityLayout: Bool {
+        voiceOverEnabled || dynamicTypeSize.isAccessibilitySize
+    }
+
+    @ViewBuilder
     private func pinnedItemsLayout(availableWidth: CGFloat) -> some View {
+        if usesStackedAccessibilityLayout {
+            stackedPinnedItemsLayout(availableWidth: availableWidth)
+        } else {
+            masonryPinnedItemsLayout(availableWidth: availableWidth)
+        }
+    }
+
+    private func stackedPinnedItemsLayout(availableWidth: CGFloat) -> some View {
         let usableWidth = max(0, availableWidth - (contentHorizontalPadding * 2))
-        let maxSmallPerRow = homeMaxSmallTilesPerRow(for: usableWidth)
-        let rows = pinnedRows(maxSmallPerRow: maxSmallPerRow)
+        let items = buildPinnedLayoutItems(columns: 1)
 
         return LazyVStack(alignment: .leading, spacing: gridSpacing) {
-            ForEach(rows) { row in
-                switch row.kind {
-                case .wideRow:
-                    if let item = row.items.first {
-                        pinnedItemView(item)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
+            ForEach(items) { cell in
+                pinnedItemView(cell.item, displaySize: cell.displaySize)
+                    .frame(
+                        width: tileWidth(
+                            span: 1,
+                            columns: 1,
+                            usableWidth: usableWidth
+                        ),
+                        alignment: .topLeading
+                    )
+            }
+        }
+    }
 
-                case .smallRow:
-                    if row.items.count <= 1, let item = row.items.first {
-                        pinnedItemView(item)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    } else {
-                        HStack(alignment: .top, spacing: gridSpacing) {
-                            ForEach(row.items) { item in
-                                pinnedItemView(item)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
+    private func masonryPinnedItemsLayout(availableWidth: CGFloat) -> some View {
+        let usableWidth = max(0, availableWidth - (contentHorizontalPadding * 2))
+        let columns = max(1, homeMaxSmallTilesPerRow(for: usableWidth))
+        let items = buildPinnedLayoutItems(columns: columns)
+        let placements = masonryPlacements(
+            for: items,
+            columns: columns,
+            usableWidth: usableWidth
+        )
+        let totalHeight = max(0, (placements.map(\.maxY).max() ?? 0))
+        let highestPriority = Double(max(0, items.count))
+
+        return ZStack(alignment: .topLeading) {
+            ForEach(placements) { placement in
+                pinnedItemView(placement.item, displaySize: placement.displaySize)
+                    .frame(width: placement.width, alignment: .topLeading)
+                    .background(masonryHeightReader(id: placement.id))
+                    .offset(x: placement.x, y: placement.y)
+                    .accessibilitySortPriority(highestPriority - Double(placement.sourceIndex))
+            }
+        }
+        .frame(height: totalHeight, alignment: .top)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .onPreferenceChange(HomeMasonryHeightPreferenceKey.self) { heights in
+            var updated = masonryMeasuredHeights
+            var changed = false
+
+            for (id, value) in heights {
+                guard value > 1 else { continue }
+                let current = updated[id] ?? 0
+                if abs(current - value) > 0.5 {
+                    updated[id] = value
+                    changed = true
                 }
+            }
+
+            if changed {
+                masonryMeasuredHeights = updated
             }
         }
     }
@@ -431,7 +501,7 @@ struct HomeView: View {
     }
 
     @ViewBuilder
-    private var categoryAvailabilityWidget: some View {
+    private func categoryAvailabilityWidget(previewRowCount: Int) -> some View {
         HomeCategoryAvailabilityTile(
             workspace: workspace,
             budgets: budgets,
@@ -439,8 +509,18 @@ struct HomeView: View {
             plannedExpenses: calculationPlannedExpensesForHome,
             variableExpenses: variableExpenses,
             startDate: appliedStartDate,
-            endDate: appliedEndDate
+            endDate: appliedEndDate,
+            previewRowCount: previewRowCount
         )
+    }
+
+    private func categoryAvailabilityPreviewRowCount(for displaySize: HomeTileDisplaySize) -> Int {
+        switch displaySize {
+        case .wideTall:
+            return 5
+        default:
+            return 3
+        }
     }
 
     private var spendTrendsWidget: some View {
@@ -471,35 +551,165 @@ struct HomeView: View {
         return max(1, min(fit, 3))
     }
 
-    private func pinnedRows(maxSmallPerRow: Int) -> [PinnedItemsRow] {
-        let maxSmallPerRow = max(1, maxSmallPerRow)
+    private func buildPinnedLayoutItems(columns: Int) -> [PinnedLayoutCell] {
+        let columns = max(1, columns)
+        var result: [PinnedLayoutCell] = []
 
-        var rows: [PinnedItemsRow] = []
-        var currentSmallRow: [HomePinnedItem] = []
-
-        func flushSmallRow() {
-            guard currentSmallRow.isEmpty == false else { return }
-            rows.append(PinnedItemsRow(kind: .smallRow, items: currentSmallRow))
-            currentSmallRow = []
+        for (index, item) in pinnedItems.enumerated() {
+            let displaySize = effectiveTileDisplaySize(for: item, columns: columns)
+            let span = max(1, min(displaySize.columnSpan(for: columns), columns))
+            result.append(
+                PinnedLayoutCell(
+                    id: "\(item.id)-\(index)",
+                    item: item,
+                    displaySize: displaySize,
+                    span: span
+                )
+            )
         }
 
-        for item in pinnedItems {
-            switch item.tileSize {
-            case .wide:
-                flushSmallRow()
-                rows.append(PinnedItemsRow(kind: .wideRow, items: [item]))
+        return result
+    }
 
-            case .small:
-                currentSmallRow.append(item)
+    private func masonryPlacements(
+        for items: [PinnedLayoutCell],
+        columns: Int,
+        usableWidth: CGFloat
+    ) -> [MasonryPlacement] {
+        let columns = max(1, columns)
+        var placements: [MasonryPlacement] = []
+        var columnBottoms = Array(repeating: CGFloat(0), count: columns)
 
-                if currentSmallRow.count >= maxSmallPerRow {
-                    flushSmallRow()
-                }
+        for (index, cell) in items.enumerated() {
+            let span = max(1, min(cell.span, columns))
+            let column = bestMasonryStartColumn(
+                columnBottoms: columnBottoms,
+                columns: columns,
+                span: span
+            )
+
+            let width = tileWidth(span: span, columns: columns, usableWidth: usableWidth)
+            let height = resolvedMasonryHeight(
+                for: cell.id,
+                displaySize: cell.displaySize
+            )
+            let y = masonryYOrigin(
+                columnBottoms: columnBottoms,
+                startColumn: column,
+                span: span
+            )
+
+            let placement = MasonryPlacement(
+                id: cell.id,
+                item: cell.item,
+                displaySize: cell.displaySize,
+                sourceIndex: index,
+                x: xOrigin(
+                    forColumn: column,
+                    columns: columns,
+                    usableWidth: usableWidth
+                ),
+                y: y,
+                width: width,
+                estimatedHeight: height
+            )
+
+            placements.append(placement)
+
+            let newBottom = placement.maxY + gridSpacing
+            for c in column..<(column + span) {
+                columnBottoms[c] = newBottom
             }
         }
 
-        flushSmallRow()
-        return rows
+        return placements
+    }
+
+    private func bestMasonryStartColumn(
+        columnBottoms: [CGFloat],
+        columns: Int,
+        span: Int
+    ) -> Int {
+        let maxStart = max(0, columns - span)
+        var bestColumn = 0
+        var bestValue = CGFloat.greatestFiniteMagnitude
+
+        for start in 0...maxStart {
+            let value = masonryYOrigin(columnBottoms: columnBottoms, startColumn: start, span: span)
+            if value < bestValue {
+                bestValue = value
+                bestColumn = start
+            }
+        }
+
+        return bestColumn
+    }
+
+    private func masonryYOrigin(columnBottoms: [CGFloat], startColumn: Int, span: Int) -> CGFloat {
+        let end = min(columnBottoms.count, startColumn + span)
+        return columnBottoms[startColumn..<end].max() ?? 0
+    }
+
+    private func tileWidth(span: Int, columns: Int, usableWidth: CGFloat) -> CGFloat {
+        let columns = max(1, columns)
+        let span = max(1, min(span, columns))
+        let totalSpacing = CGFloat(columns - 1) * gridSpacing
+        let columnWidth = max(0, (usableWidth - totalSpacing) / CGFloat(columns))
+        return (columnWidth * CGFloat(span)) + (CGFloat(span - 1) * gridSpacing)
+    }
+
+    private func xOrigin(forColumn column: Int, columns: Int, usableWidth: CGFloat) -> CGFloat {
+        let unitWidth = tileWidth(span: 1, columns: columns, usableWidth: usableWidth)
+        return CGFloat(max(0, column)) * (unitWidth + gridSpacing)
+    }
+
+    private func resolvedMasonryHeight(for id: String, displaySize: HomeTileDisplaySize) -> CGFloat {
+        if let measured = masonryMeasuredHeights[id], measured > 1 {
+            return measured
+        }
+        return estimatedMasonryHeight(for: displaySize)
+    }
+
+    private func estimatedMasonryHeight(for displaySize: HomeTileDisplaySize) -> CGFloat {
+        switch displaySize {
+        case .small:
+            return 220
+        case .wide:
+            return 240
+        case .wideTall:
+            return 460
+        }
+    }
+
+    private func masonryHeightReader(id: String) -> some View {
+        GeometryReader { proxy in
+            Color.clear.preference(
+                key: HomeMasonryHeightPreferenceKey.self,
+                value: [id: proxy.size.height]
+            )
+        }
+    }
+
+    private func effectiveTileDisplaySize(for item: HomePinnedItem, columns: Int) -> HomeTileDisplaySize {
+        guard columns >= 3 else { return baseDisplaySize(for: item.tileSize) }
+        guard isPhone == false else { return baseDisplaySize(for: item.tileSize) }
+        guard voiceOverEnabled == false else { return baseDisplaySize(for: item.tileSize) }
+        guard dynamicTypeSize.isAccessibilitySize == false else { return baseDisplaySize(for: item.tileSize) }
+
+        if case .widget(.categoryAvailability, _) = item {
+            return .wideTall
+        }
+
+        return baseDisplaySize(for: item.tileSize)
+    }
+
+    private func baseDisplaySize(for size: HomeTileSize) -> HomeTileDisplaySize {
+        switch size {
+        case .small:
+            return .small
+        case .wide:
+            return .wide
+        }
     }
 
     // MARK: - Widgets Header
@@ -683,5 +893,13 @@ struct HomeView: View {
         NavigationStack {
             HomeView(workspace: ws)
         }
+    }
+}
+
+private struct HomeMasonryHeightPreferenceKey: PreferenceKey {
+    static var defaultValue: [String: CGFloat] = [:]
+
+    static func reduce(value: inout [String: CGFloat], nextValue: () -> [String: CGFloat]) {
+        value.merge(nextValue(), uniquingKeysWith: { _, new in new })
     }
 }
