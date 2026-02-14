@@ -670,59 +670,24 @@ struct BudgetDetailView: View {
         .searchFocused($searchFocused)
 
         .toolbar {
-
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    showingAddExpenseSheet = true
-                } label: {
-                    Image(systemName: "plus")
+            if #available(iOS 26.0, macCatalyst 26.0, *) {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    budgetActionsToolbarButton
                 }
-                .accessibilityLabel("Add Transaction")
-                .disabled(linkedCards.isEmpty)
-            }
 
-            ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Button {
-                        showingManagePresetsSheet = true
-                    } label: {
-                        Label("Manage Presets", systemImage: "list.bullet.rectangle")
-                    }
+                ToolbarSpacer(.flexible, placement: .primaryAction)
 
-                    Button {
-                        showingManageCardsSheet = true
-                    } label: {
-                        Label("Manage Cards", systemImage: "creditcard")
-                    }
-
-                    Menu {
-                        Toggle("Hide Future Planned Expenses", isOn: $hideFuturePlannedExpensesInView)
-                        Toggle(
-                            "Exclude Future Planned Expenses from Totals",
-                            isOn: $excludeFuturePlannedExpensesFromCalculationsInView
-                        )
-                    } label: {
-                        Label("Planned Expense Display", systemImage: "gearshape")
-                    }
-
-                    Divider()
-
-                    Button {
-                        showingEditBudgetSheet = true
-                    } label: {
-                        Label("Edit Budget", systemImage: "pencil")
-                    }
-                    .tint(Color("AccentColor"))
-                    Button(role: .destructive) {
-                        handleDeleteBudgetTapped()
-                    } label: {
-                        Label("Delete Budget", systemImage: "trash")
-                    }
-                    .tint(Color("OffshoreDepth"))
-                } label: {
-                    Image(systemName: "ellipsis")
+                ToolbarItemGroup(placement: .primaryAction) {
+                    addTransactionToolbarButton
                 }
-                .accessibilityLabel("Budget Actions")
+            } else {
+                ToolbarItem(placement: .topBarTrailing) {
+                    addTransactionToolbarButton
+                }
+
+                ToolbarItem(placement: .primaryAction) {
+                    budgetActionsToolbarButton
+                }
             }
         }
 
@@ -861,6 +826,62 @@ struct BudgetDetailView: View {
                 )
             }
         }
+    }
+
+    @ViewBuilder
+    private var addTransactionToolbarButton: some View {
+        Button {
+            showingAddExpenseSheet = true
+        } label: {
+            Image(systemName: "plus")
+        }
+        .accessibilityLabel("Add Transaction")
+        .disabled(linkedCards.isEmpty)
+    }
+
+    @ViewBuilder
+    private var budgetActionsToolbarButton: some View {
+        Menu {
+            Button {
+                showingManagePresetsSheet = true
+            } label: {
+                Label("Manage Presets", systemImage: "list.bullet.rectangle")
+            }
+
+            Button {
+                showingManageCardsSheet = true
+            } label: {
+                Label("Manage Cards", systemImage: "creditcard")
+            }
+
+            Menu {
+                Toggle("Hide Future Planned Expenses", isOn: $hideFuturePlannedExpensesInView)
+                Toggle(
+                    "Exclude Future Planned Expenses from Totals",
+                    isOn: $excludeFuturePlannedExpensesFromCalculationsInView
+                )
+            } label: {
+                Label("Planned Expense Display", systemImage: "gearshape")
+            }
+
+            Divider()
+
+            Button {
+                showingEditBudgetSheet = true
+            } label: {
+                Label("Edit Budget", systemImage: "pencil")
+            }
+            .tint(Color("AccentColor"))
+            Button(role: .destructive) {
+                handleDeleteBudgetTapped()
+            } label: {
+                Label("Delete Budget", systemImage: "trash")
+            }
+            .tint(Color("OffshoreDepth"))
+        } label: {
+            Image(systemName: "ellipsis")
+        }
+        .accessibilityLabel("Budget Actions")
     }
 
     // MARK: - Expenses bucket rows (reactive)

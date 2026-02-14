@@ -2035,38 +2035,7 @@ struct HomeAssistantPanelView: View {
             return
         }
 
-        plan = HomeAssistantCommandPlan(
-            intent: plan.intent,
-            confidenceBand: plan.confidenceBand,
-            rawPrompt: plan.rawPrompt,
-            amount: plan.amount,
-            originalAmount: plan.originalAmount,
-            date: plan.date,
-            dateRange: plan.dateRange,
-            notes: plan.notes,
-            source: plan.source,
-            cardName: selected.name,
-            categoryName: plan.categoryName,
-            entityName: plan.entityName,
-            isPlannedIncome: plan.isPlannedIncome,
-            categoryColorHex: plan.categoryColorHex,
-            categoryColorName: plan.categoryColorName,
-            cardThemeRaw: plan.cardThemeRaw,
-            cardEffectRaw: plan.cardEffectRaw,
-            recurrenceFrequencyRaw: plan.recurrenceFrequencyRaw,
-            recurrenceInterval: plan.recurrenceInterval,
-            weeklyWeekday: plan.weeklyWeekday,
-            monthlyDayOfMonth: plan.monthlyDayOfMonth,
-            monthlyIsLastDay: plan.monthlyIsLastDay,
-            yearlyMonth: plan.yearlyMonth,
-            yearlyDayOfMonth: plan.yearlyDayOfMonth,
-            recurrenceEndDate: plan.recurrenceEndDate,
-            plannedExpenseAmountTarget: plan.plannedExpenseAmountTarget,
-            attachAllCards: plan.attachAllCards,
-            attachAllPresets: plan.attachAllPresets,
-            selectedCardNames: plan.selectedCardNames,
-            selectedPresetTitles: plan.selectedPresetTitles
-        )
+        plan = plan.updating(cardName: selected.name)
 
         pendingExpenseCardPlan = nil
         pendingExpenseCardOptions = []
@@ -2098,38 +2067,7 @@ struct HomeAssistantPanelView: View {
             return
         }
 
-        plan = HomeAssistantCommandPlan(
-            intent: plan.intent,
-            confidenceBand: plan.confidenceBand,
-            rawPrompt: plan.rawPrompt,
-            amount: plan.amount,
-            originalAmount: plan.originalAmount,
-            date: plan.date,
-            dateRange: plan.dateRange,
-            notes: plan.notes,
-            source: plan.source,
-            cardName: plan.cardName,
-            categoryName: plan.categoryName,
-            entityName: plan.entityName,
-            isPlannedIncome: resolved,
-            categoryColorHex: plan.categoryColorHex,
-            categoryColorName: plan.categoryColorName,
-            cardThemeRaw: plan.cardThemeRaw,
-            cardEffectRaw: plan.cardEffectRaw,
-            recurrenceFrequencyRaw: plan.recurrenceFrequencyRaw,
-            recurrenceInterval: plan.recurrenceInterval,
-            weeklyWeekday: plan.weeklyWeekday,
-            monthlyDayOfMonth: plan.monthlyDayOfMonth,
-            monthlyIsLastDay: plan.monthlyIsLastDay,
-            yearlyMonth: plan.yearlyMonth,
-            yearlyDayOfMonth: plan.yearlyDayOfMonth,
-            recurrenceEndDate: plan.recurrenceEndDate,
-            plannedExpenseAmountTarget: plan.plannedExpenseAmountTarget,
-            attachAllCards: plan.attachAllCards,
-            attachAllPresets: plan.attachAllPresets,
-            selectedCardNames: plan.selectedCardNames,
-            selectedPresetTitles: plan.selectedPresetTitles
-        )
+        plan = plan.updating(isPlannedIncome: resolved)
 
         pendingIncomeKindPlan = nil
         executeAddIncome(plan)
@@ -2157,37 +2095,9 @@ struct HomeAssistantPanelView: View {
             return
         }
 
-        plan = HomeAssistantCommandPlan(
-            intent: plan.intent,
-            confidenceBand: plan.confidenceBand,
-            rawPrompt: plan.rawPrompt,
-            amount: plan.amount,
-            originalAmount: plan.originalAmount,
-            date: plan.date,
-            dateRange: plan.dateRange,
-            notes: plan.notes,
-            source: plan.source,
-            cardName: plan.cardName,
-            categoryName: plan.categoryName,
-            entityName: plan.entityName,
-            isPlannedIncome: plan.isPlannedIncome,
-            categoryColorHex: plan.categoryColorHex,
-            categoryColorName: plan.categoryColorName,
-            cardThemeRaw: plan.cardThemeRaw,
-            cardEffectRaw: plan.cardEffectRaw,
+        plan = plan.updating(
             recurrenceFrequencyRaw: resolvedFrequency.rawValue,
-            recurrenceInterval: plan.recurrenceInterval ?? 1,
-            weeklyWeekday: plan.weeklyWeekday,
-            monthlyDayOfMonth: plan.monthlyDayOfMonth,
-            monthlyIsLastDay: plan.monthlyIsLastDay,
-            yearlyMonth: plan.yearlyMonth,
-            yearlyDayOfMonth: plan.yearlyDayOfMonth,
-            recurrenceEndDate: plan.recurrenceEndDate,
-            plannedExpenseAmountTarget: plan.plannedExpenseAmountTarget,
-            attachAllCards: plan.attachAllCards,
-            attachAllPresets: plan.attachAllPresets,
-            selectedCardNames: plan.selectedCardNames,
-            selectedPresetTitles: plan.selectedPresetTitles
+            recurrenceInterval: plan.recurrenceInterval ?? 1
         )
 
         pendingPresetRecurrencePlan = nil
@@ -2218,38 +2128,7 @@ struct HomeAssistantPanelView: View {
             return
         }
 
-        plan = HomeAssistantCommandPlan(
-            intent: plan.intent,
-            confidenceBand: plan.confidenceBand,
-            rawPrompt: plan.rawPrompt,
-            amount: plan.amount,
-            originalAmount: plan.originalAmount,
-            date: plan.date,
-            dateRange: plan.dateRange,
-            notes: plan.notes,
-            source: plan.source,
-            cardName: selected.name,
-            categoryName: plan.categoryName,
-            entityName: plan.entityName,
-            isPlannedIncome: plan.isPlannedIncome,
-            categoryColorHex: plan.categoryColorHex,
-            categoryColorName: plan.categoryColorName,
-            cardThemeRaw: plan.cardThemeRaw,
-            cardEffectRaw: plan.cardEffectRaw,
-            recurrenceFrequencyRaw: plan.recurrenceFrequencyRaw,
-            recurrenceInterval: plan.recurrenceInterval,
-            weeklyWeekday: plan.weeklyWeekday,
-            monthlyDayOfMonth: plan.monthlyDayOfMonth,
-            monthlyIsLastDay: plan.monthlyIsLastDay,
-            yearlyMonth: plan.yearlyMonth,
-            yearlyDayOfMonth: plan.yearlyDayOfMonth,
-            recurrenceEndDate: plan.recurrenceEndDate,
-            plannedExpenseAmountTarget: plan.plannedExpenseAmountTarget,
-            attachAllCards: plan.attachAllCards,
-            attachAllPresets: plan.attachAllPresets,
-            selectedCardNames: plan.selectedCardNames,
-            selectedPresetTitles: plan.selectedPresetTitles
-        )
+        plan = plan.updating(cardName: selected.name)
 
         pendingPresetCardPlan = nil
         executeAddPreset(plan)

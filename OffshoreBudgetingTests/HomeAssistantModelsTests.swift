@@ -172,4 +172,61 @@ struct HomeAssistantModelsTests {
 
         #expect(decoded == original)
     }
+
+    // MARK: - Command Plan Updates
+
+    @Test func commandPlanUpdating_cardName_preservesParsedAttributes() throws {
+        let original = HomeAssistantCommandPlan(
+            intent: .addPreset,
+            confidenceBand: .high,
+            rawPrompt: "create preset rent 1500 every 2 weeks on Apple Card",
+            amount: 1500,
+            notes: "rent",
+            cardName: "Old Card",
+            categoryName: "Housing",
+            entityName: "rent",
+            cardThemeRaw: "sunset",
+            cardEffectRaw: "glass",
+            recurrenceFrequencyRaw: RecurrenceFrequency.weekly.rawValue,
+            recurrenceInterval: 2,
+            weeklyWeekday: 6
+        )
+
+        let updated = original.updating(cardName: "Apple Card")
+
+        #expect(updated.cardName == "Apple Card")
+        #expect(updated.entityName == "rent")
+        #expect(updated.cardThemeRaw == "sunset")
+        #expect(updated.cardEffectRaw == "glass")
+        #expect(updated.recurrenceFrequencyRaw == RecurrenceFrequency.weekly.rawValue)
+        #expect(updated.recurrenceInterval == 2)
+        #expect(updated.weeklyWeekday == 6)
+    }
+
+    @Test func commandPlanUpdating_incomeKindAndRecurrence_preservesOtherFields() throws {
+        let original = HomeAssistantCommandPlan(
+            intent: .addIncome,
+            confidenceBand: .high,
+            rawPrompt: "log income from side gig 1200",
+            amount: 1200,
+            date: Date(timeIntervalSince1970: 1_700_000_000),
+            source: "Side Gig",
+            isPlannedIncome: nil,
+            recurrenceFrequencyRaw: nil,
+            recurrenceInterval: nil
+        )
+
+        let updated = original.updating(
+            isPlannedIncome: false,
+            recurrenceFrequencyRaw: RecurrenceFrequency.monthly.rawValue,
+            recurrenceInterval: 1
+        )
+
+        #expect(updated.amount == 1200)
+        #expect(updated.source == "Side Gig")
+        #expect(updated.date == original.date)
+        #expect(updated.isPlannedIncome == false)
+        #expect(updated.recurrenceFrequencyRaw == RecurrenceFrequency.monthly.rawValue)
+        #expect(updated.recurrenceInterval == 1)
+    }
 }

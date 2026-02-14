@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import SwiftUI
 import Testing
 @testable import Offshore
 
@@ -66,5 +67,60 @@ struct HomePinnedStoresTests {
 
         #expect(store.load() == [id2])
     }
-}
 
+    @Test func layoutCapabilities_phoneNeverSupportsMultiColumn() throws {
+        let supports = HomeLayoutCapabilities.supportsMultiColumnLayout(
+            usableWidth: 900,
+            isPhone: true,
+            voiceOverEnabled: false,
+            dynamicTypeSize: .large,
+            gridSpacing: 12
+        )
+
+        #expect(supports == false)
+    }
+
+    @Test func layoutCapabilities_nonPhoneWideWidthSupportsMultiColumn() throws {
+        let supports = HomeLayoutCapabilities.supportsMultiColumnLayout(
+            usableWidth: 700,
+            isPhone: false,
+            voiceOverEnabled: false,
+            dynamicTypeSize: .large,
+            gridSpacing: 12
+        )
+
+        #expect(supports)
+    }
+
+    @Test func layoutCapabilities_nonPhoneNarrowWidthDoesNotSupportMultiColumn() throws {
+        let supports = HomeLayoutCapabilities.supportsMultiColumnLayout(
+            usableWidth: 500,
+            isPhone: false,
+            voiceOverEnabled: false,
+            dynamicTypeSize: .large,
+            gridSpacing: 12
+        )
+
+        #expect(supports == false)
+    }
+
+    @Test func layoutCapabilities_accessibilityAndVoiceOverDisableControls() throws {
+        let accessibilityType = HomeLayoutCapabilities.supportsTileSizeControl(
+            usableWidth: 900,
+            isPhone: false,
+            voiceOverEnabled: false,
+            dynamicTypeSize: .accessibility2,
+            gridSpacing: 12
+        )
+        let voiceOver = HomeLayoutCapabilities.supportsTileSizeControl(
+            usableWidth: 900,
+            isPhone: false,
+            voiceOverEnabled: true,
+            dynamicTypeSize: .large,
+            gridSpacing: 12
+        )
+
+        #expect(accessibilityType == false)
+        #expect(voiceOver == false)
+    }
+}

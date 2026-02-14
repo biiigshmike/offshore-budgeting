@@ -493,6 +493,48 @@ struct HomeAssistantCommandPlan: Equatable {
     }
 }
 
+extension HomeAssistantCommandPlan {
+    func updating(
+        cardName: String? = nil,
+        isPlannedIncome: Bool? = nil,
+        recurrenceFrequencyRaw: String? = nil,
+        recurrenceInterval: Int? = nil
+    ) -> HomeAssistantCommandPlan {
+        HomeAssistantCommandPlan(
+            intent: intent,
+            confidenceBand: confidenceBand,
+            rawPrompt: rawPrompt,
+            amount: amount,
+            originalAmount: originalAmount,
+            date: date,
+            dateRange: dateRange,
+            notes: notes,
+            source: source,
+            cardName: cardName ?? self.cardName,
+            categoryName: categoryName,
+            entityName: entityName,
+            isPlannedIncome: isPlannedIncome ?? self.isPlannedIncome,
+            categoryColorHex: categoryColorHex,
+            categoryColorName: categoryColorName,
+            cardThemeRaw: cardThemeRaw,
+            cardEffectRaw: cardEffectRaw,
+            recurrenceFrequencyRaw: recurrenceFrequencyRaw ?? self.recurrenceFrequencyRaw,
+            recurrenceInterval: recurrenceInterval ?? self.recurrenceInterval,
+            weeklyWeekday: weeklyWeekday,
+            monthlyDayOfMonth: monthlyDayOfMonth,
+            monthlyIsLastDay: monthlyIsLastDay,
+            yearlyMonth: yearlyMonth,
+            yearlyDayOfMonth: yearlyDayOfMonth,
+            recurrenceEndDate: recurrenceEndDate,
+            plannedExpenseAmountTarget: plannedExpenseAmountTarget,
+            attachAllCards: attachAllCards,
+            attachAllPresets: attachAllPresets,
+            selectedCardNames: selectedCardNames,
+            selectedPresetTitles: selectedPresetTitles
+        )
+    }
+}
+
 struct HomeAssistantMutationResult {
     let title: String
     let subtitle: String?

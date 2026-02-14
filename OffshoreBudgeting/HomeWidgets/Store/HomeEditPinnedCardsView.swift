@@ -11,6 +11,7 @@ struct HomeEditPinnedCardsView: View {
 
     let cards: [Card]
     let workspaceID: UUID
+    let showsTileSizePicker: Bool
 
     @Binding var pinnedItems: [HomePinnedItem]
 
@@ -147,16 +148,18 @@ struct HomeEditPinnedCardsView: View {
             Text(title(for: item.wrappedValue))
                 .foregroundStyle(Color("AccentColor"))
 
-            Spacer()
+            if showsTileSizePicker {
+                Spacer()
 
-            Picker("Size", selection: sizeBinding) {
-                ForEach(HomeTileSize.allCases, id: \.self) { size in
-                    Text(size.title).tag(size)
+                Picker("Size", selection: sizeBinding) {
+                    ForEach(HomeTileSize.allCases, id: \.self) { size in
+                        Text(size.title).tag(size)
+                    }
                 }
+                .pickerStyle(.segmented)
+                .frame(width: 160)
+                .disabled(!isEditing)
             }
-            .pickerStyle(.segmented)
-            .frame(width: 160)
-            .disabled(!isEditing)
         }
     }
 

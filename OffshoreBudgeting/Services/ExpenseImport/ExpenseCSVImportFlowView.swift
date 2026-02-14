@@ -83,7 +83,7 @@ struct ExpenseCSVImportFlowView: View {
             } footer: {
                 Text(selectedFileName == nil
                      ? importHintText
-                     : "Use the toggle switch for any row you want to save and have automatically recognized next time. It will help make future imports faster.")
+                     : "Use the toggle switch for any row you want to save and have automatically recognized to speed up future imports.")
             }
 
             if vm.state == .idle {
@@ -143,6 +143,7 @@ struct ExpenseCSVImportFlowView: View {
                 }
             }
         }
+        .listStyle(.insetGrouped)
         .navigationTitle(navigationTitle)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
@@ -249,29 +250,37 @@ struct ExpenseCSVImportFlowView: View {
 
     @ViewBuilder
     private func sectionView(title: String, rows: [ExpenseCSVImportRow]) -> some View {
-        Section {
-            ForEach(rows) { row in
-                ExpenseCSVImportRowView(
-                    row: row,
-                    allCategories: vm.categories,
-                    allAllocationAccounts: vm.allocationAccounts,
-                    allowKindEditing: mode == .cardTransactions,
-                    incomeHelperText: mode == .cardTransactions
-                        ? "Imports as Actual Income (linked to this card)"
-                        : "Imports as Actual Income",
-                    onToggleInclude: { vm.toggleInclude(rowID: row.id) },
-                    onSetDate: { date in vm.setDate(rowID: row.id, date: date) },
-                    onSetMerchant: { text in vm.setMerchant(rowID: row.id, merchant: text) },
-                    onSetCategory: { category in vm.setCategory(rowID: row.id, category: category) },
-                    onSetKind: { kind in vm.setKind(rowID: row.id, kind: kind) },
-                    onSetAllocationAccount: { account in vm.setAllocationAccount(rowID: row.id, account: account) },
-                    onSetAllocationAmount: { text in vm.setAllocationAmount(rowID: row.id, amountText: text) },
-                    onToggleRemember: { vm.toggleRemember(rowID: row.id) }
-                )
+        if let firstRow = rows.first {
+            Section {
+                rowView(firstRow)
+            } header: {
+                Text(title)
             }
-        } header: {
-            Text(title)
+
+            ForEach(rows.dropFirst()) { row in
+                Section {
+                    rowView(row)
+                }
+            }
         }
+    }
+
+    private func rowView(_ row: ExpenseCSVImportRow) -> some View {
+        ExpenseCSVImportRowView(
+            row: row,
+            allCategories: vm.categories,
+            allAllocationAccounts: vm.allocationAccounts,
+            allowKindEditing: mode == .cardTransactions,
+            onToggleInclude: { vm.toggleInclude(rowID: row.id) },
+            onSetDate: { date in vm.setDate(rowID: row.id, date: date) },
+            onSetMerchant: { text in vm.setMerchant(rowID: row.id, merchant: text) },
+            onSetAmount: { text in vm.setAmount(rowID: row.id, amountText: text) },
+            onSetCategory: { category in vm.setCategory(rowID: row.id, category: category) },
+            onSetKind: { kind in vm.setKind(rowID: row.id, kind: kind) },
+            onSetAllocationAccount: { account in vm.setAllocationAccount(rowID: row.id, account: account) },
+            onSetAllocationAmount: { text in vm.setAllocationAmount(rowID: row.id, amountText: text) },
+            onToggleRemember: { vm.toggleRemember(rowID: row.id) }
+        )
     }
 
     private var navigationTitle: String {

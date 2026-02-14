@@ -681,60 +681,84 @@ struct CardDetailView: View {
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
-        ToolbarItemGroup(placement: .topBarTrailing) {
-            Menu {
-                Button {
-                    showingAddExpenseSheet = true
-                } label: {
-                    Label("Add Transaction", systemImage: "plus")
-                }
-
-                Button {
-                    showingImportExpensesSheet = true
-                } label: {
-                    Label("Import Expenses", systemImage: "tray.and.arrow.down")
-                }
-            } label: {
-                Image(systemName: "plus")
+        if #available(iOS 26.0, macCatalyst 26.0, *) {
+            ToolbarItemGroup(placement: .primaryAction) {
+                cardActionsToolbarButton
             }
-            .accessibilityLabel("Add")
+
+            ToolbarSpacer(.flexible, placement: .primaryAction)
+
+            ToolbarItemGroup(placement: .primaryAction) {
+                addToolbarButton
+            }
+        } else {
+            ToolbarItem(placement: .topBarTrailing) {
+                addToolbarButton
+            }
+
+            ToolbarItem(placement: .primaryAction) {
+                cardActionsToolbarButton
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var addToolbarButton: some View {
+        Menu {
+            Button {
+                showingAddExpenseSheet = true
+            } label: {
+                Label("Add Transaction", systemImage: "plus")
+            }
+
+            Button {
+                showingImportExpensesSheet = true
+            } label: {
+                Label("Import Expenses", systemImage: "tray.and.arrow.down")
+            }
+        } label: {
+            Image(systemName: "plus")
+        }
+        .accessibilityLabel("Add")
+    }
+
+    @ViewBuilder
+    private var cardActionsToolbarButton: some View {
+        Menu {
+            Button {
+                showingEditCardSheet = true
+            } label: {
+                Label("Edit Card", systemImage: "pencil")
+            }
 
             Menu {
-                Button {
-                    showingEditCardSheet = true
-                } label: {
-                    Label("Edit Card", systemImage: "pencil")
-                }
+                Toggle("Hide Future Planned Expenses", isOn: $hideFuturePlannedExpensesInView)
+                Toggle(
+                    "Exclude Future Planned Expenses from Totals",
+                    isOn: $excludeFuturePlannedExpensesFromCalculationsInView
+                )
+            } label: {
+                Label("Planned Expense Display", systemImage: "gearshape")
+            }
 
-                Menu {
-                    Toggle("Hide Future Planned Expenses", isOn: $hideFuturePlannedExpensesInView)
-                    Toggle(
-                        "Exclude Future Planned Expenses from Totals",
-                        isOn: $excludeFuturePlannedExpensesFromCalculationsInView
-                    )
-                } label: {
-                    Label("Planned Expense Display", systemImage: "gearshape")
-                }
+            Divider()
 
-                Divider()
-
-                Button(role: .destructive) {
-                    if confirmBeforeDeleting {
-                        pendingCardDelete = {
-                            deleteCard()
-                        }
-                        showingCardDeleteConfirm = true
-                    } else {
+            Button(role: .destructive) {
+                if confirmBeforeDeleting {
+                    pendingCardDelete = {
                         deleteCard()
                     }
-                } label: {
-                    Label("Delete Card", systemImage: "trash")
+                    showingCardDeleteConfirm = true
+                } else {
+                    deleteCard()
                 }
             } label: {
-                Image(systemName: "ellipsis")
+                Label("Delete Card", systemImage: "trash")
             }
-            .accessibilityLabel("Card Actions")
+        } label: {
+            Image(systemName: "ellipsis")
         }
+        .accessibilityLabel("Card Actions")
     }
 
     // MARK: - Empty State

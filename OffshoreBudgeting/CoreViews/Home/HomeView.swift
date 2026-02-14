@@ -58,6 +58,7 @@ struct HomeView: View {
 
     @State private var pinnedItems: [HomePinnedItem] = []
     @State private var masonryMeasuredHeights: [String: CGFloat] = [:]
+    @State private var lastMeasuredUsableWidth: CGFloat = 0
 
     @State private var isShowingWhatIfPlanner: Bool = false
     @State private var whatIfInitialScenarioID: UUID? = nil
@@ -194,6 +195,12 @@ struct HomeView: View {
                     .padding(.horizontal, contentHorizontalPadding)
                     .padding(.bottom, 18)
                 }
+                .onAppear {
+                    updateMeasuredUsableWidth(totalWidth: proxy.size.width)
+                }
+                .onChange(of: proxy.size.width) { _, newWidth in
+                    updateMeasuredUsableWidth(totalWidth: newWidth)
+                }
             }
         }
         .navigationDestination(isPresented: $isShowingWhatIfPlanner) {
@@ -259,6 +266,7 @@ struct HomeView: View {
             HomeEditPinnedCardsView(
                 cards: cards,
                 workspaceID: workspace.id,
+                showsTileSizePicker: showsTileSizePicker,
                 pinnedItems: $pinnedItems
             )
             .onDisappear {
@@ -603,16 +611,37 @@ struct HomeView: View {
     private var gridSpacing: CGFloat { 12 }
 
     private func masonryColumnCount(for usableWidth: CGFloat) -> Int {
-        let minTileWidth: CGFloat = (dynamicTypeSize >= .xxLarge) ? 420 : 330
-        let fit = Int((usableWidth + gridSpacing) / (minTileWidth + gridSpacing))
-        return max(1, min(fit, 3))
+        HomeLayoutCapabilities.masonryColumnCount(
+            usableWidth: usableWidth,
+            dynamicTypeSize: dynamicTypeSize,
+            gridSpacing: gridSpacing
+        )
     }
 
     private func shouldUseMasonry(for usableWidth: CGFloat) -> Bool {
-        guard isPhone == false else { return false }
-        guard voiceOverEnabled == false else { return false }
-        guard dynamicTypeSize.isAccessibilitySize == false else { return false }
-        return masonryColumnCount(for: usableWidth) >= 2
+        HomeLayoutCapabilities.supportsMultiColumnLayout(
+            usableWidth: usableWidth,
+            isPhone: isPhone,
+            voiceOverEnabled: voiceOverEnabled,
+            dynamicTypeSize: dynamicTypeSize,
+            gridSpacing: gridSpacing
+        )
+    }
+
+    private var showsTileSizePicker: Bool {
+        HomeLayoutCapabilities.supportsTileSizeControl(
+            usableWidth: lastMeasuredUsableWidth,
+            isPhone: isPhone,
+            voiceOverEnabled: voiceOverEnabled,
+            dynamicTypeSize: dynamicTypeSize,
+            gridSpacing: gridSpacing
+        )
+    }
+
+    private func updateMeasuredUsableWidth(totalWidth: CGFloat) {
+        let next = max(0, totalWidth - (contentHorizontalPadding * 2))
+        guard abs(next - lastMeasuredUsableWidth) > 0.5 else { return }
+        lastMeasuredUsableWidth = next
     }
 
     private func buildPinnedLayoutItems(columns: Int) -> [PinnedLayoutCell] {
@@ -1000,5 +1029,53 @@ private struct HomeMasonryHeightPreferenceKey: PreferenceKey {
 
     static func reduce(value: inout [String: CGFloat], nextValue: () -> [String: CGFloat]) {
         value.merge(nextValue(), uniquingKeysWith: { _, new in new })
+    }
+}
+
+// MARK: - Layout Capabilities
+
+enum HomeLayoutCapabilities {
+
+    static func masonryColumnCount(
+        usableWidth: CGFloat,
+        dynamicTypeSize: DynamicTypeSize,
+        gridSpacing: CGFloat
+    ) -> Int {
+        let minTileWidth: CGFloat = (dynamicTypeSize >= .xxLarge) ? 420 : 330
+        let fit = Int((usableWidth + gridSpacing) / (minTileWidth + gridSpacing))
+        return max(1, min(fit, 3))
+    }
+
+    static func supportsMultiColumnLayout(
+        usableWidth: CGFloat,
+        isPhone: Bool,
+        voiceOverEnabled: Bool,
+        dynamicTypeSize: DynamicTypeSize,
+        gridSpacing: CGFloat
+    ) -> Bool {
+        guard isPhone == false else { return false }
+        guard voiceOverEnabled == false else { return false }
+        guard dynamicTypeSize.isAccessibilitySize == false else { return false }
+        return masonryColumnCount(
+            usableWidth: usableWidth,
+            dynamicTypeSize: dynamicTypeSize,
+            gridSpacing: gridSpacing
+        ) >= 2
+    }
+
+    static func supportsTileSizeControl(
+        usableWidth: CGFloat,
+        isPhone: Bool,
+        voiceOverEnabled: Bool,
+        dynamicTypeSize: DynamicTypeSize,
+        gridSpacing: CGFloat
+    ) -> Bool {
+        supportsMultiColumnLayout(
+            usableWidth: usableWidth,
+            isPhone: isPhone,
+            voiceOverEnabled: voiceOverEnabled,
+            dynamicTypeSize: dynamicTypeSize,
+            gridSpacing: gridSpacing
+        )
     }
 }

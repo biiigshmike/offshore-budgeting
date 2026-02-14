@@ -305,6 +305,31 @@ final class ExpenseCSVImportViewModel: ObservableObject {
         rows[idx].recomputeBucket()
     }
 
+    func setAmount(rowID: UUID, amountText: String) {
+        guard let idx = rows.firstIndex(where: { $0.id == rowID }) else { return }
+        guard let parsed = CurrencyFormatter.parseAmount(amountText), parsed > 0 else { return }
+
+        rows[idx].finalAmount = CurrencyFormatter.roundedToCurrency(parsed)
+
+        let normalized = MerchantNormalizer.normalizeKey(rows[idx].finalMerchant)
+        if rows[idx].kind == .expense {
+            rows[idx].isDuplicateHint = looksLikeDuplicateExpense(
+                date: rows[idx].finalDate,
+                amount: rows[idx].finalAmount,
+                merchantKey: normalized,
+                categoryID: rows[idx].selectedCategory?.id
+            )
+        } else {
+            rows[idx].isDuplicateHint = looksLikeDuplicateIncome(
+                date: rows[idx].finalDate,
+                amount: rows[idx].finalAmount,
+                merchantKey: normalized
+            )
+        }
+
+        rows[idx].recomputeBucket()
+    }
+
     func setDate(rowID: UUID, date: Date) {
         guard let idx = rows.firstIndex(where: { $0.id == rowID }) else { return }
         rows[idx].finalDate = Calendar.current.startOfDay(for: date)
