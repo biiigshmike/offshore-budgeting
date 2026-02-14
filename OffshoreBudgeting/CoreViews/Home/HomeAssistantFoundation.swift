@@ -330,24 +330,43 @@ struct HomeAssistantPanelView: View {
             }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(action: onDismiss) {
-                        Image(systemName: "xmark")
-                            .font(.body.weight(.semibold))
+                    if #available(iOS 26.0, *) {
+                        Button(action: onDismiss) {
+                            Image(systemName: "xmark")
+                                .font(.body.weight(.semibold))
+                                .buttonStyle(.glass)
+                        }
+                        .accessibilityLabel("Close Assistant")
+                    } else {
+                        Button(action: onDismiss) {
+                            Image(systemName: "xmark")
+                                .font(.body.weight(.semibold))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Close Assistant")
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Close Assistant")
                 }
 
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        isShowingClearConversationAlert = true
-                    } label: {
-                        Text("Clear")
-                            .padding()
+                    if #available(iOS 26.0, *) {
+                        Button {
+                            isShowingClearConversationAlert = true
+                        } label: {
+                            Text("Clear")
+                                .buttonStyle(.glass)
+                        }
+                        .disabled(answers.isEmpty)
+                        .accessibilityLabel("Clear Chat")
+                    } else {
+                        Button {
+                            isShowingClearConversationAlert = true
+                        } label: {
+                            Text("Clear")
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(answers.isEmpty)
+                        .accessibilityLabel("Clear Chat")
                     }
-                    .buttonStyle(.plain)
-                    .disabled(answers.isEmpty)
-                    .accessibilityLabel("Clear Chat")
                 }
             }
         }
@@ -711,22 +730,37 @@ struct HomeAssistantPanelView: View {
                     .font(.subheadline.weight(.semibold))
                 Spacer(minLength: 0)
                 if isClarificationRail == false {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            followUpsCollapsed.toggle()
+                    if #available(iOS 26.0, *) {
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                followUpsCollapsed.toggle()
+                            }
+                        } label: {
+                            Image(systemName: followUpsCollapsed ? "ellipsis.message.fill" : "xmark")
+                                .font(.footnote.weight(.semibold))
+                                .frame(width: 28, height: 28)
                         }
-                    } label: {
-                        Image(systemName: followUpsCollapsed ? "ellipsis.message.fill" : "xmark")
-                            .font(.footnote.weight(.semibold))
-                            .frame(width: 28, height: 28)
+                        .buttonStyle(.glass)
+                        .buttonBorderShape(.circle)
+                        .accessibilityLabel(followUpsCollapsed ? "Show follow-up suggestions" : "Hide follow-up suggestions")
+                    } else {
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                followUpsCollapsed.toggle()
+                            }
+                        } label: {
+                            Image(systemName: followUpsCollapsed ? "ellipsis.message.fill" : "xmark")
+                                .font(.footnote.weight(.semibold))
+                                .frame(width: 28, height: 28)
+                        }
+                        .buttonStyle(.plain)
+                        .background(.ultraThinMaterial, in: Circle())
+                        .overlay {
+                            Circle()
+                                .stroke(Color.secondary.opacity(0.25), lineWidth: 1)
+                        }
+                        .accessibilityLabel(followUpsCollapsed ? "Show follow-up suggestions" : "Hide follow-up suggestions")
                     }
-                    .buttonStyle(.plain)
-                    .background(.ultraThinMaterial, in: Circle())
-                    .overlay {
-                        Circle()
-                            .stroke(Color.secondary.opacity(0.25), lineWidth: 1)
-                    }
-                    .accessibilityLabel(followUpsCollapsed ? "Show follow-up suggestions" : "Hide follow-up suggestions")
                 }
             }
 

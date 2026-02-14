@@ -405,15 +405,15 @@ struct HomeView: View {
 
     @ViewBuilder
     private func pinnedItemsLayout(availableWidth: CGFloat) -> some View {
-        if usesStackedAccessibilityLayout {
-            stackedPinnedItemsLayout(availableWidth: availableWidth)
+        let usableWidth = max(0, availableWidth - (contentHorizontalPadding * 2))
+        if shouldUseMasonry(for: usableWidth) {
+            masonryPinnedItemsLayout(usableWidth: usableWidth)
         } else {
-            masonryPinnedItemsLayout(availableWidth: availableWidth)
+            stackedPinnedItemsLayout(usableWidth: usableWidth)
         }
     }
 
-    private func stackedPinnedItemsLayout(availableWidth: CGFloat) -> some View {
-        let usableWidth = max(0, availableWidth - (contentHorizontalPadding * 2))
+    private func stackedPinnedItemsLayout(usableWidth: CGFloat) -> some View {
         let items = buildPinnedLayoutItems(columns: 1)
 
         return LazyVStack(alignment: .leading, spacing: gridSpacing) {
@@ -431,44 +431,52 @@ struct HomeView: View {
         }
     }
 
-    private func masonryPinnedItemsLayout(availableWidth: CGFloat) -> some View {
-        let usableWidth = max(0, availableWidth - (contentHorizontalPadding * 2))
-        let columns = max(1, homeMaxSmallTilesPerRow(for: usableWidth))
-        let items = buildPinnedLayoutItems(columns: columns)
-        let placements = masonryPlacements(
-            for: items,
-            columns: columns,
-            usableWidth: usableWidth
-        )
-        let totalHeight = max(0, (placements.map(\.maxY).max() ?? 0))
-        let highestPriority = Double(max(0, items.count))
+    @ViewBuilder
+    private func masonryPinnedItemsLayout(usableWidth: CGFloat) -> some View {
+        let columns = masonryColumnCount(for: usableWidth)
+        if columns < 2 {
+            stackedPinnedItemsLayout(usableWidth: usableWidth)
+        } else {
+            let items = buildPinnedLayoutItems(columns: columns)
+            let placements = masonryPlacements(
+                for: items,
+                columns: columns,
+                usableWidth: usableWidth
+            )
+            let totalHeight = max(0, (placements.map(\.maxY).max() ?? 0))
+            let highestPriority = Double(max(0, items.count))
 
-        return ZStack(alignment: .topLeading) {
-            ForEach(placements) { placement in
-                pinnedItemView(placement.item, displaySize: placement.displaySize)
-                    .frame(width: placement.width, alignment: .topLeading)
-                    .background(masonryHeightReader(id: placement.id))
-                    .offset(x: placement.x, y: placement.y)
-                    .accessibilitySortPriority(highestPriority - Double(placement.sourceIndex))
-            }
-        }
-        .frame(height: totalHeight, alignment: .top)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .onPreferenceChange(HomeMasonryHeightPreferenceKey.self) { heights in
-            var updated = masonryMeasuredHeights
-            var changed = false
-
-            for (id, value) in heights {
-                guard value > 1 else { continue }
-                let current = updated[id] ?? 0
-                if abs(current - value) > 0.5 {
-                    updated[id] = value
-                    changed = true
+            ZStack(alignment: .topLeading) {
+                ForEach(placements) { placement in
+                    pinnedItemView(placement.item, displaySize: placement.displaySize)
+                        .frame(width: placement.width, alignment: .topLeading)
+                        .background(masonryHeightReader(id: placement.id))
+                        .offset(x: placement.x, y: placement.y)
+                        .accessibilitySortPriority(highestPriority - Double(placement.sourceIndex))
                 }
             }
+            .frame(height: totalHeight, alignment: .top)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .onPreferenceChange(HomeMasonryHeightPreferenceKey.self) { heights in
+                let filteredHeights = heights.filter { $0.value > 1 }
+                guard filteredHeights.isEmpty == false else { return }
 
-            if changed {
-                masonryMeasuredHeights = updated
+                DispatchQueue.main.async {
+                    var updated = masonryMeasuredHeights
+                    var changed = false
+
+                    for (id, value) in filteredHeights {
+                        let current = updated[id] ?? 0
+                        if abs(current - value) > 0.5 {
+                            updated[id] = value
+                            changed = true
+                        }
+                    }
+
+                    if changed {
+                        masonryMeasuredHeights = updated
+                    }
+                }
             }
         }
     }
@@ -594,14 +602,17 @@ struct HomeView: View {
 
     private var gridSpacing: CGFloat { 12 }
 
-    private func homeMaxSmallTilesPerRow(for usableWidth: CGFloat) -> Int {
-        if isPhone { return 1 }
-        if voiceOverEnabled { return 1 }
-        if dynamicTypeSize.isAccessibilitySize { return 1 }
-
+    private func masonryColumnCount(for usableWidth: CGFloat) -> Int {
         let minTileWidth: CGFloat = (dynamicTypeSize >= .xxLarge) ? 420 : 330
         let fit = Int((usableWidth + gridSpacing) / (minTileWidth + gridSpacing))
         return max(1, min(fit, 3))
+    }
+
+    private func shouldUseMasonry(for usableWidth: CGFloat) -> Bool {
+        guard isPhone == false else { return false }
+        guard voiceOverEnabled == false else { return false }
+        guard dynamicTypeSize.isAccessibilitySize == false else { return false }
+        return masonryColumnCount(for: usableWidth) >= 2
     }
 
     private func buildPinnedLayoutItems(columns: Int) -> [PinnedLayoutCell] {
