@@ -227,27 +227,15 @@ struct SettingsGeneralView: View {
     }
 
     private var systemFirstWeekdayLabel: String {
-        let calendar = Calendar.autoupdatingCurrent
-        let index = max(1, min(calendar.firstWeekday, calendar.weekdaySymbols.count)) - 1
-        return calendar.weekdaySymbols[index]
+        AppCalendarFormat.firstWeekdayName()
     }
 
     private var systemDateFormatLabel: String {
-        Date.now.formatted(date: .numeric, time: .omitted)
+        AppDateFormat.numericDate(.now)
     }
 
     private var systemNumberFormatLabel: String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .decimal
-        formatter.locale = .current
-        formatter.minimumFractionDigits = 2
-        formatter.maximumFractionDigits = 2
-
-        if let formatted = formatter.string(from: NSNumber(value: 1_234.56)) {
-            return formatted
-        }
-
-        return 1_234.56.formatted(.number.precision(.fractionLength(2)))
+        AppNumberFormat.decimal(1_234.56, minimumFractionDigits: 2, maximumFractionDigits: 2)
     }
 
     private var defaultBudgetingPeriodBinding: Binding<BudgetingPeriod> {
@@ -471,10 +459,10 @@ private enum CurrencyPickerConstants {
     static let systemTag: String = "SYSTEM"
 
     static var systemCurrencyCode: String {
-        if let id = Locale.current.currency?.identifier, !id.isEmpty {
+        if let id = Locale.autoupdatingCurrent.currency?.identifier, !id.isEmpty {
             return id
         }
-        return "USD"
+        return CurrencyFormatter.defaultFallbackCurrencyCode
     }
 
     static var allCurrencyCodes: [String] = {
@@ -486,13 +474,13 @@ private enum CurrencyPickerConstants {
     }()
 
     static func localizedCurrencyName(for code: String) -> String {
-        Locale.current.localizedString(forCurrencyCode: code) ?? code
+        Locale.autoupdatingCurrent.localizedString(forCurrencyCode: code) ?? code
     }
 
     static func currencySymbol(for code: String) -> String {
         let formatter = NumberFormatter()
         formatter.numberStyle = .currency
-        formatter.locale = .current
+        formatter.locale = .autoupdatingCurrent
         formatter.currencyCode = code
         return formatter.currencySymbol ?? ""
     }

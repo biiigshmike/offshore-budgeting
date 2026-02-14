@@ -85,8 +85,8 @@ struct BudgetDetailView: View {
     }
     
     private var budgetDateRangeLabel: String {
-        let start = budget.startDate.formatted(date: .abbreviated, time: .omitted)
-        let end = budget.endDate.formatted(date: .abbreviated, time: .omitted)
+        let start = AppDateFormat.abbreviatedDate(budget.startDate)
+        let end = AppDateFormat.abbreviatedDate(budget.endDate)
         return "\(start) – \(end)"
     }
     
@@ -1423,7 +1423,7 @@ private struct BudgetPlannedExpenseRow: View {
                     .font(.body)
 
                 HStack(spacing: 8) {
-                    Text(expense.expenseDate.formatted(date: .abbreviated, time: .omitted))
+                    Text(AppDateFormat.abbreviatedDate(expense.expenseDate))
 
                     if showsCardName, let cardName = expense.card?.name {
                         Text("•")
@@ -1540,7 +1540,7 @@ private struct BudgetVariableExpenseRow: View {
                     .font(.body)
 
                 HStack(spacing: 8) {
-                    Text(expense.transactionDate.formatted(date: .abbreviated, time: .omitted))
+                    Text(AppDateFormat.abbreviatedDate(expense.transactionDate))
 
                     if showsCardName, let cardName = expense.card?.name {
                         Text("•")

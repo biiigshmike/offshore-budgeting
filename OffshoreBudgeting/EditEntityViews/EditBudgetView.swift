@@ -399,6 +399,6 @@ struct EditBudgetView: View {
     }
 
     private func localizedInt(_ value: Int) -> String {
-        value.formatted(.number)
+        AppNumberFormat.integer(value)
     }
 }

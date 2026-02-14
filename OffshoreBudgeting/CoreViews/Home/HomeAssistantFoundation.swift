@@ -2726,10 +2726,7 @@ struct HomeAssistantPanelView: View {
     }
 
     private func shortDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .short
-        formatter.timeStyle = .none
-        return formatter.string(from: date)
+        AppDateFormat.shortDate(date)
     }
 
     private func calendarStartOfDay(_ date: Date) -> Date {
@@ -2836,12 +2833,7 @@ struct HomeAssistantPanelView: View {
 
     private func debugDateRangeLabel(_ range: HomeQueryDateRange?) -> String {
         guard let range else { return "None" }
-
-        let formatter = DateFormatter()
-        formatter.dateStyle = .short
-        formatter.timeStyle = .none
-
-        return "\(formatter.string(from: range.startDate)) - \(formatter.string(from: range.endDate))"
+        return "\(AppDateFormat.shortDate(range.startDate)) - \(AppDateFormat.shortDate(range.endDate))"
     }
 
     private func aliasTarget(
@@ -4468,8 +4460,8 @@ private final class HomeAssistantMutationService {
             title: "Budget created",
             subtitle: "Saved budget \(trimmed).",
             rows: [
-                HomeAnswerRow(title: "Start", value: dateRange.startDate.formatted(date: .abbreviated, time: .omitted)),
-                HomeAnswerRow(title: "End", value: dateRange.endDate.formatted(date: .abbreviated, time: .omitted)),
+                HomeAnswerRow(title: "Start", value: AppDateFormat.abbreviatedDate(dateRange.startDate)),
+                HomeAnswerRow(title: "End", value: AppDateFormat.abbreviatedDate(dateRange.endDate)),
                 HomeAnswerRow(title: "Cards", value: "\(cards.count) linked"),
                 HomeAnswerRow(title: "Presets", value: "\(presets.count) linked")
             ]
@@ -4589,7 +4581,7 @@ private final class HomeAssistantMutationService {
             rows: [
                 HomeAnswerRow(title: "Amount", value: CurrencyFormatter.string(from: amount)),
                 HomeAnswerRow(title: "Card", value: card.name),
-                HomeAnswerRow(title: "Date", value: date.formatted(date: .abbreviated, time: .omitted))
+                HomeAnswerRow(title: "Date", value: AppDateFormat.abbreviatedDate(date))
             ]
         )
     }
@@ -4617,7 +4609,7 @@ private final class HomeAssistantMutationService {
             rows: [
                 HomeAnswerRow(title: "Amount", value: CurrencyFormatter.string(from: amount)),
                 HomeAnswerRow(title: "Source", value: source),
-                HomeAnswerRow(title: "Date", value: date.formatted(date: .abbreviated, time: .omitted))
+                HomeAnswerRow(title: "Date", value: AppDateFormat.abbreviatedDate(date))
             ]
         )
     }
@@ -4754,7 +4746,7 @@ private final class HomeAssistantMutationService {
             rows: [
                 HomeAnswerRow(title: "Amount", value: CurrencyFormatter.string(from: expense.amount)),
                 HomeAnswerRow(title: "Description", value: expense.descriptionText),
-                HomeAnswerRow(title: "Date", value: expense.transactionDate.formatted(date: .abbreviated, time: .omitted))
+                HomeAnswerRow(title: "Date", value: AppDateFormat.abbreviatedDate(expense.transactionDate))
             ]
         )
     }
@@ -4785,7 +4777,7 @@ private final class HomeAssistantMutationService {
             rows: [
                 HomeAnswerRow(title: "Amount", value: CurrencyFormatter.string(from: income.amount)),
                 HomeAnswerRow(title: "Source", value: income.source),
-                HomeAnswerRow(title: "Date", value: income.date.formatted(date: .abbreviated, time: .omitted))
+                HomeAnswerRow(title: "Date", value: AppDateFormat.abbreviatedDate(income.date))
             ]
         )
     }

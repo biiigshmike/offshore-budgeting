@@ -485,7 +485,7 @@ final class LocalNotificationService: ObservableObject {
             .sorted(by: { $0.identifier < $1.identifier })
             .map { request in
                 if let trigger = request.trigger as? UNCalendarNotificationTrigger {
-                    let next = trigger.nextTriggerDate()?.formatted(date: .abbreviated, time: .shortened) ?? "unknown"
+                    let next = trigger.nextTriggerDate().map(AppDateFormat.abbreviatedDateTime) ?? "unknown"
                     let title = request.content.title.isEmpty ? "Untitled" : request.content.title
                     let body = request.content.body.isEmpty ? "(no body)" : request.content.body
                     return "\(next) — \(title): \(body) • id=\(request.identifier) • repeats=\(trigger.repeats)"
@@ -567,7 +567,7 @@ final class LocalNotificationService: ObservableObject {
     }
 
     private static func localizedInt(_ value: Int) -> String {
-        value.formatted(.number)
+        AppNumberFormat.integer(value)
     }
 
     private func fetchNotificationSettings() async -> UNNotificationSettings {

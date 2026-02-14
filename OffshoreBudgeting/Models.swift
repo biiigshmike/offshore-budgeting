@@ -186,7 +186,7 @@ enum BudgetNameSuggestion {
     }
 
     private static func localizedInt(_ value: Int) -> String {
-        value.formatted(.number)
+        AppNumberFormat.integer(value)
     }
 
     private static func formatMonthYear(_ date: Date, calendar: Calendar) -> String {

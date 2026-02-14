@@ -90,6 +90,6 @@ struct HomeCardSummaryTile: View {
     }
 
     private func formattedDate(_ date: Date) -> String {
-        date.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted))
+        AppDateFormat.abbreviatedDate(date)
     }
 }

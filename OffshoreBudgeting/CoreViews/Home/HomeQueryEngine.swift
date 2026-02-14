@@ -1874,7 +1874,7 @@ struct HomeQueryEngine {
     }
 
     private func shortDate(_ date: Date) -> String {
-        date.formatted(date: .abbreviated, time: .omitted)
+        AppDateFormat.abbreviatedDate(date)
     }
 
     private func isFullMonth(_ range: HomeQueryDateRange) -> Bool {

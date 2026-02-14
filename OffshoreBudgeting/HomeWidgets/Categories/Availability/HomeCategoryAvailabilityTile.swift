@@ -294,11 +294,11 @@ struct HomeCategoryAvailabilityTile: View {
     }
 
     private func formattedDate(_ date: Date) -> String {
-        date.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted))
+        AppDateFormat.abbreviatedDate(date)
     }
 
     private func localizedInt(_ value: Int) -> String {
-        value.formatted(.number)
+        AppNumberFormat.integer(value)
     }
 
     // MARK: - Accent
@@ -379,7 +379,7 @@ private struct AvailabilityCountPill: View {
     }
 
     private func localizedInt(_ value: Int) -> String {
-        value.formatted(.number)
+        AppNumberFormat.integer(value)
     }
 }
 

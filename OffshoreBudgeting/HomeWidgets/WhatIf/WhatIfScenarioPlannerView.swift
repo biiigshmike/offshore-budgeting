@@ -669,7 +669,7 @@ struct WhatIfScenarioPlannerView: View {
         lines.append("What If? • \(workspace.name)")
         lines.append(subtitleText)
         lines.append("Scenario: \(selectedScenarioName)")
-        lines.append("Generated: \(Date().formatted(date: .abbreviated, time: .shortened))")
+        lines.append("Generated: \(AppDateFormat.abbreviatedDateTime(.now))")
         lines.append("")
         lines.append("Scenario \(savingsLabel): \(CurrencyFormatter.string(from: savingsValueMagnitude))")
         lines.append("Actual Savings: \(CurrencyFormatter.string(from: actualSavings))")
@@ -862,7 +862,7 @@ struct WhatIfScenarioPlannerView: View {
     }
 
     private func formattedDate(_ date: Date) -> String {
-        date.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted))
+        AppDateFormat.abbreviatedDate(date)
     }
 
     private func effectivePlannedExpenseAmount(_ expense: PlannedExpense) -> Double {

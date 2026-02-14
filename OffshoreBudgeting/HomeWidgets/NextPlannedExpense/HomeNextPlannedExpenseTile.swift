@@ -26,7 +26,7 @@ struct HomeNextPlannedExpenseTile: View {
     }
 
     private var dateText: String {
-        expense.expenseDate.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted))
+        AppDateFormat.abbreviatedDate(expense.expenseDate)
     }
 
     private var themeOption: CardThemeOption {
@@ -109,7 +109,7 @@ struct HomeNextPlannedExpenseTile: View {
     }
 
     private func formattedDate(_ date: Date) -> String {
-        date.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted))
+        AppDateFormat.abbreviatedDate(date)
     }
 
     private var accessibilityLabel: String {

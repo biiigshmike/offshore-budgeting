@@ -171,7 +171,7 @@ struct BudgetRecordedPlannedExpensesReviewView: View {
             }
 
             HStack(spacing: 8) {
-                Text(expense.expenseDate.formatted(date: .abbreviated, time: .omitted))
+                Text(AppDateFormat.abbreviatedDate(expense.expenseDate))
                 if let cardName = expense.card?.name {
                     Text("•")
                     Text(cardName)

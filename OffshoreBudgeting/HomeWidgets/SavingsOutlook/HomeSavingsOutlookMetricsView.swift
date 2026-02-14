@@ -431,7 +431,7 @@ struct HomeSavingsOutlookMetricsView: View {
     // MARK: - Date Helpers
 
     private func formattedDate(_ date: Date) -> String {
-        date.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted))
+        AppDateFormat.abbreviatedDate(date)
     }
 
     private func quarterLabel(for date: Date) -> String {

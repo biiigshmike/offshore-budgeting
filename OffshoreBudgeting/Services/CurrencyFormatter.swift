@@ -19,6 +19,10 @@ enum CurrencyFormatter {
     private static let systemCurrencyTag: String = "SYSTEM"
     private static let fallbackCurrencyCode: String = "USD"
 
+    static var defaultFallbackCurrencyCode: String {
+        fallbackCurrencyCode
+    }
+
     // MARK: - Public: Currency Code
 
     static var currencyCode: String {
@@ -26,7 +30,7 @@ enum CurrencyFormatter {
 
         // Settings can store a sentinel value meaning "use system currency".
         if stored == systemCurrencyTag {
-            return Locale.current.currency?.identifier ?? fallbackCurrencyCode
+            return Locale.autoupdatingCurrent.currency?.identifier ?? fallbackCurrencyCode
         }
 
         if let stored, !stored.isEmpty {
@@ -85,7 +89,7 @@ enum CurrencyFormatter {
 
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
-        formatter.locale = .current
+        formatter.locale = .autoupdatingCurrent
         formatter.usesGroupingSeparator = true
         formatter.minimumFractionDigits = digits
         formatter.maximumFractionDigits = digits
@@ -113,7 +117,7 @@ enum CurrencyFormatter {
         // 1) Try decimal parsing first (best for text fields)
         let decimalFormatter = NumberFormatter()
         decimalFormatter.numberStyle = .decimal
-        decimalFormatter.locale = .current
+        decimalFormatter.locale = .autoupdatingCurrent
 
         if let number = decimalFormatter.number(from: trimmed) {
             return number.doubleValue
@@ -171,7 +175,7 @@ enum CurrencyFormatter {
     private static func makeCurrencyFormatter() -> NumberFormatter {
         let formatter = NumberFormatter()
         formatter.numberStyle = .currency
-        formatter.locale = .current
+        formatter.locale = .autoupdatingCurrent
         formatter.currencyCode = currencyCode
         return formatter
     }
