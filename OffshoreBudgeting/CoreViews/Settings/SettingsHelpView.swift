@@ -48,7 +48,11 @@ struct SettingsHelpView: View {
         }
         .listStyle(.insetGrouped)
         .navigationTitle("Help")
-        .searchable(text: $searchText, prompt: "Search Help")
+        .searchable(
+            text: $searchText,
+            placement: .navigationBarDrawer(displayMode: .always),
+            prompt: "Search"
+        )
     }
 
     // MARK: - Navigation
