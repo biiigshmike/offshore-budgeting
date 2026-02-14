@@ -11,6 +11,8 @@ import SwiftData
 struct HomeView: View {
 
     let workspace: Workspace
+    let showAssistantToolbarButton: Bool
+    let onOpenAssistant: () -> Void
 
     @Query private var budgets: [Budget]
     @Query private var cards: [Card]
@@ -42,11 +44,15 @@ struct HomeView: View {
 
     @AppStorage("general_defaultBudgetingPeriod")
     private var defaultBudgetingPeriodRaw: String = BudgetingPeriod.monthly.rawValue
+    @AppStorage("general_hideFuturePlannedExpenses")
+    private var hideFuturePlannedExpensesDefault: Bool = false
     @AppStorage("general_excludeFuturePlannedExpensesFromCalculations")
-    private var excludeFuturePlannedExpensesFromCalculations: Bool = false
+    private var excludeFuturePlannedExpensesFromCalculationsDefault: Bool = false
 
     @State private var draftStartDate: Date = Date()
     @State private var draftEndDate: Date = Date()
+    @State private var hideFuturePlannedExpensesInView: Bool = false
+    @State private var excludeFuturePlannedExpensesFromCalculationsInView: Bool = false
 
     @State private var isEditingWidgets: Bool = false
 
@@ -74,7 +80,14 @@ struct HomeView: View {
     private var calculationPlannedExpensesForHome: [PlannedExpense] {
         PlannedExpenseFuturePolicy.filteredForCalculations(
             plannedExpensesForHome,
-            excludeFuture: excludeFuturePlannedExpensesFromCalculations
+            excludeFuture: excludeFuturePlannedExpensesFromCalculationsInView
+        )
+    }
+
+    private var visiblePlannedExpensesForHome: [PlannedExpense] {
+        PlannedExpenseFuturePolicy.filteredForVisibility(
+            plannedExpensesForHome,
+            hideFuture: hideFuturePlannedExpensesInView
         )
     }
 
@@ -91,8 +104,14 @@ struct HomeView: View {
         #endif
     }
 
-    init(workspace: Workspace) {
+    init(
+        workspace: Workspace,
+        showAssistantToolbarButton: Bool = false,
+        onOpenAssistant: @escaping () -> Void = { }
+    ) {
         self.workspace = workspace
+        self.showAssistantToolbarButton = showAssistantToolbarButton
+        self.onOpenAssistant = onOpenAssistant
         let workspaceID = workspace.id
 
         _appliedStartTimestamp = AppStorage(wrappedValue: 0, Self.appliedStartKey(workspaceID: workspaceID))
@@ -211,6 +230,31 @@ struct HomeView: View {
             ]
         )
         .navigationTitle("Home")
+        .toolbar {
+            if #available(iOS 26.0, macCatalyst 26.0, *) {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    homeActionsToolbarButton
+                }
+
+                if showAssistantToolbarButton {
+                    ToolbarSpacer(.flexible, placement: .primaryAction)
+
+                    ToolbarItemGroup(placement: .primaryAction) {
+                        assistantToolbarButton
+                    }
+                }
+            } else {
+                ToolbarItem(placement: .topBarTrailing) {
+                    homeActionsToolbarButton
+                }
+
+                if showAssistantToolbarButton {
+                    ToolbarItem(placement: .primaryAction) {
+                        assistantToolbarButton
+                    }
+                }
+            }
+        }
         .sheet(isPresented: $isEditingWidgets) {
             HomeEditPinnedCardsView(
                 cards: cards,
@@ -227,6 +271,8 @@ struct HomeView: View {
             syncDraftToApplied()
             loadPinnedItemsIfNeeded()
             prunePinnedCardsIfNeeded()
+            hideFuturePlannedExpensesInView = hideFuturePlannedExpensesDefault
+            excludeFuturePlannedExpensesFromCalculationsInView = excludeFuturePlannedExpensesFromCalculationsDefault
         }
         .onChange(of: pinnedItems) { _, _ in
             persistPinnedItems()
@@ -262,7 +308,8 @@ struct HomeView: View {
                     workspace: workspace,
                     card: card,
                     startDate: appliedStartDate,
-                    endDate: appliedEndDate
+                    endDate: appliedEndDate,
+                    excludeFuturePlannedExpensesFromCalculationsInView: excludeFuturePlannedExpensesFromCalculationsInView
                 )
                 .accessibilityElement(children: .combine)
             } else {
@@ -464,7 +511,7 @@ struct HomeView: View {
     @ViewBuilder
     private var nextPlannedExpenseWidget: some View {
         if let next = HomeNextPlannedExpenseFinder.nextExpense(
-            from: plannedExpensesForHome,
+            from: visiblePlannedExpensesForHome,
             in: appliedStartDate,
             to: appliedEndDate
         ) {
@@ -734,6 +781,26 @@ struct HomeView: View {
     }
 
     // MARK: - Widgets Header
+
+    private var homeActionsToolbarButton: some View {
+        Menu {
+            Toggle("Hide Future Planned Expenses", isOn: $hideFuturePlannedExpensesInView)
+            Toggle(
+                "Exclude Future Planned Expenses from Totals",
+                isOn: $excludeFuturePlannedExpensesFromCalculationsInView
+            )
+        } label: {
+            Image(systemName: "ellipsis")
+        }
+        .accessibilityLabel("Home Actions")
+    }
+
+    private var assistantToolbarButton: some View {
+        Button(action: onOpenAssistant) {
+            Image(systemName: "figure.wave")
+        }
+        .accessibilityLabel("Open Assistant")
+    }
 
     private var widgetsHeader: some View {
         HStack(alignment: .firstTextBaseline) {

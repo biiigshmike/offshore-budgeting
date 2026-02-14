@@ -187,9 +187,8 @@ struct AppRootView: View {
         TabView(selection: selectedSectionBinding) {
 
             NavigationStack {
-                HomeView(workspace: workspace)
+                homeRootView
             }
-            .toolbar { assistantToolbarContent }
             .safeAreaInset(edge: .bottom) {
                 if shouldShowBottomLauncher {
                     HomeAssistantLauncherBar(onTap: presentAssistant)
@@ -203,28 +202,24 @@ struct AppRootView: View {
             NavigationStack {
                 BudgetsView(workspace: workspace)
             }
-            .toolbar { assistantToolbarContent }
             .tabItem { Label(AppSection.budgets.rawValue, systemImage: AppSection.budgets.systemImage) }
             .tag(AppSection.budgets)
 
             NavigationStack {
                 IncomeView(workspace: workspace)
             }
-            .toolbar { assistantToolbarContent }
             .tabItem { Label(AppSection.income.rawValue, systemImage: AppSection.income.systemImage) }
             .tag(AppSection.income)
 
             NavigationStack {
                 CardsView(workspace: workspace)
             }
-            .toolbar { assistantToolbarContent }
             .tabItem { Label(AppSection.cards.rawValue, systemImage: AppSection.cards.systemImage) }
             .tag(AppSection.cards)
 
             NavigationStack {
                 SettingsView(workspace: workspace, selectedWorkspaceID: $selectedWorkspaceID)
             }
-            .toolbar { assistantToolbarContent }
             .tabItem { Label(AppSection.settings.rawValue, systemImage: AppSection.settings.systemImage) }
             .tag(AppSection.settings)
         }
@@ -253,7 +248,6 @@ struct AppRootView: View {
             NavigationStack(path: selectedSectionPath) {
                 sectionRootView
             }
-            .toolbar { assistantToolbarContent }
             .id(selectedSection)
         }
     }
@@ -274,20 +268,6 @@ struct AppRootView: View {
     }
 
     // MARK: - Assistant
-
-    @ToolbarContentBuilder
-    private var assistantToolbarContent: some ToolbarContent {
-        if shouldShowToolbarButton {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    presentAssistant()
-                } label: {
-                    Image(systemName: "figure.wave")
-                }
-                .accessibilityLabel("Open Assistant")
-            }
-        }
-    }
 
     private var assistantSheetPresentedBinding: Binding<Bool> {
         Binding(
@@ -470,7 +450,7 @@ struct AppRootView: View {
     private var sectionRootView: some View {
         switch selectedSection {
         case .home:
-            HomeView(workspace: workspace)
+            homeRootView
         case .budgets:
             BudgetsView(workspace: workspace)
         case .income:
@@ -480,6 +460,14 @@ struct AppRootView: View {
         case .settings:
             SettingsView(workspace: workspace, selectedWorkspaceID: $selectedWorkspaceID)
         }
+    }
+
+    private var homeRootView: some View {
+        HomeView(
+            workspace: workspace,
+            showAssistantToolbarButton: shouldShowToolbarButton,
+            onOpenAssistant: presentAssistant
+        )
     }
 }
 
