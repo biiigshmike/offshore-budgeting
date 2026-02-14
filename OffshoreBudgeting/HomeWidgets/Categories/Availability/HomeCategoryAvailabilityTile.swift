@@ -13,6 +13,20 @@ struct HomeCategoryAvailabilityTile: View {
         case wide
     }
 
+    private enum AvailabilitySlot: Identifiable {
+        case metric(CategoryAvailabilityMetric)
+        case placeholder(UUID)
+
+        var id: String {
+            switch self {
+            case .metric(let metric):
+                return metric.id.uuidString
+            case .placeholder(let id):
+                return id.uuidString
+            }
+        }
+    }
+
     let workspace: Workspace
 
     let budgets: [Budget]
@@ -28,8 +42,10 @@ struct HomeCategoryAvailabilityTile: View {
 
     @State private var scope: AvailabilityScope = .all
     @State private var pageIndex: Int = 0
+    @State private var measuredSmallRowHeight: CGFloat = 0
+    @State private var measuredWideRowHeight: CGFloat = 0
 
-    private let rowHeight: CGFloat = 76
+    private let fallbackRowHeight: CGFloat = 76
     private let rowSpacing: CGFloat = 10
     private let pageSize: Int = 6
     private var rowsPerPage: Int {
@@ -39,6 +55,16 @@ struct HomeCategoryAvailabilityTile: View {
         case .wide:
             return 3
         }
+    }
+    private var effectiveRowHeight: CGFloat {
+        let measured: CGFloat
+        switch layoutMode {
+        case .small:
+            measured = measuredSmallRowHeight
+        case .wide:
+            measured = measuredWideRowHeight
+        }
+        return measured > 1 ? measured : fallbackRowHeight
     }
 
 
@@ -78,9 +104,10 @@ struct HomeCategoryAvailabilityTile: View {
                 let start = pageIndex * pageSize
                 let end = min(start + pageSize, total)
                 let pageItems: [CategoryAvailabilityMetric] = (start < end) ? Array(result.metrics[start..<end]) : []
+                let slots = makeSlots(from: pageItems)
                 
                 let reservedRowsHeight =
-                    CGFloat(rowsPerPage) * rowHeight + CGFloat(max(0, rowsPerPage - 1)) * rowSpacing
+                    CGFloat(rowsPerPage) * effectiveRowHeight + CGFloat(max(0, rowsPerPage - 1)) * rowSpacing
 
                 VStack(alignment: .leading, spacing: 12) {
                     HStack(spacing: 10) {
@@ -95,13 +122,8 @@ struct HomeCategoryAvailabilityTile: View {
                     switch layoutMode {
                     case .small:
                         VStack(spacing: rowSpacing) {
-                            ForEach(pageItems) { metric in
-                                CategoryAvailabilityRowView(
-                                    metric: metric,
-                                    scope: scope,
-                                    currencyCode: CurrencyFormatter.currencyCode,
-                                    nearThreshold: HomeCategoryLimitsAggregator.defaultNearThreshold
-                                )
+                            ForEach(slots) { slot in
+                                slotView(slot)
                             }
                         }
                         .frame(
@@ -117,13 +139,8 @@ struct HomeCategoryAvailabilityTile: View {
                             alignment: .leading,
                             spacing: rowSpacing
                         ) {
-                            ForEach(pageItems) { metric in
-                                CategoryAvailabilityRowView(
-                                    metric: metric,
-                                    scope: scope,
-                                    currencyCode: CurrencyFormatter.currencyCode,
-                                    nearThreshold: HomeCategoryLimitsAggregator.defaultNearThreshold
-                                )
+                            ForEach(slots) { slot in
+                                slotView(slot)
                             }
                         }
                         .frame(
@@ -136,7 +153,57 @@ struct HomeCategoryAvailabilityTile: View {
                     // If data changes and is beyond the last page, clamp.
                     pageIndex = min(pageIndex, max(0, newValue - 1))
                 }
+                .onPreferenceChange(CategoryAvailabilityRowHeightPreferenceKey.self) { value in
+                    guard value > 1 else { return }
+                    switch layoutMode {
+                    case .small:
+                        if abs(measuredSmallRowHeight - value) > 0.5 {
+                            measuredSmallRowHeight = value
+                        }
+                    case .wide:
+                        if abs(measuredWideRowHeight - value) > 0.5 {
+                            measuredWideRowHeight = value
+                        }
+                    }
+                }
             }
+        }
+    }
+
+    // MARK: - Slots
+
+    private func makeSlots(from pageItems: [CategoryAvailabilityMetric]) -> [AvailabilitySlot] {
+        var slots = pageItems.prefix(pageSize).map(AvailabilitySlot.metric)
+        while slots.count < pageSize {
+            slots.append(.placeholder(UUID()))
+        }
+        return slots
+    }
+
+    @ViewBuilder
+    private func slotView(_ slot: AvailabilitySlot) -> some View {
+        switch slot {
+        case .metric(let metric):
+            CategoryAvailabilityRowView(
+                metric: metric,
+                scope: scope,
+                currencyCode: CurrencyFormatter.currencyCode,
+                nearThreshold: HomeCategoryLimitsAggregator.defaultNearThreshold
+            )
+            .background(rowHeightReader)
+        case .placeholder:
+            Color.clear
+                .frame(height: effectiveRowHeight)
+                .accessibilityHidden(true)
+        }
+    }
+
+    private var rowHeightReader: some View {
+        GeometryReader { proxy in
+            Color.clear.preference(
+                key: CategoryAvailabilityRowHeightPreferenceKey.self,
+                value: proxy.size.height
+            )
         }
     }
     
@@ -313,5 +380,13 @@ private struct AvailabilityCountPill: View {
 
     private func localizedInt(_ value: Int) -> String {
         value.formatted(.number)
+    }
+}
+
+private struct CategoryAvailabilityRowHeightPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }
