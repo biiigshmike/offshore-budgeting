@@ -25,6 +25,8 @@ struct CardsView: View {
     @State private var showingAddAllocationAccount: Bool = false
     @State private var showingEditCard: Bool = false
     @State private var editingCard: Card? = nil
+    @State private var showingEditAllocationAccount: Bool = false
+    @State private var editingAllocationAccount: AllocationAccount? = nil
     @State private var shortcutImportCard: Card? = nil
     @State private var shortcutImportClipboardText: String? = nil
     @State private var shortcutExpenseDescription: String? = nil
@@ -143,6 +145,14 @@ struct CardsView: View {
                                     }
                                     .buttonStyle(.plain)
                                     .contextMenu {
+                                        Button {
+                                            editingAllocationAccount = account
+                                            showingEditAllocationAccount = true
+                                        } label: {
+                                            Label("Edit", systemImage: "pencil")
+                                        }
+                                        .tint(Color("AccentColor"))
+
                                         if hasSharedBalanceHistory(account) {
                                             Button(role: .destructive) {
                                                 requestArchiveSharedBalance(account)
@@ -266,6 +276,15 @@ struct CardsView: View {
             NavigationStack {
                 if let editingCard {
                     EditCardView(workspace: workspace, card: editingCard)
+                } else {
+                    EmptyView()
+                }
+            }
+        }
+        .sheet(isPresented: $showingEditAllocationAccount, onDismiss: { editingAllocationAccount = nil }) {
+            NavigationStack {
+                if let editingAllocationAccount {
+                    EditAllocationAccountView(account: editingAllocationAccount)
                 } else {
                     EmptyView()
                 }

@@ -11,6 +11,7 @@ struct AllocationAccountDetailView: View {
     @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
 
     @State private var showingAddSettlementSheet: Bool = false
+    @State private var showingEditAccountSheet: Bool = false
     @State private var showingArchiveConfirm: Bool = false
     @State private var showingDeleteConfirm: Bool = false
 
@@ -103,6 +104,14 @@ struct AllocationAccountDetailView: View {
                     .accessibilityLabel("Add Settlement")
 
                     Menu {
+                        Button {
+                            showingEditAccountSheet = true
+                        } label: {
+                            Label("Edit Shared Balance", systemImage: "pencil")
+                        }
+
+                        Divider()
+
                         if hasHistory {
                             Button(role: .destructive) {
                                 if confirmBeforeDeleting {
@@ -169,6 +178,11 @@ struct AllocationAccountDetailView: View {
         .sheet(isPresented: $showingAddSettlementSheet) {
             NavigationStack {
                 AddAllocationSettlementView(workspace: workspace, account: account)
+            }
+        }
+        .sheet(isPresented: $showingEditAccountSheet) {
+            NavigationStack {
+                EditAllocationAccountView(account: account)
             }
         }
         .sheet(isPresented: $showingEditSettlementSheet, onDismiss: {

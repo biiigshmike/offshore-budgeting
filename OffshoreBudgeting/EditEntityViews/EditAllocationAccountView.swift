@@ -1,23 +1,30 @@
 import SwiftUI
 import SwiftData
 
-struct AddAllocationAccountView: View {
+struct EditAllocationAccountView: View {
 
-    let workspace: Workspace
+    @Bindable var account: AllocationAccount
 
-    @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
-    @State private var name: String = ""
-    @State private var color: Color = .blue
+    @State private var name: String
+    @State private var color: Color
 
-    private var canSave: Bool {
-        !trimmedName.isEmpty
+    init(account: AllocationAccount) {
+        self.account = account
+        _name = State(initialValue: account.name)
+        _color = State(initialValue: Color(hex: account.hexColor) ?? .blue)
     }
 
     private var trimmedName: String {
         name.trimmingCharacters(in: .whitespacesAndNewlines)
     }
+
+    private var canSave: Bool {
+        !trimmedName.isEmpty
+    }
+
+    // MARK: - Body
 
     var body: some View {
         Form {
@@ -26,7 +33,7 @@ struct AddAllocationAccountView: View {
                 ColorPicker("Color", selection: $color, supportsOpacity: false)
             }
         }
-        .navigationTitle("New Shared Balance")
+        .navigationTitle("Edit Shared Balance")
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button("Cancel") { dismiss() }
@@ -52,16 +59,12 @@ struct AddAllocationAccountView: View {
         }
     }
 
+    // MARK: - Actions
+
     private func save() {
         guard !trimmedName.isEmpty else { return }
-
-        let account = AllocationAccount(
-            name: trimmedName,
-            hexColor: color.hexRGBString(),
-            workspace: workspace
-        )
-
-        modelContext.insert(account)
+        account.name = trimmedName
+        account.hexColor = color.hexRGBString()
         dismiss()
     }
 }
