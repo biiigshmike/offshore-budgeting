@@ -84,7 +84,7 @@ struct SettingsPrivacyView: View {
                 permissionRow(
                     title: "Location",
                     status: locationPermissionStatus,
-                    description: "Allows Offshore to use Location Services during Excursion Mode to nudge you to log expenses before you forget.\nNote:Cellular Data is not needed to use the core functionalities of Offshore."
+                    description: "Allows Offshore to use Location Services during Excursion Mode to nudge you to log expenses before you forget.\nNote: Location Services are not needed to use the core functionalities of Offshore."
                 )
 
                 permissionRow(
@@ -108,7 +108,7 @@ struct SettingsPrivacyView: View {
                 permissionRow(
                     title: "Cellular Data",
                     status: cellularDataStatus,
-                    description: "Allows Offshore to use mobile data during Excursion Mode when Wi-Fi may be unavailable.\nNote:Cellular Data is not needed to use the core functionalities of Offshore."
+                    description: "Allows Offshore to use mobile data during Excursion Mode when Wi-Fi may be unavailable.\nNote: Cellular Data is not needed to use the core functionalities of Offshore."
                 )
 
                 Button {

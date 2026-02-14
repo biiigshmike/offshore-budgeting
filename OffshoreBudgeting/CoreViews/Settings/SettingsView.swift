@@ -155,7 +155,7 @@ struct SettingsView: View {
                 QuickActionsInstallView()
             } label: {
                 SettingsRow(
-                    title: "Install Quick Actions",
+                    title: "Quick Actions",
                     systemImage: "bolt.circle",
                     tint: .green
                 )
