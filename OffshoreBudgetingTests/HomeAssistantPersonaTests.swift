@@ -69,9 +69,13 @@ struct HomeAssistantPersonaTests {
     @Test func formatter_greetingAnswer_returnsMarinaGreeting() throws {
         let formatter = makeFixedFormatter()
         let greeting = formatter.greetingAnswer(for: .marina)
+        let profile = HomeAssistantPersonaCatalog.profile(for: .marina)
 
         #expect(greeting.kind == .message)
         #expect(greeting.title.contains("Marina"))
+        #expect(greeting.title == profile.greetingTitle)
+        #expect(greeting.subtitle?.contains(profile.summary) == false)
+        #expect(greeting.subtitle?.contains(profile.greetingSubtitle) == true)
         #expect(greeting.primaryValue == nil)
         #expect(greeting.rows.isEmpty)
     }

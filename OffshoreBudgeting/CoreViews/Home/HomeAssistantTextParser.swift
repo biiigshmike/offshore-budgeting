@@ -155,6 +155,10 @@ struct HomeAssistantTextParser {
             return .largestRecentTransactions
         }
 
+        if matchesExpenseListIntent(in: text) {
+            return .largestRecentTransactions
+        }
+
         if matchesCardSpendingHabitsIntent(in: text) {
             return .cardVariableSpendingHabits
         }
@@ -245,6 +249,35 @@ struct HomeAssistantTextParser {
 
         return containsAny(text, keywords: rankingKeywords)
             && containsAny(text, keywords: transactionKeywords)
+    }
+
+    private func matchesExpenseListIntent(in text: String) -> Bool {
+        let transactionKeywords = [
+            "transaction", "transactions", "purchase", "purchases",
+            "charge", "charges", "expense", "expenses"
+        ]
+        let spendListPhrases = [
+            "what did i spend my money on",
+            "where did my money go"
+        ]
+        let hasTransactionLanguage = containsAny(text, keywords: transactionKeywords)
+        let hasSpendListPhrase = containsAny(text, keywords: spendListPhrases)
+        guard hasTransactionLanguage || hasSpendListPhrase else { return false }
+
+        // Aggregate prompts should continue to route to spend totals.
+        if text.contains("how much") || text.contains("total spend") {
+            return false
+        }
+
+        let listKeywords = [
+            "list", "show", "display", "what were", "what are", "which were", "did i log"
+        ]
+        if containsAny(text, keywords: listKeywords) {
+            return true
+        }
+
+        let dateScopedKeywords = ["today", "yesterday", "last week", "on ", "from "]
+        return containsAny(text, keywords: dateScopedKeywords)
     }
 
     private func matchesCardSpendIntent(in text: String) -> Bool {

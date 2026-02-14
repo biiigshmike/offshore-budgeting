@@ -54,6 +54,38 @@ struct HomeAssistantTextParserTests {
         #expect(query?.intent == .largestRecentTransactions)
     }
 
+    @Test func parse_expenseListPrompt_withYesterday_mapsToLargestTransactionsIntent() throws {
+        let query = makeParser().parse("list expenses yesterday")
+
+        #expect(query?.intent == .largestRecentTransactions)
+        #expect(query?.dateRange?.startDate == date(2026, 2, 14, 0, 0, 0))
+        #expect(query?.dateRange?.endDate == date(2026, 2, 14, 23, 59, 59))
+    }
+
+    @Test func parse_purchaseListPrompt_withYesterday_mapsToLargestTransactionsIntent() throws {
+        let query = makeParser().parse("what were the purchases yesterday")
+
+        #expect(query?.intent == .largestRecentTransactions)
+        #expect(query?.dateRange?.startDate == date(2026, 2, 14, 0, 0, 0))
+        #expect(query?.dateRange?.endDate == date(2026, 2, 14, 23, 59, 59))
+    }
+
+    @Test func parse_spendListPrompt_withToday_mapsToLargestTransactionsIntent() throws {
+        let query = makeParser().parse("What did I spend my money on today")
+
+        #expect(query?.intent == .largestRecentTransactions)
+        #expect(query?.dateRange?.startDate == date(2026, 2, 15, 0, 0, 0))
+        #expect(query?.dateRange?.endDate == date(2026, 2, 15, 23, 59, 59))
+    }
+
+    @Test func parse_spendPrompt_withHowMuchToday_staysSpendIntent() throws {
+        let query = makeParser().parse("How much did I spend today?")
+
+        #expect(query?.intent == .spendThisMonth)
+        #expect(query?.dateRange?.startDate == date(2026, 2, 15, 0, 0, 0))
+        #expect(query?.dateRange?.endDate == date(2026, 2, 15, 23, 59, 59))
+    }
+
     @Test func parse_cardSpendPrompt_mapsToCardSpendIntent() throws {
         let query = makeParser().parse("For all cards, what was the total spent last month?")
 

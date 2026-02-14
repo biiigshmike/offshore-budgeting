@@ -130,17 +130,17 @@ struct HomeAssistantPanelView: View {
         var title: String {
             switch self {
             case .budget:
-                return "Budget Ideas"
+                return "Budget Prompt Suggestions"
             case .income:
-                return "Income Ideas"
+                return "Income Prompt Suggestions"
             case .card:
-                return "Card Ideas"
+                return "Card Prompt Suggestions"
             case .preset:
-                return "Preset Ideas"
+                return "Preset Prompt Suggestions"
             case .category:
-                return "Category Ideas"
+                return "Category Prompt Suggestions"
             case .trends:
-                return "Trend Ideas"
+                return "Trend Prompt Suggestions"
             }
         }
     }
@@ -159,6 +159,9 @@ struct HomeAssistantPanelView: View {
 
     @State private var answers: [HomeAnswer] = []
     @State private var promptText = ""
+    @State private var pendingUserPromptForNextAnswer: String? = nil
+    @State private var quickButtonsVisible = false
+    @State private var followUpsCollapsed = false
     @State private var hasLoadedConversation = false
     private let selectedPersonaID: HomeAssistantPersonaID = .marina
     @State private var isShowingClearConversationAlert = false
@@ -289,7 +292,7 @@ struct HomeAssistantPanelView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(20)
-                    .padding(.bottom, isPromptFieldFocused ? 170 : 130)
+                    .padding(.bottom, isPromptFieldFocused ? 170 : 96)
                 }
                 .scrollDismissesKeyboard(.interactively)
                 .onTapGesture {
@@ -307,11 +310,21 @@ struct HomeAssistantPanelView: View {
                     scrollToLatestMessage(using: proxy, animated: true)
                 }
                 .onChange(of: isPromptFieldFocused) { _, isFocused in
-                    guard isFocused else { return }
-                    dismissEmptySuggestionDrawer()
-                    scrollToLatestMessage(using: proxy, animated: true)
+                    if isFocused {
+                        dismissEmptySuggestionDrawer()
+                        withAnimation(.easeOut(duration: 0.18)) {
+                            quickButtonsVisible = true
+                        }
+                        scrollToLatestMessage(using: proxy, animated: true)
+                    } else {
+                        dismissEmptySuggestionDrawer()
+                        withAnimation(.easeIn(duration: 0.16)) {
+                            quickButtonsVisible = false
+                        }
+                    }
                 }
                 .onAppear {
+                    quickButtonsVisible = isPromptFieldFocused
                     scrollToLatestMessage(using: proxy, animated: false)
                 }
             }
@@ -512,7 +525,9 @@ struct HomeAssistantPanelView: View {
 
     @ViewBuilder
     private var bottomSuggestionRail: some View {
-        emptyStateSuggestionRail
+        if isPromptFieldFocused || quickButtonsVisible {
+            emptyStateSuggestionRail
+        }
     }
 
     private var emptyStateSuggestionRail: some View {
@@ -545,7 +560,10 @@ struct HomeAssistantPanelView: View {
             }
 
             HStack(spacing: 0) {
-                ForEach(EmptySuggestionGroup.allCases) { group in
+                let groups = Array(EmptySuggestionGroup.allCases.enumerated())
+                let maxIndex = max(0, groups.count - 1)
+
+                ForEach(groups, id: \.element.id) { index, group in
                     Button {
                         selectedEmptySuggestionGroup = selectedEmptySuggestionGroup == group ? nil : group
                     } label: {
@@ -554,6 +572,10 @@ struct HomeAssistantPanelView: View {
                             .frame(width: 33, height: 33)
                     }
                     .modifier(AssistantIconButtonModifier())
+                    .opacity(quickButtonsVisible ? 1 : 0)
+                    .scaleEffect(quickButtonsVisible ? 1 : 0.94, anchor: .leading)
+                    .offset(x: quickButtonsVisible ? 0 : -CGFloat((maxIndex - index) * 6))
+                    .animation(quickButtonAccordionAnimation(for: index), value: quickButtonsVisible)
                     .frame(maxWidth: .infinity)
                     .accessibilityLabel(group.title)
                 }
@@ -639,7 +661,7 @@ struct HomeAssistantPanelView: View {
             return "Suggested Questions"
         }
 
-        return "Follow-Up"
+        return "Follow-Up Suggestions"
     }
 
     private var selectedPersonaProfile: HomeAssistantPersonaProfile {
@@ -681,24 +703,50 @@ struct HomeAssistantPanelView: View {
     }
 
     private func assistantFollowUpRail(suggestions: [HomeAssistantSuggestion]) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(activeSuggestionHeaderTitle)
-                .font(.subheadline.weight(.semibold))
+        let isClarificationRail = clarificationSuggestions.isEmpty == false
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    ForEach(suggestions) { suggestion in
-                        Button {
-                            runQuery(suggestion.query, userPrompt: suggestion.title)
-                        } label: {
-                            Text(suggestion.title)
-                                .lineLimit(1)
-                                .padding(.horizontal, 12)
-                                .frame(height: 33)
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Text(activeSuggestionHeaderTitle)
+                    .font(.subheadline.weight(.semibold))
+                Spacer(minLength: 0)
+                if isClarificationRail == false {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            followUpsCollapsed.toggle()
                         }
-                        .modifier(AssistantChipButtonModifier())
+                    } label: {
+                        Image(systemName: followUpsCollapsed ? "ellipsis.message.fill" : "xmark")
+                            .font(.footnote.weight(.semibold))
+                            .frame(width: 28, height: 28)
+                    }
+                    .buttonStyle(.plain)
+                    .background(.ultraThinMaterial, in: Circle())
+                    .overlay {
+                        Circle()
+                            .stroke(Color.secondary.opacity(0.25), lineWidth: 1)
+                    }
+                    .accessibilityLabel(followUpsCollapsed ? "Show follow-up suggestions" : "Hide follow-up suggestions")
+                }
+            }
+
+            if isClarificationRail || followUpsCollapsed == false {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(suggestions) { suggestion in
+                            Button {
+                                runQuery(suggestion.query, userPrompt: suggestion.title)
+                            } label: {
+                                Text(suggestion.title)
+                                    .lineLimit(1)
+                                    .padding(.horizontal, 12)
+                                    .frame(height: 33)
+                            }
+                            .modifier(AssistantChipButtonModifier())
+                        }
                     }
                 }
+                .transition(.opacity.combined(with: .move(edge: .trailing)))
             }
         }
     }
@@ -829,9 +877,14 @@ struct HomeAssistantPanelView: View {
         )
 
         let rawAnswer = applyConfidenceTone(to: baseAnswer, confidenceBand: confidenceBand)
+        let titledAnswer = applyPromptAwareTitle(
+            to: rawAnswer,
+            query: query,
+            userPrompt: userPrompt
+        )
 
         let answer = personaFormatter.styledAnswer(
-            from: rawAnswer,
+            from: titledAnswer,
             userPrompt: userPrompt,
             personaID: selectedPersonaID,
             seedContext: personaSeedContext(for: query),
@@ -846,6 +899,7 @@ struct HomeAssistantPanelView: View {
     private func submitPrompt() {
         let prompt = trimmedPromptText
         guard prompt.isEmpty == false else { return }
+        pendingUserPromptForNextAnswer = prompt
 
         defer { promptText = "" }
 
@@ -904,9 +958,22 @@ struct HomeAssistantPanelView: View {
 
     private func handleConversationalPrompt(_ prompt: String) -> Bool {
         let normalized = normalizedPrompt(prompt)
-        let directGreetings: Set<String> = ["hi", "hello", "hey"]
-        let greetingPhrases = ["how are you", "how s it going", "how are you doing"]
-        if directGreetings.contains(normalized) || greetingPhrases.contains(where: { normalized.contains($0) }) {
+        let tokens = normalized.split(separator: " ").map(String.init)
+        let firstToken = tokens.first ?? ""
+        let greetingTokens: Set<String> = ["hi", "hello", "hey"]
+        let greetingPhrases = [
+            "how are you",
+            "how s it going",
+            "how are you doing",
+            "what s up",
+            "whats up",
+            "good morning",
+            "good afternoon",
+            "good evening"
+        ]
+
+        let isDirectGreeting = greetingTokens.contains(firstToken) && tokens.count <= 3
+        if isDirectGreeting || greetingPhrases.contains(where: { normalized.contains($0) }) {
             appendAnswer(personaFormatter.greetingAnswer(for: selectedPersonaID))
             return true
         }
@@ -2775,8 +2842,38 @@ struct HomeAssistantPanelView: View {
     }
 
     private func appendAnswer(_ answer: HomeAnswer) {
-        answers.append(answer)
+        let resolvedUserPrompt: String?
+        if let existingPrompt = answer.userPrompt, existingPrompt.isEmpty == false {
+            resolvedUserPrompt = existingPrompt
+        } else {
+            resolvedUserPrompt = pendingUserPromptForNextAnswer
+        }
+
+        let answerToAppend = HomeAnswer(
+            id: answer.id,
+            queryID: answer.queryID,
+            kind: answer.kind,
+            userPrompt: resolvedUserPrompt,
+            title: answer.title,
+            subtitle: answer.subtitle,
+            primaryValue: answer.primaryValue,
+            rows: answer.rows,
+            generatedAt: answer.generatedAt
+        )
+
+        pendingUserPromptForNextAnswer = nil
+        followUpsCollapsed = false
+        answers.append(answerToAppend)
         conversationStore.saveAnswers(answers, workspaceID: workspace.id)
+    }
+
+    private func quickButtonAccordionAnimation(for index: Int) -> Animation {
+        let count = EmptySuggestionGroup.allCases.count
+        let order = quickButtonsVisible ? index : max(0, count - 1 - index)
+        let base = quickButtonsVisible
+            ? Animation.easeOut(duration: 0.18)
+            : Animation.easeIn(duration: 0.16)
+        return base.delay(Double(order) * 0.018)
     }
 
     private func scrollToLatestMessage(
@@ -2807,6 +2904,7 @@ struct HomeAssistantPanelView: View {
 
     private func clearConversation() {
         answers.removeAll()
+        pendingUserPromptForNextAnswer = nil
         sessionContext = HomeAssistantSessionContext()
         clarificationSuggestions = []
         lastClarificationReasons = []
@@ -3782,6 +3880,95 @@ struct HomeAssistantPanelView: View {
                 generatedAt: answer.generatedAt
             )
         }
+    }
+
+    private func applyPromptAwareTitle(
+        to answer: HomeAnswer,
+        query: HomeQuery,
+        userPrompt: String?
+    ) -> HomeAnswer {
+        let resolvedTitle = resolvedPromptAwareTitle(
+            defaultTitle: answer.title,
+            query: query,
+            userPrompt: userPrompt
+        )
+        guard resolvedTitle != answer.title else { return answer }
+
+        return HomeAnswer(
+            id: answer.id,
+            queryID: answer.queryID,
+            kind: answer.kind,
+            userPrompt: answer.userPrompt,
+            title: resolvedTitle,
+            subtitle: answer.subtitle,
+            primaryValue: answer.primaryValue,
+            rows: answer.rows,
+            generatedAt: answer.generatedAt
+        )
+    }
+
+    private func resolvedPromptAwareTitle(
+        defaultTitle: String,
+        query: HomeQuery,
+        userPrompt: String?
+    ) -> String {
+        let normalized = normalizedPrompt(userPrompt ?? "")
+        let scopeSuffix = promptTimeScopeSuffix(normalizedPrompt: normalized)
+
+        switch query.intent {
+        case .largestRecentTransactions:
+            let baseTitle: String
+            if normalized.contains("purchase") {
+                baseTitle = "Purchases"
+            } else if normalized.contains("expense") {
+                baseTitle = "Expenses"
+            } else if normalized.contains("transaction") || normalized.contains("charge") {
+                baseTitle = "Transactions"
+            } else if normalized.contains("what did i spend")
+                || normalized.contains("spend my money on")
+                || normalized.contains("where did my money go")
+            {
+                baseTitle = "Spending"
+            } else {
+                baseTitle = "Transactions"
+            }
+
+            if let scopeSuffix {
+                return "\(baseTitle) \(scopeSuffix)"
+            }
+            return defaultTitle
+
+        case .spendThisMonth:
+            if let scopeSuffix {
+                return "Spend \(scopeSuffix)"
+            }
+            return defaultTitle
+
+        default:
+            return defaultTitle
+        }
+    }
+
+    private func promptTimeScopeSuffix(normalizedPrompt: String) -> String? {
+        if normalizedPrompt.contains("today") {
+            return "Today"
+        }
+        if normalizedPrompt.contains("yesterday") {
+            return "Yesterday"
+        }
+        if normalizedPrompt.contains("last week") {
+            return "Last Week"
+        }
+        if normalizedPrompt.contains("this week") {
+            return "This Week"
+        }
+        if normalizedPrompt.contains("last month") {
+            return "Last Month"
+        }
+        if normalizedPrompt.contains("this month") {
+            return "This Month"
+        }
+        return nil
     }
 
     private func shouldRunBroadOverviewBundle(

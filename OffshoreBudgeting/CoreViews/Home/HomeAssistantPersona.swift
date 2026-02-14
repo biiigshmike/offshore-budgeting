@@ -169,7 +169,21 @@ struct HomeAssistantPersonaFormatter {
     }
 
     func greetingAnswer(for personaID: HomeAssistantPersonaID) -> HomeAnswer {
-        personaIntroductionAnswer(for: personaID)
+        let profile = HomeAssistantPersonaCatalog.profile(for: personaID)
+        let greetingLine = randomLine(
+            from: greetingLines(for: personaID),
+            key: "greeting.reply.\(personaID.rawValue)"
+        )
+
+        return HomeAnswer(
+            queryID: UUID(),
+            kind: .message,
+            userPrompt: nil,
+            title: profile.greetingTitle,
+            subtitle: mergedSentencePair(greetingLine, profile.greetingSubtitle),
+            primaryValue: nil,
+            rows: []
+        )
     }
 
     func unresolvedPromptAnswer(
