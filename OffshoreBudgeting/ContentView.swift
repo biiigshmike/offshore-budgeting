@@ -17,6 +17,10 @@ struct ContentView: View {
     @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
     @AppStorage("general_defaultBudgetingPeriod")
     private var defaultBudgetingPeriodRaw: String = BudgetingPeriod.monthly.rawValue
+    @AppStorage("general_hideFuturePlannedExpenses")
+    private var hideFuturePlannedExpenses: Bool = false
+    @AppStorage("general_excludeFuturePlannedExpensesFromCalculations")
+    private var excludeFuturePlannedExpensesFromCalculations: Bool = false
 
     // MARK: - Notifications
 
@@ -111,7 +115,7 @@ struct ContentView: View {
                 CardWidgetSnapshotStore.setSelectedWorkspaceID(selectedWorkspaceID)
                 NextPlannedExpenseWidgetSnapshotStore.setSelectedWorkspaceID(selectedWorkspaceID)
                 SpendTrendsWidgetSnapshotStore.setSelectedWorkspaceID(selectedWorkspaceID)
-                syncDefaultBudgetingPeriodToWidgets()
+                syncGeneralSettingsToWidgets()
 
                 refreshIncomeWidgetSnapshotsIfPossible()
                 refreshCardWidgetSnapshotsIfPossible()
@@ -134,10 +138,18 @@ struct ContentView: View {
                 Task { await syncNotificationSchedulesIfPossible() }
             }
             .onChange(of: defaultBudgetingPeriodRaw) { _, _ in
-                syncDefaultBudgetingPeriodToWidgets()
+                syncGeneralSettingsToWidgets()
                 refreshIncomeWidgetSnapshotsIfPossible()
                 refreshCardWidgetSnapshotsIfPossible()
                 refreshNextPlannedExpenseWidgetSnapshotsIfPossible()
+                refreshSpendTrendsWidgetSnapshotsIfPossible()
+            }
+            .onChange(of: hideFuturePlannedExpenses) { _, _ in
+                syncGeneralSettingsToWidgets()
+            }
+            .onChange(of: excludeFuturePlannedExpensesFromCalculations) { _, _ in
+                syncGeneralSettingsToWidgets()
+                refreshCardWidgetSnapshotsIfPossible()
                 refreshSpendTrendsWidgetSnapshotsIfPossible()
             }
             .onChange(of: scenePhase) { _, newPhase in
@@ -230,9 +242,14 @@ struct ContentView: View {
         )
     }
 
-    private func syncDefaultBudgetingPeriodToWidgets() {
+    private func syncGeneralSettingsToWidgets() {
         guard let defaults = UserDefaults(suiteName: IncomeWidgetSnapshotStore.appGroupID) else { return }
         defaults.set(defaultBudgetingPeriodRaw, forKey: "general_defaultBudgetingPeriod")
+        defaults.set(hideFuturePlannedExpenses, forKey: "general_hideFuturePlannedExpenses")
+        defaults.set(
+            excludeFuturePlannedExpensesFromCalculations,
+            forKey: "general_excludeFuturePlannedExpensesFromCalculations"
+        )
     }
 
     // MARK: - Notification Sync

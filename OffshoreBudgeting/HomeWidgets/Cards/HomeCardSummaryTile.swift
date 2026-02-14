@@ -13,9 +13,16 @@ struct HomeCardSummaryTile: View {
     let card: Card
     let startDate: Date
     let endDate: Date
+    @AppStorage("general_excludeFuturePlannedExpensesFromCalculations")
+    private var excludeFuturePlannedExpensesFromCalculations: Bool = false
 
     private var metrics: HomeCardMetrics {
-        HomeCardMetricsCalculator.metrics(for: card, start: startDate, end: endDate)
+        HomeCardMetricsCalculator.metrics(
+            for: card,
+            start: startDate,
+            end: endDate,
+            excludeFuturePlannedExpenses: excludeFuturePlannedExpensesFromCalculations
+        )
     }
 
     private var themeOption: CardThemeOption {

@@ -48,6 +48,8 @@ enum UITestSupport {
 
         defaults.set("", forKey: "selectedWorkspaceID")
         defaults.set(false, forKey: "didSeedDefaultWorkspaces")
+        defaults.set(false, forKey: "general_hideFuturePlannedExpenses")
+        defaults.set(false, forKey: "general_excludeFuturePlannedExpensesFromCalculations")
 
         defaults.set(false, forKey: "icloud_useCloud")
         defaults.set(false, forKey: "icloud_activeUseCloud")

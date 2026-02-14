@@ -17,12 +17,24 @@ struct HomeCardMetrics: Equatable {
 
 enum HomeCardMetricsCalculator {
 
-    static func metrics(for card: Card, start: Date, end: Date) -> HomeCardMetrics {
+    static func metrics(
+        for card: Card,
+        start: Date,
+        end: Date,
+        excludeFuturePlannedExpenses: Bool
+    ) -> HomeCardMetrics {
         let s = normalizedStart(start)
         let e = normalizedEnd(end)
 
-        let planned = (card.plannedExpenses ?? [])
+        let plannedInRange = (card.plannedExpenses ?? [])
             .filter { $0.expenseDate >= s && $0.expenseDate <= e }
+
+        let plannedIncluded = PlannedExpenseFuturePolicy.filteredForCalculations(
+            plannedInRange,
+            excludeFuture: excludeFuturePlannedExpenses
+        )
+
+        let planned = plannedIncluded
             .reduce(0) { $0 + plannedEffectiveAmount($1) }
 
         let variable = (card.variableExpenses ?? [])

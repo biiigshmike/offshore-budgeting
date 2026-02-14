@@ -99,6 +99,10 @@ enum CardWidgetSnapshotBuilder {
             sortBy: [SortDescriptor(\PlannedExpense.expenseDate, order: .reverse)]
         )
         let planned = (try? modelContext.fetch(plannedDescriptor)) ?? []
+        let plannedIncluded = PlannedExpenseFuturePolicy.filteredForCalculations(
+            planned,
+            excludeFuture: defaultExcludeFuturePlannedExpensesFromSharedDefaults()
+        )
 
         // Variable
         let variableDescriptor = FetchDescriptor<VariableExpense>(
@@ -113,7 +117,7 @@ enum CardWidgetSnapshotBuilder {
         let variable = (try? modelContext.fetch(variableDescriptor)) ?? []
 
         // Totals
-        let plannedTotal = planned.reduce(0) { partial, exp in
+        let plannedTotal = plannedIncluded.reduce(0) { partial, exp in
             partial + exp.effectiveAmount()
         }
         let variableTotal = variable.reduce(0) { $0 + $1.amount }
@@ -128,7 +132,7 @@ enum CardWidgetSnapshotBuilder {
         }
 
         let merged: [RecentMergeItem] =
-            planned.map {
+            plannedIncluded.map {
                 RecentMergeItem(
                     name: $0.title,
                     amount: $0.effectiveAmount(),
@@ -215,6 +219,11 @@ enum CardWidgetSnapshotBuilder {
         let defaults = UserDefaults(suiteName: CardWidgetSnapshotStore.appGroupID)
         let raw = defaults?.string(forKey: "general_defaultBudgetingPeriod") ?? BudgetingPeriod.monthly.rawValue
         return BudgetingPeriod(rawValue: raw) ?? .monthly
+    }
+
+    private static func defaultExcludeFuturePlannedExpensesFromSharedDefaults() -> Bool {
+        let defaults = UserDefaults(suiteName: CardWidgetSnapshotStore.appGroupID)
+        return defaults?.bool(forKey: "general_excludeFuturePlannedExpensesFromCalculations") ?? false
     }
 
     private static func endOfDay(_ date: Date, calendar: Calendar) -> Date {

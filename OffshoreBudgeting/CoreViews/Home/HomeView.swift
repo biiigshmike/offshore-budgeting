@@ -42,6 +42,8 @@ struct HomeView: View {
 
     @AppStorage("general_defaultBudgetingPeriod")
     private var defaultBudgetingPeriodRaw: String = BudgetingPeriod.monthly.rawValue
+    @AppStorage("general_excludeFuturePlannedExpensesFromCalculations")
+    private var excludeFuturePlannedExpensesFromCalculations: Bool = false
 
     @State private var draftStartDate: Date = Date()
     @State private var draftEndDate: Date = Date()
@@ -66,6 +68,13 @@ struct HomeView: View {
             }
             return existingBudgetIDs.contains(sourceBudgetID)
         }
+    }
+
+    private var calculationPlannedExpensesForHome: [PlannedExpense] {
+        PlannedExpenseFuturePolicy.filteredForCalculations(
+            plannedExpensesForHome,
+            excludeFuture: excludeFuturePlannedExpensesFromCalculations
+        )
     }
 
     // MARK: - A11y + Layout Environment
@@ -172,7 +181,7 @@ struct HomeView: View {
                 workspace: workspace,
                 categories: categories,
                 incomes: incomes,
-                plannedExpenses: plannedExpensesForHome,
+                plannedExpenses: calculationPlannedExpensesForHome,
                 variableExpenses: variableExpenses,
                 startDate: appliedStartDate,
                 endDate: appliedEndDate,
@@ -362,7 +371,7 @@ struct HomeView: View {
         HomeSavingsOutlookTile(
             workspace: workspace,
             incomes: incomes,
-            plannedExpenses: plannedExpensesForHome,
+            plannedExpenses: calculationPlannedExpensesForHome,
             variableExpenses: variableExpenses,
             startDate: appliedStartDate,
             endDate: appliedEndDate
@@ -374,7 +383,7 @@ struct HomeView: View {
             workspace: workspace,
             categories: categories,
             incomes: incomes,
-            plannedExpenses: plannedExpensesForHome,
+            plannedExpenses: calculationPlannedExpensesForHome,
             variableExpenses: variableExpenses,
             startDate: appliedStartDate,
             endDate: appliedEndDate,
@@ -414,7 +423,7 @@ struct HomeView: View {
         HomeCategorySpotlightTile(
             workspace: workspace,
             categories: categories,
-            plannedExpenses: plannedExpensesForHome,
+            plannedExpenses: calculationPlannedExpensesForHome,
             variableExpenses: variableExpenses,
             startDate: appliedStartDate,
             endDate: appliedEndDate
@@ -427,7 +436,7 @@ struct HomeView: View {
             workspace: workspace,
             budgets: budgets,
             categories: categories,
-            plannedExpenses: plannedExpensesForHome,
+            plannedExpenses: calculationPlannedExpensesForHome,
             variableExpenses: variableExpenses,
             startDate: appliedStartDate,
             endDate: appliedEndDate
@@ -439,7 +448,7 @@ struct HomeView: View {
             workspace: workspace,
             cards: cards,
             categories: categories,
-            plannedExpenses: plannedExpensesForHome,
+            plannedExpenses: calculationPlannedExpensesForHome,
             variableExpenses: variableExpenses,
             startDate: appliedStartDate,
             endDate: appliedEndDate

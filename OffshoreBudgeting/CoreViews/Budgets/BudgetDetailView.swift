@@ -14,6 +14,10 @@ struct BudgetDetailView: View {
     let budget: Budget
     
     @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
+    @AppStorage("general_hideFuturePlannedExpenses")
+    private var hideFuturePlannedExpensesDefault: Bool = false
+    @AppStorage("general_excludeFuturePlannedExpensesFromCalculations")
+    private var excludeFuturePlannedExpensesFromCalculationsDefault: Bool = false
     
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -60,6 +64,8 @@ struct BudgetDetailView: View {
     @State private var selectedCategoryID: UUID? = nil
     @State private var expenseScope: ExpenseScope = .unified
     @State private var sortMode: BudgetSortMode = .dateDesc
+    @State private var hideFuturePlannedExpensesInView: Bool = false
+    @State private var excludeFuturePlannedExpensesFromCalculationsInView: Bool = false
     
     // MARK: - Search
     
@@ -207,7 +213,7 @@ struct BudgetDetailView: View {
     
     // MARK: - Filtering
     
-    private var plannedExpensesFiltered: [PlannedExpense] {
+    private var plannedExpensesFilteredForCurrentControls: [PlannedExpense] {
         let base = plannedExpensesInBudget
         
         let categoryFiltered: [PlannedExpense]
@@ -224,7 +230,30 @@ struct BudgetDetailView: View {
             searched = categoryFiltered.filter { matchesSearch($0) }
         }
         
-        return sortPlanned(searched)
+        return searched
+    }
+
+    private var hiddenFuturePlannedExpenseCount: Int {
+        guard hideFuturePlannedExpensesInView else { return 0 }
+        return plannedExpensesFilteredForCurrentControls
+            .filter { PlannedExpenseFuturePolicy.isFuturePlannedExpense($0) }
+            .count
+    }
+
+    private var plannedExpensesFiltered: [PlannedExpense] {
+        let visible = PlannedExpenseFuturePolicy.filteredForVisibility(
+            plannedExpensesFilteredForCurrentControls,
+            hideFuture: hideFuturePlannedExpensesInView
+        )
+        return sortPlanned(visible)
+    }
+
+    private var plannedExpensesForCalculations: [PlannedExpense] {
+        let included = PlannedExpenseFuturePolicy.filteredForCalculations(
+            plannedExpensesFilteredForCurrentControls,
+            excludeFuture: excludeFuturePlannedExpensesFromCalculationsInView
+        )
+        return sortPlanned(included)
     }
     
     private var variableExpensesFiltered: [VariableExpense] {
@@ -256,15 +285,15 @@ struct BudgetDetailView: View {
     // MARK: - Totals that react to Type + Category filter
     
     private var plannedExpensesPlannedTotal: Double {
-        plannedExpensesFiltered.reduce(0) { $0 + $1.plannedAmount }
+        plannedExpensesForCalculations.reduce(0) { $0 + $1.plannedAmount }
     }
     
     private var plannedExpensesActualTotal: Double {
-        plannedExpensesFiltered.reduce(0) { $0 + max(0, $1.actualAmount) }
+        plannedExpensesForCalculations.reduce(0) { $0 + max(0, $1.actualAmount) }
     }
 
     private var plannedExpensesEffectiveTotal: Double {
-        plannedExpensesFiltered.reduce(0) { $0 + $1.effectiveAmount() }
+        plannedExpensesForCalculations.reduce(0) { $0 + $1.effectiveAmount() }
     }
 
     private var variableExpensesTotal: Double {
@@ -365,6 +394,8 @@ struct BudgetDetailView: View {
             .onAppear {
                 commandHub.activate(.budgetDetail)
                 updateBudgetDetailCommandAvailability()
+                hideFuturePlannedExpensesInView = hideFuturePlannedExpensesDefault
+                excludeFuturePlannedExpensesFromCalculationsInView = excludeFuturePlannedExpensesFromCalculationsDefault
             }
             .onDisappear {
                 commandHub.deactivate(.budgetDetail)
@@ -471,7 +502,7 @@ struct BudgetDetailView: View {
 
                 case .planned:
                     if plannedExpensesFiltered.isEmpty {
-                        ContentUnavailableView("No planned expenses", systemImage: "")
+                        ContentUnavailableView(plannedEmptyMessage, systemImage: "")
                     } else {
                         ForEach(plannedExpensesFiltered, id: \.id) { expense in
                             BudgetPlannedExpenseRow(expense: expense, showsCardName: true)
@@ -535,7 +566,7 @@ struct BudgetDetailView: View {
 
                 case .unified:
                     if unifiedItemsFiltered.isEmpty {
-                        ContentUnavailableView("No expenses", systemImage: "")
+                        ContentUnavailableView(unifiedEmptyMessage, systemImage: "")
                     } else {
                         ForEach(unifiedItemsFiltered) { item in
                             switch item {
@@ -596,6 +627,10 @@ struct BudgetDetailView: View {
                 }
             } header: {
                 expensesTitleText
+            } footer: {
+                if hiddenFuturePlannedExpenseCount > 0 {
+                    Text("\(hiddenFuturePlannedExpenseCount.formatted()) future planned expenses are hidden.")
+                }
             }
         }
         .postBoardingTip(
@@ -658,6 +693,16 @@ struct BudgetDetailView: View {
                         showingManageCardsSheet = true
                     } label: {
                         Label("Manage Cards", systemImage: "creditcard")
+                    }
+
+                    Menu {
+                        Toggle("Hide Future Planned Expenses", isOn: $hideFuturePlannedExpensesInView)
+                        Toggle(
+                            "Exclude Future Planned Expenses from Totals",
+                            isOn: $excludeFuturePlannedExpensesFromCalculationsInView
+                        )
+                    } label: {
+                        Label("Planned Expense Display", systemImage: "gearshape")
                     }
 
                     Divider()
@@ -841,6 +886,20 @@ struct BudgetDetailView: View {
                 .init(label: "Unified Total", value: unifiedTotal)
             ]
         }
+    }
+
+    private var plannedEmptyMessage: String {
+        if hiddenFuturePlannedExpenseCount > 0 {
+            return "No visible planned expenses"
+        }
+        return "No planned expenses"
+    }
+
+    private var unifiedEmptyMessage: String {
+        if hiddenFuturePlannedExpenseCount > 0 {
+            return "No visible expenses"
+        }
+        return "No expenses"
     }
 
     // MARK: - Budget Deletion (Policy A)

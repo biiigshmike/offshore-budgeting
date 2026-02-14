@@ -19,6 +19,10 @@ struct SettingsGeneralView: View {
 
     @AppStorage("general_defaultBudgetingPeriod")
     private var defaultBudgetingPeriodRaw: String = BudgetingPeriod.monthly.rawValue
+    @AppStorage("general_hideFuturePlannedExpenses")
+    private var hideFuturePlannedExpenses: Bool = false
+    @AppStorage("general_excludeFuturePlannedExpensesFromCalculations")
+    private var excludeFuturePlannedExpensesFromCalculations: Bool = false
 
     @AppStorage("tips_resetToken") private var tipsResetToken: Int = 0
     @State private var eraseResultMessage: String = ""
@@ -91,6 +95,23 @@ struct SettingsGeneralView: View {
                 .tint(Color("AccentColor"))
 
                 Text("When enabled, the app will always launch with the last view you were on instead of defaulting to Home.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
+                Toggle("Hide Future Planned Expenses", isOn: $hideFuturePlannedExpenses)
+                    .tint(Color("AccentColor"))
+
+                Text("When enabled, planned expenses scheduled after today are hidden from expense lists.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
+                Toggle(
+                    "Exclude Future Planned Expenses from Totals",
+                    isOn: $excludeFuturePlannedExpensesFromCalculations
+                )
+                .tint(Color("AccentColor"))
+
+                Text("When enabled, planned expenses scheduled after today are excluded from totals and savings calculations.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
 

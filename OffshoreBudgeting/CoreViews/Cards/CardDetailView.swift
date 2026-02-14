@@ -15,6 +15,10 @@ struct CardDetailView: View {
     @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
     @AppStorage("general_defaultBudgetingPeriod")
     private var defaultBudgetingPeriodRaw: String = BudgetingPeriod.monthly.rawValue
+    @AppStorage("general_hideFuturePlannedExpenses")
+    private var hideFuturePlannedExpensesDefault: Bool = false
+    @AppStorage("general_excludeFuturePlannedExpensesFromCalculations")
+    private var excludeFuturePlannedExpensesFromCalculationsDefault: Bool = false
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -57,6 +61,8 @@ struct CardDetailView: View {
 
     @State private var expenseScope: ExpenseScope = .unified
     @State private var sortMode: SortMode = .dateDesc
+    @State private var hideFuturePlannedExpensesInView: Bool = false
+    @State private var excludeFuturePlannedExpensesFromCalculationsInView: Bool = false
 
     // MARK: - Derived Data
 
@@ -129,7 +135,7 @@ struct CardDetailView: View {
         return sortVariableExpenses(searched, by: sortMode)
     }
 
-    private var plannedExpensesFiltered: [PlannedExpense] {
+    private var plannedExpensesFilteredForCurrentControls: [PlannedExpense] {
         let start = normalizedStart(appliedStartDate)
         let end = normalizedEnd(appliedEndDate)
 
@@ -160,7 +166,30 @@ struct CardDetailView: View {
             }
         }
 
-        return sortPlannedExpenses(searched, by: sortMode)
+        return searched
+    }
+
+    private var hiddenFuturePlannedExpenseCount: Int {
+        guard hideFuturePlannedExpensesInView else { return 0 }
+        return plannedExpensesFilteredForCurrentControls
+            .filter { PlannedExpenseFuturePolicy.isFuturePlannedExpense($0) }
+            .count
+    }
+
+    private var plannedExpensesFiltered: [PlannedExpense] {
+        let visible = PlannedExpenseFuturePolicy.filteredForVisibility(
+            plannedExpensesFilteredForCurrentControls,
+            hideFuture: hideFuturePlannedExpensesInView
+        )
+        return sortPlannedExpenses(visible, by: sortMode)
+    }
+
+    private var plannedExpensesForCalculations: [PlannedExpense] {
+        let included = PlannedExpenseFuturePolicy.filteredForCalculations(
+            plannedExpensesFilteredForCurrentControls,
+            excludeFuture: excludeFuturePlannedExpensesFromCalculationsInView
+        )
+        return sortPlannedExpenses(included, by: sortMode)
     }
 
     private var variableTotal: Double {
@@ -168,7 +197,7 @@ struct CardDetailView: View {
     }
 
     private var plannedTotal: Double {
-        plannedExpensesFiltered.reduce(0) { $0 + plannedEffectiveAmount($1) }
+        plannedExpensesForCalculations.reduce(0) { $0 + plannedEffectiveAmount($1) }
     }
 
     private var unifiedTotal: Double {
@@ -215,7 +244,7 @@ struct CardDetailView: View {
 
         switch expenseScope {
         case .planned:
-            for expense in plannedExpensesFiltered {
+            for expense in plannedExpensesForCalculations {
                 add(category: expense.category, amount: plannedEffectiveAmount(expense))
             }
         case .variable:
@@ -223,7 +252,7 @@ struct CardDetailView: View {
                 add(category: expense.category, amount: expense.amount)
             }
         case .unified:
-            for expense in plannedExpensesFiltered {
+            for expense in plannedExpensesForCalculations {
                 add(category: expense.category, amount: plannedEffectiveAmount(expense))
             }
             for expense in variableExpensesFiltered {
@@ -418,6 +447,8 @@ struct CardDetailView: View {
             .onAppear {
                 commandHub.activate(.cardDetail)
                 initializeDateRangeIfNeeded()
+                hideFuturePlannedExpensesInView = hideFuturePlannedExpensesDefault
+                excludeFuturePlannedExpensesFromCalculationsInView = excludeFuturePlannedExpensesFromCalculationsDefault
             }
             .onDisappear {
                 commandHub.deactivate(.cardDetail)
@@ -530,6 +561,10 @@ struct CardDetailView: View {
             expensesSectionRows
         } header: {
             expensesTitleText
+        } footer: {
+            if hiddenFuturePlannedExpenseCount > 0 {
+                Text("\(hiddenFuturePlannedExpenseCount.formatted()) future planned expenses are hidden.")
+            }
         }
     }
 
@@ -671,6 +706,18 @@ struct CardDetailView: View {
                     Label("Edit Card", systemImage: "pencil")
                 }
 
+                Menu {
+                    Toggle("Hide Future Planned Expenses", isOn: $hideFuturePlannedExpensesInView)
+                    Toggle(
+                        "Exclude Future Planned Expenses from Totals",
+                        isOn: $excludeFuturePlannedExpensesFromCalculationsInView
+                    )
+                } label: {
+                    Label("Planned Expense Display", systemImage: "gearshape")
+                }
+
+                Divider()
+
                 Button(role: .destructive) {
                     if confirmBeforeDeleting {
                         pendingCardDelete = {
@@ -693,6 +740,9 @@ struct CardDetailView: View {
     // MARK: - Empty State
 
     private func emptyMessage() -> String {
+        if expenseScope != .variable && hiddenFuturePlannedExpenseCount > 0 {
+            return "No visible expenses. Future planned expenses are hidden."
+        }
         if selectedCategoryID != nil {
             return "No expenses match the selected category in this date range."
         }

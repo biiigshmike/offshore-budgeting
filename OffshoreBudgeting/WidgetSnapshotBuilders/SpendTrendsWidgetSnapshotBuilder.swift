@@ -116,6 +116,10 @@ enum SpendTrendsWidgetSnapshotBuilder {
             )
             plannedExpenses = (try? modelContext.fetch(descriptor)) ?? []
         }
+        let plannedIncluded = PlannedExpenseFuturePolicy.filteredForCalculations(
+            plannedExpenses,
+            excludeFuture: defaultExcludeFuturePlannedExpensesFromSharedDefaults()
+        )
 
         let variableExpenses: [VariableExpense]
         if let cardID {
@@ -140,12 +144,12 @@ enum SpendTrendsWidgetSnapshotBuilder {
         }
 
         let categoryLookup = buildCategoryLookup(
-            plannedExpenses: plannedExpenses,
+            plannedExpenses: plannedIncluded,
             variableExpenses: variableExpenses
         )
 
         let overallTotals = categoryTotals(
-            plannedExpenses: plannedExpenses,
+            plannedExpenses: plannedIncluded,
             variableExpenses: variableExpenses
         )
 
@@ -171,7 +175,7 @@ enum SpendTrendsWidgetSnapshotBuilder {
         bucketSnapshots.reserveCapacity(buckets.count)
 
         for bucket in buckets {
-            let bucketPlanned = plannedExpenses.filter { $0.expenseDate >= bucket.start && $0.expenseDate <= bucket.end }
+            let bucketPlanned = plannedIncluded.filter { $0.expenseDate >= bucket.start && $0.expenseDate <= bucket.end }
             let bucketVariable = variableExpenses.filter { $0.transactionDate >= bucket.start && $0.transactionDate <= bucket.end }
 
             let bucketTotals = categoryTotals(plannedExpenses: bucketPlanned, variableExpenses: bucketVariable)
@@ -579,5 +583,10 @@ enum SpendTrendsWidgetSnapshotBuilder {
         let defaults = UserDefaults(suiteName: SpendTrendsWidgetSnapshotStore.appGroupID)
         let raw = defaults?.string(forKey: "general_defaultBudgetingPeriod") ?? BudgetingPeriod.monthly.rawValue
         return BudgetingPeriod(rawValue: raw) ?? .monthly
+    }
+
+    private static func defaultExcludeFuturePlannedExpensesFromSharedDefaults() -> Bool {
+        let defaults = UserDefaults(suiteName: SpendTrendsWidgetSnapshotStore.appGroupID)
+        return defaults?.bool(forKey: "general_excludeFuturePlannedExpensesFromCalculations") ?? false
     }
 }

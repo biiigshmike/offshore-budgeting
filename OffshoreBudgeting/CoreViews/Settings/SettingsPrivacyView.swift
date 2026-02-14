@@ -18,10 +18,6 @@ import CoreLocation
 import Photos
 #endif
 
-#if canImport(CoreTelephony) && !targetEnvironment(macCatalyst)
-import CoreTelephony
-#endif
-
 #if canImport(ActivityKit) && !targetEnvironment(macCatalyst)
 import ActivityKit
 #endif
@@ -288,22 +284,7 @@ struct SettingsPrivacyView: View {
     }
 
     private var cellularDataStatus: String {
-        #if canImport(CoreTelephony) && !targetEnvironment(macCatalyst)
-        let cellularData = CTCellularData()
-
-        switch cellularData.restrictedState {
-        case .notRestricted:
-            return "Allowed"
-        case .restricted:
-            return "Off"
-        case .restrictedStateUnknown:
-            return "Unknown"
-        @unknown default:
-            return "Unknown"
-        }
-        #else
-        return "Unavailable"
-        #endif
+        return "Manage in App Settings"
     }
 
     @ViewBuilder
