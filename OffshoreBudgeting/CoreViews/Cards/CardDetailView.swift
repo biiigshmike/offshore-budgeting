@@ -836,7 +836,7 @@ struct CardDetailView: View {
         if let option = CardThemeOption(rawValue: raw) {
             return option
         }
-        return .charcoal
+        return .ruby
     }
 
     private func cardEffectOption(from raw: String) -> CardEffectOption {

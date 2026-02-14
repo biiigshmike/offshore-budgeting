@@ -50,8 +50,14 @@ enum DebugSeeder {
     // MARK: - Wipe
 
     private static func wipeAllData(context: ModelContext) {
+        SpendingSessionStore.end()
+
         deleteAll(Income.self, context: context)
         deleteAll(IncomeSeries.self, context: context)
+
+        deleteAll(ExpenseAllocation.self, context: context)
+        deleteAll(AllocationSettlement.self, context: context)
+        deleteAll(AllocationAccount.self, context: context)
 
         deleteAll(VariableExpense.self, context: context)
         deleteAll(PlannedExpense.self, context: context)
@@ -66,6 +72,7 @@ enum DebugSeeder {
         deleteAll(Budget.self, context: context)
 
         deleteAll(ImportMerchantRule.self, context: context)
+        deleteAll(AssistantAliasRule.self, context: context)
         deleteAll(Workspace.self, context: context)
     }
 
@@ -109,8 +116,8 @@ enum DebugSeeder {
 
         // Cards
         let cardChecking = Card(name: "Checking", theme: "sunset", effect: "plastic", workspace: workspace)
-        let cardVisa = Card(name: "Apple Card", theme: "lavender", effect: "glass", workspace: workspace)
-        let cardAmex = Card(name: "AmEx", theme: "nebula", effect: "holographic", workspace: workspace)
+        let cardVisa = Card(name: "Apple Card", theme: "periwinkle", effect: "glass", workspace: workspace)
+        let cardAmex = Card(name: "AmEx", theme: "aster", effect: "holographic", workspace: workspace)
         [cardChecking, cardVisa, cardAmex].forEach { context.insert($0) }
 
         // Presets
@@ -330,6 +337,23 @@ enum DebugSeeder {
             cardChecking: cardChecking,
             calendar: cal
         )
+
+        seedSharedBalances(
+            context: context,
+            workspace: workspace,
+            cardChecking: cardChecking,
+            cardVisa: cardVisa,
+            categories: (
+                groceries: catGroceries,
+                dining: catDining,
+                transport: catTransport,
+                entertainment: catEntertainment
+            ),
+            calendar: cal
+        )
+
+        seedMarinaConversation(workspaceID: workspace.id, now: now)
+        seedExcursionModeActive(now: now)
     }
 
     // MARK: - Budgets helpers
@@ -794,6 +818,234 @@ enum DebugSeeder {
                 categories: categories,
                 calendar: calendar
             )
+        }
+    }
+
+    // MARK: - Shared Balances
+
+    private static func seedSharedBalances(
+        context: ModelContext,
+        workspace: Workspace,
+        cardChecking: Card,
+        cardVisa: Card,
+        categories: (groceries: Category, dining: Category, transport: Category, entertainment: Category),
+        calendar: Calendar
+    ) {
+        let now = Date()
+
+        let alex = AllocationAccount(name: "Alex", hexColor: "#60A5FA", workspace: workspace)
+        let jordan = AllocationAccount(name: "Jordan", hexColor: "#F97316", workspace: workspace)
+        let casey = AllocationAccount(name: "Casey", hexColor: "#34D399", workspace: workspace)
+
+        context.insert(alex)
+        context.insert(jordan)
+        context.insert(casey)
+
+        let twoDaysAgo = calendar.date(byAdding: .day, value: -2, to: now) ?? now
+        let threeDaysAgo = calendar.date(byAdding: .day, value: -3, to: now) ?? now
+        let fiveDaysAgo = calendar.date(byAdding: .day, value: -5, to: now) ?? now
+        let sevenDaysAgo = calendar.date(byAdding: .day, value: -7, to: now) ?? now
+        let nineDaysAgo = calendar.date(byAdding: .day, value: -9, to: now) ?? now
+        let twelveDaysAgo = calendar.date(byAdding: .day, value: -12, to: now) ?? now
+        let fourteenDaysAgo = calendar.date(byAdding: .day, value: -14, to: now) ?? now
+
+        let dinnerExpense = VariableExpense(
+            descriptionText: "Dinner Split",
+            amount: 84.00,
+            transactionDate: twelveDaysAgo,
+            workspace: workspace,
+            card: cardVisa,
+            category: categories.dining
+        )
+        context.insert(dinnerExpense)
+
+        let dinnerAllocation = ExpenseAllocation(
+            allocatedAmount: 42.00,
+            createdAt: twelveDaysAgo,
+            updatedAt: twelveDaysAgo,
+            workspace: workspace,
+            account: alex,
+            expense: dinnerExpense
+        )
+        context.insert(dinnerAllocation)
+        dinnerExpense.allocation = dinnerAllocation
+
+        context.insert(
+            AllocationSettlement(
+                date: fiveDaysAgo,
+                note: "Paid me back via Zelle",
+                amount: 30.00,
+                workspace: workspace,
+                account: alex
+            )
+        )
+
+        let groceriesExpense = VariableExpense(
+            descriptionText: "Groceries Run",
+            amount: 96.00,
+            transactionDate: fourteenDaysAgo,
+            workspace: workspace,
+            card: cardChecking,
+            category: categories.groceries
+        )
+        context.insert(groceriesExpense)
+
+        let groceriesAllocation = ExpenseAllocation(
+            allocatedAmount: 48.00,
+            createdAt: fourteenDaysAgo,
+            updatedAt: fourteenDaysAgo,
+            workspace: workspace,
+            account: jordan,
+            expense: groceriesExpense
+        )
+        context.insert(groceriesAllocation)
+        groceriesExpense.allocation = groceriesAllocation
+
+        let concertExpense = VariableExpense(
+            descriptionText: "Concert Tickets",
+            amount: 100.00,
+            transactionDate: sevenDaysAgo,
+            workspace: workspace,
+            card: cardVisa,
+            category: categories.entertainment
+        )
+        context.insert(concertExpense)
+
+        let concertAllocation = ExpenseAllocation(
+            allocatedAmount: 60.00,
+            createdAt: sevenDaysAgo,
+            updatedAt: sevenDaysAgo,
+            workspace: workspace,
+            account: jordan,
+            expense: concertExpense
+        )
+        context.insert(concertAllocation)
+        concertExpense.allocation = concertAllocation
+
+        let concertOffset = AllocationSettlement(
+            date: sevenDaysAgo,
+            note: "Offset applied to Concert Tickets",
+            amount: -20.00,
+            workspace: workspace,
+            account: jordan,
+            expense: concertExpense
+        )
+        context.insert(concertOffset)
+        concertExpense.offsetSettlement = concertOffset
+
+        context.insert(
+            AllocationSettlement(
+                date: threeDaysAgo,
+                note: "I paid Jordan cash",
+                amount: -25.00,
+                workspace: workspace,
+                account: jordan
+            )
+        )
+
+        let tripExpense = VariableExpense(
+            descriptionText: "Road Trip Gas",
+            amount: 70.00,
+            transactionDate: nineDaysAgo,
+            workspace: workspace,
+            card: cardChecking,
+            category: categories.transport
+        )
+        context.insert(tripExpense)
+
+        let tripAllocation = ExpenseAllocation(
+            allocatedAmount: 35.00,
+            createdAt: nineDaysAgo,
+            updatedAt: nineDaysAgo,
+            workspace: workspace,
+            account: casey,
+            expense: tripExpense
+        )
+        context.insert(tripAllocation)
+        tripExpense.allocation = tripAllocation
+
+        context.insert(
+            AllocationSettlement(
+                date: twoDaysAgo,
+                note: "I covered parking",
+                amount: -50.00,
+                workspace: workspace,
+                account: casey
+            )
+        )
+    }
+
+    // MARK: - Marina
+
+    private static func seedMarinaConversation(workspaceID: UUID, now: Date) {
+        let store = HomeAssistantConversationStore()
+
+        let answers: [HomeAnswer] = [
+            HomeAnswer(
+                queryID: UUID(),
+                kind: .metric,
+                userPrompt: "How am I doing this month?",
+                title: "This month at a glance",
+                subtitle: "Income is covering spending so far.",
+                primaryValue: "$412.85 projected savings",
+                rows: [
+                    HomeAnswerRow(title: "Total spend", value: "$2,486.14"),
+                    HomeAnswerRow(title: "Total income", value: "$2,899.00"),
+                    HomeAnswerRow(title: "Status", value: "On track")
+                ],
+                generatedAt: now.addingTimeInterval(-1_200)
+            ),
+            HomeAnswer(
+                queryID: UUID(),
+                kind: .comparison,
+                userPrompt: "Compare this month to last month.",
+                title: "Spending change",
+                subtitle: "You spent less than last month.",
+                primaryValue: "-$183.40",
+                rows: [
+                    HomeAnswerRow(title: "Current month", value: "$2,486.14"),
+                    HomeAnswerRow(title: "Previous month", value: "$2,669.54")
+                ],
+                generatedAt: now.addingTimeInterval(-900)
+            ),
+            HomeAnswer(
+                queryID: UUID(),
+                kind: .list,
+                userPrompt: "Where can I trim spending?",
+                title: "Top categories to review",
+                subtitle: "These categories had the highest variable spend.",
+                rows: [
+                    HomeAnswerRow(title: "Dining", value: "$276.15"),
+                    HomeAnswerRow(title: "Shopping", value: "$205.78"),
+                    HomeAnswerRow(title: "Entertainment", value: "$178.00")
+                ],
+                generatedAt: now.addingTimeInterval(-600)
+            ),
+            HomeAnswer(
+                queryID: UUID(),
+                kind: .message,
+                userPrompt: "Add planned income $450 for freelance next Friday.",
+                title: "Ready to add that income",
+                subtitle: "I can prefill this as planned income so you can confirm it.",
+                rows: [
+                    HomeAnswerRow(title: "Amount", value: "$450.00"),
+                    HomeAnswerRow(title: "Source", value: "Freelance"),
+                    HomeAnswerRow(title: "Type", value: "Planned")
+                ],
+                generatedAt: now.addingTimeInterval(-300)
+            )
+        ]
+
+        store.saveAnswers(answers, workspaceID: workspaceID)
+    }
+
+    // MARK: - Excursion
+
+    private static func seedExcursionModeActive(now: Date) {
+        SpendingSessionStore.activate(hours: 2, now: now)
+
+        Task { @MainActor in
+            ShoppingModeManager.shared.refreshIfExpired(now: now)
         }
     }
 }
