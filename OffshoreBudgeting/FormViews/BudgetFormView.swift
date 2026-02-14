@@ -78,6 +78,7 @@ struct BudgetFormView: View {
                         Text(selectedCardIDs.count == cards.count && !cards.isEmpty ? "Clear All" : "Toggle All")
                             .frame(maxWidth: .infinity, minHeight: 44, alignment: .center)
                     }
+                    .listRowSeparator(.hidden)
                     .buttonStyle(.glassProminent)
                     .disabled(cards.isEmpty)
                 } else {
@@ -87,6 +88,7 @@ struct BudgetFormView: View {
                         Text(selectedCardIDs.count == cards.count && !cards.isEmpty ? "Clear All" : "Toggle All")
                             .frame(maxWidth: .infinity, minHeight: 44, alignment: .center)
                     }
+                    .listRowSeparator(.hidden)
                     .buttonStyle(.borderedProminent)
                     .disabled(cards.isEmpty)
                 }
@@ -112,6 +114,7 @@ struct BudgetFormView: View {
                         Text(selectedPresetIDs.count == presets.count && !presets.isEmpty ? "Clear All" : "Toggle All")
                             .frame(maxWidth: .infinity, minHeight: 44, alignment: .center)
                     }
+                    .listRowSeparator(.hidden)
                     .buttonStyle(.glassProminent)
                     .disabled(presets.isEmpty)
                 } else {
@@ -121,6 +124,7 @@ struct BudgetFormView: View {
                         Text(selectedPresetIDs.count == presets.count && !presets.isEmpty ? "Clear All" : "Toggle All")
                             .frame(maxWidth: .infinity, minHeight: 44, alignment: .center)
                     }
+                    .listRowSeparator(.hidden)
                     .buttonStyle(.borderedProminent)
                     .disabled(presets.isEmpty)
                 }
