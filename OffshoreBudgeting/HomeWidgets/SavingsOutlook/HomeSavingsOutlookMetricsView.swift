@@ -172,6 +172,8 @@ struct HomeSavingsOutlookMetricsView: View {
                 .frame(maxWidth: .infinity, minHeight: 240, alignment: .center)
                 .padding(.vertical, 18)
             } else {
+                let quarterAxisDates = Array(Set(points.map(\.date))).sorted()
+
                 Chart(points) { point in
                     RuleMark(y: .value("Baseline", 0))
                         .foregroundStyle(.secondary.opacity(0.35))
@@ -197,13 +199,25 @@ struct HomeSavingsOutlookMetricsView: View {
                     }
                 }
                 .chartXAxis {
-                    AxisMarks(values: .automatic(desiredCount: 5)) {
-                        AxisGridLine()
-                        AxisTick()
-                        if granularity == .month || granularity == .quarter {
-                            AxisValueLabel(format: .dateTime.month(.abbreviated))
-                        } else {
-                            AxisValueLabel(format: .dateTime.month().day())
+                    if granularity == .quarter {
+                        AxisMarks(values: quarterAxisDates) { value in
+                            AxisGridLine()
+                            AxisTick()
+                            AxisValueLabel {
+                                if let date = value.as(Date.self) {
+                                    Text(quarterLabel(for: date))
+                                }
+                            }
+                        }
+                    } else {
+                        AxisMarks(values: .automatic(desiredCount: 5)) {
+                            AxisGridLine()
+                            AxisTick()
+                            if granularity == .month {
+                                AxisValueLabel(format: .dateTime.month(.abbreviated))
+                            } else {
+                                AxisValueLabel(format: .dateTime.month().day())
+                            }
                         }
                     }
                 }
@@ -418,6 +432,12 @@ struct HomeSavingsOutlookMetricsView: View {
 
     private func formattedDate(_ date: Date) -> String {
         date.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted))
+    }
+
+    private func quarterLabel(for date: Date) -> String {
+        let month = Calendar.current.component(.month, from: date)
+        let quarter = ((month - 1) / 3) + 1
+        return "Q\(quarter)"
     }
 
     private func startOfDay(_ date: Date) -> Date {
