@@ -18,6 +18,10 @@ import CoreLocation
 import Photos
 #endif
 
+#if canImport(CoreTelephony) && !targetEnvironment(macCatalyst)
+import CoreTelephony
+#endif
+
 #if canImport(ActivityKit) && !targetEnvironment(macCatalyst)
 import ActivityKit
 #endif
@@ -84,7 +88,7 @@ struct SettingsPrivacyView: View {
                 permissionRow(
                     title: "Location",
                     status: locationPermissionStatus,
-                    description: "Excursion Mode uses location for a short period to monitor store entry and nudge you to log expenses before you forget."
+                    description: "Allows Offshore to use Location Services during Excursion Mode to nudge you to log expenses before you forget.\nNote:Cellular Data is not needed to use the core functionalities of Offshore."
                 )
 
                 permissionRow(
@@ -108,7 +112,7 @@ struct SettingsPrivacyView: View {
                 permissionRow(
                     title: "Cellular Data",
                     status: cellularDataStatus,
-                    description: "Allows Offshore to use mobile data. Offshore can run offline, but cellular helps Excursion Mode when Wi-Fi is unavailable."
+                    description: "Allows Offshore to use mobile data during Excursion Mode when Wi-Fi may be unavailable.\nNote:Cellular Data is not needed to use the core functionalities of Offshore."
                 )
 
                 Button {
@@ -119,7 +123,7 @@ struct SettingsPrivacyView: View {
             } header: {
                 Text("System Permissions")
             } footer: {
-                Text("These controls use Apple’s on-device permission system. Offshore reflects your current status here, and you can change any permission anytime in App Settings.")
+                Text("Offshore reflects Apple’s on-device permission system status. You can change any permission at anytime in App Settings.")
             }
         }
         .listStyle(.insetGrouped)
@@ -284,7 +288,22 @@ struct SettingsPrivacyView: View {
     }
 
     private var cellularDataStatus: String {
-        "Managed in iOS Settings"
+        #if canImport(CoreTelephony) && !targetEnvironment(macCatalyst)
+        let cellularData = CTCellularData()
+
+        switch cellularData.restrictedState {
+        case .notRestricted:
+            return "Allowed"
+        case .restricted:
+            return "Off"
+        case .restrictedStateUnknown:
+            return "Unknown"
+        @unknown default:
+            return "Unknown"
+        }
+        #else
+        return "Unavailable"
+        #endif
     }
 
     @ViewBuilder
