@@ -258,8 +258,8 @@ struct ExpenseImageImportParser {
     // MARK: - Bank-like list parser
 
     private static func parseBankLikeTransactions(lines: [String], context: ImageDateContext) -> [ImportRow] {
-        var rows: [ImportRow] = []
-        rows.reserveCapacity(max(8, lines.count / 6))
+        var firstPassRows: [ImportRow] = []
+        firstPassRows.reserveCapacity(max(8, lines.count / 6))
 
         var currentSectionDate: String? = nil
         var pendingUndatedRowIndex: Int? = nil
@@ -283,16 +283,18 @@ struct ExpenseImageImportParser {
                 context: context,
                 fallbackDescription: pendingDescriptionCandidate
             ) {
-                rows.append(transaction)
-                pendingUndatedRowIndex = transaction.date.isEmpty ? (rows.count - 1) : nil
+                firstPassRows.append(transaction)
+                pendingUndatedRowIndex = transaction.date.isEmpty ? (firstPassRows.count - 1) : nil
                 pendingDescriptionCandidate = nil
                 debugLog("Accepted row from line: \(line)")
                 continue
             }
 
             if let standaloneDate = normalizeDate(from: line, context: context) {
-                if let idx = pendingUndatedRowIndex, rows.indices.contains(idx), rows[idx].date.isEmpty {
-                    rows[idx].date = standaloneDate
+                if let idx = pendingUndatedRowIndex,
+                   firstPassRows.indices.contains(idx),
+                   firstPassRows[idx].date.isEmpty {
+                    firstPassRows[idx].date = standaloneDate
                     pendingUndatedRowIndex = nil
                     pendingDescriptionCandidate = nil
                     continue
@@ -333,20 +335,111 @@ struct ExpenseImageImportParser {
             }
         }
 
-        var filtered = rows.filter { !$0.description.isEmpty }
-        if filtered.isEmpty {
-            let synthesized = synthesizeRowsFromSeparatedColumns(
+        let filteredFirstPassRows = firstPassRows.filter { !$0.description.isEmpty }
+        let synthesizedRows: [ImportRow]
+        if shouldAttemptSeparatedColumnSynthesis(
+            merchantSeedCount: merchantSeeds.count,
+            separatedAmountTokenCount: separatedAmountTokens.count
+        ) {
+            synthesizedRows = synthesizeRowsFromSeparatedColumns(
                 merchantSeeds: merchantSeeds,
                 separatedAmountTokens: separatedAmountTokens,
                 fallbackDate: currentSectionDate
             )
-            if !synthesized.isEmpty {
-                debugLog("Synthesized \(synthesized.count) rows from separated merchant/amount columns")
-                filtered = synthesized
+            if !synthesizedRows.isEmpty {
+                debugLog("Synthesized \(synthesizedRows.count) rows from separated merchant/amount columns")
             }
+        } else {
+            synthesizedRows = []
         }
 
-        return filtered
+        let mergedRows = mergeFirstPassAndSynthesizedRows(
+            firstPassRows: filteredFirstPassRows,
+            synthesizedRows: synthesizedRows
+        )
+        debugLog(
+            "Bank-like merge summary: firstPass=\(filteredFirstPassRows.count) " +
+            "synthesized=\(synthesizedRows.count) merged=\(mergedRows.count)"
+        )
+        return mergedRows
+    }
+
+    private static func shouldAttemptSeparatedColumnSynthesis(
+        merchantSeedCount: Int,
+        separatedAmountTokenCount: Int
+    ) -> Bool {
+        let pairCount = min(merchantSeedCount, separatedAmountTokenCount)
+        return pairCount >= minimumSeparatedColumnPairsForSynthesis
+    }
+
+    private static let minimumSeparatedColumnPairsForSynthesis: Int = 3
+
+    private static func mergeFirstPassAndSynthesizedRows(
+        firstPassRows: [ImportRow],
+        synthesizedRows: [ImportRow]
+    ) -> [ImportRow] {
+        var merged: [ImportRow] = []
+        merged.reserveCapacity(firstPassRows.count + synthesizedRows.count)
+        var datedRowIndexByKey: [String: Int] = [:]
+        var undatedRowIndexByKey: [String: Int] = [:]
+
+        for row in firstPassRows + synthesizedRows {
+            let baseKey = rowIdentityBaseKey(for: row)
+            if row.date.isEmpty {
+                if datedRowIndexByKey[baseKey] != nil {
+                    continue
+                }
+                if let existingIndex = undatedRowIndexByKey[baseKey] {
+                    if shouldPreferRow(row, over: merged[existingIndex]) {
+                        merged[existingIndex] = row
+                    }
+                    continue
+                }
+                merged.append(row)
+                undatedRowIndexByKey[baseKey] = merged.count - 1
+                continue
+            }
+
+            if let existingIndex = datedRowIndexByKey[rowIdentityDatedKey(for: row)] {
+                if shouldPreferRow(row, over: merged[existingIndex]) {
+                    merged[existingIndex] = row
+                }
+                continue
+            }
+
+            if let undatedIndex = undatedRowIndexByKey[baseKey] {
+                merged[undatedIndex] = row
+                undatedRowIndexByKey.removeValue(forKey: baseKey)
+                datedRowIndexByKey[rowIdentityDatedKey(for: row)] = undatedIndex
+                continue
+            }
+
+            merged.append(row)
+            datedRowIndexByKey[rowIdentityDatedKey(for: row)] = merged.count - 1
+        }
+
+        return merged
+    }
+
+    private static func rowIdentityBaseKey(for row: ImportRow) -> String {
+        "\(normalizedKeywordKey(row.description))|\(row.amount)|\(row.type)"
+    }
+
+    private static func rowIdentityDatedKey(for row: ImportRow) -> String {
+        "\(rowIdentityBaseKey(for: row))|\(row.date)"
+    }
+
+    private static func shouldPreferRow(_ lhs: ImportRow, over rhs: ImportRow) -> Bool {
+        rowQualityScore(lhs) > rowQualityScore(rhs)
+    }
+
+    private static func rowQualityScore(_ row: ImportRow) -> Int {
+        var score = 0
+        if !row.date.isEmpty { score += 10 }
+        if row.description.contains(" ") { score += 2 }
+        if row.description.rangeOfCharacter(from: .letters) != nil { score += 1 }
+        score += min(row.description.count, 24) / 6
+        return score
     }
 
     private static func parseTransactionLine(
@@ -1029,20 +1122,32 @@ struct ExpenseImageImportParser {
     // MARK: - Debug
 
     private static func debugLog(_ message: String) {
-        _ = message
+        guard diagnosticsEnabled else { return }
+        print("[ExpenseImageImportParser] \(message)")
     }
 
     private static func debugLogLines(_ lines: [String], title: String) {
-        _ = lines
-        _ = title
+        guard diagnosticsEnabled else { return }
+        print("[ExpenseImageImportParser] \(title): \(lines.count) lines")
+        for (index, line) in lines.enumerated() {
+            print("[ExpenseImageImportParser] \(index + 1). \(line)")
+        }
     }
 
     private static func debugAnalyzeLines(_ lines: [String], context: ImageDateContext) {
-        _ = lines
-        _ = context
+        guard diagnosticsEnabled else { return }
+        let candidateYearsText = context.candidateYears.map(String.init).joined(separator: ", ")
+        print("[ExpenseImageImportParser] Date candidates: \(context.dateCandidates.count), years: [\(candidateYearsText)]")
     }
 
     private static func debugLogRow(_ row: ImportRow) {
-        _ = row
+        guard diagnosticsEnabled else { return }
+        print("[ExpenseImageImportParser] Row date=\(row.date) description=\(row.description) amount=\(row.amount) type=\(row.type)")
     }
+
+    private static var diagnosticsEnabled: Bool {
+        UserDefaults.standard.bool(forKey: diagnosticsEnabledDefaultsKey)
+    }
+
+    private static let diagnosticsEnabledDefaultsKey = "offshore.imageImportParser.debugEnabled"
 }

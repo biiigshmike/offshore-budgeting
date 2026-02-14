@@ -151,6 +151,202 @@ struct ExpenseImageAndPaystubImportParserTests {
         })
     }
 
+    @Test func imageScreenshot3858OCRStyle_ParsesConsistentRows() throws {
+        let lines = [
+            "Savings Account",
+            "9:08 gurra",
+            "Xiest Card Transacti. ra",
+            "DoorDash",
+            "Pending - Apple Pay",
+            "Yesterday",
+            "Apple",
+            "Card Number Used",
+            "Wednesday",
+            "DoorDash",
+            "Apple Pay",
+            "Wednesday",
+            "Apple",
+            "Card Number Used",
+            "Wednesday",
+            "Intuit",
+            "us-east-2.turbotaxonline.intuit.c..",
+            "Tuesday",
+            "Payment",
+            "From PNC Bank (.... 1115)",
+            "Saturday",
+            "The Gentlemens Cutlery",
+            "Apple Pay",
+            "2/6/26",
+            "Home Chef",
+            "Apple Pay",
+            "2/6/26",
+            "ARCO",
+            "Woodland, CA",
+            "2/3/26",
+            "Safeway",
+            "Sacramento, CA",
+            "$27.86",
+            "2%",
+            "$19.95",
+            "3%",
+            "$56.56",
+            "2%",
+            ">",
+            "$26.98",
+            "3%",
+            ">",
+            "$78.00",
+            ">",
+            "2%",
+            "+$1,030.27 >",
+            "$75.00",
+            "2%",
+            "$100.90",
+            "2%",
+            "$27.50",
+            "2%",
+            ">",
+            "$50.00",
+            "2%",
+            ">"
+        ]
+
+        let parsed = try ExpenseImageImportParser.parse(recognizedLines: lines, referenceDate: fixedNow)
+        let rows = parsed.rows.compactMap { ParsedRow(fields: $0) }
+
+        #expect(rows.count >= 8)
+        #expect(rows.contains {
+            $0.description.lowercased().contains("payment")
+                && $0.amount == "1030.27"
+                && $0.type == "income"
+        })
+        #expect(rows.contains {
+            $0.description.uppercased().contains("HOME CHEF")
+                && $0.amount == "100.90"
+                && $0.type == "expense"
+        })
+        #expect(rows.contains {
+            $0.description.uppercased().contains("ARCO")
+                && $0.amount == "27.50"
+                && $0.type == "expense"
+        })
+    }
+
+    @Test func imageScreenshot3859OCRStyle_ParsesConsistentRows() throws {
+        let lines = [
+            "9:09 :",
+            "X",
+            "Savings Account",
+            "Current Balance: $10,281",
+            "•",
+            "L123",
+            "Latest Card Transactions",
+            "...",
+            "DoorDash",
+            "Pending - Apple Pay",
+            "Yesterday",
+            "Apple",
+            "Card Number Used",
+            "Wednesday",
+            "DoorDash",
+            "Apple Pay",
+            "Wednesday",
+            "Apple",
+            "Card Number Used",
+            "Wednesday",
+            "Intuit",
+            "us-east-2.turbotaxonline.intuit.c..",
+            "Tuesday",
+            "Payment",
+            "From PNC Bank (.... 1115)",
+            "Saturday",
+            "The Gentlemens Cutlery",
+            "Apple Pay",
+            "2/6/26",
+            "Home Chef",
+            "Apple Pay",
+            "2/6/26",
+            "ARCO",
+            "Woodland, CA",
+            "2/3/26",
+            "$27.86",
+            "2%",
+            "$19.95",
+            "3%",
+            "$56.56",
+            "2%",
+            "$26.98",
+            "3%",
+            "$78.00",
+            "2%",
+            ">",
+            "+$1,030.27 >",
+            "$75.00",
+            "2%",
+            ">",
+            "$100.90",
+            "2%",
+            ">",
+            "$27.50",
+            "2%"
+        ]
+
+        let parsed = try ExpenseImageImportParser.parse(recognizedLines: lines, referenceDate: fixedNow)
+        let rows = parsed.rows.compactMap { ParsedRow(fields: $0) }
+
+        #expect(rows.count >= 8)
+        #expect(rows.contains {
+            $0.description.lowercased().contains("payment")
+                && $0.amount == "1030.27"
+                && $0.type == "income"
+        })
+        #expect(rows.contains {
+            $0.description.uppercased().contains("THE GENTLEMENS CUTLERY")
+                && $0.amount == "75.00"
+                && $0.type == "expense"
+        })
+        #expect(rows.contains {
+            $0.description.uppercased().contains("ARCO")
+                && $0.amount == "27.50"
+                && $0.type == "expense"
+        })
+    }
+
+    @Test func imageSeparatedColumns_WithSingleFirstPassRowStillSynthesizes() throws {
+        let lines = [
+            "Latest Card Transactions",
+            "Safeway $27.86",
+            "DoorDash",
+            "Apple",
+            "Intuit",
+            "Payment",
+            "The Gentlemens Cutlery",
+            "Home Chef",
+            "ARCO",
+            "$19.95",
+            "$56.56",
+            "$78.00",
+            "+$1,030.27",
+            "$75.00",
+            "$100.90",
+            "$27.50"
+        ]
+
+        let parsed = try ExpenseImageImportParser.parse(recognizedLines: lines, referenceDate: fixedNow)
+        let rows = parsed.rows.compactMap { ParsedRow(fields: $0) }
+
+        #expect(rows.count >= 6)
+        #expect(rows.contains {
+            $0.description.uppercased().contains("SAFEWAY")
+                && $0.amount == "27.86"
+        })
+        #expect(rows.contains {
+            $0.description.lowercased().contains("payment")
+                && $0.amount == "1030.27"
+                && $0.type == "income"
+        })
+    }
+
     @Test func imageRelativeDate_HoursAgoUsesReferenceDay() throws {
         let lines = [
             "Payment +$1,030.27",

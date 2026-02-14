@@ -1156,7 +1156,7 @@ struct HomeAssistantCommandParser {
 
         for pattern in patterns {
             guard
-                let range = text.range(of: pattern, options: .regularExpression)
+                let range = text.range(of: pattern, options: [.regularExpression, .caseInsensitive])
             else {
                 continue
             }
@@ -1327,10 +1327,10 @@ struct HomeAssistantCommandParser {
     }
 
     private func matchesPlannedExpenseAmountUpdateIntent(in normalized: String) -> Bool {
-        let hasUpdateVerb = normalized.contains("update")
-            || normalized.contains("edit")
-            || normalized.contains("change")
-            || normalized.contains("set")
+        let hasUpdateVerb = normalized.range(
+            of: "\\b(update|edit|change|set)\\b",
+            options: .regularExpression
+        ) != nil
         guard hasUpdateVerb else { return false }
 
         guard normalized.range(of: "\\$?[-]?[0-9][0-9,]*(?:\\.[0-9]{1,2})?", options: .regularExpression) != nil else {
