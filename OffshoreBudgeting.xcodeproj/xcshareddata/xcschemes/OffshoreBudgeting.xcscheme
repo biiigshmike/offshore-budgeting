@@ -71,11 +71,11 @@
       <CommandLineArguments>
          <CommandLineArgument
             argument = "-screenshotMode"
-            isEnabled = "YES">
+            isEnabled = "NO">
          </CommandLineArgument>
          <CommandLineArgument
             argument = "-resetSeed"
-            isEnabled = "YES">
+            isEnabled = "NO">
          </CommandLineArgument>
       </CommandLineArguments>
    </LaunchAction>
