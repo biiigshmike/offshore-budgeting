@@ -11,12 +11,12 @@ final class ShoppingModeSuggestionService {
 
     private enum Key {
         static let lastFiredByMerchant = "shoppingMode_lastFiredByMerchant"
+        static let lastGlobalFireAt = "shoppingMode_lastGlobalFireAt"
         static let lastSessionID = "shoppingMode_lastSessionID"
         static let startupNudgedSessionID = "shoppingMode_startupNudgedSessionID"
     }
 
     private let defaults = UserDefaults.standard
-    private let cooldownSeconds: TimeInterval = 15 * 60
 
     private init() {}
 
@@ -25,12 +25,14 @@ final class ShoppingModeSuggestionService {
         guard previous != newSessionID else { return }
 
         defaults.set([String: Double](), forKey: Key.lastFiredByMerchant)
+        defaults.removeObject(forKey: Key.lastGlobalFireAt)
         defaults.set(newSessionID, forKey: Key.lastSessionID)
         defaults.removeObject(forKey: Key.startupNudgedSessionID)
     }
 
     func resetAllCooldowns() {
         defaults.set([String: Double](), forKey: Key.lastFiredByMerchant)
+        defaults.removeObject(forKey: Key.lastGlobalFireAt)
         defaults.removeObject(forKey: Key.lastSessionID)
         defaults.removeObject(forKey: Key.startupNudgedSessionID)
     }
@@ -38,15 +40,24 @@ final class ShoppingModeSuggestionService {
     func handleRegionEntry(merchant: ShoppingModeMerchant, now: Date = .now) {
         guard SpendingSessionStore.isActive(now: now) else { return }
 
-        var map = (defaults.dictionary(forKey: Key.lastFiredByMerchant) as? [String: Double]) ?? [:]
-        let lastFire = map[merchant.id].map(Date.init(timeIntervalSince1970:))
+        if let lastGlobalFireAt = lastGlobalFireDate(),
+           now.timeIntervalSince(lastGlobalFireAt) < ShoppingModeTuning.globalNotificationCooldownSeconds {
+            debugLog("Suggestion suppressed for \(merchant.name): global cooldown active")
+            return
+        }
 
-        if let lastFire, now.timeIntervalSince(lastFire) < cooldownSeconds {
+        var map = (defaults.dictionary(forKey: Key.lastFiredByMerchant) as? [String: Double]) ?? [:]
+        let lastMerchantFire = map[merchant.id].map(Date.init(timeIntervalSince1970:))
+
+        if let lastMerchantFire,
+           now.timeIntervalSince(lastMerchantFire) < ShoppingModeTuning.perMerchantNotificationCooldownSeconds {
+            debugLog("Suggestion suppressed for \(merchant.name): merchant cooldown active")
             return
         }
 
         map[merchant.id] = now.timeIntervalSince1970
         defaults.set(map, forKey: Key.lastFiredByMerchant)
+        defaults.set(now.timeIntervalSince1970, forKey: Key.lastGlobalFireAt)
 
         Task { @MainActor in
             let service = LocalNotificationService()
@@ -62,6 +73,11 @@ final class ShoppingModeSuggestionService {
         sessionID: String?,
         now: Date = .now
     ) -> ShoppingModeMerchant? {
+        guard ShoppingModeTuning.startupNudgeEnabled else {
+            debugLog("Startup nudge suppressed: disabled by tuning")
+            return nil
+        }
+
         guard let sessionID else { return nil }
         guard SpendingSessionStore.isActive(now: now) else { return nil }
 
@@ -88,4 +104,16 @@ final class ShoppingModeSuggestionService {
         return closestEligible
     }
     #endif
+
+    private func lastGlobalFireDate() -> Date? {
+        let raw = defaults.double(forKey: Key.lastGlobalFireAt)
+        guard raw > 0 else { return nil }
+        return Date(timeIntervalSince1970: raw)
+    }
+
+    private func debugLog(_ message: String) {
+        #if DEBUG
+        print("[ShoppingModeSuggestionService] \(message)")
+        #endif
+    }
 }

@@ -15,6 +15,11 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
         static let monitoredMerchantPayloads = "shoppingMode_monitoredMerchantPayloads"
     }
 
+    private enum RefreshTrigger: String {
+        case startup
+        case distance
+    }
+
     private let locationManager = CLLocationManager()
     private let poiResolver = ShoppingModePOIResolver()
     private var requestedAlwaysUpgrade = false
@@ -27,9 +32,14 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
     private let desiredStartupAccuracyMeters: CLLocationAccuracy = 120
     private let maxStartupLocationWaitSeconds: UInt64 = 20
 
+    private var lastRefreshLocation: CLLocation? = nil
+    private var lastRefreshDate: Date? = nil
+
     private override init() {
         super.init()
         locationManager.delegate = self
+        locationManager.desiredAccuracy = kCLLocationAccuracyHundredMeters
+        locationManager.distanceFilter = 100
         cachedAuthorizationStatus = locationManager.authorizationStatus
         monitoredMerchantsByRegionID = loadPersistedMerchants()
         debugLog("Loaded persisted monitored merchants: \(monitoredMerchantsByRegionID.count)")
@@ -59,8 +69,9 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
             locationManager.requestAlwaysAuthorization()
         case .authorizedAlways:
             requestedAlwaysUpgrade = false
+            locationManager.startUpdatingLocation()
             debugLog("Authorized Always. Refreshing nearby monitored merchants")
-            refreshNearbyMonitoredMerchants()
+            refreshNearbyMonitoredMerchants(trigger: .startup)
         case .restricted, .denied:
             debugLog("Location authorization denied/restricted. Clearing monitored regions")
             stopMonitoringAllRegions()
@@ -75,6 +86,12 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
         for region in locationManager.monitoredRegions {
             locationManager.stopMonitoring(for: region)
         }
+        locationManager.stopUpdatingLocation()
+        locationWaitTask?.cancel()
+        locationWaitTask = nil
+        pendingLocationRefresh = false
+        lastRefreshLocation = nil
+        lastRefreshDate = nil
         monitoredMerchantsByRegionID = [:]
         persistMerchants([:])
     }
@@ -83,29 +100,29 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
         cachedAuthorizationStatus
     }
 
-    private func refreshNearbyMonitoredMerchants() {
+    private func refreshNearbyMonitoredMerchants(trigger: RefreshTrigger) {
         if let location = locationManager.location, hasGoodAccuracy(location) {
             let currentCoordinate = location.coordinate
-            debugLog("Using current location to refresh regions: \(currentCoordinate.latitude), \(currentCoordinate.longitude)")
+            debugLog("Using current location for \(trigger.rawValue) refresh: \(currentCoordinate.latitude), \(currentCoordinate.longitude)")
             Task {
-                await monitorNearbyMerchants(around: currentCoordinate)
+                await monitorNearbyMerchants(around: currentCoordinate, trigger: trigger)
             }
             return
         }
 
         pendingLocationRefresh = true
-        debugLog("Current location unavailable. Requesting one-shot location update")
+        debugLog("Current location unavailable for \(trigger.rawValue). Requesting one-shot location update")
         scheduleLocationWaitTimeout()
         locationManager.requestLocation()
     }
 
-    private func monitorNearbyMerchants(around center: CLLocationCoordinate2D) async {
+    private func monitorNearbyMerchants(around center: CLLocationCoordinate2D, trigger: RefreshTrigger) async {
         let discovered = await poiResolver.discoverNearbyMerchants(
             around: center,
             searchRadiusMeters: ShoppingModeMerchantCatalog.searchRadiusMeters,
             maxResults: ShoppingModeMerchantCatalog.maxMonitoredRegions
         )
-        debugLog("Discovered nearby MapKit POIs: \(discovered.count)")
+        debugLog("Discovered nearby MapKit POIs: \(discovered.count) [trigger=\(trigger.rawValue)]")
         for merchant in discovered.prefix(10) {
             debugLog("POI -> \(merchant.name) @ \(merchant.latitude), \(merchant.longitude) radius=\(merchant.radiusMeters)")
         }
@@ -119,7 +136,14 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
         }
 
         applyMonitoredMerchants(merchantsToMonitor)
-        sendStartupNudgeIfEligible(merchants: merchantsToMonitor, userCoordinate: center)
+        lastRefreshLocation = CLLocation(latitude: center.latitude, longitude: center.longitude)
+        lastRefreshDate = .now
+
+        sendStartupNudgeIfEligible(
+            merchants: merchantsToMonitor,
+            userCoordinate: center,
+            trigger: trigger
+        )
     }
 
     private func nearestFallbackMerchants(around center: CLLocationCoordinate2D) -> [ShoppingModeMerchant] {
@@ -153,10 +177,23 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
 
         monitoredMerchantsByRegionID = map
         persistMerchants(map)
+        if SpendingSessionStore.isActive() {
+            locationManager.startUpdatingLocation()
+        }
     }
 
-    private func sendStartupNudgeIfEligible(merchants: [ShoppingModeMerchant], userCoordinate: CLLocationCoordinate2D) {
+    private func sendStartupNudgeIfEligible(
+        merchants: [ShoppingModeMerchant],
+        userCoordinate: CLLocationCoordinate2D,
+        trigger: RefreshTrigger
+    ) {
+        guard trigger == .startup else { return }
+        guard ShoppingModeTuning.startupNudgeEnabled else {
+            debugLog("Startup nudge suppressed: disabled by tuning")
+            return
+        }
         guard let sessionID = SpendingSessionStore.sessionID() else { return }
+
         let nudged = ShoppingModeSuggestionService.shared.sendStartupNudgeIfEligible(
             merchants: merchants,
             userCoordinate: userCoordinate,
@@ -207,6 +244,36 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
         return restored
     }
 
+    private func maybeRefreshMonitoredMerchantsForMovement(_ location: CLLocation, now: Date = .now) {
+        guard SpendingSessionStore.isActive(now: now) else { return }
+        guard location.horizontalAccuracy > 0 else {
+            debugLog("Movement refresh skipped: invalid horizontal accuracy")
+            return
+        }
+
+        guard let previousLocation = lastRefreshLocation, let lastRefreshDate else {
+            debugLog("Movement refresh skipped: no baseline; waiting for startup refresh")
+            return
+        }
+
+        let elapsed = now.timeIntervalSince(lastRefreshDate)
+        if elapsed < ShoppingModeTuning.minimumRefreshIntervalSeconds {
+            debugLog("Movement refresh skipped: interval \(Int(elapsed))s < \(Int(ShoppingModeTuning.minimumRefreshIntervalSeconds))s")
+            return
+        }
+
+        let movedMeters = location.distance(from: previousLocation)
+        if movedMeters < ShoppingModeTuning.refreshDistanceMeters {
+            debugLog("Movement refresh skipped: moved \(Int(movedMeters))m < \(Int(ShoppingModeTuning.refreshDistanceMeters))m")
+            return
+        }
+
+        debugLog("Movement refresh triggered: moved \(Int(movedMeters))m in \(Int(elapsed))s")
+        Task {
+            await monitorNearbyMerchants(around: location.coordinate, trigger: .distance)
+        }
+    }
+
     // MARK: - CLLocationManagerDelegate
 
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
@@ -231,21 +298,25 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
     }
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        guard pendingLocationRefresh else { return }
-        pendingLocationRefresh = false
-        locationWaitTask?.cancel()
-        locationWaitTask = nil
-
         guard let latest = locations.last else {
-            debugLog("Location update returned empty set. Using fallback merchants")
-            applyMonitoredMerchants(Array(ShoppingModeMerchantCatalog.fallbackMerchants.prefix(ShoppingModeMerchantCatalog.maxMonitoredRegions)))
+            debugLog("Location update returned empty set")
             return
         }
-        debugLog("Received location update: \(latest.coordinate.latitude), \(latest.coordinate.longitude)")
 
-        Task {
-            await monitorNearbyMerchants(around: latest.coordinate)
+        debugLog("Received location update: \(latest.coordinate.latitude), \(latest.coordinate.longitude) accuracy=\(latest.horizontalAccuracy)")
+
+        if pendingLocationRefresh {
+            pendingLocationRefresh = false
+            locationWaitTask?.cancel()
+            locationWaitTask = nil
+
+            Task {
+                await monitorNearbyMerchants(around: latest.coordinate, trigger: .startup)
+            }
+            return
         }
+
+        maybeRefreshMonitoredMerchantsForMovement(latest)
     }
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
@@ -291,7 +362,7 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
 
         if let location = locationManager.location {
             debugLog("Location wait timeout reached. Proceeding with best available fix: \(location.coordinate.latitude), \(location.coordinate.longitude) accuracy=\(location.horizontalAccuracy)")
-            await monitorNearbyMerchants(around: location.coordinate)
+            await monitorNearbyMerchants(around: location.coordinate, trigger: .startup)
             return
         }
 

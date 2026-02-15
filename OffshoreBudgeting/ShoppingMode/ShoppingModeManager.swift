@@ -217,8 +217,8 @@ struct ShoppingModeMerchant: Equatable {
 // MARK: - ShoppingModeMerchantCatalog
 
 enum ShoppingModeMerchantCatalog {
-    static let maxMonitoredRegions = 20
-    static let searchRadiusMeters: Double = 12_000
+    static let maxMonitoredRegions = ShoppingModeTuning.maxMonitoredRegions
+    static let searchRadiusMeters: Double = ShoppingModeTuning.localSearchRadiusMeters
 
     static let fallbackMerchants: [ShoppingModeMerchant] = [
         ShoppingModeMerchant(
@@ -246,4 +246,16 @@ enum ShoppingModeMerchantCatalog {
             categoryHint: "Groceries"
         )
     ]
+}
+
+// MARK: - ShoppingModeTuning
+
+enum ShoppingModeTuning {
+    static let maxMonitoredRegions = 20
+    static let localSearchRadiusMeters: Double = 2_500
+    static let refreshDistanceMeters: Double = 250
+    static let minimumRefreshIntervalSeconds: TimeInterval = 120
+    static let startupNudgeEnabled = false
+    static let globalNotificationCooldownSeconds: TimeInterval = 10 * 60
+    static let perMerchantNotificationCooldownSeconds: TimeInterval = 15 * 60
 }
