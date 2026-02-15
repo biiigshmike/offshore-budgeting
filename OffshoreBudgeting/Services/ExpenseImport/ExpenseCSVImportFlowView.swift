@@ -198,7 +198,23 @@ struct ExpenseCSVImportFlowView: View {
                     modelContext: modelContext,
                     referenceDate: .now
                 )
+                return
             }
+
+            #if DEBUG
+            if vm.state == .idle,
+               DebugSeeder.isScreenshotModeEnabledForDebugTools,
+               let debugSampleURL = DebugSeeder.ensureDebugImportSampleCSV(modelContext: modelContext) {
+                selectedFileName = "Debug Sample CSV"
+                vm.load(
+                    url: debugSampleURL,
+                    workspace: workspace,
+                    card: card,
+                    modelContext: modelContext,
+                    referenceDate: nil
+                )
+            }
+            #endif
         }
     }
 

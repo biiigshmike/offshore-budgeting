@@ -26,6 +26,7 @@ enum DebugSeeder {
         } else {
             if hasAnyWorkspace(context: context) {
                 applyPinnedHomeOrderForExistingWorkspaceIfPossible(context: context)
+                _ = ensureDebugImportSampleCSV(modelContext: context)
                 return
             }
         }
@@ -36,6 +37,36 @@ enum DebugSeeder {
             try context.save()
         } catch {
             assertionFailure("DebugSeeder failed to save seed data: \(error)")
+        }
+
+        _ = ensureDebugImportSampleCSV(modelContext: context)
+    }
+
+    // MARK: - Debug Import CSV
+
+    static var isScreenshotModeEnabledForDebugTools: Bool {
+        let args = ProcessInfo.processInfo.arguments
+        if args.contains("-screenshotMode") { return true }
+        return UserDefaults.standard.bool(forKey: "debug_screenshotMode")
+    }
+
+    static func ensureDebugImportSampleCSV(container: ModelContainer) -> URL? {
+        let context = ModelContext(container)
+        return ensureDebugImportSampleCSV(modelContext: context)
+    }
+
+    static func ensureDebugImportSampleCSV(modelContext: ModelContext) -> URL? {
+        guard isScreenshotModeEnabledForDebugTools else { return nil }
+
+        do {
+            let appSupport = try applicationSupportDirectory()
+            let fileURL = appSupport.appendingPathComponent(debugImportCSVFileName)
+            let csv = makeMixedDebugImportCSV(modelContext: modelContext)
+            try csv.write(to: fileURL, atomically: true, encoding: .utf8)
+            return fileURL
+        } catch {
+            assertionFailure("DebugSeeder failed to write debug import CSV: \(error)")
+            return nil
         }
     }
 
@@ -132,6 +163,155 @@ enum DebugSeeder {
 
     private static func normalizedCardName(_ name: String) -> String {
         name.replacingOccurrences(of: " ", with: "").lowercased()
+    }
+
+    private static let debugImportCSVFileName: String = "DebugImportSample-Mixed.csv"
+
+    private static func applicationSupportDirectory() throws -> URL {
+        guard let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+            throw CocoaError(.fileNoSuchFile)
+        }
+        try FileManager.default.createDirectory(at: appSupport, withIntermediateDirectories: true)
+        return appSupport
+    }
+
+    private static func makeMixedDebugImportCSV(modelContext: ModelContext) -> String {
+        let workspace = workspaceForDebugCSV(context: modelContext)
+        let duplicateExpense = firstDuplicateExpenseSeed(for: workspace)
+        let duplicateIncome = firstDuplicateIncomeSeed(for: workspace)
+
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone.current
+        formatter.dateFormat = "M/d/yyyy"
+
+        let now = Date()
+        let today = formatter.string(from: now)
+        let fallbackDuplicateDate = formatter.string(from: Calendar.current.date(byAdding: .day, value: -2, to: now) ?? now)
+
+        let duplicateExpenseDate = duplicateExpense.map { formatter.string(from: $0.date) } ?? fallbackDuplicateDate
+        let duplicateIncomeDate = duplicateIncome.map { formatter.string(from: $0.date) } ?? today
+
+        let duplicateExpenseMerchant = duplicateExpense?.merchant ?? "Trader Joe's"
+        let duplicateExpenseCategory = duplicateExpense?.category ?? "Groceries"
+        let duplicateExpenseAmount = csvAmountText(value: -(duplicateExpense?.amount ?? 124.65))
+
+        let duplicateIncomeMerchant = duplicateIncome?.source ?? "Paycheck"
+        let duplicateIncomeAmount = csvAmountText(value: duplicateIncome?.amount ?? 1492.37)
+
+        let header = "Transaction Date,Posted Date,Description,Merchant,Category,Type,Amount"
+        let rows: [String] = [
+            csvRow(
+                transactionDate: today,
+                postedDate: today,
+                description: "Weekly Groceries",
+                merchant: "Trader Joe's",
+                category: "Groceries",
+                type: "Purchase",
+                amount: "-96.40"
+            ),
+            csvRow(
+                transactionDate: today,
+                postedDate: today,
+                description: "Employer Deposit",
+                merchant: "Paycheck",
+                category: "Income",
+                type: "Income",
+                amount: "1502.18"
+            ),
+            csvRow(
+                transactionDate: duplicateExpenseDate,
+                postedDate: duplicateExpenseDate,
+                description: "\(duplicateExpenseMerchant) duplicate check",
+                merchant: duplicateExpenseMerchant,
+                category: duplicateExpenseCategory,
+                type: "Purchase",
+                amount: duplicateExpenseAmount
+            ),
+            csvRow(
+                transactionDate: duplicateIncomeDate,
+                postedDate: duplicateIncomeDate,
+                description: "\(duplicateIncomeMerchant) duplicate check",
+                merchant: duplicateIncomeMerchant,
+                category: "Income",
+                type: "Income",
+                amount: duplicateIncomeAmount
+            ),
+            csvRow(
+                transactionDate: "1/1/2026",
+                postedDate: "1/1/2026",
+                description: "Uncategorized mystery transaction",
+                merchant: "",
+                category: "",
+                type: "Purchase",
+                amount: ""
+            )
+        ]
+
+        return ([header] + rows).joined(separator: "\n") + "\n"
+    }
+
+    private static func workspaceForDebugCSV(context: ModelContext) -> Workspace? {
+        do {
+            let workspaces = try context.fetch(FetchDescriptor<Workspace>())
+            return pickPinnedWorkspace(from: workspaces)
+        } catch {
+            return nil
+        }
+    }
+
+    private static func firstDuplicateExpenseSeed(for workspace: Workspace?) -> (date: Date, merchant: String, amount: Double, category: String)? {
+        guard let workspace else { return nil }
+        guard let expense = (workspace.variableExpenses ?? []).first(where: { $0.amount > 0 }) else { return nil }
+
+        return (
+            date: expense.transactionDate,
+            merchant: expense.descriptionText,
+            amount: expense.amount,
+            category: expense.category?.name ?? "Groceries"
+        )
+    }
+
+    private static func firstDuplicateIncomeSeed(for workspace: Workspace?) -> (date: Date, source: String, amount: Double)? {
+        guard let workspace else { return nil }
+        guard let income = (workspace.incomes ?? []).first(where: { !$0.isPlanned && $0.amount > 0 }) else { return nil }
+
+        return (
+            date: income.date,
+            source: income.source,
+            amount: income.amount
+        )
+    }
+
+    private static func csvAmountText(value: Double) -> String {
+        String(format: "%.2f", value)
+    }
+
+    private static func csvRow(
+        transactionDate: String,
+        postedDate: String,
+        description: String,
+        merchant: String,
+        category: String,
+        type: String,
+        amount: String
+    ) -> String {
+        [
+            csvField(transactionDate),
+            csvField(postedDate),
+            csvField(description),
+            csvField(merchant),
+            csvField(category),
+            csvField(type),
+            csvField(amount)
+        ].joined(separator: ",")
+    }
+
+    private static func csvField(_ value: String) -> String {
+        if value.contains(",") || value.contains("\"") || value.contains("\n") {
+            return "\"\(value.replacingOccurrences(of: "\"", with: "\"\""))\""
+        }
+        return value
     }
 
     // MARK: - Wipe
