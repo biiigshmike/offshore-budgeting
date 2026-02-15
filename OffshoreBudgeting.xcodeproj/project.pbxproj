@@ -579,7 +579,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = Offshore;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "Use Face ID to lock the app and secure sensitive budget data.";
-				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Offshore uses your location in Excursion Mode to suggest logging purchases when you are near points of interests, even in the background.";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Offshore uses your location in Excursion Mode to suggest logging purchases when you are near points of interest, even in the background.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Offshore uses your location during Excursion Mode to detect nearby points of interest and suggest quick expense logging.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Offshore uses photos you select to import transactions or income from screenshots.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
@@ -643,7 +643,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = Offshore;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "Use Face ID to lock the app and secure sensitive budget data.";
-				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Offshore uses your location in Excursion Mode to suggest logging purchases when you are near points of interests, even in the background.";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Offshore uses your location in Excursion Mode to suggest logging purchases when you are near points of interest, even in the background.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Offshore uses your location during Excursion Mode to detect nearby points of interest and suggest quick expense logging.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Offshore uses photos you select to import transactions or income from screenshots.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
