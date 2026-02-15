@@ -24,7 +24,10 @@ enum DebugSeeder {
         if forceReset {
             wipeAllData(context: context)
         } else {
-            if hasAnyWorkspace(context: context) { return }
+            if hasAnyWorkspace(context: context) {
+                applyPinnedHomeOrderForExistingWorkspaceIfPossible(context: context)
+                return
+            }
         }
 
         seedSampleData(context: context)
@@ -45,6 +48,90 @@ enum DebugSeeder {
         } catch {
             return false
         }
+    }
+
+    // MARK: - Home Pins
+
+    private static func applyPinnedHomeOrderForExistingWorkspaceIfPossible(context: ModelContext) {
+        do {
+            let workspaces = try context.fetch(FetchDescriptor<Workspace>())
+            guard let workspace = pickPinnedWorkspace(from: workspaces) else {
+                assertionFailure("DebugSeeder could not find a workspace for pinned widget seeding.")
+                return
+            }
+
+            let cards = try context.fetch(FetchDescriptor<Card>())
+                .filter { $0.workspace?.id == workspace.id }
+
+            guard
+                let checkingCardID = cardID(named: "checking", in: cards),
+                let appleCardID = cardID(named: "applecard", in: cards),
+                let amexCardID = cardID(named: "amex", in: cards)
+            else {
+                assertionFailure("DebugSeeder could not resolve Checking/Apple Card/AmEx for pinned widget seeding.")
+                return
+            }
+
+            applyPinnedHomeOrder(
+                workspaceID: workspace.id,
+                checkingCardID: checkingCardID,
+                appleCardID: appleCardID,
+                amexCardID: amexCardID
+            )
+        } catch {
+            assertionFailure("DebugSeeder failed to apply pinned widget order: \(error)")
+        }
+    }
+
+    private static func applyPinnedHomeOrder(
+        workspaceID: UUID,
+        checkingCardID: UUID,
+        appleCardID: UUID,
+        amexCardID: UUID
+    ) {
+        HomePinnedItemsStore(workspaceID: workspaceID).save([
+            .widget(.income, .small),
+            .widget(.categoryAvailability, .small),
+            .widget(.spendTrends, .small),
+            .card(checkingCardID, .small),
+            .card(appleCardID, .small),
+            .widget(.nextPlannedExpense, .small),
+            .widget(.categorySpotlight, .small),
+            .widget(.savingsOutlook, .small),
+            .widget(.whatIf, .small),
+            .card(amexCardID, .small)
+        ])
+
+        HomePinnedWidgetsStore(workspaceID: workspaceID).save([
+            .income,
+            .categoryAvailability,
+            .spendTrends,
+            .nextPlannedExpense,
+            .categorySpotlight,
+            .savingsOutlook,
+            .whatIf
+        ])
+
+        HomePinnedCardsStore(workspaceID: workspaceID).save([
+            checkingCardID,
+            appleCardID,
+            amexCardID
+        ])
+    }
+
+    private static func pickPinnedWorkspace(from workspaces: [Workspace]) -> Workspace? {
+        if let screenshotsWorkspace = workspaces.first(where: { $0.name.caseInsensitiveCompare("Screenshots") == .orderedSame }) {
+            return screenshotsWorkspace
+        }
+        return workspaces.first
+    }
+
+    private static func cardID(named normalizedName: String, in cards: [Card]) -> UUID? {
+        cards.first(where: { normalizedCardName($0.name) == normalizedName })?.id
+    }
+
+    private static func normalizedCardName(_ name: String) -> String {
+        name.replacingOccurrences(of: " ", with: "").lowercased()
     }
 
     // MARK: - Wipe
@@ -119,6 +206,13 @@ enum DebugSeeder {
         let cardVisa = Card(name: "Apple Card", theme: "periwinkle", effect: "glass", workspace: workspace)
         let cardAmex = Card(name: "AmEx", theme: "aster", effect: "holographic", workspace: workspace)
         [cardChecking, cardVisa, cardAmex].forEach { context.insert($0) }
+
+        applyPinnedHomeOrder(
+            workspaceID: workspace.id,
+            checkingCardID: cardChecking.id,
+            appleCardID: cardVisa.id,
+            amexCardID: cardAmex.id
+        )
 
         // Presets
         let presetRent = Preset(title: "Rent", plannedAmount: 1500, workspace: workspace)
