@@ -464,7 +464,7 @@ struct MarinaResponseDraftTests {
             }
         }
 
-        #expect(personaLines.contains(where: { $0.contains("practical") || $0.contains("status check") || $0.contains("money reality check") }))
+        #expect(personaLines.contains(where: { $0.contains("month check-in") || $0.contains("month snapshot mode") || $0.contains("this-month picture") || $0.contains("this month, so i pulled your latest read") }))
         #expect(personaLines.contains(where: { $0.contains("you are doing better") || $0.contains("you are keeping your footing") || $0.contains("you are showing consistency") }))
         #expect(personaLines.contains(where: { $0.contains("bestie") || $0.contains("cute progress") }))
     }
