@@ -338,54 +338,11 @@ enum GeneratedHelpContent {
             searchableText: "Presets Presets: Reusable Fixed Expense Templates Use presets for fixed bills like rent or subscriptions. Tap + to create one. Swipe right to edit or left to delete. How Presets Affect Totals When assigned to a budget, presets become planned expenses in that budget. Presets act as templates for planned expenses. Planned expenses generated from presets use planned amount unless you edit actual amount later. Tip Use presets to make budget setup fast and consistent month to month."
         ),
         GeneratedHelpTopic(
-            id: "settings",
-            title: "Settings",
-            group: .coreScreens,
-            iconSystemName: "gear",
-            iconStyle: .gray,
-            sections: [
-                GeneratedHelpSection(
-                    id: "settings-1",
-                    screenshotSlot: 1,
-                    header: "Settings: Configure Offshore",
-                    lines: [
-                        GeneratedHelpLine(kind: .text, value: "Every row is a separate area to manage your Offshore experience."),
-                        GeneratedHelpLine(kind: .bullet, value: "About: version info, contact support, release logs."),
-                        GeneratedHelpLine(kind: .bullet, value: "Help: this guide and Repeat Onboarding."),
-                        GeneratedHelpLine(kind: .bullet, value: "Install Quick Actions: shortcut install links and trigger setup guidance."),
-                        GeneratedHelpLine(kind: .bullet, value: "General: currency, budget period, tips reset, erase content."),
-                        GeneratedHelpLine(kind: .bullet, value: "Privacy: biometrics app lock."),
-                        GeneratedHelpLine(kind: .bullet, value: "Notifications: reminders for daily spending, income comparisons, and due presets."),
-                        GeneratedHelpLine(kind: .bullet, value: "iCloud: sync across devices and sync status."),
-                        GeneratedHelpLine(kind: .bullet, value: "Categories: manage expense categories."),
-                        GeneratedHelpLine(kind: .bullet, value: "Presets: manage expense presets."),
-                    ]
-                ),
-                GeneratedHelpSection(
-                    id: "settings-2",
-                    screenshotSlot: 2,
-                    header: "Settings Controls What You See",
-                    lines: [
-                        GeneratedHelpLine(kind: .text, value: "Set default currency in General > Formatting > Currency. You can also control whether delete confirmation alerts are shown."),
-                    ]
-                ),
-                GeneratedHelpSection(
-                    id: "settings-3",
-                    screenshotSlot: 3,
-                    header: "Workspaces",
-                    lines: [
-                        GeneratedHelpLine(kind: .text, value: "Offshore supports multiple workspaces to separate budgeting contexts like Personal and Work. Each workspace has its own cards, income, presets, categories, and budgets."),
-                    ]
-                )
-            ],
-            searchableText: "Settings Settings: Configure Offshore Every row is a separate area to manage your Offshore experience. About: version info, contact support, release logs. Help: this guide and Repeat Onboarding. Install Quick Actions: shortcut install links and trigger setup guidance. General: currency, budget period, tips reset, erase content. Privacy: biometrics app lock. Notifications: reminders for daily spending, income comparisons, and due presets. iCloud: sync across devices and sync status. Categories: manage expense categories. Presets: manage expense presets. Settings Controls What You See Set default currency in General > Formatting > Currency. You can also control whether delete confirmation alerts are shown. Workspaces Offshore supports multiple workspaces to separate budgeting contexts like Personal and Work. Each workspace has its own cards, income, presets, categories, and budgets."
-        ),
-        GeneratedHelpTopic(
             id: "quick-actions",
             title: "Quick Actions",
             group: .coreScreens,
             iconSystemName: "bolt.fill",
-            iconStyle: .orange,
+            iconStyle: .green,
             sections: [
                 GeneratedHelpSection(
                     id: "quick-actions-1",
@@ -472,6 +429,49 @@ enum GeneratedHelpContent {
                 )
             ],
             searchableText: "Quick Actions Quick Actions are optional. Install the shared shortcuts first, then set up the matching automations in Shortcuts. Before You Start Open Offshore > Settings > Install Quick Actions. Tap each shortcut link and import it in Shortcuts. Confirm these shortcuts are installed: Add Expense From Tap To Pay Add Income From An SMS Message Add Income From An Email Add Expense From Tap To Pay Open Shortcuts > Automation. Tap New Automation. Scroll down and select Wallet. Configure this screen to your liking. You can choose which card or cards should trigger the automation. It is recommended to leave all categories selected. Instead of Run After Confirmation, choose Run Immediately for an uninterrupted experience. On the next screen, tap Create New Shortcut. Add action: Get Text from Shortcut Input. In this action, tap the blue Input field and choose Shortcut Input. Add action: Run Shortcut. In Run Shortcut, tap the blue Shortcut field and select Add Expense From Tap To Pay. Save the automation. Add Income From An SMS Message Open Shortcuts > Automation. Tap New Automation. Scroll down and select Message. Configure this screen to your liking. For example, use Message Contains and type the exact phrasing your bank uses in deposit notifications. Instead of Run After Confirmation, choose Run Immediately for an uninterrupted experience. On the next screen, tap Create New Shortcut. Add action: Get Text from Shortcut Input. In this action, tap the blue Input field and choose Shortcut Input. Add action: Run Shortcut. In Run Shortcut, tap the blue Shortcut field and select Add Income From An SMS Message. Save the automation. Add Income From An Email Open Shortcuts > Automation. Tap New Automation. Scroll down and select Email. Configure this screen to your liking. For example, use Subject Contains and type the exact phrasing your bank uses in deposit email subject lines. Instead of Run After Confirmation, choose Run Immediately for an uninterrupted experience. On the next screen, tap Create New Shortcut. Add action: Get Text from Shortcut Input. In this action, tap the blue Input field and choose Shortcut Input. Add action: Run Shortcut. In Run Shortcut, tap the blue Shortcut field and select Add Income From An Email. Save the automation. Troubleshooting If a shared item imports with a long autogenerated name, rename the shortcut after import. If you do not see the expected trigger type, make sure your device and iOS version support that trigger. If the last Offshore action appears missing, confirm Offshore is installed on that device, then edit the shortcut and add Offshore Add Income or Add Expense as the last action again. If an automation does not fire, open it in Shortcuts and verify trigger condition text, selected Run Shortcut action, and run behavior settings."
+        ),
+        GeneratedHelpTopic(
+            id: "settings",
+            title: "Settings",
+            group: .coreScreens,
+            iconSystemName: "gear",
+            iconStyle: .gray,
+            sections: [
+                GeneratedHelpSection(
+                    id: "settings-1",
+                    screenshotSlot: 1,
+                    header: "Settings: Configure Offshore",
+                    lines: [
+                        GeneratedHelpLine(kind: .text, value: "Every row is a separate area to manage your Offshore experience."),
+                        GeneratedHelpLine(kind: .bullet, value: "About: version info, contact support, release logs."),
+                        GeneratedHelpLine(kind: .bullet, value: "Help: this guide and Repeat Onboarding."),
+                        GeneratedHelpLine(kind: .bullet, value: "Install Quick Actions: shortcut install links and trigger setup guidance."),
+                        GeneratedHelpLine(kind: .bullet, value: "General: currency, budget period, tips reset, erase content."),
+                        GeneratedHelpLine(kind: .bullet, value: "Privacy: biometrics app lock."),
+                        GeneratedHelpLine(kind: .bullet, value: "Notifications: reminders for daily spending, income comparisons, and due presets."),
+                        GeneratedHelpLine(kind: .bullet, value: "iCloud: sync across devices and sync status."),
+                        GeneratedHelpLine(kind: .bullet, value: "Categories: manage expense categories."),
+                        GeneratedHelpLine(kind: .bullet, value: "Presets: manage expense presets."),
+                    ]
+                ),
+                GeneratedHelpSection(
+                    id: "settings-2",
+                    screenshotSlot: 2,
+                    header: "Settings Controls What You See",
+                    lines: [
+                        GeneratedHelpLine(kind: .text, value: "Set default currency in General > Formatting > Currency. You can also control whether delete confirmation alerts are shown."),
+                    ]
+                ),
+                GeneratedHelpSection(
+                    id: "settings-3",
+                    screenshotSlot: 3,
+                    header: "Workspaces",
+                    lines: [
+                        GeneratedHelpLine(kind: .text, value: "Offshore supports multiple workspaces to separate budgeting contexts like Personal and Work. Each workspace has its own cards, income, presets, categories, and budgets."),
+                    ]
+                )
+            ],
+            searchableText: "Settings Settings: Configure Offshore Every row is a separate area to manage your Offshore experience. About: version info, contact support, release logs. Help: this guide and Repeat Onboarding. Install Quick Actions: shortcut install links and trigger setup guidance. General: currency, budget period, tips reset, erase content. Privacy: biometrics app lock. Notifications: reminders for daily spending, income comparisons, and due presets. iCloud: sync across devices and sync status. Categories: manage expense categories. Presets: manage expense presets. Settings Controls What You See Set default currency in General > Formatting > Currency. You can also control whether delete confirmation alerts are shown. Workspaces Offshore supports multiple workspaces to separate budgeting contexts like Personal and Work. Each workspace has its own cards, income, presets, categories, and budgets."
         )
     ]
 
