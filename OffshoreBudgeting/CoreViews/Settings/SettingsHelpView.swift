@@ -72,7 +72,7 @@ struct SettingsHelpView: View {
 
 // MARK: - Topic Detail
 
-private struct HelpTopicDetailView: View {
+struct HelpTopicDetailView: View {
     let topic: GeneratedHelpTopic
 
     var body: some View {

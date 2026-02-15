@@ -8,7 +8,7 @@
 import SwiftUI
 import SwiftData
 
-/// Shared form UI for adding and editing a VariableExpense ("Transaction").
+/// Shared form UI for adding and editing a VariableExpense ("Expense").
 ///
 /// Design goals:
 /// - One place for fields + validation UI
@@ -168,7 +168,7 @@ struct ExpenseFormView: View {
     private var cardSection: some View {
         Section("Card") {
             if cards.isEmpty {
-                Text("No cards yet. Create a card first to add transactions.")
+                Text("No cards yet. Create a card first to add expenses.")
                     .foregroundStyle(.secondary)
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -183,7 +183,7 @@ struct ExpenseFormView: View {
                                 selectedCardID = card.id
                             }
                             .accessibilityLabel(selectedCardID == card.id ? "\(card.name), selected" : "\(card.name)")
-                            .accessibilityHint("Double tap to set as the transaction card.")
+                            .accessibilityHint("Double tap to set as the expense card.")
                         }
                     }
                     .padding(6)
@@ -198,7 +198,7 @@ struct ExpenseFormView: View {
     }
 
     private var transactionSection: some View {
-        Section("Transaction") {
+        Section("Expense") {
             TextField("Description", text: $descriptionText)
 
             TextField("Amount", text: $amountText)
@@ -295,7 +295,7 @@ struct ExpenseFormView: View {
         guard let mode = activeSharedBalanceMode else { return nil }
 
         guard enteredAmount > 0 else {
-            return "Enter a transaction amount first."
+            return "Enter an expense amount first."
         }
 
         let selectedAccountID = mode == .split ? selectedAllocationAccountID : selectedOffsetAccountID
@@ -317,7 +317,7 @@ struct ExpenseFormView: View {
         }
 
         guard parsedAmount <= enteredAmount else {
-            return "Amount can't exceed the transaction amount."
+            return "Amount can't exceed the expense amount."
         }
 
         if mode == .offset,

@@ -64,6 +64,15 @@
       "iconStyle": "gray",
       "markdownFile": "settings.md",
       "showsScreenshots": true
+    },
+    {
+      "id": "quick-actions",
+      "title": "Quick Actions",
+      "group": "core_screens",
+      "iconSystemName": "bolt.fill",
+      "iconStyle": "orange",
+      "markdownFile": "quick-actions.md",
+      "showsScreenshots": false
     }
   ]
 }

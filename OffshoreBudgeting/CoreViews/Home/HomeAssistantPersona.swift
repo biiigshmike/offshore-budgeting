@@ -45,9 +45,9 @@ enum HomeAssistantPersonaCatalog {
                 greetingTitle: "Hi, I’m Marina.",
                 greetingSubtitle: "Ask me for quick answers from your budget data.",
                 noDataTitle: "No activity in this range yet.",
-                noDataSubtitle: "Try a different date range or add more transactions.",
+                noDataSubtitle: "Try a different date range or add more expenses.",
                 unresolvedPromptTitle: "I can help with that once I have a clearer budgeting prompt.",
-                unresolvedPromptSubtitle: "Try asking about spend totals, top categories, month-over-month change, or largest transactions.",
+                unresolvedPromptSubtitle: "Try asking about spend totals, top categories, month-over-month change, or largest expenses.",
                 previewLines: [
                     "Bestie check: You spent $1,350 this month. We can work with that.",
                     "Top category is Dining at $420. Let's keep it cute and grounded."
@@ -304,7 +304,7 @@ struct HomeAssistantPersonaFormatter {
         if answer.title.localizedCaseInsensitiveContains("Category Spend Share") {
             return [
                 makeSuggestion("Top categories this month", query: HomeQuery(intent: .topCategoriesThisMonth, resultLimit: 5)),
-                makeSuggestion("Largest transactions this month", query: HomeQuery(intent: .largestRecentTransactions, resultLimit: 5))
+                makeSuggestion("Largest expenses this month", query: HomeQuery(intent: .largestRecentTransactions, resultLimit: 5))
             ]
         }
 
@@ -324,12 +324,12 @@ struct HomeAssistantPersonaFormatter {
         case .list:
             return [
                 makeSuggestion("Spend this month", query: HomeQuery(intent: .spendThisMonth)),
-                makeSuggestion("Largest 5 transactions", query: HomeQuery(intent: .largestRecentTransactions, resultLimit: 5))
+                makeSuggestion("Largest 5 expenses", query: HomeQuery(intent: .largestRecentTransactions, resultLimit: 5))
             ]
         case .comparison:
             return [
                 makeSuggestion("Top 5 categories this month", query: HomeQuery(intent: .topCategoriesThisMonth, resultLimit: 5)),
-                makeSuggestion("Largest transactions this month", query: HomeQuery(intent: .largestRecentTransactions))
+                makeSuggestion("Largest expenses this month", query: HomeQuery(intent: .largestRecentTransactions))
             ]
         case .message:
             return [

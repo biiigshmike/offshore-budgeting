@@ -60,7 +60,7 @@ struct ImportScreenshotIntent: AppIntent {
                 try ShortcutImportPreviewService.shared.previewFromImage(url: sourceURL)
             }
         } catch {
-            let message = (error as? LocalizedError)?.errorDescription ?? "Could not parse the image into transactions."
+            let message = (error as? LocalizedError)?.errorDescription ?? "Could not parse the image into entries."
             return .result(
                 value: message,
                 dialog: IntentDialog(stringLiteral: message)

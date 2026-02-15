@@ -70,7 +70,7 @@ struct SettingsiCloudView: View {
 
                 statusRow
 
-                Text("When enabled, your budgets and transactions sync across devices with the same Apple ID. When disabled, data stays only on this device.")
+                Text("When enabled, your budgets and entries sync across devices with the same Apple ID. When disabled, data stays only on this device.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }

@@ -54,14 +54,14 @@
         ]
       },
       "noData": [
-        "Try a different date range or add more transactions.",
+        "Try a different date range or add more expenses.",
         "Widen the range and I can usually pull a useful read.",
         "A few entries in this period will unlock deeper insights.",
-        "Try this again after your next batch of transactions.",
+        "Try this again after your next batch of expenses.",
         "Shift the time window and we can compare activity."
       ],
       "unresolvedPrompt": [
-        "Give me one concrete ask and I got you: spend total, top categories, trend, or largest transactions.",
+        "Give me one concrete ask and I got you: spend total, top categories, trend, or largest expenses.",
         "Start simple and I will build with you: metric plus timeframe.",
         "Try a direct prompt and I will return a clear answer.",
         "If you include the date range, I can be much sharper.",

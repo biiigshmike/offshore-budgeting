@@ -258,7 +258,7 @@ struct OffshoreAppCommands: Commands {
             return [
                 AppMenuCommandItem(
                     id: AppCommandID.BudgetDetail.newTransaction,
-                    title: "New Transaction",
+                    title: "New Expense",
                     shortcut: KeyboardShortcut("n", modifiers: [.command]),
                     isEnabled: commandHub.availability.budgetDetailCanCreateTransaction
                 )
@@ -288,7 +288,7 @@ struct OffshoreAppCommands: Commands {
             return [
                 AppMenuCommandItem(
                     id: AppCommandID.CardDetail.newTransaction,
-                    title: "New Transaction",
+                    title: "New Expense",
                     shortcut: KeyboardShortcut("n", modifiers: [.command])
                 )
             ]

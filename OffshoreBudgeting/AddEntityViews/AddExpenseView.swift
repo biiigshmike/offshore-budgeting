@@ -116,7 +116,7 @@ struct AddExpenseView: View {
             offsetAmountText: $offsetAmountText,
             onSharedBalanceChanged: nil
         )
-        .navigationTitle("Add Transaction")
+        .navigationTitle("Add Expense")
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button("Cancel") { dismiss() }
@@ -147,17 +147,17 @@ struct AddExpenseView: View {
         .alert("Select a Card", isPresented: $showingMissingCardAlert) {
             Button("OK", role: .cancel) { }
         } message: {
-            Text("Choose a card for this transaction.")
+            Text("Choose a card for this expense.")
         }
         .alert("Invalid Split Amount", isPresented: $showingInvalidAllocationAlert) {
             Button("OK", role: .cancel) { }
         } message: {
-            Text("Split amount must be 0 or greater and cannot exceed the transaction amount.")
+            Text("Split amount must be 0 or greater and cannot exceed the expense amount.")
         }
         .alert("Invalid Offset Amount", isPresented: $showingInvalidOffsetAlert) {
             Button("OK", role: .cancel) { }
         } message: {
-            Text("Offset amount must be 0 or greater, cannot exceed the transaction amount, and cannot exceed the selected account balance.")
+            Text("Offset amount must be 0 or greater, cannot exceed the expense amount, and cannot exceed the selected account balance.")
         }
         .onAppear {
             if descriptionText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {

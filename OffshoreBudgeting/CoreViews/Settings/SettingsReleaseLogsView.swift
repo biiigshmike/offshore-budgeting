@@ -67,7 +67,7 @@ struct SettingsReleaseLogsView: View {
                 ReleaseItem(
                     systemImage: "creditcard.fill",
                     title: "Shared Balances: Now on the Cards Tab",
-                    description: "You can now split expenses and track shared balances. When adding or editing an expense, choose to split or offset it against a Shared Balance. View the running total and full transaction history in Cards > Shared Balance."
+                    description: "You can now split expenses and track shared balances. When adding or editing an expense, choose to split or offset it against a Shared Balance. View the running total and full expense history in Cards > Shared Balance."
                 ),
                 ReleaseItem(
                     systemImage: "square.2.layers.3d.top.filled",
@@ -125,7 +125,7 @@ struct SettingsReleaseLogsView: View {
                 ReleaseItem(
                     systemImage: "tray.and.arrow.down.fill",
                     title: "Improvements to Importing Expenses",
-                    description: "Incoming transactions now come in with cleaner names instead of long strings of bank text. You can store preferred names locally so future imports recognize them automatically with the press of a toggle."
+                    description: "Incoming entries now come in with cleaner names instead of long strings of bank text. You can store preferred names locally so future imports recognize them automatically with the press of a toggle."
                 )
             ]
         ),
@@ -135,8 +135,8 @@ struct SettingsReleaseLogsView: View {
             items: [
                 ReleaseItem(
                     systemImage: "tray.and.arrow.down.fill",
-                    title: "Import Transactions",
-                    description: "Import transactions and income (.csv only) directly into a card from its detail view. Select what you want, then attach them instantly."
+                    title: "Import Entries",
+                    description: "Import entries and income (.csv only) directly into a card from its detail view. Select what you want, then attach them instantly."
                 ),
                 ReleaseItem(
                     systemImage: "creditcard.fill",

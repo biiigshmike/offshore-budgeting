@@ -108,7 +108,7 @@ struct CategoryListRows: View {
             ContentUnavailableView(
                 "No Categories Yet",
                 systemImage: "tag",
-                description: Text("Create categories to organize transactions and presets.")
+                description: Text("Create categories to organize expenses and presets.")
             )
         } else {
             ForEach(categories) { category in

@@ -207,7 +207,7 @@ struct HomeQueryEngine {
                 query: HomeQuery(intent: .compareThisMonthToPreviousMonth)
             ),
             HomeAssistantSuggestion(
-                title: "Largest recent transactions",
+                title: "Largest recent expenses",
                 query: HomeQuery(intent: .largestRecentTransactions)
             ),
             HomeAssistantSuggestion(
@@ -304,7 +304,7 @@ struct HomeQueryEngine {
         if let largestTransaction = largestTransaction(in: range, plannedExpenses: plannedExpenses, variableExpenses: variableExpenses) {
             rows.append(
                 HomeAnswerRow(
-                    title: "Largest transaction",
+                    title: "Largest expense",
                     value: "\(largestTransaction.title) (\(currency(largestTransaction.amount)))"
                 )
             )
@@ -467,8 +467,8 @@ struct HomeQueryEngine {
             return HomeAnswer(
                 queryID: query.id,
                 kind: .message,
-                title: "Largest Recent Transactions",
-                subtitle: "No transactions found in this range.",
+                title: "Largest Recent Expenses",
+                subtitle: "No expenses found in this range.",
                 primaryValue: nil,
                 rows: []
             )
@@ -477,7 +477,7 @@ struct HomeQueryEngine {
         return HomeAnswer(
             queryID: query.id,
             kind: .list,
-            title: "Largest Recent Transactions",
+            title: "Largest Recent Expenses",
             subtitle: rangeLabel(for: range),
             primaryValue: nil,
             rows: rows
@@ -595,9 +595,9 @@ struct HomeQueryEngine {
                 subtitle: rangeLabel(for: range),
                 primaryValue: currency(total),
                 rows: [
-                    HomeAnswerRow(title: "Transactions", value: "\(transactionCount)"),
-                    HomeAnswerRow(title: "Average transaction", value: currency(average)),
-                    HomeAnswerRow(title: "Largest variable transaction", value: currency(maxTransaction))
+                    HomeAnswerRow(title: "Expenses", value: "\(transactionCount)"),
+                    HomeAnswerRow(title: "Average expense", value: currency(average)),
+                    HomeAnswerRow(title: "Largest variable expense", value: currency(maxTransaction))
                 ]
             )
         }
@@ -615,7 +615,7 @@ struct HomeQueryEngine {
             .map { item in
                 HomeAnswerRow(
                     title: item.card,
-                    value: "\(currency(item.total)) total | \(item.count) txns | \(currency(item.average)) avg"
+                    value: "\(currency(item.total)) total | \(item.count) expenses | \(currency(item.average)) avg"
                 )
             }
 

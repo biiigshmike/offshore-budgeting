@@ -20,7 +20,7 @@ enum StatementPDFImportParserError: LocalizedError {
         case .emptyDocument:
             return "The selected PDF did not contain readable text."
         case .noTransactionsFound:
-            return "No transaction rows were found in this PDF."
+            return "No entry rows were found in this PDF."
         }
     }
 }

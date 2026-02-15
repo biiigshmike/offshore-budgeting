@@ -5,6 +5,7 @@
 Every row is a separate area to manage your Offshore experience.
 - About: version info, contact support, release logs.
 - Help: this guide and Repeat Onboarding.
+- Install Quick Actions: shortcut install links and trigger setup guidance.
 - General: currency, budget period, tips reset, erase content.
 - Privacy: biometrics app lock.
 - Notifications: reminders for daily spending, income comparisons, and due presets.

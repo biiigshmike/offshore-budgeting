@@ -708,7 +708,7 @@ struct CardDetailView: View {
             Button {
                 showingAddExpenseSheet = true
             } label: {
-                Label("Add Transaction", systemImage: "plus")
+                Label("Add Expense", systemImage: "plus")
             }
 
             Button {

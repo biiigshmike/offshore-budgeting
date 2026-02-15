@@ -835,7 +835,7 @@ struct BudgetDetailView: View {
         } label: {
             Image(systemName: "plus")
         }
-        .accessibilityLabel("Add Transaction")
+        .accessibilityLabel("Add Expense")
         .disabled(linkedCards.isEmpty)
     }
 

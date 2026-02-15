@@ -25,12 +25,12 @@ enum MixedClipboardRowsRoute: String, AppEnum {
 
 struct ImportFromClipboardIntent: AppIntent {
     static var title: LocalizedStringResource = "Import From Clipboard"
-    static var description = IntentDescription("Parse transaction text from clipboard-style input and return an import preview summary.")
+    static var description = IntentDescription("Parse entry text from clipboard-style input and return an import preview summary.")
     static var openAppWhenRun: Bool = false
 
     @Parameter(
         title: "Clipboard Text",
-        requestValueDialog: IntentDialog("Paste or enter transaction text to import.")
+        requestValueDialog: IntentDialog("Paste or enter entry text to import.")
     )
     var clipboardText: String?
 
@@ -69,7 +69,7 @@ struct ImportFromClipboardIntent: AppIntent {
                 try ShortcutImportPreviewService.shared.previewFromClipboard(text: resolvedClipboardText)
             }
         } catch {
-            let message = (error as? LocalizedError)?.errorDescription ?? "Could not parse clipboard text into transactions."
+            let message = (error as? LocalizedError)?.errorDescription ?? "Could not parse clipboard text into entries."
             return .result(
                 value: message,
                 dialog: IntentDialog(stringLiteral: message)

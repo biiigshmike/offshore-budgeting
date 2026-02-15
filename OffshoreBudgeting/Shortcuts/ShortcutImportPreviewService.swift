@@ -13,7 +13,7 @@ enum ShortcutImportPreviewError: LocalizedError {
         case .emptyClipboard:
             return "Clipboard text is empty."
         case .couldNotParseClipboard:
-            return "Could not parse clipboard text into transactions."
+            return "Could not parse clipboard text into entries."
         case .imageFileUnavailable:
             return "The image file could not be read."
         }

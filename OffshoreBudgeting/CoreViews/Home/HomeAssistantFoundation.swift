@@ -645,7 +645,7 @@ struct HomeAssistantPanelView: View {
             return [
                 HomeAssistantSuggestion(title: "Card spend total this month", query: HomeQuery(intent: .cardSpendTotal)),
                 HomeAssistantSuggestion(title: "Variable spending habits by card", query: HomeQuery(intent: .cardVariableSpendingHabits)),
-                HomeAssistantSuggestion(title: "Largest recent transactions", query: HomeQuery(intent: .largestRecentTransactions)),
+                HomeAssistantSuggestion(title: "Largest recent expenses", query: HomeQuery(intent: .largestRecentTransactions)),
                 HomeAssistantSuggestion(title: "Spend this month", query: HomeQuery(intent: .spendThisMonth))
             ]
         case .preset:
@@ -1909,7 +1909,7 @@ struct HomeAssistantPanelView: View {
             pendingDeleteCard = card
             appendMutationMessage(
                 title: "Confirm delete",
-                subtitle: "Delete this card and all of its transactions? Reply with yes to confirm or no to cancel.",
+                subtitle: "Delete this card and all of its expenses? Reply with yes to confirm or no to cancel.",
                 rows: [HomeAnswerRow(title: "Card", value: cardDisplayLabel(card))]
             )
             return
@@ -4159,14 +4159,14 @@ struct HomeAssistantPanelView: View {
             } else if normalized.contains("expense") {
                 baseTitle = "Expenses"
             } else if normalized.contains("transaction") || normalized.contains("charge") {
-                baseTitle = "Transactions"
+                baseTitle = "Expenses"
             } else if normalized.contains("what did i spend")
                         || normalized.contains("spend my money on")
                         || normalized.contains("where did my money go")
             {
                 baseTitle = "Spending"
             } else {
-                baseTitle = "Transactions"
+                baseTitle = "Expenses"
             }
             
             if let scopeSuffix {

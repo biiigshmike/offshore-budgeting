@@ -9,6 +9,10 @@ struct QuickActionsInstallView: View {
     @Environment(\.openURL) private var openURL
     @State private var openedItemIDs: Set<String> = []
     
+    private var quickActionsHelpTopic: GeneratedHelpTopic? {
+        GeneratedHelpContent.topics.first { $0.id == "quick-actions" }
+    }
+    
     init(isOnboarding: Bool = false) {
         self.isOnboarding = isOnboarding
     }
@@ -26,7 +30,7 @@ struct QuickActionsInstallView: View {
             
             List {
                 shortcutsSection
-                automationTemplatesSection
+                triggerShortcutsSection
                 helpSection
             }
             .listStyle(.insetGrouped)
@@ -52,30 +56,32 @@ struct QuickActionsInstallView: View {
     // MARK: - Sections
     
     private var shortcutsSection: some View {
-        Section("Install Shortcuts") {
+        Section("Shortcuts") {
             ForEach(ShortcutLinkCatalog.shortcuts) { item in
                 linkButton(for: item)
             }
         }
     }
     
-    private var automationTemplatesSection: some View {
-        Section("Install Automation Templates") {
-            ForEach(ShortcutLinkCatalog.automationTemplates) { item in
+    private var triggerShortcutsSection: some View {
+        Section("Shortcuts for Automations") {
+            ForEach(ShortcutLinkCatalog.triggerShortcuts) { item in
                 linkButton(for: item)
             }
         }
     }
     
     private var helpSection: some View {
-        Section("How Automation Setup Works") {
-            Text("After importing each template, open Shortcuts > Automation and confirm the trigger and run settings on this device.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-            
-            Text("Personal automations are device-specific, so setup is needed on each device you use.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+        Section("Automation Setup Help") {
+            if let quickActionsHelpTopic {
+                NavigationLink {
+                    HelpTopicDetailView(topic: quickActionsHelpTopic)
+                } label: {
+                    Text("Setup Guide for Installing Automation Shortcuts")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(Color("AccentColor"))
+                }
+            }
         }
     }
     
@@ -85,7 +91,7 @@ struct QuickActionsInstallView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Quick Actions")
                 .font(.title2.weight(.bold))
-            Text("Install your Offshore shortcuts and automation templates for faster access from Control Center and Lock Screen.")
+            Text("Install your Offshore shortcuts, then use the Setup Guide links for step-by-step automation instructions.")
                 .foregroundStyle(.secondary)
         }
     }
@@ -107,6 +113,13 @@ struct QuickActionsInstallView: View {
                     Text(item.subtitle)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
+                    
+                    if let platformNote = item.platformNote {
+                        Text(platformNote)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                    
                 }
                 
                 Spacer(minLength: 8)

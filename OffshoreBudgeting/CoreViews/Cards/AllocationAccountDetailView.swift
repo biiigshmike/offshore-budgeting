@@ -165,7 +165,7 @@ struct AllocationAccountDetailView: View {
             }
         } message: {
             if pendingSettlementDeleteIsLinked {
-                Text("This settlement is linked to a transaction. Deleting it will restore that transaction amount.")
+                Text("This settlement is linked to an expense. Deleting it will restore that expense amount.")
             } else {
                 Text("This settlement will be deleted.")
             }
@@ -223,7 +223,7 @@ struct AllocationAccountDetailView: View {
                 }
 
                 if row.isLinkedSettlement {
-                    Text("Linked to transaction")
+                    Text("Linked to expense")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -425,7 +425,7 @@ private struct EditAllocationSettlementView: View {
         Form {
             if isLinkedToExpense {
                 Section {
-                    Text("This settlement is linked to a transaction. Saving updates the transaction amount and date.")
+                    Text("This settlement is linked to an expense. Saving updates the expense amount and date.")
                         .foregroundStyle(.secondary)
                 }
             }
@@ -520,7 +520,7 @@ private struct EditAllocationSettlementView: View {
             let newOffset = rawAmount
 
             guard newOffset <= grossAmount else {
-                saveErrorMessage = "Offset can't exceed the linked transaction amount."
+                saveErrorMessage = "Offset can't exceed the linked expense amount."
                 showingSaveErrorAlert = true
                 return
             }
