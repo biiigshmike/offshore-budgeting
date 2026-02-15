@@ -57,14 +57,15 @@ struct OnboardingStartGateView: View {
                 Spacer(minLength: 8)
 
                 Image(systemName: "sailboat.fill")
-                    .font(.system(size: 46, weight: .semibold))
+                    .font(.largeTitle.weight(.bold))
                     .foregroundStyle(.tint)
 
                 Text("Welcome to Offshore!")
                     .font(.largeTitle.weight(.bold))
+                    .foregroundStyle(.primary)
 
                 Text("A private, manual-first way to plan your money.\nNo bank connections or accounts required.")
-                    .font(.body)
+                    .font(.title)
                     .foregroundStyle(.secondary)
 
                 Spacer(minLength: 0)
