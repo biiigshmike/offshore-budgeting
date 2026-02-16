@@ -267,7 +267,7 @@ struct ManagePresetsView: View {
             title: "Preset Management",
             items: [
                 PostBoardingTipItem(
-                    systemImage: "list.bullet.badge.ellipsis",
+                    systemImage: "list.bullet.rectangle",
                     title: "Presets",
                     detail: "Save planned expenses you expect to reuse in future budgets."
                 ),

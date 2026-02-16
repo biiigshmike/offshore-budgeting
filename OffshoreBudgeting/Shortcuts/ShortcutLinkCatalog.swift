@@ -50,7 +50,7 @@ enum ShortcutLinkCatalog {
             id: "tap-apple-card",
             title: "Add Expense From Tap To Pay",
             subtitle: "Install this shortcut, then run it from your Wallet tap automation.",
-            systemImageName: "wallet.sensor.tag.radiowaves.left.and.right.fill",
+            systemImageName: "wallet.bifold",
             url: URL(string: "https://www.icloud.com/shortcuts/e6b198dbd3794e6988cb93bd87eba0b6")!,
             platformNote: "Supported on: iPhone",
             setupInstructions: "Create your trigger automation, then add Get Text from Shortcut Input and Run Shortcut."
