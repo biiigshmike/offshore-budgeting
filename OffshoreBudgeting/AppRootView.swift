@@ -191,9 +191,13 @@ struct AppRootView: View {
             }
             .safeAreaInset(edge: .bottom) {
                 if shouldShowBottomLauncher {
-                    HomeAssistantLauncherBar(onTap: presentAssistant)
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 8)
+                    if #available(iOS 26.0, *) {
+                        HomeAssistantLauncherBar(onTap: presentAssistant)
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 8)
+                    } else {
+                        HomeAssistantLauncherBar(onTap: presentAssistant)
+                    }
                 }
             }
             .tabItem { Label(AppSection.home.rawValue, systemImage: AppSection.home.systemImage) }
@@ -327,9 +331,16 @@ struct AppRootView: View {
         )
 
         guard isPhone == false else {
+            let showsBottomLauncher: Bool
+            if #available(iOS 26.0, *) {
+                showsBottomLauncher = usesCompactPhoneHeight == false
+            } else {
+                showsBottomLauncher = true
+            }
+
             return HomeAssistantPresentationPlan(
                 mode: .fullScreen,
-                showsBottomLauncher: usesCompactPhoneHeight == false,
+                showsBottomLauncher: showsBottomLauncher,
                 showsToolbarButton: false,
                 detents: [.large],
                 usesExpandedPanelSizing: false,
@@ -378,7 +389,15 @@ struct AppRootView: View {
     private var shouldShowCompactLandscapeLauncher: Bool {
         selectedSection == .home &&
         assistantRoute == nil &&
+        isRunningiOS26OrLater &&
         usesCompactPhoneHeight
+    }
+
+    private var isRunningiOS26OrLater: Bool {
+        if #available(iOS 26.0, *) {
+            return true
+        }
+        return false
     }
 
     @ViewBuilder

@@ -36,10 +36,11 @@ struct HomeAssistantLauncherBar: View {
         } else {
             Button(action: onTap) {
                 launcherLabel
-                    .background(Color(uiColor: .secondarySystemBackground), in: Capsule())
-                    .overlay {
-                        Capsule()
-                            .stroke(Color(uiColor: .separator).opacity(0.2), lineWidth: 1)
+                    .background(.bar)
+                    .overlay(alignment: .top) {
+                        Rectangle()
+                            .fill(Color(uiColor: .separator).opacity(0.2))
+                            .frame(height: 1)
                     }
             }
             .buttonStyle(.plain)

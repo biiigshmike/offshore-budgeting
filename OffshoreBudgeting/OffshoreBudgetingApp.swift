@@ -13,6 +13,10 @@ import UIKit
 @main
 struct OffshoreBudgetingApp: App {
 
+    init() {
+        configureLegacyTabBarAppearanceIfNeeded()
+    }
+
     // MARK: - Notifications Delegate
 
     #if canImport(UIKit)
@@ -119,6 +123,23 @@ struct OffshoreBudgetingApp: App {
         return UIDevice.current.userInterfaceIdiom == .pad
         #else
         return false
+        #endif
+    }
+
+    // MARK: - Legacy UI Configuration
+
+    private func configureLegacyTabBarAppearanceIfNeeded() {
+        #if canImport(UIKit)
+        guard UIDevice.current.userInterfaceIdiom == .phone else { return }
+        if #available(iOS 26.0, *) { return }
+
+        let appearance = UITabBarAppearance()
+        appearance.configureWithDefaultBackground()
+        appearance.shadowColor = .clear
+
+        let tabBar = UITabBar.appearance()
+        tabBar.standardAppearance = appearance
+        tabBar.scrollEdgeAppearance = appearance
         #endif
     }
 
