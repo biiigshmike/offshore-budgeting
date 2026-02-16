@@ -71,6 +71,7 @@ private struct PostBoardingTipModifier: ViewModifier {
     // Persisted seen keys
     @AppStorage("tips_seenKeys") private var seenKeysCSV: String = ""
     @AppStorage("tips_seen_lastResetToken") private var lastResetToken: Int = 0
+    @AppStorage("releaseLogs_seenReleaseIDs") private var seenReleaseIDsCSV: String = ""
 
     @State private var showingTip: Bool = false
 
@@ -104,6 +105,7 @@ private struct PostBoardingTipModifier: ViewModifier {
     private var shouldAttachSheet: Bool {
         guard didCompleteOnboarding else { return false }
         guard !items.isEmpty else { return false }
+        guard hasPendingCurrentReleaseLog == false else { return false }
 
         let seen = Set(seenKeysCSV.split(separator: ",").map { String($0) })
         return !seen.contains(key)
@@ -119,9 +121,16 @@ private struct PostBoardingTipModifier: ViewModifier {
     private func shouldShowTip() -> Bool {
         guard didCompleteOnboarding else { return false }
         guard !items.isEmpty else { return false }
+        guard hasPendingCurrentReleaseLog == false else { return false }
 
         let seen = Set(seenKeysCSV.split(separator: ",").map { String($0) })
         return !seen.contains(key)
+    }
+
+    private var hasPendingCurrentReleaseLog: Bool {
+        guard let currentRelease = SettingsReleaseLogsView.currentReleaseSection else { return false }
+        let seenReleaseIDs = Set(seenReleaseIDsCSV.split(separator: ",").map { String($0) })
+        return seenReleaseIDs.contains(currentRelease.id) == false
     }
 
     private func markSeen() {
