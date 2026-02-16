@@ -522,11 +522,11 @@ struct HomeAssistantPanelView: View {
     private var promptTextField: some View {
         if #available(iOS 26.0, *) {
             TextField("Message Marina", text: $promptText)
-                .textFieldStyle(.plain)
+                .textFieldStyle(.automatic)
                 .focused($isPromptFieldFocused)
                 .padding(.horizontal, 12)
                 .frame(minHeight: 44)
-                .background(Color.white.opacity(0.28), in: Capsule())
+//                .background(Color.white.opacity(0.28), in: Capsule())
                 .overlay {
                     Capsule()
                         .stroke(Color.gray.opacity(0.25), lineWidth: 1)
@@ -536,7 +536,7 @@ struct HomeAssistantPanelView: View {
                 }
         } else {
             TextField("Message Marina", text: $promptText)
-                .textFieldStyle(.roundedBorder)
+                .textFieldStyle(.automatic)
                 .focused($isPromptFieldFocused)
                 .frame(minHeight: 44)
                 .onSubmit {
