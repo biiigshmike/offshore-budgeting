@@ -1386,23 +1386,45 @@ private struct BudgetChip: View {
     }
 
     var body: some View {
-        HStack(spacing: 8) {
-            Circle()
-                .fill(baseColor)
-                .frame(width: 8, height: 8)
+        Group {
+            if #available(iOS 26.0, *) {
+                HStack(spacing: 8) {
+                    Circle()
+                        .fill(baseColor)
+                        .frame(width: 8, height: 8)
 
-            Text(title)
-                .font(.footnote.weight(.medium))
-                .lineLimit(1)
-                .foregroundStyle(foregroundColor)
+                    Text(title)
+                        .font(.footnote.weight(.medium))
+                        .lineLimit(1)
+                        .foregroundStyle(foregroundColor)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(
+                    Capsule()
+                        .fill(backgroundColor)
+                )
+                .contentShape(Capsule())
+            } else {
+                HStack(spacing: 8) {
+                    Circle()
+                        .fill(baseColor)
+                        .frame(width: 8, height: 8)
+
+                    Text(title)
+                        .font(.footnote.weight(.medium))
+                        .lineLimit(1)
+                        .foregroundStyle(foregroundColor)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(backgroundColor)
+                )
+                .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(
-            Capsule()
-                .fill(backgroundColor)
-        )
-        .contentShape(Capsule())
         .onTapGesture {
             action()
         }
