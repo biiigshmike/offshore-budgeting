@@ -648,7 +648,7 @@ struct CardDetailView: View {
             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                 Button(role: .destructive) {
                     deleteWithOptionalConfirm {
-                        modelContext.delete(expense)
+                        PlannedExpenseDeletionService.delete(expense, modelContext: modelContext)
                     }
                 } label: {
                     Label("Delete", systemImage: "trash")
@@ -1075,7 +1075,7 @@ struct CardDetailView: View {
         // This keeps behavior predictable if those rules ever change.
         if let planned = card.plannedExpenses {
             for expense in planned {
-                modelContext.delete(expense)
+                PlannedExpenseDeletionService.delete(expense, modelContext: modelContext)
             }
         }
 

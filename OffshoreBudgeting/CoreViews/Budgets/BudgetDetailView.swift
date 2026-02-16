@@ -1051,7 +1051,7 @@ struct BudgetDetailView: View {
         do {
             let matches = try modelContext.fetch(descriptor)
             for expense in matches {
-                modelContext.delete(expense)
+                PlannedExpenseDeletionService.delete(expense, modelContext: modelContext)
             }
             return matches.count
         } catch {
@@ -1136,13 +1136,13 @@ struct BudgetDetailView: View {
         if confirmBeforeDeleting {
             pendingExpenseDelete = {
                 for expense in expensesToDelete {
-                    modelContext.delete(expense)
+                    PlannedExpenseDeletionService.delete(expense, modelContext: modelContext)
                 }
             }
             showingExpenseDeleteConfirm = true
         } else {
             for expense in expensesToDelete {
-                modelContext.delete(expense)
+                PlannedExpenseDeletionService.delete(expense, modelContext: modelContext)
             }
         }
     }
@@ -1157,7 +1157,7 @@ struct BudgetDetailView: View {
                 for item in itemsToDelete {
                     switch item {
                     case .planned(let expense):
-                        modelContext.delete(expense)
+                        PlannedExpenseDeletionService.delete(expense, modelContext: modelContext)
                     case .variable(let expense):
                         deleteVariableExpenseRecord(expense)
                     }
@@ -1168,7 +1168,7 @@ struct BudgetDetailView: View {
             for item in itemsToDelete {
                 switch item {
                 case .planned(let expense):
-                    modelContext.delete(expense)
+                    PlannedExpenseDeletionService.delete(expense, modelContext: modelContext)
                 case .variable(let expense):
                     deleteVariableExpenseRecord(expense)
                 }

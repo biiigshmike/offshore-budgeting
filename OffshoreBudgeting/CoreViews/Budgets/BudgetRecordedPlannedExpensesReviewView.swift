@@ -220,11 +220,11 @@ struct BudgetRecordedPlannedExpensesReviewView: View {
     private func requestDeleteExpense(_ expense: PlannedExpense) {
         if confirmBeforeDeleting {
             pendingExpenseDelete = {
-                modelContext.delete(expense)
+                PlannedExpenseDeletionService.delete(expense, modelContext: modelContext)
             }
             showingDeleteExpenseConfirm = true
         } else {
-            modelContext.delete(expense)
+            PlannedExpenseDeletionService.delete(expense, modelContext: modelContext)
             reload()
         }
     }

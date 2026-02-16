@@ -1241,7 +1241,7 @@ private struct OnboardingCardsStep: View {
         // This keeps behavior predictable if those rules ever change.
         if let planned = card.plannedExpenses {
             for expense in planned {
-                modelContext.delete(expense)
+                PlannedExpenseDeletionService.delete(expense, modelContext: modelContext)
             }
         }
 

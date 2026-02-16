@@ -289,7 +289,7 @@ struct EditBudgetView: View {
                 let cardStillLinked = cardID.map { selectedCardIDs.contains($0) } ?? true
 
                 if !inSelectedPresets || !inWindow || !cardStillLinked {
-                    modelContext.delete(expense)
+                    PlannedExpenseDeletionService.delete(expense, modelContext: modelContext)
                 }
             }
         } catch {

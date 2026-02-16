@@ -245,7 +245,7 @@ struct ManageCardsForBudgetSheet: View {
         let scoped = matches.filter { $0.card?.id == cardID }
 
         for expense in scoped {
-            modelContext.delete(expense)
+            PlannedExpenseDeletionService.delete(expense, modelContext: modelContext)
         }
 
         return scoped.count

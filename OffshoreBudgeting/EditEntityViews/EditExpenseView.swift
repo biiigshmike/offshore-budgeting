@@ -137,7 +137,8 @@ struct EditExpenseView: View {
         .onAppear {
             // Seed fields once.
             descriptionText = expense.descriptionText
-            amountText = CurrencyFormatter.editingString(from: expense.amount)
+            let existingOffset = max(0, -(expense.offsetSettlement?.amount ?? 0))
+            amountText = CurrencyFormatter.editingString(from: expense.amount + existingOffset)
             transactionDate = expense.transactionDate
             selectedCardID = expense.card?.id
             selectedCategoryID = expense.category?.id

@@ -610,6 +610,16 @@ final class PlannedExpense {
     @Relationship(inverse: \Category.plannedExpenses)
     var category: Category? = nil
 
+    // IMPORTANT:
+    // Keep this un-annotated on this toolchain to avoid circular macro expansion.
+    // The inverse is declared on ExpenseAllocation.plannedExpense.
+    var allocation: ExpenseAllocation? = nil
+
+    // IMPORTANT:
+    // Keep this un-annotated on this toolchain to avoid circular macro expansion.
+    // The inverse is declared on AllocationSettlement.plannedExpense.
+    var offsetSettlement: AllocationSettlement? = nil
+
     var sourcePresetID: UUID? = nil
     var sourceBudgetID: UUID? = nil
 
@@ -743,6 +753,9 @@ final class ExpenseAllocation {
     @Relationship(inverse: \VariableExpense.allocation)
     var expense: VariableExpense? = nil
 
+    @Relationship(inverse: \PlannedExpense.allocation)
+    var plannedExpense: PlannedExpense? = nil
+
     init(
         id: UUID = UUID(),
         allocatedAmount: Double,
@@ -750,7 +763,8 @@ final class ExpenseAllocation {
         updatedAt: Date = .now,
         workspace: Workspace? = nil,
         account: AllocationAccount? = nil,
-        expense: VariableExpense? = nil
+        expense: VariableExpense? = nil,
+        plannedExpense: PlannedExpense? = nil
     ) {
         self.id = id
         self.allocatedAmount = allocatedAmount
@@ -759,6 +773,7 @@ final class ExpenseAllocation {
         self.workspace = workspace
         self.account = account
         self.expense = expense
+        self.plannedExpense = plannedExpense
     }
 }
 
@@ -781,6 +796,9 @@ final class AllocationSettlement {
     @Relationship(inverse: \VariableExpense.offsetSettlement)
     var expense: VariableExpense? = nil
 
+    @Relationship(inverse: \PlannedExpense.offsetSettlement)
+    var plannedExpense: PlannedExpense? = nil
+
     init(
         id: UUID = UUID(),
         date: Date,
@@ -788,7 +806,8 @@ final class AllocationSettlement {
         amount: Double,
         workspace: Workspace? = nil,
         account: AllocationAccount? = nil,
-        expense: VariableExpense? = nil
+        expense: VariableExpense? = nil,
+        plannedExpense: PlannedExpense? = nil
     ) {
         self.id = id
         self.date = date
@@ -797,6 +816,7 @@ final class AllocationSettlement {
         self.workspace = workspace
         self.account = account
         self.expense = expense
+        self.plannedExpense = plannedExpense
     }
 }
 
@@ -860,6 +880,26 @@ final class IncomeSeries {
         self.startDate = startDate
         self.endDate = endDate
         self.workspace = workspace
+    }
+}
+
+// MARK: - PlannedExpenseDeletionService
+
+@MainActor
+enum PlannedExpenseDeletionService {
+
+    static func delete(_ expense: PlannedExpense, modelContext: ModelContext) {
+        if let allocation = expense.allocation {
+            expense.allocation = nil
+            modelContext.delete(allocation)
+        }
+
+        if let offsetSettlement = expense.offsetSettlement {
+            expense.offsetSettlement = nil
+            modelContext.delete(offsetSettlement)
+        }
+
+        modelContext.delete(expense)
     }
 }
 

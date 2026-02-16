@@ -189,7 +189,7 @@ struct ManagePresetsForBudgetSheet: View {
         do {
             let matches = try modelContext.fetch(descriptor)
             for expense in matches {
-                modelContext.delete(expense)
+                PlannedExpenseDeletionService.delete(expense, modelContext: modelContext)
             }
         } catch {
             // Intentionally ignore fetch errors for now.

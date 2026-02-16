@@ -45,24 +45,43 @@ enum AllocationLedgerService {
         var rows: [LedgerRow] = []
 
         for allocation in account.expenseAllocations ?? [] {
-            guard let expense = allocation.expense else { continue }
-            let cardName = expense.card?.name ?? "No Card"
-            let categoryName = expense.category?.name ?? "Uncategorized"
+            if let expense = allocation.expense {
+                let cardName = expense.card?.name ?? "No Card"
+                let categoryName = expense.category?.name ?? "Uncategorized"
 
-            rows.append(
-                LedgerRow(
-                    id: "charge-\(allocation.id.uuidString)",
-                    type: .charge,
-                    date: expense.transactionDate,
-                    title: expense.descriptionText,
-                    subtitle: "\(cardName) • \(categoryName)",
-                    amount: allocation.allocatedAmount,
-                    settlementID: nil,
-                    allocationID: allocation.id,
-                    linkedExpenseID: expense.id,
-                    isLinkedSettlement: false
+                rows.append(
+                    LedgerRow(
+                        id: "charge-\(allocation.id.uuidString)",
+                        type: .charge,
+                        date: expense.transactionDate,
+                        title: expense.descriptionText,
+                        subtitle: "\(cardName) • \(categoryName)",
+                        amount: allocation.allocatedAmount,
+                        settlementID: nil,
+                        allocationID: allocation.id,
+                        linkedExpenseID: expense.id,
+                        isLinkedSettlement: false
+                    )
                 )
-            )
+            } else if let plannedExpense = allocation.plannedExpense {
+                let cardName = plannedExpense.card?.name ?? "No Card"
+                let categoryName = plannedExpense.category?.name ?? "Uncategorized"
+
+                rows.append(
+                    LedgerRow(
+                        id: "charge-\(allocation.id.uuidString)",
+                        type: .charge,
+                        date: plannedExpense.expenseDate,
+                        title: plannedExpense.title,
+                        subtitle: "\(cardName) • \(categoryName)",
+                        amount: allocation.allocatedAmount,
+                        settlementID: nil,
+                        allocationID: allocation.id,
+                        linkedExpenseID: plannedExpense.id,
+                        isLinkedSettlement: false
+                    )
+                )
+            }
         }
 
         for settlement in account.settlements ?? [] {
@@ -78,8 +97,8 @@ enum AllocationLedgerService {
                     amount: settlement.amount,
                     settlementID: settlement.id,
                     allocationID: nil,
-                    linkedExpenseID: settlement.expense?.id,
-                    isLinkedSettlement: settlement.expense != nil
+                    linkedExpenseID: settlement.expense?.id ?? settlement.plannedExpense?.id,
+                    isLinkedSettlement: settlement.expense != nil || settlement.plannedExpense != nil
                 )
             )
         }

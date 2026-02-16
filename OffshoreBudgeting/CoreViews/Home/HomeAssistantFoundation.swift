@@ -5130,7 +5130,7 @@ private final class HomeAssistantMutationService {
         
         if let planned = card.plannedExpenses {
             for expense in planned {
-                modelContext.delete(expense)
+                PlannedExpenseDeletionService.delete(expense, modelContext: modelContext)
             }
         }
         

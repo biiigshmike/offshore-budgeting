@@ -38,7 +38,7 @@ struct AllocationAccountDetailView: View {
 
     private var pendingSettlementDeleteIsLinked: Bool {
         guard let settlement = settlement(for: pendingSettlementDeleteID) else { return false }
-        return settlement.expense != nil
+        return settlement.expense != nil || settlement.plannedExpense != nil
     }
 
     var body: some View {
@@ -256,10 +256,15 @@ struct AllocationAccountDetailView: View {
         guard let settlement = settlement(for: id) else { return }
 
         if let expense = settlement.expense {
-            let oldOffset = max(0, -settlement.amount)
+            let oldOffset = abs(settlement.amount)
             expense.amount = max(0, expense.amount + oldOffset)
             if expense.offsetSettlement?.id == settlement.id {
                 expense.offsetSettlement = nil
+            }
+        } else if let plannedExpense = settlement.plannedExpense {
+            plannedExpense.actualAmount = 0
+            if plannedExpense.offsetSettlement?.id == settlement.id {
+                plannedExpense.offsetSettlement = nil
             }
         }
 
@@ -313,7 +318,7 @@ private struct AddAllocationSettlementView: View {
 
     var body: some View {
         Form {
-            Section("Settlement") {
+            Section {
                 TextField("Note", text: $note)
 
                 TextField("Amount", text: $amountText)
@@ -413,7 +418,7 @@ private struct EditAllocationSettlementView: View {
     @State private var saveErrorMessage: String = ""
 
     private var isLinkedToExpense: Bool {
-        settlement.expense != nil
+        settlement.expense != nil || settlement.plannedExpense != nil
     }
 
     private var canSave: Bool {
@@ -421,40 +426,111 @@ private struct EditAllocationSettlementView: View {
         return rawAmount > 0
     }
 
+    private var linkedTypeLabel: String? {
+        if settlement.expense != nil { return "Variable Expense" }
+        if settlement.plannedExpense != nil { return "Planned Expense" }
+        return nil
+    }
+
+    private var linkedTitle: String? {
+        if let expense = settlement.expense {
+            return expense.descriptionText
+        }
+        if let plannedExpense = settlement.plannedExpense {
+            return plannedExpense.title
+        }
+        return nil
+    }
+
+    private var linkedDate: Date? {
+        if let expense = settlement.expense {
+            return expense.transactionDate
+        }
+        if let plannedExpense = settlement.plannedExpense {
+            return plannedExpense.expenseDate
+        }
+        return nil
+    }
+
+    private var linkedAmountLabel: String? {
+        if let expense = settlement.expense {
+            return CurrencyFormatter.string(from: expense.amount)
+        }
+        if let plannedExpense = settlement.plannedExpense {
+            let effective = plannedExpense.actualAmount > 0 ? plannedExpense.actualAmount : plannedExpense.plannedAmount
+            return CurrencyFormatter.string(from: effective)
+        }
+        return nil
+    }
+
+    private var linkedCardName: String? {
+        if let expense = settlement.expense {
+            return expense.card?.name
+        }
+        if let plannedExpense = settlement.plannedExpense {
+            return plannedExpense.card?.name
+        }
+        return nil
+    }
+
+    private var linkedCategoryName: String? {
+        if let expense = settlement.expense {
+            return expense.category?.name
+        }
+        if let plannedExpense = settlement.plannedExpense {
+            return plannedExpense.category?.name
+        }
+        return nil
+    }
+
     var body: some View {
         Form {
             if isLinkedToExpense {
-                Section {
-                    Text("This settlement is linked to an expense. Saving updates the expense amount and date.")
-                        .foregroundStyle(.secondary)
+                Section("Linked Entry") {
+                    if let linkedTypeLabel {
+                        detailRow(label: "Type", value: linkedTypeLabel)
+                    }
+                    if let linkedTitle, !linkedTitle.isEmpty {
+                        detailRow(label: "Title", value: linkedTitle)
+                    }
+                    if let linkedDate {
+                        HStack {
+                            Text("Date")
+                            Spacer()
+                            Text(linkedDate, format: Date.FormatStyle(date: .abbreviated, time: .omitted))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    if let linkedAmountLabel {
+                        detailRow(label: "Amount", value: linkedAmountLabel)
+                    }
+                    detailRow(label: "Card", value: linkedCardName ?? "No Card")
+                    detailRow(label: "Category", value: linkedCategoryName ?? "Uncategorized")
                 }
             }
 
-            Section("Settlement") {
+            Section {
                 TextField("Note", text: $note)
 
                 TextField("Amount", text: $amountText)
                     .keyboardType(.decimalPad)
 
-                if isLinkedToExpense {
-                    HStack {
-                        Text("Direction")
-                        Spacer()
-                        Text("I Owe Them")
-                            .foregroundStyle(.secondary)
-                    }
-                } else {
-                    Picker("Direction", selection: $direction) {
-                        Text("They Owe Me").tag(1)
-                        Text("I Owe Them").tag(-1)
-                    }
-                    .pickerStyle(.segmented)
+                Picker("Direction", selection: $direction) {
+                    Text("They Owe Me").tag(1)
+                    Text("I Owe Them").tag(-1)
                 }
+                .pickerStyle(.segmented)
 
                 HStack {
                     Text("Date")
                     Spacer()
                     PillDatePickerField(title: "Date", date: $date)
+                }
+            } header: {
+                Text("Settlement")
+            } footer: {
+                if isLinkedToExpense {
+                    Text("Saving updates both this settlement and the linked expense entry.")
                 }
             }
         }
@@ -513,9 +589,10 @@ private struct EditAllocationSettlementView: View {
         }
 
         let trimmedNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        let signedAmount = Double(direction) * rawAmount
 
         if let expense = settlement.expense {
-            let oldOffset = max(0, -settlement.amount)
+            let oldOffset = abs(settlement.amount)
             let grossAmount = max(0, expense.amount + oldOffset)
             let newOffset = rawAmount
 
@@ -527,14 +604,30 @@ private struct EditAllocationSettlementView: View {
 
             settlement.note = trimmedNote
             settlement.date = date
-            settlement.amount = -newOffset
+            settlement.amount = signedAmount
 
             expense.amount = max(0, grossAmount - newOffset)
             expense.transactionDate = date
+        } else if let plannedExpense = settlement.plannedExpense {
+            let planned = max(0, plannedExpense.plannedAmount)
+            let newOffset = rawAmount
+
+            guard newOffset <= planned else {
+                saveErrorMessage = "Offset can't exceed the linked planned amount."
+                showingSaveErrorAlert = true
+                return
+            }
+
+            settlement.note = trimmedNote
+            settlement.date = date
+            settlement.amount = signedAmount
+
+            plannedExpense.actualAmount = max(0, planned - newOffset)
+            plannedExpense.expenseDate = date
         } else {
             settlement.note = trimmedNote
             settlement.date = date
-            settlement.amount = Double(direction) * rawAmount
+            settlement.amount = signedAmount
         }
 
         do {
@@ -543,6 +636,16 @@ private struct EditAllocationSettlementView: View {
         } catch {
             saveErrorMessage = error.localizedDescription
             showingSaveErrorAlert = true
+        }
+    }
+
+    private func detailRow(label: String, value: String) -> some View {
+        HStack {
+            Text(label)
+            Spacer()
+            Text(value)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.trailing)
         }
     }
 }
