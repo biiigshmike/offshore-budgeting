@@ -35,7 +35,7 @@ struct PillDatePickerField: View {
 
     @State private var isPresented = false
 
-    init(
+    init( 
         title: String,
         date: Binding<Date>,
         minimumDate: Date? = nil,
@@ -73,7 +73,8 @@ struct PillDatePickerField: View {
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.primary)
                 .lineLimit(1)
-                .minimumScaleFactor(0.85)
+                .minimumScaleFactor(0.75)
+                .allowsTightening(true)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
                 .background(Color.secondary.opacity(0.1), in: Capsule())
@@ -203,7 +204,8 @@ struct PillTimePickerField: View {
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.primary)
                 .lineLimit(1)
-                .minimumScaleFactor(0.85)
+                .minimumScaleFactor(0.75)
+                .allowsTightening(true)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
                 .background(Color.secondary.opacity(0.1), in: Capsule())

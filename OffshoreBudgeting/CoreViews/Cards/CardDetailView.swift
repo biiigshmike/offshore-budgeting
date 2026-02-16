@@ -1223,7 +1223,11 @@ private struct DateFilterRow: View {
         HStack(spacing: 12) {
 
             PillDatePickerField(title: "Start Date", date: $draftStartDate)
+                .frame(maxWidth: .infinity)
+                .layoutPriority(1)
             PillDatePickerField(title: "End Date", date: $draftEndDate)
+                .frame(maxWidth: .infinity)
+                .layoutPriority(1)
 
             IconCircleButton(systemName: "arrow.right", isEnabled: isGoEnabled, action: onTapGo)
                 .accessibilityLabel("Apply Date Range")

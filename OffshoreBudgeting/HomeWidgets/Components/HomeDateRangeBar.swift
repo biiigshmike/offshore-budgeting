@@ -22,7 +22,11 @@ struct HomeDateRangeBar: View {
 
             HStack(spacing: 10) {
                 PillDatePickerField(title: "Start Date", date: $draftStartDate)
+                    .frame(maxWidth: .infinity)
+                    .layoutPriority(1)
                 PillDatePickerField(title: "End Date", date: $draftEndDate)
+                    .frame(maxWidth: .infinity)
+                    .layoutPriority(1)
 
                 Button(action: onApply) {
                     Image(systemName: "arrow.right")
