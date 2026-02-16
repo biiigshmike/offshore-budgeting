@@ -1051,6 +1051,14 @@ struct CardDetailView: View {
             sortMode = .dateAsc
         case AppCommandID.CardDetail.sortDateDesc:
             sortMode = .dateDesc
+        case AppCommandID.ExpenseDisplay.toggleHideFuturePlanned:
+            hideFuturePlannedExpensesInView.toggle()
+        case AppCommandID.ExpenseDisplay.toggleExcludeFuturePlanned:
+            excludeFuturePlannedExpensesFromCalculationsInView.toggle()
+        case AppCommandID.ExpenseDisplay.toggleHideFutureVariable:
+            hideFutureVariableExpensesInView.toggle()
+        case AppCommandID.ExpenseDisplay.toggleExcludeFutureVariable:
+            excludeFutureVariableExpensesFromCalculationsInView.toggle()
         default:
             break
         }

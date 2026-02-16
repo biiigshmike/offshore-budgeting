@@ -80,12 +80,20 @@ enum AppCommandID {
         static let sortDateAsc = "card_detail.sort.date_asc"
         static let sortDateDesc = "card_detail.sort.date_desc"
     }
+
+    enum ExpenseDisplay {
+        static let toggleHideFuturePlanned = "expense_display.toggle_hide_future_planned"
+        static let toggleExcludeFuturePlanned = "expense_display.toggle_exclude_future_planned"
+        static let toggleHideFutureVariable = "expense_display.toggle_hide_future_variable"
+        static let toggleExcludeFutureVariable = "expense_display.toggle_exclude_future_variable"
+    }
 }
 
 // MARK: - Surface
 
 enum AppCommandSurface: Equatable {
     case none
+    case home
     case budgets
     case presets
     case categories
@@ -246,6 +254,8 @@ struct OffshoreAppCommands: Commands {
 
     private var fileItems: [AppMenuCommandItem] {
         switch commandHub.surface {
+        case .home:
+            return []
         case .budgets:
             return [
                 AppMenuCommandItem(
@@ -299,6 +309,8 @@ struct OffshoreAppCommands: Commands {
 
     private var editItems: [AppMenuCommandItem] {
         switch commandHub.surface {
+        case .home:
+            return []
         case .budgetDetail:
             return [
                 AppMenuCommandItem(
@@ -351,6 +363,8 @@ struct OffshoreAppCommands: Commands {
 
     private var viewItems: [AppMenuCommandItem] {
         switch commandHub.surface {
+        case .home:
+            return expenseDisplayItems
         case .budgets:
             return [
                 AppMenuCommandItem(
@@ -490,8 +504,8 @@ struct OffshoreAppCommands: Commands {
                     id: AppCommandID.BudgetDetail.sortDateDesc,
                     title: "Sort Date ↓",
                     shortcut: KeyboardShortcut("6", modifiers: [.command, .option])
-                )
-            ]
+                ),
+            ] + expenseDisplayItems
         case .cardDetail:
             return [
                 AppMenuCommandItem(
@@ -523,11 +537,36 @@ struct OffshoreAppCommands: Commands {
                     id: AppCommandID.CardDetail.sortDateDesc,
                     title: "Sort Date ↓",
                     shortcut: KeyboardShortcut("6", modifiers: [.command, .option])
-                )
-            ]
+                ),
+            ] + expenseDisplayItems
         case .none, .income:
             return []
         }
+    }
+
+    private var expenseDisplayItems: [AppMenuCommandItem] {
+        [
+            AppMenuCommandItem(
+                id: AppCommandID.ExpenseDisplay.toggleHideFuturePlanned,
+                title: "Toggle Hide Future Planned Expenses",
+                shortcut: KeyboardShortcut("1", modifiers: [.control, .shift])
+            ),
+            AppMenuCommandItem(
+                id: AppCommandID.ExpenseDisplay.toggleExcludeFuturePlanned,
+                title: "Toggle Exclude Future Planned Expenses from Totals",
+                shortcut: KeyboardShortcut("2", modifiers: [.control, .shift])
+            ),
+            AppMenuCommandItem(
+                id: AppCommandID.ExpenseDisplay.toggleHideFutureVariable,
+                title: "Toggle Hide Future Variable Expenses",
+                shortcut: KeyboardShortcut("3", modifiers: [.control, .shift])
+            ),
+            AppMenuCommandItem(
+                id: AppCommandID.ExpenseDisplay.toggleExcludeFutureVariable,
+                title: "Toggle Exclude Future Variable Expenses from Totals",
+                shortcut: KeyboardShortcut("4", modifiers: [.control, .shift])
+            ),
+        ]
     }
 
     @ViewBuilder

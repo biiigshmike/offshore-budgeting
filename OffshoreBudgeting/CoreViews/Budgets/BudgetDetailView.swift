@@ -1240,6 +1240,14 @@ struct BudgetDetailView: View {
             sortMode = .dateAsc
         case AppCommandID.BudgetDetail.sortDateDesc:
             sortMode = .dateDesc
+        case AppCommandID.ExpenseDisplay.toggleHideFuturePlanned:
+            hideFuturePlannedExpensesInView.toggle()
+        case AppCommandID.ExpenseDisplay.toggleExcludeFuturePlanned:
+            excludeFuturePlannedExpensesFromCalculationsInView.toggle()
+        case AppCommandID.ExpenseDisplay.toggleHideFutureVariable:
+            hideFutureVariableExpensesInView.toggle()
+        case AppCommandID.ExpenseDisplay.toggleExcludeFutureVariable:
+            excludeFutureVariableExpensesFromCalculationsInView.toggle()
         default:
             break
         }

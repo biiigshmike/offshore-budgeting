@@ -116,6 +116,7 @@ struct HomeView: View {
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
+    @Environment(\.appCommandHub) private var commandHub
 
     private var isPhone: Bool {
         #if canImport(UIKit)
@@ -294,6 +295,7 @@ struct HomeView: View {
             }
         }
         .onAppear {
+            commandHub.activate(.home)
             bootstrapAppliedDatesIfNeeded()
             applyDefaultBudgetingPeriodIfSettingsChanged()
             syncDraftToApplied()
@@ -303,6 +305,13 @@ struct HomeView: View {
             excludeFuturePlannedExpensesFromCalculationsInView = excludeFuturePlannedExpensesFromCalculationsDefault
             hideFutureVariableExpensesInView = hideFutureVariableExpensesDefault
             excludeFutureVariableExpensesFromCalculationsInView = excludeFutureVariableExpensesFromCalculationsDefault
+        }
+        .onDisappear {
+            commandHub.deactivate(.home)
+        }
+        .onReceive(commandHub.$sequence) { _ in
+            guard commandHub.surface == .home else { return }
+            handleCommand(commandHub.latestCommandID)
         }
         .onChange(of: pinnedItems) { _, _ in
             persistPinnedItems()
@@ -322,6 +331,21 @@ struct HomeView: View {
     private func openWhatIfPlanner(_ initialScenarioID: UUID?) {
         whatIfInitialScenarioID = initialScenarioID
         isShowingWhatIfPlanner = true
+    }
+
+    private func handleCommand(_ commandID: String) {
+        switch commandID {
+        case AppCommandID.ExpenseDisplay.toggleHideFuturePlanned:
+            hideFuturePlannedExpensesInView.toggle()
+        case AppCommandID.ExpenseDisplay.toggleExcludeFuturePlanned:
+            excludeFuturePlannedExpensesFromCalculationsInView.toggle()
+        case AppCommandID.ExpenseDisplay.toggleHideFutureVariable:
+            hideFutureVariableExpensesInView.toggle()
+        case AppCommandID.ExpenseDisplay.toggleExcludeFutureVariable:
+            excludeFutureVariableExpensesFromCalculationsInView.toggle()
+        default:
+            break
+        }
     }
 
     // MARK: - Unified tile rendering
