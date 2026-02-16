@@ -21,7 +21,8 @@ enum HomeCardMetricsCalculator {
         for card: Card,
         start: Date,
         end: Date,
-        excludeFuturePlannedExpenses: Bool
+        excludeFuturePlannedExpenses: Bool,
+        excludeFutureVariableExpenses: Bool
     ) -> HomeCardMetrics {
         let s = normalizedStart(start)
         let e = normalizedEnd(end)
@@ -37,8 +38,14 @@ enum HomeCardMetricsCalculator {
         let planned = plannedIncluded
             .reduce(0) { $0 + plannedEffectiveAmount($1) }
 
-        let variable = (card.variableExpenses ?? [])
+        let variableInRange = (card.variableExpenses ?? [])
             .filter { $0.transactionDate >= s && $0.transactionDate <= e }
+        let variableIncluded = VariableExpenseFuturePolicy.filteredForCalculations(
+            variableInRange,
+            excludeFuture: excludeFutureVariableExpenses
+        )
+
+        let variable = variableIncluded
             .reduce(0) { $0 + $1.amount }
 
         return HomeCardMetrics(

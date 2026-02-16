@@ -23,6 +23,10 @@ struct SettingsGeneralView: View {
     private var hideFuturePlannedExpenses: Bool = false
     @AppStorage("general_excludeFuturePlannedExpensesFromCalculations")
     private var excludeFuturePlannedExpensesFromCalculations: Bool = false
+    @AppStorage("general_hideFutureVariableExpenses")
+    private var hideFutureVariableExpenses: Bool = false
+    @AppStorage("general_excludeFutureVariableExpensesFromCalculations")
+    private var excludeFutureVariableExpensesFromCalculations: Bool = false
 
     @AppStorage("tips_resetToken") private var tipsResetToken: Int = 0
     @State private var eraseResultMessage: String = ""
@@ -98,23 +102,16 @@ struct SettingsGeneralView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
 
-                Toggle("Hide Future Planned Expenses", isOn: $hideFuturePlannedExpenses)
-                    .tint(Color("AccentColor"))
-
-                Text("When enabled, planned expenses scheduled after today are hidden from expense lists.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-
-                Toggle(
-                    "Exclude Future Planned Expenses from Totals",
-                    isOn: $excludeFuturePlannedExpensesFromCalculations
-                )
-                .tint(Color("AccentColor"))
-
-                Text("When enabled, planned expenses scheduled after today are excluded from totals and savings calculations.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-
+                NavigationLink {
+                    SettingsExpenseDisplayView(
+                        hideFuturePlannedExpenses: $hideFuturePlannedExpenses,
+                        excludeFuturePlannedExpensesFromCalculations: $excludeFuturePlannedExpensesFromCalculations,
+                        hideFutureVariableExpenses: $hideFutureVariableExpenses,
+                        excludeFutureVariableExpensesFromCalculations: $excludeFutureVariableExpensesFromCalculations
+                    )
+                } label: {
+                    Text("Expense Display")
+                }
             }
 
             Section("Budgets") {
@@ -361,6 +358,60 @@ private struct SettingsMaintenanceView: View {
             .buttonStyle(.borderedProminent)
             .tint(tint)
         }
+    }
+}
+
+// MARK: - Expense Display Screen
+
+private struct SettingsExpenseDisplayView: View {
+
+    @Binding var hideFuturePlannedExpenses: Bool
+    @Binding var excludeFuturePlannedExpensesFromCalculations: Bool
+    @Binding var hideFutureVariableExpenses: Bool
+    @Binding var excludeFutureVariableExpensesFromCalculations: Bool
+
+    var body: some View {
+        List {
+            Section("Planned Expenses") {
+                Toggle("Hide Future Planned Expenses", isOn: $hideFuturePlannedExpenses)
+                    .tint(Color("AccentColor"))
+
+                Text("When enabled, planned expenses scheduled after today are hidden from expense lists.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
+                Toggle(
+                    "Exclude Future Planned Expenses from Totals",
+                    isOn: $excludeFuturePlannedExpensesFromCalculations
+                )
+                .tint(Color("AccentColor"))
+
+                Text("When enabled, planned expenses scheduled after today are excluded from totals and savings calculations.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("Variable Expenses") {
+                Toggle("Hide Future Variable Expenses", isOn: $hideFutureVariableExpenses)
+                    .tint(Color("AccentColor"))
+
+                Text("When enabled, variable expenses dated after today are hidden from expense lists.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
+                Toggle(
+                    "Exclude Future Variable Expenses from Totals",
+                    isOn: $excludeFutureVariableExpensesFromCalculations
+                )
+                .tint(Color("AccentColor"))
+
+                Text("When enabled, variable expenses dated after today are excluded from totals and savings calculations.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .listStyle(.insetGrouped)
+        .navigationTitle("Expense Display")
     }
 }
 

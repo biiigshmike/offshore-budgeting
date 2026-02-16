@@ -21,6 +21,10 @@ struct ContentView: View {
     private var hideFuturePlannedExpenses: Bool = false
     @AppStorage("general_excludeFuturePlannedExpensesFromCalculations")
     private var excludeFuturePlannedExpensesFromCalculations: Bool = false
+    @AppStorage("general_hideFutureVariableExpenses")
+    private var hideFutureVariableExpenses: Bool = false
+    @AppStorage("general_excludeFutureVariableExpensesFromCalculations")
+    private var excludeFutureVariableExpensesFromCalculations: Bool = false
 
     // MARK: - Notifications
 
@@ -152,6 +156,14 @@ struct ContentView: View {
                 refreshCardWidgetSnapshotsIfPossible()
                 refreshSpendTrendsWidgetSnapshotsIfPossible()
             }
+            .onChange(of: hideFutureVariableExpenses) { _, _ in
+                syncGeneralSettingsToWidgets()
+            }
+            .onChange(of: excludeFutureVariableExpensesFromCalculations) { _, _ in
+                syncGeneralSettingsToWidgets()
+                refreshCardWidgetSnapshotsIfPossible()
+                refreshSpendTrendsWidgetSnapshotsIfPossible()
+            }
             .onChange(of: scenePhase) { _, newPhase in
                 // fter SwiftData/iCloud finishes loading, the app often
                 // becomes active with fresh data. Rebuild snapshots so the widget has options.
@@ -249,6 +261,11 @@ struct ContentView: View {
         defaults.set(
             excludeFuturePlannedExpensesFromCalculations,
             forKey: "general_excludeFuturePlannedExpensesFromCalculations"
+        )
+        defaults.set(hideFutureVariableExpenses, forKey: "general_hideFutureVariableExpenses")
+        defaults.set(
+            excludeFutureVariableExpensesFromCalculations,
+            forKey: "general_excludeFutureVariableExpensesFromCalculations"
         )
     }
 

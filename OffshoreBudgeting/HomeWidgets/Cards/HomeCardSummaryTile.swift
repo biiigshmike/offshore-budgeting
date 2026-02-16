@@ -14,13 +14,15 @@ struct HomeCardSummaryTile: View {
     let startDate: Date
     let endDate: Date
     let excludeFuturePlannedExpensesFromCalculationsInView: Bool
+    let excludeFutureVariableExpensesFromCalculationsInView: Bool
 
     private var metrics: HomeCardMetrics {
         HomeCardMetricsCalculator.metrics(
             for: card,
             start: startDate,
             end: endDate,
-            excludeFuturePlannedExpenses: excludeFuturePlannedExpensesFromCalculationsInView
+            excludeFuturePlannedExpenses: excludeFuturePlannedExpensesFromCalculationsInView,
+            excludeFutureVariableExpenses: excludeFutureVariableExpensesFromCalculationsInView
         )
     }
 

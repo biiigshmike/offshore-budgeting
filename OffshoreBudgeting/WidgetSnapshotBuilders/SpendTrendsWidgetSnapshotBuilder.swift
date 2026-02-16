@@ -142,15 +142,19 @@ enum SpendTrendsWidgetSnapshotBuilder {
             )
             variableExpenses = (try? modelContext.fetch(descriptor)) ?? []
         }
+        let variableIncluded = VariableExpenseFuturePolicy.filteredForCalculations(
+            variableExpenses,
+            excludeFuture: defaultExcludeFutureVariableExpensesFromSharedDefaults()
+        )
 
         let categoryLookup = buildCategoryLookup(
             plannedExpenses: plannedIncluded,
-            variableExpenses: variableExpenses
+            variableExpenses: variableIncluded
         )
 
         let overallTotals = categoryTotals(
             plannedExpenses: plannedIncluded,
-            variableExpenses: variableExpenses
+            variableExpenses: variableIncluded
         )
 
         let totalSpent = overallTotals.values.reduce(0, +)
@@ -176,7 +180,7 @@ enum SpendTrendsWidgetSnapshotBuilder {
 
         for bucket in buckets {
             let bucketPlanned = plannedIncluded.filter { $0.expenseDate >= bucket.start && $0.expenseDate <= bucket.end }
-            let bucketVariable = variableExpenses.filter { $0.transactionDate >= bucket.start && $0.transactionDate <= bucket.end }
+            let bucketVariable = variableIncluded.filter { $0.transactionDate >= bucket.start && $0.transactionDate <= bucket.end }
 
             let bucketTotals = categoryTotals(plannedExpenses: bucketPlanned, variableExpenses: bucketVariable)
             let slices = buildBucketSlices(
@@ -588,5 +592,10 @@ enum SpendTrendsWidgetSnapshotBuilder {
     private static func defaultExcludeFuturePlannedExpensesFromSharedDefaults() -> Bool {
         let defaults = UserDefaults(suiteName: SpendTrendsWidgetSnapshotStore.appGroupID)
         return defaults?.bool(forKey: "general_excludeFuturePlannedExpensesFromCalculations") ?? false
+    }
+
+    private static func defaultExcludeFutureVariableExpensesFromSharedDefaults() -> Bool {
+        let defaults = UserDefaults(suiteName: SpendTrendsWidgetSnapshotStore.appGroupID)
+        return defaults?.bool(forKey: "general_excludeFutureVariableExpensesFromCalculations") ?? false
     }
 }

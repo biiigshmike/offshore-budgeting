@@ -48,11 +48,17 @@ struct HomeView: View {
     private var hideFuturePlannedExpensesDefault: Bool = false
     @AppStorage("general_excludeFuturePlannedExpensesFromCalculations")
     private var excludeFuturePlannedExpensesFromCalculationsDefault: Bool = false
+    @AppStorage("general_hideFutureVariableExpenses")
+    private var hideFutureVariableExpensesDefault: Bool = false
+    @AppStorage("general_excludeFutureVariableExpensesFromCalculations")
+    private var excludeFutureVariableExpensesFromCalculationsDefault: Bool = false
 
     @State private var draftStartDate: Date = Date()
     @State private var draftEndDate: Date = Date()
     @State private var hideFuturePlannedExpensesInView: Bool = false
     @State private var excludeFuturePlannedExpensesFromCalculationsInView: Bool = false
+    @State private var hideFutureVariableExpensesInView: Bool = false
+    @State private var excludeFutureVariableExpensesFromCalculationsInView: Bool = false
 
     @State private var isEditingWidgets: Bool = false
 
@@ -89,6 +95,20 @@ struct HomeView: View {
         PlannedExpenseFuturePolicy.filteredForVisibility(
             plannedExpensesForHome,
             hideFuture: hideFuturePlannedExpensesInView
+        )
+    }
+
+    private var calculationVariableExpensesForHome: [VariableExpense] {
+        VariableExpenseFuturePolicy.filteredForCalculations(
+            variableExpenses,
+            excludeFuture: excludeFutureVariableExpensesFromCalculationsInView
+        )
+    }
+
+    private var visibleVariableExpensesForHome: [VariableExpense] {
+        VariableExpenseFuturePolicy.filteredForVisibility(
+            variableExpenses,
+            hideFuture: hideFutureVariableExpensesInView
         )
     }
 
@@ -209,7 +229,7 @@ struct HomeView: View {
                 categories: categories,
                 incomes: incomes,
                 plannedExpenses: calculationPlannedExpensesForHome,
-                variableExpenses: variableExpenses,
+                variableExpenses: calculationVariableExpensesForHome,
                 startDate: appliedStartDate,
                 endDate: appliedEndDate,
                 initialScenarioID: whatIfInitialScenarioID
@@ -281,6 +301,8 @@ struct HomeView: View {
             prunePinnedCardsIfNeeded()
             hideFuturePlannedExpensesInView = hideFuturePlannedExpensesDefault
             excludeFuturePlannedExpensesFromCalculationsInView = excludeFuturePlannedExpensesFromCalculationsDefault
+            hideFutureVariableExpensesInView = hideFutureVariableExpensesDefault
+            excludeFutureVariableExpensesFromCalculationsInView = excludeFutureVariableExpensesFromCalculationsDefault
         }
         .onChange(of: pinnedItems) { _, _ in
             persistPinnedItems()
@@ -317,7 +339,8 @@ struct HomeView: View {
                     card: card,
                     startDate: appliedStartDate,
                     endDate: appliedEndDate,
-                    excludeFuturePlannedExpensesFromCalculationsInView: excludeFuturePlannedExpensesFromCalculationsInView
+                    excludeFuturePlannedExpensesFromCalculationsInView: excludeFuturePlannedExpensesFromCalculationsInView,
+                    excludeFutureVariableExpensesFromCalculationsInView: excludeFutureVariableExpensesFromCalculationsInView
                 )
                 .accessibilityElement(children: .combine)
             } else {
@@ -505,7 +528,7 @@ struct HomeView: View {
             workspace: workspace,
             incomes: incomes,
             plannedExpenses: calculationPlannedExpensesForHome,
-            variableExpenses: variableExpenses,
+            variableExpenses: calculationVariableExpensesForHome,
             startDate: appliedStartDate,
             endDate: appliedEndDate
         )
@@ -517,7 +540,7 @@ struct HomeView: View {
             categories: categories,
             incomes: incomes,
             plannedExpenses: calculationPlannedExpensesForHome,
-            variableExpenses: variableExpenses,
+            variableExpenses: calculationVariableExpensesForHome,
             startDate: appliedStartDate,
             endDate: appliedEndDate,
             onOpenPlanner: openWhatIfPlanner
@@ -557,7 +580,7 @@ struct HomeView: View {
             workspace: workspace,
             categories: categories,
             plannedExpenses: calculationPlannedExpensesForHome,
-            variableExpenses: variableExpenses,
+            variableExpenses: calculationVariableExpensesForHome,
             startDate: appliedStartDate,
             endDate: appliedEndDate
         )
@@ -570,7 +593,7 @@ struct HomeView: View {
             budgets: budgets,
             categories: categories,
             plannedExpenses: calculationPlannedExpensesForHome,
-            variableExpenses: variableExpenses,
+            variableExpenses: calculationVariableExpensesForHome,
             startDate: appliedStartDate,
             endDate: appliedEndDate,
             layoutMode: categoryAvailabilityLayoutMode(for: displaySize)
@@ -598,7 +621,7 @@ struct HomeView: View {
             cards: cards,
             categories: categories,
             plannedExpenses: calculationPlannedExpensesForHome,
-            variableExpenses: variableExpenses,
+            variableExpenses: calculationVariableExpensesForHome,
             startDate: appliedStartDate,
             endDate: appliedEndDate
         )
@@ -824,11 +847,25 @@ struct HomeView: View {
 
     private var homeActionsToolbarButton: some View {
         Menu {
-            Toggle("Hide Future Planned Expenses", isOn: $hideFuturePlannedExpensesInView)
-            Toggle(
-                "Exclude Future Planned Expenses from Totals",
-                isOn: $excludeFuturePlannedExpensesFromCalculationsInView
-            )
+            Menu {
+                Toggle("Hide Future Planned Expenses", isOn: $hideFuturePlannedExpensesInView)
+                Toggle(
+                    "Exclude Future Planned Expenses from Totals",
+                    isOn: $excludeFuturePlannedExpensesFromCalculationsInView
+                )
+            } label: {
+                Label("Planned Expense Display", systemImage: "calendar")
+            }
+
+            Menu {
+                Toggle("Hide Future Variable Expenses", isOn: $hideFutureVariableExpensesInView)
+                Toggle(
+                    "Exclude Future Variable Expenses from Totals",
+                    isOn: $excludeFutureVariableExpensesFromCalculationsInView
+                )
+            } label: {
+                Label("Variable Expense Display", systemImage: "slider.horizontal.3")
+            }
         } label: {
             Image(systemName: "ellipsis")
         }

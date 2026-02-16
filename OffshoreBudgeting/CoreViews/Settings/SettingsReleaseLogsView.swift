@@ -62,7 +62,7 @@ struct SettingsReleaseLogsView: View {
                 ReleaseItem(
                     systemImage: "sailboat.fill",
                     title: "Excursion Mode",
-                    description: "Heading out shopping? Activate Excursion Mode to receive gentle reminders to log expenses when you’re near relevant points of interest. All processing happens on-device and can be turned on or off anytime."
+                    description: "Heading out to explore? Activate Excursion Mode to receive gentle reminders to log expenses when you’re near relevant points of interest. All processing happens on-device and can be turned on or off anytime."
                 ),
                 ReleaseItem(
                     systemImage: "creditcard.fill",

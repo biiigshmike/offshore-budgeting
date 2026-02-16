@@ -115,12 +115,16 @@ enum CardWidgetSnapshotBuilder {
             sortBy: [SortDescriptor(\VariableExpense.transactionDate, order: .reverse)]
         )
         let variable = (try? modelContext.fetch(variableDescriptor)) ?? []
+        let variableIncluded = VariableExpenseFuturePolicy.filteredForCalculations(
+            variable,
+            excludeFuture: defaultExcludeFutureVariableExpensesFromSharedDefaults()
+        )
 
         // Totals
         let plannedTotal = plannedIncluded.reduce(0) { partial, exp in
             partial + exp.effectiveAmount()
         }
-        let variableTotal = variable.reduce(0) { $0 + $1.amount }
+        let variableTotal = variableIncluded.reduce(0) { $0 + $1.amount }
         let unifiedTotal = plannedTotal + variableTotal
 
         // Recent (merge planned + variable, then pick newest)
@@ -140,7 +144,7 @@ enum CardWidgetSnapshotBuilder {
                     categoryHex: $0.category?.hexColor
                 )
             }
-            + variable.map {
+            + variableIncluded.map {
                 RecentMergeItem(
                     name: $0.descriptionText,
                     amount: $0.amount,
@@ -224,6 +228,11 @@ enum CardWidgetSnapshotBuilder {
     private static func defaultExcludeFuturePlannedExpensesFromSharedDefaults() -> Bool {
         let defaults = UserDefaults(suiteName: CardWidgetSnapshotStore.appGroupID)
         return defaults?.bool(forKey: "general_excludeFuturePlannedExpensesFromCalculations") ?? false
+    }
+
+    private static func defaultExcludeFutureVariableExpensesFromSharedDefaults() -> Bool {
+        let defaults = UserDefaults(suiteName: CardWidgetSnapshotStore.appGroupID)
+        return defaults?.bool(forKey: "general_excludeFutureVariableExpensesFromCalculations") ?? false
     }
 
     private static func endOfDay(_ date: Date, calendar: Calendar) -> Date {
