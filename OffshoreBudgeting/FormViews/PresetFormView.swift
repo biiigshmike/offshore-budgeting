@@ -77,6 +77,7 @@ struct PresetFormView: View {
                             }
                         }
                         .padding(.vertical, 6)
+                        .padding(.horizontal, 2)
                     }
                     
                     if selectedCardID == nil {
@@ -249,23 +250,22 @@ private struct CardTile: View {
     
     var body: some View {
         Button(action: onTap) {
-            ZStack(alignment: .topTrailing) {
-                
-                CardVisualView(
-                    title: title,
-                    theme: themeOption(from: themeRaw),
-                    effect: effectOption(from: effectRaw),
-                    minHeight: nil,
-                    showsShadow: false,
-                    titleFont: .headline,
-                    titlePadding: 12,
-                    titleOpacity: 0.82
-                )
-                .frame(width: tileWidth)
-                
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
+            CardVisualView(
+                title: title,
+                theme: themeOption(from: themeRaw),
+                effect: effectOption(from: effectRaw),
+                minHeight: nil,
+                showsShadow: false,
+                titleFont: .headline,
+                titlePadding: 12,
+                titleOpacity: 0.82
+            )
+            .frame(width: tileWidth)
+            .overlay {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .stroke(isSelected ? Color.primary.opacity(0.35) : Color.clear, lineWidth: 2)
-                
+            }
+            .overlay(alignment: .topTrailing) {
                 if isSelected {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.headline)
@@ -273,6 +273,7 @@ private struct CardTile: View {
                         .padding(10)
                 }
             }
+            .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
         .buttonStyle(.plain)
     }
