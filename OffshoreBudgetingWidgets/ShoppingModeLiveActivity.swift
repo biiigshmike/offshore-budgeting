@@ -374,7 +374,7 @@ private enum ExcursionDeepLink {
 // MARK: - ShoppingModeLiveActivityPalette
 
 private enum ShoppingModeLiveActivityPalette {
-    static let surface = Color(red: 0.12, green: 0.13, blue: 0.15)
+    static let surface = Color(.black)
     static let border = Color.white.opacity(0.08)
     static let controlFill = Color.white.opacity(0.18)
     static let brandAccent = Color(red: 0.27, green: 0.76, blue: 1.0)
