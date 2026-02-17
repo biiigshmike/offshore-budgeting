@@ -180,11 +180,11 @@ struct AppRootView: View {
                 sectionRootView
             }
             .id(selectedSection)
-            .homeAssistantHost(
-                workspace: workspace,
-                isEnabled: selectedSection == .home
-            )
         }
+        .homeAssistantHost(
+            workspace: workspace,
+            isEnabled: selectedSection == .home
+        )
     }
 
     private var selectedSectionPath: Binding<NavigationPath> {

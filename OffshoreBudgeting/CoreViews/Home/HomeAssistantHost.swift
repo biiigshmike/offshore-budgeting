@@ -7,6 +7,22 @@
 
 import SwiftUI
 
+struct HomeAssistantToolbarContext {
+    var isToolbarButtonVisible: Bool = false
+    var openAssistant: () -> Void = {}
+}
+
+private struct HomeAssistantToolbarContextKey: EnvironmentKey {
+    static let defaultValue = HomeAssistantToolbarContext()
+}
+
+extension EnvironmentValues {
+    var homeAssistantToolbarContext: HomeAssistantToolbarContext {
+        get { self[HomeAssistantToolbarContextKey.self] }
+        set { self[HomeAssistantToolbarContextKey.self] = newValue }
+    }
+}
+
 struct HomeAssistantHostModifier: ViewModifier {
 
     let workspace: Workspace
@@ -98,21 +114,7 @@ struct HomeAssistantHostModifier: ViewModifier {
                         }
                 }
             }
-            .toolbar {
-                if shouldShowToolbarButton {
-                    if #available(iOS 26.0, macCatalyst 26.0, *) {
-                        ToolbarSpacer(.flexible, placement: .primaryAction)
-
-                        ToolbarItemGroup(placement: .primaryAction) {
-                            assistantToolbarButton
-                        }
-                    } else {
-                        ToolbarItem(placement: .primaryAction) {
-                            assistantToolbarButton
-                        }
-                    }
-                }
-            }
+            .environment(\.homeAssistantToolbarContext, assistantToolbarContext)
             .onChange(of: isEnabled) { _, enabled in
                 if enabled == false {
                     dismissAssistant()
@@ -267,18 +269,15 @@ struct HomeAssistantHostModifier: ViewModifier {
         }
     }
 
-    private var assistantToolbarButton: some View {
-        Button(action: presentAssistant) {
-            Image(systemName: "figure.wave")
-        }
-        .accessibilityLabel("Open Assistant")
+    private var assistantToolbarContext: HomeAssistantToolbarContext {
+        HomeAssistantToolbarContext(
+            isToolbarButtonVisible: shouldShowToolbarButton,
+            openAssistant: presentAssistant
+        )
     }
 
     private var shouldMountInspectorPresenter: Bool {
-        isEnabled && supportsInlineInspector && (
-            assistantRoute == .inspector ||
-            assistantPresentationPlan.mode == .inspector
-        )
+        isEnabled && supportsInlineInspector && assistantRoute == .inspector
     }
 
     private func updateContainerWidth(_ rawWidth: CGFloat) {

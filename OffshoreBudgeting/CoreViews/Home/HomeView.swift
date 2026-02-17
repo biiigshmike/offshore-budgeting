@@ -114,6 +114,7 @@ struct HomeView: View {
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
+    @Environment(\.homeAssistantToolbarContext) private var assistantToolbarContext
     @Environment(\.appCommandHub) private var commandHub
 
     private var isPhone: Bool {
@@ -255,9 +256,23 @@ struct HomeView: View {
                 ToolbarItemGroup(placement: .primaryAction) {
                     homeActionsToolbarButton
                 }
+
+                if assistantToolbarContext.isToolbarButtonVisible {
+                    ToolbarSpacer(.flexible, placement: .primaryAction)
+
+                    ToolbarItemGroup(placement: .primaryAction) {
+                        assistantToolbarButton
+                    }
+                }
             } else {
                 ToolbarItem(placement: .topBarTrailing) {
                     homeActionsToolbarButton
+                }
+
+                if assistantToolbarContext.isToolbarButtonVisible {
+                    ToolbarItem(placement: .primaryAction) {
+                        assistantToolbarButton
+                    }
                 }
             }
         }
@@ -872,6 +887,13 @@ struct HomeView: View {
             Image(systemName: "ellipsis")
         }
         .accessibilityLabel("Home Actions")
+    }
+
+    private var assistantToolbarButton: some View {
+        Button(action: assistantToolbarContext.openAssistant) {
+            Image(systemName: "figure.wave")
+        }
+        .accessibilityLabel("Open Assistant")
     }
 
     private var widgetsHeader: some View {

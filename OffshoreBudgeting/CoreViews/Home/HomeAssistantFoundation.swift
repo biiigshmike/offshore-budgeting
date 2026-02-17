@@ -333,13 +333,13 @@ struct HomeAssistantPanelView: View {
                 }
             }
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
+                ToolbarItem(placement: .topBarLeading) {
                     if #available(iOS 26.0, *) {
                         Button(action: onDismiss) {
                             Image(systemName: "xmark")
                                 .font(.body.weight(.semibold))
-                                .buttonStyle(.glass)
                         }
+                        .buttonStyle(.glass)
                         .accessibilityLabel("Close Assistant")
                     } else {
                         Button(action: onDismiss) {
@@ -357,8 +357,8 @@ struct HomeAssistantPanelView: View {
                             isShowingClearConversationAlert = true
                         } label: {
                             Text("Clear")
-                                .buttonStyle(.glass)
                         }
+                        .buttonStyle(.glass)
                         .disabled(answers.isEmpty)
                         .accessibilityLabel("Clear Chat")
                     } else {
