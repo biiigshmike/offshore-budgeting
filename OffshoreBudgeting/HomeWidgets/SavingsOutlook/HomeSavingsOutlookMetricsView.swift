@@ -89,6 +89,20 @@ struct HomeSavingsOutlookMetricsView: View {
                     accent: accent
                 )
 
+                NavigationLink {
+                    SavingsAccountView(workspace: workspace)
+                } label: {
+                    HStack {
+                        Text("Open Savings Account")
+                            .foregroundStyle(.primary)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 8)
+                }
+                .buttonStyle(.plain)
+
                 Spacer(minLength: 12)
             }
             .padding(.horizontal, 16)
@@ -395,13 +409,13 @@ struct HomeSavingsOutlookMetricsView: View {
     private func sumPlannedExpensesEffectiveActual(from start: Date, to end: Date) -> Double {
         plannedExpenses
             .filter { $0.expenseDate >= start && $0.expenseDate <= end }
-            .reduce(0) { $0 + $1.effectiveAmount() }
+            .reduce(0) { $0 + SavingsMathService.plannedBudgetImpactAmount(for: $1) }
     }
 
     private func sumVariableExpenses(from start: Date, to end: Date) -> Double {
         variableExpenses
             .filter { $0.transactionDate >= start && $0.transactionDate <= end }
-            .reduce(0) { $0 + $1.amount }
+            .reduce(0) { $0 + SavingsMathService.variableBudgetImpactAmount(for: $1) }
     }
 
     // MARK: - Progress Summary

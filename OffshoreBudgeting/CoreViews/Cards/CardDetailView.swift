@@ -523,7 +523,7 @@ struct CardDetailView: View {
 
     private var dateRangeSection: some View {
         Section {
-            DateFilterRow(
+            DateRangeFilterRow(
                 draftStartDate: $draftStartDate,
                 draftEndDate: $draftEndDate,
                 isGoEnabled: isDateDirty && !isApplyingQuickRange,
@@ -1115,15 +1115,7 @@ struct CardDetailView: View {
     }
 
     private func deleteVariableExpense(_ expense: VariableExpense) {
-        if let allocation = expense.allocation {
-            expense.allocation = nil
-            modelContext.delete(allocation)
-        }
-        if let offsetSettlement = expense.offsetSettlement {
-            expense.offsetSettlement = nil
-            modelContext.delete(offsetSettlement)
-        }
-        modelContext.delete(expense)
+        VariableExpenseDeletionService.delete(expense, modelContext: modelContext)
     }
 
 

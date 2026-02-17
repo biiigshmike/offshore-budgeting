@@ -144,7 +144,7 @@ struct AppRootView: View {
             .tag(AppSection.budgets)
 
             NavigationStack {
-                IncomeView(workspace: workspace)
+                IncomeWorkspaceView(workspace: workspace)
             }
             .tabItem { Label(AppSection.income.rawValue, systemImage: AppSection.income.systemImage) }
             .tag(AppSection.income)
@@ -229,7 +229,7 @@ struct AppRootView: View {
         case .budgets:
             BudgetsView(workspace: workspace)
         case .income:
-            IncomeView(workspace: workspace)
+            IncomeWorkspaceView(workspace: workspace)
         case .cards:
             CardsView(workspace: workspace)
         case .settings:

@@ -30,6 +30,7 @@ struct AddExpenseView: View {
     @Query private var cardsInWorkspace: [Card]
     @Query private var categories: [Category]
     @Query private var allocationAccounts: [AllocationAccount]
+    @Query private var savingsAccounts: [SavingsAccount]
 
     // MARK: - Form State
 
@@ -42,6 +43,8 @@ struct AddExpenseView: View {
     @State private var allocationAmountText: String = ""
     @State private var selectedOffsetAccountID: UUID? = nil
     @State private var offsetAmountText: String = ""
+    @State private var applySavingsOffset: Bool = false
+    @State private var savingsOffsetAmountText: String = ""
 
     // MARK: - Alerts
 
@@ -49,6 +52,7 @@ struct AddExpenseView: View {
     @State private var showingMissingCardAlert: Bool = false
     @State private var showingInvalidAllocationAlert: Bool = false
     @State private var showingInvalidOffsetAlert: Bool = false
+    @State private var showingInvalidSavingsOffsetAlert: Bool = false
 
     init(
         workspace: Workspace,
@@ -81,6 +85,11 @@ struct AddExpenseView: View {
             },
             sort: [SortDescriptor(\AllocationAccount.name, order: .forward)]
         )
+
+        _savingsAccounts = Query(
+            filter: #Predicate<SavingsAccount> { $0.workspace?.id == workspaceID },
+            sort: [SortDescriptor(\SavingsAccount.createdAt, order: .forward)]
+        )
     }
 
     private var visibleCards: [Card] {
@@ -99,6 +108,10 @@ struct AddExpenseView: View {
         )
     }
 
+    private var availableSavingsBalance: Double {
+        max(0, savingsAccounts.first?.total ?? 0)
+    }
+
     var body: some View {
         ExpenseFormView(
             workspace: workspace,
@@ -114,6 +127,9 @@ struct AddExpenseView: View {
             allocationAmountText: $allocationAmountText,
             selectedOffsetAccountID: $selectedOffsetAccountID,
             offsetAmountText: $offsetAmountText,
+            applySavingsOffset: $applySavingsOffset,
+            savingsOffsetAmountText: $savingsOffsetAmountText,
+            availableSavingsBalance: availableSavingsBalance,
             onSharedBalanceChanged: nil
         )
         .navigationTitle("Add Expense")
@@ -158,6 +174,11 @@ struct AddExpenseView: View {
             Button("OK", role: .cancel) { }
         } message: {
             Text("Offset amount must be 0 or greater, cannot exceed the expense amount, and cannot exceed the selected account balance.")
+        }
+        .alert("Invalid Savings Offset", isPresented: $showingInvalidSavingsOffsetAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("Savings offset must be 0 or greater, cannot exceed the expense amount, and cannot exceed available savings.")
         }
         .onAppear {
             if descriptionText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -219,6 +240,26 @@ struct AddExpenseView: View {
 
         let netAmount = max(0, amt - offsetAmount)
 
+        let savingsOffsetAmount: Double
+        if applySavingsOffset {
+            let trimmed = savingsOffsetAmountText.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty {
+                savingsOffsetAmount = 0
+            } else {
+                guard let parsed = CurrencyFormatter.parseAmount(trimmed), parsed >= 0, parsed <= netAmount else {
+                    showingInvalidSavingsOffsetAlert = true
+                    return
+                }
+                guard parsed <= availableSavingsBalance else {
+                    showingInvalidSavingsOffsetAlert = true
+                    return
+                }
+                savingsOffsetAmount = parsed
+            }
+        } else {
+            savingsOffsetAmount = 0
+        }
+
         let allocationAmount: Double
         if selectedAllocationAccount != nil {
             let trimmed = allocationAmountText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -272,10 +313,27 @@ struct AddExpenseView: View {
             expense.offsetSettlement = settlement
         }
 
+        if savingsOffsetAmount > 0 {
+            SavingsAccountService.upsertSavingsOffset(
+                workspace: workspace,
+                variableExpense: expense,
+                offsetAmount: savingsOffsetAmount,
+                note: savingsOffsetNote(for: trimmedDesc),
+                date: transactionDate,
+                modelContext: modelContext
+            )
+        } else {
+            SavingsAccountService.removeSavingsOffset(for: expense, modelContext: modelContext)
+        }
+
         dismiss()
     }
 
     private func offsetNote(for description: String) -> String {
         "Offset applied to \(description)"
+    }
+
+    private func savingsOffsetNote(for description: String) -> String {
+        "Savings offset applied to \(description)"
     }
 }

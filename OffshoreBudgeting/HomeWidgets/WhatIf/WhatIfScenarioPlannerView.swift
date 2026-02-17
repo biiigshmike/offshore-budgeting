@@ -94,13 +94,13 @@ struct WhatIfScenarioPlannerView: View {
     private var plannedExpensesEffectiveTotal: Double {
         plannedExpenses
             .filter { isInRange($0.expenseDate) }
-            .reduce(0) { $0 + effectivePlannedExpenseAmount($1) }
+            .reduce(0) { $0 + SavingsMathService.plannedBudgetImpactAmount(for: $1) }
     }
 
     private var variableExpensesTotal: Double {
         variableExpenses
             .filter { isInRange($0.transactionDate) }
-            .reduce(0) { $0 + $1.amount }
+            .reduce(0) { $0 + SavingsMathService.variableBudgetImpactAmount(for: $1) }
     }
 
     private var actualSavings: Double {

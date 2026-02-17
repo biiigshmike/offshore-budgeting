@@ -43,6 +43,10 @@ struct ExpenseFormView: View {
     @Binding var allocationAmountText: String
     @Binding var selectedOffsetAccountID: UUID?
     @Binding var offsetAmountText: String
+    @Binding var applySavingsOffset: Bool
+    @Binding var savingsOffsetAmountText: String
+
+    let availableSavingsBalance: Double
 
     let onSharedBalanceChanged: (() -> Void)?
     @State private var draftSharedBalanceMode: SharedBalanceMode? = nil
@@ -157,6 +161,7 @@ struct ExpenseFormView: View {
             transactionSection
             categorySection
             sharedBalanceSection
+            savingsOffsetSection
         }
         .onAppear {
             if draftSharedBalanceMode == nil {
@@ -290,6 +295,82 @@ struct ExpenseFormView: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .disabled(applySavingsOffset)
+        .onChange(of: activeSharedBalanceMode?.rawValue) { _, newValue in
+            if newValue != nil && applySavingsOffset {
+                applySavingsOffset = false
+                savingsOffsetAmountText = ""
+            }
+        }
+    }
+
+    private var savingsOffsetSection: some View {
+        Section {
+            Toggle("Pay From Savings", isOn: $applySavingsOffset)
+
+            if applySavingsOffset {
+                TextField("Savings Amount", text: $savingsOffsetAmountText)
+                    .keyboardType(.decimalPad)
+
+                HStack {
+                    Text("Available Savings")
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text(availableSavingsBalance, format: CurrencyFormatter.currencyStyle())
+                        .fontWeight(.semibold)
+                }
+
+                if let message = savingsValidationMessage {
+                    Text(message)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        } header: {
+            Text("Savings Offset")
+        } footer: {
+            if hasAnySharedBalanceAction {
+                Text("Clear Shared Balance actions to use Savings Offset.")
+            }
+        }
+        .disabled(hasAnySharedBalanceAction)
+        .onChange(of: applySavingsOffset) { _, isOn in
+            if isOn && hasAnySharedBalanceAction {
+                applySavingsOffset = false
+            }
+            if !isOn {
+                savingsOffsetAmountText = ""
+            }
+        }
+    }
+
+    private var savingsValidationMessage: String? {
+        guard applySavingsOffset else { return nil }
+
+        guard enteredAmount > 0 else {
+            return "Enter an expense amount first."
+        }
+
+        let trimmed = savingsOffsetAmountText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        guard let parsed = CurrencyFormatter.parseAmount(trimmed) else {
+            return "Enter a valid amount."
+        }
+
+        guard parsed > 0 else {
+            return "Amount must be greater than 0."
+        }
+
+        guard parsed <= enteredAmount else {
+            return "Amount can't exceed the expense amount."
+        }
+
+        guard parsed <= availableSavingsBalance else {
+            return "Amount can't exceed available savings."
+        }
+
+        return nil
     }
 
     private var sharedBalanceValidationMessage: String? {

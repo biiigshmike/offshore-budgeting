@@ -1673,11 +1673,11 @@ struct HomeQueryEngine {
 
         let plannedExpensesEffectiveActualTotal = plannedExpenses
             .filter { $0.expenseDate >= range.startDate && $0.expenseDate <= range.endDate }
-            .reduce(0.0) { $0 + $1.effectiveAmount() }
+            .reduce(0.0) { $0 + SavingsMathService.plannedBudgetImpactAmount(for: $1) }
 
         let variableExpensesTotal = variableExpenses
             .filter { $0.transactionDate >= range.startDate && $0.transactionDate <= range.endDate }
-            .reduce(0.0) { $0 + $1.amount }
+            .reduce(0.0) { $0 + SavingsMathService.variableBudgetImpactAmount(for: $1) }
 
         let projectedSavings = plannedIncomeTotal - plannedExpensesPlannedTotal
         let actualSavings = actualIncomeTotal - (plannedExpensesEffectiveActualTotal + variableExpensesTotal)

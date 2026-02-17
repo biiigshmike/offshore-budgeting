@@ -5085,15 +5085,7 @@ private final class HomeAssistantMutationService {
         _ expense: VariableExpense,
         modelContext: ModelContext
     ) throws -> HomeAssistantMutationResult {
-        if let allocation = expense.allocation {
-            expense.allocation = nil
-            modelContext.delete(allocation)
-        }
-        if let offsetSettlement = expense.offsetSettlement {
-            expense.offsetSettlement = nil
-            modelContext.delete(offsetSettlement)
-        }
-        modelContext.delete(expense)
+        VariableExpenseDeletionService.delete(expense, modelContext: modelContext)
         try modelContext.save()
         
         return HomeAssistantMutationResult(
@@ -5216,15 +5208,7 @@ private final class HomeAssistantMutationService {
         _ expense: VariableExpense,
         modelContext: ModelContext
     ) {
-        if let allocation = expense.allocation {
-            expense.allocation = nil
-            modelContext.delete(allocation)
-        }
-        if let offsetSettlement = expense.offsetSettlement {
-            expense.offsetSettlement = nil
-            modelContext.delete(offsetSettlement)
-        }
-        modelContext.delete(expense)
+        VariableExpenseDeletionService.delete(expense, modelContext: modelContext)
     }
     
     func matchedIncomes(

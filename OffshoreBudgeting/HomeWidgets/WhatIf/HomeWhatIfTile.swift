@@ -37,13 +37,13 @@ struct HomeWhatIfTile: View {
     private var plannedExpensesEffectiveTotal: Double {
         plannedExpenses
             .filter { isInRange($0.expenseDate) }
-            .reduce(0) { $0 + $1.effectiveAmount() }
+            .reduce(0) { $0 + SavingsMathService.plannedBudgetImpactAmount(for: $1) }
     }
 
     private var variableExpensesTotal: Double {
         variableExpenses
             .filter { isInRange($0.transactionDate) }
-            .reduce(0) { $0 + $1.amount }
+            .reduce(0) { $0 + SavingsMathService.variableBudgetImpactAmount(for: $1) }
     }
 
     private var actualSavings: Double {
@@ -216,7 +216,7 @@ struct HomeWhatIfTile: View {
 
         for expense in plannedExpenses {
             guard isInRange(expense.expenseDate), let category = expense.category else { continue }
-            plannedByCategoryID[category.id, default: 0] += expense.effectiveAmount()
+            plannedByCategoryID[category.id, default: 0] += SavingsMathService.plannedBudgetImpactAmount(for: expense)
         }
 
         for expense in variableExpenses {

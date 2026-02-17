@@ -23,6 +23,8 @@ enum PreviewSeed {
                 Preset.self,
                 PlannedExpense.self,
                 VariableExpense.self,
+                SavingsAccount.self,
+                SavingsLedgerEntry.self,
                 Income.self
             ])
             let config = ModelConfiguration(isStoredInMemoryOnly: true)

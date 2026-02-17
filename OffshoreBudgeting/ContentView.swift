@@ -125,6 +125,7 @@ struct ContentView: View {
                 refreshCardWidgetSnapshotsIfPossible()
                 refreshNextPlannedExpenseWidgetSnapshotsIfPossible()
                 refreshSpendTrendsWidgetSnapshotsIfPossible()
+                runSavingsAutoCaptureIfPossible()
 
                 Task { await syncNotificationSchedulesIfPossible() }
             }
@@ -138,6 +139,7 @@ struct ContentView: View {
                 refreshCardWidgetSnapshotsIfPossible()
                 refreshNextPlannedExpenseWidgetSnapshotsIfPossible()
                 refreshSpendTrendsWidgetSnapshotsIfPossible()
+                runSavingsAutoCaptureIfPossible()
 
                 Task { await syncNotificationSchedulesIfPossible() }
             }
@@ -178,6 +180,7 @@ struct ContentView: View {
                 refreshCardWidgetSnapshotsIfPossible()
                 refreshNextPlannedExpenseWidgetSnapshotsIfPossible()
                 refreshSpendTrendsWidgetSnapshotsIfPossible()
+                runSavingsAutoCaptureIfPossible()
 
                 Task { await syncNotificationSchedulesIfPossible() }
             }
@@ -200,6 +203,7 @@ struct ContentView: View {
                 refreshCardWidgetSnapshotsIfPossible()
                 refreshNextPlannedExpenseWidgetSnapshotsIfPossible()
                 refreshSpendTrendsWidgetSnapshotsIfPossible()
+                runSavingsAutoCaptureIfPossible()
 
                 Task { await syncNotificationSchedulesIfPossible() }
             }
@@ -266,6 +270,34 @@ struct ContentView: View {
         defaults.set(
             excludeFutureVariableExpensesFromCalculations,
             forKey: "general_excludeFutureVariableExpensesFromCalculations"
+        )
+    }
+
+    private func runSavingsAutoCaptureIfPossible() {
+        guard let workspace = selectedWorkspace else { return }
+        let workspaceID = workspace.id
+
+        let incomeDescriptor = FetchDescriptor<Income>(
+            predicate: #Predicate<Income> { $0.workspace?.id == workspaceID }
+        )
+        let plannedDescriptor = FetchDescriptor<PlannedExpense>(
+            predicate: #Predicate<PlannedExpense> { $0.workspace?.id == workspaceID }
+        )
+        let variableDescriptor = FetchDescriptor<VariableExpense>(
+            predicate: #Predicate<VariableExpense> { $0.workspace?.id == workspaceID }
+        )
+
+        let incomes = (try? modelContext.fetch(incomeDescriptor)) ?? []
+        let plannedExpenses = (try? modelContext.fetch(plannedDescriptor)) ?? []
+        let variableExpenses = (try? modelContext.fetch(variableDescriptor)) ?? []
+
+        SavingsAccountService.runAutoCaptureIfNeeded(
+            for: workspace,
+            defaultBudgetingPeriodRaw: defaultBudgetingPeriodRaw,
+            incomes: incomes,
+            plannedExpenses: plannedExpenses,
+            variableExpenses: variableExpenses,
+            modelContext: modelContext
         )
     }
 

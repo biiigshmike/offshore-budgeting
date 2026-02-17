@@ -460,15 +460,7 @@ struct CardsView: View {
 
         if let variable = card.variableExpenses {
             for expense in variable {
-                if let allocation = expense.allocation {
-                    expense.allocation = nil
-                    modelContext.delete(allocation)
-                }
-                if let offsetSettlement = expense.offsetSettlement {
-                    expense.offsetSettlement = nil
-                    modelContext.delete(offsetSettlement)
-                }
-                modelContext.delete(expense)
+                VariableExpenseDeletionService.delete(expense, modelContext: modelContext)
             }
         }
 

@@ -322,11 +322,11 @@ struct BudgetDetailView: View {
     }
 
     private var plannedExpensesEffectiveTotal: Double {
-        plannedExpensesForCalculations.reduce(0) { $0 + $1.effectiveAmount() }
+        plannedExpensesForCalculations.reduce(0) { $0 + SavingsMathService.plannedBudgetImpactAmount(for: $1) }
     }
 
     private var variableExpensesTotal: Double {
-        variableExpensesForCalculations.reduce(0) { $0 + $1.amount }
+        variableExpensesForCalculations.reduce(0) { $0 + SavingsMathService.variableBudgetImpactAmount(for: $1) }
     }
     
     // MARK: - Savings math (reacts to category + type)
@@ -1190,15 +1190,7 @@ struct BudgetDetailView: View {
     }
 
     private func deleteVariableExpenseRecord(_ expense: VariableExpense) {
-        if let allocation = expense.allocation {
-            expense.allocation = nil
-            modelContext.delete(allocation)
-        }
-        if let offsetSettlement = expense.offsetSettlement {
-            expense.offsetSettlement = nil
-            modelContext.delete(offsetSettlement)
-        }
-        modelContext.delete(expense)
+        VariableExpenseDeletionService.delete(expense, modelContext: modelContext)
     }
 
     // MARK: - Category Limit Math
@@ -1207,14 +1199,14 @@ struct BudgetDetailView: View {
         plannedExpensesInBudget
             .filter { $0.category?.id == category.id }
             .reduce(0) { total, expense in
-                total + expense.effectiveAmount()
+                total + SavingsMathService.plannedBudgetImpactAmount(for: expense)
             }
     }
 
     private func variableContribution(for category: Category) -> Double {
         variableExpensesInBudget
             .filter { $0.category?.id == category.id }
-            .reduce(0) { $0 + $1.amount }
+            .reduce(0) { $0 + SavingsMathService.variableBudgetImpactAmount(for: $1) }
     }
 
     private func updateBudgetDetailCommandAvailability() {

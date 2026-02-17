@@ -12,6 +12,8 @@ struct IncomeView: View {
 
     let workspace: Workspace
     @Query private var incomes: [Income]
+    @Query private var plannedExpenses: [PlannedExpense]
+    @Query private var variableExpenses: [VariableExpense]
 
     @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
     @AppStorage(AppShortcutNavigationStore.pendingActionKey) private var pendingShortcutActionRaw: String = ""
@@ -87,6 +89,14 @@ struct IncomeView: View {
         _incomes = Query(
             filter: #Predicate<Income> { $0.workspace?.id == workspaceID },
             sort: [SortDescriptor(\Income.date, order: .reverse)]
+        )
+        _plannedExpenses = Query(
+            filter: #Predicate<PlannedExpense> { $0.workspace?.id == workspaceID },
+            sort: [SortDescriptor(\PlannedExpense.expenseDate, order: .forward)]
+        )
+        _variableExpenses = Query(
+            filter: #Predicate<VariableExpense> { $0.workspace?.id == workspaceID },
+            sort: [SortDescriptor(\VariableExpense.transactionDate, order: .forward)]
         )
 
         let today = Date()
@@ -422,6 +432,14 @@ struct IncomeView: View {
                 consumePendingShortcutActionIfNeeded()
                 commandHub.activate(.income)
                 updateIncomeCommandAvailability()
+                SavingsAccountService.runAutoCaptureIfNeeded(
+                    for: workspace,
+                    defaultBudgetingPeriodRaw: UserDefaults.standard.string(forKey: "general_defaultBudgetingPeriod") ?? BudgetingPeriod.monthly.rawValue,
+                    incomes: incomes,
+                    plannedExpenses: plannedExpenses,
+                    variableExpenses: variableExpenses,
+                    modelContext: modelContext
+                )
             }
             .onDisappear {
                 commandHub.deactivate(.income)

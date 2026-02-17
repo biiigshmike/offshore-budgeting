@@ -33,6 +33,7 @@ struct EditPlannedExpenseView: View {
     @Query private var cards: [Card]
     @Query private var categories: [Category]
     @Query private var allocationAccounts: [AllocationAccount]
+    @Query private var savingsAccounts: [SavingsAccount]
 
     // MARK: - Form State
 
@@ -48,6 +49,8 @@ struct EditPlannedExpenseView: View {
     @State private var allocationAmountText: String = ""
     @State private var selectedOffsetAccountID: UUID? = nil
     @State private var offsetAmountText: String = ""
+    @State private var applySavingsOffset: Bool = false
+    @State private var savingsOffsetAmountText: String = ""
 
     @State private var isProgrammaticSync: Bool = false
 
@@ -57,6 +60,7 @@ struct EditPlannedExpenseView: View {
     @State private var showingMissingCardAlert: Bool = false
     @State private var showingInvalidSplitAmountAlert: Bool = false
     @State private var showingInvalidOffsetAmountAlert: Bool = false
+    @State private var showingInvalidSavingsOffsetAmountAlert: Bool = false
 
     init(workspace: Workspace, plannedExpense: PlannedExpense) {
         self.workspace = workspace
@@ -78,6 +82,11 @@ struct EditPlannedExpenseView: View {
                 $0.workspace?.id == workspaceID && $0.isArchived == false
             },
             sort: [SortDescriptor(\AllocationAccount.name, order: .forward)]
+        )
+
+        _savingsAccounts = Query(
+            filter: #Predicate<SavingsAccount> { $0.workspace?.id == workspaceID },
+            sort: [SortDescriptor(\SavingsAccount.createdAt, order: .forward)]
         )
     }
 
@@ -104,6 +113,12 @@ struct EditPlannedExpenseView: View {
         if hasAllocationConfigured && !hasOffsetConfigured { return .split }
         if hasOffsetConfigured && !hasAllocationConfigured { return .offset }
         return nil
+    }
+
+    private var availableSavingsBalance: Double {
+        let current = max(0, savingsAccounts.first?.total ?? 0)
+        let existingOffset = max(0, -(plannedExpense.savingsLedgerEntry?.amount ?? 0))
+        return current + existingOffset
     }
 
     private var canSave: Bool {
@@ -143,6 +158,27 @@ struct EditPlannedExpenseView: View {
                     guard parsedSharedAmount <= available else {
                         return false
                     }
+                }
+            }
+        }
+
+        if applySavingsOffset {
+            if activeSharedBalanceMode != nil {
+                return false
+            }
+
+            let trimmedSavings = savingsOffsetAmountText.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmedSavings.isEmpty {
+                guard let parsed = CurrencyFormatter.parseAmount(trimmedSavings), parsed >= 0 else {
+                    return false
+                }
+
+                guard parsed <= plannedAmount else {
+                    return false
+                }
+
+                guard parsed <= availableSavingsBalance else {
+                    return false
                 }
             }
         }
@@ -190,6 +226,8 @@ struct EditPlannedExpenseView: View {
             if isSharedBalanceEnabled {
                 sharedBalanceSection
             }
+
+            savingsOffsetSection
         }
         .navigationTitle("Edit Planned Expense")
         .toolbar {
@@ -234,6 +272,11 @@ struct EditPlannedExpenseView: View {
         } message: {
             Text("Offset amount must be 0 or greater, cannot exceed the planned amount, and cannot exceed the selected account balance.")
         }
+        .alert("Invalid Savings Offset Amount", isPresented: $showingInvalidSavingsOffsetAmountAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("Savings offset amount must be 0 or greater, cannot exceed planned amount, and cannot exceed available savings.")
+        }
         .onAppear {
             title = plannedExpense.title
             plannedAmountText = CurrencyFormatter.editingString(from: plannedExpense.plannedAmount)
@@ -254,6 +297,16 @@ struct EditPlannedExpenseView: View {
                 offsetAmountText = CurrencyFormatter.editingString(from: -settlement.amount)
             } else {
                 offsetAmountText = ""
+            }
+
+            if let savingsEntry = plannedExpense.savingsLedgerEntry,
+               savingsEntry.kind == .expenseOffset,
+               savingsEntry.amount < 0 {
+                applySavingsOffset = true
+                savingsOffsetAmountText = CurrencyFormatter.editingString(from: -savingsEntry.amount)
+            } else {
+                applySavingsOffset = false
+                savingsOffsetAmountText = ""
             }
 
             if hasAllocationConfigured && !hasOffsetConfigured {
@@ -330,6 +383,33 @@ struct EditPlannedExpenseView: View {
                 }
             }
         }
+        .disabled(applySavingsOffset)
+    }
+
+    private var savingsOffsetSection: some View {
+        Section {
+            Toggle("Pay From Savings", isOn: $applySavingsOffset)
+
+            if applySavingsOffset {
+                TextField("Savings Amount", text: $savingsOffsetAmountText)
+                    .keyboardType(.decimalPad)
+
+                HStack {
+                    Text("Available Savings")
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text(availableSavingsBalance, format: CurrencyFormatter.currencyStyle())
+                        .fontWeight(.semibold)
+                }
+            }
+        } header: {
+            Text("Savings Offset")
+        } footer: {
+            if activeSharedBalanceMode != nil {
+                Text("Clear Shared Balance actions to use Savings Offset.")
+            }
+        }
+        .disabled(activeSharedBalanceMode != nil)
     }
 
     private var sharedBalanceModeBinding: Binding<SharedBalanceMode?> {
@@ -592,6 +672,26 @@ struct EditPlannedExpenseView: View {
             offsetAmount = 0
         }
 
+        let savingsOffsetAmount: Double
+        if applySavingsOffset {
+            let trimmed = savingsOffsetAmountText.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty {
+                savingsOffsetAmount = 0
+            } else {
+                guard let parsed = CurrencyFormatter.parseAmount(trimmed), parsed >= 0, parsed <= planned else {
+                    showingInvalidSavingsOffsetAmountAlert = true
+                    return
+                }
+                guard parsed <= availableSavingsBalance else {
+                    showingInvalidSavingsOffsetAmountAlert = true
+                    return
+                }
+                savingsOffsetAmount = parsed
+            }
+        } else {
+            savingsOffsetAmount = 0
+        }
+
         let hasSplit = resolvedAllocationAccount != nil && allocationAmount > 0
         let hasOffset = resolvedOffsetAccount != nil && offsetAmount > 0
 
@@ -674,6 +774,19 @@ struct EditPlannedExpenseView: View {
             modelContext.delete(existingOffset)
         }
 
+        if savingsOffsetAmount > 0 {
+            SavingsAccountService.upsertSavingsOffset(
+                workspace: workspace,
+                plannedExpense: plannedExpense,
+                offsetAmount: savingsOffsetAmount,
+                note: savingsOffsetNote(for: trimmedTitle),
+                date: expenseDate,
+                modelContext: modelContext
+            )
+        } else {
+            SavingsAccountService.removeSavingsOffset(for: plannedExpense, modelContext: modelContext)
+        }
+
         try? modelContext.save()
         dismiss()
     }
@@ -687,6 +800,10 @@ struct EditPlannedExpenseView: View {
 
     private func offsetNote(for title: String) -> String {
         "Offset applied to \(title)"
+    }
+
+    private func savingsOffsetNote(for title: String) -> String {
+        "Savings offset applied to \(title)"
     }
 
     private func liveEditingAmountString(from value: Double) -> String {

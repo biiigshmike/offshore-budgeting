@@ -308,6 +308,12 @@ final class Workspace {
     var allocationSettlements: [AllocationSettlement]? = nil
 
     @Relationship(deleteRule: .cascade)
+    var savingsAccounts: [SavingsAccount]? = nil
+
+    @Relationship(deleteRule: .cascade)
+    var savingsLedgerEntries: [SavingsLedgerEntry]? = nil
+
+    @Relationship(deleteRule: .cascade)
     var importMerchantRules: [ImportMerchantRule]? = nil
 
     @Relationship(deleteRule: .cascade)
@@ -620,6 +626,11 @@ final class PlannedExpense {
     // The inverse is declared on AllocationSettlement.plannedExpense.
     var offsetSettlement: AllocationSettlement? = nil
 
+    // IMPORTANT:
+    // Keep this un-annotated on this toolchain to avoid circular macro expansion.
+    // The inverse is declared on SavingsLedgerEntry.plannedExpense.
+    var savingsLedgerEntry: SavingsLedgerEntry? = nil
+
     var sourcePresetID: UUID? = nil
     var sourceBudgetID: UUID? = nil
 
@@ -676,6 +687,11 @@ final class VariableExpense {
     // Keep this un-annotated on this toolchain to avoid circular macro expansion.
     // The inverse is declared on AllocationSettlement.expense.
     var offsetSettlement: AllocationSettlement? = nil
+
+    // IMPORTANT:
+    // Keep this un-annotated on this toolchain to avoid circular macro expansion.
+    // The inverse is declared on SavingsLedgerEntry.variableExpense.
+    var savingsLedgerEntry: SavingsLedgerEntry? = nil
 
     init(
         id: UUID = UUID(),
@@ -883,6 +899,117 @@ final class IncomeSeries {
     }
 }
 
+// MARK: - Savings
+
+enum SavingsLedgerEntryKind: String, CaseIterable, Identifiable {
+    case periodClose
+    case manualAdjustment
+    case expenseOffset
+
+    var id: String { rawValue }
+}
+
+@Model
+final class SavingsAccount {
+
+    var id: UUID = UUID()
+    var name: String = "Savings Account"
+    var total: Double = 0
+    var didBackfillHistory: Bool = false
+    var autoCaptureThroughDate: Date? = nil
+    var createdAt: Date = Date.now
+    var updatedAt: Date = Date.now
+
+    @Relationship(inverse: \Workspace.savingsAccounts)
+    var workspace: Workspace? = nil
+
+    @Relationship(deleteRule: .cascade)
+    var entries: [SavingsLedgerEntry]? = nil
+
+    init(
+        id: UUID = UUID(),
+        name: String = "Savings Account",
+        total: Double = 0,
+        didBackfillHistory: Bool = false,
+        autoCaptureThroughDate: Date? = nil,
+        createdAt: Date = .now,
+        updatedAt: Date = .now,
+        workspace: Workspace? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.total = total
+        self.didBackfillHistory = didBackfillHistory
+        self.autoCaptureThroughDate = autoCaptureThroughDate
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.workspace = workspace
+    }
+}
+
+@Model
+final class SavingsLedgerEntry {
+
+    var id: UUID = UUID()
+    var date: Date = Date.now
+    var amount: Double = 0
+    var note: String = ""
+    var kindRaw: String = SavingsLedgerEntryKind.manualAdjustment.rawValue
+    var periodStartDate: Date? = nil
+    var periodEndDate: Date? = nil
+    var createdAt: Date = Date.now
+    var updatedAt: Date = Date.now
+
+    @Relationship(inverse: \Workspace.savingsLedgerEntries)
+    var workspace: Workspace? = nil
+
+    @Relationship(inverse: \SavingsAccount.entries)
+    var account: SavingsAccount? = nil
+
+    @Relationship(inverse: \VariableExpense.savingsLedgerEntry)
+    var variableExpense: VariableExpense? = nil
+
+    @Relationship(inverse: \PlannedExpense.savingsLedgerEntry)
+    var plannedExpense: PlannedExpense? = nil
+
+    init(
+        id: UUID = UUID(),
+        date: Date,
+        amount: Double,
+        note: String,
+        kindRaw: String,
+        periodStartDate: Date? = nil,
+        periodEndDate: Date? = nil,
+        createdAt: Date = .now,
+        updatedAt: Date = .now,
+        workspace: Workspace? = nil,
+        account: SavingsAccount? = nil,
+        variableExpense: VariableExpense? = nil,
+        plannedExpense: PlannedExpense? = nil
+    ) {
+        self.id = id
+        self.date = date
+        self.amount = amount
+        self.note = note
+        self.kindRaw = kindRaw
+        self.periodStartDate = periodStartDate
+        self.periodEndDate = periodEndDate
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.workspace = workspace
+        self.account = account
+        self.variableExpense = variableExpense
+        self.plannedExpense = plannedExpense
+    }
+}
+
+extension SavingsLedgerEntry {
+    var kind: SavingsLedgerEntryKind {
+        get { SavingsLedgerEntryKind(rawValue: kindRaw) ?? .manualAdjustment }
+        set { kindRaw = newValue.rawValue }
+    }
+}
+
 // MARK: - PlannedExpenseDeletionService
 
 @MainActor
@@ -897,6 +1024,34 @@ enum PlannedExpenseDeletionService {
         if let offsetSettlement = expense.offsetSettlement {
             expense.offsetSettlement = nil
             modelContext.delete(offsetSettlement)
+        }
+
+        if let savingsEntry = expense.savingsLedgerEntry {
+            expense.savingsLedgerEntry = nil
+            modelContext.delete(savingsEntry)
+        }
+
+        modelContext.delete(expense)
+    }
+}
+
+@MainActor
+enum VariableExpenseDeletionService {
+
+    static func delete(_ expense: VariableExpense, modelContext: ModelContext) {
+        if let allocation = expense.allocation {
+            expense.allocation = nil
+            modelContext.delete(allocation)
+        }
+
+        if let offsetSettlement = expense.offsetSettlement {
+            expense.offsetSettlement = nil
+            modelContext.delete(offsetSettlement)
+        }
+
+        if let savingsEntry = expense.savingsLedgerEntry {
+            expense.savingsLedgerEntry = nil
+            modelContext.delete(savingsEntry)
         }
 
         modelContext.delete(expense)
