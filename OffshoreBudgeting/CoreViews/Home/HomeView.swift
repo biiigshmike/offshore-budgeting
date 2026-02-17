@@ -11,8 +11,6 @@ import SwiftData
 struct HomeView: View {
 
     let workspace: Workspace
-    let showAssistantToolbarButton: Bool
-    let onOpenAssistant: () -> Void
 
     @Query private var budgets: [Budget]
     @Query private var cards: [Card]
@@ -126,14 +124,8 @@ struct HomeView: View {
         #endif
     }
 
-    init(
-        workspace: Workspace,
-        showAssistantToolbarButton: Bool = false,
-        onOpenAssistant: @escaping () -> Void = { }
-    ) {
+    init(workspace: Workspace) {
         self.workspace = workspace
-        self.showAssistantToolbarButton = showAssistantToolbarButton
-        self.onOpenAssistant = onOpenAssistant
         let workspaceID = workspace.id
 
         _appliedStartTimestamp = AppStorage(wrappedValue: 0, Self.appliedStartKey(workspaceID: workspaceID))
@@ -263,23 +255,9 @@ struct HomeView: View {
                 ToolbarItemGroup(placement: .primaryAction) {
                     homeActionsToolbarButton
                 }
-
-                if showAssistantToolbarButton {
-                    ToolbarSpacer(.flexible, placement: .primaryAction)
-
-                    ToolbarItemGroup(placement: .primaryAction) {
-                        assistantToolbarButton
-                    }
-                }
             } else {
                 ToolbarItem(placement: .topBarTrailing) {
                     homeActionsToolbarButton
-                }
-
-                if showAssistantToolbarButton {
-                    ToolbarItem(placement: .primaryAction) {
-                        assistantToolbarButton
-                    }
                 }
             }
         }
@@ -894,13 +872,6 @@ struct HomeView: View {
             Image(systemName: "ellipsis")
         }
         .accessibilityLabel("Home Actions")
-    }
-
-    private var assistantToolbarButton: some View {
-        Button(action: onOpenAssistant) {
-            Image(systemName: "figure.wave")
-        }
-        .accessibilityLabel("Open Assistant")
     }
 
     private var widgetsHeader: some View {
