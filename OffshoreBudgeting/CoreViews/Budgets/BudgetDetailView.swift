@@ -1500,8 +1500,50 @@ private struct BudgetPlannedExpenseRow: View {
     let expense: PlannedExpense
     let showsCardName: Bool
 
+    private enum SharedBalancePresentation {
+        case none
+        case split
+        case offset
+    }
+
     private var amountToShow: Double {
         expense.effectiveAmount()
+    }
+
+    private var offsetAmount: Double {
+        max(0, -(expense.offsetSettlement?.amount ?? 0))
+    }
+
+    private var splitAmount: Double {
+        max(0, expense.allocation?.allocatedAmount ?? 0)
+    }
+
+    private var presentation: SharedBalancePresentation {
+        if offsetAmount > 0 { return .offset }
+        if splitAmount > 0 { return .split }
+        return .none
+    }
+
+    private var indicatorSymbolName: String? {
+        switch presentation {
+        case .none:
+            return nil
+        case .split:
+            return "arrow.trianglehead.branch"
+        case .offset:
+            return "arrow.trianglehead.2.clockwise"
+        }
+    }
+
+    private var indicatorAccessibilityLabel: String {
+        switch presentation {
+        case .none:
+            return ""
+        case .split:
+            return "Shared balance split"
+        case .offset:
+            return "Shared balance offset"
+        }
     }
 
     private var categoryColor: Color {
@@ -1514,10 +1556,20 @@ private struct BudgetPlannedExpenseRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
 
-            Circle()
-                .fill(categoryColor)
-                .frame(width: 10, height: 10)
-                .padding(.top, 6)
+            VStack(spacing: 4) {
+                Circle()
+                    .fill(categoryColor)
+                    .frame(width: 10, height: 10)
+
+                if let indicatorSymbolName {
+                    Image(systemName: indicatorSymbolName)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .accessibilityLabel(indicatorAccessibilityLabel)
+                }
+            }
+            .frame(width: 12)
+            .padding(.top, 6)
 
             // LEFT SIDE
             VStack(alignment: .leading, spacing: 4) {
@@ -1583,7 +1635,7 @@ private struct BudgetVariableExpenseRow: View {
         case .split:
             return "arrow.trianglehead.branch"
         case .offset:
-            return "text.append"
+            return "arrow.trianglehead.2.clockwise"
         }
     }
 

@@ -18,8 +18,11 @@ struct AllocationAccountDetailView: View {
     @State private var showingSettlementDeleteConfirm: Bool = false
     @State private var pendingSettlementDeleteID: UUID? = nil
 
-    @State private var showingEditSettlementSheet: Bool = false
-    @State private var editingSettlementID: UUID? = nil
+    @State private var showingChargeDeleteConfirm: Bool = false
+    @State private var pendingChargeDeleteID: UUID? = nil
+
+    @State private var showingEditEntrySheet: Bool = false
+    @State private var editingEntry: EditableEntry? = nil
 
     @State private var showingSettlementActionError: Bool = false
     @State private var settlementActionErrorMessage: String = ""
@@ -67,8 +70,19 @@ struct AllocationAccountDetailView: View {
                             .swipeActions(edge: .leading, allowsFullSwipe: false) {
                                 if let settlementID = row.settlementID, !account.isArchived {
                                     Button {
-                                        editingSettlementID = settlementID
-                                        showingEditSettlementSheet = true
+                                        editingEntry = .settlement(settlementID)
+                                        showingEditEntrySheet = true
+                                    } label: {
+                                        Label("Edit", systemImage: "pencil")
+                                    }
+                                    .tint(Color("AccentColor"))
+                                }
+                                if isEditableChargeRow(row), !account.isArchived {
+                                    Button {
+                                        if let allocationID = row.allocationID {
+                                            editingEntry = .allocation(allocationID)
+                                            showingEditEntrySheet = true
+                                        }
                                     } label: {
                                         Label("Edit", systemImage: "pencil")
                                     }
@@ -79,6 +93,13 @@ struct AllocationAccountDetailView: View {
                                 if let settlementID = row.settlementID, !account.isArchived {
                                     Button(role: .destructive) {
                                         requestDeleteSettlement(id: settlementID)
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
+                                    }
+                                }
+                                if isEditableChargeRow(row), !account.isArchived, let allocationID = row.allocationID {
+                                    Button(role: .destructive) {
+                                        requestDeleteChargeAllocation(id: allocationID)
                                     } label: {
                                         Label("Delete", systemImage: "trash")
                                     }
@@ -170,6 +191,16 @@ struct AllocationAccountDetailView: View {
                 Text("This settlement will be deleted.")
             }
         }
+        .alert("Delete Split Charge?", isPresented: $showingChargeDeleteConfirm) {
+            Button("Delete", role: .destructive) {
+                performPendingChargeDelete()
+            }
+            Button("Cancel", role: .cancel) {
+                pendingChargeDeleteID = nil
+            }
+        } message: {
+            Text("Deleting this split charge will remove the split and restore the original gross expense amount.")
+        }
         .alert("Couldn't Update Settlement", isPresented: $showingSettlementActionError) {
             Button("OK", role: .cancel) { }
         } message: {
@@ -185,17 +216,21 @@ struct AllocationAccountDetailView: View {
                 EditAllocationAccountView(account: account)
             }
         }
-        .sheet(isPresented: $showingEditSettlementSheet, onDismiss: {
-            editingSettlementID = nil
+        .sheet(isPresented: $showingEditEntrySheet, onDismiss: {
+            editingEntry = nil
         }) {
             NavigationStack {
-                if let settlement = settlement(for: editingSettlementID) {
-                    EditAllocationSettlementView(settlement: settlement)
+                if let resolvedEditingEntry {
+                    EditSharedBalanceEntryView(
+                        workspace: workspace,
+                        account: account,
+                        entry: resolvedEditingEntry
+                    )
                 } else {
                     ContentUnavailableView(
-                        "Settlement Unavailable",
+                        "Entry Unavailable",
                         systemImage: "exclamationmark.triangle",
-                        description: Text("The selected settlement could not be found.")
+                        description: Text("The selected shared balance entry could not be found.")
                     )
                 }
             }
@@ -222,11 +257,6 @@ struct AllocationAccountDetailView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                if row.isLinkedSettlement {
-                    Text("Linked to expense")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
             }
 
             Spacer(minLength: 12)
@@ -250,6 +280,21 @@ struct AllocationAccountDetailView: View {
         guard let id = pendingSettlementDeleteID else { return }
         deleteSettlement(id: id)
         pendingSettlementDeleteID = nil
+    }
+
+    private func requestDeleteChargeAllocation(id: UUID) {
+        if confirmBeforeDeleting {
+            pendingChargeDeleteID = id
+            showingChargeDeleteConfirm = true
+        } else {
+            deleteChargeAllocation(id: id)
+        }
+    }
+
+    private func performPendingChargeDelete() {
+        guard let id = pendingChargeDeleteID else { return }
+        deleteChargeAllocation(id: id)
+        pendingChargeDeleteID = nil
     }
 
     private func deleteSettlement(id: UUID) {
@@ -283,6 +328,60 @@ struct AllocationAccountDetailView: View {
         return (account.settlements ?? []).first(where: { $0.id == id })
     }
 
+    private func allocation(for id: UUID?) -> ExpenseAllocation? {
+        guard let id else { return nil }
+        return (account.expenseAllocations ?? []).first(where: { $0.id == id })
+    }
+
+    private func isEditableChargeRow(_ row: AllocationLedgerService.LedgerRow) -> Bool {
+        guard row.type == .charge else { return false }
+        guard let allocation = allocation(for: row.allocationID) else { return false }
+        return allocation.expense != nil || allocation.plannedExpense != nil
+    }
+
+    private var resolvedEditingEntry: EditSharedBalanceEntryView.Entry? {
+        guard let editingEntry else { return nil }
+
+        switch editingEntry {
+        case .allocation(let id):
+            guard let allocation = allocation(for: id) else { return nil }
+            return .allocation(allocation)
+        case .settlement(let id):
+            guard let settlement = settlement(for: id) else { return nil }
+            return .settlement(settlement)
+        }
+    }
+
+    private func deleteChargeAllocation(id: UUID) {
+        guard let allocation = allocation(for: id) else { return }
+        if let expense = allocation.expense {
+            let oldSplit = max(0, allocation.allocatedAmount)
+            let gross = max(0, expense.amount + oldSplit)
+            expense.amount = gross
+
+            if expense.allocation?.id == allocation.id {
+                expense.allocation = nil
+            }
+        } else if let plannedExpense = allocation.plannedExpense {
+            plannedExpense.actualAmount = 0
+
+            if plannedExpense.allocation?.id == allocation.id {
+                plannedExpense.allocation = nil
+            }
+        } else {
+            return
+        }
+
+        modelContext.delete(allocation)
+
+        do {
+            try modelContext.save()
+        } catch {
+            settlementActionErrorMessage = "Unable to delete split charge. \(error.localizedDescription)"
+            showingSettlementActionError = true
+        }
+    }
+
     private func archiveAccountAndDismiss() {
         account.isArchived = true
         account.archivedAt = .now
@@ -295,6 +394,565 @@ struct AllocationAccountDetailView: View {
         modelContext.delete(account)
         try? modelContext.save()
         dismiss()
+    }
+}
+
+private enum EditableEntry {
+    case allocation(UUID)
+    case settlement(UUID)
+}
+
+private struct EditSharedBalanceEntryView: View {
+
+    enum Entry {
+        case allocation(ExpenseAllocation)
+        case settlement(AllocationSettlement)
+    }
+
+    private enum ActionMode: String, CaseIterable, Identifiable {
+        case none
+        case split
+        case offset
+
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .none: return "None"
+            case .split: return "Split"
+            case .offset: return "Offset"
+            }
+        }
+    }
+
+    private enum LinkedSource {
+        case variable(VariableExpense)
+        case planned(PlannedExpense)
+        case none
+    }
+
+    let workspace: Workspace
+    let account: AllocationAccount
+    let entry: Entry
+
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
+
+    @Query private var allocationAccounts: [AllocationAccount]
+
+    @State private var actionMode: ActionMode = .none
+    @State private var selectedAccountID: UUID? = nil
+    @State private var amountText: String = ""
+    @State private var note: String = ""
+    @State private var date: Date = .now
+    @State private var direction: Int = -1
+
+    @State private var showingInvalidAmountAlert: Bool = false
+    @State private var showingSaveErrorAlert: Bool = false
+    @State private var saveErrorMessage: String = ""
+
+    init(workspace: Workspace, account: AllocationAccount, entry: Entry) {
+        self.workspace = workspace
+        self.account = account
+        self.entry = entry
+
+        let workspaceID = workspace.id
+        _allocationAccounts = Query(
+            filter: #Predicate<AllocationAccount> {
+                $0.workspace?.id == workspaceID && $0.isArchived == false
+            },
+            sort: [SortDescriptor(\AllocationAccount.name, order: .forward)]
+        )
+    }
+
+    private var linkedSource: LinkedSource {
+        switch entry {
+        case .allocation(let allocation):
+            if let expense = allocation.expense { return .variable(expense) }
+            if let plannedExpense = allocation.plannedExpense { return .planned(plannedExpense) }
+            return .none
+        case .settlement(let settlement):
+            if let expense = settlement.expense { return .variable(expense) }
+            if let plannedExpense = settlement.plannedExpense { return .planned(plannedExpense) }
+            return .none
+        }
+    }
+
+    private var isLinked: Bool {
+        switch linkedSource {
+        case .variable, .planned: return true
+        case .none: return false
+        }
+    }
+
+    private var selectedAccount: AllocationAccount? {
+        guard let selectedAccountID else { return nil }
+        return allocationAccounts.first(where: { $0.id == selectedAccountID })
+    }
+
+    private var amountValue: Double? {
+        CurrencyFormatter.parseAmount(amountText)
+    }
+
+    private var linkedCardName: String {
+        switch linkedSource {
+        case .variable(let expense):
+            return expense.card?.name ?? "No Card"
+        case .planned(let plannedExpense):
+            return plannedExpense.card?.name ?? "No Card"
+        case .none:
+            return "No Card"
+        }
+    }
+
+    private var linkedCategoryName: String {
+        switch linkedSource {
+        case .variable(let expense):
+            return expense.category?.name ?? "Uncategorized"
+        case .planned(let plannedExpense):
+            return plannedExpense.category?.name ?? "Uncategorized"
+        case .none:
+            return "Uncategorized"
+        }
+    }
+
+    private var maxLinkedAmount: Double {
+        switch linkedSource {
+        case .variable(let expense):
+            return variableGrossAmount(for: expense)
+        case .planned(let plannedExpense):
+            return max(0, plannedExpense.plannedAmount)
+        case .none:
+            return .greatestFiniteMagnitude
+        }
+    }
+
+    private var canSave: Bool {
+        if isLinked {
+            if actionMode == .none {
+                return true
+            }
+
+            guard selectedAccountID != nil else { return false }
+            guard let amount = amountValue, amount > 0 else { return false }
+            guard amount <= maxLinkedAmount else { return false }
+
+            if actionMode == .offset, let selectedAccount {
+                let available = availableOffsetBalance(for: selectedAccount)
+                guard amount <= available else { return false }
+            }
+
+            return true
+        }
+
+        guard selectedAccountID != nil else { return false }
+        guard let amount = amountValue, amount > 0 else { return false }
+        return amount > 0
+    }
+
+    var body: some View {
+        Form {
+            if isLinked {
+                Section("Linked Entry") {
+                    detailRow(label: "Card", value: linkedCardName)
+                    detailRow(label: "Category", value: linkedCategoryName)
+                }
+
+                Section("Action") {
+                    Picker("Action", selection: $actionMode) {
+                        ForEach(ActionMode.allCases) { mode in
+                            Text(mode.title).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                }
+            }
+
+            Section("Shared Balance Entry") {
+                Picker("Shared Balance", selection: $selectedAccountID) {
+                    Text("None").tag(UUID?.none)
+                    ForEach(allocationAccounts) { account in
+                        Text(account.name).tag(Optional(account.id))
+                    }
+                }
+
+                if !isLinked || actionMode != .none {
+                    TextField("Amount", text: $amountText)
+                        .keyboardType(.decimalPad)
+                }
+
+                if !isLinked || actionMode == .offset {
+                    Picker("Direction", selection: $direction) {
+                        Text("Add to Shared Balance").tag(1)
+                        Text("Use Shared Balance").tag(-1)
+                    }
+                    .pickerStyle(.segmented)
+                }
+
+                if !isLinked || actionMode == .offset {
+                    TextField("Note", text: $note)
+                }
+
+                HStack {
+                    Text("Date")
+                    Spacer()
+                    PillDatePickerField(title: "Date", date: $date)
+                }
+
+                if let selectedAccount {
+                    HStack {
+                        Text("Available Balance")
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text(AllocationLedgerService.balance(for: selectedAccount), format: CurrencyFormatter.currencyStyle())
+                            .fontWeight(.semibold)
+                    }
+                }
+            }
+        }
+        .navigationTitle("Edit Shared Balance Entry")
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button("Cancel") { dismiss() }
+            }
+            if #available(iOS 26.0, *) {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Save") { save() }
+                        .disabled(!canSave)
+                        .tint(.accentColor)
+                        .controlSize(.large)
+                        .buttonStyle(.glassProminent)
+                }
+            } else {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Save") { save() }
+                        .disabled(!canSave)
+                        .tint(.accentColor)
+                        .controlSize(.large)
+                        .buttonStyle(.plain)
+                }
+            }
+        }
+        .alert("Invalid Amount", isPresented: $showingInvalidAmountAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("Please enter a valid amount that matches this action.")
+        }
+        .alert("Couldn't Save", isPresented: $showingSaveErrorAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(saveErrorMessage)
+        }
+        .onAppear {
+            seedFromEntry()
+        }
+    }
+
+    private func seedFromEntry() {
+        selectedAccountID = account.id
+        note = ""
+        direction = -1
+        date = .now
+
+        switch entry {
+        case .allocation(let allocation):
+            actionMode = .split
+            selectedAccountID = allocation.account?.id ?? account.id
+            amountText = CurrencyFormatter.editingString(from: max(0, allocation.allocatedAmount))
+
+            if let expense = allocation.expense {
+                date = expense.transactionDate
+                note = offsetNote(for: expense.descriptionText)
+            } else if let plannedExpense = allocation.plannedExpense {
+                date = plannedExpense.expenseDate
+                note = offsetNote(for: plannedExpense.title)
+            }
+        case .settlement(let settlement):
+            actionMode = isLinked ? .offset : .none
+            selectedAccountID = settlement.account?.id ?? account.id
+            amountText = CurrencyFormatter.editingString(from: max(0, abs(settlement.amount)))
+            note = settlement.note
+            date = settlement.date
+            direction = settlement.amount < 0 ? -1 : 1
+        }
+    }
+
+    private func save() {
+        if isLinked {
+            if actionMode != .none {
+                guard let selectedAccount else {
+                    saveErrorMessage = "Please select a shared balance account."
+                    showingSaveErrorAlert = true
+                    return
+                }
+
+                guard let rawAmount = amountValue, rawAmount > 0 else {
+                    showingInvalidAmountAlert = true
+                    return
+                }
+
+                guard rawAmount <= maxLinkedAmount else {
+                    showingInvalidAmountAlert = true
+                    return
+                }
+
+                if actionMode == .offset {
+                    let available = availableOffsetBalance(for: selectedAccount)
+                    guard rawAmount <= available else {
+                        showingInvalidAmountAlert = true
+                        return
+                    }
+                }
+            }
+        }
+
+        do {
+            switch linkedSource {
+            case .variable(let expense):
+                if actionMode == .none {
+                    try saveLinkedVariable(expense, account: account, amount: 0)
+                } else if let selectedAccount, let rawAmount = amountValue {
+                    try saveLinkedVariable(expense, account: selectedAccount, amount: rawAmount)
+                }
+            case .planned(let plannedExpense):
+                if actionMode == .none {
+                    try saveLinkedPlanned(plannedExpense, account: account, amount: 0)
+                } else if let selectedAccount, let rawAmount = amountValue {
+                    try saveLinkedPlanned(plannedExpense, account: selectedAccount, amount: rawAmount)
+                }
+            case .none:
+                guard let selectedAccount else {
+                    saveErrorMessage = "Please select a shared balance account."
+                    showingSaveErrorAlert = true
+                    return
+                }
+                guard let rawAmount = amountValue, rawAmount > 0 else {
+                    showingInvalidAmountAlert = true
+                    return
+                }
+                try saveStandaloneSettlement(account: selectedAccount, amount: rawAmount)
+            }
+
+            try modelContext.save()
+            dismiss()
+        } catch {
+            saveErrorMessage = error.localizedDescription
+            showingSaveErrorAlert = true
+        }
+    }
+
+    private func saveLinkedVariable(_ expense: VariableExpense, account: AllocationAccount, amount: Double) throws {
+        let gross = variableGrossAmount(for: expense)
+
+        switch actionMode {
+        case .none:
+            if let allocation = expense.allocation {
+                expense.allocation = nil
+                modelContext.delete(allocation)
+            }
+            if let settlement = expense.offsetSettlement {
+                expense.offsetSettlement = nil
+                modelContext.delete(settlement)
+            }
+            expense.amount = gross
+        case .split:
+            if let settlement = expense.offsetSettlement {
+                expense.offsetSettlement = nil
+                modelContext.delete(settlement)
+            }
+
+            if let allocation = expense.allocation {
+                allocation.allocatedAmount = AllocationLedgerService.cappedAllocationAmount(amount, expenseAmount: gross)
+                allocation.updatedAt = .now
+                allocation.account = account
+                allocation.workspace = workspace
+                allocation.expense = expense
+            } else {
+                let allocation = ExpenseAllocation(
+                    allocatedAmount: AllocationLedgerService.cappedAllocationAmount(amount, expenseAmount: gross),
+                    createdAt: .now,
+                    updatedAt: .now,
+                    workspace: workspace,
+                    account: account,
+                    expense: expense,
+                    plannedExpense: nil
+                )
+                modelContext.insert(allocation)
+                expense.allocation = allocation
+            }
+
+            expense.amount = max(0, gross - amount)
+        case .offset:
+            if let allocation = expense.allocation {
+                expense.allocation = nil
+                modelContext.delete(allocation)
+            }
+
+            let signedAmount = Double(direction) * amount
+            let trimmedNote = resolvedOffsetNote(for: expense.descriptionText)
+
+            if let settlement = expense.offsetSettlement {
+                settlement.note = trimmedNote
+                settlement.amount = signedAmount
+                settlement.date = date
+                settlement.account = account
+                settlement.workspace = workspace
+                settlement.expense = expense
+                settlement.plannedExpense = nil
+            } else {
+                let settlement = AllocationSettlement(
+                    date: date,
+                    note: trimmedNote,
+                    amount: signedAmount,
+                    workspace: workspace,
+                    account: account,
+                    expense: expense,
+                    plannedExpense: nil
+                )
+                modelContext.insert(settlement)
+                expense.offsetSettlement = settlement
+            }
+
+            expense.amount = max(0, gross - amount)
+        }
+
+        expense.transactionDate = date
+        expense.workspace = workspace
+    }
+
+    private func saveLinkedPlanned(_ plannedExpense: PlannedExpense, account: AllocationAccount, amount: Double) throws {
+        let plannedAmount = max(0, plannedExpense.plannedAmount)
+
+        switch actionMode {
+        case .none:
+            if let allocation = plannedExpense.allocation {
+                plannedExpense.allocation = nil
+                modelContext.delete(allocation)
+            }
+            if let settlement = plannedExpense.offsetSettlement {
+                plannedExpense.offsetSettlement = nil
+                modelContext.delete(settlement)
+            }
+            plannedExpense.actualAmount = 0
+        case .split:
+            if let settlement = plannedExpense.offsetSettlement {
+                plannedExpense.offsetSettlement = nil
+                modelContext.delete(settlement)
+            }
+
+            if let allocation = plannedExpense.allocation {
+                allocation.allocatedAmount = AllocationLedgerService.cappedAllocationAmount(amount, expenseAmount: plannedAmount)
+                allocation.updatedAt = .now
+                allocation.account = account
+                allocation.workspace = workspace
+                allocation.expense = nil
+                allocation.plannedExpense = plannedExpense
+            } else {
+                let allocation = ExpenseAllocation(
+                    allocatedAmount: AllocationLedgerService.cappedAllocationAmount(amount, expenseAmount: plannedAmount),
+                    createdAt: .now,
+                    updatedAt: .now,
+                    workspace: workspace,
+                    account: account,
+                    expense: nil,
+                    plannedExpense: plannedExpense
+                )
+                modelContext.insert(allocation)
+                plannedExpense.allocation = allocation
+            }
+
+            plannedExpense.actualAmount = max(0, plannedAmount - amount)
+        case .offset:
+            if let allocation = plannedExpense.allocation {
+                plannedExpense.allocation = nil
+                modelContext.delete(allocation)
+            }
+
+            let signedAmount = Double(direction) * amount
+            let trimmedNote = resolvedOffsetNote(for: plannedExpense.title)
+
+            if let settlement = plannedExpense.offsetSettlement {
+                settlement.note = trimmedNote
+                settlement.amount = signedAmount
+                settlement.date = date
+                settlement.account = account
+                settlement.workspace = workspace
+                settlement.expense = nil
+                settlement.plannedExpense = plannedExpense
+            } else {
+                let settlement = AllocationSettlement(
+                    date: date,
+                    note: trimmedNote,
+                    amount: signedAmount,
+                    workspace: workspace,
+                    account: account,
+                    expense: nil,
+                    plannedExpense: plannedExpense
+                )
+                modelContext.insert(settlement)
+                plannedExpense.offsetSettlement = settlement
+            }
+
+            plannedExpense.actualAmount = max(0, plannedAmount - amount)
+        }
+
+        plannedExpense.expenseDate = date
+        plannedExpense.workspace = workspace
+    }
+
+    private func saveStandaloneSettlement(account: AllocationAccount, amount: Double) throws {
+        guard case .settlement(let settlement) = entry else {
+            throw NSError(domain: "EditSharedBalanceEntry", code: 1, userInfo: [NSLocalizedDescriptionKey: "Entry is unavailable."])
+        }
+
+        let trimmedNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        settlement.note = trimmedNote
+        settlement.date = date
+        settlement.amount = Double(direction) * amount
+        settlement.account = account
+        settlement.workspace = workspace
+    }
+
+    private func variableGrossAmount(for expense: VariableExpense) -> Double {
+        let splitAmount = max(0, expense.allocation?.allocatedAmount ?? 0)
+        let offsetAmount = max(0, -(expense.offsetSettlement?.amount ?? 0))
+        return max(0, expense.amount + splitAmount + offsetAmount)
+    }
+
+    private func availableOffsetBalance(for account: AllocationAccount) -> Double {
+        let currentBalance = max(0, AllocationLedgerService.balance(for: account))
+
+        switch linkedSource {
+        case .variable(let expense):
+            guard let existing = expense.offsetSettlement else { return currentBalance }
+            guard existing.account?.id == account.id else { return currentBalance }
+            return max(0, currentBalance + max(0, -existing.amount))
+        case .planned(let plannedExpense):
+            guard let existing = plannedExpense.offsetSettlement else { return currentBalance }
+            guard existing.account?.id == account.id else { return currentBalance }
+            return max(0, currentBalance + max(0, -existing.amount))
+        case .none:
+            return currentBalance
+        }
+    }
+
+    private func resolvedOffsetNote(for title: String) -> String {
+        let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? offsetNote(for: title) : trimmed
+    }
+
+    private func offsetNote(for title: String) -> String {
+        "Offset applied to \(title)"
+    }
+
+    private func detailRow(label: String, value: String) -> some View {
+        HStack {
+            Text(label)
+            Spacer()
+            Text(value)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.trailing)
+        }
     }
 }
 
@@ -325,8 +983,8 @@ private struct AddAllocationSettlementView: View {
                     .keyboardType(.decimalPad)
 
                 Picker("Direction", selection: directionBinding) {
-                    Text("They Owe Me").tag(1)
-                    Text("I Owe Them").tag(-1)
+                    Text("Add to Shared Balance").tag(1)
+                    Text("Use Shared Balance").tag(-1)
                 }
                 .pickerStyle(.segmented)
 
@@ -398,254 +1056,5 @@ private struct AddAllocationSettlementView: View {
 
         modelContext.insert(settlement)
         dismiss()
-    }
-}
-
-private struct EditAllocationSettlementView: View {
-    @Bindable var settlement: AllocationSettlement
-
-    @Environment(\.modelContext) private var modelContext
-    @Environment(\.dismiss) private var dismiss
-
-    @State private var note: String = ""
-    @State private var amountText: String = ""
-    @State private var date: Date = .now
-
-    @State private var direction: Int = -1
-
-    @State private var showingInvalidAmountAlert: Bool = false
-    @State private var showingSaveErrorAlert: Bool = false
-    @State private var saveErrorMessage: String = ""
-
-    private var isLinkedToExpense: Bool {
-        settlement.expense != nil || settlement.plannedExpense != nil
-    }
-
-    private var canSave: Bool {
-        guard let rawAmount = CurrencyFormatter.parseAmount(amountText) else { return false }
-        return rawAmount > 0
-    }
-
-    private var linkedTypeLabel: String? {
-        if settlement.expense != nil { return "Variable Expense" }
-        if settlement.plannedExpense != nil { return "Planned Expense" }
-        return nil
-    }
-
-    private var linkedTitle: String? {
-        if let expense = settlement.expense {
-            return expense.descriptionText
-        }
-        if let plannedExpense = settlement.plannedExpense {
-            return plannedExpense.title
-        }
-        return nil
-    }
-
-    private var linkedDate: Date? {
-        if let expense = settlement.expense {
-            return expense.transactionDate
-        }
-        if let plannedExpense = settlement.plannedExpense {
-            return plannedExpense.expenseDate
-        }
-        return nil
-    }
-
-    private var linkedAmountLabel: String? {
-        if let expense = settlement.expense {
-            return CurrencyFormatter.string(from: expense.amount)
-        }
-        if let plannedExpense = settlement.plannedExpense {
-            let effective = plannedExpense.actualAmount > 0 ? plannedExpense.actualAmount : plannedExpense.plannedAmount
-            return CurrencyFormatter.string(from: effective)
-        }
-        return nil
-    }
-
-    private var linkedCardName: String? {
-        if let expense = settlement.expense {
-            return expense.card?.name
-        }
-        if let plannedExpense = settlement.plannedExpense {
-            return plannedExpense.card?.name
-        }
-        return nil
-    }
-
-    private var linkedCategoryName: String? {
-        if let expense = settlement.expense {
-            return expense.category?.name
-        }
-        if let plannedExpense = settlement.plannedExpense {
-            return plannedExpense.category?.name
-        }
-        return nil
-    }
-
-    var body: some View {
-        Form {
-            if isLinkedToExpense {
-                Section("Linked Entry") {
-                    if let linkedTypeLabel {
-                        detailRow(label: "Type", value: linkedTypeLabel)
-                    }
-                    if let linkedTitle, !linkedTitle.isEmpty {
-                        detailRow(label: "Title", value: linkedTitle)
-                    }
-                    if let linkedDate {
-                        HStack {
-                            Text("Date")
-                            Spacer()
-                            Text(linkedDate, format: Date.FormatStyle(date: .abbreviated, time: .omitted))
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    if let linkedAmountLabel {
-                        detailRow(label: "Amount", value: linkedAmountLabel)
-                    }
-                    detailRow(label: "Card", value: linkedCardName ?? "No Card")
-                    detailRow(label: "Category", value: linkedCategoryName ?? "Uncategorized")
-                }
-            }
-
-            Section {
-                TextField("Note", text: $note)
-
-                TextField("Amount", text: $amountText)
-                    .keyboardType(.decimalPad)
-
-                Picker("Direction", selection: $direction) {
-                    Text("They Owe Me").tag(1)
-                    Text("I Owe Them").tag(-1)
-                }
-                .pickerStyle(.segmented)
-
-                HStack {
-                    Text("Date")
-                    Spacer()
-                    PillDatePickerField(title: "Date", date: $date)
-                }
-            } header: {
-                Text("Settlement")
-            } footer: {
-                if isLinkedToExpense {
-                    Text("Saving updates both this settlement and the linked expense entry.")
-                }
-            }
-        }
-        .navigationTitle("Edit Settlement")
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button("Cancel") { dismiss() }
-            }
-
-            if #available(iOS 26.0, *) {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Save") { save() }
-                        .disabled(!canSave)
-                        .tint(.accentColor)
-                        .controlSize(.large)
-                        .buttonStyle(.glassProminent)
-                }
-            } else {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Save") { save() }
-                        .disabled(!canSave)
-                        .tint(.accentColor)
-                        .controlSize(.large)
-                        .buttonStyle(.plain)
-                }
-            }
-        }
-        .alert("Invalid Amount", isPresented: $showingInvalidAmountAlert) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text("Please enter an amount greater than 0.")
-        }
-        .alert("Couldn't Save Settlement", isPresented: $showingSaveErrorAlert) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text(saveErrorMessage)
-        }
-        .onAppear {
-            note = settlement.note
-            date = settlement.date
-
-            if settlement.amount < 0 {
-                direction = -1
-                amountText = CurrencyFormatter.editingString(from: -settlement.amount)
-            } else {
-                direction = 1
-                amountText = CurrencyFormatter.editingString(from: settlement.amount)
-            }
-        }
-    }
-
-    private func save() {
-        guard let rawAmount = CurrencyFormatter.parseAmount(amountText), rawAmount > 0 else {
-            showingInvalidAmountAlert = true
-            return
-        }
-
-        let trimmedNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
-        let signedAmount = Double(direction) * rawAmount
-
-        if let expense = settlement.expense {
-            let oldOffset = abs(settlement.amount)
-            let grossAmount = max(0, expense.amount + oldOffset)
-            let newOffset = rawAmount
-
-            guard newOffset <= grossAmount else {
-                saveErrorMessage = "Offset can't exceed the linked expense amount."
-                showingSaveErrorAlert = true
-                return
-            }
-
-            settlement.note = trimmedNote
-            settlement.date = date
-            settlement.amount = signedAmount
-
-            expense.amount = max(0, grossAmount - newOffset)
-            expense.transactionDate = date
-        } else if let plannedExpense = settlement.plannedExpense {
-            let planned = max(0, plannedExpense.plannedAmount)
-            let newOffset = rawAmount
-
-            guard newOffset <= planned else {
-                saveErrorMessage = "Offset can't exceed the linked planned amount."
-                showingSaveErrorAlert = true
-                return
-            }
-
-            settlement.note = trimmedNote
-            settlement.date = date
-            settlement.amount = signedAmount
-
-            plannedExpense.actualAmount = max(0, planned - newOffset)
-            plannedExpense.expenseDate = date
-        } else {
-            settlement.note = trimmedNote
-            settlement.date = date
-            settlement.amount = signedAmount
-        }
-
-        do {
-            try modelContext.save()
-            dismiss()
-        } catch {
-            saveErrorMessage = error.localizedDescription
-            showingSaveErrorAlert = true
-        }
-    }
-
-    private func detailRow(label: String, value: String) -> some View {
-        HStack {
-            Text(label)
-            Spacer()
-            Text(value)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.trailing)
-        }
     }
 }

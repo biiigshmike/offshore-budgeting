@@ -86,6 +86,18 @@ enum AllocationLedgerService {
 
         for settlement in account.settlements ?? [] {
             let note = settlement.note.trimmingCharacters(in: .whitespacesAndNewlines)
+            let subtitle: String?
+            if let expense = settlement.expense {
+                let cardName = expense.card?.name ?? "No Card"
+                let categoryName = expense.category?.name ?? "Uncategorized"
+                subtitle = "\(cardName) • \(categoryName)"
+            } else if let plannedExpense = settlement.plannedExpense {
+                let cardName = plannedExpense.card?.name ?? "No Card"
+                let categoryName = plannedExpense.category?.name ?? "Uncategorized"
+                subtitle = "\(cardName) • \(categoryName)"
+            } else {
+                subtitle = nil
+            }
 
             rows.append(
                 LedgerRow(
@@ -93,7 +105,7 @@ enum AllocationLedgerService {
                     type: .settlement,
                     date: settlement.date,
                     title: note.isEmpty ? "Settlement" : note,
-                    subtitle: nil,
+                    subtitle: subtitle,
                     amount: settlement.amount,
                     settlementID: settlement.id,
                     allocationID: nil,

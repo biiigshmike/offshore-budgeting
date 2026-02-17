@@ -71,8 +71,8 @@ struct HomeQueryEngineTests {
         #expect(answer.kind == .metric)
         #expect(answer.title.contains("Card Spending Habits"))
         #expect((answer.primaryValue ?? "").filter(\.isNumber).contains("200"))
-        #expect(answer.rows.contains(where: { $0.title == "Transactions" && $0.value == "2" }))
-        #expect(answer.rows.contains(where: { $0.title == "Largest variable transaction" && $0.value.filter(\.isNumber).contains("120") }))
+        #expect(answer.rows.contains(where: { $0.title == "Expenses" && $0.value == "2" }))
+        #expect(answer.rows.contains(where: { $0.title == "Largest variable expense" && $0.value.filter(\.isNumber).contains("120") }))
     }
 
     @Test func cardVariableSpendingHabits_allCards_usesReadableRowValueFormat() throws {
@@ -100,7 +100,7 @@ struct HomeQueryEngineTests {
 
         #expect(answer.kind == .list)
         #expect(answer.rows.contains(where: { $0.value.contains(" total | ") }))
-        #expect(answer.rows.contains(where: { $0.value.contains(" txns | ") }))
+        #expect(answer.rows.contains(where: { $0.value.contains(" expenses | ") }))
         #expect(answer.rows.contains(where: { $0.value.contains(" avg") }))
     }
 
@@ -547,7 +547,7 @@ struct HomeQueryEngineTests {
         #expect((answer.primaryValue ?? "").filter(\.isNumber).contains("1250"))
         #expect(answer.rows.contains(where: { $0.title == "Total spend" && $0.value.filter(\.isNumber).contains("1250") }))
         #expect(answer.rows.contains(where: { $0.title == "Top category" && $0.value.contains("Travel") }))
-        #expect(answer.rows.contains(where: { $0.title == "Largest transaction" && $0.value.contains("Airfare") }))
+        #expect(answer.rows.contains(where: { $0.title == "Largest expense" && $0.value.contains("Airfare") }))
     }
 
     @Test func periodOverview_withNoData_returnsMessage() throws {

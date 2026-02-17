@@ -369,4 +369,159 @@ struct SwiftDataCRUDTests {
         #expect(fetchedSettlement?.amount == -10)
         #expect(fetchedSettlement?.date == updatedDate)
     }
+
+    // MARK: - Linked split charge integrity
+
+    @Test func deletingLinkedSplitCharge_restoresVariableGrossAndUnlinks() throws {
+        let context = try makeContext()
+
+        let ws = Workspace(name: "WS", hexColor: "#3B82F6")
+        let card = Card(name: "Visa", workspace: ws)
+        let cat = Category(name: "Food", hexColor: "#FF0000", workspace: ws)
+        let account = AllocationAccount(name: "Partner", workspace: ws)
+        let date = Calendar.current.date(from: DateComponents(year: 2026, month: 1, day: 10))!
+
+        let expense = VariableExpense(
+            descriptionText: "Groceries",
+            amount: 80,
+            transactionDate: date,
+            workspace: ws,
+            card: card,
+            category: cat
+        )
+
+        let allocation = ExpenseAllocation(
+            allocatedAmount: 20,
+            createdAt: .now,
+            updatedAt: .now,
+            workspace: ws,
+            account: account,
+            expense: expense
+        )
+        expense.allocation = allocation
+
+        context.insert(ws)
+        context.insert(card)
+        context.insert(cat)
+        context.insert(account)
+        context.insert(expense)
+        context.insert(allocation)
+        try context.save()
+
+        let oldSplit = max(0, allocation.allocatedAmount)
+        let gross = max(0, expense.amount + oldSplit)
+        expense.amount = gross
+        expense.allocation = nil
+        context.delete(allocation)
+        try context.save()
+
+        let fetchedExpense = try fetchAll(VariableExpense.self, in: context).first
+        let allocations = try fetchAll(ExpenseAllocation.self, in: context)
+
+        #expect(allocations.isEmpty)
+        #expect(fetchedExpense?.amount == 100)
+        #expect(fetchedExpense?.allocation == nil)
+    }
+
+    @Test func editingLinkedSplitCharge_updatesPlannedActualAndAllocationAmount() throws {
+        let context = try makeContext()
+
+        let ws = Workspace(name: "WS", hexColor: "#3B82F6")
+        let card = Card(name: "Visa", workspace: ws)
+        let cat = Category(name: "Housing", hexColor: "#FF0000", workspace: ws)
+        let account = AllocationAccount(name: "Partner", workspace: ws)
+        let date = Calendar.current.date(from: DateComponents(year: 2026, month: 1, day: 1))!
+
+        let plannedExpense = PlannedExpense(
+            title: "Rent",
+            plannedAmount: 1200,
+            actualAmount: 900,
+            expenseDate: date,
+            workspace: ws,
+            card: card,
+            category: cat
+        )
+
+        let allocation = ExpenseAllocation(
+            allocatedAmount: 300,
+            createdAt: .now,
+            updatedAt: .now,
+            workspace: ws,
+            account: account,
+            expense: nil,
+            plannedExpense: plannedExpense
+        )
+        plannedExpense.allocation = allocation
+
+        context.insert(ws)
+        context.insert(card)
+        context.insert(cat)
+        context.insert(account)
+        context.insert(plannedExpense)
+        context.insert(allocation)
+        try context.save()
+
+        let newSplit = AllocationLedgerService.cappedAllocationAmount(450, expenseAmount: plannedExpense.plannedAmount)
+        allocation.allocatedAmount = newSplit
+        plannedExpense.actualAmount = max(0, plannedExpense.plannedAmount - newSplit)
+        try context.save()
+
+        let fetchedPlanned = try fetchAll(PlannedExpense.self, in: context).first
+        let fetchedAllocation = try fetchAll(ExpenseAllocation.self, in: context).first
+
+        #expect(fetchedAllocation?.allocatedAmount == 450)
+        #expect(fetchedPlanned?.actualAmount == 750)
+        #expect(fetchedPlanned?.allocation?.id == fetchedAllocation?.id)
+    }
+
+    @Test func deletingLinkedPlannedSplitCharge_resetsActualAndUnlinks() throws {
+        let context = try makeContext()
+
+        let ws = Workspace(name: "WS", hexColor: "#3B82F6")
+        let card = Card(name: "Visa", workspace: ws)
+        let cat = Category(name: "Housing", hexColor: "#FF0000", workspace: ws)
+        let account = AllocationAccount(name: "Partner", workspace: ws)
+        let date = Calendar.current.date(from: DateComponents(year: 2026, month: 1, day: 1))!
+
+        let plannedExpense = PlannedExpense(
+            title: "Rent",
+            plannedAmount: 1200,
+            actualAmount: 900,
+            expenseDate: date,
+            workspace: ws,
+            card: card,
+            category: cat
+        )
+
+        let allocation = ExpenseAllocation(
+            allocatedAmount: 300,
+            createdAt: .now,
+            updatedAt: .now,
+            workspace: ws,
+            account: account,
+            expense: nil,
+            plannedExpense: plannedExpense
+        )
+        plannedExpense.allocation = allocation
+
+        context.insert(ws)
+        context.insert(card)
+        context.insert(cat)
+        context.insert(account)
+        context.insert(plannedExpense)
+        context.insert(allocation)
+        try context.save()
+
+        plannedExpense.actualAmount = 0
+        plannedExpense.allocation = nil
+        context.delete(allocation)
+        try context.save()
+
+        let fetchedPlanned = try fetchAll(PlannedExpense.self, in: context).first
+        let allocations = try fetchAll(ExpenseAllocation.self, in: context)
+
+        #expect(allocations.isEmpty)
+        #expect(fetchedPlanned?.actualAmount == 0)
+        #expect(fetchedPlanned?.allocation == nil)
+    }
 }
