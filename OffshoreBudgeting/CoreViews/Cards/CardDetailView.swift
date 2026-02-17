@@ -717,6 +717,7 @@ struct CardDetailView: View {
     private var toolbarContent: some ToolbarContent {
         if #available(iOS 26.0, macCatalyst 26.0, *) {
             ToolbarItemGroup(placement: .primaryAction) {
+                cardDisplayToolbarButton
                 cardActionsToolbarButton
             }
 
@@ -728,6 +729,10 @@ struct CardDetailView: View {
         } else {
             ToolbarItem(placement: .topBarTrailing) {
                 addToolbarButton
+            }
+
+            ToolbarItem(placement: .primaryAction) {
+                cardDisplayToolbarButton
             }
 
             ToolbarItem(placement: .primaryAction) {
@@ -765,26 +770,6 @@ struct CardDetailView: View {
                 Label("Edit Card", systemImage: "pencil")
             }
 
-            Menu {
-                Toggle("Hide Future Planned Expenses", isOn: $hideFuturePlannedExpensesInView)
-                Toggle(
-                    "Exclude Future Planned Expenses from Totals",
-                    isOn: $excludeFuturePlannedExpensesFromCalculationsInView
-                )
-            } label: {
-                Label("Planned Expense Display", systemImage: "gearshape")
-            }
-
-            Menu {
-                Toggle("Hide Future Variable Expenses", isOn: $hideFutureVariableExpensesInView)
-                Toggle(
-                    "Exclude Future Variable Expenses from Totals",
-                    isOn: $excludeFutureVariableExpensesFromCalculationsInView
-                )
-            } label: {
-                Label("Variable Expense Display", systemImage: "slider.horizontal.3")
-            }
-
             Divider()
 
             Button(role: .destructive) {
@@ -803,6 +788,34 @@ struct CardDetailView: View {
             Image(systemName: "ellipsis")
         }
         .accessibilityLabel("Card Actions")
+    }
+
+    @ViewBuilder
+    private var cardDisplayToolbarButton: some View {
+        Menu {
+            Menu {
+                Toggle("Hide Future Planned Expenses", isOn: $hideFuturePlannedExpensesInView)
+                Toggle(
+                    "Exclude Future Planned Expenses from Totals",
+                    isOn: $excludeFuturePlannedExpensesFromCalculationsInView
+                )
+            } label: {
+                Label("Planned Expense Display", systemImage: "calendar")
+            }
+
+            Menu {
+                Toggle("Hide Future Variable Expenses", isOn: $hideFutureVariableExpensesInView)
+                Toggle(
+                    "Exclude Future Variable Expenses from Totals",
+                    isOn: $excludeFutureVariableExpensesFromCalculationsInView
+                )
+            } label: {
+                Label("Variable Expense Display", systemImage: "slider.horizontal.3")
+            }
+        } label: {
+            Image(systemName: "eye")
+        }
+        .accessibilityLabel("Expense Display")
     }
 
     // MARK: - Empty State

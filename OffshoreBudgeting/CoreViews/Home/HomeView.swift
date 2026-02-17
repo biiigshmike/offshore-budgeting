@@ -884,7 +884,7 @@ struct HomeView: View {
                 Label("Variable Expense Display", systemImage: "slider.horizontal.3")
             }
         } label: {
-            Image(systemName: "ellipsis")
+            Image(systemName: "eye")
         }
         .accessibilityLabel("Home Actions")
     }
