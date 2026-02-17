@@ -610,7 +610,7 @@ private struct EditSharedBalanceEntryView: View {
                 }
             }
         }
-        .navigationTitle("Edit Shared Balance Entry")
+        .navigationTitle("Edit Shared Balance")
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button("Cancel") { dismiss() }
