@@ -134,12 +134,7 @@ struct CardsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
-                Picker("View", selection: $selectedSegment) {
-                    Text("Cards").tag(CardsSegment.cards)
-                    Text("Shared Balances").tag(CardsSegment.sharedBalances)
-                }
-                .pickerStyle(.segmented)
-                .padding(.top, 8)
+
 
                 Group {
                     if selectedSegment == .cards {
@@ -252,6 +247,15 @@ struct CardsView: View {
             ]
         )
         .navigationTitle(navigationTitleText)
+        .safeAreaInset(edge: .top) {
+            Picker("View", selection: $selectedSegment) {
+                Text("Cards").tag(CardsSegment.cards)
+                Text("Shared Balances").tag(CardsSegment.sharedBalances)
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal)
+            .padding(.bottom)
+        }
         .toolbar {
             if #available(iOS 26.0, macCatalyst 26.0, *) {
                 ToolbarItemGroup(placement: .primaryAction) {

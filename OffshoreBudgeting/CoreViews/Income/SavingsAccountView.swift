@@ -5,6 +5,8 @@ import Charts
 struct SavingsAccountView: View {
 
     let workspace: Workspace
+    let showSegmentControl: Bool
+    let selectedSegment: Binding<IncomeWorkspaceView.Segment>?
 
     @AppStorage("general_defaultBudgetingPeriod")
     private var defaultBudgetingPeriodRaw: String = BudgetingPeriod.monthly.rawValue
@@ -30,9 +32,17 @@ struct SavingsAccountView: View {
 
     @State private var showingDeleteConfirm: Bool = false
     @State private var pendingDeleteEntry: SavingsLedgerEntry? = nil
+    @State private var searchText: String = ""
+    @FocusState private var searchFocused: Bool
 
-    init(workspace: Workspace) {
+    init(
+        workspace: Workspace,
+        showSegmentControl: Bool = false,
+        selectedSegment: Binding<IncomeWorkspaceView.Segment>? = nil
+    ) {
         self.workspace = workspace
+        self.showSegmentControl = showSegmentControl
+        self.selectedSegment = selectedSegment
         let workspaceID = workspace.id
 
         _incomes = Query(
@@ -66,7 +76,7 @@ struct SavingsAccountView: View {
     }
 
     private var displayRows: [SavingsLedgerEntry] {
-        savingsEntries
+        let dateFiltered = savingsEntries
             .filter { entry in
                 entry.date >= normalizedStart(appliedStartDate) && entry.date <= normalizedEnd(appliedEndDate)
             }
@@ -76,6 +86,12 @@ struct SavingsAccountView: View {
                 }
                 return lhs.date > rhs.date
             }
+
+        let trimmedSearch = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedSearch.isEmpty else { return dateFiltered }
+        return dateFiltered.filter { entry in
+            entryMatchesSearch(entry, query: trimmedSearch)
+        }
     }
 
     private var isDateDirty: Bool {
@@ -92,6 +108,9 @@ struct SavingsAccountView: View {
     }
 
     private var chartPoints: [SavingsChartPoint] {
+        let rangeStart = normalizedStart(appliedStartDate)
+        let rangeEnd = normalizedEnd(appliedEndDate)
+
         let entriesAsc = savingsEntries.sorted { lhs, rhs in
             if lhs.date == rhs.date {
                 return lhs.createdAt < rhs.createdAt
@@ -99,17 +118,38 @@ struct SavingsAccountView: View {
             return lhs.date < rhs.date
         }
 
-        var total: Double = 0
-        var points: [SavingsChartPoint] = []
-        for entry in entriesAsc {
-            total += entry.amount
-            points.append(SavingsChartPoint(date: entry.date, total: total))
+        let totalBeforeRange = entriesAsc
+            .filter { $0.date < rangeStart }
+            .reduce(0) { $0 + $1.amount }
+
+        let entriesInRange = entriesAsc.filter { entry in
+            entry.date >= rangeStart && entry.date <= rangeEnd
         }
-        return points
+
+        guard !entriesInRange.isEmpty else { return [] }
+
+        var total: Double = totalBeforeRange
+        var totalsByDay: [Date: Double] = [:]
+        totalsByDay[rangeStart] = totalBeforeRange
+
+        for entry in entriesInRange {
+            total += entry.amount
+            let day = Calendar.current.startOfDay(for: entry.date)
+            totalsByDay[day] = total
+        }
+
+        return totalsByDay
+            .keys
+            .sorted()
+            .map { day in
+                SavingsChartPoint(date: day, total: totalsByDay[day] ?? 0)
+            }
     }
 
     var body: some View {
         List {
+
+
             Section {
                 savingsChartSection
                     .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
@@ -170,7 +210,25 @@ struct SavingsAccountView: View {
             }
         }
         .listStyle(.insetGrouped)
-        .navigationTitle("Income")
+        .navigationTitle("Savings")
+        .safeAreaInset(edge: .top) {
+            if showSegmentControl, let selectedSegment {
+                Picker("Section", selection: selectedSegment) {
+                    ForEach(IncomeWorkspaceView.Segment.allCases) { segment in
+                        Text(segment.rawValue).tag(segment)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal)
+                .padding(.bottom)
+            }
+        }
+        .searchable(
+            text: $searchText,
+            placement: .navigationBarDrawer(displayMode: .always),
+            prompt: "Search"
+        )
+        .searchFocused($searchFocused)
         .onAppear {
             initializeDateRangeIfNeeded()
             SavingsAccountService.runAutoCaptureIfNeeded(
@@ -317,6 +375,37 @@ struct SavingsAccountView: View {
         return Calendar.current.date(byAdding: DateComponents(day: 1, second: -1), to: start) ?? date
     }
 
+    private func entryMatchesSearch(_ entry: SavingsLedgerEntry, query: String) -> Bool {
+        let normalized = query.lowercased()
+
+        let typeLabel = kindLabel(for: entry.kind)
+        let searchableFields = [
+            entry.note,
+            typeLabel,
+            AppDateFormat.abbreviatedDate(entry.date),
+            AppDateFormat.numericDate(entry.date),
+            CurrencyFormatter.string(from: entry.amount),
+            CurrencyFormatter.editingString(from: entry.amount),
+            String(entry.amount),
+            String(format: "%.2f", entry.amount)
+        ]
+
+        return searchableFields.contains { field in
+            field.lowercased().contains(normalized)
+        }
+    }
+
+    private func kindLabel(for kind: SavingsLedgerEntryKind) -> String {
+        switch kind {
+        case .periodClose:
+            return "Period Close"
+        case .manualAdjustment:
+            return "Manual Adjustment"
+        case .expenseOffset:
+            return "Expense Offset"
+        }
+    }
+
     // MARK: - Actions
 
     private func saveEntry(date: Date, amount: Double, note: String, kind: SavingsLedgerEntryKind) {
@@ -354,22 +443,7 @@ struct SavingsAccountView: View {
     }
 
     private func deleteEntry(_ entry: SavingsLedgerEntry) {
-        if let variableExpense = entry.variableExpense {
-            variableExpense.savingsLedgerEntry = nil
-        }
-
-        if let plannedExpense = entry.plannedExpense {
-            plannedExpense.savingsLedgerEntry = nil
-        }
-
-        let account = entry.account
-        modelContext.delete(entry)
-
-        if let account {
-            SavingsAccountService.recalculateAccountTotal(account)
-        }
-
-        try? modelContext.save()
+        SavingsAccountService.deleteEntry(entry, modelContext: modelContext)
     }
 }
 

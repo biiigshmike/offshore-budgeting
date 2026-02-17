@@ -128,6 +128,7 @@ enum SavingsAccountService {
         try? modelContext.save()
     }
 
+    @discardableResult
     static func upsertSavingsOffset(
         workspace: Workspace,
         variableExpense: VariableExpense,
@@ -135,13 +136,21 @@ enum SavingsAccountService {
         note: String,
         date: Date,
         modelContext: ModelContext
-    ) {
+    ) -> Bool {
         guard offsetAmount > 0 else {
             removeSavingsOffset(for: variableExpense, modelContext: modelContext)
-            return
+            return true
         }
 
         let account = ensureSavingsAccount(for: workspace, modelContext: modelContext)
+        let existingLinkedOffset = max(0, -(variableExpense.savingsLedgerEntry?.amount ?? 0))
+        let available = availableBalance(for: account, existingLinkedOffset: existingLinkedOffset)
+        let isValid = canApplyOffset(
+            requested: offsetAmount,
+            available: available,
+            expenseAmount: max(0, variableExpense.amount)
+        )
+        guard isValid else { return false }
 
         if let existing = variableExpense.savingsLedgerEntry {
             existing.date = date
@@ -169,8 +178,10 @@ enum SavingsAccountService {
 
         recalculateAccountTotal(account)
         try? modelContext.save()
+        return true
     }
 
+    @discardableResult
     static func upsertSavingsOffset(
         workspace: Workspace,
         plannedExpense: PlannedExpense,
@@ -178,13 +189,21 @@ enum SavingsAccountService {
         note: String,
         date: Date,
         modelContext: ModelContext
-    ) {
+    ) -> Bool {
         guard offsetAmount > 0 else {
             removeSavingsOffset(for: plannedExpense, modelContext: modelContext)
-            return
+            return true
         }
 
         let account = ensureSavingsAccount(for: workspace, modelContext: modelContext)
+        let existingLinkedOffset = max(0, -(plannedExpense.savingsLedgerEntry?.amount ?? 0))
+        let available = availableBalance(for: account, existingLinkedOffset: existingLinkedOffset)
+        let isValid = canApplyOffset(
+            requested: offsetAmount,
+            available: available,
+            expenseAmount: max(0, plannedExpense.effectiveAmount())
+        )
+        guard isValid else { return false }
 
         if let existing = plannedExpense.savingsLedgerEntry {
             existing.date = date
@@ -212,6 +231,7 @@ enum SavingsAccountService {
 
         recalculateAccountTotal(account)
         try? modelContext.save()
+        return true
     }
 
     static func removeSavingsOffset(
@@ -256,6 +276,35 @@ enum SavingsAccountService {
 
         account.total = total
         account.updatedAt = .now
+    }
+
+    static func deleteEntry(
+        _ entry: SavingsLedgerEntry,
+        modelContext: ModelContext
+    ) {
+        if let variableExpense = entry.variableExpense {
+            variableExpense.savingsLedgerEntry = nil
+        }
+
+        if let plannedExpense = entry.plannedExpense {
+            plannedExpense.savingsLedgerEntry = nil
+        }
+
+        let account = entry.account
+        let accountID = account?.id
+        let workspace = entry.workspace
+        modelContext.delete(entry)
+
+        if let accountID {
+            recalculateAccountTotal(accountID: accountID, modelContext: modelContext)
+        } else if let workspace {
+            let accounts = workspaceSavingsAccounts(for: workspace, modelContext: modelContext)
+            for account in accounts {
+                recalculateAccountTotal(accountID: account.id, modelContext: modelContext)
+            }
+        }
+
+        try? modelContext.save()
     }
 
     // MARK: - Internals
@@ -340,6 +389,44 @@ enum SavingsAccountService {
 
     private static func isInRange(_ date: Date, start: Date, end: Date) -> Bool {
         date >= start && date <= end
+    }
+
+    private static func availableBalance(
+        for account: SavingsAccount,
+        existingLinkedOffset: Double
+    ) -> Double {
+        max(0, account.total + existingLinkedOffset)
+    }
+
+    private static func canApplyOffset(
+        requested: Double,
+        available: Double,
+        expenseAmount: Double
+    ) -> Bool {
+        guard requested > 0 else { return false }
+        guard available > 0 else { return false }
+        return requested <= available && requested <= expenseAmount
+    }
+
+    private static func recalculateAccountTotal(
+        accountID: UUID,
+        modelContext: ModelContext
+    ) {
+        let accountDescriptor = FetchDescriptor<SavingsAccount>(
+            predicate: #Predicate<SavingsAccount> { $0.id == accountID }
+        )
+        guard let account = try? modelContext.fetch(accountDescriptor).first else { return }
+
+        let entryDescriptor = FetchDescriptor<SavingsLedgerEntry>(
+            predicate: #Predicate<SavingsLedgerEntry> { $0.account?.id == accountID },
+            sortBy: [
+                SortDescriptor(\SavingsLedgerEntry.date, order: .forward),
+                SortDescriptor(\SavingsLedgerEntry.createdAt, order: .forward)
+            ]
+        )
+        let entries = (try? modelContext.fetch(entryDescriptor)) ?? []
+        account.total = entries.reduce(0) { $0 + $1.amount }
+        account.updatedAt = .now
     }
 
     private static func periodCloseNote(start: Date, end: Date) -> String {

@@ -11,6 +11,8 @@ import SwiftData
 struct IncomeView: View {
 
     let workspace: Workspace
+    let showSegmentControl: Bool
+    let selectedSegment: Binding<IncomeWorkspaceView.Segment>?
     @Query private var incomes: [Income]
     @Query private var plannedExpenses: [PlannedExpense]
     @Query private var variableExpenses: [VariableExpense]
@@ -82,8 +84,14 @@ struct IncomeView: View {
     @State private var shortcutDeleteCandidates: [Income] = []
     @State private var shortcutDeleteKind: IncomeDeleteKind? = nil
 
-    init(workspace: Workspace) {
+    init(
+        workspace: Workspace,
+        showSegmentControl: Bool = false,
+        selectedSegment: Binding<IncomeWorkspaceView.Segment>? = nil
+    ) {
         self.workspace = workspace
+        self.showSegmentControl = showSegmentControl
+        self.selectedSegment = selectedSegment
 
         let workspaceID = workspace.id
         _incomes = Query(
@@ -242,6 +250,8 @@ struct IncomeView: View {
 
         GeometryReader { proxy in
             List {
+
+
                 // MARK: - Calendar
 
                 Section {
@@ -353,6 +363,18 @@ struct IncomeView: View {
                 ]
             )
             .navigationTitle("Income")
+            .safeAreaInset(edge: .top) {
+                if showSegmentControl, let selectedSegment {
+                        Picker("Section", selection: selectedSegment) {
+                            ForEach(IncomeWorkspaceView.Segment.allCases) { segment in
+                                Text(segment.rawValue).tag(segment)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .padding(.horizontal)
+                        .padding(.bottom)
+                }
+            }
             .searchable(
                 text: $searchText,
                 placement: .navigationBarDrawer(displayMode: .always),

@@ -14,23 +14,22 @@ struct IncomeWorkspaceView: View {
     @State private var selectedSegment: Segment = .income
 
     var body: some View {
-        VStack(spacing: 0) {
-            Picker("Section", selection: $selectedSegment) {
-                ForEach(Segment.allCases) { segment in
-                    Text(segment.rawValue).tag(segment)
-                }
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal, 16)
-            .padding(.top, 8)
-
+        Group {
             if selectedSegment == .income {
-                IncomeView(workspace: workspace)
+                IncomeView(
+                    workspace: workspace,
+                    showSegmentControl: true,
+                    selectedSegment: $selectedSegment
+                )
             } else {
-                SavingsAccountView(workspace: workspace)
+                SavingsAccountView(
+                    workspace: workspace,
+                    showSegmentControl: true,
+                    selectedSegment: $selectedSegment
+                )
             }
         }
-        .navigationTitle("Income")
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationTitle(selectedSegment.rawValue)
+        .navigationBarTitleDisplayMode(.automatic)
     }
 }
