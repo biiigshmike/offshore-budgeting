@@ -85,24 +85,6 @@ struct HomeAssistantHostModifier: ViewModifier {
                     shouldUseLargeMinimumSize: false
                 )
             }
-            .safeAreaInset(edge: .bottom) {
-                if shouldShowBottomLauncher {
-                    if #available(iOS 26.0, *) {
-                        HomeAssistantLauncherBar(onTap: presentAssistant)
-                            .padding(.horizontal, 16)
-                            .padding(.bottom, 8)
-                    } else {
-                        HomeAssistantLauncherBar(onTap: presentAssistant)
-                    }
-                }
-            }
-            .overlay(alignment: .bottomTrailing) {
-                if shouldShowCompactLandscapeLauncher {
-                    compactLandscapeAssistantButton
-                        .padding(.trailing, 24)
-                        .padding(.bottom, 8)
-                }
-            }
             .background {
                 GeometryReader { proxy in
                     Color.clear
@@ -154,6 +136,7 @@ struct HomeAssistantHostModifier: ViewModifier {
 
     private func presentAssistant() {
         guard isEnabled else { return }
+        guard assistantRoute == nil else { return }
         assistantRoute = route(for: assistantPresentationPlan.mode)
     }
 
@@ -181,17 +164,10 @@ struct HomeAssistantHostModifier: ViewModifier {
         )
 
         guard isPhone == false else {
-            let showsBottomLauncher: Bool
-            if #available(iOS 26.0, *) {
-                showsBottomLauncher = usesCompactPhoneHeight == false
-            } else {
-                showsBottomLauncher = true
-            }
-
             return HomeAssistantPresentationPlan(
                 mode: .fullScreen,
-                showsBottomLauncher: showsBottomLauncher,
-                showsToolbarButton: false,
+                showsBottomLauncher: false,
+                showsToolbarButton: true,
                 detents: [.large],
                 usesExpandedPanelSizing: false,
                 prefersInlineInspectorWhenAvailable: false
@@ -224,49 +200,16 @@ struct HomeAssistantHostModifier: ViewModifier {
         #endif
     }
 
-    private var shouldShowBottomLauncher: Bool {
-        isEnabled && assistantRoute == nil && assistantPresentationPlan.showsBottomLauncher
-    }
-
     private var shouldShowToolbarButton: Bool {
-        isEnabled && assistantRoute == nil && assistantPresentationPlan.showsToolbarButton
-    }
+        guard isEnabled, assistantPresentationPlan.showsToolbarButton else {
+            return false
+        }
 
-    private var shouldShowCompactLandscapeLauncher: Bool {
-        isEnabled &&
-        assistantRoute == nil &&
-        isRunningiOS26OrLater &&
-        usesCompactPhoneHeight
-    }
-
-    private var isRunningiOS26OrLater: Bool {
-        if #available(iOS 26.0, *) {
+        if isPhone {
             return true
         }
-        return false
-    }
 
-    @ViewBuilder
-    private var compactLandscapeAssistantButton: some View {
-        if #available(iOS 26.0, *) {
-            Button(action: presentAssistant) {
-                Image(systemName: "figure.wave")
-                    .font(.subheadline.weight(.semibold))
-                    .frame(width: 30, height: 30)
-            }
-            .buttonStyle(.glassProminent)
-            .buttonBorderShape(.circle)
-            .accessibilityLabel("Open Assistant")
-        } else {
-            Button(action: presentAssistant) {
-                Image(systemName: "figure.wave")
-                    .font(.subheadline.weight(.semibold))
-                    .frame(width: 30, height: 30)
-            }
-            .buttonStyle(.borderedProminent)
-            .clipShape(Circle())
-            .accessibilityLabel("Open Assistant")
-        }
+        return assistantRoute == nil
     }
 
     private var assistantToolbarContext: HomeAssistantToolbarContext {

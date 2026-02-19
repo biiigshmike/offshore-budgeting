@@ -347,7 +347,7 @@ struct IncomeView: View {
             .navigationTitle("Income")
             .searchable(
                 text: $searchText,
-                placement: .navigationBarDrawer(displayMode: .always),
+                placement: .navigationBarDrawer(displayMode: .automatic),
                 prompt: "Search"
             )
             .searchFocused($searchFocused)

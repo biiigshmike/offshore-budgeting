@@ -262,17 +262,17 @@ struct HomeView: View {
                     ToolbarSpacer(.flexible, placement: .primaryAction)
 
                     ToolbarItemGroup(placement: .primaryAction) {
-                        assistantToolbarButton
+                        assistantToolbarButtoniOS26
                     }
                 }
             } else {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItemGroup(placement: .primaryAction) {
                     homeActionsToolbarButton
                 }
 
                 if assistantToolbarContext.isToolbarButtonVisible {
                     ToolbarItem(placement: .primaryAction) {
-                        assistantToolbarButton
+                        assistantToolbarButtonLegacy
                     }
                 }
             }
@@ -890,10 +890,21 @@ struct HomeView: View {
         .accessibilityLabel("Home Actions")
     }
 
-    private var assistantToolbarButton: some View {
+    @available(iOS 26.0, macCatalyst 26.0, *)
+    private var assistantToolbarButtoniOS26: some View {
         Button(action: assistantToolbarContext.openAssistant) {
             Image(systemName: "figure.wave")
         }
+        .buttonStyle(.glassProminent)
+        .accessibilityLabel("Open Assistant")
+    }
+
+    private var assistantToolbarButtonLegacy: some View {
+        Button(action: assistantToolbarContext.openAssistant) {
+            Image(systemName: "figure.wave")
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(Color("AccentColor"))
         .accessibilityLabel("Open Assistant")
     }
 

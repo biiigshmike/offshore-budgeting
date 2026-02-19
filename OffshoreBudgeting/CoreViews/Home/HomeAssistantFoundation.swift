@@ -21,53 +21,6 @@ private enum HomeAssistantPlanResolutionSource: String {
     case entityAware
 }
 
-// MARK: - Launcher Bar (iPhone)
-
-struct HomeAssistantLauncherBar: View {
-    let onTap: () -> Void
-    
-    var body: some View {
-        if #available(iOS 26.0, *) {
-            Button(action: onTap) {
-                launcherLabel
-            }
-            .buttonStyle(.glass)
-            .buttonBorderShape(.capsule)
-        } else {
-            Button(action: onTap) {
-                launcherLabel
-                    .background(.bar)
-                    .overlay(alignment: .top) {
-                        Rectangle()
-                            .fill(Color(uiColor: .separator).opacity(0.2))
-                            .frame(height: 1)
-                    }
-            }
-            .buttonStyle(.plain)
-        }
-    }
-    
-    private var launcherLabel: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "figure.wave")
-                .font(.subheadline.weight(.semibold))
-            
-            Text("Marina")
-                .font(.subheadline.weight(.semibold))
-                .lineLimit(1)
-            
-            Spacer(minLength: 8)
-            
-            Image(systemName: "chevron.up")
-                .font(.caption.weight(.semibold))
-        }
-        .foregroundStyle(.primary)
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
-
 // MARK: - Presented Panel
 
 struct HomeAssistantPanelView: View {
