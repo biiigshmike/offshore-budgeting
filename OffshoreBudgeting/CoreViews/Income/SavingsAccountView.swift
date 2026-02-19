@@ -5,8 +5,6 @@ import Charts
 struct SavingsAccountView: View {
 
     let workspace: Workspace
-    let showSegmentControl: Bool
-    let selectedSegment: Binding<IncomeWorkspaceView.Segment>?
 
     @AppStorage("general_defaultBudgetingPeriod")
     private var defaultBudgetingPeriodRaw: String = BudgetingPeriod.monthly.rawValue
@@ -14,9 +12,6 @@ struct SavingsAccountView: View {
 
     @Environment(\.modelContext) private var modelContext
 
-    @Query private var incomes: [Income]
-    @Query private var plannedExpenses: [PlannedExpense]
-    @Query private var variableExpenses: [VariableExpense]
     @Query private var savingsAccounts: [SavingsAccount]
     @Query private var savingsEntries: [SavingsLedgerEntry]
 
@@ -35,30 +30,9 @@ struct SavingsAccountView: View {
     @State private var searchText: String = ""
     @FocusState private var searchFocused: Bool
 
-    init(
-        workspace: Workspace,
-        showSegmentControl: Bool = false,
-        selectedSegment: Binding<IncomeWorkspaceView.Segment>? = nil
-    ) {
+    init(workspace: Workspace) {
         self.workspace = workspace
-        self.showSegmentControl = showSegmentControl
-        self.selectedSegment = selectedSegment
         let workspaceID = workspace.id
-
-        _incomes = Query(
-            filter: #Predicate<Income> { $0.workspace?.id == workspaceID },
-            sort: [SortDescriptor(\Income.date, order: .forward)]
-        )
-
-        _plannedExpenses = Query(
-            filter: #Predicate<PlannedExpense> { $0.workspace?.id == workspaceID },
-            sort: [SortDescriptor(\PlannedExpense.expenseDate, order: .forward)]
-        )
-
-        _variableExpenses = Query(
-            filter: #Predicate<VariableExpense> { $0.workspace?.id == workspaceID },
-            sort: [SortDescriptor(\VariableExpense.transactionDate, order: .forward)]
-        )
 
         _savingsAccounts = Query(
             filter: #Predicate<SavingsAccount> { $0.workspace?.id == workspaceID },
@@ -210,35 +184,8 @@ struct SavingsAccountView: View {
             }
         }
         .listStyle(.insetGrouped)
-        .navigationTitle("Savings")
-        .safeAreaInset(edge: .top) {
-            if showSegmentControl, let selectedSegment {
-                Picker("Section", selection: selectedSegment) {
-                    ForEach(IncomeWorkspaceView.Segment.allCases) { segment in
-                        Text(segment.rawValue).tag(segment)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .padding(.horizontal)
-                .padding(.bottom)
-            }
-        }
-        .searchable(
-            text: $searchText,
-            placement: .navigationBarDrawer(displayMode: .always),
-            prompt: "Search"
-        )
-        .searchFocused($searchFocused)
         .onAppear {
             initializeDateRangeIfNeeded()
-            SavingsAccountService.runAutoCaptureIfNeeded(
-                for: workspace,
-                defaultBudgetingPeriodRaw: defaultBudgetingPeriodRaw,
-                incomes: incomes,
-                plannedExpenses: plannedExpenses,
-                variableExpenses: variableExpenses,
-                modelContext: modelContext
-            )
             if account == nil {
                 _ = SavingsAccountService.ensureSavingsAccount(for: workspace, modelContext: modelContext)
                 try? modelContext.save()

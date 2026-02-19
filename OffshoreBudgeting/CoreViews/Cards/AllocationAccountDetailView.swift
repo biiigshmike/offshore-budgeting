@@ -111,19 +111,14 @@ struct AllocationAccountDetailView: View {
         }
         .navigationTitle(account.name)
         .toolbar {
-            ToolbarItemGroup(placement: .topBarTrailing) {
-                if account.isArchived {
+            if account.isArchived {
+                ToolbarItemGroup(placement: .topBarTrailing) {
                     Text("Archived")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                } else {
-                    Button {
-                        showingAddSettlementSheet = true
-                    } label: {
-                        Image(systemName: "plus")
-                    }
-                    .accessibilityLabel("Add Settlement")
-
+                }
+            } else if #available(iOS 26.0, *) {
+                ToolbarItemGroup(placement: .primaryAction) {
                     Menu {
                         Button {
                             showingEditAccountSheet = true
@@ -158,6 +153,61 @@ struct AllocationAccountDetailView: View {
                         Image(systemName: "ellipsis")
                     }
                     .accessibilityLabel("Shared Balance Actions")
+                }
+
+                ToolbarSpacer(.flexible, placement: .primaryAction)
+
+                ToolbarItemGroup(placement: .primaryAction) {
+                    Button {
+                        showingAddSettlementSheet = true
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                    .accessibilityLabel("Add Settlement")
+                }
+            } else {
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    Menu {
+                        Button {
+                            showingEditAccountSheet = true
+                        } label: {
+                            Label("Edit Shared Balance", systemImage: "pencil")
+                        }
+
+                        Divider()
+
+                        if hasHistory {
+                            Button(role: .destructive) {
+                                if confirmBeforeDeleting {
+                                    showingArchiveConfirm = true
+                                } else {
+                                    archiveAccountAndDismiss()
+                                }
+                            } label: {
+                                Label("Archive", systemImage: "archivebox")
+                            }
+                        } else {
+                            Button(role: .destructive) {
+                                if confirmBeforeDeleting {
+                                    showingDeleteConfirm = true
+                                } else {
+                                    deleteAccountAndDismiss()
+                                }
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis")
+                    }
+                    .accessibilityLabel("Shared Balance Actions")
+
+                    Button {
+                        showingAddSettlementSheet = true
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                    .accessibilityLabel("Add Settlement")
                 }
             }
         }

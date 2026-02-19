@@ -21,6 +21,15 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
 
     var id: String { rawValue }
 
+    var title: String {
+        switch self {
+        case .cards:
+            return "Accounts"
+        default:
+            return rawValue
+        }
+    }
+
     var systemImage: String {
         switch self {
         case .home: return "house"
@@ -64,7 +73,7 @@ struct AppRootView: View {
     }
 
     private var selectedSection: AppSection {
-        AppSection(rawValue: selectedSectionRaw) ?? .home
+        section(from: selectedSectionRaw) ?? .home
     }
 
     private var selectedSectionBinding: Binding<AppSection> {
@@ -150,9 +159,9 @@ struct AppRootView: View {
             .tag(AppSection.income)
 
             NavigationStack {
-                CardsView(workspace: workspace)
+                AccountsView(workspace: workspace)
             }
-            .tabItem { Label(AppSection.cards.rawValue, systemImage: AppSection.cards.systemImage) }
+            .tabItem { Label(AppSection.cards.title, systemImage: AppSection.cards.systemImage) }
             .tag(AppSection.cards)
 
             NavigationStack {
@@ -169,7 +178,7 @@ struct AppRootView: View {
         NavigationSplitView(columnVisibility: $splitViewVisibility) {
             List(selection: selectedSectionForSidebar) {
                 ForEach(AppSection.allCases) { section in
-                    Label(section.rawValue, systemImage: section.systemImage)
+                    Label(section.title, systemImage: section.systemImage)
                         .tag(section)
                 }
             }
@@ -206,11 +215,23 @@ struct AppRootView: View {
         let pending = pendingShortcutSectionRaw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !pending.isEmpty else { return }
 
-        if let section = AppSection(rawValue: pending) {
+        if let section = section(from: pending) {
             selectedSectionRaw = section.rawValue
         }
 
         pendingShortcutSectionRaw = ""
+    }
+
+    private func section(from raw: String) -> AppSection? {
+        if let section = AppSection(rawValue: raw) {
+            return section
+        }
+
+        if raw == "Accounts" {
+            return .cards
+        }
+
+        return nil
     }
 
     private func handleCommand(_ commandID: String) {
@@ -231,7 +252,7 @@ struct AppRootView: View {
         case .income:
             IncomeWorkspaceView(workspace: workspace)
         case .cards:
-            CardsView(workspace: workspace)
+            AccountsView(workspace: workspace)
         case .settings:
             SettingsView(workspace: workspace, selectedWorkspaceID: $selectedWorkspaceID)
         }

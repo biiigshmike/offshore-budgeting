@@ -299,7 +299,6 @@ struct HomeView: View {
             excludeFuturePlannedExpensesFromCalculationsInView = excludeFuturePlannedExpensesFromCalculationsDefault
             hideFutureVariableExpensesInView = hideFutureVariableExpensesDefault
             excludeFutureVariableExpensesFromCalculationsInView = excludeFutureVariableExpensesFromCalculationsDefault
-            runSavingsAutoCapture()
         }
         .onDisappear {
             commandHub.deactivate(.home)
@@ -318,7 +317,6 @@ struct HomeView: View {
             applyDefaultBudgetingPeriodToApplied()
             lastSyncedDefaultBudgetingPeriodRaw = defaultBudgetingPeriodRaw
             syncDraftToApplied()
-            runSavingsAutoCapture()
         }
     }
 
@@ -327,17 +325,6 @@ struct HomeView: View {
     private func openWhatIfPlanner(_ initialScenarioID: UUID?) {
         whatIfInitialScenarioID = initialScenarioID
         isShowingWhatIfPlanner = true
-    }
-
-    private func runSavingsAutoCapture() {
-        SavingsAccountService.runAutoCaptureIfNeeded(
-            for: workspace,
-            defaultBudgetingPeriodRaw: defaultBudgetingPeriodRaw,
-            incomes: incomes,
-            plannedExpenses: plannedExpensesForHome,
-            variableExpenses: variableExpenses,
-            modelContext: modelContext
-        )
     }
 
     private func handleCommand(_ commandID: String) {

@@ -149,6 +149,7 @@ struct ContentView: View {
                 refreshCardWidgetSnapshotsIfPossible()
                 refreshNextPlannedExpenseWidgetSnapshotsIfPossible()
                 refreshSpendTrendsWidgetSnapshotsIfPossible()
+                runSavingsAutoCaptureIfPossible()
             }
             .onChange(of: hideFuturePlannedExpenses) { _, _ in
                 syncGeneralSettingsToWidgets()
