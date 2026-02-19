@@ -95,10 +95,7 @@ struct OffshoreBudgetingApp: App {
         .modelContainer(modelContainer)
         .commands {
             if shouldInstallMenuCommands {
-                OffshoreAppCommands(
-                    commandHub: commandHub,
-                    showsCustomHelpCommand: shouldInstallCustomHelpCommand
-                )
+                OffshoreAppCommands(commandHub: commandHub)
             }
         }
     }
@@ -107,19 +104,6 @@ struct OffshoreBudgetingApp: App {
         #if targetEnvironment(macCatalyst)
         return true
         #elseif canImport(UIKit)
-        return UIDevice.current.userInterfaceIdiom == .pad
-        #else
-        return false
-        #endif
-    }
-
-    private var shouldInstallCustomHelpCommand: Bool {
-        #if targetEnvironment(macCatalyst)
-        return false
-        #elseif canImport(UIKit)
-        if ProcessInfo.processInfo.isiOSAppOnMac {
-            return false
-        }
         return UIDevice.current.userInterfaceIdiom == .pad
         #else
         return false

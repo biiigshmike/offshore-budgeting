@@ -79,14 +79,6 @@ struct HelpTopicDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 ForEach(topic.sections) { section in
-                    if let slot = section.screenshotSlot {
-                        HelpScreenshotPlaceholder(
-                            sectionTitle: topic.title,
-                            slot: slot
-                        )
-                        .padding(.vertical, 4)
-                    }
-
                     if let header = section.header {
                         Text(header)
                             .font(.title3.weight(.semibold))
@@ -99,6 +91,24 @@ struct HelpTopicDetailView: View {
                             Text(line.value)
                         case .bullet:
                             Text("• \(line.value)")
+                        case .heroScreenshot:
+                            if let slot = Int(line.value) {
+                                HelpScreenshotPlaceholder(
+                                    sectionTitle: topic.title,
+                                    slot: slot,
+                                    style: .hero
+                                )
+                                .padding(.vertical, 4)
+                            }
+                        case .miniScreenshot:
+                            if let slot = Int(line.value) {
+                                HelpScreenshotPlaceholder(
+                                    sectionTitle: topic.title,
+                                    slot: slot,
+                                    style: .mini
+                                )
+                                .padding(.vertical, 2)
+                            }
                         }
                     }
 
@@ -189,8 +199,14 @@ private struct HelpIconTile: View {
 // MARK: - Screenshot Loader
 
 private struct HelpScreenshotPlaceholder: View {
+    enum Style {
+        case hero
+        case mini
+    }
+
     let sectionTitle: String
     let slot: Int
+    let style: Style
 
     private var assetName: String {
         let sanitizedSection = sectionTitle.replacingOccurrences(of: " ", with: "")
@@ -202,22 +218,36 @@ private struct HelpScreenshotPlaceholder: View {
             Image(platformImage: image)
                 .resizable()
                 .scaledToFit()
-                .frame(maxWidth: .infinity)
-                .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+                .frame(maxWidth: style == .hero ? .infinity : 420, alignment: .leading)
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius: style == .hero ? 26 : 14,
+                        style: .continuous
+                    )
+                )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 26, style: .continuous)
+                    RoundedRectangle(
+                        cornerRadius: style == .hero ? 26 : 14,
+                        style: .continuous
+                    )
                         .stroke(Color.primary.opacity(0.18), lineWidth: 1)
                 )
         } else {
             ZStack {
-                RoundedRectangle(cornerRadius: 26, style: .continuous)
+                RoundedRectangle(
+                    cornerRadius: style == .hero ? 26 : 14,
+                    style: .continuous
+                )
                     .fill(Color.primary.opacity(0.04))
-                RoundedRectangle(cornerRadius: 26, style: .continuous)
+                RoundedRectangle(
+                    cornerRadius: style == .hero ? 26 : 14,
+                    style: .continuous
+                )
                     .stroke(Color.primary.opacity(0.18), lineWidth: 1)
 
                 VStack(spacing: 6) {
                     Image(systemName: "photo")
-                        .font(.system(size: 22, weight: .regular))
+                        .font(.system(size: style == .hero ? 22 : 18, weight: .regular))
                     Text("\(sectionTitle) Screenshot \(slot)")
                         .font(.subheadline.weight(.semibold))
                     Text("Add asset: \(assetName)")
@@ -226,6 +256,7 @@ private struct HelpScreenshotPlaceholder: View {
                 .foregroundStyle(.secondary)
                 .padding(.vertical, 18)
             }
+            .frame(maxWidth: style == .hero ? .infinity : 420, alignment: .leading)
         }
     }
 

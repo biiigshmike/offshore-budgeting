@@ -201,7 +201,6 @@ private struct AppMenuCommandItem: Identifiable {
 
 struct OffshoreAppCommands: Commands {
     @ObservedObject var commandHub: AppCommandHub
-    let showsCustomHelpCommand: Bool
 
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
@@ -216,13 +215,21 @@ struct OffshoreAppCommands: Commands {
             }
         }
 
-        if showsCustomHelpCommand {
+        #if targetEnvironment(macCatalyst)
+        CommandGroup(replacing: .help) {
+            ForEach(helpItems) { item in
+                commandButton(for: item)
+            }
+        }
+        #elseif canImport(UIKit)
+        if UIDevice.current.userInterfaceIdiom == .pad && ProcessInfo.processInfo.isiOSAppOnMac == false {
             CommandGroup(after: .help) {
                 ForEach(helpItems) { item in
                     commandButton(for: item)
                 }
             }
         }
+        #endif
 
         CommandGroup(after: .pasteboard) {
             if !editItems.isEmpty {

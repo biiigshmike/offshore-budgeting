@@ -1,6 +1,4 @@
 *.md
-!HelpSource/en/*.md
-!docs/help-authoring.md
 tree.txt
 ref1.PNG
 ref2.PNG
