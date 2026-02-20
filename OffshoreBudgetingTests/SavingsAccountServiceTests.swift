@@ -408,4 +408,33 @@ struct SavingsAccountServiceTests {
         #expect(entries.first?.kind == .manualAdjustment)
         #expect(account.total == 100)
     }
+
+    @Test func deletingLastSavingsEntry_setsRunningTotalToZero() throws {
+        let context = try makeContext()
+
+        let ws = Workspace(name: "WS", hexColor: "#3B82F6")
+        context.insert(ws)
+
+        let account = SavingsAccountService.ensureSavingsAccount(for: ws, modelContext: context)
+        SavingsAccountService.addManualAdjustment(
+            workspace: ws,
+            account: account,
+            date: makeDate(2026, 7, 1),
+            amount: 250,
+            note: "Initial contribution",
+            modelContext: context
+        )
+        #expect(account.total == 250)
+
+        let entries = try fetchAll(SavingsLedgerEntry.self, in: context)
+        #expect(entries.count == 1)
+
+        if let onlyEntry = entries.first {
+            SavingsAccountService.deleteEntry(onlyEntry, modelContext: context)
+        }
+
+        let remainingEntries = try fetchAll(SavingsLedgerEntry.self, in: context)
+        #expect(remainingEntries.isEmpty)
+        #expect(account.total == 0)
+    }
 }

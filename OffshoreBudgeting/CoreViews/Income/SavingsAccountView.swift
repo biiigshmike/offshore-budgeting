@@ -149,12 +149,19 @@ struct SavingsAccountView: View {
                         .font(.headline)
                         .foregroundStyle(runningTotal >= 0 ? .green : .red)
                 }
+
+                Text("Running Total includes all dates in your savings ledger.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
 
             Section("Ledger") {
                 if displayRows.isEmpty {
-                    Text("No savings entries for this date range.")
-                        .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("No savings entries for this date range.")
+                        Text("Try expanding the date range. Running Total still reflects your full ledger balance.")
+                    }
+                    .foregroundStyle(.secondary)
                 } else {
                     ForEach(displayRows) { entry in
                         Button {
@@ -243,9 +250,12 @@ struct SavingsAccountView: View {
                 .font(.headline.weight(.semibold))
 
             if chartPoints.isEmpty {
-                Text("No savings history yet.")
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, minHeight: 200)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("No savings history in this date range.")
+                    Text("Running Total still reflects your full ledger balance.")
+                }
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, minHeight: 200, alignment: .topLeading)
             } else {
                 Chart(chartPoints) { point in
                     LineMark(
