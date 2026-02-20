@@ -11,10 +11,10 @@ struct SettingsHelpView: View {
         normalizedSearchText.isEmpty == false
     }
 
-    private var searchResults: [GeneratedHelpTopic] {
+    private var searchResults: [GeneratedHelpLeafTopic] {
         guard isSearching else { return [] }
 
-        return GeneratedHelpContent.topics.filter { topic in
+        return GeneratedHelpContent.allLeafTopics.filter { topic in
             topic.searchableText.localizedCaseInsensitiveContains(normalizedSearchText)
         }
     }
@@ -28,20 +28,20 @@ struct SettingsHelpView: View {
                             .foregroundStyle(.secondary)
                     } else {
                         ForEach(searchResults) { topic in
-                            topicNavigationLink(topic)
+                            leafTopicNavigationLink(topic)
                         }
                     }
                 }
             } else {
                 Section("Getting Started") {
-                    ForEach(GeneratedHelpContent.gettingStartedTopics) { topic in
-                        topicNavigationLink(topic)
+                    ForEach(GeneratedHelpContent.gettingStartedDestinations) { destination in
+                        destinationNavigationLink(destination)
                     }
                 }
 
                 Section("Core Screens") {
-                    ForEach(GeneratedHelpContent.coreScreenTopics) { topic in
-                        topicNavigationLink(topic)
+                    ForEach(GeneratedHelpContent.coreScreenDestinations) { destination in
+                        destinationNavigationLink(destination)
                     }
                 }
             }
@@ -57,23 +57,51 @@ struct SettingsHelpView: View {
 
     // MARK: - Navigation
 
-    private func topicNavigationLink(_ topic: GeneratedHelpTopic) -> some View {
+    private func destinationNavigationLink(_ destination: GeneratedHelpDestination) -> some View {
+        NavigationLink {
+            HelpDestinationTopicsView(destination: destination)
+        } label: {
+            HelpRowLabel(
+                iconSystemName: destination.iconSystemName,
+                title: destination.title,
+                iconStyle: HelpIconStyle(generatedStyle: destination.iconStyle)
+            )
+        }
+    }
+
+    private func leafTopicNavigationLink(_ topic: GeneratedHelpLeafTopic) -> some View {
         NavigationLink {
             HelpTopicDetailView(topic: topic)
         } label: {
-            HelpRowLabel(
-                iconSystemName: topic.iconSystemName,
-                title: topic.title,
-                iconStyle: HelpIconStyle(generatedStyle: topic.iconStyle)
-            )
+            Text(topic.title)
         }
+    }
+}
+
+// MARK: - Destination Topics
+
+private struct HelpDestinationTopicsView: View {
+    let destination: GeneratedHelpDestination
+
+    var body: some View {
+        List {
+            ForEach(GeneratedHelpContent.leafTopics(for: destination)) { topic in
+                NavigationLink {
+                    HelpTopicDetailView(topic: topic)
+                } label: {
+                    Text(topic.title)
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+        .navigationTitle(destination.title)
     }
 }
 
 // MARK: - Topic Detail
 
 struct HelpTopicDetailView: View {
-    let topic: GeneratedHelpTopic
+    let topic: GeneratedHelpLeafTopic
 
     var body: some View {
         ScrollView {
@@ -94,7 +122,7 @@ struct HelpTopicDetailView: View {
                         case .heroScreenshot:
                             if let slot = Int(line.value) {
                                 HelpScreenshotPlaceholder(
-                                    sectionTitle: topic.title,
+                                    topic: topic,
                                     slot: slot,
                                     style: .hero
                                 )
@@ -103,7 +131,7 @@ struct HelpTopicDetailView: View {
                         case .miniScreenshot:
                             if let slot = Int(line.value) {
                                 HelpScreenshotPlaceholder(
-                                    sectionTitle: topic.title,
+                                    topic: topic,
                                     slot: slot,
                                     style: .mini
                                 )
@@ -204,13 +232,17 @@ private struct HelpScreenshotPlaceholder: View {
         case mini
     }
 
-    let sectionTitle: String
+    let topic: GeneratedHelpLeafTopic
     let slot: Int
     let style: Style
 
     private var assetName: String {
-        let sanitizedSection = sectionTitle.replacingOccurrences(of: " ", with: "")
-        return "Help-\(sanitizedSection)-\(slot)"
+        if let assetPrefix = topic.assetPrefix {
+            return "\(assetPrefix)-\(slot)"
+        }
+
+        let fallbackTitle = topic.title.replacingOccurrences(of: " ", with: "")
+        return "Help-\(fallbackTitle)-\(slot)"
     }
 
     var body: some View {
@@ -248,7 +280,7 @@ private struct HelpScreenshotPlaceholder: View {
                 VStack(spacing: 6) {
                     Image(systemName: "photo")
                         .font(.system(size: style == .hero ? 22 : 18, weight: .regular))
-                    Text("\(sectionTitle) Screenshot \(slot)")
+                    Text("\(topic.title) Screenshot \(slot)")
                         .font(.subheadline.weight(.semibold))
                     Text("Add asset: \(assetName)")
                         .font(.caption)
@@ -259,28 +291,34 @@ private struct HelpScreenshotPlaceholder: View {
             .frame(maxWidth: style == .hero ? .infinity : 420, alignment: .leading)
         }
     }
-
-    #if canImport(UIKit)
-    private func platformImage(named name: String) -> UIImage? { UIImage(named: name) }
-    #elseif canImport(AppKit)
-    private func platformImage(named name: String) -> NSImage? { NSImage(named: name) }
-    #else
-    private func platformImage(named name: String) -> Any? { nil }
-    #endif
 }
+
+// MARK: - Platform Image Helpers
 
 #if canImport(UIKit)
-private extension Image {
-    init(platformImage: UIImage) { self.init(uiImage: platformImage) }
-}
-#elseif canImport(AppKit)
-private extension Image {
-    init(platformImage: NSImage) { self.init(nsImage: platformImage) }
-}
-#endif
+import UIKit
+private typealias NativeImage = UIImage
 
-#Preview("Help") {
-    NavigationStack {
-        SettingsHelpView()
+private func platformImage(named name: String) -> NativeImage? {
+    UIImage(named: name)
+}
+
+private extension Image {
+    init(platformImage: NativeImage) {
+        self.init(uiImage: platformImage)
     }
 }
+#elseif canImport(AppKit)
+import AppKit
+private typealias NativeImage = NSImage
+
+private func platformImage(named name: String) -> NativeImage? {
+    NSImage(named: name)
+}
+
+private extension Image {
+    init(platformImage: NativeImage) {
+        self.init(nsImage: platformImage)
+    }
+}
+#endif

@@ -9,8 +9,8 @@ struct QuickActionsInstallView: View {
     @Environment(\.openURL) private var openURL
     @State private var openedItemIDs: Set<String> = []
     
-    private var quickActionsHelpTopic: GeneratedHelpTopic? {
-        GeneratedHelpContent.topics.first { $0.id == "quick-actions" }
+    private var quickActionsHelpTopic: GeneratedHelpLeafTopic? {
+        GeneratedHelpContent.leafTopic(for: "introduction-quick-actions")
     }
     
     init(isOnboarding: Bool = false) {
