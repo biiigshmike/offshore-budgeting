@@ -178,6 +178,7 @@ struct CategorySpotlightDetailView: View {
                 Image(systemName: showsAll ? "chevron.up" : "chevron.down")
                     .font(.system(size: 12, weight: .semibold))
             }
+            .frame(maxWidth: .infinity, minHeight: 44)
         }
     }
 }
