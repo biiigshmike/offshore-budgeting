@@ -205,11 +205,11 @@ struct ExpenseCSVImportRowView: View {
 
     private var row4SharedBalance: some View {
         HStack(spacing: 10) {
-            Text("Shared Balance")
+            Text("Reconciliation")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 
-            Picker("Shared Balance", selection: Binding(
+            Picker("Reconciliation", selection: Binding(
                 get: { row.selectedAllocationAccount?.id },
                 set: { newID in
                     let match = allAllocationAccounts.first(where: { $0.id == newID })

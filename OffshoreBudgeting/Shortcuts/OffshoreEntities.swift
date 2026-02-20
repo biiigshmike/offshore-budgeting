@@ -56,10 +56,10 @@ struct OffshoreCategoryEntityQuery: EntityQuery {
     }
 }
 
-// MARK: - Shared Balance Entity
+// MARK: - Reconciliation Entity
 
 struct OffshoreAllocationAccountEntity: AppEntity, Identifiable, Hashable {
-    static var typeDisplayRepresentation: TypeDisplayRepresentation = "Shared Balance"
+    static var typeDisplayRepresentation: TypeDisplayRepresentation = "Reconciliation"
     static var defaultQuery = OffshoreAllocationAccountEntityQuery()
 
     let id: String

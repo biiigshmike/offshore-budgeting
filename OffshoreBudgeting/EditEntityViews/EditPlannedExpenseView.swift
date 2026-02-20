@@ -334,7 +334,7 @@ struct EditPlannedExpenseView: View {
     }
 
     private var sharedBalanceSection: some View {
-        Section("Shared Balance") {
+        Section("Reconciliation") {
             Picker("Action", selection: sharedBalanceModeBinding) {
                 Text("None").tag(SharedBalanceMode?.none)
                 ForEach(SharedBalanceMode.allCases) { mode in
@@ -350,7 +350,7 @@ struct EditPlannedExpenseView: View {
             }
 
             if let mode = activeSharedBalanceMode {
-                Picker("Shared Balance", selection: accountBinding(for: mode)) {
+                Picker("Reconciliation", selection: accountBinding(for: mode)) {
                     Text("None").tag(UUID?.none)
                     ForEach(allocationAccounts) { account in
                         Text(account.name).tag(UUID?.some(account.id))
@@ -378,7 +378,7 @@ struct EditPlannedExpenseView: View {
             }
 
             if hasAllocationConfigured || hasOffsetConfigured || isLegacyDualConfiguration {
-                Button("Clear Shared Balance Action", role: .destructive) {
+                Button("Clear Reconciliation Action", role: .destructive) {
                     clearSharedBalanceAction()
                 }
             }
@@ -406,7 +406,7 @@ struct EditPlannedExpenseView: View {
             Text("Savings Offset")
         } footer: {
             if activeSharedBalanceMode != nil {
-                Text("Clear Shared Balance actions to use Savings Offset.")
+                Text("Clear Reconciliation actions to use Savings Offset.")
             }
         }
         .disabled(activeSharedBalanceMode != nil)
@@ -457,7 +457,7 @@ struct EditPlannedExpenseView: View {
         let rawAmountText = mode == .split ? allocationAmountText : offsetAmountText
 
         guard selectedAccountID != nil else {
-            return "Choose a Shared Balance."
+            return "Choose a Reconciliation."
         }
 
         let trimmedAmount = rawAmountText.trimmingCharacters(in: .whitespacesAndNewlines)

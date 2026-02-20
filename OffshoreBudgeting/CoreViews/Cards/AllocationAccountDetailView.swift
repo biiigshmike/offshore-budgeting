@@ -123,7 +123,7 @@ struct AllocationAccountDetailView: View {
                         Button {
                             showingEditAccountSheet = true
                         } label: {
-                            Label("Edit Shared Balance", systemImage: "pencil")
+                            Label("Edit Reconciliation", systemImage: "pencil")
                         }
 
                         Divider()
@@ -152,7 +152,7 @@ struct AllocationAccountDetailView: View {
                     } label: {
                         Image(systemName: "ellipsis")
                     }
-                    .accessibilityLabel("Shared Balance Actions")
+                    .accessibilityLabel("Reconciliation Actions")
                 }
 
                 ToolbarSpacer(.flexible, placement: .primaryAction)
@@ -171,7 +171,7 @@ struct AllocationAccountDetailView: View {
                         Button {
                             showingEditAccountSheet = true
                         } label: {
-                            Label("Edit Shared Balance", systemImage: "pencil")
+                            Label("Edit Reconciliation", systemImage: "pencil")
                         }
 
                         Divider()
@@ -200,7 +200,7 @@ struct AllocationAccountDetailView: View {
                     } label: {
                         Image(systemName: "ellipsis")
                     }
-                    .accessibilityLabel("Shared Balance Actions")
+                    .accessibilityLabel("Reconciliation Actions")
 
                     Button {
                         showingAddSettlementSheet = true
@@ -211,21 +211,21 @@ struct AllocationAccountDetailView: View {
                 }
             }
         }
-        .alert("Archive Shared Balance?", isPresented: $showingArchiveConfirm) {
+        .alert("Archive Reconciliation?", isPresented: $showingArchiveConfirm) {
             Button("Archive", role: .destructive) {
                 archiveAccountAndDismiss()
             }
             Button("Cancel", role: .cancel) { }
         } message: {
-            Text("Archived Shared Balances stay in history but are hidden from new allocation choices.")
+            Text("Archived Reconciliations stay in history but are hidden from new allocation choices.")
         }
-        .alert("Delete Shared Balance?", isPresented: $showingDeleteConfirm) {
+        .alert("Delete Reconciliation?", isPresented: $showingDeleteConfirm) {
             Button("Delete", role: .destructive) {
                 deleteAccountAndDismiss()
             }
             Button("Cancel", role: .cancel) { }
         } message: {
-            Text("This deletes the Shared Balance permanently.")
+            Text("This deletes the Reconciliation permanently.")
         }
         .alert("Delete Settlement?", isPresented: $showingSettlementDeleteConfirm) {
             Button("Delete", role: .destructive) {
@@ -280,7 +280,7 @@ struct AllocationAccountDetailView: View {
                     ContentUnavailableView(
                         "Entry Unavailable",
                         systemImage: "exclamationmark.triangle",
-                        description: Text("The selected shared balance entry could not be found.")
+                        description: Text("The selected reconciliation entry could not be found.")
                     )
                 }
             }
@@ -618,8 +618,8 @@ private struct EditSharedBalanceEntryView: View {
                 }
             }
 
-            Section("Shared Balance Entry") {
-                Picker("Shared Balance", selection: $selectedAccountID) {
+            Section("Reconciliation Entry") {
+                Picker("Reconciliation", selection: $selectedAccountID) {
                     Text("None").tag(UUID?.none)
                     ForEach(allocationAccounts) { account in
                         Text(account.name).tag(Optional(account.id))
@@ -633,8 +633,8 @@ private struct EditSharedBalanceEntryView: View {
 
                 if !isLinked || actionMode == .offset {
                     Picker("Direction", selection: $direction) {
-                        Text("Add to Shared Balance").tag(1)
-                        Text("Use Shared Balance").tag(-1)
+                        Text("Add to Reconciliation").tag(1)
+                        Text("Use Reconciliation").tag(-1)
                     }
                     .pickerStyle(.segmented)
                 }
@@ -660,7 +660,7 @@ private struct EditSharedBalanceEntryView: View {
                 }
             }
         }
-        .navigationTitle("Edit Shared Balance")
+        .navigationTitle("Edit Reconciliation")
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button("Cancel") { dismiss() }
@@ -731,7 +731,7 @@ private struct EditSharedBalanceEntryView: View {
         if isLinked {
             if actionMode != .none {
                 guard let selectedAccount else {
-                    saveErrorMessage = "Please select a shared balance account."
+                    saveErrorMessage = "Please select a reconciliation account."
                     showingSaveErrorAlert = true
                     return
                 }
@@ -772,7 +772,7 @@ private struct EditSharedBalanceEntryView: View {
                 }
             case .none:
                 guard let selectedAccount else {
-                    saveErrorMessage = "Please select a shared balance account."
+                    saveErrorMessage = "Please select a reconciliation account."
                     showingSaveErrorAlert = true
                     return
                 }
@@ -1033,8 +1033,8 @@ private struct AddAllocationSettlementView: View {
                     .keyboardType(.decimalPad)
 
                 Picker("Direction", selection: directionBinding) {
-                    Text("Add to Shared Balance").tag(1)
-                    Text("Use Shared Balance").tag(-1)
+                    Text("Add to Reconciliation").tag(1)
+                    Text("Use Reconciliation").tag(-1)
                 }
                 .pickerStyle(.segmented)
 

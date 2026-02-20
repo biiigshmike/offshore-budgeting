@@ -86,7 +86,7 @@ struct AllocationAccountView: View {
             VStack(alignment: .leading, spacing: 12) {
                 if allocationAccounts.isEmpty {
                     ContentUnavailableView(
-                        "No Shared Balances Yet",
+                        "No Reconciliations Yet",
                         systemImage: "person.2",
                         description: Text("Create an account to track shared expenses and settlements.")
                     )
@@ -153,7 +153,7 @@ struct AllocationAccountView: View {
                 }
             }
         }
-        .alert("Delete Shared Balance?", isPresented: $showingSharedBalanceDeleteConfirm) {
+        .alert("Delete Reconciliation?", isPresented: $showingSharedBalanceDeleteConfirm) {
             Button("Delete", role: .destructive) {
                 pendingSharedBalanceDelete?()
                 pendingSharedBalanceDelete = nil
@@ -162,9 +162,9 @@ struct AllocationAccountView: View {
                 pendingSharedBalanceDelete = nil
             }
         } message: {
-            Text("This deletes the Shared Balance permanently.")
+            Text("This deletes the Reconciliation permanently.")
         }
-        .alert("Archive Shared Balance?", isPresented: $showingSharedBalanceArchiveConfirm) {
+        .alert("Archive Reconciliation?", isPresented: $showingSharedBalanceArchiveConfirm) {
             Button("Archive", role: .destructive) {
                 pendingSharedBalanceArchive?()
                 pendingSharedBalanceArchive = nil
@@ -173,7 +173,7 @@ struct AllocationAccountView: View {
                 pendingSharedBalanceArchive = nil
             }
         } message: {
-            Text("Archived Shared Balances stay in history but are hidden from new allocation choices.")
+            Text("Archived Reconciliations stay in history but are hidden from new allocation choices.")
         }
         .sheet(isPresented: $showingAddAllocationAccount) {
             NavigationStack {
@@ -202,7 +202,7 @@ struct AllocationAccountView: View {
         } label: {
             Image(systemName: "plus")
         }
-        .accessibilityLabel("Add Shared Balance")
+        .accessibilityLabel("Add Reconciliation")
     }
 
     @ViewBuilder

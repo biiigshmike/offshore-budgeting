@@ -307,25 +307,25 @@ enum GeneratedHelpContent {
         ),
         GeneratedHelpTopic(
             id: "shared-balances",
-            title: "Shared Balances",
+            title: "Reconciliations",
             group: .coreScreens,
             iconSystemName: "person.2.fill",
             iconStyle: .purple,
             sections: [
                 GeneratedHelpSection(
                     id: "shared-balances-1",
-                    header: "Shared Balances: Track Shared Spending in One Place",
+                    header: "Reconciliations: Track Shared Spending in One Place",
                     lines: [
                         GeneratedHelpLine(kind: .heroScreenshot, value: "1"),
-                        GeneratedHelpLine(kind: .text, value: "Shared Balances help you track money you fronted, split, or need to settle with someone else."),
+                        GeneratedHelpLine(kind: .text, value: "Reconciliations help you track money you fronted, split, or need to settle with someone else."),
                     ]
                 ),
                 GeneratedHelpSection(
                     id: "shared-balances-2",
-                    header: "Create and Manage Shared Balances",
+                    header: "Create and Manage Reconciliations",
                     lines: [
                         GeneratedHelpLine(kind: .miniScreenshot, value: "2"),
-                        GeneratedHelpLine(kind: .text, value: "From Accounts > Shared Balances, tap + to add a shared balance."),
+                        GeneratedHelpLine(kind: .text, value: "From Accounts > Reconciliations, tap + to add a reconciliation."),
                         GeneratedHelpLine(kind: .bullet, value: "Name each balance clearly (for example: Roommate, Trip Fund, Work Lunches)."),
                         GeneratedHelpLine(kind: .bullet, value: "Tap a balance to open details."),
                         GeneratedHelpLine(kind: .bullet, value: "Edit from the context menu."),
@@ -336,14 +336,14 @@ enum GeneratedHelpContent {
                     header: "Settlements and History",
                     lines: [
                         GeneratedHelpLine(kind: .miniScreenshot, value: "3"),
-                        GeneratedHelpLine(kind: .text, value: "Shared Balances keep a running ledger from allocations and settlements."),
+                        GeneratedHelpLine(kind: .text, value: "Reconciliations keep a running ledger from allocations and settlements."),
                         GeneratedHelpLine(kind: .bullet, value: "Settlements move the balance toward zero."),
                         GeneratedHelpLine(kind: .bullet, value: "Balances with history are archived instead of hard deleted."),
                         GeneratedHelpLine(kind: .bullet, value: "Archived balances stay in history but are hidden from new choices."),
                     ]
                 )
             ],
-            searchableText: "Shared Balances Shared Balances: Track Shared Spending in One Place 1 Shared Balances help you track money you fronted, split, or need to settle with someone else. Create and Manage Shared Balances 2 From Accounts > Shared Balances, tap + to add a shared balance. Name each balance clearly (for example: Roommate, Trip Fund, Work Lunches). Tap a balance to open details. Edit from the context menu. Settlements and History 3 Shared Balances keep a running ledger from allocations and settlements. Settlements move the balance toward zero. Balances with history are archived instead of hard deleted. Archived balances stay in history but are hidden from new choices."
+            searchableText: "Reconciliations Reconciliations: Track Shared Spending in One Place 1 Reconciliations help you track money you fronted, split, or need to settle with someone else. Create and Manage Reconciliations 2 From Accounts > Reconciliations, tap + to add a reconciliation. Name each balance clearly (for example: Roommate, Trip Fund, Work Lunches). Tap a balance to open details. Edit from the context menu. Settlements and History 3 Reconciliations keep a running ledger from allocations and settlements. Settlements move the balance toward zero. Balances with history are archived instead of hard deleted. Archived balances stay in history but are hidden from new choices."
         ),
         GeneratedHelpTopic(
             id: "savings-account",

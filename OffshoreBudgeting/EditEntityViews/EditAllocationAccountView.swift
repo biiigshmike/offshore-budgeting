@@ -28,12 +28,12 @@ struct EditAllocationAccountView: View {
 
     var body: some View {
         Form {
-            Section("Shared Balance") {
+            Section("Reconciliation") {
                 TextField("Name", text: $name)
                 ColorPicker("Color", selection: $color, supportsOpacity: false)
             }
         }
-        .navigationTitle("Edit Shared Balance")
+        .navigationTitle("Edit Reconciliation")
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button("Cancel") { dismiss() }

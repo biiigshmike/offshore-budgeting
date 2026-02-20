@@ -31,7 +31,7 @@ final class OffshoreIntentDataStore {
             case .categoryUnavailable:
                 return "The selected category was not found in your active workspace."
             case .allocationAccountUnavailable:
-                return "The selected Shared Balance was not found in your active workspace."
+                return "The selected Reconciliation was not found in your active workspace."
             }
         }
     }

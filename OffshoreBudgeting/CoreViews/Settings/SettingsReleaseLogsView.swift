@@ -66,8 +66,8 @@ struct SettingsReleaseLogsView: View {
                 ),
                 ReleaseItem(
                     systemImage: "creditcard.fill",
-                    title: "Shared Balances: Now on the Cards Tab",
-                    description: "You can now split expenses and track shared balances. When adding or editing an expense, choose to split or offset it against a Shared Balance. View the running total and full expense history in Cards > Shared Balance."
+                    title: "Reconciliations: Now on the Cards Tab",
+                    description: "You can now split expenses and track reconciliations. When adding or editing an expense, choose to split or offset it against a Reconciliation. View the running total and full expense history in Cards > Reconciliation."
                 ),
                 ReleaseItem(
                     systemImage: "square.2.layers.3d.top.filled",
@@ -93,7 +93,7 @@ struct SettingsReleaseLogsView: View {
                 ReleaseItem(
                     systemImage: "ladybug.slash",
                     title: "Swept for Bugs",
-                    description: "Cleaned around the bank and managed to squash a few bugs and improve some UI glitches in the process."
+                    description: "Cleaned around the vault and managed to squash a few bugs and improve some UI glitches in the process."
                 )
             ]
         ),

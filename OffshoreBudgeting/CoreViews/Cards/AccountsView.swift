@@ -4,7 +4,7 @@ struct AccountsView: View {
 
     enum Segment: String, CaseIterable, Identifiable {
         case cards = "Cards"
-        case sharedBalances = "Shared Balances"
+        case sharedBalances = "Reconciliations"
         case savings = "Savings"
 
         var id: String { rawValue }
@@ -80,7 +80,7 @@ private struct AccountsSegmentControlModifier: ViewModifier {
     private var segmentPicker: some View {
         Picker("Section", selection: $selectedSegment) {
             Text("Cards").tag(AccountsView.Segment.cards)
-            Text("Shared Balances").tag(AccountsView.Segment.sharedBalances)
+            Text("Reconciliations").tag(AccountsView.Segment.sharedBalances)
             Text("Savings").tag(AccountsView.Segment.savings)
         }
         .pickerStyle(.segmented)
