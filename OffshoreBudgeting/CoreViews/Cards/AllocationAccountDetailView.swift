@@ -21,8 +21,7 @@ struct AllocationAccountDetailView: View {
     @State private var showingChargeDeleteConfirm: Bool = false
     @State private var pendingChargeDeleteID: UUID? = nil
 
-    @State private var showingEditEntrySheet: Bool = false
-    @State private var editingEntry: EditableEntry? = nil
+    @State private var editingSheetEntry: EditSharedBalanceEntryView.Entry? = nil
 
     @State private var showingSettlementActionError: Bool = false
     @State private var settlementActionErrorMessage: String = ""
@@ -70,8 +69,11 @@ struct AllocationAccountDetailView: View {
                             .swipeActions(edge: .leading, allowsFullSwipe: false) {
                                 if let settlementID = row.settlementID, !account.isArchived {
                                     Button {
-                                        editingEntry = .settlement(settlementID)
-                                        showingEditEntrySheet = true
+                                        guard let settlement = settlement(for: settlementID) else {
+                                            showEntryUnavailableError()
+                                            return
+                                        }
+                                        editingSheetEntry = .settlement(settlement)
                                     } label: {
                                         Label("Edit", systemImage: "pencil")
                                     }
@@ -79,10 +81,12 @@ struct AllocationAccountDetailView: View {
                                 }
                                 if isEditableChargeRow(row), !account.isArchived {
                                     Button {
-                                        if let allocationID = row.allocationID {
-                                            editingEntry = .allocation(allocationID)
-                                            showingEditEntrySheet = true
+                                        guard let allocationID = row.allocationID,
+                                              let allocation = allocation(for: allocationID) else {
+                                            showEntryUnavailableError()
+                                            return
                                         }
+                                        editingSheetEntry = .allocation(allocation)
                                     } label: {
                                         Label("Edit", systemImage: "pencil")
                                     }
@@ -266,23 +270,15 @@ struct AllocationAccountDetailView: View {
                 EditAllocationAccountView(account: account)
             }
         }
-        .sheet(isPresented: $showingEditEntrySheet, onDismiss: {
-            editingEntry = nil
-        }) {
+        .sheet(item: $editingSheetEntry, onDismiss: {
+            editingSheetEntry = nil
+        }) { entry in
             NavigationStack {
-                if let resolvedEditingEntry {
-                    EditSharedBalanceEntryView(
-                        workspace: workspace,
-                        account: account,
-                        entry: resolvedEditingEntry
-                    )
-                } else {
-                    ContentUnavailableView(
-                        "Entry Unavailable",
-                        systemImage: "exclamationmark.triangle",
-                        description: Text("The selected reconciliation entry could not be found.")
-                    )
-                }
+                EditSharedBalanceEntryView(
+                    workspace: workspace,
+                    account: account,
+                    entry: entry
+                )
             }
         }
     }
@@ -389,17 +385,9 @@ struct AllocationAccountDetailView: View {
         return allocation.expense != nil || allocation.plannedExpense != nil
     }
 
-    private var resolvedEditingEntry: EditSharedBalanceEntryView.Entry? {
-        guard let editingEntry else { return nil }
-
-        switch editingEntry {
-        case .allocation(let id):
-            guard let allocation = allocation(for: id) else { return nil }
-            return .allocation(allocation)
-        case .settlement(let id):
-            guard let settlement = settlement(for: id) else { return nil }
-            return .settlement(settlement)
-        }
+    private func showEntryUnavailableError() {
+        settlementActionErrorMessage = "The selected reconciliation entry could not be found."
+        showingSettlementActionError = true
     }
 
     private func deleteChargeAllocation(id: UUID) {
@@ -447,16 +435,20 @@ struct AllocationAccountDetailView: View {
     }
 }
 
-private enum EditableEntry {
-    case allocation(UUID)
-    case settlement(UUID)
-}
-
 private struct EditSharedBalanceEntryView: View {
 
-    enum Entry {
+    enum Entry: Identifiable {
         case allocation(ExpenseAllocation)
         case settlement(AllocationSettlement)
+
+        var id: String {
+            switch self {
+            case .allocation(let allocation):
+                return "allocation-\(allocation.id.uuidString)"
+            case .settlement(let settlement):
+                return "settlement-\(settlement.id.uuidString)"
+            }
+        }
     }
 
     private enum ActionMode: String, CaseIterable, Identifiable {
@@ -633,8 +625,8 @@ private struct EditSharedBalanceEntryView: View {
 
                 if !isLinked || actionMode == .offset {
                     Picker("Direction", selection: $direction) {
-                        Text("Add to Reconciliation").tag(1)
-                        Text("Use Reconciliation").tag(-1)
+                        Text("They Owe Me").tag(1)
+                        Text("I Owe Them").tag(-1)
                     }
                     .pickerStyle(.segmented)
                 }
@@ -1033,8 +1025,8 @@ private struct AddAllocationSettlementView: View {
                     .keyboardType(.decimalPad)
 
                 Picker("Direction", selection: directionBinding) {
-                    Text("Add to Reconciliation").tag(1)
-                    Text("Use Reconciliation").tag(-1)
+                    Text("They Owe Me").tag(1)
+                    Text("I Owe Them").tag(-1)
                 }
                 .pickerStyle(.segmented)
 
