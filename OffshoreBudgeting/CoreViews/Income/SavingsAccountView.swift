@@ -30,6 +30,7 @@ struct SavingsAccountView: View {
     @State private var pendingDeleteEntry: SavingsLedgerEntry? = nil
     @State private var searchText: String = ""
     @FocusState private var searchFocused: Bool
+    @State private var lastHandledCommandSequence: Int? = nil
 
     init(workspace: Workspace) {
         self.workspace = workspace
@@ -195,7 +196,14 @@ struct SavingsAccountView: View {
         .onChange(of: defaultBudgetingPeriodRaw) { _, _ in
             applyDefaultPeriodRange()
         }
-        .onReceive(commandHub.$sequence) { _ in
+        .onReceive(commandHub.$sequence) { sequence in
+            if lastHandledCommandSequence == nil {
+                lastHandledCommandSequence = sequence
+                return
+            }
+
+            guard sequence != lastHandledCommandSequence else { return }
+            lastHandledCommandSequence = sequence
             handleCommand(commandHub.latestCommandID)
         }
         .alert("Delete Entry?", isPresented: $showingDeleteConfirm) {

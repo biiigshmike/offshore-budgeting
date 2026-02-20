@@ -17,6 +17,7 @@ struct AllocationAccountView: View {
     @State private var pendingSharedBalanceDelete: (() -> Void)? = nil
     @State private var showingSharedBalanceArchiveConfirm: Bool = false
     @State private var pendingSharedBalanceArchive: (() -> Void)? = nil
+    @State private var lastHandledCommandSequence: Int? = nil
 
     let workspace: Workspace
 
@@ -168,7 +169,14 @@ struct AllocationAccountView: View {
                 }
             }
         }
-        .onReceive(commandHub.$sequence) { _ in
+        .onReceive(commandHub.$sequence) { sequence in
+            if lastHandledCommandSequence == nil {
+                lastHandledCommandSequence = sequence
+                return
+            }
+
+            guard sequence != lastHandledCommandSequence else { return }
+            lastHandledCommandSequence = sequence
             guard commandHub.surface == .cards else { return }
             handleCommand(commandHub.latestCommandID)
         }

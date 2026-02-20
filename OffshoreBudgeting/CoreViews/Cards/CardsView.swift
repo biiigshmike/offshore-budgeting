@@ -31,6 +31,7 @@ struct CardsView: View {
 
     @State private var showingCardDeleteConfirm: Bool = false
     @State private var pendingCardDelete: (() -> Void)? = nil
+    @State private var lastHandledCommandSequence: Int? = nil
 
     let workspace: Workspace
 
@@ -201,7 +202,14 @@ struct CardsView: View {
         .onChange(of: pendingShortcutActionRaw) { _, _ in
             consumePendingShortcutActionIfNeeded()
         }
-        .onReceive(commandHub.$sequence) { _ in
+        .onReceive(commandHub.$sequence) { sequence in
+            if lastHandledCommandSequence == nil {
+                lastHandledCommandSequence = sequence
+                return
+            }
+
+            guard sequence != lastHandledCommandSequence else { return }
+            lastHandledCommandSequence = sequence
             guard commandHub.surface == .cards else { return }
             handleCommand(commandHub.latestCommandID)
         }
