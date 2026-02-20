@@ -42,10 +42,14 @@ struct CategorySpotlightDetailView: View {
         result.metrics.first
     }
 
+    private var visibleMetrics: [CategorySpendMetric] {
+        showsAll ? result.metrics : Array(result.metrics.prefix(topN))
+    }
+
     private var slices: [DonutSlice] {
         DonutChartView.slicesFromCategoryMetrics(
-            result.metrics,
-            topN: topN,
+            visibleMetrics,
+            topN: visibleMetrics.count,
             includeOther: false
         )
     }
@@ -107,29 +111,11 @@ struct CategorySpotlightDetailView: View {
             .listRowSeparator(.hidden)
 
             Section {
-                Button {
-                    withAnimation(.spring(response: 0.28, dampingFraction: 0.9)) {
-                        showsAll.toggle()
-                    }
-                } label: {
-                    HStack {
-                        Text(showAllButtonTitle)
-                            .font(.subheadline.weight(.semibold))
-
-                        Spacer()
-
-                        Image(systemName: showsAll ? "chevron.up" : "chevron.down")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .buttonStyle(.plain)
+                showAllCategoriesButton
             }
 
             Section {
-                let visible = showsAll ? result.metrics : Array(result.metrics.prefix(topN))
-
-                ForEach(visible) { metric in
+                ForEach(visibleMetrics) { metric in
                     let color = metric.categoryColorHex.flatMap { Color(hex: $0) } ?? .secondary
 
                     CategoryMetricRowView(
@@ -162,5 +148,36 @@ struct CategorySpotlightDetailView: View {
 
     private func localizedInt(_ value: Int) -> String {
         AppNumberFormat.integer(value)
+    }
+
+    @ViewBuilder
+    private var showAllCategoriesButton: some View {
+        if #available(iOS 26.0, *) {
+            baseShowAllCategoriesButton
+                .buttonStyle(.glassProminent)
+                .tint(Color("AccentColor"))
+        } else {
+            baseShowAllCategoriesButton
+                .buttonStyle(.borderedProminent)
+                .tint(Color("AccentColor"))
+        }
+    }
+
+    private var baseShowAllCategoriesButton: some View {
+        Button {
+            withAnimation(.spring(response: 0.28, dampingFraction: 0.9)) {
+                showsAll.toggle()
+            }
+        } label: {
+            HStack {
+                Text(showAllButtonTitle)
+                    .font(.subheadline.weight(.semibold))
+
+                Spacer()
+
+                Image(systemName: showsAll ? "chevron.up" : "chevron.down")
+                    .font(.system(size: 12, weight: .semibold))
+            }
+        }
     }
 }
