@@ -139,27 +139,6 @@ struct CardsView: View {
                 )
             ]
         )
-        .toolbar {
-            if #available(iOS 26.0, macCatalyst 26.0, *) {
-                ToolbarItemGroup(placement: .primaryAction) {
-                    sortToolbarButton
-                }
-
-                ToolbarSpacer(.flexible, placement: .primaryAction)
-
-                ToolbarItemGroup(placement: .primaryAction) {
-                    addToolbarButton
-                }
-            } else {
-                ToolbarItem(placement: .topBarTrailing) {
-                    addToolbarButton
-                }
-
-                ToolbarItem(placement: .primaryAction) {
-                    sortToolbarButton
-                }
-            }
-        }
         .alert("Delete Card?", isPresented: $showingCardDeleteConfirm) {
             Button("Delete", role: .destructive) {
                 pendingCardDelete?()
@@ -225,41 +204,6 @@ struct CardsView: View {
         .onReceive(commandHub.$sequence) { _ in
             guard commandHub.surface == .cards else { return }
             handleCommand(commandHub.latestCommandID)
-        }
-    }
-
-    @ViewBuilder
-    private var addToolbarButton: some View {
-        Button {
-            showingAddCard = true
-        } label: {
-            Image(systemName: "plus")
-        }
-        .accessibilityLabel("Add Card")
-    }
-
-    @ViewBuilder
-    private var sortToolbarButton: some View {
-        Menu {
-            cardsSortMenuButton(title: "A-Z", mode: .az)
-            cardsSortMenuButton(title: "Z-A", mode: .za)
-        } label: {
-            Image(systemName: "arrow.up.arrow.down")
-        }
-        .accessibilityLabel("Sort")
-    }
-
-    private func cardsSortMenuButton(title: String, mode: CardsSortMode) -> some View {
-        Button {
-            setCardsSortMode(mode)
-        } label: {
-            HStack {
-                Text(title)
-                if cardsSortMode == mode {
-                    Spacer()
-                    Image(systemName: "checkmark")
-                }
-            }
         }
     }
 

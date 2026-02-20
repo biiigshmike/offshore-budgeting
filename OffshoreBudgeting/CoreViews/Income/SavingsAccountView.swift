@@ -11,6 +11,7 @@ struct SavingsAccountView: View {
     @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.appCommandHub) private var commandHub
 
     @Query private var savingsAccounts: [SavingsAccount]
     @Query private var savingsEntries: [SavingsLedgerEntry]
@@ -194,16 +195,8 @@ struct SavingsAccountView: View {
         .onChange(of: defaultBudgetingPeriodRaw) { _, _ in
             applyDefaultPeriodRange()
         }
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    editingEntry = nil
-                    showingEntrySheet = true
-                } label: {
-                    Image(systemName: "plus")
-                }
-                .accessibilityLabel("Add Savings Entry")
-            }
+        .onReceive(commandHub.$sequence) { _ in
+            handleCommand(commandHub.latestCommandID)
         }
         .alert("Delete Entry?", isPresented: $showingDeleteConfirm) {
             Button("Delete", role: .destructive) {
@@ -391,6 +384,12 @@ struct SavingsAccountView: View {
 
     private func deleteEntry(_ entry: SavingsLedgerEntry) {
         SavingsAccountService.deleteEntry(entry, modelContext: modelContext)
+    }
+
+    private func handleCommand(_ commandID: String) {
+        guard commandID == AppCommandID.Savings.newEntry else { return }
+        editingEntry = nil
+        showingEntrySheet = true
     }
 }
 

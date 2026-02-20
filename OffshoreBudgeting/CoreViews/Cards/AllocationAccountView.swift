@@ -132,27 +132,6 @@ struct AllocationAccountView: View {
             .padding(.horizontal)
             .padding(.bottom, 8)
         }
-        .toolbar {
-            if #available(iOS 26.0, macCatalyst 26.0, *) {
-                ToolbarItemGroup(placement: .primaryAction) {
-                    sortToolbarButton
-                }
-
-                ToolbarSpacer(.flexible, placement: .primaryAction)
-
-                ToolbarItemGroup(placement: .primaryAction) {
-                    addToolbarButton
-                }
-            } else {
-                ToolbarItem(placement: .topBarTrailing) {
-                    addToolbarButton
-                }
-
-                ToolbarItem(placement: .primaryAction) {
-                    sortToolbarButton
-                }
-            }
-        }
         .alert("Delete Reconciliation?", isPresented: $showingSharedBalanceDeleteConfirm) {
             Button("Delete", role: .destructive) {
                 pendingSharedBalanceDelete?()
@@ -192,43 +171,6 @@ struct AllocationAccountView: View {
         .onReceive(commandHub.$sequence) { _ in
             guard commandHub.surface == .cards else { return }
             handleCommand(commandHub.latestCommandID)
-        }
-    }
-
-    @ViewBuilder
-    private var addToolbarButton: some View {
-        Button {
-            showingAddAllocationAccount = true
-        } label: {
-            Image(systemName: "plus")
-        }
-        .accessibilityLabel("Add Reconciliation")
-    }
-
-    @ViewBuilder
-    private var sortToolbarButton: some View {
-        Menu {
-            sharedBalancesSortMenuButton(title: "A-Z", mode: .az)
-            sharedBalancesSortMenuButton(title: "Z-A", mode: .za)
-            sharedBalancesSortMenuButton(title: "$ ↑", mode: .amountAsc)
-            sharedBalancesSortMenuButton(title: "$ ↓", mode: .amountDesc)
-        } label: {
-            Image(systemName: "arrow.up.arrow.down")
-        }
-        .accessibilityLabel("Sort")
-    }
-
-    private func sharedBalancesSortMenuButton(title: String, mode: SharedBalancesSortMode) -> some View {
-        Button {
-            setSharedBalancesSortMode(mode)
-        } label: {
-            HStack {
-                Text(title)
-                if sharedBalancesSortMode == mode {
-                    Spacer()
-                    Image(systemName: "checkmark")
-                }
-            }
         }
     }
 

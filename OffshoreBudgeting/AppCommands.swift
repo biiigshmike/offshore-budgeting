@@ -69,6 +69,10 @@ enum AppCommandID {
         static let sortAmountDesc = "shared_balances.sort.amount_desc"
     }
 
+    enum Savings {
+        static let newEntry = "savings.new_entry"
+    }
+
     enum CardDetail {
         static let newTransaction = "card_detail.new_transaction"
         static let editCard = "card_detail.edit_card"
