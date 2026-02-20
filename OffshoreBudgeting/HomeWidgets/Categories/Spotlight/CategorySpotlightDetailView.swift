@@ -112,6 +112,7 @@ struct CategorySpotlightDetailView: View {
 
             Section {
                 showAllCategoriesButton
+                    .listRowBackground(Color.clear)
             }
 
             Section {
@@ -169,16 +170,15 @@ struct CategorySpotlightDetailView: View {
                 showsAll.toggle()
             }
         } label: {
-            HStack {
+            HStack(spacing: 8) {
                 Text(showAllButtonTitle)
                     .font(.subheadline.weight(.semibold))
-
-                Spacer()
 
                 Image(systemName: showsAll ? "chevron.up" : "chevron.down")
                     .font(.system(size: 12, weight: .semibold))
             }
             .frame(maxWidth: .infinity, minHeight: 44)
+            .multilineTextAlignment(.center)
         }
     }
 }
