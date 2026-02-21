@@ -291,8 +291,11 @@ struct HomeAssistantPanelView: View {
                         Button(action: onDismiss) {
                             Image(systemName: "xmark")
                                 .font(.body.weight(.semibold))
-                                .buttonStyle(.glass)
+                                .frame(width: 33, height: 33)
+                                .controlSize(.large)
                         }
+                        .buttonStyle(.glass)
+                        .buttonBorderShape(.circle)
                         .accessibilityLabel("Close Assistant")
                     } else {
                         Button(action: onDismiss) {
@@ -310,8 +313,11 @@ struct HomeAssistantPanelView: View {
                             isShowingClearConversationAlert = true
                         } label: {
                             Text("Clear")
-                                .buttonStyle(.glass)
+                                .controlSize(.large)
+                                .frame(height: 33)
                         }
+                        .buttonStyle(.glass)
+                        .buttonBorderShape(.capsule)
                         .disabled(answers.isEmpty)
                         .accessibilityLabel("Clear Chat")
                     } else {
