@@ -151,7 +151,7 @@ enum DebugSeeder {
     }
 
     private static func pickPinnedWorkspace(from workspaces: [Workspace]) -> Workspace? {
-        if let screenshotsWorkspace = workspaces.first(where: { $0.name.caseInsensitiveCompare("Screenshots") == .orderedSame }) {
+        if let screenshotsWorkspace = workspaces.first(where: { $0.name.caseInsensitiveCompare("Personal") == .orderedSame }) {
             return screenshotsWorkspace
         }
         return workspaces.first
@@ -361,7 +361,7 @@ enum DebugSeeder {
         let now = Date()
 
         // Workspace
-        let workspace = Workspace(name: "Screenshots", hexColor: "#3B82F6")
+        let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
         context.insert(workspace)
 
         // Categories

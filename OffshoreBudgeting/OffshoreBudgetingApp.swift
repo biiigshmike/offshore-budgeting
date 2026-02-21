@@ -50,7 +50,7 @@ struct OffshoreBudgetingApp: App {
         if Self.isScreenshotModeEnabled {
             UserDefaults.standard.set(false, forKey: "icloud_activeUseCloud")
             UserDefaults.standard.set(0.0, forKey: "icloud_bootstrapStartedAt")
-            return Self.makeModelContainer(useICloud: false, debugStoreOverride: "Screenshots")
+            return Self.makeModelContainer(useICloud: false, debugStoreOverride: "Personal")
         }
         #endif
 
