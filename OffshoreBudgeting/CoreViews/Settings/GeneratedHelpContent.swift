@@ -22,18 +22,6 @@ enum GeneratedHelpIconStyle: String {
     case orange
 }
 
-struct GeneratedHelpLine: Hashable {
-    enum Kind: String {
-        case text
-        case bullet
-        case heroScreenshot
-        case miniScreenshot
-    }
-
-    let kind: Kind
-    let value: String
-}
-
 struct GeneratedHelpSectionMediaItem: Identifiable, Hashable {
     let id: String
     let assetName: String
@@ -43,7 +31,8 @@ struct GeneratedHelpSectionMediaItem: Identifiable, Hashable {
 struct GeneratedHelpSection: Identifiable, Hashable {
     let id: String
     let header: String?
-    let lines: [GeneratedHelpLine]
+    let bodyText: String
+    let mediaItems: [GeneratedHelpSectionMediaItem]
 }
 
 struct GeneratedHelpLeafTopic: Identifiable, Hashable {
@@ -51,7 +40,6 @@ struct GeneratedHelpLeafTopic: Identifiable, Hashable {
     let destinationID: String
     let title: String
     let sections: [GeneratedHelpSection]
-    let assetPrefix: String?
 
     var searchableText: String {
         var parts: [String] = [title]
@@ -61,65 +49,18 @@ struct GeneratedHelpLeafTopic: Identifiable, Hashable {
                 parts.append(header)
             }
 
-            for mediaItem in mediaItems(for: section) {
-                parts.append(mediaItem.bodyText)
-            }
+            parts.append(section.bodyText)
+            parts.append(contentsOf: section.mediaItems.map(\.bodyText))
         }
 
-        return parts.joined(separator: " ")
+        return parts
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
     }
 
-    // MARK: - Section Media
-
-    // I keep two media slots per section so I can swap screenshots in Assets.xcassets later.
     func mediaItems(for section: GeneratedHelpSection) -> [GeneratedHelpSectionMediaItem] {
-        let sectionBodyText = section.condensedBodyText
-        var items: [GeneratedHelpSectionMediaItem] = []
-
-        for slot in section.screenshotSlots.prefix(2) {
-            items.append(
-                GeneratedHelpSectionMediaItem(
-                    id: "\(section.id)-media-\(items.count + 1)",
-                    assetName: screenshotAssetName(slot: slot),
-                    bodyText: sectionBodyText
-                )
-            )
-        }
-
-        while items.count < 2 {
-            let placeholderSlot = items.count + 1
-            items.append(
-                GeneratedHelpSectionMediaItem(
-                    id: "\(section.id)-media-\(placeholderSlot)",
-                    assetName: section.placeholderAssetName(slot: placeholderSlot),
-                    bodyText: sectionBodyText
-                )
-            )
-        }
-
-        return items
-    }
-
-    // MARK: - Screenshot Import Guide
-
-    // I name section placeholders as Help-<section-id>-1 and Help-<section-id>-2 in Assets.xcassets.
-    var sectionImportAssetNames: [String: [String]] {
-        var mapping: [String: [String]] = [:]
-
-        for section in sections {
-            mapping[section.id] = mediaItems(for: section).map(\.assetName)
-        }
-
-        return mapping
-    }
-
-    private func screenshotAssetName(slot: Int) -> String {
-        if let assetPrefix = assetPrefix {
-            return "\(assetPrefix)-\(slot)"
-        }
-
-        let fallbackTitle = title.replacingOccurrences(of: " ", with: "")
-        return "Help-\(fallbackTitle)-\(slot)"
+        section.mediaItems
     }
 }
 
@@ -166,10 +107,9 @@ enum GeneratedHelpContent {
             iconStyle: .purple,
             leafTopicIDs: [
                 "home-overview",
-                "home-widgets",
                 "home-customization",
-                "home-calculations",
-                "home-marina"
+                "home-marina",
+                "home-widgets"
             ]
         ),
         GeneratedHelpDestination(
@@ -180,7 +120,7 @@ enum GeneratedHelpContent {
             iconStyle: .blue,
             leafTopicIDs: [
                 "budgets-overview",
-                "budgets-details",
+                "budgets-budget-details",
                 "budgets-calculations"
             ]
         ),
@@ -218,10 +158,14 @@ enum GeneratedHelpContent {
             iconStyle: .gray,
             leafTopicIDs: [
                 "settings-overview",
-                "settings-expense-display-toggles",
-                "settings-hide-vs-exclude",
-                "settings-workspaces",
-                "settings-presets"
+                "settings-general",
+                "settings-privacy",
+                "settings-notifications",
+                "settings-icloud",
+                "settings-quick-actions",
+                "settings-categories",
+                "settings-presets",
+                "settings-workspaces"
             ]
         )
     ]
@@ -229,775 +173,766 @@ enum GeneratedHelpContent {
     // MARK: - Leaf Topics
 
     static let allLeafTopics: [GeneratedHelpLeafTopic] = [
+        // MARK: Introduction
+
         GeneratedHelpLeafTopic(
             id: "introduction-building-blocks",
             destinationID: "introduction",
             title: "The Building Blocks",
             sections: [
-                GeneratedHelpSection(
+                textSection(
                     id: "introduction-building-blocks-1",
                     header: "The Building Blocks",
-                    lines: [
-                        GeneratedHelpLine(kind: .text, value: "Welcome to Offshore Budgeting, a privacy-first budgeting app. All data is processed on your device, and you will never be asked to connect a bank account."),
-                        GeneratedHelpLine(kind: .text, value: "Cards, Income, Expense Categories, Presets, and Budgets are the foundation:"),
-                        GeneratedHelpLine(kind: .bullet, value: "Cards hold your expenses and let you analyze spending by card."),
-                        GeneratedHelpLine(kind: .bullet, value: "Income is tracked as planned or actual. Planned income helps you forecast savings, while actual income powers real savings calculations."),
-                        GeneratedHelpLine(kind: .bullet, value: "Expense Categories describe what an expense was for, like groceries, rent, or fuel."),
-                        GeneratedHelpLine(kind: .bullet, value: "Presets are reusable planned expenses for recurring bills."),
-                        GeneratedHelpLine(kind: .bullet, value: "Variable expenses are one-off or unpredictable expenses tied to a card."),
-                        GeneratedHelpLine(kind: .bullet, value: "Budgets group a date range so the app can summarize income, expenses, and savings for that period.")
-                    ]
+                    body: "Offshore is built around cards, income, categories, presets, and budgets. Cards store where expenses were charged, while income tracks what you planned and what you actually received. Categories and presets organize recurring behavior, and budgets tie everything together into a date range you can measure."
                 )
-            ],
-            assetPrefix: nil
+            ]
         ),
         GeneratedHelpLeafTopic(
             id: "introduction-planned-expenses",
             destinationID: "introduction",
             title: "Planned Expenses",
             sections: [
-                GeneratedHelpSection(
+                textSection(
                     id: "introduction-planned-expenses-1",
                     header: "Planned Expenses",
-                    lines: [
-                        GeneratedHelpLine(kind: .text, value: "Expected or recurring costs for a budget period, like rent or subscriptions."),
-                        GeneratedHelpLine(kind: .bullet, value: "Planned Amount: the amount you expect to debit from your account."),
-                        GeneratedHelpLine(kind: .bullet, value: "Actual Amount: if a planned expense costs more or less than expected, edit the planned expense and enter the actual amount.")
-                    ]
+                    body: "Planned expenses are expected costs such as rent, subscriptions, or recurring bills. You can set a planned amount up front, then record an actual amount later if the charge changed. This gives you a forecast and a reality check in the same workflow."
                 )
-            ],
-            assetPrefix: nil
+            ]
         ),
         GeneratedHelpLeafTopic(
             id: "introduction-variable-expenses",
             destinationID: "introduction",
             title: "Variable Expenses",
             sections: [
-                GeneratedHelpSection(
+                textSection(
                     id: "introduction-variable-expenses-1",
                     header: "Variable Expenses",
-                    lines: [
-                        GeneratedHelpLine(kind: .text, value: "Unpredictable, one-off costs during a budget period, like fuel or dining. These are always treated as actual spending and are tracked by card and category.")
-                    ]
+                    body: "Variable expenses cover one-off or unpredictable spending such as fuel, dining, or quick purchases. They are treated as actual spending and roll into budget and card totals immediately. Use categories to keep this spending easy to filter and review later."
                 )
-            ],
-            assetPrefix: nil
+            ]
         ),
         GeneratedHelpLeafTopic(
             id: "introduction-planned-income",
             destinationID: "introduction",
             title: "Planned Income",
             sections: [
-                GeneratedHelpSection(
+                textSection(
                     id: "introduction-planned-income-1",
                     header: "Planned Income",
-                    lines: [
-                        GeneratedHelpLine(kind: .text, value: "Income you expect to receive, like salary or deposits. Planned income is used for forecasts and potential savings."),
-                        GeneratedHelpLine(kind: .bullet, value: "Use planned income to help plan your budget. If income is very consistent, consider recurring actual income instead.")
-                    ]
+                    body: "Planned income is the amount you expect to receive in a period. It powers forward-looking savings projections before deposits arrive. Once income is received, log actual entries to confirm what really happened."
                 )
-            ],
-            assetPrefix: nil
+            ]
         ),
         GeneratedHelpLeafTopic(
             id: "introduction-actual-income",
             destinationID: "introduction",
             title: "Actual Income",
             sections: [
-                GeneratedHelpSection(
+                textSection(
                     id: "introduction-actual-income-1",
                     header: "Actual Income",
-                    lines: [
-                        GeneratedHelpLine(kind: .text, value: "Income you actually receive. Actual income drives real totals, real savings, and the amount you can still spend safely."),
-                        GeneratedHelpLine(kind: .bullet, value: "Income can be logged as actual when received, or set as recurring actual income for consistent paychecks.")
-                    ]
+                    body: "Actual income is money already received, so it drives real totals and real savings. Use recurring actual income for consistent paychecks, or manual entries when deposits vary. This keeps Home and Budget metrics grounded in real cash flow."
                 )
-            ],
-            assetPrefix: nil
+            ]
         ),
         GeneratedHelpLeafTopic(
             id: "introduction-budgets",
             destinationID: "introduction",
             title: "Budgets",
             sections: [
-                GeneratedHelpSection(
+                textSection(
                     id: "introduction-budgets-1",
                     header: "Budgets",
-                    lines: [
-                        GeneratedHelpLine(kind: .text, value: "Budgets are a lens for viewing your income and expenses over a specific date range. Create budgets that align with your financial goals and pay cycles.")
-                    ]
+                    body: "Budgets define a start and end date so Offshore can summarize spending, income, and savings for a clear window. You can compare planned versus actual behavior in the same period and adjust quickly. This is the main lens for measuring progress over time."
                 )
-            ],
-            assetPrefix: nil
+            ]
         ),
         GeneratedHelpLeafTopic(
             id: "introduction-calculations",
             destinationID: "introduction",
             title: "Calculations",
             sections: [
-                GeneratedHelpSection(
+                textSection(
                     id: "introduction-calculations-1",
-                    header: "How Totals Are Calculated",
-                    lines: [
-                        GeneratedHelpLine(kind: .text, value: "Everything in Offshore is basic math:"),
-                        GeneratedHelpLine(kind: .bullet, value: "Planned expenses total = sum of planned amounts for planned expenses in the budget period."),
-                        GeneratedHelpLine(kind: .bullet, value: "Actual planned expenses total = sum of actual amounts for those planned expenses."),
-                        GeneratedHelpLine(kind: .bullet, value: "Variable expenses total = sum of variable expenses in the budget period."),
-                        GeneratedHelpLine(kind: .bullet, value: "Planned income total = sum of income entries marked Planned in the period."),
-                        GeneratedHelpLine(kind: .bullet, value: "Actual income total = sum of income entries marked Actual in the period."),
-                        GeneratedHelpLine(kind: .bullet, value: "Potential savings = planned income total - planned expenses planned total."),
-                        GeneratedHelpLine(kind: .bullet, value: "Actual savings = actual income total - (planned expenses actual total + variable expenses total).")
-                    ]
+                    header: "Calculation Basics",
+                    body: "Most totals in Offshore are straightforward sums grouped by date range, category, type, and visibility settings. Planned values support forecasting, while actual values represent real outcomes. Savings views combine income and expense totals so you can see direction quickly."
                 )
-            ],
-            assetPrefix: nil
+            ]
         ),
         GeneratedHelpLeafTopic(
             id: "introduction-import",
             destinationID: "introduction",
             title: "Import",
             sections: [
-                GeneratedHelpSection(
+                textSection(
                     id: "introduction-import-1",
-                    header: "Import Workflow for Income and Expenses",
-                    lines: [
-                        GeneratedHelpLine(kind: .text, value: "Offshore can parse files, photos, and clipboard text to speed up entry.")
-                    ]
-                ),
-                GeneratedHelpSection(
-                    id: "introduction-import-2",
-                    header: "Supported Import Sources",
-                    lines: [
-                        GeneratedHelpLine(kind: .text, value: "You can import from:"),
-                        GeneratedHelpLine(kind: .bullet, value: "Files (CSV, PDF, image)"),
-                        GeneratedHelpLine(kind: .bullet, value: "Photos"),
-                        GeneratedHelpLine(kind: .bullet, value: "Clipboard text"),
-                        GeneratedHelpLine(kind: .bullet, value: "Shortcut screenshot or clipboard preview flows")
-                    ]
-                ),
-                GeneratedHelpSection(
-                    id: "introduction-import-3",
-                    header: "Review Before You Commit",
-                    lines: [
-                        GeneratedHelpLine(kind: .text, value: "Imports open a review screen before anything is saved."),
-                        GeneratedHelpLine(kind: .bullet, value: "Ready to Import"),
-                        GeneratedHelpLine(kind: .bullet, value: "Possible Matches"),
-                        GeneratedHelpLine(kind: .bullet, value: "Possible Duplicates"),
-                        GeneratedHelpLine(kind: .bullet, value: "Needs More Data / Skipped rows")
-                    ]
-                ),
-                GeneratedHelpSection(
-                    id: "introduction-import-4",
-                    header: "Commit and Learning",
-                    lines: [
-                        GeneratedHelpLine(kind: .text, value: "After review, tap Import to save selected rows."),
-                        GeneratedHelpLine(kind: .bullet, value: "Offshore stores merchant/category matching signals to improve future imports."),
-                        GeneratedHelpLine(kind: .bullet, value: "Expense imports route to a selected card."),
-                        GeneratedHelpLine(kind: .bullet, value: "Income imports route to income entries.")
-                    ]
+                    header: "Import Flow",
+                    body: "Import helps you bring in expense or income data from supported sources, then review matches before saving. The review step lets you catch duplicates and fill missing fields before anything is committed. This keeps imports fast without losing control over data quality."
                 )
-            ],
-            assetPrefix: nil
+            ]
         ),
         GeneratedHelpLeafTopic(
             id: "introduction-quick-actions",
             destinationID: "introduction",
             title: "Quick Actions",
             sections: [
-                GeneratedHelpSection(
+                textSection(
                     id: "introduction-quick-actions-1",
-                    header: "Quick Actions: Shortcut Entry Points",
-                    lines: [
-                        GeneratedHelpLine(kind: .text, value: "Quick Actions are optional. Install the shared shortcuts first, then set up the matching automations in Shortcuts."),
-                        GeneratedHelpLine(kind: .bullet, value: "Add Expense to Offshore"),
-                        GeneratedHelpLine(kind: .bullet, value: "Add Income to Offshore"),
-                        GeneratedHelpLine(kind: .bullet, value: "Start Excursion Mode")
-                    ]
-                ),
-                GeneratedHelpSection(
-                    id: "introduction-quick-actions-2",
-                    header: "Shortcuts & Automations",
-                    lines: [
-                        GeneratedHelpLine(kind: .text, value: "Trigger automations can feed Offshore from Wallet, Messages, and Email."),
-                        GeneratedHelpLine(kind: .bullet, value: "Add Expense From Tap To Pay"),
-                        GeneratedHelpLine(kind: .bullet, value: "Add Income From An SMS Message"),
-                        GeneratedHelpLine(kind: .bullet, value: "Add Income From An Email"),
-                        GeneratedHelpLine(kind: .bullet, value: "Use Run Immediately for the smoothest experience.")
-                    ]
-                ),
-                GeneratedHelpSection(
-                    id: "introduction-quick-actions-3",
-                    header: "App Shortcuts You Can Run Anytime",
-                    lines: [
-                        GeneratedHelpLine(kind: .text, value: "Offshore also exposes direct shortcuts for common actions."),
-                        GeneratedHelpLine(kind: .bullet, value: "Log Expense"),
-                        GeneratedHelpLine(kind: .bullet, value: "Log Income"),
-                        GeneratedHelpLine(kind: .bullet, value: "Review Today's Spending"),
-                        GeneratedHelpLine(kind: .bullet, value: "Forecast Savings"),
-                        GeneratedHelpLine(kind: .bullet, value: "What Can I Spend Today?"),
-                        GeneratedHelpLine(kind: .bullet, value: "Open Quick Add flows")
-                    ]
-                ),
-                GeneratedHelpSection(
-                    id: "introduction-quick-actions-4",
-                    header: "Before You Start",
-                    lines: [
-                        GeneratedHelpLine(kind: .bullet, value: "Open Offshore > Settings > Quick Actions."),
-                        GeneratedHelpLine(kind: .bullet, value: "Tap each shortcut link and import it in Shortcuts."),
-                        GeneratedHelpLine(kind: .bullet, value: "Confirm the imported shortcut names are correct.")
-                    ]
-                ),
-                GeneratedHelpSection(
-                    id: "introduction-quick-actions-5",
-                    header: "Add Expense From Tap To Pay",
-                    lines: [
-                        GeneratedHelpLine(kind: .bullet, value: "Open Shortcuts > Automation."),
-                        GeneratedHelpLine(kind: .bullet, value: "Tap New Automation."),
-                        GeneratedHelpLine(kind: .bullet, value: "Scroll down and select Wallet."),
-                        GeneratedHelpLine(kind: .bullet, value: "Configure this screen to your liking. You can choose which card or cards should trigger the automation. It is recommended to leave all categories selected. Instead of Run After Confirmation, choose Run Immediately for an uninterrupted experience."),
-                        GeneratedHelpLine(kind: .bullet, value: "On the next screen, tap Create New Shortcut."),
-                        GeneratedHelpLine(kind: .bullet, value: "Add action: Get Text from Shortcut Input."),
-                        GeneratedHelpLine(kind: .bullet, value: "In this action, tap the blue Input field and choose Shortcut Input."),
-                        GeneratedHelpLine(kind: .bullet, value: "Add action: Run Shortcut."),
-                        GeneratedHelpLine(kind: .bullet, value: "In Run Shortcut, tap the blue Shortcut field and select Add Expense From Tap To Pay."),
-                        GeneratedHelpLine(kind: .bullet, value: "Save the automation.")
-                    ]
-                ),
-                GeneratedHelpSection(
-                    id: "introduction-quick-actions-6",
-                    header: "Add Income From An SMS Message",
-                    lines: [
-                        GeneratedHelpLine(kind: .bullet, value: "Open Shortcuts > Automation."),
-                        GeneratedHelpLine(kind: .bullet, value: "Tap New Automation."),
-                        GeneratedHelpLine(kind: .bullet, value: "Scroll down and select Message."),
-                        GeneratedHelpLine(kind: .bullet, value: "Configure this screen to your liking. For example, use Message Contains and type the exact phrasing your bank uses in deposit notifications. Instead of Run After Confirmation, choose Run Immediately for an uninterrupted experience."),
-                        GeneratedHelpLine(kind: .bullet, value: "On the next screen, tap Create New Shortcut."),
-                        GeneratedHelpLine(kind: .bullet, value: "Add action: Get Text from Shortcut Input."),
-                        GeneratedHelpLine(kind: .bullet, value: "In this action, tap the blue Input field and choose Shortcut Input."),
-                        GeneratedHelpLine(kind: .bullet, value: "Add action: Run Shortcut."),
-                        GeneratedHelpLine(kind: .bullet, value: "In Run Shortcut, tap the blue Shortcut field and select Add Income From An SMS Message."),
-                        GeneratedHelpLine(kind: .bullet, value: "Save the automation.")
-                    ]
-                ),
-                GeneratedHelpSection(
-                    id: "introduction-quick-actions-7",
-                    header: "Add Income From An Email",
-                    lines: [
-                        GeneratedHelpLine(kind: .bullet, value: "Open Shortcuts > Automation."),
-                        GeneratedHelpLine(kind: .bullet, value: "Tap New Automation."),
-                        GeneratedHelpLine(kind: .bullet, value: "Scroll down and select Email."),
-                        GeneratedHelpLine(kind: .bullet, value: "Configure this screen to your liking. For example, use Subject Contains and type the exact phrasing your bank uses in deposit email subject lines. Instead of Run After Confirmation, choose Run Immediately for an uninterrupted experience."),
-                        GeneratedHelpLine(kind: .bullet, value: "On the next screen, tap Create New Shortcut."),
-                        GeneratedHelpLine(kind: .bullet, value: "Add action: Get Text from Shortcut Input."),
-                        GeneratedHelpLine(kind: .bullet, value: "In this action, tap the blue Input field and choose Shortcut Input."),
-                        GeneratedHelpLine(kind: .bullet, value: "Add action: Run Shortcut."),
-                        GeneratedHelpLine(kind: .bullet, value: "In Run Shortcut, tap the blue Shortcut field and select Add Income From An Email."),
-                        GeneratedHelpLine(kind: .bullet, value: "Save the automation.")
-                    ]
-                ),
-                GeneratedHelpSection(
-                    id: "introduction-quick-actions-8",
-                    header: "Troubleshooting",
-                    lines: [
-                        GeneratedHelpLine(kind: .bullet, value: "If a shared item imports with a long autogenerated name, rename the shortcut after import."),
-                        GeneratedHelpLine(kind: .bullet, value: "If you do not see the expected trigger type, make sure your device and iOS version support that trigger."),
-                        GeneratedHelpLine(kind: .bullet, value: "If the last Offshore action appears missing, confirm Offshore is installed on that device, then edit the shortcut and add Offshore Add Income or Add Expense as the last action again."),
-                        GeneratedHelpLine(kind: .bullet, value: "If an automation does not fire, open it in Shortcuts and verify trigger condition text, selected Run Shortcut action, and run behavior settings.")
-                    ]
+                    header: "Quick Actions",
+                    body: "Quick Actions are optional shortcuts that help you log expenses or income faster. Install them from Settings, then pair them with Shortcuts automations if you want background-style capture flows. Offshore works fully without them, but they can reduce repeated manual entry."
                 )
-            ],
-            assetPrefix: nil
+            ]
         ),
         GeneratedHelpLeafTopic(
             id: "introduction-excursion-mode",
             destinationID: "introduction",
             title: "Excursion Mode",
             sections: [
-                GeneratedHelpSection(
+                textSection(
                     id: "introduction-excursion-mode-1",
-                    header: "Excursion Mode: Temporary Spending Session",
-                    lines: [
-                        GeneratedHelpLine(kind: .text, value: "Excursion Mode is a timed session for in-the-moment spending.")
-                    ]
-                ),
-                GeneratedHelpSection(
-                    id: "introduction-excursion-mode-2",
-                    header: "Start, Stop, and Extend",
-                    lines: [
-                        GeneratedHelpLine(kind: .text, value: "You can start Excursion Mode from Notifications, Shortcuts, or in-app controls."),
-                        GeneratedHelpLine(kind: .bullet, value: "Start for 1, 2, or 4 hours."),
-                        GeneratedHelpLine(kind: .bullet, value: "Stop anytime."),
-                        GeneratedHelpLine(kind: .bullet, value: "Extend active sessions by 30 minutes.")
-                    ]
-                ),
-                GeneratedHelpSection(
-                    id: "introduction-excursion-mode-3",
-                    header: "Session Signals",
-                    lines: [
-                        GeneratedHelpLine(kind: .text, value: "While active, Offshore can surface session status and nudges."),
-                        GeneratedHelpLine(kind: .bullet, value: "Live Activity support on iPhone."),
-                        GeneratedHelpLine(kind: .bullet, value: "Optional location-aware reminders."),
-                        GeneratedHelpLine(kind: .bullet, value: "Session status appears in relevant controls until expiration.")
-                    ]
+                    header: "Excursion Mode",
+                    body: "Excursion Mode is designed for focused tracking while you are out and spending. It keeps quick entry front and center so you can capture transactions with less friction. Use it when you want tighter day-of-spend awareness."
                 )
-            ],
-            assetPrefix: nil
+            ]
         ),
+
+        // MARK: Home
 
         GeneratedHelpLeafTopic(
             id: "home-overview",
             destinationID: "home",
             title: "Overview",
             sections: [
-                GeneratedHelpSection(
+                mediaSection(
                     id: "home-overview-1",
-                    header: "Home: Welcome to Your Dashboard",
-                    lines: [
-                        GeneratedHelpLine(kind: .heroScreenshot, value: "1"),
-                        GeneratedHelpLine(kind: .text, value: "You can pick your own custom start and end date, or use predefined ranges in the period menu. Widgets respond to the date range you select.")
+                    header: "Home Overview",
+                    body: "Home is your dashboard for current spending, income, and savings direction. Use the visible widgets to spot changes quickly and drill into detail where needed. You can keep this screen lightweight or data-dense depending on what you pin.",
+                    media: [
+                        mediaItem(
+                            id: "home-overview-1-image-1",
+                            assetName: "Help/CoreScreens/Home/Overview/overview",
+                            bodyText: "Home gives you a quick read of your current financial position without opening each screen. Use the top-level summaries to decide where to drill in next. If something looks off, tap through to Budgets, Income, or Accounts for detail."
+                        )
                     ]
                 )
-            ],
-            assetPrefix: "Help-Home"
-        ),
-        GeneratedHelpLeafTopic(
-            id: "home-widgets",
-            destinationID: "home",
-            title: "Widgets",
-            sections: [
-                GeneratedHelpSection(
-                    id: "home-widgets-1",
-                    header: "Widgets Overview",
-                    lines: [
-                        GeneratedHelpLine(kind: .miniScreenshot, value: "2"),
-                        GeneratedHelpLine(kind: .text, value: "Home is made of widgets. Tap any widget to open its detail page."),
-                        GeneratedHelpLine(kind: .bullet, value: "Income: shows actual income versus planned income."),
-                        GeneratedHelpLine(kind: .bullet, value: "Savings Outlook: projected savings based on planned income and planned expenses."),
-                        GeneratedHelpLine(kind: .bullet, value: "Next Planned Expense: displays the next upcoming planned expense."),
-                        GeneratedHelpLine(kind: .bullet, value: "Category Spotlight: top categories by spend in the current range."),
-                        GeneratedHelpLine(kind: .bullet, value: "Spend Trends: spend totals by day, week, or month depending on range."),
-                        GeneratedHelpLine(kind: .bullet, value: "Category Availability: category caps and remaining amounts for the period."),
-                        GeneratedHelpLine(kind: .bullet, value: "What If?: interactive scenario planner for budget outcomes.")
-                    ]
-                )
-            ],
-            assetPrefix: "Help-Home"
+            ]
         ),
         GeneratedHelpLeafTopic(
             id: "home-customization",
             destinationID: "home",
             title: "Customization",
             sections: [
-                GeneratedHelpSection(
-                    id: "home-customization-1",
-                    header: "HomeView & Customization",
-                    lines: [
-                        GeneratedHelpLine(kind: .miniScreenshot, value: "3"),
-                        GeneratedHelpLine(kind: .text, value: "Use Edit on Home to choose what appears on your dashboard."),
-                        GeneratedHelpLine(kind: .bullet, value: "Pin widgets and cards you care about most."),
-                        GeneratedHelpLine(kind: .bullet, value: "Reorder pinned items to put key metrics first."),
-                        GeneratedHelpLine(kind: .bullet, value: "Remove items you do not need right now."),
-                        GeneratedHelpLine(kind: .bullet, value: "Keep Home focused on the date range and metrics you actually use.")
+                mediaSection(
+                    id: "home-customization-edit-home",
+                    header: "Customize Home",
+                    body: "You can tailor Home so the most important insights show first. Reordering or pinning widgets helps you build a workflow that matches your routine. This makes daily check-ins faster and more consistent.",
+                    media: [
+                        mediaItem(
+                            id: "home-customization-edit-home-1",
+                            assetName: "Help/CoreScreens/Home/Customization/edit-home-1",
+                            bodyText: "Open Home customization and enter edit mode to start arranging cards and widgets. This is the setup step where you decide what matters most for your default dashboard view."
+                        ),
+                        mediaItem(
+                            id: "home-customization-edit-home-2",
+                            assetName: "Help/CoreScreens/Home/Customization/edit-home-2",
+                            bodyText: "Drag widgets into the order you want so high-priority insights stay at the top. Keep frequently used sections near the top to reduce scrolling during quick reviews."
+                        ),
+                        mediaItem(
+                            id: "home-customization-edit-home-3",
+                            assetName: "Help/CoreScreens/Home/Customization/edit-home-3",
+                            bodyText: "Save your layout to apply the updated Home sequence. You can return anytime and adjust as your priorities change across weeks or months."
+                        )
                     ]
                 )
-            ],
-            assetPrefix: "Help-Home"
-        ),
-        GeneratedHelpLeafTopic(
-            id: "home-calculations",
-            destinationID: "home",
-            title: "Calculations",
-            sections: [
-                GeneratedHelpSection(
-                    id: "home-calculations-1",
-                    header: "Home Calculations",
-                    lines: [
-                        GeneratedHelpLine(kind: .text, value: "Home calculations mirror budget math."),
-                        GeneratedHelpLine(kind: .bullet, value: "Actual Savings = actual income - (planned expenses effective amount + variable expenses total)."),
-                        GeneratedHelpLine(kind: .bullet, value: "Remaining Income = actual income - expenses.")
-                    ]
-                )
-            ],
-            assetPrefix: "Help-Home"
+            ]
         ),
         GeneratedHelpLeafTopic(
             id: "home-marina",
             destinationID: "home",
             title: "Marina",
             sections: [
-                GeneratedHelpSection(
+                mediaSection(
                     id: "home-marina-1",
-                    header: "Marina: Built-In Home Assistant",
-                    lines: [
-                        GeneratedHelpLine(kind: .text, value: "Marina is your in-app budget assistant on Home. She answers from your Offshore data.")
-                    ]
-                ),
-                GeneratedHelpSection(
-                    id: "home-marina-2",
-                    header: "What You Can Ask",
-                    lines: [
-                        GeneratedHelpLine(kind: .text, value: "Marina supports practical spending and savings questions."),
-                        GeneratedHelpLine(kind: .bullet, value: "\"How am I doing this month?\""),
-                        GeneratedHelpLine(kind: .bullet, value: "\"Top categories this month\""),
-                        GeneratedHelpLine(kind: .bullet, value: "\"Largest recent expenses\""),
-                        GeneratedHelpLine(kind: .bullet, value: "\"How is my savings status?\""),
-                        GeneratedHelpLine(kind: .bullet, value: "\"Do I have presets due soon?\"")
-                    ]
-                ),
-                GeneratedHelpSection(
-                    id: "home-marina-3",
-                    header: "Clarifications and Follow-Ups",
-                    lines: [
-                        GeneratedHelpLine(kind: .text, value: "If a request is unclear, Marina asks quick clarifying questions."),
-                        GeneratedHelpLine(kind: .bullet, value: "Tap a follow-up suggestion to refine results."),
-                        GeneratedHelpLine(kind: .bullet, value: "Use specific dates, categories, or cards for tighter answers."),
-                        GeneratedHelpLine(kind: .bullet, value: "Treat responses as decision support based on your current data.")
+                    header: "Marina Assistant",
+                    body: "Marina is your in-app budgeting assistant on Home. Use prompts to ask for quick insights, trend checks, and practical next actions based on your existing data. Keep prompts specific to get the most relevant guidance.",
+                    media: [
+                        mediaItem(
+                            id: "home-marina-1-image-1",
+                            assetName: "Help/CoreScreens/Home/Marina/marina",
+                            bodyText: "Open Marina from Home when you want a conversational summary instead of manual digging. Ask targeted questions about spending, income, or savings to get practical, on-device guidance."
+                        )
                     ]
                 )
-            ],
-            assetPrefix: nil
+            ]
         ),
+        GeneratedHelpLeafTopic(
+            id: "home-widgets",
+            destinationID: "home",
+            title: "Widgets",
+            sections: [
+                mediaSection(
+                    id: "home-widgets-overview",
+                    header: "Widget Highlights",
+                    body: "Home widgets surface focused metrics so you can scan key patterns quickly. Each tile answers a different question, from category pressure to savings momentum. Use them together for a fast daily check-in.",
+                    media: [
+                        mediaItem(
+                            id: "home-widgets-income",
+                            assetName: "Help/CoreScreens/Home/Widgets/income",
+                            bodyText: "The income widget helps you compare what was planned versus what was actually received. Use this to spot shortfalls early and decide whether spending needs to be adjusted this period."
+                        ),
+                        mediaItem(
+                            id: "home-widgets-savings-outlook",
+                            assetName: "Help/CoreScreens/Home/Widgets/savings-outlook",
+                            bodyText: "Savings Outlook estimates how your period may finish based on current inputs. Check this regularly when adding expenses so you can course-correct before the period closes."
+                        ),
+                        mediaItem(
+                            id: "home-widgets-spend-trends",
+                            assetName: "Help/CoreScreens/Home/Widgets/spend-trends",
+                            bodyText: "Spend Trends shows how your spending is moving over time instead of just the current total. Use it to catch acceleration patterns before they become budget problems."
+                        ),
+                        mediaItem(
+                            id: "home-widgets-category-spotlight",
+                            assetName: "Help/CoreScreens/Home/Widgets/category-spotlight",
+                            bodyText: "Category Spotlight surfaces categories that are taking the largest share of spending. This is useful for finding where a small adjustment could make the biggest difference."
+                        ),
+                        mediaItem(
+                            id: "home-widgets-what-if",
+                            assetName: "Help/CoreScreens/Home/Widgets/what-if",
+                            bodyText: "What If lets you test spending scenarios before making changes. Try adjustments here to understand impact on savings and remaining budget before committing to decisions."
+                        )
+                    ]
+                )
+            ]
+        ),
+
+        // MARK: Budgets
 
         GeneratedHelpLeafTopic(
             id: "budgets-overview",
             destinationID: "budgets",
             title: "Overview",
             sections: [
-                GeneratedHelpSection(
-                    id: "budgets-overview-1",
-                    header: "Budgets: Where the Actual Budgeting Work Happens",
-                    lines: [
-                        GeneratedHelpLine(kind: .heroScreenshot, value: "1"),
-                        GeneratedHelpLine(kind: .text, value: "This screen lists past, active, and upcoming budgets. Tap any budget to open details and add expenses, assign cards, and monitor budget metrics.")
+                mediaSection(
+                    id: "budgets-overview-overview",
+                    header: "Budgets Overview",
+                    body: "The Budgets screen is the index of active, upcoming, and past periods. Open a budget to manage planned and variable spending in one place. This is your main control center for period-by-period tracking.",
+                    media: [
+                        mediaItem(
+                            id: "budgets-overview-overview-image-1",
+                            assetName: "Help/CoreScreens/Budgets/Overview/overview",
+                            bodyText: "Use Budgets to scan current periods quickly and jump into details with one tap. Active budgets are where day-to-day planning and tracking happen."
+                        )
+                    ]
+                ),
+                mediaSection(
+                    id: "budgets-overview-create-budget",
+                    header: "Create a Budget",
+                    body: "Creating a budget sets the date window and planning context for expenses and income. This gives you a clean frame for totals and savings metrics. Start here when beginning a new cycle.",
+                    media: [
+                        mediaItem(
+                            id: "budgets-overview-create-budget-1",
+                            assetName: "Help/CoreScreens/Budgets/Overview/create-budget-1",
+                            bodyText: "Tap add from the Budgets screen to create a new period. Enter a clear name and set a start/end range that matches your planning cadence."
+                        ),
+                        mediaItem(
+                            id: "budgets-overview-create-budget-2",
+                            assetName: "Help/CoreScreens/Budgets/Overview/create-budget-2",
+                            bodyText: "Review your budget details before saving so totals line up with the period you expect. Once saved, you can assign cards and begin adding expenses immediately."
+                        )
                     ]
                 )
-            ],
-            assetPrefix: "Help-Budgets"
+            ]
         ),
         GeneratedHelpLeafTopic(
-            id: "budgets-details",
+            id: "budgets-budget-details",
             destinationID: "budgets",
             title: "Budget Details",
             sections: [
-                GeneratedHelpSection(
-                    id: "budgets-details-1",
-                    header: "Budget Details: Build the Budget",
-                    lines: [
-                        GeneratedHelpLine(kind: .heroScreenshot, value: "2"),
-                        GeneratedHelpLine(kind: .text, value: "Inside a budget, you track expenses in two lanes:"),
-                        GeneratedHelpLine(kind: .bullet, value: "Planned: recurring or expected costs."),
-                        GeneratedHelpLine(kind: .bullet, value: "Variable: one-off spending from your cards."),
-                        GeneratedHelpLine(kind: .bullet, value: "Categories: long-press a category and assign a spending cap for this budgeting period.")
+                mediaSection(
+                    id: "budgets-details-add-expense",
+                    header: "Add Expense",
+                    body: "Budget Details is where you log and monitor spending for the selected period. Planned entries capture expected costs and variable entries capture live spending. Use this screen to keep the period accurate as it unfolds.",
+                    media: [
+                        mediaItem(
+                            id: "budgets-details-add-expense-1",
+                            assetName: "Help/CoreScreens/Budgets/Budget Details/add-expense-1",
+                            bodyText: "Use the add flow inside Budget Details to create a new expense in the current budget. Choose the correct expense type so calculations reflect planned versus variable behavior correctly."
+                        ),
+                        mediaItem(
+                            id: "budgets-details-add-expense-2",
+                            assetName: "Help/CoreScreens/Budgets/Budget Details/add-expense-2",
+                            bodyText: "Complete amount, date, card, and category fields before saving. Accurate categorization now makes filters and spending insights much more useful later."
+                        )
+                    ]
+                ),
+                mediaSection(
+                    id: "budgets-details-filter-expenses",
+                    header: "Filter Expenses",
+                    body: "Filters let you narrow budget expenses by category and other scope controls. This helps isolate exactly where pressure is coming from in a period. Use filters before making spending decisions.",
+                    media: [
+                        mediaItem(
+                            id: "budgets-details-filter-expenses-1",
+                            assetName: "Help/CoreScreens/Budgets/Budget Details/filter-expenses",
+                            bodyText: "Apply filters to reduce noise and review only the expenses relevant to your current question. This is ideal when you are troubleshooting one category or one card at a time."
+                        )
+                    ]
+                ),
+                mediaSection(
+                    id: "budgets-details-spending-limits",
+                    header: "Spending Limits",
+                    body: "Category spending limits help you set soft guardrails inside a budget. They are useful for categories that tend to drift upward over time. Track these limits as part of your regular budget review.",
+                    media: [
+                        mediaItem(
+                            id: "budgets-details-spending-limits-1",
+                            assetName: "Help/CoreScreens/Budgets/Budget Details/spending-limits",
+                            bodyText: "Set or adjust category limits from Budget Details so high-variance categories stay visible. This makes it easier to react before overspending compounds."
+                        )
                     ]
                 )
-            ],
-            assetPrefix: "Help-Budgets"
+            ]
         ),
         GeneratedHelpLeafTopic(
             id: "budgets-calculations",
             destinationID: "budgets",
             title: "Calculations",
             sections: [
-                GeneratedHelpSection(
-                    id: "budgets-calculations-1",
-                    header: "How Budget Totals Are Calculated",
-                    lines: [
-                        GeneratedHelpLine(kind: .heroScreenshot, value: "3"),
-                        GeneratedHelpLine(kind: .text, value: "These totals are shown in the budget header."),
-                        GeneratedHelpLine(kind: .bullet, value: "Planned Income = planned income total in this period."),
-                        GeneratedHelpLine(kind: .bullet, value: "Actual Income = actual income total in this period."),
-                        GeneratedHelpLine(kind: .bullet, value: "Planned Total = sum of planned expense planned amounts."),
-                        GeneratedHelpLine(kind: .bullet, value: "Variable Total = sum of variable expenses in the period."),
-                        GeneratedHelpLine(kind: .bullet, value: "Unified Total = planned effective total + variable total."),
-                        GeneratedHelpLine(kind: .bullet, value: "Max Savings = planned income - planned expenses effective total."),
-                        GeneratedHelpLine(kind: .bullet, value: "Projected Savings = planned income - planned expenses planned total."),
-                        GeneratedHelpLine(kind: .bullet, value: "Actual Savings = actual income - (planned expenses effective total + variable expenses total).")
+                mediaSection(
+                    id: "budgets-calculations-overview",
+                    header: "Calculations Overview",
+                    body: "Budget totals combine planned income, actual income, planned expenses, and variable expenses for the selected period. These values react to your current filters and policy toggles. Use the header metrics as your source of truth for progress.",
+                    media: [
+                        mediaItem(
+                            id: "budgets-calculations-overview-image-1",
+                            assetName: "Help/CoreScreens/Budgets/Calculations/overview",
+                            bodyText: "Start with the calculations overview to understand how the budget summary is assembled. This view shows the relationship between income, expense totals, and resulting savings metrics."
+                        )
+                    ]
+                ),
+                mediaSection(
+                    id: "budgets-calculations-details",
+                    header: "Calculation Details",
+                    body: "Use this section to verify how each total changes when planned entries get actual amounts or when variable spending rises. It is designed to make tradeoffs visible early. Compare projected and actual savings to judge period performance.",
+                    media: [
+                        mediaItem(
+                            id: "budgets-calculations-details-image-1",
+                            assetName: "Help/CoreScreens/Budgets/Calculations/calculations",
+                            bodyText: "Review the detailed math breakdown when totals do not match expectations. It clarifies which components are driving movement in max, projected, and actual savings."
+                        )
                     ]
                 )
-            ],
-            assetPrefix: "Help-Budgets"
+            ]
         ),
+
+        // MARK: Income
 
         GeneratedHelpLeafTopic(
             id: "income-overview",
             destinationID: "income",
             title: "Overview",
             sections: [
-                GeneratedHelpSection(
+                mediaSection(
                     id: "income-overview-1",
-                    header: "Income: Calendar-Based Tracking",
-                    lines: [
-                        GeneratedHelpLine(kind: .heroScreenshot, value: "1"),
-                        GeneratedHelpLine(kind: .text, value: "The calendar shows planned and actual income totals per day. Tap a day to see entries and weekly totals.")
+                    header: "Income Overview",
+                    body: "Income uses a calendar-first view so you can track planned and actual income by day. Select a date to inspect entries and see weekly totals in context. This helps you validate incoming cash flow against expectations.",
+                    media: [
+                        mediaItem(
+                            id: "income-overview-1-image-1",
+                            assetName: "Help/CoreScreens/Income/Overview/overview",
+                            bodyText: "Use the Income screen to move between days and confirm what has landed versus what was planned. The calendar makes patterns easy to spot across the month."
+                        )
                     ]
                 )
-            ],
-            assetPrefix: "Help-Income"
+            ]
         ),
         GeneratedHelpLeafTopic(
             id: "income-planned-vs-actual",
             destinationID: "income",
             title: "Planned vs Actual",
             sections: [
-                GeneratedHelpSection(
+                mediaSection(
                     id: "income-planned-vs-actual-1",
-                    header: "Planned Income vs Actual Income",
-                    lines: [
-                        GeneratedHelpLine(kind: .heroScreenshot, value: "2"),
-                        GeneratedHelpLine(kind: .text, value: "If your paycheck is consistent, create recurring actual income. If it varies, use planned income to estimate and log actual income when it arrives.")
+                    header: "Planned vs Actual Income",
+                    body: "Planned income helps forecast upcoming periods, while actual income confirms what you really received. Use both together to monitor reliability of income sources. This keeps your savings projections honest and actionable.",
+                    media: [
+                        mediaItem(
+                            id: "income-planned-vs-actual-1-image-1",
+                            assetName: "Help/CoreScreens/Income/Planned vs Actual/planned-vs-actual",
+                            bodyText: "Compare planned and actual entries side by side to find gaps quickly. If a source varies, keep planned entries realistic and update actuals as deposits arrive."
+                        )
                     ]
                 )
-            ],
-            assetPrefix: "Help-Income"
+            ]
         ),
         GeneratedHelpLeafTopic(
             id: "income-calculations",
             destinationID: "income",
             title: "Calculations",
             sections: [
-                GeneratedHelpSection(
+                textSection(
                     id: "income-calculations-1",
-                    header: "How Income Feeds the App",
-                    lines: [
-                        GeneratedHelpLine(kind: .heroScreenshot, value: "3"),
-                        GeneratedHelpLine(kind: .text, value: "Income entries contribute to Home and Budget calculations. Actual income drives real totals and savings, while planned income supports forecasts.")
-                    ]
+                    header: "Income Calculation Notes",
+                    body: "Income totals feed both Home and Budget summaries. Planned income supports forecasting, while actual income drives real savings and remaining capacity. If numbers look off, verify date range and entry type first."
                 )
-            ],
-            assetPrefix: "Help-Income"
+            ]
         ),
+
+        // MARK: Accounts
 
         GeneratedHelpLeafTopic(
             id: "accounts-overview",
             destinationID: "accounts",
             title: "Overview",
             sections: [
-                GeneratedHelpSection(
+                mediaSection(
                     id: "accounts-overview-1",
-                    header: "Accounts: Spending Account Gallery",
-                    lines: [
-                        GeneratedHelpLine(kind: .heroScreenshot, value: "1"),
-                        GeneratedHelpLine(kind: .text, value: "Tap + to add an account card. Tap a card to open detail view.")
+                    header: "Accounts Overview",
+                    body: "Accounts is where you manage cards, reconciliations, and savings in one area. Open a card for transaction-level detail, or switch to reconciliation and savings workflows as needed. This screen helps separate daily spending from settlement tracking.",
+                    media: [
+                        mediaItem(
+                            id: "accounts-overview-1-image-1",
+                            assetName: "Help/CoreScreens/Accounts/Overview/overview",
+                            bodyText: "Use Accounts to access each financial container quickly, including card-level detail and shared-balance tracking. This is the launch point for most spending operations outside Budgets."
+                        )
                     ]
                 )
-            ],
-            assetPrefix: "Help-Accounts"
+            ]
         ),
         GeneratedHelpLeafTopic(
             id: "accounts-card-details",
             destinationID: "accounts",
             title: "Card Details",
             sections: [
-                GeneratedHelpSection(
-                    id: "accounts-card-details-1",
-                    header: "Card Detail: Deep Dive",
-                    lines: [
-                        GeneratedHelpLine(kind: .heroScreenshot, value: "2"),
-                        GeneratedHelpLine(kind: .text, value: "Card detail is a focused spending console with filters, scope controls, sorting, and search.")
+                mediaSection(
+                    id: "accounts-card-details-overview",
+                    header: "Card Detail Overview",
+                    body: "Card Detail is the focused workspace for reviewing and editing expenses on a specific card. It includes search, filters, and scoped totals so you can diagnose spending quickly. Use this when you need transaction-level control.",
+                    media: [
+                        mediaItem(
+                            id: "accounts-card-details-overview-image-1",
+                            assetName: "Help/CoreScreens/Accounts/Card Details/overview",
+                            bodyText: "Open a card to inspect its expenses with full context, including category and date filtering. This view is ideal when reconciling statements or cleaning up tagged spending."
+                        )
+                    ]
+                ),
+                mediaSection(
+                    id: "accounts-card-details-add-expense",
+                    header: "Add Expense",
+                    body: "You can add expenses directly from card detail when capturing new activity. This keeps card history up to date without switching screens. Enter complete metadata so downstream insights stay accurate.",
+                    media: [
+                        mediaItem(
+                            id: "accounts-card-details-add-expense-image-1",
+                            assetName: "Help/CoreScreens/Accounts/Card Details/add-expense",
+                            bodyText: "Use the add button in card detail to log a new expense immediately under that card. Fill amount, date, and category fields before saving to preserve reporting quality."
+                        )
+                    ]
+                ),
+                mediaSection(
+                    id: "accounts-card-details-filter-expenses",
+                    header: "Filter Expenses",
+                    body: "Filters let you focus on a subset of card expenses, such as one category or date range. This is useful when investigating unusual totals or preparing edits. Apply filters first, then review the scoped totals.",
+                    media: [
+                        mediaItem(
+                            id: "accounts-card-details-filter-expenses-image-1",
+                            assetName: "Help/CoreScreens/Accounts/Card Details/filter-expenses",
+                            bodyText: "Use card-level filters to isolate transactions that match your current review goal. This reduces noise and makes manual cleanup much faster."
+                        )
+                    ]
+                ),
+                mediaSection(
+                    id: "accounts-card-details-import-expenses",
+                    header: "Import Expenses",
+                    body: "Import from card detail routes parsed expense rows into the selected card workflow. Review entries before saving to avoid duplicates or misclassified rows. This is useful for bulk capture sessions.",
+                    media: [
+                        mediaItem(
+                            id: "accounts-card-details-import-expenses-image-1",
+                            assetName: "Help/CoreScreens/Accounts/Card Details/import-expenses",
+                            bodyText: "Start an import from card detail when you need to add multiple transactions quickly. Confirm matches and categories in review so imported data lands correctly."
+                        )
                     ]
                 )
-            ],
-            assetPrefix: "Help-Accounts"
+            ]
         ),
         GeneratedHelpLeafTopic(
             id: "accounts-calculations",
             destinationID: "accounts",
             title: "Calculations",
             sections: [
-                GeneratedHelpSection(
+                mediaSection(
                     id: "accounts-calculations-1",
-                    header: "Card Calculations",
-                    lines: [
-                        GeneratedHelpLine(kind: .heroScreenshot, value: "3"),
-                        GeneratedHelpLine(kind: .text, value: "Totals reflect the current filters. Variable expenses are always actual. Planned expenses use actual amount when provided, otherwise planned amount.")
+                    header: "Account Calculation Notes",
+                    body: "Card totals respond to your current filters and expense type selections. Planned entries can use actual amounts when available, and variable entries always contribute as actual spend. Check this view when card totals need validation.",
+                    media: [
+                        mediaItem(
+                            id: "accounts-calculations-1-image-1",
+                            assetName: "Help/CoreScreens/Accounts/Calculations/calculations",
+                            bodyText: "Use the calculations panel to verify how scoped totals are built from the current transaction set. This makes it easier to explain why a filtered total changed."
+                        )
                     ]
                 )
-            ],
-            assetPrefix: "Help-Accounts"
+            ]
         ),
         GeneratedHelpLeafTopic(
             id: "accounts-reconciliations",
             destinationID: "accounts",
             title: "Reconciliations",
             sections: [
-                GeneratedHelpSection(
-                    id: "accounts-reconciliations-1",
-                    header: "Reconciliations: Track Shared Spending in One Place",
-                    lines: [
-                        GeneratedHelpLine(kind: .text, value: "Reconciliations help you track money you fronted, split, or need to settle with someone else.")
+                mediaSection(
+                    id: "accounts-reconciliations-overview",
+                    header: "Reconciliations Overview",
+                    body: "Reconciliations track shared balances like money fronted, split, or owed between people. Each reconciliation maintains a running ledger so you can settle over time instead of losing context. Use clear names for each balance to keep history readable.",
+                    media: [
+                        mediaItem(
+                            id: "accounts-reconciliations-overview-image-1",
+                            assetName: "Help/CoreScreens/Accounts/Reconciliations/overview",
+                            bodyText: "Create and monitor shared balances from the Reconciliations area in Accounts. This keeps peer-to-peer tracking separate from normal card spending."
+                        )
                     ]
                 ),
-                GeneratedHelpSection(
-                    id: "accounts-reconciliations-2",
-                    header: "Create and Manage Reconciliations",
-                    lines: [
-                        GeneratedHelpLine(kind: .text, value: "From Accounts > Reconciliations, tap + to add a reconciliation."),
-                        GeneratedHelpLine(kind: .bullet, value: "Name each balance clearly (for example: Roommate, Trip Fund, Work Lunches)."),
-                        GeneratedHelpLine(kind: .bullet, value: "Tap a balance to open details."),
-                        GeneratedHelpLine(kind: .bullet, value: "Edit from the context menu.")
+                mediaSection(
+                    id: "accounts-reconciliations-add-settlement",
+                    header: "Add a Settlement",
+                    body: "Settlements move a reconciliation balance toward zero and document progress. Use this flow whenever money is paid back or collected. Over time, the ledger gives a clean audit trail.",
+                    media: [
+                        mediaItem(
+                            id: "accounts-reconciliations-add-settlement-1",
+                            assetName: "Help/CoreScreens/Accounts/Reconciliations/add-settlement-1",
+                            bodyText: "Open the reconciliation detail and choose to add a settlement entry. Select the correct direction so the balance moves the way you expect."
+                        ),
+                        mediaItem(
+                            id: "accounts-reconciliations-add-settlement-2",
+                            assetName: "Help/CoreScreens/Accounts/Reconciliations/add-settlement-2",
+                            bodyText: "Confirm amount and note before saving so future reviews show exactly why the balance changed. Good notes make shared-balance history much easier to interpret."
+                        )
                     ]
                 ),
-                GeneratedHelpSection(
-                    id: "accounts-reconciliations-3",
-                    header: "Settlements and History",
-                    lines: [
-                        GeneratedHelpLine(kind: .text, value: "Reconciliations keep a running ledger from allocations and settlements."),
-                        GeneratedHelpLine(kind: .bullet, value: "Settlements move the balance toward zero."),
-                        GeneratedHelpLine(kind: .bullet, value: "Balances with history are archived instead of hard deleted."),
-                        GeneratedHelpLine(kind: .bullet, value: "Archived balances stay in history but are hidden from new choices.")
+                mediaSection(
+                    id: "accounts-reconciliations-detail-view",
+                    header: "Detail View",
+                    body: "The detail view shows all ledger activity for one reconciliation, including allocations and settlements. Archived items remain in history so past context is preserved. Use this view for complete timeline review.",
+                    media: [
+                        mediaItem(
+                            id: "accounts-reconciliations-detail-view-image-1",
+                            assetName: "Help/CoreScreens/Accounts/Reconciliations/detail-view",
+                            bodyText: "Use reconciliation detail to inspect each ledger event in order and confirm current balance. This is the best place to audit old entries or prepare a clean settle-up summary."
+                        )
                     ]
                 )
-            ],
-            assetPrefix: nil
+            ]
         ),
         GeneratedHelpLeafTopic(
             id: "accounts-savings-account",
             destinationID: "accounts",
             title: "Savings Account",
             sections: [
-                GeneratedHelpSection(
-                    id: "accounts-savings-account-1",
-                    header: "Savings Account: Your Savings Ledger",
-                    lines: [
-                        GeneratedHelpLine(kind: .text, value: "Savings gives you a dedicated ledger and running total for money you are setting aside.")
-                    ]
-                ),
-                GeneratedHelpSection(
-                    id: "accounts-savings-account-2",
-                    header: "Add and Manage Savings Entries",
-                    lines: [
-                        GeneratedHelpLine(kind: .text, value: "From Accounts > Savings, tap + to add a ledger entry."),
-                        GeneratedHelpLine(kind: .bullet, value: "Add positive entries for contributions."),
-                        GeneratedHelpLine(kind: .bullet, value: "Add negative entries for withdrawals."),
-                        GeneratedHelpLine(kind: .bullet, value: "Swipe to edit or delete an entry.")
-                    ]
-                ),
-                GeneratedHelpSection(
-                    id: "accounts-savings-account-3",
-                    header: "Savings Trend and Date Range",
-                    lines: [
-                        GeneratedHelpLine(kind: .text, value: "Savings includes a trend chart and date range filter."),
-                        GeneratedHelpLine(kind: .bullet, value: "Use date range controls to review a period."),
-                        GeneratedHelpLine(kind: .bullet, value: "Running Total reflects your full ledger balance."),
-                        GeneratedHelpLine(kind: .bullet, value: "The chart helps you see momentum over time.")
+                mediaSection(
+                    id: "accounts-savings-account-overview",
+                    header: "Savings Account",
+                    body: "Savings Account keeps a running ledger and trend chart for money set aside. Add entries for contributions, withdrawals, or adjustments and review movement by date range. This gives a dedicated history separate from card spending.",
+                    media: [
+                        mediaItem(
+                            id: "accounts-savings-account-overview-image-1",
+                            assetName: "Help/CoreScreens/Accounts/Savings Account/overview",
+                            bodyText: "Use the savings ledger to track how your saved balance changes across the period. The trend chart helps you confirm whether momentum is improving or slipping."
+                        )
                     ]
                 )
-            ],
-            assetPrefix: nil
+            ]
         ),
+
+        // MARK: Settings
 
         GeneratedHelpLeafTopic(
             id: "settings-overview",
             destinationID: "settings",
             title: "Overview",
             sections: [
-                GeneratedHelpSection(
+                mediaSection(
                     id: "settings-overview-1",
-                    header: "Settings: Configure Offshore",
-                    lines: [
-                        GeneratedHelpLine(kind: .heroScreenshot, value: "1"),
-                        GeneratedHelpLine(kind: .text, value: "Every row is a separate area to manage your Offshore experience."),
-                        GeneratedHelpLine(kind: .bullet, value: "About: version info, contact support, release logs."),
-                        GeneratedHelpLine(kind: .bullet, value: "Help: this guide and Repeat Onboarding."),
-                        GeneratedHelpLine(kind: .bullet, value: "Install Quick Actions: shortcut install links and trigger setup guidance."),
-                        GeneratedHelpLine(kind: .bullet, value: "General: currency, budget period, tips reset, erase content."),
-                        GeneratedHelpLine(kind: .bullet, value: "Privacy: biometrics app lock."),
-                        GeneratedHelpLine(kind: .bullet, value: "Notifications: reminders for daily spending, income comparisons, and due presets."),
-                        GeneratedHelpLine(kind: .bullet, value: "iCloud: sync across devices and sync status."),
-                        GeneratedHelpLine(kind: .bullet, value: "Categories: manage expense categories."),
-                        GeneratedHelpLine(kind: .bullet, value: "Presets: manage expense presets.")
+                    header: "Settings Overview",
+                    body: "Settings is where you configure app behavior, privacy, notifications, sync, shortcuts, and management tools. Use it as your control panel for defaults and maintenance tasks. Most long-term preferences live here.",
+                    media: [
+                        mediaItem(
+                            id: "settings-overview-1-image-1",
+                            assetName: "Help/CoreScreens/Settings/Overview/overview",
+                            bodyText: "Start in Settings Overview to see all management areas in one list, from General and Privacy to Categories and Presets. This helps you quickly choose whether you are configuring behavior or managing data."
+                        )
                     ]
                 )
-            ],
-            assetPrefix: "Help-Settings"
+            ]
         ),
         GeneratedHelpLeafTopic(
-            id: "settings-expense-display-toggles",
+            id: "settings-general",
             destinationID: "settings",
-            title: "Expense Display Toggles",
+            title: "General",
             sections: [
-                GeneratedHelpSection(
-                    id: "settings-expense-display-toggles-1",
-                    header: "Settings Toggles for Expense Display",
-                    lines: [
-                        GeneratedHelpLine(kind: .miniScreenshot, value: "2"),
-                        GeneratedHelpLine(kind: .text, value: "In General > Expense Display, you can control future expenses in two different ways."),
-                        GeneratedHelpLine(kind: .bullet, value: "Hide future planned expenses: hides planned items from lists."),
-                        GeneratedHelpLine(kind: .bullet, value: "Exclude future planned expenses from calculations: removes future planned items from totals."),
-                        GeneratedHelpLine(kind: .bullet, value: "Hide future variable expenses: hides variable items dated in the future."),
-                        GeneratedHelpLine(kind: .bullet, value: "Exclude future variable expenses from calculations: keeps those future variable items out of totals.")
+                mediaSection(
+                    id: "settings-general-1",
+                    header: "General",
+                    body: "General contains app-wide behavior settings such as display and calculation preferences. Changes here can affect how future expenses are shown and how totals are computed. Review these toggles if numbers look different than expected.",
+                    media: [
+                        mediaItem(
+                            id: "settings-general-1-image-1",
+                            assetName: "Help/CoreScreens/Settings/General/overview",
+                            bodyText: "Use General to tune how Offshore displays and calculates future planned and variable expenses. This is where you control visibility versus inclusion in totals."
+                        )
                     ]
                 )
-            ],
-            assetPrefix: "Help-Settings"
+            ]
         ),
         GeneratedHelpLeafTopic(
-            id: "settings-hide-vs-exclude",
+            id: "settings-privacy",
             destinationID: "settings",
-            title: "Hide vs Exclude",
+            title: "Privacy",
             sections: [
-                GeneratedHelpSection(
-                    id: "settings-hide-vs-exclude-1",
-                    header: "Why Hide vs Exclude Matters",
-                    lines: [
-                        GeneratedHelpLine(kind: .miniScreenshot, value: "3"),
-                        GeneratedHelpLine(kind: .text, value: "Hide and Exclude are not the same setting."),
-                        GeneratedHelpLine(kind: .bullet, value: "Hide changes what you see on screen."),
-                        GeneratedHelpLine(kind: .bullet, value: "Exclude changes calculation results."),
-                        GeneratedHelpLine(kind: .bullet, value: "You can combine them if you want cleaner views and tighter totals.")
+                mediaSection(
+                    id: "settings-privacy-1",
+                    header: "Privacy",
+                    body: "Privacy settings control protections such as app lock and sensitive workflow permissions. Use this area to align security behavior with your device habits. It is the first stop when tightening access rules.",
+                    media: [
+                        mediaItem(
+                            id: "settings-privacy-1-image-1",
+                            assetName: "Help/CoreScreens/Settings/Privacy/overview",
+                            bodyText: "Open Privacy to configure how the app protects access and handles sensitive entry flows. Keep these settings aligned with your preferred level of friction and safety."
+                        )
                     ]
                 )
-            ],
-            assetPrefix: "Help-Settings"
+            ]
         ),
         GeneratedHelpLeafTopic(
-            id: "settings-workspaces",
+            id: "settings-notifications",
             destinationID: "settings",
-            title: "Workspaces",
+            title: "Notifications",
             sections: [
-                GeneratedHelpSection(
-                    id: "settings-workspaces-1",
-                    header: "Workspaces",
-                    lines: [
-                        GeneratedHelpLine(kind: .text, value: "Offshore supports multiple workspaces to separate budgeting contexts like Personal and Work. Each workspace has its own cards, income, presets, categories, and budgets.")
+                mediaSection(
+                    id: "settings-notifications-1",
+                    header: "Notifications",
+                    body: "Notifications help you stay on top of daily spending checks, income reminders, and due items. Configure timing and behavior so reminders support your routine without becoming noise. This is useful for consistency during busy periods.",
+                    media: [
+                        mediaItem(
+                            id: "settings-notifications-1-image-1",
+                            assetName: "Help/CoreScreens/Settings/Notifications/overview",
+                            bodyText: "Use Notifications to choose which reminders Offshore sends and when they should appear. A small set of focused reminders usually works better than enabling everything."
+                        )
                     ]
                 )
-            ],
-            assetPrefix: nil
+            ]
+        ),
+        GeneratedHelpLeafTopic(
+            id: "settings-icloud",
+            destinationID: "settings",
+            title: "iCloud",
+            sections: [
+                mediaSection(
+                    id: "settings-icloud-1",
+                    header: "iCloud",
+                    body: "iCloud settings show sync status and cross-device behavior for your data. Use this area to confirm your workspace changes are propagating as expected. It is helpful when validating setup on a new device.",
+                    media: [
+                        mediaItem(
+                            id: "settings-icloud-1-image-1",
+                            assetName: "Help/CoreScreens/Settings/iCloud/overview",
+                            bodyText: "Open iCloud settings to verify sync health and ensure your data is available across devices. If something looks stale, check this area first before troubleshooting elsewhere."
+                        )
+                    ]
+                )
+            ]
+        ),
+        GeneratedHelpLeafTopic(
+            id: "settings-quick-actions",
+            destinationID: "settings",
+            title: "Quick Actions",
+            sections: [
+                textSection(
+                    id: "settings-quick-actions-1",
+                    header: "Install and Use Quick Actions",
+                    body: "Quick Actions in Settings provide install links and setup guidance for optional shortcuts. After installing, you can run them manually or pair them with Shortcuts automations for faster capture flows. Keep shortcut names consistent so automations stay reliable."
+                )
+            ]
+        ),
+        GeneratedHelpLeafTopic(
+            id: "settings-categories",
+            destinationID: "settings",
+            title: "Categories",
+            sections: [
+                mediaSection(
+                    id: "settings-categories-overview",
+                    header: "Categories Overview",
+                    body: "Manage Categories lets you create and organize spending labels used across budgets and cards. Clean categories improve filters, trends, and guidance quality throughout the app. Review this list occasionally to keep naming consistent.",
+                    media: [
+                        mediaItem(
+                            id: "settings-categories-overview-image-1",
+                            assetName: "Help/CoreScreens/Settings/Categories/overview",
+                            bodyText: "Use Manage Categories to keep your spending taxonomy clean and practical. Good category hygiene makes every downstream report easier to trust."
+                        )
+                    ]
+                ),
+                mediaSection(
+                    id: "settings-categories-add-category",
+                    header: "Add Category",
+                    body: "Add categories when you notice spending patterns that need their own label. Specific categories improve both tracking clarity and targeted adjustments. Keep names short and distinct.",
+                    media: [
+                        mediaItem(
+                            id: "settings-categories-add-category-image-1",
+                            assetName: "Help/CoreScreens/Settings/Categories/add-category",
+                            bodyText: "Create a new category from this screen when existing labels are too broad. This helps you separate meaningful spending behavior instead of lumping it together."
+                        )
+                    ]
+                )
+            ]
         ),
         GeneratedHelpLeafTopic(
             id: "settings-presets",
             destinationID: "settings",
             title: "Presets",
             sections: [
-                GeneratedHelpSection(
-                    id: "settings-presets-1",
-                    header: "Presets: Reusable Fixed Expense Templates",
-                    lines: [
-                        GeneratedHelpLine(kind: .heroScreenshot, value: "1"),
-                        GeneratedHelpLine(kind: .text, value: "Use presets for fixed bills like rent or subscriptions. Tap + to create one. Swipe right to edit or left to delete.")
+                mediaSection(
+                    id: "settings-presets-overview",
+                    header: "Presets Overview",
+                    body: "Presets are reusable templates for recurring planned expenses. They speed up budget setup and keep repeated bills consistent across periods. Use presets for stable costs such as rent, subscriptions, and utilities.",
+                    media: [
+                        mediaItem(
+                            id: "settings-presets-overview-image-1",
+                            assetName: "Help/CoreScreens/Settings/Presets/overview",
+                            bodyText: "Manage Presets is where you review, edit, and organize your recurring planned-expense templates. Well-maintained presets make new budget creation much faster."
+                        )
                     ]
                 ),
-                GeneratedHelpSection(
-                    id: "settings-presets-2",
-                    header: "How Presets Affect Totals",
-                    lines: [
-                        GeneratedHelpLine(kind: .heroScreenshot, value: "2"),
-                        GeneratedHelpLine(kind: .text, value: "When assigned to a budget, presets become planned expenses in that budget."),
-                        GeneratedHelpLine(kind: .bullet, value: "Presets act as templates for planned expenses."),
-                        GeneratedHelpLine(kind: .bullet, value: "Planned expenses generated from presets use planned amount unless you edit actual amount later.")
-                    ]
-                ),
-                GeneratedHelpSection(
-                    id: "settings-presets-3",
-                    header: "Tip",
-                    lines: [
-                        GeneratedHelpLine(kind: .heroScreenshot, value: "3"),
-                        GeneratedHelpLine(kind: .text, value: "Use presets to make budget setup fast and consistent month to month.")
+                mediaSection(
+                    id: "settings-presets-add-preset",
+                    header: "Add Preset",
+                    body: "Create a preset once, then reuse it in future budgets instead of retyping the same planned expense. This improves consistency and reduces setup time. Keep amounts and category mappings accurate so template reuse stays reliable.",
+                    media: [
+                        mediaItem(
+                            id: "settings-presets-add-preset-1",
+                            assetName: "Help/CoreScreens/Settings/Presets/add-preset-1",
+                            bodyText: "Start the add preset flow and define the core fields such as name, amount, and category. Choose values that reflect how the recurring expense normally behaves."
+                        ),
+                        mediaItem(
+                            id: "settings-presets-add-preset-2",
+                            assetName: "Help/CoreScreens/Settings/Presets/add-preset-2",
+                            bodyText: "Review the preset before saving so future budgets inherit correct defaults. A clean preset today prevents repeated edits later in each budget cycle."
+                        )
                     ]
                 )
-            ],
-            assetPrefix: "Help-Presets"
+            ]
+        ),
+        GeneratedHelpLeafTopic(
+            id: "settings-workspaces",
+            destinationID: "settings",
+            title: "Workspaces",
+            sections: [
+                mediaSection(
+                    id: "settings-workspaces-1",
+                    header: "Workspaces",
+                    body: "Workspaces separate budgeting contexts so personal and other domains can stay independent. Each workspace has its own cards, categories, presets, and budgets. Switch or manage workspaces from the Settings toolbar menu.",
+                    media: [
+                        mediaItem(
+                            id: "settings-workspaces-1-image-1",
+                            assetName: "Help/CoreScreens/Settings/Workspaces/overview",
+                            bodyText: "Use Workspaces when you want separate financial contexts without mixing records. This keeps totals and history scoped to the context you are actively managing."
+                        )
+                    ]
+                )
+            ]
         )
     ]
 
@@ -1034,37 +969,35 @@ enum GeneratedHelpContent {
     }
 }
 
-private extension GeneratedHelpSection {
-    var screenshotSlots: [Int] {
-        lines.compactMap { line in
-            switch line.kind {
-            case .heroScreenshot, .miniScreenshot:
-                return Int(line.value)
-            case .text, .bullet:
-                return nil
-            }
-        }
-    }
+// MARK: - Builders
 
-    var condensedBodyText: String {
-        let content = lines.compactMap { line -> String? in
-            switch line.kind {
-            case .text, .bullet:
-                return line.value.trimmingCharacters(in: .whitespacesAndNewlines)
-            case .heroScreenshot, .miniScreenshot:
-                return nil
-            }
-        }
-        .filter { $0.isEmpty == false }
+private func textSection(id: String, header: String?, body: String) -> GeneratedHelpSection {
+    GeneratedHelpSection(
+        id: id,
+        header: header,
+        bodyText: body,
+        mediaItems: []
+    )
+}
 
-        if content.isEmpty {
-            return "Replace this placeholder with concise help text for this section."
-        }
+private func mediaSection(
+    id: String,
+    header: String?,
+    body: String,
+    media: [GeneratedHelpSectionMediaItem]
+) -> GeneratedHelpSection {
+    GeneratedHelpSection(
+        id: id,
+        header: header,
+        bodyText: body,
+        mediaItems: media
+    )
+}
 
-        return content.joined(separator: " ")
-    }
-
-    func placeholderAssetName(slot: Int) -> String {
-        "Help-\(id)-\(slot)"
-    }
+private func mediaItem(id: String, assetName: String, bodyText: String) -> GeneratedHelpSectionMediaItem {
+    GeneratedHelpSectionMediaItem(
+        id: id,
+        assetName: assetName,
+        bodyText: bodyText
+    )
 }

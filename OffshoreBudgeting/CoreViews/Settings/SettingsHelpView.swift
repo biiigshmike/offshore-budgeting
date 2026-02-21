@@ -131,34 +131,31 @@ struct HelpTopicDetailView: View {
     @ViewBuilder
     private func sectionContent(_ section: GeneratedHelpSection) -> some View {
         let mediaItems = topic.mediaItems(for: section)
-        let selectedItem = selectedMediaItem(for: section, from: mediaItems)
 
         if let header = section.header {
             Text(header)
                 .font(.title3.weight(.semibold))
         }
 
-        HelpSectionMediaStrip(
-            mediaItems: mediaItems,
-            selectedMediaID: selectedItem.id
-        ) { tappedItem in
-            handleMediaTap(tappedItem, section: section, allItems: mediaItems)
-        }
+        if mediaItems.isEmpty {
+            HelpSectionBodyCard(text: section.bodyText)
+        } else if let selectedItem = selectedMediaItem(for: section, from: mediaItems) {
+            HelpSectionMediaStrip(
+                mediaItems: mediaItems,
+                selectedMediaID: selectedItem.id
+            ) { tappedItem in
+                handleMediaTap(tappedItem, section: section, allItems: mediaItems)
+            }
 
-        HelpSectionBodyCard(text: selectedItem.bodyText)
+            HelpSectionBodyCard(text: selectedItem.bodyText)
+        }
     }
 
     private func selectedMediaItem(
         for section: GeneratedHelpSection,
         from mediaItems: [GeneratedHelpSectionMediaItem]
-    ) -> GeneratedHelpSectionMediaItem {
-        guard let fallbackItem = mediaItems.first else {
-            return GeneratedHelpSectionMediaItem(
-                id: "\(section.id)-fallback",
-                assetName: "Help-\(section.id)-1",
-                bodyText: "Replace this placeholder with concise help text for this section."
-            )
-        }
+    ) -> GeneratedHelpSectionMediaItem? {
+        guard let fallbackItem = mediaItems.first else { return nil }
 
         let selectedID = selectedMediaIDsBySectionID[section.id] ?? fallbackItem.id
         return mediaItems.first(where: { $0.id == selectedID }) ?? fallbackItem
@@ -169,7 +166,14 @@ struct HelpTopicDetailView: View {
         section: GeneratedHelpSection,
         allItems: [GeneratedHelpSectionMediaItem]
     ) {
-        let currentSelectedID = selectedMediaIDsBySectionID[section.id] ?? allItems.first?.id
+        guard !allItems.isEmpty else { return }
+
+        let currentSelectedID = selectedMediaIDsBySectionID[section.id]
+
+        if currentSelectedID == nil {
+            selectedMediaIDsBySectionID[section.id] = tappedItem.id
+            return
+        }
 
         if currentSelectedID == tappedItem.id {
             fullscreenPresentation = HelpFullscreenPresentation(
