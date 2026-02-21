@@ -103,26 +103,83 @@ private struct HelpDestinationTopicsView: View {
 struct HelpTopicDetailView: View {
     let topic: GeneratedHelpLeafTopic
 
+    @State private var currentTopicID: String
     @State private var selectedMediaIDsBySectionID: [String: String] = [:]
     @State private var fullscreenPresentation: HelpFullscreenPresentation?
 
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                ForEach(topic.sections) { section in
-                    sectionContent(section)
+    private let topAnchorID: String = "help-topic-top-anchor"
 
-                    if section.id != topic.sections.last?.id {
-                        Divider()
-                            .padding(.top, 4)
+    init(topic: GeneratedHelpLeafTopic) {
+        self.topic = topic
+        _currentTopicID = State(initialValue: topic.id)
+    }
+
+    private var currentTopic: GeneratedHelpLeafTopic {
+        GeneratedHelpContent.leafTopic(for: currentTopicID) ?? topic
+    }
+
+    private var orderedTopicsInDestination: [GeneratedHelpLeafTopic] {
+        guard let destination = GeneratedHelpContent.destination(for: currentTopic.destinationID) else {
+            return [currentTopic]
+        }
+
+        let topics = GeneratedHelpContent.leafTopics(for: destination)
+        return topics.isEmpty ? [currentTopic] : topics
+    }
+
+    private var currentTopicIndex: Int? {
+        orderedTopicsInDestination.firstIndex(where: { $0.id == currentTopic.id })
+    }
+
+    private var previousTopic: GeneratedHelpLeafTopic? {
+        guard let index = currentTopicIndex, index > 0 else { return nil }
+        return orderedTopicsInDestination[index - 1]
+    }
+
+    private var nextTopic: GeneratedHelpLeafTopic? {
+        guard let index = currentTopicIndex, index + 1 < orderedTopicsInDestination.count else { return nil }
+        return orderedTopicsInDestination[index + 1]
+    }
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    Color.clear
+                        .frame(height: 0)
+                        .id(topAnchorID)
+
+                    ForEach(currentTopic.sections) { section in
+                        sectionContent(section)
+
+                        if section.id != currentTopic.sections.last?.id {
+                            Divider()
+                                .padding(.top, 4)
+                        }
                     }
                 }
+                .padding()
             }
-            .padding()
-        }
-        .navigationTitle(topic.title)
-        .fullScreenCover(item: $fullscreenPresentation) { presentation in
-            HelpSectionFullscreenViewer(topicTitle: topic.title, presentation: presentation)
+            .navigationTitle(currentTopic.title)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                HelpTopicPagerBar(
+                    previousTitle: previousTopic?.title,
+                    nextTitle: nextTopic?.title,
+                    onBack: goToPreviousTopic,
+                    onNext: goToNextTopic
+                )
+            }
+            .onChange(of: currentTopicID) { _, _ in
+                selectedMediaIDsBySectionID = [:]
+                fullscreenPresentation = nil
+
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    proxy.scrollTo(topAnchorID, anchor: .top)
+                }
+            }
+            .fullScreenCover(item: $fullscreenPresentation) { presentation in
+                HelpSectionFullscreenViewer(topicTitle: currentTopic.title, presentation: presentation)
+            }
         }
     }
 
@@ -130,7 +187,7 @@ struct HelpTopicDetailView: View {
 
     @ViewBuilder
     private func sectionContent(_ section: GeneratedHelpSection) -> some View {
-        let mediaItems = topic.mediaItems(for: section)
+        let mediaItems = currentTopic.mediaItems(for: section)
 
         if let header = section.header {
             Text(header)
@@ -183,6 +240,72 @@ struct HelpTopicDetailView: View {
             )
         } else {
             selectedMediaIDsBySectionID[section.id] = tappedItem.id
+        }
+    }
+
+    private func goToPreviousTopic() {
+        guard let previousTopic else { return }
+        currentTopicID = previousTopic.id
+    }
+
+    private func goToNextTopic() {
+        guard let nextTopic else { return }
+        currentTopicID = nextTopic.id
+    }
+}
+
+private struct HelpTopicPagerBar: View {
+    let previousTitle: String?
+    let nextTitle: String?
+    let onBack: () -> Void
+    let onNext: () -> Void
+
+    private var previousDisplayTitle: String {
+        previousTitle ?? "Start of Section"
+    }
+
+    private var nextDisplayTitle: String {
+        nextTitle ?? "End of Section"
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Divider()
+
+            HStack(spacing: 10) {
+                Button(action: onBack) {
+                    VStack(spacing: 3) {
+                        Text("Back")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                        Text(previousDisplayTitle)
+                            .font(.body.weight(.semibold))
+                            .lineLimit(1)
+                    }
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                }
+                .buttonStyle(.bordered)
+                .disabled(previousTitle == nil)
+
+                Button(action: onNext) {
+                    VStack(spacing: 3) {
+                        Text("Next")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                        Text(nextDisplayTitle)
+                            .font(.body.weight(.semibold))
+                            .lineLimit(1)
+                    }
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(nextTitle == nil)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(.ultraThinMaterial)
         }
     }
 }
