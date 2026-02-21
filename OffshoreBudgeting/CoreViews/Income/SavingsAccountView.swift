@@ -513,6 +513,16 @@ private struct SavingsLedgerEntryFormView: View {
             Text("Please enter a valid amount.")
         }
         .onAppear {
+            if DebugScreenshotFormDefaults.isEnabled {
+                if amountText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    amountText = DebugScreenshotFormDefaults.savingsEntryAmountText
+                }
+
+                if note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    note = DebugScreenshotFormDefaults.savingsEntryNote
+                }
+            }
+
             if let entry {
                 date = entry.date
                 amountText = CurrencyFormatter.editingString(from: entry.amount)

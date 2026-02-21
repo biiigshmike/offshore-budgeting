@@ -275,6 +275,10 @@ struct ContentView: View {
     }
 
     private func runSavingsAutoCaptureIfPossible() {
+        if DebugScreenshotFormDefaults.isEnabled {
+            return
+        }
+
         guard let workspace = selectedWorkspace else { return }
         let workspaceID = workspace.id
 

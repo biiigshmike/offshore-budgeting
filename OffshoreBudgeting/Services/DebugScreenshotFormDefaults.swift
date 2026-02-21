@@ -22,6 +22,8 @@ enum DebugScreenshotFormDefaults {
     static let expenseDescription: String = "Trader Joe's Run"
     static let incomeSource: String = "Paycheck"
     static let presetTitle: String = "Internet Bill"
+    static let settlementNote: String = "Settled in cash"
+    static let savingsEntryNote: String = "Monthly savings transfer"
 
     // MARK: - Amount Defaults
 
@@ -34,6 +36,12 @@ enum DebugScreenshotFormDefaults {
     static let offsetAmountText: String = "18.00"
     static let savingsOffsetAmountText: String = "15.00"
     static let plannedExpenseActualAmountText: String = "64.00"
+    static let settlementAmountText: String = "35.00"
+    static let savingsEntryAmountText: String = "225.00"
+
+    // MARK: - Picker Defaults
+
+    static let settlementDirection: Int = -1
 
     // MARK: - Lookups
 

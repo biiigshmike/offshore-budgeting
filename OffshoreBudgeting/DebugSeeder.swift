@@ -28,6 +28,7 @@ enum DebugSeeder {
             if hasAnyWorkspace(context: context) {
                 applyPinnedHomeOrderForExistingWorkspaceIfPossible(context: context)
                 refreshMarinaConversationForExistingWorkspaceIfPossible(context: context, now: now)
+                refreshScreenshotSavingsForExistingWorkspaceIfPossible(context: context, now: now)
                 _ = ensureDebugImportSampleCSV(modelContext: context)
                 return
             }
@@ -113,6 +114,23 @@ enum DebugSeeder {
             )
         } catch {
             assertionFailure("DebugSeeder failed to apply pinned widget order: \(error)")
+        }
+    }
+
+    private static func refreshScreenshotSavingsForExistingWorkspaceIfPossible(context: ModelContext, now: Date) {
+        guard isScreenshotModeEnabledForDebugTools else { return }
+
+        do {
+            let workspaces = try context.fetch(FetchDescriptor<Workspace>())
+            guard let workspace = pickPinnedWorkspace(from: workspaces) else {
+                assertionFailure("DebugSeeder could not find a workspace for screenshot savings seeding.")
+                return
+            }
+
+            seedScreenshotSavingsLedger(context: context, workspace: workspace, now: now)
+            try context.save()
+        } catch {
+            assertionFailure("DebugSeeder failed to refresh screenshot savings ledger: \(error)")
         }
     }
 
@@ -327,6 +345,8 @@ enum DebugSeeder {
         deleteAll(ExpenseAllocation.self, context: context)
         deleteAll(AllocationSettlement.self, context: context)
         deleteAll(AllocationAccount.self, context: context)
+        deleteAll(SavingsLedgerEntry.self, context: context)
+        deleteAll(SavingsAccount.self, context: context)
 
         deleteAll(VariableExpense.self, context: context)
         deleteAll(PlannedExpense.self, context: context)
@@ -638,6 +658,7 @@ enum DebugSeeder {
             calendar: cal
         )
 
+        seedScreenshotSavingsLedger(context: context, workspace: workspace, now: now)
         seedMarinaConversation(workspace: workspace, now: now)
         seedExcursionModeActive(now: now)
     }
@@ -1259,6 +1280,139 @@ enum DebugSeeder {
                 account: casey
             )
         )
+    }
+
+    // MARK: - Savings (Screenshot Mode)
+
+    private static func seedScreenshotSavingsLedger(
+        context: ModelContext,
+        workspace: Workspace,
+        now: Date
+    ) {
+        guard isScreenshotModeEnabledForDebugTools else { return }
+
+        let workspaceID = workspace.id
+        let incomeDescriptor = FetchDescriptor<Income>(
+            predicate: #Predicate<Income> { $0.workspace?.id == workspaceID }
+        )
+        let plannedDescriptor = FetchDescriptor<PlannedExpense>(
+            predicate: #Predicate<PlannedExpense> { $0.workspace?.id == workspaceID }
+        )
+        let variableDescriptor = FetchDescriptor<VariableExpense>(
+            predicate: #Predicate<VariableExpense> { $0.workspace?.id == workspaceID }
+        )
+
+        let incomes = (try? context.fetch(incomeDescriptor)) ?? []
+        let plannedExpenses = (try? context.fetch(plannedDescriptor)) ?? []
+        let variableExpenses = (try? context.fetch(variableDescriptor)) ?? []
+
+        let period = screenshotBudgetingPeriod()
+        let range = period.defaultRange(containing: now, calendar: .current)
+        let rangeStart = Calendar.current.startOfDay(for: range.start)
+        let rangeEnd = Calendar.current.startOfDay(for: range.end)
+
+        let actualIncomeTotal = incomes
+            .filter { !$0.isPlanned && $0.date >= rangeStart && $0.date <= rangeEnd }
+            .reduce(0.0) { $0 + $1.amount }
+
+        let plannedImpactTotal = plannedExpenses
+            .filter { $0.expenseDate >= rangeStart && $0.expenseDate <= rangeEnd }
+            .reduce(0.0) { $0 + SavingsMathService.plannedBudgetImpactAmount(for: $1) }
+
+        let variableImpactTotal = variableExpenses
+            .filter { $0.transactionDate >= rangeStart && $0.transactionDate <= rangeEnd }
+            .reduce(0.0) { $0 + SavingsMathService.variableBudgetImpactAmount(for: $1) }
+
+        let strictMatchTotal = roundedToCents(actualIncomeTotal - (plannedImpactTotal + variableImpactTotal))
+
+        let account = SavingsAccountService.ensureSavingsAccount(for: workspace, modelContext: context)
+        for entry in account.entries ?? [] {
+            context.delete(entry)
+        }
+
+        let entryDates = screenshotSavingsEntryDates(
+            from: rangeStart,
+            to: rangeEnd,
+            calendar: .current
+        )
+        let splitAmounts = splitAmountAcrossEntries(strictMatchTotal, count: entryDates.count)
+
+        for (index, date) in entryDates.enumerated() {
+            let amount = splitAmounts[index]
+            let entry = SavingsLedgerEntry(
+                date: date,
+                amount: amount,
+                note: "Screenshot seed \(index + 1)",
+                kindRaw: SavingsLedgerEntryKind.manualAdjustment.rawValue,
+                periodStartDate: rangeStart,
+                periodEndDate: rangeEnd,
+                createdAt: date,
+                updatedAt: date,
+                workspace: workspace,
+                account: account
+            )
+            context.insert(entry)
+        }
+
+        account.didBackfillHistory = true
+        account.autoCaptureThroughDate = rangeEnd
+        SavingsAccountService.recalculateAccountTotal(account)
+    }
+
+    private static func screenshotBudgetingPeriod() -> BudgetingPeriod {
+        let raw = UserDefaults.standard.string(forKey: "general_defaultBudgetingPeriod")
+            ?? BudgetingPeriod.monthly.rawValue
+        return BudgetingPeriod(rawValue: raw) ?? .monthly
+    }
+
+    private static func screenshotSavingsEntryDates(
+        from start: Date,
+        to end: Date,
+        calendar: Calendar
+    ) -> [Date] {
+        let startDay = calendar.startOfDay(for: start)
+        let endDay = calendar.startOfDay(for: end)
+        let spanDays = max(0, calendar.dateComponents([.day], from: startDay, to: endDay).day ?? 0)
+
+        if spanDays == 0 {
+            return [startDay]
+        }
+
+        let firstOffset = max(0, spanDays / 3)
+        let secondOffset = max(firstOffset, (spanDays * 2) / 3)
+        let candidateOffsets = [firstOffset, secondOffset, spanDays]
+
+        var uniqueDates: [Date] = []
+        for offset in candidateOffsets {
+            let date = calendar.date(byAdding: .day, value: offset, to: startDay) ?? endDay
+            let day = calendar.startOfDay(for: date)
+            if !uniqueDates.contains(where: { calendar.isDate($0, inSameDayAs: day) }) {
+                uniqueDates.append(day)
+            }
+        }
+
+        if uniqueDates.isEmpty {
+            return [startDay]
+        }
+
+        return uniqueDates.sorted()
+    }
+
+    private static func splitAmountAcrossEntries(_ total: Double, count: Int) -> [Double] {
+        let safeCount = max(1, count)
+        if safeCount == 1 {
+            return [roundedToCents(total)]
+        }
+
+        let base = roundedToCents(total / Double(safeCount))
+        var parts = Array(repeating: base, count: safeCount)
+        let used = parts.dropLast().reduce(0.0, +)
+        parts[safeCount - 1] = roundedToCents(total - used)
+        return parts
+    }
+
+    private static func roundedToCents(_ value: Double) -> Double {
+        (value * 100).rounded() / 100
     }
 
     // MARK: - Marina

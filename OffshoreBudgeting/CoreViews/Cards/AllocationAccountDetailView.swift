@@ -717,6 +717,28 @@ private struct EditSharedBalanceEntryView: View {
             date = settlement.date
             direction = settlement.amount < 0 ? -1 : 1
         }
+
+        if DebugScreenshotFormDefaults.isEnabled {
+            if selectedAccountID == nil {
+                selectedAccountID = DebugScreenshotFormDefaults.preferredAllocationAccountID(in: allocationAccounts) ?? account.id
+            }
+
+            if amountText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                switch actionMode {
+                case .split:
+                    amountText = DebugScreenshotFormDefaults.splitAmountText
+                case .offset:
+                    amountText = DebugScreenshotFormDefaults.offsetAmountText
+                case .none:
+                    amountText = DebugScreenshotFormDefaults.settlementAmountText
+                }
+            }
+
+            let shouldSeedNote = (!isLinked || actionMode == .offset)
+            if shouldSeedNote && note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                note = DebugScreenshotFormDefaults.settlementNote
+            }
+        }
     }
 
     private func save() {
@@ -1065,6 +1087,19 @@ private struct AddAllocationSettlementView: View {
             Button("OK", role: .cancel) { }
         } message: {
             Text("Please enter an amount greater than 0.")
+        }
+        .onAppear {
+            guard DebugScreenshotFormDefaults.isEnabled else { return }
+
+            if note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                note = DebugScreenshotFormDefaults.settlementNote
+            }
+
+            if amountText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                amountText = DebugScreenshotFormDefaults.settlementAmountText
+            }
+
+            currentDirection = DebugScreenshotFormDefaults.settlementDirection >= 0 ? 1 : -1
         }
     }
 
