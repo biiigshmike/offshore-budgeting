@@ -49,6 +49,12 @@ struct AddWorkspaceView: View {
                     }
                 }
             }
+            .onAppear {
+                guard DebugScreenshotFormDefaults.isEnabled else { return }
+                if WorkspaceFormView.trimmedName(name).isEmpty {
+                    name = DebugScreenshotFormDefaults.workspaceName
+                }
+            }
     }
 
     private func save() {

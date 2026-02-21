@@ -78,6 +78,7 @@ struct EditCategoryLimitView: View {
             }
             .onAppear {
                 loadExisting()
+                applyScreenshotPrefillIfNeeded()
             }
         }
     }
@@ -174,6 +175,18 @@ struct EditCategoryLimitView: View {
             limit = nil
             minText = ""
             maxText = ""
+        }
+    }
+
+    private func applyScreenshotPrefillIfNeeded() {
+        guard DebugScreenshotFormDefaults.isEnabled else { return }
+
+        let trimmedMin = minText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedMax = maxText.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if trimmedMin.isEmpty && trimmedMax.isEmpty {
+            minText = DebugScreenshotFormDefaults.categoryLimitMinText
+            maxText = DebugScreenshotFormDefaults.categoryLimitMaxText
         }
     }
 

@@ -316,6 +316,8 @@ struct EditPlannedExpenseView: View {
             } else {
                 draftSharedBalanceMode = nil
             }
+
+            applyScreenshotPrefillIfNeeded()
         }
         .onChange(of: plannedAmountText) { _, _ in
             syncActualFromActiveSharedAmountIfNeeded()
@@ -330,6 +332,48 @@ struct EditPlannedExpenseView: View {
         }
         .onChange(of: actualAmountText) { _, newValue in
             syncSharedAmountFromActual(newValue)
+        }
+    }
+
+    private func applyScreenshotPrefillIfNeeded() {
+        guard DebugScreenshotFormDefaults.isEnabled else { return }
+
+        if PresetFormView.trimmedTitle(title).isEmpty {
+            title = DebugScreenshotFormDefaults.presetTitle
+        }
+
+        let trimmedPlanned = plannedAmountText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedPlanned.isEmpty {
+            plannedAmountText = DebugScreenshotFormDefaults.presetAmountText
+        }
+
+        let trimmedActual = actualAmountText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedActual.isEmpty {
+            actualAmountText = DebugScreenshotFormDefaults.plannedExpenseActualAmountText
+        }
+
+        if selectedCardID == nil {
+            selectedCardID = DebugScreenshotFormDefaults.preferredCardID(in: cards)
+        }
+
+        if selectedCategoryID == nil {
+            selectedCategoryID = DebugScreenshotFormDefaults.preferredCategoryID(in: categories)
+        }
+
+        guard isSharedBalanceEnabled else { return }
+
+        let hasSharedAmount = !allocationAmountText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || !offsetAmountText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let hasSavingsAmount = !savingsOffsetAmountText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        if hasSharedAmount || hasSavingsAmount { return }
+
+        if selectedAllocationAccountID == nil {
+            selectedAllocationAccountID = DebugScreenshotFormDefaults.preferredAllocationAccountID(in: allocationAccounts)
+        }
+
+        if selectedAllocationAccountID != nil {
+            draftSharedBalanceMode = .split
+            allocationAmountText = DebugScreenshotFormDefaults.splitAmountText
         }
     }
 

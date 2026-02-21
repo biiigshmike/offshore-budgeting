@@ -188,13 +188,30 @@ struct AddExpenseView: View {
                 }
             }
 
+            if DebugScreenshotFormDefaults.isEnabled {
+                if descriptionText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    descriptionText = DebugScreenshotFormDefaults.expenseDescription
+                }
+
+                let trimmedAmount = amountText.trimmingCharacters(in: .whitespacesAndNewlines)
+                if trimmedAmount.isEmpty {
+                    amountText = DebugScreenshotFormDefaults.expenseAmountText
+                }
+            }
+
             // Preselect card when launched from CardDetailView.
             if selectedCardID == nil {
                 if let defaultCard {
                     selectedCardID = defaultCard.id
                 } else if visibleCards.count == 1 {
                     selectedCardID = visibleCards.first?.id
+                } else if DebugScreenshotFormDefaults.isEnabled {
+                    selectedCardID = DebugScreenshotFormDefaults.preferredCardID(in: visibleCards)
                 }
+            }
+
+            if DebugScreenshotFormDefaults.isEnabled, selectedCategoryID == nil {
+                selectedCategoryID = DebugScreenshotFormDefaults.preferredCategoryID(in: categories)
             }
         }
     }

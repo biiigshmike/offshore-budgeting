@@ -49,6 +49,12 @@ struct AddCardView: View {
                     }
                 }
             }
+            .onAppear {
+                guard DebugScreenshotFormDefaults.isEnabled else { return }
+                if CardFormView.trimmedName(name).isEmpty {
+                    name = DebugScreenshotFormDefaults.cardName
+                }
+            }
     }
 
     private func save() {

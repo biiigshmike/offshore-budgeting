@@ -52,6 +52,12 @@ struct AddCategoryView: View {
                     }
                 }
             }
+            .onAppear {
+                guard DebugScreenshotFormDefaults.isEnabled else { return }
+                if CategoryFormView.trimmedName(name).isEmpty {
+                    name = DebugScreenshotFormDefaults.categoryName
+                }
+            }
     }
 
     private func save() {

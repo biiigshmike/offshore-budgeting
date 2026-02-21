@@ -50,6 +50,12 @@ struct AddAllocationAccountView: View {
                 }
             }
         }
+        .onAppear {
+            guard DebugScreenshotFormDefaults.isEnabled else { return }
+            if trimmedName.isEmpty {
+                name = DebugScreenshotFormDefaults.accountName
+            }
+        }
     }
 
     private func save() {

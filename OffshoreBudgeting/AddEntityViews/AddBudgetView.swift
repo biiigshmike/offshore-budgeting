@@ -102,6 +102,7 @@ struct AddBudgetView: View {
         }
         .onAppear {
             seedInitialDatesAndName()
+            applyScreenshotPrefillIfNeeded()
         }
         .onChange(of: defaultBudgetingPeriodRaw) { _, _ in
             applyDefaultPeriodRange()
@@ -120,6 +121,23 @@ struct AddBudgetView: View {
         userEditedName = false
         applyDefaultPeriodRange()
         autoFillNameIfNeeded(force: true)
+    }
+
+    private func applyScreenshotPrefillIfNeeded() {
+        guard DebugScreenshotFormDefaults.isEnabled else { return }
+        guard selectedCardIDs.isEmpty else { return }
+
+        if let preferredCardID = DebugScreenshotFormDefaults.preferredCardID(in: cards) {
+            selectedCardIDs.insert(preferredCardID)
+        } else {
+            selectedCardIDs = Set(cards.prefix(1).map { $0.id })
+        }
+
+        if selectedPresetIDs.isEmpty {
+            if let firstPresetID = presets.first?.id {
+                selectedPresetIDs.insert(firstPresetID)
+            }
+        }
     }
 
     private func applyDefaultPeriodRange() {

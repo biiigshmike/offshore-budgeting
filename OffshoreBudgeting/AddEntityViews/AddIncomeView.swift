@@ -92,6 +92,18 @@ struct AddIncomeView: View {
         } message: {
             Text("When Repeat is set, you must also set an End Date (and it cannot be before the start date).")
         }
+        .onAppear {
+            guard DebugScreenshotFormDefaults.isEnabled else { return }
+
+            if trimmedSource.isEmpty {
+                source = DebugScreenshotFormDefaults.incomeSource
+            }
+
+            let trimmedAmount = amountText.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmedAmount.isEmpty {
+                amountText = DebugScreenshotFormDefaults.incomeAmountText
+            }
+        }
     }
 
     // MARK: - Validation

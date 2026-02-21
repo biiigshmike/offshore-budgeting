@@ -120,6 +120,26 @@ struct AddPresetView: View {
         } message: {
             Text("Choose a default card for this preset.")
         }
+        .onAppear {
+            guard DebugScreenshotFormDefaults.isEnabled else { return }
+
+            if trimmedTitle.isEmpty {
+                title = DebugScreenshotFormDefaults.presetTitle
+            }
+
+            let trimmedAmount = plannedAmountText.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmedAmount.isEmpty {
+                plannedAmountText = DebugScreenshotFormDefaults.presetAmountText
+            }
+
+            if selectedCardID == nil {
+                selectedCardID = DebugScreenshotFormDefaults.preferredCardID(in: cards)
+            }
+
+            if selectedCategoryID == nil {
+                selectedCategoryID = DebugScreenshotFormDefaults.preferredCategoryID(in: categories)
+            }
+        }
     }
 
     private func save() {

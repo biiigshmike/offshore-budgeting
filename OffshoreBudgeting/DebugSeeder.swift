@@ -404,6 +404,17 @@ enum DebugSeeder {
         let presets: [Preset] = [presetRent, presetInternet, presetGym, presetInsurance, presetStreaming]
         presets.forEach { context.insert($0) }
 
+        presetRent.defaultCard = cardChecking
+        presetRent.defaultCategory = catHousing
+        presetInternet.defaultCard = cardChecking
+        presetInternet.defaultCategory = catUtilities
+        presetGym.defaultCard = cardVisa
+        presetGym.defaultCategory = catHealth
+        presetInsurance.defaultCard = cardChecking
+        presetInsurance.defaultCategory = catHealth
+        presetStreaming.defaultCard = cardVisa
+        presetStreaming.defaultCategory = catEntertainment
+
         // Budgets
         let currentMonthStart = startOfMonth(containing: now, calendar: cal)
         let currentMonthEnd = endOfMonth(containing: now, calendar: cal)

@@ -112,6 +112,18 @@ struct EditIncomeView: View {
         } message: {
             Text("This income is part of a repeating series.")
         }
+        .onAppear {
+            guard DebugScreenshotFormDefaults.isEnabled else { return }
+
+            if trimmedSource.isEmpty {
+                source = DebugScreenshotFormDefaults.incomeSource
+            }
+
+            let trimmedAmount = amountText.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmedAmount.isEmpty {
+                amountText = DebugScreenshotFormDefaults.incomeAmountText
+            }
+        }
     }
 
     // MARK: - Validation

@@ -106,6 +106,7 @@ struct EditBudgetView: View {
         }
         .onAppear {
             seedFromBudget()
+            applyScreenshotPrefillIfNeeded()
         }
     }
 
@@ -122,6 +123,22 @@ struct EditBudgetView: View {
 
         selectedCardIDs = Set((budget.cardLinks ?? []).compactMap { $0.card?.id })
         selectedPresetIDs = Set((budget.presetLinks ?? []).compactMap { $0.preset?.id })
+    }
+
+    private func applyScreenshotPrefillIfNeeded() {
+        guard DebugScreenshotFormDefaults.isEnabled else { return }
+
+        if trimmedName.isEmpty {
+            name = BudgetNameSuggestion.suggestedName(start: startDate, end: endDate, calendar: .current)
+        }
+
+        if selectedCardIDs.isEmpty, let preferredCardID = DebugScreenshotFormDefaults.preferredCardID(in: cards) {
+            selectedCardIDs.insert(preferredCardID)
+        }
+
+        if selectedPresetIDs.isEmpty, let firstPresetID = presets.first?.id {
+            selectedPresetIDs.insert(firstPresetID)
+        }
     }
 
     // MARK: - Date handling

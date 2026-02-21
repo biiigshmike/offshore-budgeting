@@ -186,6 +186,43 @@ struct EditExpenseView: View {
                 applySavingsOffset = false
                 savingsOffsetAmountText = ""
             }
+
+            applyScreenshotPrefillIfNeeded()
+        }
+    }
+
+    private func applyScreenshotPrefillIfNeeded() {
+        guard DebugScreenshotFormDefaults.isEnabled else { return }
+
+        if ExpenseFormView.trimmedDescription(descriptionText).isEmpty {
+            descriptionText = DebugScreenshotFormDefaults.expenseDescription
+        }
+
+        let trimmedAmount = amountText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedAmount.isEmpty {
+            amountText = DebugScreenshotFormDefaults.expenseAmountText
+        }
+
+        if selectedCardID == nil {
+            selectedCardID = DebugScreenshotFormDefaults.preferredCardID(in: cards)
+        }
+
+        if selectedCategoryID == nil {
+            selectedCategoryID = DebugScreenshotFormDefaults.preferredCategoryID(in: categories)
+        }
+
+        let hasSharedAmount = !allocationAmountText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || !offsetAmountText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let hasSavingsAmount = !savingsOffsetAmountText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+
+        if !hasSharedAmount && !hasSavingsAmount {
+            if selectedAllocationAccountID == nil {
+                selectedAllocationAccountID = DebugScreenshotFormDefaults.preferredAllocationAccountID(in: allocationAccounts)
+            }
+
+            if selectedAllocationAccountID != nil {
+                allocationAmountText = DebugScreenshotFormDefaults.splitAmountText
+            }
         }
     }
 
