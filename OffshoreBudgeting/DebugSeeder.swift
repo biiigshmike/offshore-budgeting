@@ -20,12 +20,14 @@ enum DebugSeeder {
         didRunThisLaunch = true
 
         let context = ModelContext(container)
+        let now = Date()
 
         if forceReset {
             wipeAllData(context: context)
         } else {
             if hasAnyWorkspace(context: context) {
                 applyPinnedHomeOrderForExistingWorkspaceIfPossible(context: context)
+                refreshMarinaConversationForExistingWorkspaceIfPossible(context: context, now: now)
                 _ = ensureDebugImportSampleCSV(modelContext: context)
                 return
             }
@@ -359,7 +361,6 @@ enum DebugSeeder {
     private static func seedSampleData(context: ModelContext) {
         let cal = Calendar.current
         let now = Date()
-
         // Workspace
         let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
         context.insert(workspace)
@@ -637,7 +638,7 @@ enum DebugSeeder {
             calendar: cal
         )
 
-        seedMarinaConversation(workspaceID: workspace.id, now: now)
+        seedMarinaConversation(workspace: workspace, now: now)
         seedExcursionModeActive(now: now)
     }
 
@@ -1262,66 +1263,88 @@ enum DebugSeeder {
 
     // MARK: - Marina
 
-    private static func seedMarinaConversation(workspaceID: UUID, now: Date) {
-        let store = HomeAssistantConversationStore()
+    private struct DebugMarinaSeedQuerySpec {
+        let prompt: String
+        let query: HomeQuery
+        let generatedAt: Date
+    }
 
-        let answers: [HomeAnswer] = [
-            HomeAnswer(
-                queryID: UUID(),
-                kind: .metric,
-                userPrompt: "How am I doing this month?",
-                title: "This month at a glance",
-                subtitle: "Income is covering spending so far.",
-                primaryValue: "$412.85 projected savings",
-                rows: [
-                    HomeAnswerRow(title: "Total spend", value: "$2,486.14"),
-                    HomeAnswerRow(title: "Total income", value: "$2,899.00"),
-                    HomeAnswerRow(title: "Status", value: "On track")
-                ],
+    private static func refreshMarinaConversationForExistingWorkspaceIfPossible(context: ModelContext, now: Date) {
+        do {
+            let workspaces = try context.fetch(FetchDescriptor<Workspace>())
+            guard let workspace = pickPinnedWorkspace(from: workspaces) else {
+                assertionFailure("DebugSeeder could not find a workspace for Marina conversation seeding.")
+                return
+            }
+
+            seedMarinaConversation(workspace: workspace, now: now)
+        } catch {
+            assertionFailure("DebugSeeder failed to refresh Marina conversation: \(error)")
+        }
+    }
+
+    private static func seedMarinaConversation(workspace: Workspace, now: Date) {
+        let store = HomeAssistantConversationStore()
+        let engine = HomeQueryEngine()
+        let monthRange = HomeQueryDateRange(
+            startDate: startOfMonth(containing: now, calendar: .current),
+            endDate: endOfMonth(containing: now, calendar: .current)
+        )
+
+        let specs: [DebugMarinaSeedQuerySpec] = [
+            DebugMarinaSeedQuerySpec(
+                prompt: "How am I doing this month?",
+                query: HomeQuery(intent: .periodOverview, dateRange: monthRange),
                 generatedAt: now.addingTimeInterval(-1_200)
             ),
-            HomeAnswer(
-                queryID: UUID(),
-                kind: .comparison,
-                userPrompt: "Compare this month to last month.",
-                title: "Spending change",
-                subtitle: "You spent less than last month.",
-                primaryValue: "-$183.40",
-                rows: [
-                    HomeAnswerRow(title: "Current month", value: "$2,486.14"),
-                    HomeAnswerRow(title: "Previous month", value: "$2,669.54")
-                ],
+            DebugMarinaSeedQuerySpec(
+                prompt: "Compare this month to last month.",
+                query: HomeQuery(intent: .compareThisMonthToPreviousMonth, dateRange: monthRange),
                 generatedAt: now.addingTimeInterval(-900)
             ),
-            HomeAnswer(
-                queryID: UUID(),
-                kind: .list,
-                userPrompt: "Where can I trim spending?",
-                title: "Top categories to review",
-                subtitle: "These categories had the highest variable spend.",
-                rows: [
-                    HomeAnswerRow(title: "Dining", value: "$276.15"),
-                    HomeAnswerRow(title: "Shopping", value: "$205.78"),
-                    HomeAnswerRow(title: "Entertainment", value: "$178.00")
-                ],
+            DebugMarinaSeedQuerySpec(
+                prompt: "Where am I spending the most this month?",
+                query: HomeQuery(intent: .topCategoriesThisMonth, dateRange: monthRange, resultLimit: 3),
                 generatedAt: now.addingTimeInterval(-600)
             ),
-            HomeAnswer(
-                queryID: UUID(),
-                kind: .message,
-                userPrompt: "Add planned income $450 for freelance next Friday.",
-                title: "Ready to add that income",
-                subtitle: "I can prefill this as planned income so you can confirm it.",
-                rows: [
-                    HomeAnswerRow(title: "Amount", value: "$450.00"),
-                    HomeAnswerRow(title: "Source", value: "Freelance"),
-                    HomeAnswerRow(title: "Type", value: "Planned")
-                ],
+            DebugMarinaSeedQuerySpec(
+                prompt: "How am I doing this month with my savings?",
+                query: HomeQuery(intent: .savingsStatus, dateRange: monthRange),
                 generatedAt: now.addingTimeInterval(-300)
             )
         ]
 
-        store.saveAnswers(answers, workspaceID: workspaceID)
+        let categories = workspace.categories ?? []
+        let presets = workspace.presets ?? []
+        let plannedExpenses = workspace.plannedExpenses ?? []
+        let variableExpenses = workspace.variableExpenses ?? []
+        let incomes = workspace.incomes ?? []
+
+        let answers = specs.map { spec in
+            let generated = engine.execute(
+                query: spec.query,
+                categories: categories,
+                presets: presets,
+                plannedExpenses: plannedExpenses,
+                variableExpenses: variableExpenses,
+                incomes: incomes,
+                now: now
+            )
+
+            return HomeAnswer(
+                id: generated.id,
+                queryID: generated.queryID,
+                kind: generated.kind,
+                userPrompt: spec.prompt,
+                title: generated.title,
+                subtitle: generated.subtitle,
+                primaryValue: generated.primaryValue,
+                rows: generated.rows,
+                generatedAt: spec.generatedAt
+            )
+        }
+
+        store.saveAnswers(answers, workspaceID: workspace.id)
     }
 
     // MARK: - Excursion
