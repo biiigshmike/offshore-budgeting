@@ -1297,7 +1297,7 @@ private struct DatePillButton: View {
                 )
         }
         .buttonStyle(.plain)
-    }
+    } 
 }
 
 // MARK: - Category Chips Row
