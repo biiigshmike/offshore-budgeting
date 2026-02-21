@@ -9,26 +9,30 @@ struct DateRangeFilterRow: View {
     let onSelectQuickRange: (CalendarQuickRangePreset) -> Void
 
     var body: some View {
-        HStack(spacing: 12) {
-            PillDatePickerField(title: "Start Date", date: $draftStartDate)
-                .frame(maxWidth: .infinity)
-                .layoutPriority(1)
+        HStack(spacing: 0) {
+            Spacer(minLength: 0)
 
-            PillDatePickerField(title: "End Date", date: $draftEndDate)
-                .frame(maxWidth: .infinity)
-                .layoutPriority(1)
+            HStack(spacing: 10) {
+                PillDatePickerField(title: "Start Date", date: $draftStartDate)
+                    .layoutPriority(1)
 
-            DateRangeIconCircleButton(systemName: "arrow.right", isEnabled: isGoEnabled, action: onTapGo)
-                .accessibilityLabel("Apply Date Range")
+                PillDatePickerField(title: "End Date", date: $draftEndDate)
+                    .layoutPriority(1)
 
-            Menu {
-                CalendarQuickRangeMenuItems { preset in
-                    onSelectQuickRange(preset)
+                DateRangeIconCircleButton(systemName: "arrow.right", isEnabled: isGoEnabled, action: onTapGo)
+                    .accessibilityLabel("Apply Date Range")
+
+                Menu {
+                    CalendarQuickRangeMenuItems { preset in
+                        onSelectQuickRange(preset)
+                    }
+                } label: {
+                    DateRangeIconCircleLabel(systemName: "calendar")
                 }
-            } label: {
-                DateRangeIconCircleLabel(systemName: "calendar")
+                .accessibilityLabel("Quick Date Ranges")
             }
-            .accessibilityLabel("Quick Date Ranges")
+
+            Spacer(minLength: 0)
         }
     }
 }
