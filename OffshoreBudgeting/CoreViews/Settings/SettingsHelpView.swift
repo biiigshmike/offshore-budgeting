@@ -103,51 +103,358 @@ private struct HelpDestinationTopicsView: View {
 struct HelpTopicDetailView: View {
     let topic: GeneratedHelpLeafTopic
 
+    @State private var selectedMediaIDsBySectionID: [String: String] = [:]
+    @State private var fullscreenPresentation: HelpFullscreenPresentation?
+
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 18) {
                 ForEach(topic.sections) { section in
-                    if let header = section.header {
-                        Text(header)
-                            .font(.title3.weight(.semibold))
-                        Divider()
-                    }
-
-                    ForEach(Array(section.lines.enumerated()), id: \.offset) { _, line in
-                        switch line.kind {
-                        case .text:
-                            Text(line.value)
-                        case .bullet:
-                            Text("• \(line.value)")
-                        case .heroScreenshot:
-                            if let slot = Int(line.value) {
-                                HelpScreenshotPlaceholder(
-                                    topic: topic,
-                                    slot: slot,
-                                    style: .hero
-                                )
-                                .padding(.vertical, 4)
-                            }
-                        case .miniScreenshot:
-                            if let slot = Int(line.value) {
-                                HelpScreenshotPlaceholder(
-                                    topic: topic,
-                                    slot: slot,
-                                    style: .mini
-                                )
-                                .padding(.vertical, 2)
-                            }
-                        }
-                    }
+                    sectionContent(section)
 
                     if section.id != topic.sections.last?.id {
-                        Spacer().frame(height: 8)
+                        Divider()
+                            .padding(.top, 4)
                     }
                 }
             }
             .padding()
         }
         .navigationTitle(topic.title)
+        .fullScreenCover(item: $fullscreenPresentation) { presentation in
+            HelpSectionFullscreenViewer(topicTitle: topic.title, presentation: presentation)
+        }
+    }
+
+    // MARK: - Section UI
+
+    @ViewBuilder
+    private func sectionContent(_ section: GeneratedHelpSection) -> some View {
+        let mediaItems = topic.mediaItems(for: section)
+        let selectedItem = selectedMediaItem(for: section, from: mediaItems)
+
+        if let header = section.header {
+            Text(header)
+                .font(.title3.weight(.semibold))
+        }
+
+        HelpSectionMediaStrip(
+            mediaItems: mediaItems,
+            selectedMediaID: selectedItem.id
+        ) { tappedItem in
+            handleMediaTap(tappedItem, section: section, allItems: mediaItems)
+        }
+
+        HelpSectionBodyCard(text: selectedItem.bodyText)
+    }
+
+    private func selectedMediaItem(
+        for section: GeneratedHelpSection,
+        from mediaItems: [GeneratedHelpSectionMediaItem]
+    ) -> GeneratedHelpSectionMediaItem {
+        guard let fallbackItem = mediaItems.first else {
+            return GeneratedHelpSectionMediaItem(
+                id: "\(section.id)-fallback",
+                assetName: "Help-\(section.id)-1",
+                bodyText: "Replace this placeholder with concise help text for this section."
+            )
+        }
+
+        let selectedID = selectedMediaIDsBySectionID[section.id] ?? fallbackItem.id
+        return mediaItems.first(where: { $0.id == selectedID }) ?? fallbackItem
+    }
+
+    private func handleMediaTap(
+        _ tappedItem: GeneratedHelpSectionMediaItem,
+        section: GeneratedHelpSection,
+        allItems: [GeneratedHelpSectionMediaItem]
+    ) {
+        let currentSelectedID = selectedMediaIDsBySectionID[section.id] ?? allItems.first?.id
+
+        if currentSelectedID == tappedItem.id {
+            fullscreenPresentation = HelpFullscreenPresentation(
+                sectionTitle: section.header ?? "Help",
+                mediaItems: allItems,
+                selectedMediaID: tappedItem.id
+            )
+        } else {
+            selectedMediaIDsBySectionID[section.id] = tappedItem.id
+        }
+    }
+}
+
+private struct HelpFullscreenPresentation: Identifiable {
+    let id: UUID = UUID()
+    let sectionTitle: String
+    let mediaItems: [GeneratedHelpSectionMediaItem]
+    let selectedMediaID: String
+}
+
+// MARK: - Section Media
+
+private struct HelpSectionMediaStrip: View {
+    let mediaItems: [GeneratedHelpSectionMediaItem]
+    let selectedMediaID: String
+    let onTap: (GeneratedHelpSectionMediaItem) -> Void
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            LazyHStack(spacing: 12) {
+                ForEach(mediaItems) { item in
+                    Button {
+                        onTap(item)
+                    } label: {
+                        HelpSectionThumbnail(
+                            item: item,
+                            isSelected: item.id == selectedMediaID
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.vertical, 4)
+        }
+    }
+}
+
+private struct HelpSectionThumbnail: View {
+    let item: GeneratedHelpSectionMediaItem
+    let isSelected: Bool
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color(.secondarySystemGroupedBackground))
+
+            if let image = platformImage(named: item.assetName) {
+                Image(platformImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 148, height: 104)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            } else {
+                VStack(spacing: 6) {
+                    Image(systemName: "photo")
+                        .font(.headline)
+                    Text("Import: \(item.assetName)")
+                        .font(.caption2)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                }
+                .foregroundStyle(.secondary)
+                .padding(8)
+            }
+        }
+        .frame(width: 152, height: 108)
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(
+                    isSelected ? Color.accentColor : Color.primary.opacity(0.15),
+                    lineWidth: isSelected ? 2 : 1
+                )
+        )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(Text(item.assetName))
+    }
+}
+
+private struct HelpSectionBodyCard: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(.body)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(12)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color(.secondarySystemGroupedBackground))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+            )
+    }
+}
+
+// MARK: - Fullscreen Media
+
+private struct HelpSectionFullscreenViewer: View {
+    let topicTitle: String
+    let presentation: HelpFullscreenPresentation
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var selectedMediaID: String
+
+    init(topicTitle: String, presentation: HelpFullscreenPresentation) {
+        self.topicTitle = topicTitle
+        self.presentation = presentation
+        _selectedMediaID = State(initialValue: presentation.selectedMediaID)
+    }
+
+    private var selectedItem: GeneratedHelpSectionMediaItem? {
+        presentation.mediaItems.first(where: { $0.id == selectedMediaID }) ?? presentation.mediaItems.first
+    }
+
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                header
+
+                TabView(selection: $selectedMediaID) {
+                    ForEach(presentation.mediaItems) { item in
+                        HelpZoomableImage(assetName: item.assetName)
+                            .tag(item.id)
+                            .padding(.horizontal)
+                            .padding(.bottom, 12)
+                    }
+                }
+                .tabViewStyle(.page(indexDisplayMode: .automatic))
+
+                if let selectedItem {
+                    Text(selectedItem.bodyText)
+                        .font(.body)
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(16)
+                        .background(Color.black.opacity(0.62))
+                }
+            }
+        }
+        .gesture(
+            DragGesture(minimumDistance: 20)
+                .onEnded { value in
+                    if value.translation.height > 120 {
+                        dismiss()
+                    }
+                }
+        )
+    }
+
+    private var header: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(topicTitle)
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.75))
+                Text(presentation.sectionTitle)
+                    .font(.headline)
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+            }
+
+            Spacer()
+
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.title3)
+                    .foregroundStyle(.white.opacity(0.9))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Text("Close"))
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 14)
+        .padding(.bottom, 10)
+    }
+}
+
+private struct HelpZoomableImage: View {
+    let assetName: String
+
+    @State private var scale: CGFloat = 1
+    @State private var lastScale: CGFloat = 1
+    @State private var offset: CGSize = .zero
+    @State private var lastOffset: CGSize = .zero
+
+    var body: some View {
+        Group {
+            if let image = platformImage(named: assetName) {
+                Image(platformImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .scaleEffect(scale)
+                    .offset(offset)
+                    .contentShape(Rectangle())
+                    .onTapGesture(count: 2) {
+                        toggleZoom()
+                    }
+                    .gesture(magnifyAndPanGesture)
+            } else {
+                VStack(spacing: 10) {
+                    Image(systemName: "photo")
+                        .font(.title)
+                    Text("Missing asset")
+                        .font(.headline)
+                    Text("Import: \(assetName)")
+                        .font(.caption)
+                        .multilineTextAlignment(.center)
+                }
+                .foregroundStyle(.white.opacity(0.8))
+                .padding()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .fill(Color.white.opacity(0.08))
+                )
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var magnifyAndPanGesture: some Gesture {
+        SimultaneousGesture(
+            MagnificationGesture()
+                .onChanged { value in
+                    let updatedScale = max(1, min(lastScale * value, 4))
+                    scale = updatedScale
+                }
+                .onEnded { _ in
+                    lastScale = scale
+
+                    if scale <= 1.01 {
+                        resetPan()
+                    }
+                },
+            DragGesture(minimumDistance: 0)
+                .onChanged { value in
+                    guard scale > 1 else { return }
+
+                    offset = CGSize(
+                        width: lastOffset.width + value.translation.width,
+                        height: lastOffset.height + value.translation.height
+                    )
+                }
+                .onEnded { _ in
+                    if scale <= 1.01 {
+                        resetPan()
+                    } else {
+                        lastOffset = offset
+                    }
+                }
+        )
+    }
+
+    private func toggleZoom() {
+        withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
+            if scale > 1.01 {
+                scale = 1
+                lastScale = 1
+                resetPan()
+            } else {
+                scale = 2
+                lastScale = 2
+            }
+        }
+    }
+
+    private func resetPan() {
+        offset = .zero
+        lastOffset = .zero
     }
 }
 
@@ -221,75 +528,6 @@ private struct HelpIconTile: View {
         }
         .frame(width: 28, height: 28)
         .accessibilityHidden(true)
-    }
-}
-
-// MARK: - Screenshot Loader
-
-private struct HelpScreenshotPlaceholder: View {
-    enum Style {
-        case hero
-        case mini
-    }
-
-    let topic: GeneratedHelpLeafTopic
-    let slot: Int
-    let style: Style
-
-    private var assetName: String {
-        if let assetPrefix = topic.assetPrefix {
-            return "\(assetPrefix)-\(slot)"
-        }
-
-        let fallbackTitle = topic.title.replacingOccurrences(of: " ", with: "")
-        return "Help-\(fallbackTitle)-\(slot)"
-    }
-
-    var body: some View {
-        if let image = platformImage(named: assetName) {
-            Image(platformImage: image)
-                .resizable()
-                .scaledToFit()
-                .frame(maxWidth: style == .hero ? .infinity : 420, alignment: .leading)
-                .clipShape(
-                    RoundedRectangle(
-                        cornerRadius: style == .hero ? 26 : 14,
-                        style: .continuous
-                    )
-                )
-                .overlay(
-                    RoundedRectangle(
-                        cornerRadius: style == .hero ? 26 : 14,
-                        style: .continuous
-                    )
-                        .stroke(Color.primary.opacity(0.18), lineWidth: 1)
-                )
-        } else {
-            ZStack {
-                RoundedRectangle(
-                    cornerRadius: style == .hero ? 26 : 14,
-                    style: .continuous
-                )
-                    .fill(Color.primary.opacity(0.04))
-                RoundedRectangle(
-                    cornerRadius: style == .hero ? 26 : 14,
-                    style: .continuous
-                )
-                    .stroke(Color.primary.opacity(0.18), lineWidth: 1)
-
-                VStack(spacing: 6) {
-                    Image(systemName: "photo")
-                        .font(.system(size: style == .hero ? 22 : 18, weight: .regular))
-                    Text("\(topic.title) Screenshot \(slot)")
-                        .font(.subheadline.weight(.semibold))
-                    Text("Add asset: \(assetName)")
-                        .font(.caption)
-                }
-                .foregroundStyle(.secondary)
-                .padding(.vertical, 18)
-            }
-            .frame(maxWidth: style == .hero ? .infinity : 420, alignment: .leading)
-        }
     }
 }
 

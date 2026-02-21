@@ -34,6 +34,12 @@ struct GeneratedHelpLine: Hashable {
     let value: String
 }
 
+struct GeneratedHelpSectionMediaItem: Identifiable, Hashable {
+    let id: String
+    let assetName: String
+    let bodyText: String
+}
+
 struct GeneratedHelpSection: Identifiable, Hashable {
     let id: String
     let header: String?
@@ -55,12 +61,65 @@ struct GeneratedHelpLeafTopic: Identifiable, Hashable {
                 parts.append(header)
             }
 
-            for line in section.lines {
-                parts.append(line.value)
+            for mediaItem in mediaItems(for: section) {
+                parts.append(mediaItem.bodyText)
             }
         }
 
         return parts.joined(separator: " ")
+    }
+
+    // MARK: - Section Media
+
+    // I keep two media slots per section so I can swap screenshots in Assets.xcassets later.
+    func mediaItems(for section: GeneratedHelpSection) -> [GeneratedHelpSectionMediaItem] {
+        let sectionBodyText = section.condensedBodyText
+        var items: [GeneratedHelpSectionMediaItem] = []
+
+        for slot in section.screenshotSlots.prefix(2) {
+            items.append(
+                GeneratedHelpSectionMediaItem(
+                    id: "\(section.id)-media-\(items.count + 1)",
+                    assetName: screenshotAssetName(slot: slot),
+                    bodyText: sectionBodyText
+                )
+            )
+        }
+
+        while items.count < 2 {
+            let placeholderSlot = items.count + 1
+            items.append(
+                GeneratedHelpSectionMediaItem(
+                    id: "\(section.id)-media-\(placeholderSlot)",
+                    assetName: section.placeholderAssetName(slot: placeholderSlot),
+                    bodyText: sectionBodyText
+                )
+            )
+        }
+
+        return items
+    }
+
+    // MARK: - Screenshot Import Guide
+
+    // I name section placeholders as Help-<section-id>-1 and Help-<section-id>-2 in Assets.xcassets.
+    var sectionImportAssetNames: [String: [String]] {
+        var mapping: [String: [String]] = [:]
+
+        for section in sections {
+            mapping[section.id] = mediaItems(for: section).map(\.assetName)
+        }
+
+        return mapping
+    }
+
+    private func screenshotAssetName(slot: Int) -> String {
+        if let assetPrefix = assetPrefix {
+            return "\(assetPrefix)-\(slot)"
+        }
+
+        let fallbackTitle = title.replacingOccurrences(of: " ", with: "")
+        return "Help-\(fallbackTitle)-\(slot)"
     }
 }
 
@@ -972,5 +1031,40 @@ enum GeneratedHelpContent {
 
     static func leafTopics(for destination: GeneratedHelpDestination) -> [GeneratedHelpLeafTopic] {
         destination.leafTopicIDs.compactMap { leafTopicsByID[$0] }
+    }
+}
+
+private extension GeneratedHelpSection {
+    var screenshotSlots: [Int] {
+        lines.compactMap { line in
+            switch line.kind {
+            case .heroScreenshot, .miniScreenshot:
+                return Int(line.value)
+            case .text, .bullet:
+                return nil
+            }
+        }
+    }
+
+    var condensedBodyText: String {
+        let content = lines.compactMap { line -> String? in
+            switch line.kind {
+            case .text, .bullet:
+                return line.value.trimmingCharacters(in: .whitespacesAndNewlines)
+            case .heroScreenshot, .miniScreenshot:
+                return nil
+            }
+        }
+        .filter { $0.isEmpty == false }
+
+        if content.isEmpty {
+            return "Replace this placeholder with concise help text for this section."
+        }
+
+        return content.joined(separator: " ")
+    }
+
+    func placeholderAssetName(slot: Int) -> String {
+        "Help-\(id)-\(slot)"
     }
 }
