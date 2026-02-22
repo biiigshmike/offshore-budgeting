@@ -15,7 +15,6 @@ struct IncomeView: View {
 
     @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
     @AppStorage(AppShortcutNavigationStore.pendingActionKey) private var pendingShortcutActionRaw: String = ""
-    @AppStorage(AppShortcutNavigationStore.pendingImportClipboardTextKey) private var pendingImportClipboardText: String = ""
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.appCommandHub) private var commandHub
@@ -71,7 +70,6 @@ struct IncomeView: View {
 
     @State private var addIncomeSheet: AddIncomeSheet? = nil
     @State private var showingImportIncomeSheet: Bool = false
-    @State private var shortcutImportClipboardText: String? = nil
 
     @State private var showingEditIncome: Bool = false
     @State private var editingIncome: Income? = nil
@@ -407,7 +405,7 @@ struct IncomeView: View {
                 NavigationStack {
                     ExpenseCSVImportFlowView(
                         workspace: workspace,
-                        initialClipboardText: shortcutImportClipboardText
+                        initialClipboardText: nil
                     )
                 }
             }
@@ -554,16 +552,11 @@ struct IncomeView: View {
         let pending = pendingShortcutActionRaw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !pending.isEmpty else { return }
 
-        if pending == AppShortcutNavigationStore.PendingAction.openIncomeImportReview.rawValue {
-            let clipboard = pendingImportClipboardText.trimmingCharacters(in: .whitespacesAndNewlines)
-            shortcutImportClipboardText = clipboard.isEmpty ? nil : clipboard
-            showingImportIncomeSheet = true
-        } else if pending == AppShortcutNavigationStore.PendingAction.openQuickAddIncome.rawValue {
+        if pending == AppShortcutNavigationStore.PendingAction.openQuickAddIncome.rawValue {
             addIncomeSheet = AddIncomeSheet(initialDate: selectedDayStart, initialIsPlanned: false)
         }
 
         pendingShortcutActionRaw = ""
-        pendingImportClipboardText = ""
     }
 }
 

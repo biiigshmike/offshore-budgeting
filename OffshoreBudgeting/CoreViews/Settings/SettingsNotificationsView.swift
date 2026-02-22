@@ -174,23 +174,23 @@ struct SettingsNotificationsView: View {
                 }
             }
 
-            #if DEBUG
-            Section("Debug") {
-                Button("Print Notification Previews to Console") {
-                    Task {
-                        let lines = await notificationService.debugPendingRequestLines()
-                        print("---- Notification Previews (\(lines.count)) ----")
-                        for line in lines {
-                            print(line)
-                        }
-                    }
-                }
-
-                Text("This prints what each scheduled notification will look like (next date + title + body).")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-            #endif
+//            #if DEBUG
+//            Section("Debug") {
+//                Button("Print Notification Previews to Console") {
+//                    Task {
+//                        let lines = await notificationService.debugPendingRequestLines()
+//                        print("---- Notification Previews (\(lines.count)) ----")
+//                        for line in lines {
+//                            print(line)
+//                        }
+//                    }
+//                }
+//
+//                Text("This prints what each scheduled notification will look like (next date + title + body).")
+//                    .font(.footnote)
+//                    .foregroundStyle(.secondary)
+//            }
+//            #endif
         }
         .listStyle(.insetGrouped)
         .navigationTitle("Notifications")
