@@ -49,29 +49,38 @@ enum ShortcutLinkCatalog {
         ShortcutLinkItem(
             id: "tap-apple-card",
             title: "Add Expense From Tap To Pay",
-            subtitle: "Install this shortcut, then run it from your Wallet tap automation.",
+            subtitle: "Install this shortcut, then run it from your Wallet pass or payment card automation.",
             systemImageName: "wallet.bifold",
-            url: URL(string: "https://www.icloud.com/shortcuts/e6b198dbd3794e6988cb93bd87eba0b6")!,
+            url: URL(string: "https://www.icloud.com/shortcuts/489287c73246442086c7c8cb2d77ac4a")!,
             platformNote: "Supported on: iPhone",
-            setupInstructions: "Create your trigger automation, then add Get Text from Shortcut Input and Run Shortcut."
+            setupInstructions: "When I tap any Wallet pass or payment card -> Run Immediately -> Create New Shortcut -> Search for \"Run Shortcut\" -> Add Expense From Tap To Pay -> Down Arrow -> Input: Choose Variable -> Shortcut Input -> Save."
         ),
         ShortcutLinkItem(
-            id: "sms-credited",
-            title: "Add Income From An SMS Message",
-            subtitle: "Install this shortcut, then run it from your message automation.",
-            systemImageName: "message.fill",
-            url: URL(string: "https://www.icloud.com/shortcuts/a8490bc9431c40c3aae04d4050cdf690")!,
+            id: "amazon-ordered",
+            title: "Add Amazon Expense From Amazon.com",
+            subtitle: "Install this shortcut, then run it from your Amazon confirmation email automation.",
+            systemImageName: "cart.fill",
+            url: URL(string: "https://www.icloud.com/shortcuts/23a32d53deb741d3a75bbc17f83809f1")!,
             platformNote: "Supported on: iPhone, iPad, and Mac",
-            setupInstructions: "Create your trigger automation, then add Get Text from Shortcut Input and Run Shortcut."
+            setupInstructions: "When I get an email subject contains \"Ordered:\" from auto-confirm@amazon.com -> Run Immediately -> Create New Shortcut -> Search for \"Run Shortcut\" -> Add Amazon Expense From Amazon.com -> Down Arrow -> Input: Choose Variable -> Shortcut Input -> Save."
         ),
         ShortcutLinkItem(
             id: "email-credited",
             title: "Add Income From An Email",
             subtitle: "Install this shortcut, then run it from your email automation.",
             systemImageName: "envelope.fill",
-            url: URL(string: "https://www.icloud.com/shortcuts/dfdb203b9b7a48439319009e9c0e364b")!,
+            url: URL(string: "https://www.icloud.com/shortcuts/791f1d8f99634215a7fdb71f5a606fe6")!,
             platformNote: "Supported on: iPhone, iPad, and Mac",
-            setupInstructions: "Create your trigger automation, then add Get Text from Shortcut Input and Run Shortcut."
+            setupInstructions: "When I get an email subject contains \"credited to your account\" -> Run Immediately -> Create New Shortcut -> Search for \"Run Shortcut\" -> Add Income From An Email -> Down Arrow -> Input: Choose Variable -> Shortcut Input -> Save."
+        ),
+        ShortcutLinkItem(
+            id: "sms-credited",
+            title: "Add Income From An SMS Message",
+            subtitle: "Install this shortcut, then run it from your message automation.",
+            systemImageName: "message.fill",
+            url: URL(string: "https://www.icloud.com/shortcuts/6ebb3d15fa444f9e9b880907cbb5978a")!,
+            platformNote: "Supported on: iPhone, iPad, and Mac",
+            setupInstructions: "When message contains \"credited to your account ending in x1234\" -> Run Immediately -> Create New Shortcut -> Search for \"Run Shortcut\" -> Add Income From An SMS Message -> Down Arrow -> Input: Choose Variable -> Shortcut Input -> Save."
         )
     ]
 }

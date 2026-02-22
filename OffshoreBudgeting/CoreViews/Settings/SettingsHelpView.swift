@@ -151,11 +151,6 @@ struct HelpTopicDetailView: View {
 
                     ForEach(currentTopic.sections) { section in
                         sectionContent(section)
-
-                        if section.id != currentTopic.sections.last?.id {
-                            Divider()
-                                .padding(.top, 4)
-                        }
                     }
                 }
                 .padding()
@@ -188,15 +183,17 @@ struct HelpTopicDetailView: View {
     @ViewBuilder
     private func sectionContent(_ section: GeneratedHelpSection) -> some View {
         let mediaItems = currentTopic.mediaItems(for: section)
+        let selectedItem = selectedMediaItem(for: section, from: mediaItems)
+        let sectionTitle = selectedItem?.displayTitle ?? section.header
 
-        if let header = section.header {
+        if let header = sectionTitle {
             Text(header)
                 .font(.title3.weight(.semibold))
         }
 
         if mediaItems.isEmpty {
             HelpSectionBodyCard(text: section.bodyText)
-        } else if let selectedItem = selectedMediaItem(for: section, from: mediaItems) {
+        } else if let selectedItem {
             HelpSectionMediaStrip(
                 mediaItems: mediaItems,
                 selectedMediaID: selectedItem.id
@@ -260,6 +257,22 @@ private struct HelpTopicPagerBar: View {
     let onBack: () -> Void
     let onNext: () -> Void
 
+    private var isBackEnabled: Bool {
+        previousTitle != nil
+    }
+
+    private var isNextEnabled: Bool {
+        nextTitle != nil
+    }
+
+    private var backTint: Color {
+        isBackEnabled ? Color("OffshoreDepth") : Color("OffshoreWave")
+    }
+
+    private var nextTint: Color {
+        isNextEnabled ? Color("AccentColor") : Color("OffshoreWave")
+    }
+
     private var previousDisplayTitle: String {
         previousTitle ?? "Start of Section"
     }
@@ -273,39 +286,59 @@ private struct HelpTopicPagerBar: View {
             Divider()
 
             HStack(spacing: 10) {
-                Button(action: onBack) {
+                styledPagerButton(
+                    action: onBack,
+                    isEnabled: isBackEnabled,
+                    tint: backTint
+                ) {
                     VStack(spacing: 3) {
                         Text("Back")
                             .font(.footnote.weight(.semibold))
-                            .foregroundStyle(.secondary)
                         Text(previousDisplayTitle)
                             .font(.body.weight(.semibold))
                             .lineLimit(1)
                     }
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: .infinity, alignment: .center)
                 }
-                .buttonStyle(.bordered)
-                .disabled(previousTitle == nil)
 
-                Button(action: onNext) {
+                styledPagerButton(
+                    action: onNext,
+                    isEnabled: isNextEnabled,
+                    tint: nextTint
+                ) {
                     VStack(spacing: 3) {
                         Text("Next")
                             .font(.footnote.weight(.semibold))
-                            .foregroundStyle(.secondary)
                         Text(nextDisplayTitle)
                             .font(.body.weight(.semibold))
                             .lineLimit(1)
                     }
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: .infinity, alignment: .center)
                 }
-                .buttonStyle(.borderedProminent)
-                .disabled(nextTitle == nil)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
             .background(.ultraThinMaterial)
+        }
+    }
+
+    @ViewBuilder
+    private func styledPagerButton<Label: View>(
+        action: @escaping () -> Void,
+        isEnabled: Bool,
+        tint: Color,
+        @ViewBuilder label: () -> Label
+    ) -> some View {
+        let button = Button(action: action) {
+            label()
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity, alignment: .center)
+        }
+        .tint(tint)
+        .disabled(!isEnabled)
+
+        if #available(iOS 26.0, macCatalyst 26.0, *) {
+            button.buttonStyle(.glassProminent)
+        } else {
+            button.buttonStyle(.borderedProminent)
         }
     }
 }
@@ -348,17 +381,39 @@ private struct HelpSectionThumbnail: View {
     let item: GeneratedHelpSectionMediaItem
     let isSelected: Bool
 
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    private var thumbnailSize: CGSize {
+        #if targetEnvironment(macCatalyst)
+        return CGSize(width: 200, height: 140)
+        #else
+        if horizontalSizeClass == .regular {
+            return CGSize(width: 200, height: 140)
+        }
+        return CGSize(width: 176, height: 124)
+        #endif
+    }
+
+    private var imageSize: CGSize {
+        CGSize(width: thumbnailSize.width - 4, height: thumbnailSize.height - 4)
+    }
+
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(Color(.secondarySystemGroupedBackground))
 
             if let image = platformImage(named: item.assetName) {
-                Image(platformImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 148, height: 104)
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color(.tertiarySystemGroupedBackground))
+                    .frame(width: imageSize.width, height: imageSize.height)
+                    .overlay {
+                        Image(platformImage: image)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: imageSize.width, height: imageSize.height)
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
             } else {
                 VStack(spacing: 6) {
                     Image(systemName: "photo")
@@ -372,13 +427,19 @@ private struct HelpSectionThumbnail: View {
                 .padding(8)
             }
         }
-        .frame(width: 152, height: 108)
+        .frame(width: thumbnailSize.width, height: thumbnailSize.height)
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(
                     isSelected ? Color.accentColor : Color.primary.opacity(0.15),
-                    lineWidth: isSelected ? 2 : 1
+                    lineWidth: isSelected ? 2.5 : 1
                 )
+        )
+        .shadow(
+            color: isSelected ? Color.accentColor.opacity(0.25) : .clear,
+            radius: isSelected ? 8 : 0,
+            x: 0,
+            y: isSelected ? 2 : 0
         )
         .accessibilityElement(children: .combine)
         .accessibilityLabel(Text(item.assetName))

@@ -119,7 +119,6 @@ struct QuickActionsInstallView: View {
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
-                    
                 }
                 
                 Spacer(minLength: 8)

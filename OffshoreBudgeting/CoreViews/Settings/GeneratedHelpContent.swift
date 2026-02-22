@@ -25,6 +25,7 @@ enum GeneratedHelpIconStyle: String {
 struct GeneratedHelpSectionMediaItem: Identifiable, Hashable {
     let id: String
     let assetName: String
+    let displayTitle: String?
     let bodyText: String
     let fullscreenCaptionText: String?
 }
@@ -51,6 +52,7 @@ struct GeneratedHelpLeafTopic: Identifiable, Hashable {
             }
 
             parts.append(section.bodyText)
+            parts.append(contentsOf: section.mediaItems.compactMap(\.displayTitle))
             parts.append(contentsOf: section.mediaItems.map(\.bodyText))
             parts.append(contentsOf: section.mediaItems.compactMap(\.fullscreenCaptionText))
         }
@@ -185,27 +187,27 @@ enum GeneratedHelpContent {
                 textSection(
                     id: "introduction-building-blocks-1",
                     header: "What This Includes",
-                    body: "Offshore is organized into a few core parts that work together: Accounts (cards and reconciliations), Income, Budgets, and Settings tools like Categories and Presets. Each part has a focused job so you can understand where money came from, where it went, and how that compares to your plan. Learning these building blocks first makes every other screen easier to use."
+                    body: "Offshore is organized into core functions that work together instead of competing for your attention. Accounts includes Cards, Reconciliations, and a dedicated workspace Savings Account. Income is split into planned and actual inflows, while Budgets gives you the lens that compares what you expected against what really happened.\n\nEach area has one clear job so you always know where to go: where money is being spent, what income is expected, what income has landed, and what your savings direction looks like in the current period. Settings supports all of this with defaults and tools like Categories, Presets, and workspace-level behavior. Once these building blocks click, every other screen feels much more natural."
                 ),
                 textSection(
                     id: "introduction-building-blocks-2",
                     header: "Where To Find Everything",
-                    body: "Use the main navigation to open Home, Budgets, Income, Accounts, and Settings. Home gives you a summary, while the other screens are where entries are created and managed. If you are unsure where to edit something, start from the screen that owns that type of record."
+                    body: "Use the main navigation to open Home, Budgets, Income, Accounts, and Settings. Home is your one-screen summary of what needs attention, while the other screens are where records are created, edited, and verified.\n\nIf you are ever unsure where to make a change, start from the screen that owns that record type. Budgets owns budget cycles and expense planning, Income owns inflows, Accounts owns card and reconciliation workflows, and Settings owns long-term configuration. That one rule will save you a lot of backtracking."
                 ),
                 textSection(
                     id: "introduction-building-blocks-3",
                     header: "Basic Workflow",
-                    body: "Create or open a budget period first, then add planned items and track actual activity as it happens. Use Income for pay and inflows, Accounts for card-linked spending context, and Categories for clean reporting. This pattern gives you a predictable routine each period."
+                    body: "Start by creating or opening the budget period you are working in. During setup, decide which cards and presets belong to that cycle, then add planned items that make the period realistic from day one.\n\nAs the period unfolds, log variable spending and track income in Income as deposits arrive. If your income is predictable, recurring entries can reduce repetitive work. Keep categories clear and meaningful so your trends stay readable as history grows."
                 ),
                 textSection(
                     id: "introduction-building-blocks-4",
                     header: "Verify Your Setup",
-                    body: "After entering data, check Home and the relevant detail screen to confirm totals moved the way you expected. If the change is visible in both places, your records are aligned. This quick check prevents confusion later when comparing planned versus actual."
+                    body: "After you enter data, do a quick verification pass before moving on. Check Home first, then check the destination screen that owns the records you just changed.\n\nIf both views moved in the way you expected, your setup is aligned and you can continue with confidence. This short habit prevents most of the confusion that appears later during planned-versus-actual reviews."
                 ),
                 textSection(
                     id: "introduction-building-blocks-5",
                     header: "Building Block Pitfalls",
-                    body: "The most common issue is mixing concepts, like treating planned values as already-spent money or creating categories that overlap too much. Keep names clear and consistent, and use each screen for its intended purpose. A little structure early will keep reports readable as your history grows."
+                    body: "The most common issue is mixing concepts, especially treating planned values like money that has already moved. Planned values still represent intent, so read savings metrics with that context in mind.\n\nAnother common issue is category overlap or unclear naming. Keep names consistent, use each screen for its intended purpose, and keep your workspace structure simple early on. A little structure now goes a long way as your history grows."
                 )
             ]
         ),
@@ -217,27 +219,27 @@ enum GeneratedHelpContent {
                 textSection(
                     id: "introduction-planned-expenses-1",
                     header: "What Planned Expenses Mean",
-                    body: "Planned expenses are expected costs you want in the budget before money is actually spent. They help you forecast recurring obligations like rent, subscriptions, utilities, and known bills. Think of them as your financial intention for the period."
+                    body: "Planned expenses are expected costs you want visible before money is actually spent. They represent your intention for the period and give your budget structure early, before real transactions start rolling in.\n\nUse planned expenses for recurring or predictable obligations such as rent, subscriptions, utilities, and similar fixed commitments. When planned values are clear, your savings outlook becomes much easier to trust."
                 ),
                 textSection(
                     id: "introduction-planned-expenses-2",
                     header: "Where To Add Them",
-                    body: "Open the budget period you are working in and use the expense add flow to create planned entries. You can also rely on presets for recurring items so setup is faster and more consistent. Staying inside the correct budget period keeps planned totals scoped correctly."
+                    body: "Add planned expenses from the budget period you are actively managing so totals remain scoped to the right cycle. Staying inside the correct period avoids silent crossover issues that can make math look wrong later.\n\nFor recurring items, use presets whenever possible. Presets speed up setup, reduce manual mistakes, and keep naming and category behavior consistent from one period to the next."
                 ),
                 textSection(
                     id: "introduction-planned-expenses-3",
                     header: "How To Use Them Day To Day",
-                    body: "Add planned expenses early in the period, then review them as real charges happen. If the final charge differs, record the actual outcome so planned versus actual stays meaningful. This turns your budget into a live plan instead of a static list."
+                    body: "Add planned expenses early in the period so your numbers start from a realistic baseline. As real charges happen, compare those charges to the plan and keep records updated.\n\nIf the final amount changes, record the actual outcome and let planned-versus-actual do its job. That keeps your budget alive and useful instead of turning into a static list that no longer reflects reality."
                 ),
                 textSection(
                     id: "introduction-planned-expenses-4",
                     header: "Verify They Are Working",
-                    body: "Check that the budget reflects planned totals before you begin logging variable or actual spending. As actuals are recorded, confirm comparisons still make sense and highlight real differences. This gives you a clear signal when you are drifting from plan."
+                    body: "Before heavy day-to-day tracking begins, confirm your planned totals look right in the active budget. This gives you a stable reference point for the rest of the period.\n\nAs actual entries come in, verify that comparisons still make sense and are highlighting true differences. Good verification here gives you early warning when spending starts drifting from your original plan."
                 ),
                 textSection(
                     id: "introduction-planned-expenses-5",
                     header: "Planned Expense Pitfalls",
-                    body: "Avoid duplicating the same recurring bill across presets and manual entries, which can overstate your plan. Keep naming and category mapping consistent so reviews are easy to interpret. If a planned amount changes often, update the source template so future periods stay accurate."
+                    body: "Avoid duplicating recurring bills across presets and manual entries, because duplicates can quietly overstate your period. If a planned amount changes often, update the preset source so future cycles stay accurate.\n\nKeep category mapping and naming consistent. When labels drift, reviews get noisy and it becomes harder to spot real behavior changes."
                 )
             ]
         ),
@@ -249,27 +251,27 @@ enum GeneratedHelpContent {
                 textSection(
                     id: "introduction-variable-expenses-1",
                     header: "What Variable Expenses Mean",
-                    body: "Variable expenses are unplanned or flexible purchases that happen as real spending in the period. They usually include categories like dining, fuel, shopping, and one-off costs. These entries reflect what already happened, not what you expected to happen."
+                    body: "Variable expenses are flexible or less predictable purchases that happen in real time during the period. These are usually your day-to-day categories, like dining, fuel, shopping, entertainment, and one-off needs.\n\nUnlike planned expenses, variable entries describe what already happened. They are your lived spending behavior, and they give the most honest signal about where your budget pressure is building."
                 ),
                 textSection(
                     id: "introduction-variable-expenses-2",
                     header: "Where To Record Them",
-                    body: "Log variable expenses from the appropriate expense entry flow in your active budget context. Assign category and related account details carefully so later filtering is useful. Clean inputs here directly improve every downstream summary."
+                    body: "Record variable expenses in the active budget context so entries land in the correct period and comparisons stay meaningful. Keeping the right context from the start prevents avoidable cleanup work.\n\nAssign category, amount, date, and account details with care. Clean entry data now directly improves every filter, report, and trend you rely on later."
                 ),
                 textSection(
                     id: "introduction-variable-expenses-3",
                     header: "How To Use Them In Workflow",
-                    body: "Record variable spending as soon as possible after purchase so your budget stays current. Use short, consistent naming and accurate amounts so trend views remain trustworthy. Frequent small entries are better than waiting and batch-entering from memory."
+                    body: "Try to log variable spending close to when it happens so your budget stays current and useful. Small, consistent updates are easier to trust than delayed batch entry from memory.\n\nUse clear naming and accurate amounts so trend views stay reliable over time. Fast capture with clean details gives you both speed and quality."
                 ),
                 textSection(
                     id: "introduction-variable-expenses-4",
                     header: "Verify Your Tracking",
-                    body: "After saving, confirm the entry appears in the expected budget and updates relevant totals. Then check category-level views to make sure the expense landed in the right bucket. Quick verification catches miscategorized spending before it compounds."
+                    body: "After each save, confirm the expense appears in the expected budget and moves totals in the direction you anticipated. A quick check immediately after entry catches mistakes while context is still fresh.\n\nThen verify category placement so spending is landing in the right bucket. This keeps category trends clean and prevents misclassification from compounding over time."
                 ),
                 textSection(
                     id: "introduction-variable-expenses-5",
                     header: "Variable Expense Pitfalls",
-                    body: "Avoid broad category labels that hide useful detail, especially for frequent variable spending. Also avoid delaying entry for too long, which can make end-of-period totals feel surprising. Capture consistently and your spending patterns become much easier to manage."
+                    body: "Avoid broad category labels that hide useful detail, especially in high-frequency variable spending areas. Clear categories make it easier to understand what is actually driving pressure.\n\nAlso avoid delaying entries too long. Delayed capture usually turns into surprise totals at period close, while steady capture keeps you in control all cycle long."
                 )
             ]
         ),
@@ -281,27 +283,27 @@ enum GeneratedHelpContent {
                 textSection(
                     id: "introduction-planned-income-1",
                     header: "What Planned Income Means",
-                    body: "Planned income is the amount you expect to receive during a period before deposits arrive. It powers forecasts, including whether your budgeted plan appears sustainable. This gives you early visibility before real cash flow is finalized."
+                    body: "Planned income is what you expect to receive before deposits actually land. It gives your budget a forward-looking baseline and helps you decide whether the period plan is realistic.\n\nThis is one of the most important setup inputs because it shapes early savings expectations. Strong planned income data gives you better decisions before the month gets busy."
                 ),
                 textSection(
                     id: "introduction-planned-income-2",
                     header: "Where To Enter It",
-                    body: "Open Income and create planned entries for each expected inflow in the active timeframe. Keep names clear enough to distinguish paycheck-like entries from irregular income. Clear labeling makes planned versus actual review much easier later."
+                    body: "Enter planned income in Income for the same timeframe as your active budget period. Keep each source clearly labeled so you can quickly distinguish predictable pay from irregular inflows.\n\nClear naming now makes planned-versus-actual review much easier later. It also helps you identify which income source changed when a variance appears."
                 ),
                 textSection(
                     id: "introduction-planned-income-3",
                     header: "How To Use It In Workflow",
-                    body: "Start each period by entering expected income so savings outlook and budget pressure are realistic. As dates pass, compare the plan against what was actually received. This gives you time to adjust spending if income arrives lower or later than expected."
+                    body: "At the beginning of each cycle, enter expected income so your savings outlook starts from realistic assumptions. Then, as dates pass, compare plan versus actual and update as needed.\n\nIf inflow timing shifts or amounts come in lower, adjust spending priorities early instead of waiting for period close. Early adjustments are almost always easier than late corrections."
                 ),
                 textSection(
                     id: "introduction-planned-income-4",
                     header: "Verify Forecast Quality",
-                    body: "Check Home and Income views to confirm planned totals match your expected period cash flow. If numbers look off, review duplicate entries and date alignment first. Accurate planned income improves every forward-looking metric."
+                    body: "Review Home and Income together to make sure planned totals reflect your true expected cash flow. If a number looks off, first check period dates and duplicate entries.\n\nWhen planned income is clean, every forecast in the app becomes more trustworthy. This is a small verification step with a big downstream payoff."
                 ),
                 textSection(
                     id: "introduction-planned-income-5",
                     header: "Planned Income Pitfalls",
-                    body: "Do not treat planned income as guaranteed money in daily decision-making. Keep uncertain income clearly separated and update plans when expectations change. A realistic plan is more valuable than an optimistic one."
+                    body: "Do not treat planned income like guaranteed cash that is already available. Keep uncertain sources clearly separated and update expectations when reality changes.\n\nA realistic plan is always more helpful than an optimistic one. Accuracy gives you control, while optimism without verification can create avoidable pressure."
                 )
             ]
         ),
@@ -313,27 +315,27 @@ enum GeneratedHelpContent {
                 textSection(
                     id: "introduction-actual-income-1",
                     header: "What Actual Income Means",
-                    body: "Actual income is money that has already been received and is available in real cash flow totals. It is the grounding layer for what truly happened this period. Use it as the source of truth when comparing against planned income."
+                    body: "Actual income is money that has already landed and is available in real cash flow. It is your source of truth for what happened in this period, not what you hoped would happen.\n\nWhen planned and actual diverge, actual income should guide decisions first. It keeps budgeting grounded in reality."
                 ),
                 textSection(
                     id: "introduction-actual-income-2",
                     header: "Where To Record It",
-                    body: "Record actual income in the Income area using the add flow that matches how you track deposits. Include accurate amount and date so period comparisons remain trustworthy. Good entry timing keeps your dashboard aligned with reality."
+                    body: "Record actual income in Income using the flow that matches how you track deposits. Capture accurate amount and date so the entry lands in the right period and comparisons stay trustworthy.\n\nTimely recording matters. The faster you log landed income, the more reliable Home and budget guidance becomes."
                 ),
                 textSection(
                     id: "introduction-actual-income-3",
                     header: "How To Use It In Workflow",
-                    body: "Log income soon after a deposit clears, then review planned versus actual differences. Use those differences to decide whether spending should be tightened or if you can safely allocate extra. This closes the loop between expectation and outcome."
+                    body: "Log deposits shortly after they clear, then compare planned versus actual while the context is still fresh. This keeps your cycle grounded in current reality.\n\nUse the variance to decide next actions: tighten spending, hold steady, or reallocate surplus. That closes the loop between expectation and outcome in a practical way."
                 ),
                 textSection(
                     id: "introduction-actual-income-4",
                     header: "Verify Totals",
-                    body: "After saving, check Income totals and Home summary cards to confirm values updated as expected. If a number seems inflated, inspect duplicate entries or wrong-period dates first. Consistent validation prevents small data issues from snowballing."
+                    body: "After saving, check Income totals and Home summary cards to confirm values moved as expected. If numbers seem inflated, check for duplicates and wrong-period dates first.\n\nThis lightweight validation keeps small entry issues from snowballing into confusing period summaries."
                 ),
                 textSection(
                     id: "introduction-actual-income-5",
                     header: "Actual Income Pitfalls",
-                    body: "Avoid entering expected deposits as actual before they land, since that can overstate available funds. Also avoid merging unrelated income sources under one vague label. Clear, timely entries make your trend history much more useful."
+                    body: "Avoid entering expected deposits as actual before money lands. Doing that can overstate available funds and make your period look healthier than it really is.\n\nAlso avoid lumping unrelated inflows under vague labels. Clear source naming and timely entry are what make income history truly useful."
                 )
             ]
         ),
@@ -345,27 +347,27 @@ enum GeneratedHelpContent {
                 textSection(
                     id: "introduction-budgets-1",
                     header: "What A Budget Is",
-                    body: "A budget is the time window Offshore uses to group income, expenses, and savings progress. It defines the period you are measuring, such as monthly or custom ranges. Everything in that range can then be reviewed as one cohesive cycle."
+                    body: "A budget is the period container Offshore uses to group income, expenses, and savings outcomes. It gives you a clear time window so every number is measured in the same context.\n\nWhether you run monthly or custom ranges, the budget period is the frame that keeps analysis clean and decisions consistent."
                 ),
                 textSection(
                     id: "introduction-budgets-2",
                     header: "Where To Create It",
-                    body: "Open Budgets and create a new period with a clear name and start/end dates. Choose a range that matches how you naturally review finances. Consistent cadence makes cross-period comparisons easier."
+                    body: "Create budgets in Budgets with clear names and deliberate start and end dates. Choose a cadence that matches how you naturally review money, so staying consistent feels practical.\n\nConsistent periods make cross-cycle comparison much easier. Irregular ranges can still work, but they require more intentional review."
                 ),
                 textSection(
                     id: "introduction-budgets-3",
                     header: "How To Use It In Workflow",
-                    body: "After creating a budget, add planned entries, record variable spending, and track income for the same window. Return frequently during the period to adjust as new information arrives. A budget works best as an active tool, not a one-time setup."
+                    body: "After creating a budget, load planned items first, then track variable expenses and income inside the same window. Revisit the period frequently so adjustments happen while they can still help.\n\nA budget works best as an active workflow, not a one-time setup task. Short frequent check-ins beat occasional deep corrections."
                 ),
                 textSection(
                     id: "introduction-budgets-4",
                     header: "Verify It Is Healthy",
-                    body: "Review planned versus actual inside the budget and cross-check with Home summaries. If totals do not match expectations, check for missing entries or dates outside the range. This keeps your period review reliable from start to finish."
+                    body: "Review planned versus actual directly in Budgets, then cross-check with Home to confirm alignment. If totals feel off, inspect missing entries and out-of-range dates first.\n\nThis quick health check keeps period math trustworthy from setup through closeout."
                 ),
                 textSection(
                     id: "introduction-budgets-5",
                     header: "Budget Pitfalls",
-                    body: "Avoid overlapping periods unless you intentionally want parallel contexts. Also avoid changing date ranges mid-cycle without reviewing affected totals. Stable ranges produce cleaner history and better trend clarity."
+                    body: "Avoid overlapping periods unless you intentionally want separate parallel contexts. Overlap can make it harder to explain which cycle owns a given result.\n\nAlso avoid changing date ranges mid-cycle without reviewing impacted totals. Stable ranges produce cleaner history and clearer trend comparisons."
                 )
             ]
         ),
@@ -377,27 +379,27 @@ enum GeneratedHelpContent {
                 textSection(
                     id: "introduction-calculations-1",
                     header: "How Calculations Work",
-                    body: "Most totals in Offshore are grouped sums filtered by period, record type, and visibility context. Planned values support forecasting, while actual values represent real outcomes. Reading each total in the right context prevents most confusion."
+                    body: "Most totals in Offshore are grouped sums filtered by period, record type, and view context. That means a number can change based on scope, even when the underlying records did not.\n\nPlanned values support forecasting, while actual values represent what really happened. Reading both in the correct context prevents most interpretation mistakes."
                 ),
                 textSection(
                     id: "introduction-calculations-2",
                     header: "Where Calculations Appear",
-                    body: "You will see calculated totals across Home, Budgets, Income, and related detail views. The same underlying records can surface in different summaries depending on the screen purpose. Use labels on each screen to confirm whether you are viewing planned or actual numbers."
+                    body: "You will see calculations throughout Home, Budgets, Income, Accounts, and detail screens. The same records may appear in different summaries depending on the purpose of that view.\n\nWhen reading any total, use labels and context clues to confirm whether you are looking at planned or actual values. That quick check keeps comparisons meaningful."
                 ),
                 textSection(
                     id: "introduction-calculations-3",
                     header: "How To Read Them In Workflow",
-                    body: "Start with period-level totals, then drill into categories or entry lists when a number looks unexpected. Compare planned and actual side by side instead of in isolation. This approach helps you move from signal to root cause quickly."
+                    body: "Start with period-level totals to identify whether a meaningful shift happened. If something looks off, drill into category or entry-level detail to find the root cause.\n\nCompare planned and actual side by side whenever possible. Looking at one without the other can hide the reason a value moved."
                 ),
                 textSection(
                     id: "introduction-calculations-4",
                     header: "Verify A Number",
-                    body: "When validating a total, confirm date range first, then confirm the included entries in detail views. Check for duplicates, missing records, and wrong classification between planned and actual. This short audit process usually resolves mismatches fast."
+                    body: "When verifying any number, check period range first. Then confirm included entries in detail views so you can see exactly what contributed.\n\nLook for duplicates, missing records, and planned-versus-actual misclassification. This short audit process resolves most mismatches quickly."
                 ),
                 textSection(
                     id: "introduction-calculations-5",
                     header: "Calculation Pitfalls",
-                    body: "Avoid comparing numbers from different periods or different data types without realizing it. Also avoid assuming every summary includes the same filters by default. Always anchor comparisons to the same timeframe and context."
+                    body: "Avoid comparing values from different periods or different data types without realizing it. The numbers may both be correct while still answering different questions.\n\nAlso avoid assuming every summary uses the same filters by default. Anchor comparisons to one timeframe and one context whenever possible."
                 )
             ]
         ),
@@ -409,27 +411,27 @@ enum GeneratedHelpContent {
                 textSection(
                     id: "introduction-import-1",
                     header: "What Import Is For",
-                    body: "Import is designed to speed up entry by bringing in batches of expense or income records, then letting you review them before saving. It reduces repetitive typing while preserving control over final data quality. Use it when manual entry would be slow or error-prone."
+                    body: "Import helps you capture batches of expense or income records faster than manual entry. It is built for speed, but still gives you a review step so quality stays in your control.\n\nUse import when repetitive typing would slow you down or increase mistakes. A clean import workflow saves time without sacrificing data trust."
                 ),
                 textSection(
                     id: "introduction-import-2",
                     header: "Where To Start Import",
-                    body: "Open the relevant import flow from the area where you want records to land, then choose your source and proceed to review. Keep the target period in mind before you begin so imported records are scoped correctly. This prevents cleanup after the fact."
+                    body: "Start import from the screen that owns the records you want to create. This keeps destination context clear and reduces mapping confusion.\n\nBefore importing, confirm the target period so records land in the correct cycle. That one check prevents a lot of cleanup later."
                 ),
                 textSection(
                     id: "introduction-import-3",
                     header: "How To Review Records",
-                    body: "During review, check names, amounts, categories, and dates before committing. Resolve possible duplicates and fill any missing required details while still in the review step. Taking an extra minute here prevents long correction sessions later."
+                    body: "During review, check names, amounts, dates, and categories before committing. Resolve likely duplicates and fill missing required details while you are still in the review step.\n\nTaking an extra minute here is usually faster than fixing a full batch after save. Clean imports protect every report that depends on them."
                 ),
                 textSection(
                     id: "introduction-import-4",
                     header: "Verify The Result",
-                    body: "After import, open list and summary views to confirm totals and entry counts changed as expected. Spot-check a few imported rows for classification accuracy. Verification right away makes rollback or edits much simpler."
+                    body: "After import, verify totals and entry counts in both list and summary views. Spot-check a few rows to confirm category and date accuracy.\n\nImmediate verification makes follow-up edits simple and catches problems before they spread into period analysis."
                 ),
                 textSection(
                     id: "introduction-import-5",
                     header: "Import Pitfalls",
-                    body: "Avoid importing the same source repeatedly without duplicate review, which can inflate totals quickly. Also avoid skipping category cleanup during review, since low-quality labels weaken every report. Clean imports save time in every future period."
+                    body: "Avoid importing the same source repeatedly without duplicate review. Repeated batches can inflate totals quickly and create hard-to-trace variance.\n\nAlso avoid skipping category cleanup during review. Weak labels in imported data reduce report quality everywhere else."
                 )
             ]
         ),
@@ -441,27 +443,27 @@ enum GeneratedHelpContent {
                 textSection(
                     id: "introduction-quick-actions-1",
                     header: "What Quick Actions Are",
-                    body: "Quick Actions are optional shortcuts that speed up common entry tasks like capturing expenses or income. They are meant to reduce taps, not replace standard screens. Offshore works fully without them, so treat them as an efficiency layer."
+                    body: "Quick Actions are optional Apple Shortcuts that speed up repeat workflows like logging income or expenses from triggers you already see every day. They reduce taps, improve consistency, and make capture feel less manual.\n\nOffshore still works fully without automations, so this is an efficiency layer, not a requirement. If you want to scale your setup over time, start with one or two automations and add the rest after they are working reliably."
                 ),
                 textSection(
                     id: "introduction-quick-actions-2",
                     header: "Where To Set Them Up",
-                    body: "Go to Settings and open the Quick Actions area to install and review available shortcuts. If you use Apple Shortcuts, you can connect these actions into your own automation routines. Start simple first, then add automation after basic flows feel stable."
+                    body: "Open Quick Actions in Settings to install each Offshore shortcut first. Then open Apple Shortcuts and create a personal automation that runs the matching Offshore shortcut.\n\nFor each automation, the core mapping step is the same after you choose \"Run Shortcut\": press the Down Arrow, set Input to Choose Variable, then choose Shortcut Input. This makes sure trigger text gets passed into the Offshore shortcut correctly."
                 ),
                 textSection(
                     id: "introduction-quick-actions-3",
                     header: "How To Use Them Safely",
-                    body: "Run a quick action and immediately verify the created record in the destination screen. Confirm amount, category, and date so the shortcut behavior matches your expectations. This one-time validation protects you from repeated automation mistakes."
+                    body: "Use these literal trigger setups once the matching shortcuts are installed:\n\nExpense automations:\n\n1. Add Expense From Tap To Pay\nTrigger: When I tap any Wallet pass or payment card.\nSetup:\n- Run Immediately.\n- Create New Shortcut.\n- Search for \"Run Shortcut\".\n- Choose \"Add Expense From Tap To Pay\".\n- Press the Down Arrow.\n- Set Input to Choose Variable.\n- Choose \"Shortcut Input\".\n- Save.\n\n2. Add Amazon Expense From Amazon.com\nTrigger: When I get an email with subject containing \"Ordered:\" from auto-confirm@amazon.com.\nSetup:\n- Run Immediately.\n- Create New Shortcut.\n- Search for \"Run Shortcut\".\n- Choose \"Add Amazon Expense From Amazon.com\".\n- Press the Down Arrow.\n- Set Input to Choose Variable.\n- Choose \"Shortcut Input\".\n- Save.\n\nIncome automations:\n\n3. Add Income From An Email\nTrigger: When I get an email with subject containing \"credited to your account\".\nSetup:\n- Run Immediately.\n- Create New Shortcut.\n- Search for \"Run Shortcut\".\n- Choose \"Add Income From An Email\".\n- Press the Down Arrow.\n- Set Input to Choose Variable.\n- Choose \"Shortcut Input\".\n- Save.\n\n4. Add Income From An SMS Message\nTrigger: When message contains \"credited to your account ending in x1234\".\nSetup:\n- Run Immediately.\n- Create New Shortcut.\n- Search for \"Run Shortcut\".\n- Choose \"Add Income From An SMS Message\".\n- Press the Down Arrow.\n- Set Input to Choose Variable.\n- Choose \"Shortcut Input\".\n- Save."
                 ),
                 textSection(
                     id: "introduction-quick-actions-4",
                     header: "Verify Reliability",
-                    body: "Test your most-used action a few times with realistic examples before relying on it daily. Keep shortcut naming clear so future edits are easier to manage. Reliable quick actions should feel boring and predictable."
+                    body: "After setup, test each automation once with realistic input and verify the created record in Offshore immediately. Confirm destination, amount parsing, and category behavior before you trust daily usage.\n\nIf one automation fails, simplify and retest that single flow before changing others. Reliable automation should feel boring and predictable once it is configured correctly."
                 ),
                 textSection(
                     id: "introduction-quick-actions-5",
                     header: "Quick Action Pitfalls",
-                    body: "Avoid building complex automations before validating simple manual-trigger behavior. Also avoid using ambiguous default values that can create wrong categories or amounts. Start small, prove accuracy, then expand."
+                    body: "Avoid changing multiple trigger rules at the same time before each one is proven. Most issues come from input mapping or trigger text mismatch, not from Offshore itself.\n\nYou can customize trigger phrases later, but keep the text format consistent with what your shortcut expects so parsing stays stable. Make one change at a time, retest, and then continue."
                 )
             ]
         ),
@@ -473,27 +475,27 @@ enum GeneratedHelpContent {
                 textSection(
                     id: "introduction-excursion-mode-1",
                     header: "What Excursion Mode Is",
-                    body: "Excursion Mode is a focused tracking state for moments when spending activity is high and fast. It prioritizes quick capture so you can log activity with minimal interruption. Use it when you want tighter real-time awareness."
+                    body: "Excursion Mode is a focused tracking mode for high-activity windows when transactions are happening quickly. It prioritizes fast capture so you can stay present while still logging spending accurately.\n\nUse it when real-time awareness matters more than deep entry detail in the moment."
                 ),
                 textSection(
                     id: "introduction-excursion-mode-2",
                     header: "When To Use It",
-                    body: "Turn to Excursion Mode during outings, travel, event days, or any period with many small transactions. It is especially useful when waiting until later would cause missed details. Short bursts of disciplined capture can dramatically improve data quality."
+                    body: "Use Excursion Mode during travel, outings, event days, or any period with many small transactions. It is especially helpful when waiting until later would cause details to be forgotten.\n\nShort bursts of consistent capture can dramatically improve data quality and reduce end-of-day guesswork."
                 ),
                 textSection(
                     id: "introduction-excursion-mode-3",
                     header: "How To Work In It",
-                    body: "Capture each transaction quickly, then return later for any deeper cleanup such as notes or fine category adjustments. Keep the process simple so you maintain momentum instead of delaying entry. The goal is completeness first, refinement second."
+                    body: "Capture each transaction quickly, then return later for deeper cleanup if needed, such as notes or category refinement. Keep the process simple so you keep momentum.\n\nThe goal in this mode is completeness first, refinement second. A complete draft record is better than a missing one."
                 ),
                 textSection(
                     id: "introduction-excursion-mode-4",
                     header: "Verify After A Session",
-                    body: "When the high-activity window ends, review what was captured and confirm totals align with what you expected to spend. Fix obvious mislabels while context is still fresh. This quick closeout step keeps excursion sessions trustworthy."
+                    body: "When the high-activity window ends, do a short closeout review. Confirm totals align with what you expected and fix obvious mislabels while memory is still fresh.\n\nThis quick wrap-up step keeps excursion sessions accurate and prevents cleanup from piling up later."
                 ),
                 textSection(
                     id: "introduction-excursion-mode-5",
                     header: "Excursion Mode Pitfalls",
-                    body: "Avoid over-editing each entry in the moment, which usually leads to skipped captures. Also avoid forgetting a short post-session review, since fast entry can include minor classification errors. Use the mode for speed, then verify for accuracy."
+                    body: "Avoid over-editing entries in the moment, because that usually leads to skipped capture. Focus on fast capture first.\n\nAlso avoid skipping the post-session review. Fast entry is great for speed, but the short cleanup pass is what locks in long-term accuracy."
                 )
             ]
         ),
@@ -513,7 +515,7 @@ enum GeneratedHelpContent {
                         mediaItem(
                             id: "home-overview-1-image-1",
                             assetName: "Help/CoreScreens/Home/Overview/overview",
-                            bodyText: "This overview image shows the Home dashboard acting as a starting point for daily review. Read top-level totals first, then look for any widget that suggests a shift in spending, income, or savings direction. When something needs clarification, open the matching core screen and validate the underlying entries. Returning to Home after each adjustment helps you confirm whether the correction improved the period outlook.",
+                            bodyText: "The Home dashboard acts as a starting point for daily review. Read top-level totals first, then look for any widget that suggests a shift in spending, income, or savings direction. When something needs clarification, open the matching core screen and validate the underlying entries. Returning to Home after each adjustment helps you confirm whether the correction improved the period outlook.",
                             fullscreenCaptionText: "Use Home as your first scan, then open the matching screen to verify any number that looks off."
                         )
                     ]
@@ -533,13 +535,13 @@ enum GeneratedHelpContent {
                         mediaItem(
                             id: "home-customization-edit-home-1",
                             assetName: "Help/CoreScreens/Home/Customization/edit-home-1",
-                            bodyText: "This first step shows entering edit mode from Home customization. Use this point to decide which tiles belong in your top view versus lower priority positions. If you are unsure, place your most decision-driving widgets first, such as income reliability or savings trend signals. Starting with intention makes later ordering changes simpler.",
+                            bodyText: "This first step walks you into edit mode from Home customization. Use this point to decide which tiles belong in your top view versus lower priority positions. If you are unsure, place your most decision-driving widgets first, such as income reliability or savings trend signals. Starting with intention makes later ordering changes simpler.",
                             fullscreenCaptionText: "Enter edit mode to begin arranging the Home widgets around your priorities."
                         ),
                         mediaItem(
                             id: "home-customization-edit-home-2",
                             assetName: "Help/CoreScreens/Home/Customization/edit-home-2",
-                            bodyText: "This step shows reordering widgets into the sequence you want for quick daily checks. Drag high-impact tiles toward the top so important shifts are visible immediately. Keep related widgets near each other when possible so context is easier to read. A practical order reduces friction and improves follow-through.",
+                            bodyText: "This step shows you how to reorder widgets into the sequence you want for quick daily checks. Drag high-impact tiles toward the top so important shifts are visible immediately. Keep related widgets near each other when possible so context is easier to read. A practical order reduces friction and improves follow-through.",
                             fullscreenCaptionText: "Drag widgets into the order that supports your fastest daily review."
                         ),
                         mediaItem(
@@ -560,13 +562,13 @@ enum GeneratedHelpContent {
                 mediaSection(
                     id: "home-marina-1",
                     header: "Marina Assistant",
-                    body: "Marina is your conversational helper for translating raw budget data into practical next steps. It is most useful when you want a quick interpretation before diving into individual screens. Ask focused questions tied to a period, category, or concern so the response stays actionable.\n\nUse Marina as a planning companion, then verify key points in the underlying destination views. This pattern combines speed with confidence because you get guidance and confirmation. Specific prompts usually produce the most useful recommendations.\n\nA strong habit is to ask one question, act on one recommendation, then re-check your summary state. This keeps interaction purposeful and avoids information overload. Marina works best when used as a decision accelerator.",
+                    body: "Marina is your conversational helper for turning raw numbers into clear next steps. Ask focused questions about a period, category, card, or savings direction to get practical guidance quickly.\n\nMarina also pairs well with your create, update, and cleanup workflow. Use the + button on the owning screen when you need to add a new record, then use edit or delete actions in that same screen to finish cleanup. Marina helps you decide what to do, and the destination screens help you do it accurately.\n\nA strong routine is simple: ask one question, take one action, then verify the result. This keeps guidance actionable and prevents overload.",
                     media: [
                         mediaItem(
                             id: "home-marina-1-image-1",
                             assetName: "Help/CoreScreens/Home/Marina/marina",
-                            bodyText: "This image shows opening Marina from Home for a conversational review flow. Use concise prompts about spending trends, income variance, or savings direction to get targeted guidance. After receiving a suggestion, jump to the relevant screen and confirm the supporting records. This keeps Marina responses grounded in your live data workflow.",
-                            fullscreenCaptionText: "Ask Marina targeted questions, then confirm recommendations in the related core screen."
+                            bodyText: "Marina is opened from Home for a conversational review flow. Ask concise prompts about trends, savings direction, or variance, then open the related screen to take action. When you need to add something new, use the + button in that screen. For changes later, use edit and delete there as well so your records stay clean and traceable.",
+                            fullscreenCaptionText: "Ask Marina for guidance, then use +, edit, or delete in the owning screen to complete the workflow."
                         )
                     ]
                 )
@@ -579,36 +581,41 @@ enum GeneratedHelpContent {
             sections: [
                 mediaSection(
                     id: "home-widgets-overview",
-                    header: "Widget Highlights",
+                    header: "Widgets",
                     body: "Home widgets are designed to answer distinct budgeting questions quickly without opening every screen. Each tile provides a focused signal, and together they form a reliable daily scan pattern. Use them in sequence so you can detect pressure, prioritize action, and decide where to drill in next.\n\nTreat widgets as an early-warning system. They help you catch shifts while there is still time to correct course. When one tile changes sharply, verify the cause in Budgets, Income, or Accounts before making decisions.\n\nConsistency matters more than speed here. A short repeatable scan each day usually produces better outcomes than occasional deep dives. Use the same order to build confidence and reduce missed signals.",
                     media: [
                         mediaItem(
                             id: "home-widgets-income",
                             assetName: "Help/CoreScreens/Home/Widgets/income",
+                            displayTitle: "Income",
                             bodyText: "The income widget helps you compare expected versus received inflows at a glance. Use it early in the period to detect timing delays or lower-than-planned deposits. If a gap appears, adjust planned spending priorities before pressure builds. This widget is your first check for cash-flow reliability.",
                             fullscreenCaptionText: "Compare planned and actual income quickly to spot shortfalls early."
                         ),
                         mediaItem(
                             id: "home-widgets-savings-outlook",
                             assetName: "Help/CoreScreens/Home/Widgets/savings-outlook",
+                            displayTitle: "Savings Outlook",
                             bodyText: "Savings Outlook projects where the period may end based on current entries and assumptions. Review it after adding meaningful expenses or income updates so direction changes are visible immediately. Use this signal to decide whether you need to slow discretionary spending. Frequent checks keep surprises smaller at period close.",
                             fullscreenCaptionText: "Use Savings Outlook to forecast direction and course-correct before period close."
                         ),
                         mediaItem(
                             id: "home-widgets-spend-trends",
                             assetName: "Help/CoreScreens/Home/Widgets/spend-trends",
+                            displayTitle: "Spend Trends",
                             bodyText: "Spend Trends emphasizes movement over time, not just a single total. Watch for acceleration patterns that indicate a category or habit is drifting upward. When trend slope changes, inspect recent entries to identify what triggered the shift. Early trend awareness makes interventions more effective.",
                             fullscreenCaptionText: "Watch trend direction, not just totals, to catch acceleration early."
                         ),
                         mediaItem(
                             id: "home-widgets-category-spotlight",
                             assetName: "Help/CoreScreens/Home/Widgets/category-spotlight",
-                            bodyText: "Category Spotlight highlights which categories currently have the most budget pressure. Use it to find the best place for small behavior changes that can create meaningful impact. After identifying a heavy category, open details and verify the entries driving that weight. This supports targeted adjustments instead of broad guesswork.",
+                            displayTitle: "Category Spotlight",
+                            bodyText: "Category Spotlight highlights which categories currently have the most budget pressure. Use this to find the best place for small behavior changes that can create meaningful impact. After identifying a heavy category, open details and verify the entries driving that weight. This supports targeted adjustments instead of broad guesswork.",
                             fullscreenCaptionText: "Use Category Spotlight to find the categories creating the most pressure."
                         ),
                         mediaItem(
                             id: "home-widgets-what-if",
                             assetName: "Help/CoreScreens/Home/Widgets/what-if",
+                            displayTitle: "What If",
                             bodyText: "What If lets you test potential spending adjustments before committing to them in your real plan. Use it when you are deciding between competing choices or trying to recover from an unfavorable trend. Simulating outcomes helps you choose options with clearer tradeoffs. It is a safe planning step before making real entries.",
                             fullscreenCaptionText: "Run What If scenarios to compare tradeoffs before committing real changes."
                         )
@@ -632,7 +639,7 @@ enum GeneratedHelpContent {
                         mediaItem(
                             id: "budgets-overview-overview-image-1",
                             assetName: "Help/CoreScreens/Budgets/Overview/overview",
-                            bodyText: "This overview image shows the list of budget periods and their current status. Use it to quickly locate the active period, then open it for daily updates and review. If multiple periods exist, confirm dates before editing so entries stay in the correct cycle. A fast period check prevents confusing totals later.",
+                            bodyText: "The list of budget periods shows current status at a glance. Use it to quickly locate the active period, then open it for daily updates and review. If multiple periods exist, confirm dates before editing so entries stay in the correct cycle. A fast period check prevents confusing totals later.",
                             fullscreenCaptionText: "Start in Budgets to open the correct period before making any updates."
                         )
                     ]
@@ -640,18 +647,18 @@ enum GeneratedHelpContent {
                 mediaSection(
                     id: "budgets-overview-create-budget",
                     header: "Create a Budget",
-                    body: "Creating a budget establishes the date window used for all totals, comparisons, and savings outcomes in that cycle. This step defines the frame that every entry depends on, so clarity here matters. Choose a period cadence that matches how you naturally review finances.\n\nA clean setup flow includes naming, date selection, and quick review before save. Keep names recognizable so you can find the right period quickly later. Consistent naming and date boundaries make trend analysis cleaner over time.\n\nAfter creation, move directly into assigning structure and adding initial planned entries. That keeps momentum and reduces setup debt. Early setup quality improves every downstream decision.",
+                    body: "Creating a budget establishes the date window used for totals, comparisons, and savings outcomes in that cycle. This step defines the frame every entry depends on, so clarity here matters.\n\nThe title field is dynamic and can self-generate based on your period setup. You can keep that generated title or enter your own custom title if you want tighter naming control.\n\nAfter creation, move directly into assigning structure and adding initial planned entries. Early setup quality improves every downstream decision.",
                     media: [
                         mediaItem(
                             id: "budgets-overview-create-budget-1",
                             assetName: "Help/CoreScreens/Budgets/Overview/create-budget-1",
-                            bodyText: "This first step shows starting a new budget period from the add flow. Enter a clear name and choose a date range that matches your review rhythm, such as monthly or custom cycles. Make sure the window aligns with planned income and recurring expenses you expect to track. Accurate dates are the foundation for trustworthy budget math.",
-                            fullscreenCaptionText: "Create a budget with a clear name and date range that matches your cycle."
+                            bodyText: "Start a new budget period from the add flow. The title can auto-fill based on your period details, and you can override it with your own name at any time before saving. Choose a date range that matches your review rhythm so planned income and recurring expenses align cleanly.",
+                            fullscreenCaptionText: "Start the budget, keep the generated title or enter your own, then confirm dates."
                         ),
                         mediaItem(
                             id: "budgets-overview-create-budget-2",
                             assetName: "Help/CoreScreens/Budgets/Overview/create-budget-2",
-                            bodyText: "This step shows reviewing and confirming budget setup details before saving. Verify the period boundaries and core settings now so you do not need cleanup edits after entries are added. Once saved, continue directly into cards, planned expenses, and other setup tasks. A short confirmation pass here saves significant correction time later.",
+                            bodyText: "This step walks through reviewing and confirming budget setup details before saving. Verify the period boundaries and core settings now so you do not need cleanup edits after entries are added. Once saved, continue directly into cards, planned expenses, and other setup tasks. A short confirmation pass here saves significant correction time later.",
                             fullscreenCaptionText: "Review setup details before save so the period starts with clean boundaries."
                         )
                     ]
@@ -666,31 +673,31 @@ enum GeneratedHelpContent {
                 mediaSection(
                     id: "budgets-details-add-expense",
                     header: "Add Expense",
-                    body: "Budget Details is where period execution happens day by day. This is where you add, edit, and monitor expenses while keeping planned and variable behavior in sync. Treat this view as your working ledger for the active cycle.\n\nUse planned entries for expected obligations and variable entries for real-time spending. Keeping both updated in one place helps comparisons stay meaningful. Frequent updates here reduce end-of-period surprises.\n\nAfter each meaningful change, quickly scan summary signals to confirm direction. Small, consistent updates make budget control much easier than large delayed corrections. This section is the core of active budget maintenance.",
+                    body: "Budget Details is where period execution happens day by day. This is where you add, edit, and monitor expenses while keeping planned and variable behavior in sync.\n\nWhen adding an expense, you can also use split and offset controls when one purchase needs more than one treatment. Split helps you break a single charge into multiple tracked parts, while offset helps you intentionally reduce the balance impact when another source is covering all or part of that cost.\n\nAfter each meaningful change, scan summary signals to confirm direction. Small, consistent updates make budget control much easier than large delayed corrections.",
                     media: [
                         mediaItem(
                             id: "budgets-details-add-expense-1",
                             assetName: "Help/CoreScreens/Budgets/Budget Details/add-expense-1",
-                            bodyText: "This step shows opening the add expense flow from Budget Details. Choose the correct expense type first so the entry contributes to calculations in the right way. Planned and variable entries serve different purposes, so classification is important. Starting with the right type prevents avoidable reporting confusion.",
+                            bodyText: "This step opens the add expense flow from Budget Details. Choose the correct expense type first so the entry contributes to calculations in the right way. Planned and variable entries serve different purposes, so classification is important. Starting with the right type prevents avoidable reporting confusion.",
                             fullscreenCaptionText: "Start add expense from Budget Details and choose the correct expense type first."
                         ),
                         mediaItem(
                             id: "budgets-details-add-expense-2",
                             assetName: "Help/CoreScreens/Budgets/Budget Details/add-expense-2",
-                            bodyText: "This step completes the entry fields such as amount, date, card, and category. Fill these carefully so filters, category reports, and trend views remain useful later. If something is uncertain, add the best available values now and refine shortly after. High-quality entry details make every later review faster.",
-                            fullscreenCaptionText: "Finish amount, date, card, and category fields before saving the expense."
+                            bodyText: "This step completes amount, date, card, and category, and it is where split and offset are applied when needed. Use split when one transaction should be tracked across multiple purposes, and use offset when another source should reduce part of the balance impact. Verify totals right after save so you can confirm the split or offset behaved the way you expected.",
+                            fullscreenCaptionText: "Complete fields, apply split or offset if needed, then verify totals after save."
                         )
                     ]
                 ),
                 mediaSection(
                     id: "budgets-details-filter-expenses",
                     header: "Filter Expenses",
-                    body: "Filtering lets you isolate the exact slice of spending you need to evaluate before making changes. Use it to narrow by category, card, or other scope controls when totals need explanation. Focused views reduce noise and shorten investigation time.\n\nA good sequence is filter first, inspect entries second, then decide action. This keeps decisions tied to evidence instead of intuition. Clear filtered views are especially useful when spending accelerates unexpectedly.\n\nReset filters after analysis so future reviews begin from full context. That habit avoids accidental conclusions from stale scopes. Filtering is most powerful when used intentionally and reset consistently.",
+                    body: "Filtering lets you isolate the exact slice of spending you need to evaluate before making changes. Use this to narrow by category, card, or other scope controls when totals need explanation. Focused views reduce noise and shorten investigation time.\n\nA good sequence is filter first, inspect entries second, then decide action. This keeps decisions tied to evidence instead of intuition. Clear filtered views are especially useful when spending accelerates unexpectedly.\n\nReset filters after analysis so future reviews begin from full context. That habit avoids accidental conclusions from stale scopes. Filtering is most powerful when used intentionally and reset consistently.",
                     media: [
                         mediaItem(
                             id: "budgets-details-filter-expenses-1",
                             assetName: "Help/CoreScreens/Budgets/Budget Details/filter-expenses",
-                            bodyText: "This image shows applying filters to narrow the visible expense set. Use this when troubleshooting one category, one card, or one timeframe instead of scanning the full ledger. A focused result set makes it easier to identify the entries driving pressure. Confirm conclusions, then reset filters before moving on.",
+                            bodyText: "Filters are applied to narrow the visible expense set. Use this when troubleshooting one category, one card, or one timeframe instead of scanning the full ledger. A focused result set makes it easier to identify the entries driving pressure. Confirm conclusions, then reset filters before moving on.",
                             fullscreenCaptionText: "Apply filters to isolate the exact expense slice you want to diagnose."
                         )
                     ]
@@ -718,26 +725,26 @@ enum GeneratedHelpContent {
                 mediaSection(
                     id: "budgets-calculations-overview",
                     header: "Calculations Overview",
-                    body: "Budget calculations summarize how income and expenses combine into period outcomes. The overview helps you read relationships between planned values, actual values, and resulting savings direction. Start here when a top-line number changes and you need context.\n\nRemember that filters and policy toggles can change what appears included. Always confirm scope before comparing numbers across screens. Consistent scope checks prevent most calculation misunderstandings.\n\nUse this summary as a navigation map: identify the metric that moved, then inspect the contributing entries. This creates a reliable path from signal to cause.",
+                    body: "Calculations summarize how income and expenses combine into period outcomes. When a number looks off, first check whether values are hidden or excluded before assuming the math is wrong.\n\nThe eye control changes visibility and can make totals look different from what you expected if some values are currently hidden. Always confirm visibility state before comparing screens.\n\nYou can set default visibility behavior in Settings > General > Expense Display, then use the eye control for quick per-view adjustments.",
                     media: [
                         mediaItem(
                             id: "budgets-calculations-overview-image-1",
                             assetName: "Help/CoreScreens/Budgets/Calculations/overview",
-                            bodyText: "This overview image shows the top-level budget math components in one place. Use it to see how planned and actual values combine into savings outcomes for the active period. When totals shift unexpectedly, start here to identify which component moved first. Then inspect that component in detail before making adjustments.",
-                            fullscreenCaptionText: "Use the overview to identify which calculation component moved first."
+                            bodyText: "The overview shows top-level budget math in one place, including controls that affect what is visible. If totals look unusual, check the eye state first to confirm no values are hidden or excluded. This quick check prevents unnecessary troubleshooting.",
+                            fullscreenCaptionText: "Check eye visibility first when totals look off."
                         )
                     ]
                 ),
                 mediaSection(
                     id: "budgets-calculations-details",
                     header: "Calculation Details",
-                    body: "Calculation Details explains why specific totals changed, not just that they changed. Use it when projected and actual outcomes diverge or when period momentum feels unclear. This is where tradeoffs become visible enough to act on.\n\nCompare projected versus actual savings with current expense behavior to decide next steps. If variance is growing, investigate the entries driving that spread. Detailed math review helps you prioritize corrective action.\n\nA quick detail check after major edits can prevent end-of-period surprises. It is a practical verification step, not just a diagnostic tool. Use it proactively when stakes are high.",
+                    body: "Calculation Details is where you confirm why a total changed. Use it after checking visibility controls so you know whether the value changed because of data or because items are hidden.\n\nIf numbers still look wrong, trace by entry type and recent edits. This is usually enough to find the exact source quickly.\n\nFor consistent behavior across sessions, review Settings > General > Expense Display and choose defaults that match how you like to review expense math.",
                     media: [
                         mediaItem(
                             id: "budgets-calculations-details-image-1",
                             assetName: "Help/CoreScreens/Budgets/Calculations/calculations",
-                            bodyText: "This detail image shows the deeper math breakdown behind budget outcomes. Use it to verify which totals are driving movement across projected and actual savings. When a value looks wrong, trace it back to entry type, timing, and recent edits. Clear math tracing makes fixes faster and more reliable.",
-                            fullscreenCaptionText: "Open details to trace projected and actual savings changes to their source."
+                            bodyText: "The detail view breaks down the numbers behind budget outcomes. If something seems inconsistent, verify hidden or excluded values first, then trace the remaining difference to entry type, timing, and recent edits. This keeps debugging focused and fast.",
+                            fullscreenCaptionText: "Use details after visibility checks to trace the exact source of a mismatch."
                         )
                     ]
                 )
@@ -754,12 +761,12 @@ enum GeneratedHelpContent {
                 mediaSection(
                     id: "income-overview-1",
                     header: "Income Overview",
-                    body: "Income uses a calendar-centered workflow so you can track inflows by date and context. This makes it easier to match expected deposits with what actually arrived. Start here when validating cash flow reliability for the active cycle.\n\nMove through days intentionally instead of scanning only totals. Date-level review helps you catch timing shifts that can affect spending decisions. Even when totals look fine, timing issues can still create pressure.\n\nA strong routine is to review the selected date, confirm planned versus actual, then update records immediately. That habit keeps all downstream calculations aligned. Income accuracy is critical for trustworthy savings projections.",
+                    body: "Income uses a calendar-centered workflow so you can track inflows by date and context. This makes it easier to match expected deposits with what actually arrived. Start here whenever validating cash flow reliability for the active cycle.\n\nMove through days intentionally instead of scanning only totals. Date-level review helps you catch timing shifts that can affect spending decisions. Even when totals look fine, timing issues can still create pressure.\n\nA strong routine is to review the selected date, confirm planned versus actual, then update records immediately. That habit keeps all downstream calculations aligned. Income accuracy is critical for trustworthy savings projections.",
                     media: [
                         mediaItem(
                             id: "income-overview-1-image-1",
                             assetName: "Help/CoreScreens/Income/Overview/overview",
-                            bodyText: "This overview image shows the calendar-driven Income workspace for daily verification. Use it to move between dates and confirm what was planned versus what was received. If a deposit is missing or delayed, update records so budget pressure reflects reality. Daily validation here keeps Home and Budget signals honest.",
+                            bodyText: "The calendar-driven Income workspace supports daily verification. Use this to move between dates and confirm what was planned versus what was received. If a deposit is missing or delayed, update records so budget pressure reflects reality. Daily validation here keeps Home and Budget signals honest.",
                             fullscreenCaptionText: "Use the Income calendar to verify planned and actual inflows by day."
                         )
                     ]
@@ -779,7 +786,7 @@ enum GeneratedHelpContent {
                         mediaItem(
                             id: "income-planned-vs-actual-1-image-1",
                             assetName: "Help/CoreScreens/Income/Planned vs Actual/planned-vs-actual",
-                            bodyText: "This image highlights the side-by-side planned and actual income comparison view. Use it to identify gaps, timing delays, or overestimation patterns quickly. When a source varies, adjust plans to realistic expectations and continue logging actuals as they arrive. This keeps savings forecasting practical instead of optimistic.",
+                            bodyText: "This image highlights the side-by-side planned and actual income comparison view. Use this to identify gaps, timing delays, or overestimation patterns quickly. When a source varies, adjust plans to realistic expectations and continue logging actuals as they arrive. This keeps savings forecasting practical instead of optimistic.",
                             fullscreenCaptionText: "Compare planned and actual income side by side to identify variance quickly."
                         )
                     ]
@@ -809,13 +816,13 @@ enum GeneratedHelpContent {
                 mediaSection(
                     id: "accounts-overview-1",
                     header: "Accounts Overview",
-                    body: "Accounts is the hub for card activity, shared-balance reconciliation, and savings tracking. It helps you separate normal spending workflows from settlement and reserve workflows so your data stays organized. Start here when the task is account-specific rather than period-planning specific.\n\nUse this screen to choose the right container before editing entries. Card details are best for transaction-level spending maintenance, while reconciliations and savings serve different financial intents. Choosing the right area first reduces accidental misclassification.\n\nA quick review pass in Accounts each cycle keeps card-level accuracy strong. This improves every related report and trend in the app. Think of Accounts as structure and integrity for spending records.",
+                    body: "Accounts is the hub for card activity, shared-balance reconciliation, and savings tracking. It helps you separate normal spending workflows from settlement and reserve workflows so your data stays organized.\n\nUse the three colored toggle buttons at the top to move between Cards, Reconciliations, and Savings quickly. Think of them as fast container switches so you can jump directly to the area that owns the task.\n\nA quick review pass in Accounts each cycle keeps card-level accuracy strong and improves related reports across the app.",
                     media: [
                         mediaItem(
                             id: "accounts-overview-1-image-1",
                             assetName: "Help/CoreScreens/Accounts/Overview/overview",
-                            bodyText: "This overview image shows Accounts as the launch point for cards, reconciliations, and savings workflows. Use it to jump into the specific container that matches the task you need to complete. Opening the correct container first keeps edits contextual and easier to validate. It is the best starting point for non-budget transaction maintenance.",
-                            fullscreenCaptionText: "Use Accounts to jump into cards, reconciliations, or savings with the right context."
+                            bodyText: "Accounts is the launch point for Cards, Reconciliations, and Savings workflows. Use the card, person, and cash toggle buttons to switch containers and start in the right place for the job. Container-first navigation keeps edits easier to validate and reduces accidental cross-workflow changes.",
+                            fullscreenCaptionText: "Use the top toggles to switch between Cards, Reconciliations, and Savings."
                         )
                     ]
                 )
@@ -834,7 +841,7 @@ enum GeneratedHelpContent {
                         mediaItem(
                             id: "accounts-card-details-overview-image-1",
                             assetName: "Help/CoreScreens/Accounts/Card Details/overview",
-                            bodyText: "This image shows the Card Detail overview where transactions can be reviewed with focused controls. Use category and date scopes here when reconciling statements or cleaning inconsistent tagging. Start with broad context, then narrow to the exact rows driving the issue. This keeps card cleanup accurate and efficient.",
+                            bodyText: "Card Detail is where transactions are reviewed with focused controls. Use category and date scopes when reconciling statements or cleaning inconsistent tagging. Start with broad context, then narrow to the exact rows driving the issue. This keeps card cleanup accurate and efficient.",
                             fullscreenCaptionText: "Open Card Detail to review transactions with focused filters and scoped totals."
                         )
                     ]
@@ -860,7 +867,7 @@ enum GeneratedHelpContent {
                         mediaItem(
                             id: "accounts-card-details-filter-expenses-image-1",
                             assetName: "Help/CoreScreens/Accounts/Card Details/filter-expenses",
-                            bodyText: "This image shows applying card-level filters to narrow transaction review. Use filtered scopes to isolate the exact rows tied to a discrepancy or cleanup goal. Once identified, update entries and recheck scoped totals for confirmation. Focused filtering can cut investigation time dramatically.",
+                            bodyText: "Card-level filters narrow transaction review. Use filtered scopes to isolate the exact rows tied to a discrepancy or cleanup goal. Once identified, update entries and recheck scoped totals for confirmation. Focused filtering can cut investigation time dramatically.",
                             fullscreenCaptionText: "Filter card transactions to isolate the rows tied to your current review goal."
                         )
                     ]
@@ -868,13 +875,13 @@ enum GeneratedHelpContent {
                 mediaSection(
                     id: "accounts-card-details-import-expenses",
                     header: "Import Expenses",
-                    body: "Card import helps you add multiple transactions quickly when manual entry would be slow. Starting import from Card Detail keeps the destination context clear and reduces mapping mistakes. This is ideal for catch-up sessions after travel or statement review.\n\nUse the review stage to confirm amount, date, and category quality before commit. Duplicate checks are especially important during repeated imports. Better review quality now means less cleanup later.\n\nAfter import, validate sample rows and scoped totals to ensure the batch landed correctly. Immediate verification prevents hidden drift. Bulk speed should still include quality control.",
+                    body: "Card import helps you add multiple transactions quickly when manual entry would be slow. Offshore supports CSV, PDF, and image imports from this flow.\n\nIf you use the mapping memory toggle, Offshore can reuse similar import structure later so repeat imports are faster. It is a good option when your source format is consistent.\n\nFriendly warning: avoid importing card payment transfers as expenses. Offshore is built to help you understand spending and savings direction, and importing payments as expenses can create confusing or inflated math. Keep imports focused on true spending or income activity.",
                     media: [
                         mediaItem(
                             id: "accounts-card-details-import-expenses-image-1",
                             assetName: "Help/CoreScreens/Accounts/Card Details/import-expenses",
-                            bodyText: "This step shows starting a card-scoped import flow for bulk transaction capture. Review each parsed row for duplicates and category accuracy before saving the batch. When records commit, check a few entries and totals to verify correct placement. Strong review habits make imports both fast and reliable.",
-                            fullscreenCaptionText: "Use card import for bulk capture, then review rows carefully before saving."
+                            bodyText: "This step starts a card-scoped import flow for bulk transaction capture from CSV, PDF, or images. Review parsed rows for duplicates and category accuracy, and use the mapping memory toggle when you want faster repeat imports from similar files. Skip payment-transfer rows that are not true expenses so totals stay clean.",
+                            fullscreenCaptionText: "Import CSV/PDF/image records, use mapping memory for repeats, and avoid payment-transfer expense rows."
                         )
                     ]
                 )
@@ -893,7 +900,7 @@ enum GeneratedHelpContent {
                         mediaItem(
                             id: "accounts-calculations-1-image-1",
                             assetName: "Help/CoreScreens/Accounts/Calculations/calculations",
-                            bodyText: "This image shows the card calculation view used to validate scoped totals. Use it to confirm how current filters and entry composition produce the number you are seeing. If totals changed, trace contributing groups before editing additional data. Clear tracing helps you fix the right issue the first time.",
+                            bodyText: "The card calculation view validates scoped totals. Use it to confirm how current filters and entry composition produce the number you are seeing. If totals changed, trace contributing groups before editing additional data. Clear tracing helps you fix the right issue the first time.",
                             fullscreenCaptionText: "Use card calculations to trace filtered totals back to contributing transaction groups."
                         )
                     ]
@@ -913,27 +920,8 @@ enum GeneratedHelpContent {
                         mediaItem(
                             id: "accounts-reconciliations-overview-image-1",
                             assetName: "Help/CoreScreens/Accounts/Reconciliations/overview",
-                            bodyText: "This overview image shows the Reconciliations list for managing shared balances. Use it to create and monitor person-specific or context-specific ledgers without mixing them with card expenses. Keep names explicit so balances are easy to recognize during review. Separate ledgers make settlement progress easier to communicate.",
+                            bodyText: "The Reconciliations list manages shared balances. Use it to create and monitor person-specific or context-specific ledgers without mixing them with card expenses. Keep names explicit so balances are easy to recognize during review. Separate ledgers make settlement progress easier to communicate.",
                             fullscreenCaptionText: "Use Reconciliations to track shared balances separately from normal card spending."
-                        )
-                    ]
-                ),
-                mediaSection(
-                    id: "accounts-reconciliations-add-settlement",
-                    header: "Add a Settlement",
-                    body: "Settlements are the entries that reduce or clear shared balances over time. Use this flow any time money is paid back, collected, or otherwise resolves a reconciliation amount. Recording settlements promptly keeps the ledger honest and current.\n\nDirection and amount accuracy matter because they determine whether balances move toward zero correctly. Include brief notes so future you can understand why each movement occurred. Clear settlement records prevent timeline confusion later.\n\nAfter saving, verify updated balance direction in detail view. This quick check catches sign mistakes immediately. Reliable settlement entry is key to trustworthy shared-balance tracking.",
-                    media: [
-                        mediaItem(
-                            id: "accounts-reconciliations-add-settlement-1",
-                            assetName: "Help/CoreScreens/Accounts/Reconciliations/add-settlement-1",
-                            bodyText: "This first step shows opening reconciliation detail and initiating a settlement entry. Choose the settlement direction carefully so the balance moves as intended. Direction mistakes can invert progress and create confusion in later review. Confirm the sign before continuing.",
-                            fullscreenCaptionText: "Start a settlement from reconciliation detail and confirm the balance direction."
-                        ),
-                        mediaItem(
-                            id: "accounts-reconciliations-add-settlement-2",
-                            assetName: "Help/CoreScreens/Accounts/Reconciliations/add-settlement-2",
-                            bodyText: "This step confirms settlement amount and notes before committing the entry. Add a concise reason so future reviews clearly explain the balance change. Good notes are especially valuable when multiple people or events affect one ledger. Save only after amount, direction, and context are all clear.",
-                            fullscreenCaptionText: "Confirm amount and add a short note so settlement history stays clear."
                         )
                     ]
                 ),
@@ -945,8 +933,27 @@ enum GeneratedHelpContent {
                         mediaItem(
                             id: "accounts-reconciliations-detail-view-image-1",
                             assetName: "Help/CoreScreens/Accounts/Reconciliations/detail-view",
-                            bodyText: "This image shows the reconciliation detail timeline used for full ledger audit. Review entries in order to confirm how the current balance was produced. Use it before final settle-up discussions so you can explain each movement clearly. A complete timeline review reduces ambiguity and mistakes.",
+                            bodyText: "The reconciliation detail timeline supports full ledger audit. Review entries in order to confirm how the current balance was produced. Use it before settle-up conversations so you can explain each movement clearly. A complete timeline review reduces ambiguity and mistakes.",
                             fullscreenCaptionText: "Use detail view to audit the full reconciliation timeline before final settlement."
+                        )
+                    ]
+                ),
+                mediaSection(
+                    id: "accounts-reconciliations-add-settlement",
+                    header: "Add a Settlement",
+                    body: "Settlements are the entries that reduce or clear shared balances over time. Use this flow any time money is paid back, collected, or otherwise resolves a reconciliation amount. Recording settlements promptly keeps the ledger honest and current.\n\nDirection and amount accuracy matter because they determine whether balances move toward zero correctly. Include brief notes so future you can understand why each movement occurred. Clear settlement records prevent timeline confusion later.\n\nAfter saving, verify updated balance direction in detail view. This quick check catches sign mistakes immediately. Reliable settlement entry is key to trustworthy shared-balance tracking.",
+                    media: [
+                        mediaItem(
+                            id: "accounts-reconciliations-add-settlement-1",
+                            assetName: "Help/CoreScreens/Accounts/Reconciliations/add-settlement-1",
+                            bodyText: "This first step opens reconciliation detail and starts a settlement entry. Choose settlement direction carefully so the balance moves as intended. Direction mistakes can invert progress and create confusion in later review. Confirm the sign before continuing.",
+                            fullscreenCaptionText: "Start a settlement from reconciliation detail and confirm the balance direction."
+                        ),
+                        mediaItem(
+                            id: "accounts-reconciliations-add-settlement-2",
+                            assetName: "Help/CoreScreens/Accounts/Reconciliations/add-settlement-2",
+                            bodyText: "This step confirms settlement amount and notes before committing the entry. Add a concise reason so future reviews clearly explain the balance change. Good notes are especially valuable when multiple people or events affect one ledger. Save only after amount, direction, and context are all clear.",
+                            fullscreenCaptionText: "Confirm amount and add a short note so settlement history stays clear."
                         )
                     ]
                 )
@@ -960,13 +967,13 @@ enum GeneratedHelpContent {
                 mediaSection(
                     id: "accounts-savings-account-overview",
                     header: "Savings Account",
-                    body: "Savings Account provides a dedicated ledger and trend view for money set aside outside normal card spending. Use it to track contributions, withdrawals, and adjustments with clear historical context. Separating savings from spending records improves clarity during review.\n\nThe trend view helps you evaluate momentum instead of relying on a single balance snapshot. Regularly checking movement direction can reveal whether habits are supporting goals. Small trend shifts matter when repeated across cycles.\n\nAfter each savings update, verify the entry and resulting movement quickly. This keeps your reserve history trustworthy. A clean savings ledger supports better planning decisions.",
+                    body: "Savings Account provides a dedicated ledger and trend view for money set aside outside normal card spending. It is especially useful when you want saved funds to offset future purchases without losing expense ownership on the card that made the purchase.\n\nA practical pattern is: save money during one period, keep a later purchase on the correct card, then use Savings activity to offset the balance impact intentionally. This keeps card history accurate while showing how savings supported the purchase.\n\nAfter each savings update, verify both ledgers moved as expected. This keeps your reserve history trustworthy and your card math clean.",
                     media: [
                         mediaItem(
                             id: "accounts-savings-account-overview-image-1",
                             assetName: "Help/CoreScreens/Accounts/Savings Account/overview",
-                            bodyText: "This image shows the Savings Account ledger with trend context for recent movement. Use it to confirm each contribution or withdrawal updates the timeline as expected. Review trend direction periodically to catch early signs of momentum loss. Dedicated savings tracking makes reserve progress much easier to manage.",
-                            fullscreenCaptionText: "Track contributions and withdrawals here, then monitor trend direction over time."
+                            bodyText: "The Savings Account ledger shows contributions, withdrawals, and trend context in one view. Use it when you are offsetting a future card purchase with saved funds so the card still owns the expense while savings absorbs part of the impact. After posting, verify the card and savings records both reflect your intent.",
+                            fullscreenCaptionText: "Use Savings to offset future card purchases while keeping expense ownership on the card."
                         )
                     ]
                 )
@@ -988,7 +995,7 @@ enum GeneratedHelpContent {
                         mediaItem(
                             id: "settings-overview-1-image-1",
                             assetName: "Help/CoreScreens/Settings/Overview/overview",
-                            bodyText: "This overview image shows the main Settings list with all management areas in one place. Use it to choose whether you are adjusting behavior, security, sync, or organizational data. Starting from this index helps you enter the correct section quickly. A clear route through Settings reduces accidental changes in unrelated areas.",
+                            bodyText: "The main Settings list keeps all management areas in one place. Use it to choose whether you are adjusting behavior, security, sync, or organizational data. Starting from this index helps you enter the correct section quickly. A clear route through Settings reduces accidental changes in unrelated areas.",
                             fullscreenCaptionText: "Start in Settings Overview to jump directly to the management area you need."
                         )
                     ]
@@ -1008,7 +1015,7 @@ enum GeneratedHelpContent {
                         mediaItem(
                             id: "settings-general-1-image-1",
                             assetName: "Help/CoreScreens/Settings/General/overview",
-                            bodyText: "This image shows General settings used to tune core display and calculation behavior. Use it to control how planned and variable items are surfaced and interpreted in summaries. After updates, validate one familiar screen to ensure the result matches your intent. Purposeful configuration here keeps totals predictable.",
+                            bodyText: "General settings tune core display and calculation behavior. Use this to control how planned and variable items are surfaced and interpreted in summaries. After updates, validate one familiar screen to ensure the result matches your intent. Purposeful configuration here keeps totals predictable.",
                             fullscreenCaptionText: "Adjust General preferences to control global display and calculation behavior."
                         )
                     ]
@@ -1023,13 +1030,13 @@ enum GeneratedHelpContent {
                 mediaSection(
                     id: "settings-privacy-1",
                     header: "Privacy",
-                    body: "Privacy settings control access protections and sensitive workflow behavior across the app. Use this section to align security posture with your device usage and personal comfort level. It is the first place to visit when hardening access.\n\nChoose a privacy setup that balances safety with daily usability. Too little friction can reduce protection, while too much can reduce consistency. Pick the level you will actually maintain.\n\nAfter changing privacy controls, test one normal flow to confirm behavior feels right. Practical verification ensures protection works without breaking routine. Security settings are most effective when they remain usable.",
+                    body: "Privacy in Offshore is primarily a visibility and status view for permissions the system controls. Use it to review what Offshore currently has access to, then open iOS App Settings if you want to change those permissions.\n\nA good workflow is: review status here, open App Settings for permission changes, then return and verify expected behavior. This keeps permission changes intentional and easy to confirm.\n\nCore Offshore budgeting functions work fully offline. Network-dependent features are optional, so your core workflow remains available even without connectivity.",
                     media: [
                         mediaItem(
                             id: "settings-privacy-1-image-1",
                             assetName: "Help/CoreScreens/Settings/Privacy/overview",
-                            bodyText: "This image shows the Privacy controls used to protect access and sensitive workflows. Use these options to set the right balance between security and convenience for your routine. After updates, run a quick unlock and entry check to confirm expected behavior. A verified setup is safer than assumptions.",
-                            fullscreenCaptionText: "Configure Privacy controls to match your preferred security and access friction."
+                            bodyText: "This screen shows Offshore permission status and privacy-related controls. Use it as your checkpoint, then open App Settings to modify permissions when needed. After changes, run a quick verification pass to confirm expected behavior. Core budgeting features continue to work offline.",
+                            fullscreenCaptionText: "Review permission status here, manage changes in App Settings, and keep in mind core features work offline."
                         )
                     ]
                 )
@@ -1048,7 +1055,7 @@ enum GeneratedHelpContent {
                         mediaItem(
                             id: "settings-notifications-1-image-1",
                             assetName: "Help/CoreScreens/Settings/Notifications/overview",
-                            bodyText: "This image shows Notification settings for selecting reminder types and schedule timing. Enable only the reminders that directly improve your daily workflow. Then validate delivery timing against when you can actually review or log data. Focused reminder design increases consistency and lowers noise.",
+                            bodyText: "Notification settings control reminder types and schedule timing. Enable only the reminders that directly improve your daily workflow. Then validate delivery timing against when you can actually review or log data. Focused reminder design increases consistency and lowers noise.",
                             fullscreenCaptionText: "Enable only high-value reminders and schedule them when you can act."
                         )
                     ]
@@ -1068,7 +1075,7 @@ enum GeneratedHelpContent {
                         mediaItem(
                             id: "settings-icloud-1-image-1",
                             assetName: "Help/CoreScreens/Settings/iCloud/overview",
-                            bodyText: "This image shows iCloud sync status and related controls for cross-device data behavior. Use it to confirm that recent edits are propagating correctly across your devices. If something appears stale, verify sync health here before changing records elsewhere. Sync-first troubleshooting prevents avoidable data confusion.",
+                            bodyText: "iCloud sync status and related controls are shown here for cross-device behavior. Use this to confirm that recent edits are propagating correctly across your devices. If something appears stale, verify sync health here before changing records elsewhere. Sync-first troubleshooting prevents avoidable data confusion.",
                             fullscreenCaptionText: "Check iCloud status first when data looks stale across devices."
                         )
                     ]
@@ -1083,7 +1090,7 @@ enum GeneratedHelpContent {
                 textSection(
                     id: "settings-quick-actions-1",
                     header: "Install and Use Quick Actions",
-                    body: "Quick Actions in Settings provide optional shortcut install and setup paths for faster capture workflows. They are useful when you repeat the same entry actions often and want fewer manual taps. Offshore works fully without them, so treat this as an efficiency layer.\n\nStart with one or two high-value actions and verify created records before scaling automation. Reliable small flows are better than complex fragile ones. Use clear shortcut naming so future edits stay manageable.\n\nIf an automation behaves unexpectedly, simplify first and retest with manual triggers. Stability should come before complexity. This keeps speed gains from turning into cleanup work."
+                    body: "Quick Actions is your install hub for all Offshore shortcuts and automation links. Install the shortcuts first, then build automations in Apple Shortcuts using the steps below.\n\nExpense automations:\n\n1. Add Expense From Tap To Pay\nTrigger: When I tap any Wallet pass or payment card.\nSetup:\n- Run Immediately.\n- Create New Shortcut.\n- Search for \"Run Shortcut\".\n- Choose \"Add Expense From Tap To Pay\".\n- Press the Down Arrow.\n- Set Input to Choose Variable.\n- Choose \"Shortcut Input\".\n- Save.\n\n2. Add Amazon Expense From Amazon.com\nTrigger: When I get an email with subject containing \"Ordered:\" from auto-confirm@amazon.com.\nSetup:\n- Run Immediately.\n- Create New Shortcut.\n- Search for \"Run Shortcut\".\n- Choose \"Add Amazon Expense From Amazon.com\".\n- Press the Down Arrow.\n- Set Input to Choose Variable.\n- Choose \"Shortcut Input\".\n- Save.\n\nIncome automations:\n\n3. Add Income From An Email\nTrigger: When I get an email with subject containing \"credited to your account\".\nSetup:\n- Run Immediately.\n- Create New Shortcut.\n- Search for \"Run Shortcut\".\n- Choose \"Add Income From An Email\".\n- Press the Down Arrow.\n- Set Input to Choose Variable.\n- Choose \"Shortcut Input\".\n- Save.\n\n4. Add Income From An SMS Message\nTrigger: When message contains \"credited to your account ending in x1234\".\nSetup:\n- Run Immediately.\n- Create New Shortcut.\n- Search for \"Run Shortcut\".\n- Choose \"Add Income From An SMS Message\".\n- Press the Down Arrow.\n- Set Input to Choose Variable.\n- Choose \"Shortcut Input\".\n- Save.\n\nFriendly note: You can customize trigger phrases later, but keep the input format consistent with what each shortcut expects and retest after every change."
                 )
             ]
         ),
@@ -1100,7 +1107,7 @@ enum GeneratedHelpContent {
                         mediaItem(
                             id: "settings-categories-overview-image-1",
                             assetName: "Help/CoreScreens/Settings/Categories/overview",
-                            bodyText: "This image shows the category management list used to organize your spending taxonomy. Use it to review naming consistency and remove ambiguity before it spreads into reports. Well-maintained categories make every filter and trend easier to trust. Small cleanup sessions here pay off across the entire app.",
+                            bodyText: "The category management list organizes your spending taxonomy. Use this to review naming consistency and remove ambiguity before it spreads into reports. Well-maintained categories make every filter and trend easier to trust. Small cleanup sessions here pay off across the entire app.",
                             fullscreenCaptionText: "Review category structure here to keep spending analysis clean and consistent."
                         )
                     ]
@@ -1113,7 +1120,7 @@ enum GeneratedHelpContent {
                         mediaItem(
                             id: "settings-categories-add-category-image-1",
                             assetName: "Help/CoreScreens/Settings/Categories/add-category",
-                            bodyText: "This step shows creating a new category to separate spending behavior currently grouped too broadly. Add categories when you need clearer tracking and better targeted adjustments. Keep names distinct so users can classify entries quickly and consistently. Focused categories improve decision quality downstream.",
+                            bodyText: "This step creates a new category to separate spending behavior that is currently grouped too broadly. Add categories when you need clearer tracking and better targeted adjustments. Keep names distinct so users can classify entries quickly and consistently. Focused categories improve decision quality downstream.",
                             fullscreenCaptionText: "Create a category when existing labels are too broad for useful decisions."
                         )
                     ]
@@ -1133,7 +1140,7 @@ enum GeneratedHelpContent {
                         mediaItem(
                             id: "settings-presets-overview-image-1",
                             assetName: "Help/CoreScreens/Settings/Presets/overview",
-                            bodyText: "This image shows the Presets management list for reviewing and organizing recurring templates. Use it to keep template values and categories accurate before each cycle begins. Clean presets improve speed and reduce setup mistakes in new budgets. This is your maintenance home for recurring planned expense logic.",
+                            bodyText: "The Presets management list is for reviewing and organizing recurring templates. Use this to keep template values and categories accurate before each cycle begins. Clean presets improve speed and reduce setup mistakes in new budgets. This is your maintenance home for recurring planned expense logic.",
                             fullscreenCaptionText: "Use Presets management to keep recurring templates accurate and ready."
                         )
                     ]
@@ -1146,13 +1153,13 @@ enum GeneratedHelpContent {
                         mediaItem(
                             id: "settings-presets-add-preset-1",
                             assetName: "Help/CoreScreens/Settings/Presets/add-preset-1",
-                            bodyText: "This first step shows entering core preset fields such as name, amount, and category. Choose defaults that match normal recurring behavior so reuse requires minimal edits. Clear naming helps you select the right preset quickly during budget setup. Strong defaults create repeatable efficiency.",
+                            bodyText: "This first step fills in core preset fields such as name, amount, and category. Choose defaults that match normal recurring behavior so reuse requires minimal edits. Clear naming helps you select the right preset quickly during budget setup. Strong defaults create repeatable efficiency.",
                             fullscreenCaptionText: "Define clear preset defaults so recurring setup needs minimal editing later."
                         ),
                         mediaItem(
                             id: "settings-presets-add-preset-2",
                             assetName: "Help/CoreScreens/Settings/Presets/add-preset-2",
-                            bodyText: "This step shows reviewing preset details before saving the template. Confirm amount and category mapping now so future budgets inherit reliable defaults. A careful review here prevents repeated cycle-by-cycle fixes. Save only after template intent is clear.",
+                            bodyText: "This step reviews preset details before saving the template. Confirm amount and category mapping now so future budgets inherit reliable defaults. A careful review here prevents repeated cycle-by-cycle fixes. Save only after template intent is clear.",
                             fullscreenCaptionText: "Review and confirm preset details before save to prevent recurring setup errors."
                         )
                     ]
@@ -1172,7 +1179,7 @@ enum GeneratedHelpContent {
                         mediaItem(
                             id: "settings-workspaces-1-image-1",
                             assetName: "Help/CoreScreens/Settings/Workspaces/overview",
-                            bodyText: "This image shows the Workspaces area used to manage and switch independent budgeting contexts. Use it when you want separate histories and totals that do not overlap. Verify the active workspace before edits so records land where intended. Proper workspace use protects data boundaries and reporting clarity.",
+                            bodyText: "The Workspaces area is used to manage and switch independent budgeting contexts. Use it when you want separate histories and totals that do not overlap. Verify the active workspace before edits so records land where intended. Proper workspace use protects data boundaries and reporting clarity.",
                             fullscreenCaptionText: "Use Workspaces to keep contexts separate and prevent cross-domain data mixing."
                         )
                     ]
@@ -1242,12 +1249,14 @@ private func mediaSection(
 private func mediaItem(
     id: String,
     assetName: String,
+    displayTitle: String? = nil,
     bodyText: String,
     fullscreenCaptionText: String? = nil
 ) -> GeneratedHelpSectionMediaItem {
     GeneratedHelpSectionMediaItem(
         id: id,
         assetName: assetName,
+        displayTitle: displayTitle,
         bodyText: bodyText,
         fullscreenCaptionText: fullscreenCaptionText
     )
