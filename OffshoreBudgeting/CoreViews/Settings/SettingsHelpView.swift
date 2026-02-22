@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsHelpView: View {
     @State private var searchText: String = ""
+    private let faqEngine = HelpFAQEngine()
 
     private var normalizedSearchText: String {
         searchText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -11,21 +12,59 @@ struct SettingsHelpView: View {
         normalizedSearchText.isEmpty == false
     }
 
+    private var faqResolution: HelpFAQResolution? {
+        guard isSearching else { return nil }
+        return faqEngine.resolve(
+            prompt: normalizedSearchText,
+            topics: GeneratedHelpContent.allLeafTopics
+        )
+    }
+
     private var searchResults: [GeneratedHelpLeafTopic] {
         guard isSearching else { return [] }
 
         return GeneratedHelpContent.allLeafTopics.filter { topic in
-            topic.searchableText.localizedCaseInsensitiveContains(normalizedSearchText)
+            topic.faqSearchText.localizedCaseInsensitiveContains(normalizedSearchText)
         }
     }
 
+    private var unresolvedSuggestions: [GeneratedHelpLeafTopic] {
+        guard let faqResolution, faqResolution.answer == nil else { return [] }
+        return faqResolution.suggestions
+    }
+
     var body: some View {
+        let currentFAQResolution = faqResolution
+
         List {
             if isSearching {
+                Section {
+                    Text("Ask in plain language. Marina answers from Help topics only.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+
+                if let answer = currentFAQResolution?.answer {
+                    Section("Marina FAQ Answer") {
+                        faqAnswerCard(answer)
+                    }
+                }
+
                 Section("Results") {
-                    if searchResults.isEmpty {
-                        Text("No matching help topics.")
+                    if let currentFAQResolution, currentFAQResolution.answer == nil {
+                        Text("I need a clearer help question, but I can suggest likely topics.")
                             .foregroundStyle(.secondary)
+
+                        ForEach(unresolvedSuggestions) { topic in
+                            leafTopicNavigationLink(topic)
+                        }
+                    }
+
+                    if searchResults.isEmpty {
+                        if currentFAQResolution?.answer != nil {
+                            Text("No matching help topics.")
+                                .foregroundStyle(.secondary)
+                        }
                     } else {
                         ForEach(searchResults) { topic in
                             leafTopicNavigationLink(topic)
@@ -51,7 +90,7 @@ struct SettingsHelpView: View {
         .searchable(
             text: $searchText,
             placement: .navigationBarDrawer(displayMode: .always),
-            prompt: "Search"
+            prompt: "Search or ask a help question"
         )
     }
 
@@ -74,6 +113,57 @@ struct SettingsHelpView: View {
             HelpTopicDetailView(topic: topic)
         } label: {
             Text(topic.title)
+        }
+    }
+
+    @ViewBuilder
+    private func faqAnswerCard(_ answer: HelpFAQAnswer) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(answer.title)
+                .font(.headline)
+
+            Text(answer.narrative)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 8) {
+                Text(confidenceLabel(for: answer.confidence))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+
+                if let sectionTitle = answer.match.sectionTitle,
+                   sectionTitle.isEmpty == false
+                {
+                    Text("|")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(sectionTitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+
+            if let topic = GeneratedHelpContent.leafTopic(for: answer.match.topicID) {
+                NavigationLink {
+                    HelpTopicDetailView(topic: topic)
+                } label: {
+                    Label("Open Topic", systemImage: "arrow.right.circle")
+                        .font(.subheadline.weight(.semibold))
+                }
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func confidenceLabel(for confidence: HelpFAQConfidence) -> String {
+        switch confidence {
+        case .high:
+            return "Best match"
+        case .medium:
+            return "Likely match"
+        case .low:
+            return "Low confidence"
         }
     }
 }

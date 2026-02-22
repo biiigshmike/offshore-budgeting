@@ -6,17 +6,23 @@ enum SavingsAccountService {
 
     // MARK: - Account
 
+    struct SavingsNormalizationReport {
+        let mergedAccountsCount: Int
+        let reassignedEntriesCount: Int
+        let recalculatedTotal: Double
+    }
+
     static func ensureSavingsAccount(
         for workspace: Workspace,
         modelContext: ModelContext
     ) -> SavingsAccount {
-        if let existing = workspaceSavingsAccounts(for: workspace, modelContext: modelContext).first {
-            return existing
+        var accounts = workspaceSavingsAccounts(for: workspace, modelContext: modelContext)
+        if accounts.isEmpty {
+            let account = SavingsAccount(workspace: workspace)
+            modelContext.insert(account)
+            accounts = [account]
         }
-
-        let account = SavingsAccount(workspace: workspace)
-        modelContext.insert(account)
-        return account
+        return accounts[0]
     }
 
     static func workspaceSavingsAccounts(
@@ -37,6 +43,89 @@ enum SavingsAccountService {
         account.total
     }
 
+    @discardableResult
+    static func normalizeSavingsData(
+        for workspace: Workspace,
+        modelContext: ModelContext
+    ) -> SavingsNormalizationReport {
+        let accounts = workspaceSavingsAccounts(for: workspace, modelContext: modelContext)
+        guard let primaryAccount = accounts.first else {
+            return SavingsNormalizationReport(
+                mergedAccountsCount: 0,
+                reassignedEntriesCount: 0,
+                recalculatedTotal: 0
+            )
+        }
+
+        var reassignedEntriesCount = 0
+        var didMutate = false
+        let workspaceEntries = workspaceSavingsEntries(for: workspace, modelContext: modelContext)
+        for entry in workspaceEntries {
+            let isAlreadyPrimary = entry.account?.id == primaryAccount.id
+            if isAlreadyPrimary { continue }
+            entry.account = primaryAccount
+            reassignedEntriesCount += 1
+            didMutate = true
+        }
+
+        var mergedAccountsCount = 0
+        for duplicateAccount in accounts.dropFirst() {
+            mergeAccountState(from: duplicateAccount, into: primaryAccount)
+            modelContext.delete(duplicateAccount)
+            mergedAccountsCount += 1
+            didMutate = true
+        }
+
+        let previousTotal = primaryAccount.total
+        recalculateAccountTotal(accountID: primaryAccount.id, modelContext: modelContext)
+        if primaryAccount.total != previousTotal {
+            didMutate = true
+        }
+        if didMutate {
+            try? modelContext.save()
+        }
+
+        trace(
+            "Normalization mergedAccounts=\(mergedAccountsCount) " +
+            "reassignedEntries=\(reassignedEntriesCount) total=\(primaryAccount.total)"
+        )
+
+        return SavingsNormalizationReport(
+            mergedAccountsCount: mergedAccountsCount,
+            reassignedEntriesCount: reassignedEntriesCount,
+            recalculatedTotal: primaryAccount.total
+        )
+    }
+
+    @discardableResult
+    static func rebuildRunningTotal(
+        for workspace: Workspace,
+        modelContext: ModelContext
+    ) -> Double {
+        let account = ensureSavingsAccount(for: workspace, modelContext: modelContext)
+        recalculateAccountTotal(accountID: account.id, modelContext: modelContext)
+        try? modelContext.save()
+        trace("Manual running-total rebuild total=\(account.total)")
+        return account.total
+    }
+
+    // MARK: - Debug Trace
+
+    private static var isTraceEnabled: Bool {
+        #if DEBUG
+        UserDefaults.standard.bool(forKey: "debug_savingsAutoCaptureTraceEnabled")
+        #else
+        false
+        #endif
+    }
+
+    private static func trace(_ message: String) {
+        #if DEBUG
+        guard isTraceEnabled else { return }
+        print("[SavingsTrace] \(message)")
+        #endif
+    }
+
     // MARK: - Auto Capture
 
     static func runAutoCaptureIfNeeded(
@@ -51,12 +140,19 @@ enum SavingsAccountService {
         let account = ensureSavingsAccount(for: workspace, modelContext: modelContext)
         let period = BudgetingPeriod(rawValue: defaultBudgetingPeriodRaw) ?? .monthly
 
+        trace(
+            "Auto-capture start workspace=\(workspace.name) period=\(period.rawValue) " +
+            "incomes=\(incomes.count) planned=\(plannedExpenses.count) variable=\(variableExpenses.count)"
+        )
+
         let currentRange = periodRange(containing: now, period: period)
         guard let latestClosedRange = previousRange(before: currentRange.start, period: period) else {
+            trace("No latest closed range found. Skipping auto-capture.")
             return
         }
 
         if !account.didBackfillHistory {
+            trace("Backfill needed. through=\(AppDateFormat.abbreviatedDate(latestClosedRange.end))")
             backfillHistory(
                 workspace: workspace,
                 account: account,
@@ -71,37 +167,65 @@ enum SavingsAccountService {
             account.autoCaptureThroughDate = latestClosedRange.end
         }
 
-        let captureStartDate = account.autoCaptureThroughDate ?? latestClosedRange.start
-        var cursor = periodRange(containing: captureStartDate, period: period)
+        var captureStartRange: (start: Date, end: Date)?
+        if let autoCaptureThroughDate = account.autoCaptureThroughDate {
+            let processedRange = periodRange(containing: autoCaptureThroughDate, period: period)
+            let isRangeEnd = Calendar.current.isDate(autoCaptureThroughDate, inSameDayAs: processedRange.end)
+            captureStartRange = isRangeEnd ? nextRange(after: processedRange, period: period) : processedRange
+        } else {
+            captureStartRange = latestClosedRange
+        }
 
-        while cursor.start <= latestClosedRange.start {
-            if !periodCloseExists(account: account, start: cursor.start, end: cursor.end) {
+        if let captureStartRange {
+            trace(
+                "Capture window start=\(AppDateFormat.abbreviatedDate(captureStartRange.start)) " +
+                "latestClosedEnd=\(AppDateFormat.abbreviatedDate(latestClosedRange.end))"
+            )
+        } else {
+            trace(
+                "Capture window is empty latestClosedEnd=\(AppDateFormat.abbreviatedDate(latestClosedRange.end))"
+            )
+        }
+
+        var cursor = captureStartRange
+        while let currentRange = cursor, currentRange.start <= latestClosedRange.start {
+            if !periodCloseExists(account: account, start: currentRange.start, end: currentRange.end) {
                 let delta = periodDelta(
-                    in: cursor,
+                    in: currentRange,
                     incomes: incomes,
                     plannedExpenses: plannedExpenses,
                     variableExpenses: variableExpenses
                 )
                 let entry = SavingsLedgerEntry(
-                    date: cursor.end,
+                    date: currentRange.end,
                     amount: delta,
-                    note: periodCloseNote(start: cursor.start, end: cursor.end),
+                    note: periodCloseNote(start: currentRange.start, end: currentRange.end),
                     kindRaw: SavingsLedgerEntryKind.periodClose.rawValue,
-                    periodStartDate: cursor.start,
-                    periodEndDate: cursor.end,
+                    periodStartDate: currentRange.start,
+                    periodEndDate: currentRange.end,
                     workspace: workspace,
                     account: account
                 )
                 modelContext.insert(entry)
+                trace(
+                    "Inserted period-close start=\(AppDateFormat.abbreviatedDate(currentRange.start)) " +
+                    "end=\(AppDateFormat.abbreviatedDate(currentRange.end)) amount=\(delta)"
+                )
+            } else {
+                trace(
+                    "Period-close already exists start=\(AppDateFormat.abbreviatedDate(currentRange.start)) " +
+                    "end=\(AppDateFormat.abbreviatedDate(currentRange.end))"
+                )
             }
 
-            guard let next = nextRange(after: cursor, period: period) else { break }
+            guard let next = nextRange(after: currentRange, period: period) else { break }
             cursor = next
         }
 
         account.autoCaptureThroughDate = latestClosedRange.end
         recalculateAccountTotal(account)
         account.updatedAt = .now
+        trace("Auto-capture end runningTotal=\(account.total)")
         try? modelContext.save()
     }
 
@@ -282,6 +406,11 @@ enum SavingsAccountService {
         _ entry: SavingsLedgerEntry,
         modelContext: ModelContext
     ) {
+        let deletedKind = entry.kind
+        let deletedDateText = AppDateFormat.abbreviatedDate(entry.date)
+        let deletedPeriodStart = entry.periodStartDate.map { AppDateFormat.abbreviatedDate($0) } ?? "n/a"
+        let deletedPeriodEnd = entry.periodEndDate.map { AppDateFormat.abbreviatedDate($0) } ?? "n/a"
+
         if let variableExpense = entry.variableExpense {
             variableExpense.savingsLedgerEntry = nil
         }
@@ -304,6 +433,10 @@ enum SavingsAccountService {
             }
         }
 
+        trace(
+            "Deleted entry kind=\(deletedKind.rawValue) date=\(deletedDateText) " +
+            "periodStart=\(deletedPeriodStart) periodEnd=\(deletedPeriodEnd)"
+        )
         try? modelContext.save()
     }
 
@@ -324,10 +457,18 @@ enum SavingsAccountService {
             plannedExpenses.map(\.expenseDate) +
             variableExpenses.map(\.transactionDate)
 
-        guard let firstActivity = activityDates.min() else { return }
+        guard let firstActivity = activityDates.min() else {
+            trace("Backfill skipped: no activity dates.")
+            return
+        }
 
         var cursor = periodRange(containing: firstActivity, period: period)
         let latest = periodRange(containing: latestClosedPeriodEnd, period: period)
+
+        trace(
+            "Backfill range firstActivity=\(AppDateFormat.abbreviatedDate(firstActivity)) " +
+            "latestClosedEnd=\(AppDateFormat.abbreviatedDate(latest.end))"
+        )
 
         while cursor.start <= latest.start {
             if !periodCloseExists(account: account, start: cursor.start, end: cursor.end) {
@@ -348,6 +489,10 @@ enum SavingsAccountService {
                     account: account
                 )
                 modelContext.insert(entry)
+                trace(
+                    "Backfill inserted period-close start=\(AppDateFormat.abbreviatedDate(cursor.start)) " +
+                    "end=\(AppDateFormat.abbreviatedDate(cursor.end)) amount=\(delta)"
+                )
             }
 
             guard let next = nextRange(after: cursor, period: period) else { break }
@@ -355,6 +500,44 @@ enum SavingsAccountService {
         }
 
         recalculateAccountTotal(account)
+    }
+
+    private static func mergeAccountState(
+        from source: SavingsAccount,
+        into destination: SavingsAccount
+    ) {
+        if source.didBackfillHistory {
+            destination.didBackfillHistory = true
+        }
+
+        guard let sourceThroughDate = source.autoCaptureThroughDate else {
+            return
+        }
+
+        if let destinationThroughDate = destination.autoCaptureThroughDate {
+            if sourceThroughDate > destinationThroughDate {
+                destination.autoCaptureThroughDate = sourceThroughDate
+            }
+        } else {
+            destination.autoCaptureThroughDate = sourceThroughDate
+        }
+    }
+
+    private static func workspaceSavingsEntries(
+        for workspace: Workspace,
+        modelContext: ModelContext
+    ) -> [SavingsLedgerEntry] {
+        let workspaceID = workspace.id
+        let descriptor = FetchDescriptor<SavingsLedgerEntry>(
+            predicate: #Predicate<SavingsLedgerEntry> { entry in
+                entry.workspace?.id == workspaceID
+            },
+            sortBy: [
+                SortDescriptor(\SavingsLedgerEntry.date, order: .forward),
+                SortDescriptor(\SavingsLedgerEntry.createdAt, order: .forward)
+            ]
+        )
+        return (try? modelContext.fetch(descriptor)) ?? []
     }
 
     private static func periodCloseExists(account: SavingsAccount, start: Date, end: Date) -> Bool {

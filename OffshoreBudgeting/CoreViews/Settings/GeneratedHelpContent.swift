@@ -44,6 +44,10 @@ struct GeneratedHelpLeafTopic: Identifiable, Hashable {
     let sections: [GeneratedHelpSection]
 
     var searchableText: String {
+        faqSearchText
+    }
+
+    var faqSearchText: String {
         var parts: [String] = [title]
 
         for section in sections {

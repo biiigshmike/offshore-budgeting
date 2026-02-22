@@ -54,6 +54,7 @@ struct ContentView: View {
     @State private var showingCannotDeleteLastWorkspaceAlert: Bool = false
     @State private var showingWorkspaceDeleteConfirm: Bool = false
     @State private var pendingWorkspaceDelete: (() -> Void)? = nil
+    @State private var repairedSavingsWorkspaceIDs: Set<UUID> = []
 
     // MARK: - SwiftData
 
@@ -281,6 +282,11 @@ struct ContentView: View {
 
         guard let workspace = selectedWorkspace else { return }
         let workspaceID = workspace.id
+
+        if !repairedSavingsWorkspaceIDs.contains(workspaceID) {
+            _ = SavingsAccountService.normalizeSavingsData(for: workspace, modelContext: modelContext)
+            repairedSavingsWorkspaceIDs.insert(workspaceID)
+        }
 
         let incomeDescriptor = FetchDescriptor<Income>(
             predicate: #Predicate<Income> { $0.workspace?.id == workspaceID }

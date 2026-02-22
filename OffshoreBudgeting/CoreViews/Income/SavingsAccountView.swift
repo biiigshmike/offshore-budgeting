@@ -51,8 +51,13 @@ struct SavingsAccountView: View {
         savingsAccounts.first
     }
 
+    private var accountScopedEntries: [SavingsLedgerEntry] {
+        guard let accountID = account?.id else { return [] }
+        return savingsEntries.filter { $0.account?.id == accountID }
+    }
+
     private var displayRows: [SavingsLedgerEntry] {
-        let dateFiltered = savingsEntries
+        let dateFiltered = accountScopedEntries
             .filter { entry in
                 entry.date >= normalizedStart(appliedStartDate) && entry.date <= normalizedEnd(appliedEndDate)
             }
@@ -87,7 +92,7 @@ struct SavingsAccountView: View {
         let rangeStart = normalizedStart(appliedStartDate)
         let rangeEnd = normalizedEnd(appliedEndDate)
 
-        let entriesAsc = savingsEntries.sorted { lhs, rhs in
+        let entriesAsc = accountScopedEntries.sorted { lhs, rhs in
             if lhs.date == rhs.date {
                 return lhs.createdAt < rhs.createdAt
             }
@@ -195,10 +200,6 @@ struct SavingsAccountView: View {
         .listStyle(.insetGrouped)
         .onAppear {
             initializeDateRangeIfNeeded()
-            if account == nil {
-                _ = SavingsAccountService.ensureSavingsAccount(for: workspace, modelContext: modelContext)
-                try? modelContext.save()
-            }
         }
         .onChange(of: defaultBudgetingPeriodRaw) { _, _ in
             applyDefaultPeriodRange()
@@ -367,7 +368,10 @@ struct SavingsAccountView: View {
     // MARK: - Actions
 
     private func saveEntry(date: Date, amount: Double, note: String, kind: SavingsLedgerEntryKind) {
-        guard let account else { return }
+        let account = account ?? SavingsAccountService.ensureSavingsAccount(
+            for: workspace,
+            modelContext: modelContext
+        )
 
         if let editingEntry {
             editingEntry.date = date

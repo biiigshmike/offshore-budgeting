@@ -163,6 +163,293 @@ struct SavingsAccountServiceTests {
         #expect(accounts[0].total == 5600)
     }
 
+    @Test func deletingPeriodCloseEntry_staysDeleted_andFuturePeriodsStillAutoCapture() throws {
+        let context = try makeContext()
+
+        let ws = Workspace(name: "WS", hexColor: "#3B82F6")
+        let card = Card(name: "Visa", workspace: ws)
+        let cat = Category(name: "General", hexColor: "#22AA66", workspace: ws)
+        context.insert(ws)
+        context.insert(card)
+        context.insert(cat)
+
+        let incomes = [
+            Income(source: "Pay", amount: 2500, date: makeDate(2026, 1, 5), isPlanned: false, workspace: ws, card: card)
+        ]
+        let plannedExpenses = [
+            PlannedExpense(title: "Rent", plannedAmount: 1000, actualAmount: 1000, expenseDate: makeDate(2026, 1, 10), workspace: ws, card: card, category: cat)
+        ]
+        let variableExpenses = [
+            VariableExpense(descriptionText: "Groceries", amount: 500, transactionDate: makeDate(2026, 1, 15), workspace: ws, card: card, category: cat)
+        ]
+
+        incomes.forEach(context.insert)
+        plannedExpenses.forEach(context.insert)
+        variableExpenses.forEach(context.insert)
+        try context.save()
+
+        SavingsAccountService.runAutoCaptureIfNeeded(
+            for: ws,
+            defaultBudgetingPeriodRaw: BudgetingPeriod.monthly.rawValue,
+            incomes: incomes,
+            plannedExpenses: plannedExpenses,
+            variableExpenses: variableExpenses,
+            modelContext: context,
+            now: makeDate(2026, 2, 15)
+        )
+
+        var entries = try fetchAll(
+            SavingsLedgerEntry.self,
+            in: context,
+            sortBy: [SortDescriptor(\SavingsLedgerEntry.date, order: .forward)]
+        )
+        let originalPeriodCloseEntries = entries.filter { $0.kind == .periodClose }
+        #expect(originalPeriodCloseEntries.count == 1)
+
+        if let originalPeriodCloseEntry = originalPeriodCloseEntries.first {
+            SavingsAccountService.deleteEntry(originalPeriodCloseEntry, modelContext: context)
+        }
+
+        entries = try fetchAll(
+            SavingsLedgerEntry.self,
+            in: context,
+            sortBy: [SortDescriptor(\SavingsLedgerEntry.date, order: .forward)]
+        )
+        let periodCloseEntriesAfterDelete = entries.filter { $0.kind == .periodClose }
+        #expect(periodCloseEntriesAfterDelete.isEmpty)
+
+        SavingsAccountService.runAutoCaptureIfNeeded(
+            for: ws,
+            defaultBudgetingPeriodRaw: BudgetingPeriod.monthly.rawValue,
+            incomes: incomes,
+            plannedExpenses: plannedExpenses,
+            variableExpenses: variableExpenses,
+            modelContext: context,
+            now: makeDate(2026, 2, 15)
+        )
+
+        entries = try fetchAll(
+            SavingsLedgerEntry.self,
+            in: context,
+            sortBy: [SortDescriptor(\SavingsLedgerEntry.date, order: .forward)]
+        )
+        let periodCloseEntriesAfterRecapture = entries.filter { $0.kind == .periodClose }
+
+        #expect(periodCloseEntriesAfterRecapture.isEmpty)
+
+        let febIncome = Income(
+            source: "Pay",
+            amount: 2600,
+            date: makeDate(2026, 2, 5),
+            isPlanned: false,
+            workspace: ws,
+            card: card
+        )
+        let febPlanned = PlannedExpense(
+            title: "Rent",
+            plannedAmount: 1000,
+            actualAmount: 1000,
+            expenseDate: makeDate(2026, 2, 10),
+            workspace: ws,
+            card: card,
+            category: cat
+        )
+        let febVariable = VariableExpense(
+            descriptionText: "Groceries",
+            amount: 400,
+            transactionDate: makeDate(2026, 2, 15),
+            workspace: ws,
+            card: card,
+            category: cat
+        )
+        context.insert(febIncome)
+        context.insert(febPlanned)
+        context.insert(febVariable)
+        try context.save()
+
+        SavingsAccountService.runAutoCaptureIfNeeded(
+            for: ws,
+            defaultBudgetingPeriodRaw: BudgetingPeriod.monthly.rawValue,
+            incomes: incomes + [febIncome],
+            plannedExpenses: plannedExpenses + [febPlanned],
+            variableExpenses: variableExpenses + [febVariable],
+            modelContext: context,
+            now: makeDate(2026, 3, 15)
+        )
+
+        entries = try fetchAll(
+            SavingsLedgerEntry.self,
+            in: context,
+            sortBy: [SortDescriptor(\SavingsLedgerEntry.date, order: .forward)]
+        )
+        let periodCloseEntriesAfterMarchRun = entries.filter { $0.kind == .periodClose }
+        #expect(periodCloseEntriesAfterMarchRun.count == 1)
+        #expect(periodCloseEntriesAfterMarchRun.first?.amount == 1200)
+    }
+
+    // MARK: - Integrity
+
+    @Test func normalization_mergesDuplicateSavingsAccounts_andReassignsWorkspaceEntries() throws {
+        let context = try makeContext()
+
+        let ws = Workspace(name: "WS", hexColor: "#3B82F6")
+        context.insert(ws)
+
+        let primary = SavingsAccount(
+            name: "Primary",
+            total: 999,
+            didBackfillHistory: false,
+            autoCaptureThroughDate: makeDate(2025, 12, 31),
+            createdAt: makeDate(2025, 9, 1),
+            workspace: ws
+        )
+        let duplicate = SavingsAccount(
+            name: "Duplicate",
+            total: 111,
+            didBackfillHistory: true,
+            autoCaptureThroughDate: makeDate(2026, 1, 31),
+            createdAt: makeDate(2025, 10, 1),
+            workspace: ws
+        )
+        context.insert(primary)
+        context.insert(duplicate)
+
+        let primaryEntry = SavingsLedgerEntry(
+            date: makeDate(2026, 1, 5),
+            amount: 100,
+            note: "Primary",
+            kindRaw: SavingsLedgerEntryKind.manualAdjustment.rawValue,
+            workspace: ws,
+            account: primary
+        )
+        let duplicateEntry = SavingsLedgerEntry(
+            date: makeDate(2026, 1, 10),
+            amount: -25,
+            note: "Duplicate",
+            kindRaw: SavingsLedgerEntryKind.manualAdjustment.rawValue,
+            workspace: ws,
+            account: duplicate
+        )
+        let orphanEntry = SavingsLedgerEntry(
+            date: makeDate(2026, 1, 12),
+            amount: 50,
+            note: "Orphan",
+            kindRaw: SavingsLedgerEntryKind.manualAdjustment.rawValue,
+            workspace: ws
+        )
+        context.insert(primaryEntry)
+        context.insert(duplicateEntry)
+        context.insert(orphanEntry)
+        try context.save()
+
+        let report = SavingsAccountService.normalizeSavingsData(for: ws, modelContext: context)
+
+        let accounts = try fetchAll(
+            SavingsAccount.self,
+            in: context,
+            sortBy: [SortDescriptor(\SavingsAccount.createdAt, order: .forward)]
+        )
+        #expect(accounts.count == 1)
+        #expect(accounts[0].id == primary.id)
+        #expect(accounts[0].didBackfillHistory)
+        #expect(accounts[0].autoCaptureThroughDate == makeDate(2026, 1, 31))
+        #expect(accounts[0].total == 125)
+
+        let entries = try fetchAll(SavingsLedgerEntry.self, in: context)
+        #expect(entries.count == 3)
+        #expect(entries.allSatisfy { $0.account?.id == primary.id })
+
+        #expect(report.mergedAccountsCount == 1)
+        #expect(report.reassignedEntriesCount == 2)
+        #expect(report.recalculatedTotal == 125)
+    }
+
+    @Test func ensureSavingsAccount_keepsExistingDuplicateAccountsUntilRepairRuns() throws {
+        let context = try makeContext()
+
+        let ws = Workspace(name: "WS", hexColor: "#3B82F6")
+        context.insert(ws)
+
+        let first = SavingsAccount(
+            name: "First",
+            createdAt: makeDate(2025, 9, 1),
+            workspace: ws
+        )
+        let second = SavingsAccount(
+            name: "Second",
+            createdAt: makeDate(2025, 9, 2),
+            workspace: ws
+        )
+        context.insert(first)
+        context.insert(second)
+
+        let duplicateEntry = SavingsLedgerEntry(
+            date: makeDate(2026, 1, 8),
+            amount: 75,
+            note: "Dup",
+            kindRaw: SavingsLedgerEntryKind.manualAdjustment.rawValue,
+            workspace: ws,
+            account: second
+        )
+        context.insert(duplicateEntry)
+        try context.save()
+
+        let ensured = SavingsAccountService.ensureSavingsAccount(for: ws, modelContext: context)
+
+        let accounts = try fetchAll(SavingsAccount.self, in: context)
+        #expect(accounts.count == 2)
+        #expect(ensured.id == first.id)
+
+        let entries = try fetchAll(SavingsLedgerEntry.self, in: context)
+        #expect(entries.count == 1)
+        #expect(entries[0].account?.id == second.id)
+    }
+
+    @Test func rebuildRunningTotal_recomputesFromLedgerEntries() throws {
+        let context = try makeContext()
+
+        let ws = Workspace(name: "WS", hexColor: "#3B82F6")
+        context.insert(ws)
+
+        let account = SavingsAccountService.ensureSavingsAccount(for: ws, modelContext: context)
+        let entries = [
+            SavingsLedgerEntry(
+                date: makeDate(2026, 1, 1),
+                amount: 500,
+                note: "A",
+                kindRaw: SavingsLedgerEntryKind.manualAdjustment.rawValue,
+                workspace: ws,
+                account: account
+            ),
+            SavingsLedgerEntry(
+                date: makeDate(2026, 1, 2),
+                amount: -120,
+                note: "B",
+                kindRaw: SavingsLedgerEntryKind.manualAdjustment.rawValue,
+                workspace: ws,
+                account: account
+            ),
+            SavingsLedgerEntry(
+                date: makeDate(2026, 1, 3),
+                amount: 20,
+                note: "C",
+                kindRaw: SavingsLedgerEntryKind.manualAdjustment.rawValue,
+                workspace: ws,
+                account: account
+            )
+        ]
+        entries.forEach(context.insert)
+        account.total = 9999
+        try context.save()
+
+        let rebuilt = SavingsAccountService.rebuildRunningTotal(for: ws, modelContext: context)
+        #expect(rebuilt == 400)
+
+        let accounts = try fetchAll(SavingsAccount.self, in: context)
+        #expect(accounts.count == 1)
+        #expect(accounts[0].total == 400)
+    }
+
     // MARK: - Positive Offset
 
     @Test func positiveSavings_allowsVariableAndPlannedOffsets_andBudgetImpactUsesNet() throws {
