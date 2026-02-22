@@ -60,7 +60,7 @@ enum ShortcutLinkCatalog {
             title: "Add Amazon Expense From Amazon.com",
             subtitle: "Install this shortcut, then run it from your Amazon confirmation email automation.",
             systemImageName: "cart.fill",
-            url: URL(string: "https://www.icloud.com/shortcuts/23a32d53deb741d3a75bbc17f83809f1")!,
+            url: URL(string: "https://www.icloud.com/shortcuts/dfdc98c5724b4c13ac021f55134882ef")!,
             platformNote: "Supported on: iPhone, iPad, and Mac",
             setupInstructions: "When I get an email subject contains \"Ordered:\" from auto-confirm@amazon.com -> Run Immediately -> Create New Shortcut -> Search for \"Run Shortcut\" -> Add Amazon Expense From Amazon.com -> Down Arrow -> Input: Choose Variable -> Shortcut Input -> Save."
         ),
