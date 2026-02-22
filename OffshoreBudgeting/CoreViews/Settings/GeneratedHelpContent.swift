@@ -463,7 +463,7 @@ enum GeneratedHelpContent {
                 textSection(
                     id: "introduction-quick-actions-5",
                     header: "Quick Action Pitfalls",
-                    body: "Avoid changing multiple trigger rules at the same time before each one is proven. Most issues come from input mapping or trigger text mismatch, not from Offshore itself.\n\nYou can customize trigger phrases later, but keep the text format consistent with what your shortcut expects so parsing stays stable. Make one change at a time, retest, and then continue."
+                    body: "Avoid changing multiple trigger rules at the same time before each one is proven. Most issues come from input mapping or trigger text mismatch, not from Offshore itself.\n\nYou can customize trigger phrases later, but keep the text format consistent with what your shortcut expects so parsing stays stable. Make one change at a time, retest, and then continue.\n\nIf you are using iCloud Sync, only enable automations on one of your devices to avoid automating adding duplicate entries."
                 )
             ]
         ),

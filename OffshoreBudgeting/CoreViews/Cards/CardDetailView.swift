@@ -800,7 +800,7 @@ struct CardDetailView: View {
                     isOn: $excludeFuturePlannedExpensesFromCalculationsInView
                 )
             } label: {
-                Label("Planned Expense Display", systemImage: "calendar")
+                Label("Planned Expense Display", systemImage: "calendar.badge")
             }
 
             Menu {
@@ -810,7 +810,7 @@ struct CardDetailView: View {
                     isOn: $excludeFutureVariableExpensesFromCalculationsInView
                 )
             } label: {
-                Label("Variable Expense Display", systemImage: "slider.horizontal.3")
+                Label("Variable Expense Display", systemImage: "chart.xyaxis.line")
             }
         } label: {
             Image(systemName: "eye")
