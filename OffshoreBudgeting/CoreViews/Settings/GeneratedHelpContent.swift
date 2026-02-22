@@ -790,8 +790,8 @@ enum GeneratedHelpContent {
                         mediaItem(
                             id: "income-planned-vs-actual-1-image-1",
                             assetName: "Help/CoreScreens/Income/Planned vs Actual/planned-vs-actual",
-                            bodyText: "This image highlights the side-by-side planned and actual income comparison view. Use this to identify gaps, timing delays, or overestimation patterns quickly. When a source varies, adjust plans to realistic expectations and continue logging actuals as they arrive. This keeps savings forecasting practical instead of optimistic.",
-                            fullscreenCaptionText: "Compare planned and actual income side by side to identify variance quickly."
+                            bodyText: "This image shows adding Actual Income received and setting it up as a recurring series. If an income source varies, consider using the Planned segment and logging income when actually received.",
+                            fullscreenCaptionText: "Adding an Actual income recurring series, repeats every 2 weeks on Fridays, ending 1 year from now."
                         )
                     ]
                 )
@@ -1124,7 +1124,7 @@ enum GeneratedHelpContent {
                         mediaItem(
                             id: "settings-categories-add-category-image-1",
                             assetName: "Help/CoreScreens/Settings/Categories/add-category",
-                            bodyText: "This step creates a new category to separate spending behavior that is currently grouped too broadly. Add categories when you need clearer tracking and better targeted adjustments. Keep names distinct so users can classify entries quickly and consistently. Focused categories improve decision quality downstream.",
+                            bodyText: "This step creates a new category to separate spending behavior that is currently grouped too broadly. Add categories when you need clearer tracking and better targeted adjustments. Keep names distinct so that you can classify entries quickly and consistently.",
                             fullscreenCaptionText: "Create a category when existing labels are too broad for useful decisions."
                         )
                     ]
