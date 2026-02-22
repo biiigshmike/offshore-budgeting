@@ -194,6 +194,9 @@ struct AppRootView: View {
             workspace: workspace,
             isEnabled: selectedSection == .home
         )
+        .background {
+            MacWindowSceneTitleHost(title: macWindowSceneTitle)
+        }
     }
 
     private var selectedSectionPath: Binding<NavigationPath> {
@@ -238,6 +241,10 @@ struct AppRootView: View {
         if commandID == AppCommandID.Help.openHelp {
             showingHelpSheet = true
         }
+    }
+
+    private var macWindowSceneTitle: String {
+        selectedSection.title
     }
 
     // MARK: - Detail Root

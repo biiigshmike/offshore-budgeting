@@ -6,7 +6,11 @@
 //
 
 import SwiftUI
-import CoreGraphics
+import CoreText
+
+#if canImport(UIKit)
+import UIKit
+#endif
 
 struct WhatIfScenarioPlannerView: View {
     
@@ -14,16 +18,17 @@ struct WhatIfScenarioPlannerView: View {
 
     private enum ExportSheetRoute: Identifiable {
         case options
+        case share
 
         var id: String {
             switch self {
             case .options: return "options"
+            case .share: return "share"
             }
         }
     }
 
     @State private var exportSheetRoute: ExportSheetRoute? = nil
-    @State private var shareExportArtifact: ShareExportArtifact? = nil
 
 
     let workspace: Workspace
@@ -171,6 +176,12 @@ struct WhatIfScenarioPlannerView: View {
         return rows.joined(separator: "\n")
     }
 
+    // MARK: - Export UI state
+
+    @State private var showExportSheet: Bool = false
+    @State private var shareItems: [Any] = []
+    @State private var showExportOptions: Bool = false
+
     // MARK: - Donut slices
 
     private var donutSlices: [DonutSlice] {
@@ -275,7 +286,20 @@ struct WhatIfScenarioPlannerView: View {
                 scenarioMenu
             }
 
+            #if canImport(UIKit)
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Done") { hideKeyboard() }
+                    .font(.subheadline.weight(.semibold))
+            }
+            #endif
         }
+        #if canImport(UIKit)
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 10)
+                .onChanged { _ in hideKeyboard() }
+        )
+        #endif
         .onAppear {
             loadEverythingIfNeeded()
         }
@@ -369,14 +393,16 @@ struct WhatIfScenarioPlannerView: View {
             case .options:
                 ExportOptionsSheet(
                     onSelect: { format in
+                        // Close options first, then open share.
                         exportSheetRoute = nil
-                        shareExportArtifact = buildExportArtifact(format)
+                        exportAndShare(format)
+                        exportSheetRoute = .share
                     }
                 )
+
+            case .share:
+                ShareSheet(items: shareItems)
             }
-        }
-        .sheet(item: $shareExportArtifact) { artifact in
-            ShareExportSheet(artifact: artifact)
         }
     }
 
@@ -384,9 +410,18 @@ struct WhatIfScenarioPlannerView: View {
         let onSelect: (ExportFormat) -> Void
         @Environment(\.dismiss) private var dismiss
         @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+        @Environment(\.verticalSizeClass) private var verticalSizeClass
+
+        private var isPhone: Bool {
+            #if os(iOS)
+            UIDevice.current.userInterfaceIdiom == .phone
+            #else
+            false
+            #endif
+        }
 
         private var useMediumDetent: Bool {
-            horizontalSizeClass == .compact
+            isPhone
         }
 
         var body: some View {
@@ -538,18 +573,10 @@ struct WhatIfScenarioPlannerView: View {
 
     // MARK: - Export helpers
 
-    fileprivate enum ExportFormat {
+    private enum ExportFormat {
         case csv
         case pdf
         case txt
-
-        var displayName: String {
-            switch self {
-            case .csv: return "CSV"
-            case .pdf: return "PDF"
-            case .txt: return "Text"
-            }
-        }
 
         var fileExtension: String {
             switch self {
@@ -560,32 +587,28 @@ struct WhatIfScenarioPlannerView: View {
         }
     }
 
-    fileprivate struct ShareExportArtifact: Identifiable {
-        let format: ExportFormat
-        let url: URL
-
-        var id: String {
-            "\(format.fileExtension)-\(url.path)"
-        }
-    }
-
-    private func buildExportArtifact(_ format: ExportFormat) -> ShareExportArtifact? {
+    private func exportAndShare(_ format: ExportFormat) {
         let fileName = sanitizedFileName("WhatIf_\(workspace.name)_\(selectedScenarioName)")
 
         switch format {
         case .csv:
-            guard let url = writeTempFile(data: Data(exportCSV.utf8), fileName: fileName, ext: format.fileExtension) else { return nil }
-            return ShareExportArtifact(format: format, url: url)
+            guard let url = writeTempFile(data: Data(exportCSV.utf8), fileName: fileName, ext: format.fileExtension) else { return }
+            presentShareSheet([url])
 
         case .txt:
-            guard let url = writeTempFile(data: Data(exportText.utf8), fileName: fileName, ext: format.fileExtension) else { return nil }
-            return ShareExportArtifact(format: format, url: url)
+            guard let url = writeTempFile(data: Data(exportText.utf8), fileName: fileName, ext: format.fileExtension) else { return }
+            presentShareSheet([url])
 
         case .pdf:
-            guard let data = buildTextOnlyPDFData() else { return nil }
-            guard let url = writeTempFile(data: data, fileName: fileName, ext: format.fileExtension) else { return nil }
-            return ShareExportArtifact(format: format, url: url)
+            guard let data = buildTextOnlyPDFData() else { return }
+            guard let url = writeTempFile(data: data, fileName: fileName, ext: format.fileExtension) else { return }
+            presentShareSheet([url])
         }
+    }
+
+    private func presentShareSheet(_ items: [Any]) {
+        shareItems = items
+        showExportSheet = true
     }
 
     private func sanitizedFileName(_ raw: String) -> String {
@@ -608,47 +631,59 @@ struct WhatIfScenarioPlannerView: View {
     }
 
     private func buildTextOnlyPDFData() -> Data? {
-        let pageRect = CGRect(x: 0, y: 0, width: 612, height: 792)
-        let margin: CGFloat = 36
+        #if canImport(UIKit)
+        let pageRect = CGRect(x: 0, y: 0, width: 612, height: 792) // US Letter @ 72 dpi
+        let renderer = UIGraphicsPDFRenderer(bounds: pageRect)
 
-        let contentView = WhatIfPDFReportView(
-            workspaceName: workspace.name,
-            subtitleText: subtitleText,
-            selectedScenarioName: selectedScenarioName,
-            generatedAtText: AppDateFormat.abbreviatedDateTime(.now),
-            savingsLabel: savingsLabel,
-            savingsValueMagnitude: savingsValueMagnitude,
-            actualSavings: actualSavings,
-            categories: categories,
-            scenarioByCategoryID: scenarioByCategoryID,
-            scenarioSavings: scenarioSavings
-        )
-        .frame(width: pageRect.width - (margin * 2), alignment: .leading)
-        .padding(20)
-        .background(.white)
+        let bodyText = buildPDFText()
+        let data = renderer.pdfData { ctx in
+            ctx.beginPage()
 
-        let renderer = ImageRenderer(content: contentView)
-        renderer.scale = 1
+            let margin: CGFloat = 36
+            let rect = CGRect(x: margin, y: margin, width: pageRect.width - (margin * 2), height: pageRect.height - (margin * 2))
+            let attrs: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: 12),
+                .foregroundColor: UIColor.label
+            ]
 
-        let data = NSMutableData()
-        guard let consumer = CGDataConsumer(data: data as CFMutableData) else { return nil }
-
-        var mediaBox = pageRect
-        guard let context = CGContext(consumer: consumer, mediaBox: &mediaBox, nil) else { return nil }
-
-        context.beginPDFPage(nil)
-
-        renderer.render { _, renderInContext in
+            let attributed = NSAttributedString(string: bodyText, attributes: attrs)
+            let framesetter = CTFramesetterCreateWithAttributedString(attributed)
+            let path = CGPath(rect: rect, transform: nil)
+            let frame = CTFramesetterCreateFrame(framesetter, CFRangeMake(0, attributed.length), path, nil)
+            let context = ctx.cgContext
             context.saveGState()
-            context.translateBy(x: margin, y: margin)
-            renderInContext(context)
+            context.translateBy(x: 0, y: pageRect.height)
+            context.scaleBy(x: 1, y: -1)
+            CTFrameDraw(frame, context)
             context.restoreGState()
         }
 
-        context.endPDFPage()
-        context.closePDF()
+        return data
+        #else
+        return nil
+        #endif
+    }
 
-        return data as Data
+    private func buildPDFText() -> String {
+        var lines: [String] = []
+        lines.append("What If? • \(workspace.name)")
+        lines.append(subtitleText)
+        lines.append("Scenario: \(selectedScenarioName)")
+        lines.append("Generated: \(AppDateFormat.abbreviatedDateTime(.now))")
+        lines.append("")
+        lines.append("Scenario \(savingsLabel): \(CurrencyFormatter.string(from: savingsValueMagnitude))")
+        lines.append("Actual Savings: \(CurrencyFormatter.string(from: actualSavings))")
+        lines.append("")
+        lines.append("Categories")
+
+        for c in categories {
+            let amount = scenarioByCategoryID[c.id, default: 0]
+            lines.append("• \(c.name): \(CurrencyFormatter.string(from: amount))")
+        }
+
+        lines.append("")
+        lines.append("Savings/Remaining: \(CurrencyFormatter.string(from: scenarioSavings))")
+        return lines.joined(separator: "\n")
     }
 
     private func loadScenarioIntoUI(id: UUID) {
@@ -848,96 +883,22 @@ struct WhatIfScenarioPlannerView: View {
 
 }
 
-private struct ShareExportSheet: View {
-    let artifact: WhatIfScenarioPlannerView.ShareExportArtifact
-
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            VStack(alignment: .leading, spacing: 16) {
-                Text("\(artifact.format.displayName) file is ready.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-
-                ShareLink(item: artifact.url) {
-                    Label("Share \(artifact.format.displayName)", systemImage: "square.and.arrow.up")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-
-                Spacer()
-            }
-            .padding()
-            .navigationTitle("Share Export")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") { dismiss() }
-                }
-            }
-        }
+#if canImport(UIKit)
+private extension View {
+    func hideKeyboard() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 }
 
-private struct WhatIfPDFReportView: View {
-    let workspaceName: String
-    let subtitleText: String
-    let selectedScenarioName: String
-    let generatedAtText: String
-    let savingsLabel: String
-    let savingsValueMagnitude: Double
-    let actualSavings: Double
-    let categories: [Category]
-    let scenarioByCategoryID: [UUID: Double]
-    let scenarioSavings: Double
+private struct ShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("What If? • \(workspaceName)")
-                .font(.title3.weight(.semibold))
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
 
-            Text(subtitleText)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-
-            Text("Scenario: \(selectedScenarioName)")
-                .font(.subheadline)
-
-            Text("Generated: \(generatedAtText)")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            Divider()
-
-            Text("Scenario \(savingsLabel): \(CurrencyFormatter.string(from: savingsValueMagnitude))")
-                .font(.subheadline.weight(.semibold))
-
-            Text("Actual Savings: \(CurrencyFormatter.string(from: actualSavings))")
-                .font(.subheadline)
-
-            Divider()
-
-            Text("Categories")
-                .font(.headline)
-
-            ForEach(categories) { category in
-                let amount = scenarioByCategoryID[category.id, default: 0]
-                HStack(alignment: .firstTextBaseline) {
-                    Text(category.name)
-                    Spacer(minLength: 8)
-                    Text(CurrencyFormatter.string(from: amount))
-                        .monospacedDigit()
-                }
-                .font(.subheadline)
-            }
-
-            Divider()
-
-            Text("Savings/Remaining: \(CurrencyFormatter.string(from: scenarioSavings))")
-                .font(.subheadline.weight(.semibold))
-        }
-        .foregroundStyle(.black)
-        .frame(maxWidth: .infinity, alignment: .leading)
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {
+        // No-op
     }
 }
+#endif
