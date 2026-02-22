@@ -423,6 +423,11 @@ private struct HelpSectionFullscreenViewer: View {
         presentation.mediaItems.first(where: { $0.id == selectedMediaID }) ?? presentation.mediaItems.first
     }
 
+    private var selectedCaptionText: String? {
+        guard let selectedItem else { return nil }
+        return selectedItem.fullscreenCaptionText ?? selectedItem.bodyText
+    }
+
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
@@ -440,8 +445,8 @@ private struct HelpSectionFullscreenViewer: View {
                 }
                 .tabViewStyle(.page(indexDisplayMode: .automatic))
 
-                if let selectedItem {
-                    Text(selectedItem.bodyText)
+                if let selectedCaptionText {
+                    Text(selectedCaptionText)
                         .font(.body)
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity, alignment: .leading)
