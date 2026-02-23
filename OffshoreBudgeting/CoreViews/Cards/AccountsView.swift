@@ -272,7 +272,7 @@ private struct AccountsGlassSegmentControl: View {
                     segmentButton(for: selectedSegment)
                 }
             }
-            .animation(.spring(response: 0.32, dampingFraction: 0.84), value: isExpanded)
+            .animation(.smooth, value: isExpanded)
         }
     }
 
@@ -306,6 +306,7 @@ private struct AccountsGlassSegmentControl: View {
                 .contentShape(.capsule)
         }
         .glassEffectID(segment.id, in: namespace)
+        .glassEffectTransition(.matchedGeometry)
         .accessibilityLabel(segment.rawValue)
     }
 }
