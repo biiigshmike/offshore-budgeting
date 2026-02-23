@@ -223,7 +223,7 @@ struct PillTimePickerField: View {
                             .datePickerStyle(.wheel)
                             .labelsHidden()
                             .frame(height: PillPickerSheetMetrics.timePickerContentHeight, alignment: .top)
-                            .frame(maxWidth: .infinity, alignment: .topLeading)
+                            .frame(maxWidth: .infinity, alignment: .center)
                     }
                     .scrollBounceBehavior(.basedOnSize)
                     .transaction { txn in
