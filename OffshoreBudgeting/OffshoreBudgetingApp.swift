@@ -10,6 +10,16 @@ import SwiftData
 import UIKit
 #endif
 
+struct AppWindowContext: Codable, Hashable {
+    let sectionRawValue: String
+    let nonce: UUID
+
+    init(sectionRawValue: String, nonce: UUID = UUID()) {
+        self.sectionRawValue = sectionRawValue
+        self.nonce = nonce
+    }
+}
+
 @main
 struct OffshoreBudgetingApp: App {
 
@@ -58,12 +68,13 @@ struct OffshoreBudgetingApp: App {
     }()
 
     @Environment(\.scenePhase) private var scenePhase
-    @StateObject private var commandHub: AppCommandHub = AppCommandHub()
 
     var body: some Scene {
-        WindowGroup {
-            AppBootstrapRootView(modelContainer: $modelContainer)
-                .environment(\.appCommandHub, commandHub)
+        WindowGroup(for: AppWindowContext.self) { windowContext in
+            WindowSceneRootView(
+                modelContainer: $modelContainer,
+                initialSectionOverride: initialSection(from: windowContext.wrappedValue)
+            )
                 .id(rootResetToken)
                 .onAppear {
                     ShoppingModeManager.shared.refreshIfExpired()
@@ -95,9 +106,14 @@ struct OffshoreBudgetingApp: App {
         .modelContainer(modelContainer)
         .commands {
             if shouldInstallMenuCommands {
-                OffshoreAppCommands(commandHub: commandHub)
+                OffshoreAppCommands()
             }
         }
+    }
+
+    private func initialSection(from context: AppWindowContext?) -> AppSection? {
+        guard let context else { return nil }
+        return AppSection.fromStorageRaw(context.sectionRawValue)
     }
 
     private var shouldInstallMenuCommands: Bool {
@@ -276,4 +292,20 @@ struct OffshoreBudgetingApp: App {
         return false
     }
     #endif
+}
+
+private struct WindowSceneRootView: View {
+    @Binding var modelContainer: ModelContainer
+    let initialSectionOverride: AppSection?
+
+    @StateObject private var commandHub: AppCommandHub = AppCommandHub()
+
+    var body: some View {
+        AppBootstrapRootView(
+            modelContainer: $modelContainer,
+            initialSectionOverride: initialSectionOverride
+        )
+        .environment(\.appCommandHub, commandHub)
+        .focusedSceneObject(commandHub)
+    }
 }

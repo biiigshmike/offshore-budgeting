@@ -9,6 +9,11 @@ import SwiftUI
 import SwiftData
 
 struct ContentView: View {
+    let initialSectionOverride: AppSection?
+
+    init(initialSectionOverride: AppSection? = nil) {
+        self.initialSectionOverride = initialSectionOverride
+    }
 
     // MARK: - Selection
 
@@ -75,7 +80,8 @@ struct ContentView: View {
                 } else if let selected = selectedWorkspace {
                     AppRootView(
                         workspace: selected,
-                        selectedWorkspaceID: $selectedWorkspaceID
+                        selectedWorkspaceID: $selectedWorkspaceID,
+                        initialSectionOverride: initialSectionOverride
                     )
                 } else {
                     NavigationStack {

@@ -6,6 +6,7 @@ import SwiftData
 struct AppBootstrapRootView: View {
 
     @Binding var modelContainer: ModelContainer
+    let initialSectionOverride: AppSection?
 
     @AppStorage("didCompleteOnboarding") private var didCompleteOnboarding: Bool = false
     @AppStorage("onboarding_didChooseDataSource") private var didChooseDataSource: Bool = false
@@ -33,7 +34,7 @@ struct AppBootstrapRootView: View {
                 didChooseDataSource = true
             }
         } else {
-            ContentView()
+            ContentView(initialSectionOverride: initialSectionOverride)
         }
     }
 }

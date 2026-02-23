@@ -11,6 +11,10 @@ import Combine
 // MARK: - Command IDs
 
 enum AppCommandID {
+    enum Window {
+        static let newWindow = "window.new_window"
+    }
+
     enum Help {
         static let openHelp = "help.open_help"
     }
@@ -127,6 +131,7 @@ struct AppCommandAvailability: Equatable {
 final class AppCommandHub: ObservableObject {
     @Published private(set) var surface: AppCommandSurface = .none
     @Published private(set) var availability: AppCommandAvailability = .init()
+    @Published private(set) var activeSectionRaw: String = AppSection.home.rawValue
     @Published private(set) var sequence: Int = 0
     private(set) var latestCommandID: String = ""
 
@@ -161,6 +166,11 @@ final class AppCommandHub: ObservableObject {
     func dispatch(_ commandID: String) {
         latestCommandID = commandID
         sequence += 1
+    }
+
+    func setActiveSectionRaw(_ sectionRaw: String) {
+        guard activeSectionRaw != sectionRaw else { return }
+        activeSectionRaw = sectionRaw
     }
 }
 
@@ -204,15 +214,20 @@ private struct AppMenuCommandItem: Identifiable {
 // MARK: - Commands
 
 struct OffshoreAppCommands: Commands {
-    @ObservedObject var commandHub: AppCommandHub
+    @FocusedObject private var commandHub: AppCommandHub?
+    @Environment(\.openWindow) private var openWindow
+    @Environment(\.supportsMultipleWindows) private var supportsMultipleWindows
 
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
-            if fileItems.isEmpty {
-                Button("New") { }
-                    .keyboardShortcut("n", modifiers: [.command])
-                    .disabled(true)
-            } else {
+            Button("New Window") {
+                openNewWindow()
+            }
+            .keyboardShortcut("n", modifiers: [.command, .option])
+            .disabled(supportsMultipleWindows == false)
+
+            if !fileItems.isEmpty {
+                Divider()
                 ForEach(fileItems) { item in
                     commandButton(for: item)
                 }
@@ -264,7 +279,7 @@ struct OffshoreAppCommands: Commands {
     }
 
     private var fileItems: [AppMenuCommandItem] {
-        switch commandHub.surface {
+        switch currentSurface {
         case .home:
             return []
         case .budgets:
@@ -281,7 +296,7 @@ struct OffshoreAppCommands: Commands {
                     id: AppCommandID.BudgetDetail.newTransaction,
                     title: "New Expense",
                     shortcut: KeyboardShortcut("n", modifiers: [.command]),
-                    isEnabled: commandHub.availability.budgetDetailCanCreateTransaction
+                    isEnabled: currentAvailability.budgetDetailCanCreateTransaction
                 )
             ]
         case .income:
@@ -319,7 +334,7 @@ struct OffshoreAppCommands: Commands {
     }
 
     private var editItems: [AppMenuCommandItem] {
-        switch commandHub.surface {
+        switch currentSurface {
         case .home:
             return []
         case .budgetDetail:
@@ -342,14 +357,14 @@ struct OffshoreAppCommands: Commands {
                     id: AppCommandID.Income.deleteActual,
                     title: "Delete Actual Income",
                     shortcut: KeyboardShortcut(.delete, modifiers: [.command]),
-                    isEnabled: commandHub.availability.incomeCanDeleteActual,
+                    isEnabled: currentAvailability.incomeCanDeleteActual,
                     role: .destructive
                 ),
                 AppMenuCommandItem(
                     id: AppCommandID.Income.deletePlanned,
                     title: "Delete Planned Income",
                     shortcut: KeyboardShortcut(.delete, modifiers: [.command, .shift]),
-                    isEnabled: commandHub.availability.incomeCanDeletePlanned,
+                    isEnabled: currentAvailability.incomeCanDeletePlanned,
                     role: .destructive
                 )
             ]
@@ -373,7 +388,7 @@ struct OffshoreAppCommands: Commands {
     }
 
     private var viewItems: [AppMenuCommandItem] {
-        switch commandHub.surface {
+        switch currentSurface {
         case .home:
             return expenseDisplayItems
         case .budgets:
@@ -446,7 +461,7 @@ struct OffshoreAppCommands: Commands {
                 )
             ]
         case .cards:
-            switch commandHub.availability.cardsSortContext {
+            switch currentAvailability.cardsSortContext {
             case .cards:
                 return [
                     AppMenuCommandItem(
@@ -584,16 +599,33 @@ struct OffshoreAppCommands: Commands {
     private func commandButton(for item: AppMenuCommandItem) -> some View {
         if let role = item.role {
             Button(item.title, role: role) {
-                commandHub.dispatch(item.id)
+                dispatch(item.id)
             }
             .keyboardShortcut(item.shortcut)
             .disabled(!item.isEnabled)
         } else {
             Button(item.title) {
-                commandHub.dispatch(item.id)
+                dispatch(item.id)
             }
             .keyboardShortcut(item.shortcut)
             .disabled(!item.isEnabled)
         }
+    }
+
+    private var currentSurface: AppCommandSurface {
+        commandHub?.surface ?? .none
+    }
+
+    private var currentAvailability: AppCommandAvailability {
+        commandHub?.availability ?? .init()
+    }
+
+    private func dispatch(_ commandID: String) {
+        commandHub?.dispatch(commandID)
+    }
+
+    private func openNewWindow() {
+        let sectionRaw = commandHub?.activeSectionRaw ?? AppSection.home.rawValue
+        openWindow(value: AppWindowContext(sectionRawValue: sectionRaw))
     }
 }

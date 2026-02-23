@@ -39,12 +39,35 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
         case .settings: return "gear"
         }
     }
+
+    static func fromStorageRaw(_ raw: String) -> AppSection? {
+        if let section = AppSection(rawValue: raw) {
+            return section
+        }
+
+        if raw == "Accounts" {
+            return .cards
+        }
+
+        return nil
+    }
 }
 
 struct AppRootView: View {
 
     let workspace: Workspace
     @Binding var selectedWorkspaceID: String
+    let initialSectionOverride: AppSection?
+
+    init(
+        workspace: Workspace,
+        selectedWorkspaceID: Binding<String>,
+        initialSectionOverride: AppSection? = nil
+    ) {
+        self.workspace = workspace
+        self._selectedWorkspaceID = selectedWorkspaceID
+        self.initialSectionOverride = initialSectionOverride
+    }
 
     @AppStorage("general_rememberTabSelection") private var rememberTabSelection: Bool = false
     @AppStorage(AppShortcutNavigationStore.pendingSectionKey) private var pendingShortcutSectionRaw: String = ""
@@ -73,7 +96,7 @@ struct AppRootView: View {
     }
 
     private var selectedSection: AppSection {
-        section(from: selectedSectionRaw) ?? .home
+        AppSection.fromStorageRaw(selectedSectionRaw) ?? .home
     }
 
     private var selectedSectionBinding: Binding<AppSection> {
@@ -105,10 +128,16 @@ struct AppRootView: View {
         .onAppear {
             guard didApplyInitialSection == false else { return }
             didApplyInitialSection = true
-            consumePendingShortcutSectionIfNeeded()
+            if let initialSectionOverride {
+                selectedSectionRaw = initialSectionOverride.rawValue
+            } else {
+                consumePendingShortcutSectionIfNeeded()
 
-            guard rememberTabSelection == false else { return }
-            selectedSectionRaw = AppSection.home.rawValue
+                guard rememberTabSelection == false else { return }
+                selectedSectionRaw = AppSection.home.rawValue
+            }
+
+            commandHub.setActiveSectionRaw(selectedSectionRaw)
         }
         .onChange(of: rememberTabSelection) { _, newValue in
             guard newValue == false else { return }
@@ -119,6 +148,9 @@ struct AppRootView: View {
         }
         .onReceive(commandHub.$sequence) { _ in
             handleCommand(commandHub.latestCommandID)
+        }
+        .onChange(of: selectedSectionRaw) { _, newValue in
+            commandHub.setActiveSectionRaw(newValue)
         }
         .sheet(isPresented: $showingHelpSheet) {
             NavigationStack {
@@ -218,23 +250,11 @@ struct AppRootView: View {
         let pending = pendingShortcutSectionRaw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !pending.isEmpty else { return }
 
-        if let section = section(from: pending) {
+        if let section = AppSection.fromStorageRaw(pending) {
             selectedSectionRaw = section.rawValue
         }
 
         pendingShortcutSectionRaw = ""
-    }
-
-    private func section(from raw: String) -> AppSection? {
-        if let section = AppSection(rawValue: raw) {
-            return section
-        }
-
-        if raw == "Accounts" {
-            return .cards
-        }
-
-        return nil
     }
 
     private func handleCommand(_ commandID: String) {
