@@ -43,6 +43,18 @@ struct AccountsView: View {
 
     @Environment(\.appCommandHub) private var commandHub
 
+    private var isPhone: Bool {
+        #if canImport(UIKit)
+        UIDevice.current.userInterfaceIdiom == .phone
+        #else
+        false
+        #endif
+    }
+
+    private var shouldSyncCommandSurface: Bool {
+        isPhone == false
+    }
+
     // MARK: - View
 
     var body: some View {
@@ -96,13 +108,17 @@ struct AccountsView: View {
             updateCommandSurface()
         }
         .onDisappear {
-            commandHub.deactivate(.cards)
+            if shouldSyncCommandSurface {
+                commandHub.deactivate(.cards)
+            }
         }
     }
 
     // MARK: - Commands
 
     private func updateCommandSurface() {
+        guard shouldSyncCommandSurface else { return }
+
         switch selectedSegment {
         case .cards:
             commandHub.activate(.cards)

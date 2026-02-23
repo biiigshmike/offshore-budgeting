@@ -300,12 +300,27 @@ private struct WindowSceneRootView: View {
 
     @StateObject private var commandHub: AppCommandHub = AppCommandHub()
 
+    private var shouldUseFocusedSceneObject: Bool {
+        #if targetEnvironment(macCatalyst)
+        return true
+        #elseif canImport(UIKit)
+        return UIDevice.current.userInterfaceIdiom != .phone
+        #else
+        return true
+        #endif
+    }
+
     var body: some View {
-        AppBootstrapRootView(
+        let root = AppBootstrapRootView(
             modelContainer: $modelContainer,
             initialSectionOverride: initialSectionOverride
         )
         .environment(\.appCommandHub, commandHub)
-        .focusedSceneObject(commandHub)
+
+        if shouldUseFocusedSceneObject {
+            root.focusedSceneObject(commandHub)
+        } else {
+            root
+        }
     }
 }

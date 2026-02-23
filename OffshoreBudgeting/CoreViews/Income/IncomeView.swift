@@ -80,6 +80,18 @@ struct IncomeView: View {
     @State private var shortcutDeleteCandidates: [Income] = []
     @State private var shortcutDeleteKind: IncomeDeleteKind? = nil
 
+    private var isPhone: Bool {
+        #if canImport(UIKit)
+        UIDevice.current.userInterfaceIdiom == .phone
+        #else
+        false
+        #endif
+    }
+
+    private var shouldSyncCommandSurface: Bool {
+        isPhone == false
+    }
+
     init(workspace: Workspace) {
         self.workspace = workspace
 
@@ -422,24 +434,34 @@ struct IncomeView: View {
             }
             .onAppear {
                 consumePendingShortcutActionIfNeeded()
-                commandHub.activate(.income)
-                updateIncomeCommandAvailability()
+                if shouldSyncCommandSurface {
+                    commandHub.activate(.income)
+                    updateIncomeCommandAvailability()
+                }
             }
             .onDisappear {
-                commandHub.deactivate(.income)
-                commandHub.setIncomeDeletionAvailability(canDeleteActual: false, canDeletePlanned: false)
+                if shouldSyncCommandSurface {
+                    commandHub.deactivate(.income)
+                    commandHub.setIncomeDeletionAvailability(canDeleteActual: false, canDeletePlanned: false)
+                }
             }
             .onChange(of: pendingShortcutActionRaw) { _, _ in
                 consumePendingShortcutActionIfNeeded()
             }
             .onChange(of: selectedDayStart) { _, _ in
-                updateIncomeCommandAvailability()
+                if shouldSyncCommandSurface {
+                    updateIncomeCommandAvailability()
+                }
             }
             .onChange(of: actualIncomesForSelectedDay.count) { _, _ in
-                updateIncomeCommandAvailability()
+                if shouldSyncCommandSurface {
+                    updateIncomeCommandAvailability()
+                }
             }
             .onChange(of: plannedIncomesForSelectedDay.count) { _, _ in
-                updateIncomeCommandAvailability()
+                if shouldSyncCommandSurface {
+                    updateIncomeCommandAvailability()
+                }
             }
             .onReceive(commandHub.$sequence) { _ in
                 guard commandHub.surface == .income else { return }

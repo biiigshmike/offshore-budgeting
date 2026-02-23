@@ -99,6 +99,10 @@ struct AppRootView: View {
         AppSection.fromStorageRaw(selectedSectionRaw) ?? .home
     }
 
+    private var shouldSyncActiveSectionToCommandHub: Bool {
+        isPhone == false
+    }
+
     private var selectedSectionBinding: Binding<AppSection> {
         Binding(
             get: { selectedSection },
@@ -137,7 +141,9 @@ struct AppRootView: View {
                 selectedSectionRaw = AppSection.home.rawValue
             }
 
-            commandHub.setActiveSectionRaw(selectedSectionRaw)
+            if shouldSyncActiveSectionToCommandHub {
+                commandHub.setActiveSectionRaw(selectedSectionRaw)
+            }
         }
         .onChange(of: rememberTabSelection) { _, newValue in
             guard newValue == false else { return }
@@ -150,7 +156,9 @@ struct AppRootView: View {
             handleCommand(commandHub.latestCommandID)
         }
         .onChange(of: selectedSectionRaw) { _, newValue in
-            commandHub.setActiveSectionRaw(newValue)
+            if shouldSyncActiveSectionToCommandHub {
+                commandHub.setActiveSectionRaw(newValue)
+            }
         }
         .sheet(isPresented: $showingHelpSheet) {
             NavigationStack {

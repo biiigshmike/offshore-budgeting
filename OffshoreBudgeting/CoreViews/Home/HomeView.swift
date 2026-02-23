@@ -126,6 +126,10 @@ struct HomeView: View {
         #endif
     }
 
+    private var shouldSyncCommandSurface: Bool {
+        isPhone == false
+    }
+
     init(workspace: Workspace) {
         self.workspace = workspace
         let workspaceID = workspace.id
@@ -289,7 +293,9 @@ struct HomeView: View {
             }
         }
         .onAppear {
-            commandHub.activate(.home)
+            if shouldSyncCommandSurface {
+                commandHub.activate(.home)
+            }
             bootstrapAppliedDatesIfNeeded()
             applyDefaultBudgetingPeriodIfSettingsChanged()
             syncDraftToApplied()
@@ -301,7 +307,9 @@ struct HomeView: View {
             excludeFutureVariableExpensesFromCalculationsInView = excludeFutureVariableExpensesFromCalculationsDefault
         }
         .onDisappear {
-            commandHub.deactivate(.home)
+            if shouldSyncCommandSurface {
+                commandHub.deactivate(.home)
+            }
         }
         .onReceive(commandHub.$sequence) { _ in
             guard commandHub.surface == .home else { return }

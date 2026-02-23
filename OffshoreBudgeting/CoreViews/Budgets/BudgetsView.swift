@@ -40,6 +40,18 @@ struct BudgetsView: View {
         )
     }
 
+    private var isPhone: Bool {
+        #if canImport(UIKit)
+        UIDevice.current.userInterfaceIdiom == .phone
+        #else
+        false
+        #endif
+    }
+
+    private var shouldSyncCommandSurface: Bool {
+        isPhone == false
+    }
+
     // MARK: - Date Buckets
 
     private var todayStartOfDay: Date {
@@ -205,10 +217,14 @@ struct BudgetsView: View {
             }
         }
         .onAppear {
-            commandHub.activate(.budgets)
+            if shouldSyncCommandSurface {
+                commandHub.activate(.budgets)
+            }
         }
         .onDisappear {
-            commandHub.deactivate(.budgets)
+            if shouldSyncCommandSurface {
+                commandHub.deactivate(.budgets)
+            }
         }
         .onReceive(commandHub.$sequence) { _ in
             guard commandHub.surface == .budgets else { return }
