@@ -110,6 +110,67 @@ struct HelpFAQEngineTests {
         #expect(first == ["notifications", "general", "budgets"])
     }
 
+    @Test func rankedTopicMatches_prioritizesFocusedMatch_andIncludesSectionMetadata() {
+        let engine = HelpFAQEngine()
+
+        let topics: [GeneratedHelpLeafTopic] = [
+            makeTopic(
+                id: "budget-setup",
+                title: "Budget Setup",
+                header: "Create a Budget",
+                body: "Create a budget, choose cards, and verify setup in one flow."
+            ),
+            makeTopic(
+                id: "home-overview",
+                title: "Home Overview",
+                header: "Overview",
+                body: "Home summarizes budgets, spending, and trends after setup is complete."
+            )
+        ]
+
+        let matches = engine.rankedTopicMatches(
+            for: "How can I create a budget?",
+            topics: topics
+        )
+
+        #expect(matches.isEmpty == false)
+        #expect(matches.first?.topicID == "budget-setup")
+        #expect(matches.first?.sectionID == "budget-setup-section")
+        #expect(matches.first?.sectionTitle == "Create a Budget")
+    }
+
+    @Test func rankedTopicMatches_samePrompt_returnsDeterministicOrdering() {
+        let engine = HelpFAQEngine()
+
+        let topics: [GeneratedHelpLeafTopic] = [
+            makeTopic(
+                id: "notifications",
+                title: "Notifications",
+                header: "Notification Reminders",
+                body: "Manage notification reminders and alert schedule for your budget periods."
+            ),
+            makeTopic(
+                id: "general",
+                title: "General Settings",
+                header: "Defaults",
+                body: "Adjust default budgeting period and reminder behavior."
+            ),
+            makeTopic(
+                id: "privacy",
+                title: "Privacy",
+                header: "Permissions",
+                body: "Review privacy controls and data settings."
+            )
+        ]
+
+        let prompt = "notification reminder settings"
+        let first = engine.rankedTopicMatches(for: prompt, topics: topics).map(\.topicID)
+        let second = engine.rankedTopicMatches(for: prompt, topics: topics).map(\.topicID)
+
+        #expect(first == second)
+        #expect(first.first == "notifications")
+    }
+
     // MARK: - Helpers
 
     private func makeTopic(
