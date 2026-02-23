@@ -26,6 +26,7 @@ struct BudgetDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appCommandHub) private var commandHub
+    @Environment(DetailViewSnapshotCache.self) private var detailSnapshotCache
     
     // MARK: - Budget Delete Flow
     
@@ -34,29 +35,10 @@ struct BudgetDetailView: View {
     
     @State private var showingBudgetDeleteOptionsDialog: Bool = false
     @State private var showingNothingToDeleteAlert: Bool = false
-    
-    @State private var showingReviewRecordedBudgetPlannedExpenses: Bool = false
 
     // MARK: - Sheets
 
-    @State private var showingAddExpenseSheet: Bool = false
-    @State private var showingManagePresetsSheet: Bool = false
-    @State private var showingManageCardsSheet: Bool = false
-    @State private var showingEditBudgetSheet: Bool = false
-
-    @State private var showingEditExpenseSheet: Bool = false
-    @State private var editingExpense: VariableExpense? = nil
-
-    @State private var showingEditPlannedExpenseSheet: Bool = false
-    @State private var editingPlannedExpense: PlannedExpense? = nil
-
-    @State private var showingEditPresetSheet: Bool = false
-    @State private var editingPreset: Preset? = nil
-
-    @State private var showingEditCategoryLimitSheet: Bool = false
-    @State private var editingCategoryLimitCategory: Category? = nil
-    @State private var editingCategoryLimitPlannedContribution: Double = 0
-    @State private var editingCategoryLimitVariableContribution: Double = 0
+    @State private var activeModal: BudgetDetailModalRoute? = nil
     
     // MARK: - Expense Delete Flow
     
@@ -72,10 +54,31 @@ struct BudgetDetailView: View {
     @State private var excludeFuturePlannedExpensesFromCalculationsInView: Bool = false
     @State private var hideFutureVariableExpensesInView: Bool = false
     @State private var excludeFutureVariableExpensesFromCalculationsInView: Bool = false
+
+    private var isPhone: Bool {
+        #if canImport(UIKit)
+        UIDevice.current.userInterfaceIdiom == .phone
+        #else
+        false
+        #endif
+    }
+
+    private var shouldSyncCommandSurface: Bool {
+        isPhone == false
+    }
     
     // MARK: - Search
     
     @State private var searchText: String = ""
+    @State private var derivedState: BudgetDetailDerivedState = .empty
+    @State private var searchRebuildTask: Task<Void, Never>? = nil
+    @State private var didApplyDefaultsOnAppear: Bool = false
+    @State private var hasLoadedDerivedState: Bool = false
+    @State private var needsDerivedStateRefresh: Bool = false
+    @State private var isVisible: Bool = false
+#if DEBUG
+    @State private var appearCount: Int = 0
+#endif
     @FocusState private var searchFocused: Bool
     
     // MARK: - Budget Window
@@ -97,7 +100,30 @@ struct BudgetDetailView: View {
     }
     
     // MARK: - Linked Cards
-    
+
+    private static let tipItems: [PostBoardingTipItem] = [
+        PostBoardingTipItem(
+            systemImage: "chart.bar.xaxis",
+            title: "Detailed Overview",
+            detail: "View income, expenses, and savings summaries for the budget period."
+        ),
+        PostBoardingTipItem(
+            systemImage: "magnifyingglass",
+            title: "Search for Expenses",
+            detail: "Search by name, category, card, date, or amount using the search bar."
+        ),
+        PostBoardingTipItem(
+            systemImage: "tag",
+            title: "Categories",
+            detail: "Tap a category to filter expenses by that category alone, then tap the same category again to clear your selection."
+        ),
+        PostBoardingTipItem(
+            systemImage: "ellipsis",
+            title: "Budget Management",
+            detail: "Press the three dots and manage your budget easily. Assign cards and presets to track them for your budget period."
+        )
+    ]
+
     private var linkedCards: [Card] {
         (budget.cardLinks ?? [])
             .compactMap { $0.card }
@@ -120,227 +146,266 @@ struct BudgetDetailView: View {
     
     // MARK: - Income (within budget window)
     
-    private var incomesInBudget: [Income] {
-        (workspace.incomes ?? [])
+    private struct BudgetDetailDerivedState {
+        let plannedExpensesInBudget: [PlannedExpense]
+        let variableExpensesInBudget: [VariableExpense]
+        let categoriesInBudget: [Category]
+        let plannedIncomeTotal: Double
+        let actualIncomeTotal: Double
+        let plannedExpensesFiltered: [PlannedExpense]
+        let variableExpensesFiltered: [VariableExpense]
+        let unifiedItemsFiltered: [BudgetUnifiedExpenseItem]
+        let hiddenFuturePlannedExpenseCount: Int
+        let hiddenFutureVariableExpenseCount: Int
+        let plannedExpensesPlannedTotal: Double
+        let plannedExpensesActualTotal: Double
+        let plannedExpensesEffectiveTotal: Double
+        let variableExpensesTotal: Double
+        let maxSavings: Double
+        let projectedSavings: Double
+        let actualSavings: Double
+        let presetBySourceID: [UUID: Preset]
+
+        static let empty = BudgetDetailDerivedState(
+            plannedExpensesInBudget: [],
+            variableExpensesInBudget: [],
+            categoriesInBudget: [],
+            plannedIncomeTotal: 0,
+            actualIncomeTotal: 0,
+            plannedExpensesFiltered: [],
+            variableExpensesFiltered: [],
+            unifiedItemsFiltered: [],
+            hiddenFuturePlannedExpenseCount: 0,
+            hiddenFutureVariableExpenseCount: 0,
+            plannedExpensesPlannedTotal: 0,
+            plannedExpensesActualTotal: 0,
+            plannedExpensesEffectiveTotal: 0,
+            variableExpensesTotal: 0,
+            maxSavings: 0,
+            projectedSavings: 0,
+            actualSavings: 0,
+            presetBySourceID: [:]
+        )
+    }
+
+    private struct CategoryLimitEditorInput {
+        let category: Category
+        let plannedContribution: Double
+        let variableContribution: Double
+    }
+
+    private enum BudgetDetailModalRoute: Identifiable {
+        case addExpense
+        case managePresets
+        case manageCards
+        case editBudget
+        case editExpense(VariableExpense)
+        case editPlannedExpense(PlannedExpense)
+        case editPreset(Preset)
+        case editCategoryLimit(CategoryLimitEditorInput)
+        case reviewRecordedPlannedExpenses
+
+        var id: String {
+            switch self {
+            case .addExpense:
+                return "add-expense"
+            case .managePresets:
+                return "manage-presets"
+            case .manageCards:
+                return "manage-cards"
+            case .editBudget:
+                return "edit-budget"
+            case .editExpense(let expense):
+                return "edit-expense-\(expense.id.uuidString)"
+            case .editPlannedExpense(let expense):
+                return "edit-planned-expense-\(expense.id.uuidString)"
+            case .editPreset(let preset):
+                return "edit-preset-\(preset.id.uuidString)"
+            case .editCategoryLimit(let input):
+                return "edit-category-limit-\(input.category.id.uuidString)"
+            case .reviewRecordedPlannedExpenses:
+                return "review-recorded-planned-expenses"
+            }
+        }
+    }
+
+    private func buildDerivedState() -> BudgetDetailDerivedState {
+        let incomesInBudget = (workspace.incomes ?? [])
             .filter { isWithinBudget($0.date) }
             .sorted { $0.date > $1.date }
-    }
-    
-    private var plannedIncomeTotal: Double {
-        incomesInBudget
+
+        let plannedIncomeTotal = incomesInBudget
             .filter { $0.isPlanned }
             .reduce(0) { $0 + $1.amount }
-    }
-    
-    private var actualIncomeTotal: Double {
-        incomesInBudget
+        let actualIncomeTotal = incomesInBudget
             .filter { !$0.isPlanned }
             .reduce(0) { $0 + $1.amount }
-    }
-    
-    // MARK: - Planned expenses (generated for this budget)
 
-    private var plannedExpensesInBudget: [PlannedExpense] {
-        BudgetPlannedExpenseStore.plannedExpenses(in: workspace, for: budget)
-    }
-
-    // MARK: - Variable expenses aggregated from linked cards (within budget window)
-    
-    private var variableExpensesInBudget: [VariableExpense] {
-        linkedCards
+        let plannedExpensesInBudget = BudgetPlannedExpenseStore.plannedExpenses(in: workspace, for: budget)
+        let variableExpensesInBudget = linkedCards
             .flatMap { $0.variableExpenses ?? [] }
             .filter { isWithinBudget($0.transactionDate) }
             .sorted { $0.transactionDate > $1.transactionDate }
-    }
-    
-    // MARK: - Categories (chips)
-    
-    private var categoriesInBudget: [Category] {
-        var categoriesByID: [UUID: Category] = [:]
 
+        var categoriesByID: [UUID: Category] = [:]
         for category in (workspace.categories ?? []) {
             categoriesByID[category.id] = category
         }
-
         for category in (plannedExpensesInBudget.compactMap { $0.category } + variableExpensesInBudget.compactMap { $0.category }) {
             categoriesByID[category.id] = category
         }
-
-        return categoriesByID.values
+        let categoriesInBudget = categoriesByID.values
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-    }
-    
-    // MARK: - Search helpers
-    
-    private var trimmedSearch: String {
-        searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-    
-    private func matchesSearch(_ planned: PlannedExpense) -> Bool {
+
         let query = SearchQueryParser.parse(searchText)
-        guard !query.isEmpty else { return true }
-        
-        if !SearchMatch.matchesDateRange(query, date: planned.expenseDate) { return false }
-        
-        let textFields: [String?] = [
-            planned.title,
-            planned.category?.name,
-            planned.card?.name
-        ]
-        if !SearchMatch.matchesTextTerms(query, in: textFields) { return false }
-        
-        let amounts: [Double] = [
-            planned.plannedAmount,
-            planned.actualAmount,
-            plannedAmountForSort(planned)
-        ]
-        if !SearchMatch.matchesAmountDigitTerms(query, amounts: amounts) { return false }
-        
-        return true
-    }
-    
-    private func matchesSearch(_ variable: VariableExpense) -> Bool {
-        let query = SearchQueryParser.parse(searchText)
-        guard !query.isEmpty else { return true }
-        
-        if !SearchMatch.matchesDateRange(query, date: variable.transactionDate) { return false }
-        
-        let textFields: [String?] = [
-            variable.descriptionText,
-            variable.category?.name,
-            variable.card?.name
-        ]
-        if !SearchMatch.matchesTextTerms(query, in: textFields) { return false }
-        
-        if !SearchMatch.matchesAmountDigitTerms(query, amounts: [variable.amount]) { return false }
-        
-        return true
-    }
-    
-    // MARK: - Filtering
-    
-    private var plannedExpensesFilteredForCurrentControls: [PlannedExpense] {
-        let base = plannedExpensesInBudget
-        
-        let categoryFiltered: [PlannedExpense]
+        let isSearching = query.isEmpty == false
+
+        func matchesSearch(_ planned: PlannedExpense) -> Bool {
+            guard isSearching else { return true }
+            if !SearchMatch.matchesDateRange(query, date: planned.expenseDate) { return false }
+
+            let textFields: [String?] = [
+                planned.title,
+                planned.category?.name,
+                planned.card?.name
+            ]
+            if !SearchMatch.matchesTextTerms(query, in: textFields) { return false }
+
+            let amounts: [Double] = [
+                planned.plannedAmount,
+                planned.actualAmount,
+                plannedAmountForSort(planned)
+            ]
+            if !SearchMatch.matchesAmountDigitTerms(query, amounts: amounts) { return false }
+
+            return true
+        }
+
+        func matchesSearch(_ variable: VariableExpense) -> Bool {
+            guard isSearching else { return true }
+            if !SearchMatch.matchesDateRange(query, date: variable.transactionDate) { return false }
+
+            let textFields: [String?] = [
+                variable.descriptionText,
+                variable.category?.name,
+                variable.card?.name
+            ]
+            if !SearchMatch.matchesTextTerms(query, in: textFields) { return false }
+
+            if !SearchMatch.matchesAmountDigitTerms(query, amounts: [variable.amount]) { return false }
+
+            return true
+        }
+
+        let plannedCategoryFiltered: [PlannedExpense]
         if let selectedCategoryID {
-            categoryFiltered = base.filter { $0.category?.id == selectedCategoryID }
+            plannedCategoryFiltered = plannedExpensesInBudget.filter { $0.category?.id == selectedCategoryID }
         } else {
-            categoryFiltered = base
+            plannedCategoryFiltered = plannedExpensesInBudget
         }
-        
-        let searched: [PlannedExpense]
-        if trimmedSearch.isEmpty {
-            searched = categoryFiltered
+        let plannedFilteredForCurrentControls = plannedCategoryFiltered.filter { matchesSearch($0) }
+
+        let variableCategoryFiltered: [VariableExpense]
+        if let selectedCategoryID {
+            variableCategoryFiltered = variableExpensesInBudget.filter { $0.category?.id == selectedCategoryID }
         } else {
-            searched = categoryFiltered.filter { matchesSearch($0) }
+            variableCategoryFiltered = variableExpensesInBudget
         }
-        
-        return searched
-    }
+        let variableFilteredForCurrentControls = variableCategoryFiltered.filter { matchesSearch($0) }
 
-    private var hiddenFuturePlannedExpenseCount: Int {
-        guard hideFuturePlannedExpensesInView else { return 0 }
-        return plannedExpensesFilteredForCurrentControls
-            .filter { PlannedExpenseFuturePolicy.isFuturePlannedExpense($0) }
-            .count
-    }
+        let hiddenFuturePlannedExpenseCount: Int
+        if hideFuturePlannedExpensesInView {
+            hiddenFuturePlannedExpenseCount = plannedFilteredForCurrentControls
+                .filter { PlannedExpenseFuturePolicy.isFuturePlannedExpense($0) }
+                .count
+        } else {
+            hiddenFuturePlannedExpenseCount = 0
+        }
 
-    private var plannedExpensesFiltered: [PlannedExpense] {
-        let visible = PlannedExpenseFuturePolicy.filteredForVisibility(
-            plannedExpensesFilteredForCurrentControls,
+        let hiddenFutureVariableExpenseCount: Int
+        if hideFutureVariableExpensesInView {
+            hiddenFutureVariableExpenseCount = variableFilteredForCurrentControls
+                .filter { VariableExpenseFuturePolicy.isFutureVariableExpense($0) }
+                .count
+        } else {
+            hiddenFutureVariableExpenseCount = 0
+        }
+
+        let plannedVisible = PlannedExpenseFuturePolicy.filteredForVisibility(
+            plannedFilteredForCurrentControls,
             hideFuture: hideFuturePlannedExpensesInView
         )
-        return sortPlanned(visible)
-    }
+        let plannedExpensesFiltered = sortPlanned(plannedVisible)
 
-    private var plannedExpensesForCalculations: [PlannedExpense] {
-        let included = PlannedExpenseFuturePolicy.filteredForCalculations(
-            plannedExpensesFilteredForCurrentControls,
+        let plannedIncluded = PlannedExpenseFuturePolicy.filteredForCalculations(
+            plannedFilteredForCurrentControls,
             excludeFuture: excludeFuturePlannedExpensesFromCalculationsInView
         )
-        return sortPlanned(included)
-    }
+        let plannedExpensesForCalculations = sortPlanned(plannedIncluded)
 
-    private var variableExpensesFilteredForCurrentControls: [VariableExpense] {
-        let base = variableExpensesInBudget
-        
-        let categoryFiltered: [VariableExpense]
-        if let selectedCategoryID {
-            categoryFiltered = base.filter { $0.category?.id == selectedCategoryID }
-        } else {
-            categoryFiltered = base
-        }
-        
-        let searched: [VariableExpense]
-        if trimmedSearch.isEmpty {
-            searched = categoryFiltered
-        } else {
-            searched = categoryFiltered.filter { matchesSearch($0) }
-        }
-
-        return searched
-    }
-
-    private var hiddenFutureVariableExpenseCount: Int {
-        guard hideFutureVariableExpensesInView else { return 0 }
-        return variableExpensesFilteredForCurrentControls
-            .filter { VariableExpenseFuturePolicy.isFutureVariableExpense($0) }
-            .count
-    }
-
-    private var variableExpensesFiltered: [VariableExpense] {
-        let visible = VariableExpenseFuturePolicy.filteredForVisibility(
-            variableExpensesFilteredForCurrentControls,
+        let variableVisible = VariableExpenseFuturePolicy.filteredForVisibility(
+            variableFilteredForCurrentControls,
             hideFuture: hideFutureVariableExpensesInView
         )
-        return sortVariable(visible)
-    }
+        let variableExpensesFiltered = sortVariable(variableVisible)
 
-    private var variableExpensesForCalculations: [VariableExpense] {
-        let included = VariableExpenseFuturePolicy.filteredForCalculations(
-            variableExpensesFilteredForCurrentControls,
+        let variableIncluded = VariableExpenseFuturePolicy.filteredForCalculations(
+            variableFilteredForCurrentControls,
             excludeFuture: excludeFutureVariableExpensesFromCalculationsInView
         )
-        return sortVariable(included)
-    }
-    
-    private var unifiedItemsFiltered: [BudgetUnifiedExpenseItem] {
-        let planned = plannedExpensesFiltered.map { BudgetUnifiedExpenseItem.planned($0) }
-        let variable = variableExpensesFiltered.map { BudgetUnifiedExpenseItem.variable($0) }
-        return sortUnified(planned + variable)
-    }
-    
-    // MARK: - Totals that react to Type + Category filter
-    
-    private var plannedExpensesPlannedTotal: Double {
-        plannedExpensesForCalculations.reduce(0) { $0 + $1.plannedAmount }
-    }
-    
-    private var plannedExpensesActualTotal: Double {
-        plannedExpensesForCalculations.reduce(0) { $0 + max(0, $1.actualAmount) }
+        let variableExpensesForCalculations = sortVariable(variableIncluded)
+
+        let unifiedItemsFiltered = sortUnified(
+            plannedExpensesFiltered.map { BudgetUnifiedExpenseItem.planned($0) } +
+            variableExpensesFiltered.map { BudgetUnifiedExpenseItem.variable($0) }
+        )
+
+        let plannedExpensesPlannedTotal = plannedExpensesForCalculations.reduce(0) { $0 + $1.plannedAmount }
+        let plannedExpensesActualTotal = plannedExpensesForCalculations.reduce(0) { $0 + max(0, $1.actualAmount) }
+        let plannedExpensesEffectiveTotal = plannedExpensesForCalculations.reduce(0) {
+            $0 + SavingsMathService.plannedBudgetImpactAmount(for: $1)
+        }
+        let variableExpensesTotal = variableExpensesForCalculations.reduce(0) {
+            $0 + SavingsMathService.variableBudgetImpactAmount(for: $1)
+        }
+
+        let maxSavings = plannedIncomeTotal - plannedExpensesEffectiveTotal
+        let projectedSavings = plannedIncomeTotal - plannedExpensesPlannedTotal
+        let actualSavings = actualIncomeTotal - plannedExpensesEffectiveTotal - variableExpensesTotal
+
+        return BudgetDetailDerivedState(
+            plannedExpensesInBudget: plannedExpensesInBudget,
+            variableExpensesInBudget: variableExpensesInBudget,
+            categoriesInBudget: categoriesInBudget,
+            plannedIncomeTotal: plannedIncomeTotal,
+            actualIncomeTotal: actualIncomeTotal,
+            plannedExpensesFiltered: plannedExpensesFiltered,
+            variableExpensesFiltered: variableExpensesFiltered,
+            unifiedItemsFiltered: unifiedItemsFiltered,
+            hiddenFuturePlannedExpenseCount: hiddenFuturePlannedExpenseCount,
+            hiddenFutureVariableExpenseCount: hiddenFutureVariableExpenseCount,
+            plannedExpensesPlannedTotal: plannedExpensesPlannedTotal,
+            plannedExpensesActualTotal: plannedExpensesActualTotal,
+            plannedExpensesEffectiveTotal: plannedExpensesEffectiveTotal,
+            variableExpensesTotal: variableExpensesTotal,
+            maxSavings: maxSavings,
+            projectedSavings: projectedSavings,
+            actualSavings: actualSavings,
+            presetBySourceID: presetLookup(for: plannedExpensesFiltered)
+        )
     }
 
-    private var plannedExpensesEffectiveTotal: Double {
-        plannedExpensesForCalculations.reduce(0) { $0 + SavingsMathService.plannedBudgetImpactAmount(for: $1) }
-    }
+    private func presetLookup(for plannedExpenses: [PlannedExpense]) -> [UUID: Preset] {
+        let sourcePresetIDs = Set(plannedExpenses.compactMap(\.sourcePresetID))
+        guard !sourcePresetIDs.isEmpty else { return [:] }
 
-    private var variableExpensesTotal: Double {
-        variableExpensesForCalculations.reduce(0) { $0 + SavingsMathService.variableBudgetImpactAmount(for: $1) }
-    }
-    
-    // MARK: - Savings math (reacts to category + type)
-    
-    private var maxSavings: Double {
-        plannedIncomeTotal - plannedExpensesEffectiveTotal
-    }
-    
-    private var projectedSavings: Double {
-        plannedIncomeTotal - plannedExpensesPlannedTotal
-    }
-    
-    private var actualSavings: Double {
-        actualIncomeTotal - plannedExpensesEffectiveTotal - variableExpensesTotal
+        var presetsByID: [UUID: Preset] = [:]
+        for preset in workspace.presets ?? [] {
+            if sourcePresetIDs.contains(preset.id) {
+                presetsByID[preset.id] = preset
+            }
+        }
+        return presetsByID
     }
     
     // MARK: - Sort
@@ -402,17 +467,17 @@ struct BudgetDetailView: View {
 
     // MARK: - List title (reacts to type)
     
-    private var expensesTitleText: Text {
+    private func expensesTitleText(_ derived: BudgetDetailDerivedState) -> Text {
         switch expenseScope {
         case .planned:
-            return Text("Planned Expenses • \(plannedExpensesPlannedTotal, format: CurrencyFormatter.currencyStyle())")
+            return Text("Planned Expenses • \(derived.plannedExpensesPlannedTotal, format: CurrencyFormatter.currencyStyle())")
             
         case .unified:
-            let unifiedTotal = plannedExpensesEffectiveTotal + variableExpensesTotal
+            let unifiedTotal = derived.plannedExpensesEffectiveTotal + derived.variableExpensesTotal
             return Text("All Expenses • \(unifiedTotal, format: CurrencyFormatter.currencyStyle())")
             
         case .variable:
-            return Text("Variable Expenses • \(variableExpensesTotal, format: CurrencyFormatter.currencyStyle())")
+            return Text("Variable Expenses • \(derived.variableExpensesTotal, format: CurrencyFormatter.currencyStyle())")
         }
     }
     
@@ -421,66 +486,88 @@ struct BudgetDetailView: View {
     var body: some View {
         mainContent
             .onAppear {
-                commandHub.activate(.budgetDetail)
+                isVisible = true
+                if shouldSyncCommandSurface {
+                    commandHub.activate(.budgetDetail)
+                }
                 updateBudgetDetailCommandAvailability()
-                hideFuturePlannedExpensesInView = hideFuturePlannedExpensesDefault
-                excludeFuturePlannedExpensesFromCalculationsInView = excludeFuturePlannedExpensesFromCalculationsDefault
-                hideFutureVariableExpensesInView = hideFutureVariableExpensesDefault
-                excludeFutureVariableExpensesFromCalculationsInView = excludeFutureVariableExpensesFromCalculationsDefault
+                if !didApplyDefaultsOnAppear {
+                    hideFuturePlannedExpensesInView = hideFuturePlannedExpensesDefault
+                    excludeFuturePlannedExpensesFromCalculationsInView = excludeFuturePlannedExpensesFromCalculationsDefault
+                    hideFutureVariableExpensesInView = hideFutureVariableExpensesDefault
+                    excludeFutureVariableExpensesFromCalculationsInView = excludeFutureVariableExpensesFromCalculationsDefault
+                    didApplyDefaultsOnAppear = true
+                }
+                if hasLoadedDerivedState == false {
+                    hydrateDerivedStateFromCacheIfAvailable()
+                    rebuildDerivedState(reason: "onAppearInitial")
+                    hasLoadedDerivedState = true
+                    needsDerivedStateRefresh = false
+                } else if needsDerivedStateRefresh {
+                    rebuildDerivedState(reason: "onAppearRefresh")
+                    needsDerivedStateRefresh = false
+                }
+#if DEBUG
+                appearCount += 1
+                debugLog("onAppear count=\(appearCount)")
+#endif
             }
             .onDisappear {
-                commandHub.deactivate(.budgetDetail)
-                commandHub.setBudgetDetailCanCreateTransaction(false)
+                isVisible = false
+                searchFocused = false
+                if shouldSyncCommandSurface {
+                    commandHub.deactivate(.budgetDetail)
+                    commandHub.setBudgetDetailCanCreateTransaction(false)
+                }
+                searchRebuildTask?.cancel()
+#if DEBUG
+                debugLog("onDisappear")
+#endif
             }
             .onChange(of: linkedCards.count) { _, _ in
                 updateBudgetDetailCommandAvailability()
             }
             .onReceive(commandHub.$sequence) { _ in
+                guard shouldSyncCommandSurface else { return }
                 guard commandHub.surface == .budgetDetail else { return }
                 handleCommand(commandHub.latestCommandID)
+            }
+            .onChange(of: searchText) { _, _ in
+                if isVisible {
+                    scheduleSearchDerivedStateRebuild()
+                } else {
+                    searchRebuildTask?.cancel()
+                    needsDerivedStateRefresh = true
+                }
+            }
+            .onChange(of: derivedRebuildInputs) { _, _ in
+                if isVisible {
+                    rebuildDerivedState(reason: "derivedRebuildInputs")
+                } else {
+                    needsDerivedStateRefresh = true
+                }
             }
     }
 
     private var mainContent: some View {
-        budgetDetailList
+        budgetDetailList(derived: derivedState)
         .postBoardingTip(
             key: "tip.budgetdetail.v1",
             title: "Budget Detail Overview",
-            items: [
-                PostBoardingTipItem(
-                    systemImage: "chart.bar.xaxis",
-                    title: "Detailed Overview",
-                    detail: "View income, expenses, and savings summaries for the budget period."
-                ),
-                PostBoardingTipItem(
-                    systemImage: "magnifyingglass",
-                    title: "Search for Expenses",
-                    detail: "Search by name, category, card, date, or amount using the search bar."
-                ),
-                PostBoardingTipItem(
-                    systemImage: "tag",
-                    title: "Categories",
-                    detail: "Tap a category to filter expenses by that category alone, then tap the same category again to clear your selection."
-                ),
-                PostBoardingTipItem(
-                    systemImage: "ellipsis",
-                    title: "Budget Management",
-                    detail: "Press the three dots and manage your budget easily. Assign cards and presets to track them for your budget period."
-                )
-            ]
+            items: Self.tipItems
         )
         .listStyle(.insetGrouped)
         .navigationTitle(budget.name)
 
         .searchable(
             text: $searchText,
-            placement: .navigationBarDrawer(displayMode: .always),
+            placement: .navigationBarDrawer(displayMode: isPhone ? .automatic : .always),
             prompt: "Search"
         )
         .searchFocused($searchFocused)
 
         .toolbar {
-            if #available(iOS 26.0, macCatalyst 26.0, *) {
+            if #available(iOS 26.0, macCatalyst 26.0, *), isPhone == false {
                 ToolbarItemGroup(placement: .primaryAction) {
                     budgetDisplayToolbarButton
                     budgetActionsToolbarButton
@@ -550,134 +637,248 @@ struct BudgetDetailView: View {
                 pendingExpenseDelete = nil
             }
         }
-
-        .sheet(isPresented: $showingAddExpenseSheet) {
-            NavigationStack {
-                AddExpenseView(
-                    workspace: workspace,
-                    allowedCards: linkedCards,
-                    defaultDate: .now
-                )
-            }
-        }
-
-        .sheet(isPresented: $showingManagePresetsSheet) {
-            NavigationStack {
-                ManagePresetsForBudgetSheet(workspace: workspace, budget: budget)
-            }
-        }
-
-        .sheet(isPresented: $showingManageCardsSheet) {
-            NavigationStack {
-                ManageCardsForBudgetSheet(workspace: workspace, budget: budget)
-            }
-        }
-
-        .sheet(isPresented: $showingEditBudgetSheet) {
-            NavigationStack {
-                EditBudgetView(workspace: workspace, budget: budget)
-            }
-        }
-
-        .sheet(isPresented: $showingEditExpenseSheet, onDismiss: { editingExpense = nil }) {
-            NavigationStack {
-                if let editingExpense {
-                    EditExpenseView(workspace: workspace, expense: editingExpense)
-                } else {
-                    EmptyView()
+        .sheet(item: $activeModal, onDismiss: handleModalDismiss) { modal in
+            switch modal {
+            case .addExpense:
+                NavigationStack {
+                    AddExpenseView(
+                        workspace: workspace,
+                        allowedCards: linkedCards,
+                        defaultDate: .now
+                    )
                 }
-            }
-        }
-
-        .sheet(isPresented: $showingEditPlannedExpenseSheet, onDismiss: { editingPlannedExpense = nil }) {
-            NavigationStack {
-                if let editingPlannedExpense {
-                    EditPlannedExpenseView(workspace: workspace, plannedExpense: editingPlannedExpense)
-                } else {
-                    EmptyView()
+            case .managePresets:
+                NavigationStack {
+                    ManagePresetsForBudgetSheet(workspace: workspace, budget: budget)
                 }
-            }
-        }
-
-        .sheet(isPresented: $showingEditPresetSheet, onDismiss: { editingPreset = nil }) {
-            NavigationStack {
-                if let editingPreset {
-                    EditPresetView(workspace: workspace, preset: editingPreset)
-                } else {
-                    EmptyView()
+            case .manageCards:
+                NavigationStack {
+                    ManageCardsForBudgetSheet(workspace: workspace, budget: budget)
                 }
-            }
-        }
-
-        .sheet(isPresented: $showingEditCategoryLimitSheet, onDismiss: {
-            editingCategoryLimitCategory = nil
-            editingCategoryLimitPlannedContribution = 0
-            editingCategoryLimitVariableContribution = 0
-        }) {
-            if let editingCategoryLimitCategory {
+            case .editBudget:
+                NavigationStack {
+                    EditBudgetView(workspace: workspace, budget: budget)
+                }
+            case .editExpense(let expense):
+                NavigationStack {
+                    EditExpenseView(workspace: workspace, expense: expense)
+                }
+            case .editPlannedExpense(let plannedExpense):
+                NavigationStack {
+                    EditPlannedExpenseView(workspace: workspace, plannedExpense: plannedExpense)
+                }
+            case .editPreset(let preset):
+                NavigationStack {
+                    EditPresetView(workspace: workspace, preset: preset)
+                }
+            case .editCategoryLimit(let input):
                 EditCategoryLimitView(
                     budget: budget,
-                    category: editingCategoryLimitCategory,
-                    plannedContribution: editingCategoryLimitPlannedContribution,
-                    variableContribution: editingCategoryLimitVariableContribution
+                    category: input.category,
+                    plannedContribution: input.plannedContribution,
+                    variableContribution: input.variableContribution
                 )
-            } else {
-                EmptyView()
-            }
-        }
-
-        .sheet(isPresented: $showingReviewRecordedBudgetPlannedExpenses) {
-            NavigationStack {
-                BudgetRecordedPlannedExpensesReviewView(
-                    workspace: workspace,
-                    budget: budget,
-                    onDeleteBudget: {
-                        showingReviewRecordedBudgetPlannedExpenses = false
-                        deleteBudgetOnly()
-                    },
-                    onDone: {
-                        showingReviewRecordedBudgetPlannedExpenses = false
-                    }
-                )
+            case .reviewRecordedPlannedExpenses:
+                NavigationStack {
+                    BudgetRecordedPlannedExpensesReviewView(
+                        workspace: workspace,
+                        budget: budget,
+                        onDeleteBudget: {
+                            activeModal = nil
+                            deleteBudgetOnly()
+                        },
+                        onDone: {
+                            activeModal = nil
+                        }
+                    )
+                }
             }
         }
     }
 
-    private var budgetDetailList: some View {
+    private var linkedVariableExpenseCount: Int {
+        linkedCards.reduce(0) { partialResult, card in
+            partialResult + (card.variableExpenses?.count ?? 0)
+        }
+    }
+
+    private struct DerivedRebuildInputs: Equatable {
+        let selectedCategoryID: UUID?
+        let expenseScope: ExpenseScope
+        let sortMode: BudgetSortMode
+        let hideFuturePlannedExpensesInView: Bool
+        let excludeFuturePlannedExpensesFromCalculationsInView: Bool
+        let hideFutureVariableExpensesInView: Bool
+        let excludeFutureVariableExpensesFromCalculationsInView: Bool
+        let workspaceIncomesCount: Int
+        let workspacePlannedExpensesCount: Int
+        let workspaceCategoriesCount: Int
+        let workspacePresetsCount: Int
+        let budgetPresetLinksCount: Int
+        let linkedCardsCount: Int
+        let linkedVariableExpenseCount: Int
+        let budgetStartDate: Date
+        let budgetEndDate: Date
+    }
+
+    private var derivedRebuildInputs: DerivedRebuildInputs {
+        DerivedRebuildInputs(
+            selectedCategoryID: selectedCategoryID,
+            expenseScope: expenseScope,
+            sortMode: sortMode,
+            hideFuturePlannedExpensesInView: hideFuturePlannedExpensesInView,
+            excludeFuturePlannedExpensesFromCalculationsInView: excludeFuturePlannedExpensesFromCalculationsInView,
+            hideFutureVariableExpensesInView: hideFutureVariableExpensesInView,
+            excludeFutureVariableExpensesFromCalculationsInView: excludeFutureVariableExpensesFromCalculationsInView,
+            workspaceIncomesCount: workspace.incomes?.count ?? 0,
+            workspacePlannedExpensesCount: workspace.plannedExpenses?.count ?? 0,
+            workspaceCategoriesCount: workspace.categories?.count ?? 0,
+            workspacePresetsCount: workspace.presets?.count ?? 0,
+            budgetPresetLinksCount: budget.presetLinks?.count ?? 0,
+            linkedCardsCount: linkedCards.count,
+            linkedVariableExpenseCount: linkedVariableExpenseCount,
+            budgetStartDate: budget.startDate,
+            budgetEndDate: budget.endDate
+        )
+    }
+
+    private func rebuildDerivedState(reason: String = "unspecified") {
+        let start = DispatchTime.now().uptimeNanoseconds
+        derivedState = buildDerivedState()
+        detailSnapshotCache.store(derivedState, for: derivedStateCacheKey)
+#if DEBUG
+        let elapsedMS = Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000
+        if elapsedMS >= 8 {
+            debugLog("rebuildDerivedState reason=\(reason) elapsedMS=\(elapsedMS)")
+        }
+#endif
+    }
+
+    private func scheduleSearchDerivedStateRebuild() {
+        searchRebuildTask?.cancel()
+        guard isVisible else {
+            needsDerivedStateRefresh = true
+            return
+        }
+        searchRebuildTask = Task {
+            try? await Task.sleep(nanoseconds: 120_000_000)
+            guard !Task.isCancelled, isVisible else { return }
+            rebuildDerivedState(reason: "searchDebounced")
+        }
+    }
+
+    private func handleModalDismiss() {
+        if isVisible {
+            rebuildDerivedState(reason: "modalDismiss")
+        } else {
+            needsDerivedStateRefresh = true
+        }
+    }
+
+    private func hydrateDerivedStateFromCacheIfAvailable() {
+        if let cached: BudgetDetailDerivedState = detailSnapshotCache.snapshot(for: derivedStateCacheKey) {
+            derivedState = cached
+#if DEBUG
+            debugLog("cache hit key=\(derivedStateCacheKey)")
+#endif
+        } else {
+#if DEBUG
+            debugLog("cache miss key=\(derivedStateCacheKey)")
+#endif
+        }
+    }
+
+    private var derivedStateCacheKey: String {
+        let budgetStartStamp = Int64(budget.startDate.timeIntervalSinceReferenceDate)
+        let budgetEndStamp = Int64(budget.endDate.timeIntervalSinceReferenceDate)
+        let trimmedSearch = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        var parts: [String] = []
+        parts.reserveCapacity(23)
+        parts.append("budget-detail")
+        parts.append(workspace.id.uuidString)
+        parts.append(budget.id.uuidString)
+        parts.append(selectedCategoryID?.uuidString ?? "none")
+        parts.append(expenseScope.rawValue)
+        parts.append(sortMode.rawValue)
+        parts.append(hideFuturePlannedExpensesInView ? "1" : "0")
+        parts.append(excludeFuturePlannedExpensesFromCalculationsInView ? "1" : "0")
+        parts.append(hideFutureVariableExpensesInView ? "1" : "0")
+        parts.append(excludeFutureVariableExpensesFromCalculationsInView ? "1" : "0")
+        parts.append(String(budgetStartStamp))
+        parts.append(String(budgetEndStamp))
+        parts.append(String(workspace.incomes?.count ?? 0))
+        parts.append(String(workspace.plannedExpenses?.count ?? 0))
+        parts.append(String(workspace.categories?.count ?? 0))
+        parts.append(String(workspace.presets?.count ?? 0))
+        parts.append(String(budget.presetLinks?.count ?? 0))
+        parts.append(String(linkedCards.count))
+        parts.append(String(linkedVariableExpenseCount))
+        parts.append(String(latestLinkedVariableExpenseStamp))
+        parts.append(String(latestWorkspaceIncomeStamp))
+        parts.append(String(latestWorkspacePlannedExpenseStamp))
+        parts.append(trimmedSearch)
+        return parts.joined(separator: "|")
+    }
+
+    private var latestLinkedVariableExpenseStamp: Int64 {
+        Int64(
+            linkedCards
+                .flatMap { $0.variableExpenses ?? [] }
+                .map(\.transactionDate.timeIntervalSinceReferenceDate)
+                .max() ?? 0
+        )
+    }
+
+    private var latestWorkspaceIncomeStamp: Int64 {
+        Int64((workspace.incomes ?? []).map(\.date.timeIntervalSinceReferenceDate).max() ?? 0)
+    }
+
+    private var latestWorkspacePlannedExpenseStamp: Int64 {
+        Int64((workspace.plannedExpenses ?? []).map(\.expenseDate.timeIntervalSinceReferenceDate).max() ?? 0)
+    }
+
+#if DEBUG
+    private func debugLog(_ message: String) {
+        print("[BudgetDetailView:\(budget.id.uuidString)] \(message)")
+    }
+#endif
+
+    private func budgetDetailList(derived: BudgetDetailDerivedState) -> some View {
         List {
-            summarySection
-            categorySection
+            summarySection(derived)
+            categorySection(derived)
             typeAndSortSection
-            expenseListSection
+            expenseListSection(derived)
         }
     }
 
     @ViewBuilder
-    private var summarySection: some View {
+    private func summarySection(_ derived: BudgetDetailDerivedState) -> some View {
         Section {
             VStack(spacing: 12) {
                 BudgetSummaryBucketCard(
                     title: "Income",
                     titleColor: .blue,
                     rows: [
-                        .init(label: "Planned Income", value: plannedIncomeTotal),
-                        .init(label: "Actual Income", value: actualIncomeTotal)
+                        .init(label: "Planned Income", value: derived.plannedIncomeTotal),
+                        .init(label: "Actual Income", value: derived.actualIncomeTotal)
                     ]
                 )
 
                 BudgetSummaryBucketCard(
                     title: "Expenses",
                     titleColor: .orange,
-                    rows: expenseRowsForCurrentSelection()
+                    rows: expenseRowsForCurrentSelection(derived)
                 )
 
                 BudgetSummaryBucketCard(
                     title: "Savings",
                     titleColor: .green,
                     rows: [
-                        .init(label: "Max Savings", value: maxSavings),
-                        .init(label: "Projected Savings", value: projectedSavings),
-                        .init(label: "Actual Savings", value: actualSavings)
+                        .init(label: "Max Savings", value: derived.maxSavings),
+                        .init(label: "Projected Savings", value: derived.projectedSavings),
+                        .init(label: "Actual Savings", value: derived.actualSavings)
                     ]
                 )
             }
@@ -692,17 +893,19 @@ struct BudgetDetailView: View {
     }
 
     @ViewBuilder
-    private var categorySection: some View {
-        if !categoriesInBudget.isEmpty {
+    private func categorySection(_ derived: BudgetDetailDerivedState) -> some View {
+        if !derived.categoriesInBudget.isEmpty {
             Section {
                 BudgetCategoryChipsRow(
-                    categories: categoriesInBudget,
+                    categories: derived.categoriesInBudget,
                     selectedID: $selectedCategoryID,
                     onLongPressCategory: { category in
-                        editingCategoryLimitCategory = category
-                        editingCategoryLimitPlannedContribution = plannedContribution(for: category)
-                        editingCategoryLimitVariableContribution = variableContribution(for: category)
-                        showingEditCategoryLimitSheet = true
+                        let input = CategoryLimitEditorInput(
+                            category: category,
+                            plannedContribution: plannedContribution(for: category, derived: derived),
+                            variableContribution: variableContribution(for: category, derived: derived)
+                        )
+                        activeModal = .editCategoryLimit(input)
                     }
                 )
             } header: {
@@ -736,59 +939,62 @@ struct BudgetDetailView: View {
         }
     }
 
-    private var expenseListSection: some View {
+    private func expenseListSection(_ derived: BudgetDetailDerivedState) -> some View {
         Section {
-            expenseListSectionContent
+            expenseListSectionContent(derived)
         } header: {
-            expensesTitleText
+            expensesTitleText(derived)
         } footer: {
-            expenseListSectionFooter
+            expenseListSectionFooter(derived)
         }
     }
 
     @ViewBuilder
-    private var expenseListSectionContent: some View {
+    private func expenseListSectionContent(_ derived: BudgetDetailDerivedState) -> some View {
         switch expenseScope {
         case .planned:
-            if plannedExpensesFiltered.isEmpty {
-                ContentUnavailableView(plannedEmptyMessage, systemImage: "")
+            if derived.plannedExpensesFiltered.isEmpty {
+                ContentUnavailableView(plannedEmptyMessage(derived), systemImage: "")
             } else {
-                ForEach(plannedExpensesFiltered, id: \.id) { expense in
-                    plannedExpenseRow(expense)
+                ForEach(derived.plannedExpensesFiltered, id: \.id) { expense in
+                    plannedExpenseRow(expense, presetBySourceID: derived.presetBySourceID)
                 }
             }
 
         case .variable:
-            if variableExpensesFiltered.isEmpty {
-                ContentUnavailableView(variableEmptyMessage, systemImage: "")
+            if derived.variableExpensesFiltered.isEmpty {
+                ContentUnavailableView(variableEmptyMessage(derived), systemImage: "")
             } else {
-                ForEach(variableExpensesFiltered, id: \.id) { expense in
+                ForEach(derived.variableExpensesFiltered, id: \.id) { expense in
                     variableExpenseRow(expense)
                 }
             }
 
         case .unified:
-            if unifiedItemsFiltered.isEmpty {
-                ContentUnavailableView(unifiedEmptyMessage, systemImage: "")
+            if derived.unifiedItemsFiltered.isEmpty {
+                ContentUnavailableView(unifiedEmptyMessage(derived), systemImage: "")
             } else {
-                ForEach(unifiedItemsFiltered) { item in
-                    unifiedExpenseRow(item)
+                ForEach(derived.unifiedItemsFiltered) { item in
+                    unifiedExpenseRow(item, presetBySourceID: derived.presetBySourceID)
                 }
             }
         }
     }
 
     @ViewBuilder
-    private var expenseListSectionFooter: some View {
-        if hiddenFuturePlannedExpenseCount > 0 {
-            Text("\(hiddenFuturePlannedExpenseCount.formatted()) future planned expenses are hidden.")
+    private func expenseListSectionFooter(_ derived: BudgetDetailDerivedState) -> some View {
+        if derived.hiddenFuturePlannedExpenseCount > 0 {
+            Text("\(derived.hiddenFuturePlannedExpenseCount.formatted()) future planned expenses are hidden.")
         }
-        if hiddenFutureVariableExpenseCount > 0 {
-            Text("\(hiddenFutureVariableExpenseCount.formatted()) future variable expenses are hidden.")
+        if derived.hiddenFutureVariableExpenseCount > 0 {
+            Text("\(derived.hiddenFutureVariableExpenseCount.formatted()) future variable expenses are hidden.")
         }
     }
 
-    private func plannedExpenseRow(_ expense: PlannedExpense) -> some View {
+    private func plannedExpenseRow(
+        _ expense: PlannedExpense,
+        presetBySourceID: [UUID: Preset]
+    ) -> some View {
         BudgetPlannedExpenseRow(expense: expense, showsCardName: true)
             .swipeActions(edge: .leading, allowsFullSwipe: false) {
                 Button {
@@ -798,7 +1004,7 @@ struct BudgetDetailView: View {
                 }
                 .tint(Color("AccentColor"))
 
-                if let preset = presetForPlannedExpense(expense) {
+                if let presetID = expense.sourcePresetID, let preset = presetBySourceID[presetID] {
                     Button {
                         openEditPreset(preset)
                     } label: {
@@ -843,10 +1049,13 @@ struct BudgetDetailView: View {
     }
 
     @ViewBuilder
-    private func unifiedExpenseRow(_ item: BudgetUnifiedExpenseItem) -> some View {
+    private func unifiedExpenseRow(
+        _ item: BudgetUnifiedExpenseItem,
+        presetBySourceID: [UUID: Preset]
+    ) -> some View {
         switch item {
         case .planned(let expense):
-            plannedExpenseRow(expense)
+            plannedExpenseRow(expense, presetBySourceID: presetBySourceID)
         case .variable(let expense):
             variableExpenseRow(expense)
         }
@@ -855,7 +1064,7 @@ struct BudgetDetailView: View {
     @ViewBuilder
     private var addTransactionToolbarButton: some View {
         Button {
-            showingAddExpenseSheet = true
+            activeModal = .addExpense
         } label: {
             Image(systemName: "plus")
         }
@@ -867,13 +1076,13 @@ struct BudgetDetailView: View {
     private var budgetActionsToolbarButton: some View {
         Menu {
             Button {
-                showingManagePresetsSheet = true
+                activeModal = .managePresets
             } label: {
                 Label("Manage Presets", systemImage: "list.bullet.rectangle")
             }
 
             Button {
-                showingManageCardsSheet = true
+                activeModal = .manageCards
             } label: {
                 Label("Manage Cards", systemImage: "creditcard")
             }
@@ -881,7 +1090,7 @@ struct BudgetDetailView: View {
             Divider()
 
             Button {
-                showingEditBudgetSheet = true
+                activeModal = .editBudget
             } label: {
                 Label("Edit Budget", systemImage: "pencil")
             }
@@ -928,45 +1137,45 @@ struct BudgetDetailView: View {
 
     // MARK: - Expenses bucket rows (reactive)
 
-    private func expenseRowsForCurrentSelection() -> [BudgetSummaryBucketCard.Row] {
+    private func expenseRowsForCurrentSelection(_ derived: BudgetDetailDerivedState) -> [BudgetSummaryBucketCard.Row] {
         switch expenseScope {
         case .planned:
             return [
-                .init(label: "Planned Total", value: plannedExpensesPlannedTotal),
-                .init(label: "Actual Total", value: plannedExpensesActualTotal)
+                .init(label: "Planned Total", value: derived.plannedExpensesPlannedTotal),
+                .init(label: "Actual Total", value: derived.plannedExpensesActualTotal)
             ]
 
         case .variable:
             return [
-                .init(label: "Variable Total", value: variableExpensesTotal),
+                .init(label: "Variable Total", value: derived.variableExpensesTotal),
             ]
 
         case .unified:
-            let unifiedTotal = plannedExpensesEffectiveTotal + variableExpensesTotal
+            let unifiedTotal = derived.plannedExpensesEffectiveTotal + derived.variableExpensesTotal
             return [
-                .init(label: "Planned Total", value: plannedExpensesEffectiveTotal),
-                .init(label: "Variable Total", value: variableExpensesTotal),
+                .init(label: "Planned Total", value: derived.plannedExpensesEffectiveTotal),
+                .init(label: "Variable Total", value: derived.variableExpensesTotal),
                 .init(label: "Unified Total", value: unifiedTotal)
             ]
         }
     }
 
-    private var plannedEmptyMessage: String {
-        if hiddenFuturePlannedExpenseCount > 0 {
+    private func plannedEmptyMessage(_ derived: BudgetDetailDerivedState) -> String {
+        if derived.hiddenFuturePlannedExpenseCount > 0 {
             return "No visible planned expenses"
         }
         return "No planned expenses"
     }
 
-    private var variableEmptyMessage: String {
-        if hiddenFutureVariableExpenseCount > 0 {
+    private func variableEmptyMessage(_ derived: BudgetDetailDerivedState) -> String {
+        if derived.hiddenFutureVariableExpenseCount > 0 {
             return "No visible variable expenses"
         }
         return "No variable expenses"
     }
 
-    private var unifiedEmptyMessage: String {
-        if hiddenFuturePlannedExpenseCount > 0 || hiddenFutureVariableExpenseCount > 0 {
+    private func unifiedEmptyMessage(_ derived: BudgetDetailDerivedState) -> String {
+        if derived.hiddenFuturePlannedExpenseCount > 0 || derived.hiddenFutureVariableExpenseCount > 0 {
             return "No visible expenses"
         }
         return "No expenses"
@@ -1023,7 +1232,7 @@ struct BudgetDetailView: View {
         if recordedCount > 0 {
             // If everything is recorded (deletedUnspentCount == 0), still route the user to review
             // instead of showing "Nothing to delete", because there *is* something to consider.
-            showingReviewRecordedBudgetPlannedExpenses = true
+            activeModal = .reviewRecordedPlannedExpenses
             return
         }
 
@@ -1073,53 +1282,45 @@ struct BudgetDetailView: View {
     // MARK: - Edit + Preset lookup (added, matches CardDetailView)
 
     private func openEdit(_ expense: VariableExpense) {
-        editingExpense = expense
-        showingEditExpenseSheet = true
+        activeModal = .editExpense(expense)
     }
 
     private func openEdit(_ plannedExpense: PlannedExpense) {
-        editingPlannedExpense = plannedExpense
-        showingEditPlannedExpenseSheet = true
+        activeModal = .editPlannedExpense(plannedExpense)
     }
 
     private func openEditPreset(_ preset: Preset) {
-        editingPreset = preset
-        showingEditPresetSheet = true
-    }
-
-    private func presetForPlannedExpense(_ expense: PlannedExpense) -> Preset? {
-        guard let presetID = expense.sourcePresetID else { return nil }
-
-        let desc = FetchDescriptor<Preset>(
-            predicate: #Predicate<Preset> { $0.id == presetID }
-        )
-
-        return (try? modelContext.fetch(desc))?.first
+        activeModal = .editPreset(preset)
     }
 
     private func deleteVariableExpense(_ expense: VariableExpense) {
-        guard let index = variableExpensesFiltered.firstIndex(where: { $0.id == expense.id }) else { return }
-        deleteVariableExpensesFiltered(at: IndexSet(integer: index))
+        deleteWithOptionalConfirm {
+            deleteVariableExpenseRecord(expense)
+        }
     }
 
     private func deletePlannedExpense(_ expense: PlannedExpense) {
-        guard let index = plannedExpensesFiltered.firstIndex(where: { $0.id == expense.id }) else { return }
-        deletePlannedExpensesFiltered(at: IndexSet(integer: index))
+        deleteWithOptionalConfirm {
+            PlannedExpenseDeletionService.delete(expense, modelContext: modelContext)
+        }
+    }
+
+    private func deleteWithOptionalConfirm(_ deleteAction: @escaping () -> Void) {
+        if confirmBeforeDeleting {
+            pendingExpenseDelete = deleteAction
+            showingExpenseDeleteConfirm = true
+        } else {
+            deleteAction()
+        }
     }
 
     private func deleteVariableExpensesFiltered(at offsets: IndexSet) {
+        let derived = derivedState
         let expensesToDelete = offsets.compactMap { index in
-            variableExpensesFiltered.indices.contains(index) ? variableExpensesFiltered[index] : nil
+            derived.variableExpensesFiltered.indices.contains(index) ? derived.variableExpensesFiltered[index] : nil
         }
 
-        if confirmBeforeDeleting {
-            pendingExpenseDelete = {
-                for expense in expensesToDelete {
-                    deleteVariableExpenseRecord(expense)
-                }
-            }
-            showingExpenseDeleteConfirm = true
-        } else {
+        deleteWithOptionalConfirm {
             for expense in expensesToDelete {
                 deleteVariableExpenseRecord(expense)
             }
@@ -1127,18 +1328,12 @@ struct BudgetDetailView: View {
     }
 
     private func deletePlannedExpensesFiltered(at offsets: IndexSet) {
+        let derived = derivedState
         let expensesToDelete = offsets.compactMap { index in
-            plannedExpensesFiltered.indices.contains(index) ? plannedExpensesFiltered[index] : nil
+            derived.plannedExpensesFiltered.indices.contains(index) ? derived.plannedExpensesFiltered[index] : nil
         }
 
-        if confirmBeforeDeleting {
-            pendingExpenseDelete = {
-                for expense in expensesToDelete {
-                    PlannedExpenseDeletionService.delete(expense, modelContext: modelContext)
-                }
-            }
-            showingExpenseDeleteConfirm = true
-        } else {
+        deleteWithOptionalConfirm {
             for expense in expensesToDelete {
                 PlannedExpenseDeletionService.delete(expense, modelContext: modelContext)
             }
@@ -1146,23 +1341,12 @@ struct BudgetDetailView: View {
     }
 
     private func deleteUnifiedExpensesFiltered(at offsets: IndexSet) {
+        let derived = derivedState
         let itemsToDelete = offsets.compactMap { index in
-            unifiedItemsFiltered.indices.contains(index) ? unifiedItemsFiltered[index] : nil
+            derived.unifiedItemsFiltered.indices.contains(index) ? derived.unifiedItemsFiltered[index] : nil
         }
 
-        if confirmBeforeDeleting {
-            pendingExpenseDelete = {
-                for item in itemsToDelete {
-                    switch item {
-                    case .planned(let expense):
-                        PlannedExpenseDeletionService.delete(expense, modelContext: modelContext)
-                    case .variable(let expense):
-                        deleteVariableExpenseRecord(expense)
-                    }
-                }
-            }
-            showingExpenseDeleteConfirm = true
-        } else {
+        deleteWithOptionalConfirm {
             for item in itemsToDelete {
                 switch item {
                 case .planned(let expense):
@@ -1180,30 +1364,31 @@ struct BudgetDetailView: View {
 
     // MARK: - Category Limit Math
 
-    private func plannedContribution(for category: Category) -> Double {
-        plannedExpensesInBudget
+    private func plannedContribution(for category: Category, derived: BudgetDetailDerivedState) -> Double {
+        derived.plannedExpensesInBudget
             .filter { $0.category?.id == category.id }
             .reduce(0) { total, expense in
                 total + SavingsMathService.plannedBudgetImpactAmount(for: expense)
             }
     }
 
-    private func variableContribution(for category: Category) -> Double {
-        variableExpensesInBudget
+    private func variableContribution(for category: Category, derived: BudgetDetailDerivedState) -> Double {
+        derived.variableExpensesInBudget
             .filter { $0.category?.id == category.id }
             .reduce(0) { $0 + SavingsMathService.variableBudgetImpactAmount(for: $1) }
     }
 
     private func updateBudgetDetailCommandAvailability() {
+        guard shouldSyncCommandSurface else { return }
         commandHub.setBudgetDetailCanCreateTransaction(!linkedCards.isEmpty)
     }
 
     private func openNewTransaction() {
-        showingAddExpenseSheet = true
+        activeModal = .addExpense
     }
 
     private func openEditBudget() {
-        showingEditBudgetSheet = true
+        activeModal = .editBudget
     }
 
     private func deleteBudget() {

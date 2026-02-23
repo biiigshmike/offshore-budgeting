@@ -47,17 +47,19 @@ enum SearchMatch {
         return true
     }
 
-    private static func amountDigitsOnlyString(from value: Double) -> String {
-        let absVal = abs(value)
-
+    private static let amountDigitsFormatter: NumberFormatter = {
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
-        formatter.locale = .current
+        formatter.locale = .autoupdatingCurrent
         formatter.usesGroupingSeparator = false
         formatter.minimumFractionDigits = 0
         formatter.maximumFractionDigits = 6
+        return formatter
+    }()
 
-        let s = formatter.string(from: NSNumber(value: absVal)) ?? "\(absVal)"
+    private static func amountDigitsOnlyString(from value: Double) -> String {
+        let absVal = abs(value)
+        let s = amountDigitsFormatter.string(from: NSNumber(value: absVal)) ?? "\(absVal)"
         return s.filter(\.isNumber)
     }
 
@@ -81,4 +83,3 @@ enum SearchMatch {
         return start <= queryRange.upperBound && end >= queryRange.lowerBound
     }
 }
-

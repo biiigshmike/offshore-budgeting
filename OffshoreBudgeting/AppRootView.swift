@@ -84,6 +84,7 @@ struct AppRootView: View {
 
     @State private var didApplyInitialSection: Bool = false
     @State private var showingHelpSheet: Bool = false
+    @State private var detailSnapshotCache = DetailViewSnapshotCache()
 
     @Environment(\.appCommandHub) private var commandHub
 
@@ -128,6 +129,7 @@ struct AppRootView: View {
                 splitView
             }
         }
+        .environment(detailSnapshotCache)
         .whatsNewForCurrentRelease()
         .onAppear {
             guard didApplyInitialSection == false else { return }
@@ -159,6 +161,9 @@ struct AppRootView: View {
             if shouldSyncActiveSectionToCommandHub {
                 commandHub.setActiveSectionRaw(newValue)
             }
+#if DEBUG
+            debugLog("selectedSectionRaw=\(newValue) pathDepths=\(pathDepthSummary)")
+#endif
         }
         .sheet(isPresented: $showingHelpSheet) {
             NavigationStack {
@@ -179,32 +184,32 @@ struct AppRootView: View {
     private var phoneTabs: some View {
         TabView(selection: selectedSectionBinding) {
 
-            NavigationStack {
+            NavigationStack(path: $homePath) {
                 homeRootView
             }
             .homeAssistantHost(workspace: workspace)
             .tabItem { Label(AppSection.home.rawValue, systemImage: AppSection.home.systemImage) }
             .tag(AppSection.home)
 
-            NavigationStack {
+            NavigationStack(path: $budgetsPath) {
                 BudgetsView(workspace: workspace)
             }
             .tabItem { Label(AppSection.budgets.rawValue, systemImage: AppSection.budgets.systemImage) }
             .tag(AppSection.budgets)
 
-            NavigationStack {
+            NavigationStack(path: $incomePath) {
                 IncomeWorkspaceView(workspace: workspace)
             }
             .tabItem { Label(AppSection.income.rawValue, systemImage: AppSection.income.systemImage) }
             .tag(AppSection.income)
 
-            NavigationStack {
+            NavigationStack(path: $cardsPath) {
                 AccountsView(workspace: workspace)
             }
             .tabItem { Label(AppSection.cards.title, systemImage: AppSection.cards.systemImage) }
             .tag(AppSection.cards)
 
-            NavigationStack {
+            NavigationStack(path: $settingsPath) {
                 SettingsView(workspace: workspace, selectedWorkspaceID: $selectedWorkspaceID)
             }
             .tabItem { Label(AppSection.settings.rawValue, systemImage: AppSection.settings.systemImage) }
@@ -296,4 +301,14 @@ struct AppRootView: View {
     private var homeRootView: some View {
         HomeView(workspace: workspace)
     }
+
+#if DEBUG
+    private var pathDepthSummary: String {
+        "home:\(homePath.count),budgets:\(budgetsPath.count),income:\(incomePath.count),cards:\(cardsPath.count),settings:\(settingsPath.count)"
+    }
+
+    private func debugLog(_ message: String) {
+        print("[AppRootView:\(workspace.id.uuidString)] \(message)")
+    }
+#endif
 }
