@@ -1592,9 +1592,9 @@ private struct VariableExpenseRow: View {
                         )
                     )
                 }
+                .font(.footnote)
+                .foregroundStyle(.secondary)
             }
-            .font(.footnote)
-            .foregroundStyle(.secondary)
 
             Spacer(minLength: 0)
 
