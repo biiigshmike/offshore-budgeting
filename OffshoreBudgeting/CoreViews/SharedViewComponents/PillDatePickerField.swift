@@ -11,6 +11,14 @@ import SwiftUI
 import UIKit
 #endif
 
+// MARK: - Presentation Metrics
+
+private enum PillPickerSheetMetrics {
+    static let sheetHeight: CGFloat = 520
+    static let datePickerContentHeight: CGFloat = 340
+    static let timePickerContentHeight: CGFloat = 240
+}
+
 private extension View {
     @ViewBuilder
     func platformCalendarDatePickerStyle(useWheelOnPhoneLandscape: Bool) -> some View {
@@ -24,7 +32,6 @@ private extension View {
 
 struct PillDatePickerField: View {
 
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     let title: String
@@ -55,10 +62,6 @@ struct PillDatePickerField: View {
         #endif
     }
 
-    private var useMediumDetent: Bool {
-        isPhone
-    }
-
     private var useWheelOnPhoneLandscape: Bool {
         isPhone && verticalSizeClass == .compact
     }
@@ -84,7 +87,7 @@ struct PillDatePickerField: View {
         .sheet(isPresented: $isPresented) {
             NavigationStack {
                 VStack(alignment: .leading, spacing: 14) {
-                    picker
+                    pickerContainer
                 }
                 .padding()
                 .navigationTitle(title)
@@ -112,48 +115,63 @@ struct PillDatePickerField: View {
                     }
                 }
             }
-            .modifier(PillPickerSheetPresentationModifier(useMediumDetent: useMediumDetent))
+            .modifier(PillPickerSheetPresentationModifier())
         }
     }
 
     @ViewBuilder
     private var picker: some View {
-        let content: AnyView = {
-            if let range = optionalClosedRange(minimumDate: minimumDate, maximumDate: maximumDate) {
-                return AnyView(
-                    DatePicker("", selection: $date, in: range, displayedComponents: [.date])
-                        .platformCalendarDatePickerStyle(useWheelOnPhoneLandscape: useWheelOnPhoneLandscape)
-                        .labelsHidden()
-                )
-            } else if let min = minimumDate {
-                return AnyView(
-                    DatePicker("", selection: $date, in: min..., displayedComponents: [.date])
-                        .platformCalendarDatePickerStyle(useWheelOnPhoneLandscape: useWheelOnPhoneLandscape)
-                        .labelsHidden()
-                )
-            } else if let max = maximumDate {
-                return AnyView(
-                    DatePicker("", selection: $date, in: ...max, displayedComponents: [.date])
-                        .platformCalendarDatePickerStyle(useWheelOnPhoneLandscape: useWheelOnPhoneLandscape)
-                        .labelsHidden()
-                )
-            } else {
-                return AnyView(
-                    DatePicker("", selection: $date, displayedComponents: [.date])
-                        .platformCalendarDatePickerStyle(useWheelOnPhoneLandscape: useWheelOnPhoneLandscape)
-                        .labelsHidden()
-                )
-            }
-        }()
+        if let range = optionalClosedRange(minimumDate: minimumDate, maximumDate: maximumDate) {
+            datePickerContent(selection: $date, range: .bounded(range))
+        } else if let minimumDate {
+            datePickerContent(selection: $date, range: .minimum(minimumDate))
+        } else if let maximumDate {
+            datePickerContent(selection: $date, range: .maximum(maximumDate))
+        } else {
+            datePickerContent(selection: $date, range: .unbounded)
+        }
+    }
 
-        // macOS stability:
-        // - lock the graphical DatePicker to a steady layout box
-        // - remove implicit animations that can amplify tiny layout re-measures
-        content
-            .frame(minHeight: useWheelOnPhoneLandscape ? nil : 340)
-            .transaction { txn in
-                txn.animation = nil
-            }
+    @ViewBuilder
+    private func datePickerContent(selection: Binding<Date>, range: DatePickerRange) -> some View {
+        switch range {
+        case .bounded(let bounded):
+            DatePicker("", selection: selection, in: bounded, displayedComponents: [.date])
+                .platformCalendarDatePickerStyle(useWheelOnPhoneLandscape: useWheelOnPhoneLandscape)
+                .labelsHidden()
+        case .minimum(let minimum):
+            DatePicker("", selection: selection, in: minimum..., displayedComponents: [.date])
+                .platformCalendarDatePickerStyle(useWheelOnPhoneLandscape: useWheelOnPhoneLandscape)
+                .labelsHidden()
+        case .maximum(let maximum):
+            DatePicker("", selection: selection, in: ...maximum, displayedComponents: [.date])
+                .platformCalendarDatePickerStyle(useWheelOnPhoneLandscape: useWheelOnPhoneLandscape)
+                .labelsHidden()
+        case .unbounded:
+            DatePicker("", selection: selection, displayedComponents: [.date])
+                .platformCalendarDatePickerStyle(useWheelOnPhoneLandscape: useWheelOnPhoneLandscape)
+                .labelsHidden()
+        }
+    }
+
+    @ViewBuilder
+    private var pickerContainer: some View {
+        ScrollView(.vertical) {
+            picker
+                .frame(height: PillPickerSheetMetrics.datePickerContentHeight, alignment: .top)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .transaction { txn in
+            txn.animation = nil
+        }
+    }
+
+    private enum DatePickerRange {
+        case bounded(ClosedRange<Date>)
+        case minimum(Date)
+        case maximum(Date)
+        case unbounded
     }
 
     private func optionalClosedRange(minimumDate: Date?, maximumDate: Date?) -> ClosedRange<Date>? {
@@ -169,9 +187,6 @@ struct PillDatePickerField: View {
 
 struct PillTimePickerField: View {
 
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    @Environment(\.verticalSizeClass) private var verticalSizeClass
-
     let title: String
     @Binding var time: Date
 
@@ -180,18 +195,6 @@ struct PillTimePickerField: View {
     init(title: String, time: Binding<Date>) {
         self.title = title
         self._time = time
-    }
-
-    private var isPhone: Bool {
-        #if os(iOS)
-        UIDevice.current.userInterfaceIdiom == .phone
-        #else
-        false
-        #endif
-    }
-
-    private var useMediumDetent: Bool {
-        isPhone
     }
 
     var body: some View {
@@ -215,12 +218,17 @@ struct PillTimePickerField: View {
         .sheet(isPresented: $isPresented) {
             NavigationStack {
                 VStack(alignment: .leading, spacing: 14) {
-                    DatePicker("", selection: $time, displayedComponents: [.hourAndMinute])
-                        .datePickerStyle(.wheel)
-                        .labelsHidden()
-                        .transaction { txn in
-                            txn.animation = nil
-                        }
+                    ScrollView(.vertical) {
+                        DatePicker("", selection: $time, displayedComponents: [.hourAndMinute])
+                            .datePickerStyle(.wheel)
+                            .labelsHidden()
+                            .frame(height: PillPickerSheetMetrics.timePickerContentHeight, alignment: .top)
+                            .frame(maxWidth: .infinity, alignment: .topLeading)
+                    }
+                    .scrollBounceBehavior(.basedOnSize)
+                    .transaction { txn in
+                        txn.animation = nil
+                    }
                 }
                 .padding()
                 .navigationTitle(title)
@@ -248,7 +256,7 @@ struct PillTimePickerField: View {
                     }
                 }
             }
-            .modifier(PillPickerSheetPresentationModifier(useMediumDetent: useMediumDetent))
+            .modifier(PillPickerSheetPresentationModifier())
         }
     }
 
@@ -261,24 +269,9 @@ struct PillTimePickerField: View {
 
 private struct PillPickerSheetPresentationModifier: ViewModifier {
 
-    let useMediumDetent: Bool
-
     func body(content: Content) -> some View {
-        #if os(macOS)
-        // On macOS, detents + graphical DatePicker often triggers repeated re-measurement -> flicker.
-        // Use a stable fixed-height detent to stop the sheet from “breathing”.
         content
-            .presentationDetents([.height(520)])
+            .presentationDetents([.height(PillPickerSheetMetrics.sheetHeight)])
             .presentationDragIndicator(.visible)
-        #elseif targetEnvironment(macCatalyst)
-        // Use a fixed height to avoid repeated sheet re-measurements (calendar + Done button flicker).
-        content
-            .presentationDetents([.height(520)])
-            .presentationDragIndicator(.visible)
-        #else
-        content
-            .presentationDetents(useMediumDetent ? [.medium] : [.height(520)])
-            .presentationDragIndicator(.visible)
-        #endif
     }
 }
