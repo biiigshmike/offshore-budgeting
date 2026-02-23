@@ -66,8 +66,8 @@ struct SettingsReleaseLogsView: View {
                 ),
                 ReleaseItem(
                     systemImage: "creditcard.fill",
-                    title: "Reconciliations: Now on the Cards Tab",
-                    description: "You can now split expenses and track reconciliations. When adding or editing an expense, choose to split or offset it against a Reconciliation. View the running total and full expense history in Cards > Reconciliation."
+                    title: "Reconciliations and Savings: Now on the Accounts Tab",
+                    description: "Accounts is now your place for Cards, Reconciliations, and a workspaced-scoped Savings Account! You can now split expenses and track reconciliations. When adding or editing an expense, choose to split or offset it against a Reconciliation. View the running total and full expense history in Cards > Reconciliation. At the end of your budget periods, your Savings Account will keep a running total. This feature is designed to help offset future expenses with any surplus savings."
                 ),
                 ReleaseItem(
                     systemImage: "square.2.layers.3d.top.filled",
@@ -78,6 +78,11 @@ struct SettingsReleaseLogsView: View {
                     systemImage: "filemenu.and.selection",
                     title: "Screen-Aware Keyboard Shortcuts",
                     description: "The iPad and Mac menu bar has been refined with screen-aware keyboard shortcuts. Shortcuts now appear only where relevant and are organized into the appropriate menu sections."
+                ),
+                ReleaseItem(
+                    systemImage: "eye",
+                    title: "Expense Display",
+                    description: "In Settings > General > Expense Display, it is now possible to hide future expenses from view, as well as excluding future expenses from being calculated. To toggle this temporarily, look for the eye button on Budget Details and Card Details."
                 ),
                 ReleaseItem(
                     systemImage: "widget.large.badge.plus",
