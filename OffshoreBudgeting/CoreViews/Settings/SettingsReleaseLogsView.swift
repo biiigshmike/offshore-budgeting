@@ -67,7 +67,7 @@ struct SettingsReleaseLogsView: View {
                 ReleaseItem(
                     systemImage: "creditcard.fill",
                     title: "Reconciliations and Savings: Now on the Accounts Tab",
-                    description: "Accounts is now your place for Cards, Reconciliations, and a workspaced-scoped Savings Account! You can now split expenses and track reconciliations. When adding or editing an expense, choose to split or offset it against a Reconciliation. View the running total and full expense history in Cards > Reconciliation. At the end of your budget periods, your Savings Account will keep a running total. This feature is designed to help offset future expenses with any surplus savings."
+                    description: "Accounts is now your place for Cards, Reconciliations, and a workspace-scoped Savings Account! You can now split expenses and track reconciliations. When adding or editing an expense, choose to split or offset it against a Reconciliation. View the running total and full expense history in Cards > Reconciliation. At the end of your budget periods, your Savings Account will keep a running total. This feature is designed to help offset future expenses with any surplus savings."
                 ),
                 ReleaseItem(
                     systemImage: "square.2.layers.3d.top.filled",
