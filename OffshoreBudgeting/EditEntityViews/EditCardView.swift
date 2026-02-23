@@ -44,7 +44,6 @@ struct EditCardView: View {
                         Button("Save") { save() }
                             .disabled(!canSave)
                             .tint(.accentColor)
-                            .controlSize(.large)
                             .buttonStyle(.glassProminent)
                     }
                 } else {

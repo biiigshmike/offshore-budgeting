@@ -662,7 +662,6 @@ private struct EditSharedBalanceEntryView: View {
                     Button("Save") { save() }
                         .disabled(!canSave)
                         .tint(.accentColor)
-                        .controlSize(.large)
                         .buttonStyle(.glassProminent)
                 }
             } else {
@@ -1070,7 +1069,6 @@ private struct AddAllocationSettlementView: View {
                     Button("Save") { save() }
                         .disabled(!canSave)
                         .tint(.accentColor)
-                        .controlSize(.large)
                         .buttonStyle(.glassProminent)
                 }
             } else {

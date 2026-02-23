@@ -87,7 +87,6 @@ struct AddBudgetView: View {
                     Button("Save") { createBudget() }
                         .disabled(!canCreate)
                         .tint(.accentColor)
-                        .controlSize(.large)
                         .buttonStyle(.glassProminent)
                 }
             } else {

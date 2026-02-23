@@ -292,7 +292,6 @@ struct HomeAssistantPanelView: View {
                             Image(systemName: "xmark")
                                 .font(.body.weight(.semibold))
                                 .frame(width: 33, height: 33)
-                                .controlSize(.large)
                                 .buttonStyle(.glass)
                         }
                         .accessibilityLabel("Close Assistant")
@@ -312,7 +311,6 @@ struct HomeAssistantPanelView: View {
                             isShowingClearConversationAlert = true
                         } label: {
                             Text("Clear")
-                                .controlSize(.large)
                                 .frame(height: 33)
                                 .buttonStyle(.glass)
                         }

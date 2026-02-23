@@ -118,7 +118,6 @@ struct EditPresetView: View {
                     Button("Save") { saveChanges() }
                         .disabled(!canSave)
                         .tint(.accentColor)
-                        .controlSize(.large)
                         .buttonStyle(.glassProminent)
                 }
             } else {

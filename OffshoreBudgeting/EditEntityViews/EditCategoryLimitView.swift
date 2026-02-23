@@ -60,7 +60,6 @@ struct EditCategoryLimitView: View {
                         }
                         .disabled(!canSave)
                         .tint(.accentColor)
-                        .controlSize(.large)
                         .buttonStyle(.glassProminent)
                     }
                 } else {
