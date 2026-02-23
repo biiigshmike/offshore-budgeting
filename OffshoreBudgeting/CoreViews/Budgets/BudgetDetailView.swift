@@ -551,7 +551,7 @@ struct BudgetDetailView: View {
                                         } label: {
                                             Label("Edit Preset", systemImage: "list.bullet.rectangle")
                                         }
-                                        .tint(.orange)
+                                        .tint(.Color("OffshoreSand"))
                                     }
                                 }
                                 .swipeActions(edge: .trailing, allowsFullSwipe: true) {
@@ -617,7 +617,7 @@ struct BudgetDetailView: View {
                                             } label: {
                                                 Label("Edit Preset", systemImage: "list.bullet.rectangle")
                                             }
-                                            .tint(.orange)
+                                            .tint(Color("OffshoreSand"))
                                         }
                                     }
                                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
