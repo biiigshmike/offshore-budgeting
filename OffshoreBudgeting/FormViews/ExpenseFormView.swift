@@ -50,6 +50,9 @@ struct ExpenseFormView: View {
 
     let onSharedBalanceChanged: (() -> Void)?
     @State private var draftSharedBalanceMode: SharedBalanceMode? = nil
+    @State private var splitPercentage: Double = 0.5
+    @State private var shouldApplyInitialSplitDefault: Bool = false
+    @State private var hasAppliedInitialSplitDefault: Bool = false
 
     private var enteredAmount: Double {
         ExpenseFormView.parseAmount(amountText) ?? 0
@@ -108,18 +111,22 @@ struct ExpenseFormView: View {
 
                 switch newMode {
                 case .split:
+                    shouldApplyInitialSplitDefault = !hasAppliedInitialSplitDefault
                     if selectedAllocationAccountID == nil {
                         selectedAllocationAccountID = selectedOffsetAccountID
                     }
                     selectedOffsetAccountID = nil
                     offsetAmountText = ""
+                    applyInitialSplitDefaultIfNeeded(notifySharedBalanceChanged: false)
                 case .offset:
+                    shouldApplyInitialSplitDefault = false
                     if selectedOffsetAccountID == nil {
                         selectedOffsetAccountID = selectedAllocationAccountID
                     }
                     selectedAllocationAccountID = nil
                     allocationAmountText = ""
                 case nil:
+                    shouldApplyInitialSplitDefault = false
                     selectedAllocationAccountID = nil
                     allocationAmountText = ""
                     selectedOffsetAccountID = nil
@@ -167,6 +174,15 @@ struct ExpenseFormView: View {
             if draftSharedBalanceMode == nil {
                 draftSharedBalanceMode = activeSharedBalanceMode
             }
+            if activeSharedBalanceMode == .split {
+                applyPercentageFromSplitAmountText()
+            }
+        }
+        .onChange(of: amountText) { _, _ in
+            handleExpenseAmountChangedForSplit()
+        }
+        .onChange(of: allocationAmountText) { _, _ in
+            handleSplitAmountTextChanged()
         }
     }
 
@@ -261,6 +277,10 @@ struct ExpenseFormView: View {
                 TextField("Amount", text: amountBinding(for: mode))
                     .keyboardType(.decimalPad)
 
+                if mode == .split {
+                    splitPercentageControl
+                }
+
                 if let account = selectedAccount(for: mode) {
                     HStack {
                         Text("Available Balance")
@@ -301,6 +321,41 @@ struct ExpenseFormView: View {
                 applySavingsOffset = false
                 savingsOffsetAmountText = ""
             }
+            if newValue == SharedBalanceMode.split.rawValue {
+                applyPercentageFromSplitAmountText()
+            } else {
+                shouldApplyInitialSplitDefault = false
+            }
+        }
+    }
+
+    private var splitPercentageControl: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Split Percentage")
+                Spacer()
+                Text(splitPercentage.formatted(.percent.precision(.fractionLength(0))))
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+
+            Slider(
+                value: splitPercentageBinding,
+                in: 0...1,
+                step: 0.01
+            ) {
+                Text("Split Percentage")
+            } minimumValueLabel: {
+                Text("0%")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            } maximumValueLabel: {
+                Text("100%")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            .disabled(enteredAmount <= 0)
+            .accessibilityValue(splitPercentage.formatted(.percent.precision(.fractionLength(0))))
         }
     }
 
@@ -433,6 +488,17 @@ struct ExpenseFormView: View {
         )
     }
 
+    private var splitPercentageBinding: Binding<Double> {
+        Binding(
+            get: { splitPercentage },
+            set: { newValue in
+                splitPercentage = roundedSplitPercentage(newValue)
+                shouldApplyInitialSplitDefault = false
+                applySplitAmountFromPercentage(notifySharedBalanceChanged: true)
+            }
+        )
+    }
+
     private func amountBinding(for mode: SharedBalanceMode) -> Binding<String> {
         Binding(
             get: {
@@ -451,6 +517,89 @@ struct ExpenseFormView: View {
                 onSharedBalanceChanged?()
             }
         )
+    }
+
+    private func handleExpenseAmountChangedForSplit() {
+        guard activeSharedBalanceMode == .split else { return }
+
+        if shouldApplyInitialSplitDefault {
+            applyInitialSplitDefaultIfNeeded(notifySharedBalanceChanged: true)
+            return
+        }
+
+        guard enteredAmount > 0 else { return }
+
+        let trimmedSplit = allocationAmountText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedSplit.isEmpty else { return }
+
+        applySplitAmountFromPercentage(notifySharedBalanceChanged: true)
+    }
+
+    private func handleSplitAmountTextChanged() {
+        guard activeSharedBalanceMode == .split else { return }
+
+        let trimmedSplit = allocationAmountText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedSplit.isEmpty else { return }
+
+        hasAppliedInitialSplitDefault = true
+        shouldApplyInitialSplitDefault = false
+        applyPercentageFromSplitAmountText()
+    }
+
+    private func applyInitialSplitDefaultIfNeeded(notifySharedBalanceChanged: Bool) {
+        guard activeSharedBalanceMode == .split else { return }
+        guard shouldApplyInitialSplitDefault else { return }
+        guard enteredAmount > 0 else { return }
+
+        let trimmedSplit = allocationAmountText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmedSplit.isEmpty else {
+            hasAppliedInitialSplitDefault = true
+            shouldApplyInitialSplitDefault = false
+            applyPercentageFromSplitAmountText()
+            return
+        }
+
+        splitPercentage = 0.5
+        hasAppliedInitialSplitDefault = true
+        shouldApplyInitialSplitDefault = false
+        applySplitAmountFromPercentage(notifySharedBalanceChanged: notifySharedBalanceChanged)
+    }
+
+    private func applySplitAmountFromPercentage(notifySharedBalanceChanged: Bool) {
+        guard activeSharedBalanceMode == .split else { return }
+        guard enteredAmount > 0 else { return }
+
+        let splitAmount = normalizedSplitAmount(baseAmount: enteredAmount, percentage: splitPercentage)
+        allocationAmountText = CurrencyFormatter.editingString(from: splitAmount)
+
+        if notifySharedBalanceChanged {
+            onSharedBalanceChanged?()
+        }
+    }
+
+    private func applyPercentageFromSplitAmountText() {
+        guard activeSharedBalanceMode == .split else { return }
+        guard enteredAmount > 0 else { return }
+
+        let trimmedSplit = allocationAmountText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let splitAmount = CurrencyFormatter.parseAmount(trimmedSplit) else { return }
+
+        hasAppliedInitialSplitDefault = true
+        let normalized = splitAmount / enteredAmount
+        splitPercentage = roundedSplitPercentage(normalized)
+    }
+
+    private func normalizedSplitAmount(baseAmount: Double, percentage: Double) -> Double {
+        let safeBaseAmount = max(0, baseAmount)
+        let clampedPercentage = min(max(percentage, 0), 1)
+        let rawSplitAmount = safeBaseAmount * clampedPercentage
+        let cappedSplitAmount = min(safeBaseAmount, max(0, rawSplitAmount))
+        return CurrencyFormatter.roundedToCurrency(cappedSplitAmount)
+    }
+
+    private func roundedSplitPercentage(_ value: Double) -> Double {
+        let clamped = min(max(value, 0), 1)
+        return (clamped * 100).rounded() / 100
     }
 
     private func selectedAccount(for mode: SharedBalanceMode) -> AllocationAccount? {

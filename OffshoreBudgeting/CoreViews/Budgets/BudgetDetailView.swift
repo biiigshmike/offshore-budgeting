@@ -442,231 +442,7 @@ struct BudgetDetailView: View {
     }
 
     private var mainContent: some View {
-        List {
-            // MARK: - Summary (3 equal-height rows)
-            
-            Section {
-                VStack(spacing: 12) {
-                    
-                    BudgetSummaryBucketCard(
-                        title: "Income",
-                        titleColor: .blue,
-                        rows: [
-                            .init(label: "Planned Income", value: plannedIncomeTotal),
-                            .init(label: "Actual Income", value: actualIncomeTotal)
-                        ]
-                    )
-                    
-                    BudgetSummaryBucketCard(
-                        title: "Expenses",
-                        titleColor: .orange,
-                        rows: expenseRowsForCurrentSelection()
-                    )
-                    
-                    BudgetSummaryBucketCard(
-                        title: "Savings",
-                        titleColor: .green,
-                        rows: [
-                            .init(label: "Max Savings", value: maxSavings),
-                            .init(label: "Projected Savings", value: projectedSavings),
-                            .init(label: "Actual Savings", value: actualSavings)
-                        ]
-                    )
-                }
-                .padding(.vertical, 4)
-            } header: {
-                Text("Overview • \(budgetDateRangeLabel)")
-            } footer: {
-                if let footnote = presetRequiresCardFootnote {
-                    Text(footnote)
-                }
-            }
-
-            // MARK: - Category Chips
-
-            if !categoriesInBudget.isEmpty {
-                Section {
-                    BudgetCategoryChipsRow(
-                        categories: categoriesInBudget,
-                        selectedID: $selectedCategoryID,
-                        onLongPressCategory: { category in
-                            editingCategoryLimitCategory = category
-                            editingCategoryLimitPlannedContribution = plannedContribution(for: category)
-                            editingCategoryLimitVariableContribution = variableContribution(for: category)
-                            showingEditCategoryLimitSheet = true
-                        }
-                    )
-                } header: {
-                    Text("Categories")
-                } footer: {
-                    Text("Single-press a category filter expenses; long-press to edit its spending limit.")
-                }
-            }
-
-            // MARK: - Type + Sort
-
-            Section {
-                Picker("Type", selection: $expenseScope) {
-                    Text("Planned").tag(ExpenseScope.planned)
-                    Text("Unified").tag(ExpenseScope.unified)
-                    Text("Variable").tag(ExpenseScope.variable)
-                }
-                .pickerStyle(.segmented)
-
-                Picker("Sort", selection: $sortMode) {
-                    Text("A–Z").tag(BudgetSortMode.az)
-                    Text("Z–A").tag(BudgetSortMode.za)
-                    Text("\(CurrencyFormatter.currencySymbol)↑").tag(BudgetSortMode.amountAsc)
-                    Text("\(CurrencyFormatter.currencySymbol)↓").tag(BudgetSortMode.amountDesc)
-                    Text("Date ↑").tag(BudgetSortMode.dateAsc)
-                    Text("Date ↓").tag(BudgetSortMode.dateDesc)
-                }
-                .pickerStyle(.segmented)
-            } header: {
-                Text("Sort")
-            }
-
-            // MARK: - Expense List (swipe behavior added)
-
-            Section {
-                switch expenseScope {
-
-                case .planned:
-                    if plannedExpensesFiltered.isEmpty {
-                        ContentUnavailableView(plannedEmptyMessage, systemImage: "")
-                    } else {
-                        ForEach(plannedExpensesFiltered, id: \.id) { expense in
-                            BudgetPlannedExpenseRow(expense: expense, showsCardName: true)
-                                .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                                    Button {
-                                        openEdit(expense)
-                                    } label: {
-                                        Label("Edit", systemImage: "pencil")
-                                    }
-                                    .tint(Color("AccentColor"))
-
-                                    if let preset = presetForPlannedExpense(expense) {
-                                        Button {
-                                            openEditPreset(preset)
-                                        } label: {
-                                            Label("Edit Preset", systemImage: "list.bullet.rectangle")
-                                        }
-                                        .tint(.Color("OffshoreSand"))
-                                    }
-                                }
-                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                    Button {
-                                        deletePlannedExpense(expense)
-                                    } label: {
-                                        Label("Delete", systemImage: "trash")
-                                    }
-                                    .tint(Color("OffshoreDepth"))
-                                }
-                        }
-                    }
-
-                case .variable:
-                    if variableExpensesFiltered.isEmpty {
-                        ContentUnavailableView(variableEmptyMessage, systemImage: "")
-                    } else {
-                        ForEach(variableExpensesFiltered, id: \.id) { expense in
-                            Button {
-                                openEdit(expense)
-                            } label: {
-                                BudgetVariableExpenseRow(expense: expense, showsCardName: true)
-                            }
-                            .buttonStyle(.plain)
-                            .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                                Button {
-                                    openEdit(expense)
-                                } label: {
-                                    Label("Edit", systemImage: "pencil")
-                                }
-                                .tint(Color("AccentColor"))
-                            }
-                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                Button {
-                                    deleteVariableExpense(expense)
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
-                                }
-                                .tint(Color("OffshoreDepth"))
-                            }
-                        }
-                    }
-
-                case .unified:
-                    if unifiedItemsFiltered.isEmpty {
-                        ContentUnavailableView(unifiedEmptyMessage, systemImage: "")
-                    } else {
-                        ForEach(unifiedItemsFiltered) { item in
-                            switch item {
-                            case .planned(let expense):
-                                BudgetPlannedExpenseRow(expense: expense, showsCardName: true)
-                                    .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                                        Button {
-                                            openEdit(expense)
-                                        } label: {
-                                            Label("Edit", systemImage: "pencil")
-                                        }
-                                        .tint(Color("AccentColor"))
-
-                                        if let preset = presetForPlannedExpense(expense) {
-                                            Button {
-                                                openEditPreset(preset)
-                                            } label: {
-                                                Label("Edit Preset", systemImage: "list.bullet.rectangle")
-                                            }
-                                            .tint(Color("OffshoreSand"))
-                                        }
-                                    }
-                                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                        Button {
-                                            deletePlannedExpense(expense)
-                                        } label: {
-                                            Label("Delete", systemImage: "trash")
-                                        }
-                                        .tint(Color("OffshoreDepth"))
-                                    }
-
-                            case .variable(let expense):
-                                Button {
-                                    openEdit(expense)
-                                } label: {
-                                    BudgetVariableExpenseRow(expense: expense, showsCardName: true)
-                                }
-                                .buttonStyle(.plain)
-                                .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                                    Button {
-                                        openEdit(expense)
-                                    } label: {
-                                        Label("Edit", systemImage: "pencil")
-                                    }
-                                    .tint(Color("AccentColor"))
-                                }
-                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                    Button {
-                                        deleteVariableExpense(expense)
-                                    } label: {
-                                        Label("Delete", systemImage: "trash")
-                                    }
-                                    .tint(Color("OffshoreDepth"))
-                                }
-                            }
-                        }
-                    }
-                }
-            } header: {
-                expensesTitleText
-            } footer: {
-                if hiddenFuturePlannedExpenseCount > 0 {
-                    Text("\(hiddenFuturePlannedExpenseCount.formatted()) future planned expenses are hidden.")
-                }
-                if hiddenFutureVariableExpenseCount > 0 {
-                    Text("\(hiddenFutureVariableExpenseCount.formatted()) future variable expenses are hidden.")
-                }
-            }
-        }
+        budgetDetailList
         .postBoardingTip(
             key: "tip.budgetdetail.v1",
             title: "Budget Detail Overview",
@@ -864,6 +640,215 @@ struct BudgetDetailView: View {
                     }
                 )
             }
+        }
+    }
+
+    private var budgetDetailList: some View {
+        List {
+            summarySection
+            categorySection
+            typeAndSortSection
+            expenseListSection
+        }
+    }
+
+    @ViewBuilder
+    private var summarySection: some View {
+        Section {
+            VStack(spacing: 12) {
+                BudgetSummaryBucketCard(
+                    title: "Income",
+                    titleColor: .blue,
+                    rows: [
+                        .init(label: "Planned Income", value: plannedIncomeTotal),
+                        .init(label: "Actual Income", value: actualIncomeTotal)
+                    ]
+                )
+
+                BudgetSummaryBucketCard(
+                    title: "Expenses",
+                    titleColor: .orange,
+                    rows: expenseRowsForCurrentSelection()
+                )
+
+                BudgetSummaryBucketCard(
+                    title: "Savings",
+                    titleColor: .green,
+                    rows: [
+                        .init(label: "Max Savings", value: maxSavings),
+                        .init(label: "Projected Savings", value: projectedSavings),
+                        .init(label: "Actual Savings", value: actualSavings)
+                    ]
+                )
+            }
+            .padding(.vertical, 4)
+        } header: {
+            Text("Overview • \(budgetDateRangeLabel)")
+        } footer: {
+            if let footnote = presetRequiresCardFootnote {
+                Text(footnote)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var categorySection: some View {
+        if !categoriesInBudget.isEmpty {
+            Section {
+                BudgetCategoryChipsRow(
+                    categories: categoriesInBudget,
+                    selectedID: $selectedCategoryID,
+                    onLongPressCategory: { category in
+                        editingCategoryLimitCategory = category
+                        editingCategoryLimitPlannedContribution = plannedContribution(for: category)
+                        editingCategoryLimitVariableContribution = variableContribution(for: category)
+                        showingEditCategoryLimitSheet = true
+                    }
+                )
+            } header: {
+                Text("Categories")
+            } footer: {
+                Text("Single-press a category filter expenses; long-press to edit its spending limit.")
+            }
+        }
+    }
+
+    private var typeAndSortSection: some View {
+        Section {
+            Picker("Type", selection: $expenseScope) {
+                Text("Planned").tag(ExpenseScope.planned)
+                Text("Unified").tag(ExpenseScope.unified)
+                Text("Variable").tag(ExpenseScope.variable)
+            }
+            .pickerStyle(.segmented)
+
+            Picker("Sort", selection: $sortMode) {
+                Text("A–Z").tag(BudgetSortMode.az)
+                Text("Z–A").tag(BudgetSortMode.za)
+                Text("\(CurrencyFormatter.currencySymbol)↑").tag(BudgetSortMode.amountAsc)
+                Text("\(CurrencyFormatter.currencySymbol)↓").tag(BudgetSortMode.amountDesc)
+                Text("Date ↑").tag(BudgetSortMode.dateAsc)
+                Text("Date ↓").tag(BudgetSortMode.dateDesc)
+            }
+            .pickerStyle(.segmented)
+        } header: {
+            Text("Sort")
+        }
+    }
+
+    private var expenseListSection: some View {
+        Section {
+            expenseListSectionContent
+        } header: {
+            expensesTitleText
+        } footer: {
+            expenseListSectionFooter
+        }
+    }
+
+    @ViewBuilder
+    private var expenseListSectionContent: some View {
+        switch expenseScope {
+        case .planned:
+            if plannedExpensesFiltered.isEmpty {
+                ContentUnavailableView(plannedEmptyMessage, systemImage: "")
+            } else {
+                ForEach(plannedExpensesFiltered, id: \.id) { expense in
+                    plannedExpenseRow(expense)
+                }
+            }
+
+        case .variable:
+            if variableExpensesFiltered.isEmpty {
+                ContentUnavailableView(variableEmptyMessage, systemImage: "")
+            } else {
+                ForEach(variableExpensesFiltered, id: \.id) { expense in
+                    variableExpenseRow(expense)
+                }
+            }
+
+        case .unified:
+            if unifiedItemsFiltered.isEmpty {
+                ContentUnavailableView(unifiedEmptyMessage, systemImage: "")
+            } else {
+                ForEach(unifiedItemsFiltered) { item in
+                    unifiedExpenseRow(item)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var expenseListSectionFooter: some View {
+        if hiddenFuturePlannedExpenseCount > 0 {
+            Text("\(hiddenFuturePlannedExpenseCount.formatted()) future planned expenses are hidden.")
+        }
+        if hiddenFutureVariableExpenseCount > 0 {
+            Text("\(hiddenFutureVariableExpenseCount.formatted()) future variable expenses are hidden.")
+        }
+    }
+
+    private func plannedExpenseRow(_ expense: PlannedExpense) -> some View {
+        BudgetPlannedExpenseRow(expense: expense, showsCardName: true)
+            .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                Button {
+                    openEdit(expense)
+                } label: {
+                    Label("Edit", systemImage: "pencil")
+                }
+                .tint(Color("AccentColor"))
+
+                if let preset = presetForPlannedExpense(expense) {
+                    Button {
+                        openEditPreset(preset)
+                    } label: {
+                        Label("Edit Preset", systemImage: "list.bullet.rectangle")
+                    }
+                    .tint(Color("OffshoreSand"))
+                }
+            }
+            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                Button {
+                    deletePlannedExpense(expense)
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+                .tint(Color("OffshoreDepth"))
+            }
+    }
+
+    private func variableExpenseRow(_ expense: VariableExpense) -> some View {
+        Button {
+            openEdit(expense)
+        } label: {
+            BudgetVariableExpenseRow(expense: expense, showsCardName: true)
+        }
+        .buttonStyle(.plain)
+        .swipeActions(edge: .leading, allowsFullSwipe: true) {
+            Button {
+                openEdit(expense)
+            } label: {
+                Label("Edit", systemImage: "pencil")
+            }
+            .tint(Color("AccentColor"))
+        }
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            Button {
+                deleteVariableExpense(expense)
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+            .tint(Color("OffshoreDepth"))
+        }
+    }
+
+    @ViewBuilder
+    private func unifiedExpenseRow(_ item: BudgetUnifiedExpenseItem) -> some View {
+        switch item {
+        case .planned(let expense):
+            plannedExpenseRow(expense)
+        case .variable(let expense):
+            variableExpenseRow(expense)
         }
     }
 
