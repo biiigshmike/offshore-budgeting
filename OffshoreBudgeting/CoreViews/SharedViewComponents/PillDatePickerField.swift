@@ -19,6 +19,23 @@ private enum PillPickerSheetMetrics {
     static let timePickerContentHeight: CGFloat = 240
 }
 
+private enum PillPickerPopoverMetrics {
+    static let datePickerWidth: CGFloat = 320
+    static let datePickerHeight: CGFloat = 320
+    static let timePickerWidth: CGFloat = 280
+    static let timePickerHeight: CGFloat = 200
+}
+
+private enum PillPickerPlatform {
+    static var isMacCatalyst: Bool {
+        #if targetEnvironment(macCatalyst)
+        true
+        #else
+        false
+        #endif
+    }
+}
+
 private extension View {
     @ViewBuilder
     func platformCalendarDatePickerStyle(useWheelOnPhoneLandscape: Bool) -> some View {
@@ -26,6 +43,15 @@ private extension View {
             self.datePickerStyle(.wheel)
         } else {
             self.datePickerStyle(.graphical)
+        }
+    }
+
+    @ViewBuilder
+    func platformTimePickerStyle(useWheel: Bool) -> some View {
+        if useWheel {
+            self.datePickerStyle(.wheel)
+        } else {
+            self.datePickerStyle(.compact)
         }
     }
 }
@@ -42,7 +68,7 @@ struct PillDatePickerField: View {
 
     @State private var isPresented = false
 
-    init( 
+    init(
         title: String,
         date: Binding<Date>,
         minimumDate: Date? = nil,
@@ -69,10 +95,25 @@ struct PillDatePickerField: View {
     var body: some View {
         let dateText = formattedDate(date)
 
+        if PillPickerPlatform.isMacCatalyst {
+            triggerButton(text: dateText, accessibilityText: "\(title) \(dateText)")
+                .popover(isPresented: $isPresented, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
+                    macPopoverContent
+                        .presentationCompactAdaptation(.popover)
+                }
+        } else {
+            triggerButton(text: dateText, accessibilityText: "\(title) \(dateText)")
+                .sheet(isPresented: $isPresented) {
+                    mobileSheetContent
+                }
+        }
+    }
+
+    private func triggerButton(text: String, accessibilityText: String) -> some View {
         Button {
             isPresented = true
         } label: {
-            Text(dateText)
+            Text(text)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.primary)
                 .lineLimit(1)
@@ -83,39 +124,64 @@ struct PillDatePickerField: View {
                 .background(Color.secondary.opacity(0.1), in: Capsule())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(title) \(dateText)")
-        .sheet(isPresented: $isPresented) {
-            NavigationStack {
-                VStack(alignment: .leading, spacing: 14) {
-                    pickerContainer
-                }
-                .padding()
-                .navigationTitle(title)
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    if #available(iOS 26.0, *) {
-                        ToolbarItem(placement: .topBarTrailing) {
-                            Button("Done") {
-                                isPresented = false
-                            }
-                            .tint(.accentColor)
-                            .controlSize(.large)
-                            .buttonStyle(.glassProminent)
-                            .buttonBorderShape(.automatic)
+        .accessibilityLabel(accessibilityText)
+    }
+
+    private var mobileSheetContent: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 14) {
+                pickerContainer
+            }
+            .padding()
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                if #available(iOS 26.0, *) {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Done") {
+                            isPresented = false
                         }
-                    } else {
-                        ToolbarItem(placement: .topBarTrailing) {
-                            Button("Done") {
-                                isPresented = false
-                            }
-                            .tint(.accentColor)
-                            .controlSize(.large)
-                            .buttonStyle(.plain)
+                        .tint(.accentColor)
+                        .controlSize(.large)
+                        .buttonStyle(.glassProminent)
+                        .buttonBorderShape(.automatic)
+                    }
+                } else {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Done") {
+                            isPresented = false
                         }
+                        .tint(.accentColor)
+                        .controlSize(.large)
+                        .buttonStyle(.plain)
                     }
                 }
             }
-            .modifier(PillPickerSheetPresentationModifier())
+        }
+        .modifier(PillPickerSheetPresentationModifier())
+    }
+
+    private var macPopoverContent: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title)
+                .font(.headline)
+
+            picker
+                .frame(height: PillPickerPopoverMetrics.datePickerHeight, alignment: .top)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+
+            HStack {
+                Spacer()
+                Button("Done") {
+                    isPresented = false
+                }
+                .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(14)
+        .frame(width: PillPickerPopoverMetrics.datePickerWidth, alignment: .topLeading)
+        .transaction { txn in
+            txn.animation = nil
         }
     }
 
@@ -200,10 +266,25 @@ struct PillTimePickerField: View {
     var body: some View {
         let timeText = formattedTime(time)
 
+        if PillPickerPlatform.isMacCatalyst {
+            triggerButton(text: timeText, accessibilityText: "\(title) \(timeText)")
+                .popover(isPresented: $isPresented, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
+                    macPopoverContent
+                        .presentationCompactAdaptation(.popover)
+                }
+        } else {
+            triggerButton(text: timeText, accessibilityText: "\(title) \(timeText)")
+                .sheet(isPresented: $isPresented) {
+                    mobileSheetContent
+                }
+        }
+    }
+
+    private func triggerButton(text: String, accessibilityText: String) -> some View {
         Button {
             isPresented = true
         } label: {
-            Text(timeText)
+            Text(text)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.primary)
                 .lineLimit(1)
@@ -214,49 +295,79 @@ struct PillTimePickerField: View {
                 .background(Color.secondary.opacity(0.1), in: Capsule())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(title) \(timeText)")
-        .sheet(isPresented: $isPresented) {
-            NavigationStack {
-                VStack(alignment: .leading, spacing: 14) {
-                    ScrollView(.vertical) {
-                        DatePicker("", selection: $time, displayedComponents: [.hourAndMinute])
-                            .datePickerStyle(.wheel)
-                            .labelsHidden()
-                            .frame(height: PillPickerSheetMetrics.timePickerContentHeight, alignment: .top)
-                            .frame(maxWidth: .infinity, alignment: .center)
-                    }
-                    .scrollBounceBehavior(.basedOnSize)
-                    .transaction { txn in
-                        txn.animation = nil
-                    }
+        .accessibilityLabel(accessibilityText)
+    }
+
+    private var mobileSheetContent: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 14) {
+                ScrollView(.vertical) {
+                    DatePicker("", selection: $time, displayedComponents: [.hourAndMinute])
+                        .platformTimePickerStyle(useWheel: true)
+                        .labelsHidden()
+                        .frame(height: PillPickerSheetMetrics.timePickerContentHeight, alignment: .top)
+                        .frame(maxWidth: .infinity, alignment: .center)
                 }
-                .padding()
-                .navigationTitle(title)
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    if #available(iOS 26.0, *) {
-                        ToolbarItem(placement: .topBarTrailing) {
-                            Button("Done") {
-                                isPresented = false
-                            }
-                            .tint(.accentColor)
-                            .controlSize(.large)
-                            .buttonStyle(.glassProminent)
-                            .buttonBorderShape(.automatic)
+                .scrollBounceBehavior(.basedOnSize)
+                .transaction { txn in
+                    txn.animation = nil
+                }
+            }
+            .padding()
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                if #available(iOS 26.0, *) {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Done") {
+                            isPresented = false
                         }
-                    } else {
-                        ToolbarItem(placement: .topBarTrailing) {
-                            Button("Done") {
-                                isPresented = false
-                            }
-                            .tint(.accentColor)
-                            .controlSize(.large)
-                            .buttonStyle(.plain)
+                        .tint(.accentColor)
+                        .controlSize(.large)
+                        .buttonStyle(.glassProminent)
+                        .buttonBorderShape(.automatic)
+                    }
+                } else {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Done") {
+                            isPresented = false
                         }
+                        .tint(.accentColor)
+                        .controlSize(.large)
+                        .buttonStyle(.plain)
                     }
                 }
             }
-            .modifier(PillPickerSheetPresentationModifier())
+        }
+        .modifier(PillPickerSheetPresentationModifier())
+    }
+
+    private var macPopoverContent: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title)
+                .font(.headline)
+
+            DatePicker("", selection: $time, displayedComponents: [.hourAndMinute])
+                .platformTimePickerStyle(useWheel: false)
+                .labelsHidden()
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            HStack {
+                Spacer()
+                Button("Done") {
+                    isPresented = false
+                }
+                .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(14)
+        .frame(
+            width: PillPickerPopoverMetrics.timePickerWidth,
+            height: PillPickerPopoverMetrics.timePickerHeight,
+            alignment: .topLeading
+        )
+        .transaction { txn in
+            txn.animation = nil
         }
     }
 
