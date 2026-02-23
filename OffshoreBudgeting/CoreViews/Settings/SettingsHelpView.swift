@@ -2,7 +2,6 @@ import SwiftUI
 
 struct SettingsHelpView: View {
     @State private var searchText: String = ""
-    @State private var expandedTopicIDs: Set<String> = []
     private let faqEngine = HelpFAQEngine()
 
     private var normalizedSearchText: String {
@@ -21,12 +20,12 @@ struct SettingsHelpView: View {
         )
     }
 
-    private var rankedMatches: [HelpFAQTopicMatch] {
+    private var searchResults: [GeneratedHelpLeafTopic] {
         guard isSearching else { return [] }
-        return faqEngine.rankedTopicMatches(
-            for: normalizedSearchText,
-            topics: GeneratedHelpContent.allLeafTopics
-        )
+
+        return GeneratedHelpContent.allLeafTopics.filter { topic in
+            topic.faqSearchText.localizedCaseInsensitiveContains(normalizedSearchText)
+        }
     }
 
     private var unresolvedSuggestions: [GeneratedHelpLeafTopic] {
@@ -34,58 +33,41 @@ struct SettingsHelpView: View {
         return faqResolution.suggestions
     }
 
-    private var queryTokens: Set<String> {
-        faqEngine.queryTokens(for: normalizedSearchText)
-    }
-
-    private var displayedSearchResults: [HelpSearchResult] {
-        guard isSearching else { return [] }
-
-        if let faqResolution, faqResolution.answer == nil {
-            return unresolvedSuggestions.map { topic in
-                HelpSearchResult(
-                    topic: topic,
-                    matchedSectionID: nil,
-                    matchedSectionTitle: nil
-                )
-            }
-        }
-
-        return rankedMatches.compactMap { match in
-            guard let topic = GeneratedHelpContent.leafTopic(for: match.topicID) else {
-                return nil
-            }
-
-            return HelpSearchResult(
-                topic: topic,
-                matchedSectionID: match.sectionID,
-                matchedSectionTitle: match.sectionTitle
-            )
-        }
-    }
-
     var body: some View {
+        let currentFAQResolution = faqResolution
+
         List {
             if isSearching {
+                Section {
+                    Text("Ask in plain language. Marina answers from Help topics only.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+
+                if let answer = currentFAQResolution?.answer {
+                    Section("Marina FAQ Answer") {
+                        faqAnswerCard(answer)
+                    }
+                }
+
                 Section("Results") {
-                    if displayedSearchResults.isEmpty {
-                        Text("No matching help topics.")
+                    if let currentFAQResolution, currentFAQResolution.answer == nil {
+                        Text("I need a clearer help question, but I can suggest likely topics.")
                             .foregroundStyle(.secondary)
+
+                        ForEach(unresolvedSuggestions) { topic in
+                            leafTopicNavigationLink(topic)
+                        }
+                    }
+
+                    if searchResults.isEmpty {
+                        if currentFAQResolution?.answer != nil {
+                            Text("No matching help topics.")
+                                .foregroundStyle(.secondary)
+                        }
                     } else {
-                        ForEach(displayedSearchResults) { result in
-                            HelpSearchResultDisclosureRow(
-                                topic: result.topic,
-                                sectionTitle: sectionTitle(for: result),
-                                previewSnippet: highlightedSnippet(
-                                    collapsedSnippet(for: result),
-                                    queryTokens: queryTokens
-                                ),
-                                expandedSnippet: highlightedSnippet(
-                                    expandedSnippet(for: result),
-                                    queryTokens: queryTokens
-                                ),
-                                isExpanded: expansionBinding(for: result.topic.id)
-                            )
+                        ForEach(searchResults) { topic in
+                            leafTopicNavigationLink(topic)
                         }
                     }
                 }
@@ -110,9 +92,6 @@ struct SettingsHelpView: View {
             placement: .navigationBarDrawer(displayMode: .always),
             prompt: "Search or ask a help question"
         )
-        .onChange(of: searchText) { _, _ in
-            expandedTopicIDs = []
-        }
     }
 
     // MARK: - Navigation
@@ -129,228 +108,43 @@ struct SettingsHelpView: View {
         }
     }
 
-    // MARK: - Search Results
-
-    private func expansionBinding(for topicID: String) -> Binding<Bool> {
-        Binding(
-            get: {
-                expandedTopicIDs.contains(topicID)
-            },
-            set: { isExpanded in
-                if isExpanded {
-                    expandedTopicIDs.insert(topicID)
-                } else {
-                    expandedTopicIDs.remove(topicID)
-                }
-            }
-        )
-    }
-
-    private func sectionTitle(for result: HelpSearchResult) -> String? {
-        if let matchedSection = matchedSection(for: result),
-           let header = matchedSection.header?.trimmingCharacters(in: .whitespacesAndNewlines),
-           header.isEmpty == false {
-            return header
-        }
-
-        if let title = result.matchedSectionTitle?.trimmingCharacters(in: .whitespacesAndNewlines),
-           title.isEmpty == false {
-            return title
-        }
-
-        if let firstHeader = result.topic.sections.first?.header?.trimmingCharacters(in: .whitespacesAndNewlines),
-           firstHeader.isEmpty == false {
-            return firstHeader
-        }
-
-        return nil
-    }
-
-    private func matchedSection(for result: HelpSearchResult) -> GeneratedHelpSection? {
-        guard let sectionID = result.matchedSectionID else { return nil }
-        return result.topic.sections.first(where: { $0.id == sectionID })
-    }
-
-    private func snippetSourceText(for result: HelpSearchResult) -> String {
-        if let matchedSection = matchedSection(for: result) {
-            let body = matchedSection.bodyText.trimmingCharacters(in: .whitespacesAndNewlines)
-            if body.isEmpty == false {
-                return body
-            }
-
-            if let header = matchedSection.header?.trimmingCharacters(in: .whitespacesAndNewlines),
-               header.isEmpty == false
-            {
-                return header
-            }
-        }
-
-        if let firstSection = result.topic.sections.first {
-            let body = firstSection.bodyText.trimmingCharacters(in: .whitespacesAndNewlines)
-            if body.isEmpty == false {
-                return body
-            }
-
-            if let header = firstSection.header?.trimmingCharacters(in: .whitespacesAndNewlines),
-               header.isEmpty == false
-            {
-                return header
-            }
-        }
-
-        return result.topic.title
-    }
-
-    private func collapsedSnippet(for result: HelpSearchResult) -> String {
-        excerpt(
-            from: snippetSourceText(for: result),
-            queryTokens: queryTokens,
-            maxLength: 150
-        )
-    }
-
-    private func expandedSnippet(for result: HelpSearchResult) -> String {
-        excerpt(
-            from: snippetSourceText(for: result),
-            queryTokens: queryTokens,
-            maxLength: 320
-        )
-    }
-
-    private func excerpt(
-        from text: String,
-        queryTokens: Set<String>,
-        maxLength: Int
-    ) -> String {
-        let condensed = condensedWhitespace(text)
-        guard condensed.isEmpty == false else { return "" }
-        guard condensed.count > maxLength else { return condensed }
-
-        if let matchIndex = firstMatchIndex(in: condensed, queryTokens: queryTokens) {
-            let leadingContext = maxLength / 3
-            let start = condensed.index(matchIndex, offsetBy: -leadingContext, limitedBy: condensed.startIndex)
-                ?? condensed.startIndex
-            let end = condensed.index(start, offsetBy: maxLength, limitedBy: condensed.endIndex)
-                ?? condensed.endIndex
-
-            var snippet = String(condensed[start..<end]).trimmingCharacters(in: .whitespacesAndNewlines)
-            if start > condensed.startIndex {
-                snippet = "... " + snippet
-            }
-            if end < condensed.endIndex {
-                snippet += " ..."
-            }
-            return snippet
-        }
-
-        return truncatedSnippet(condensed, maxLength: maxLength)
-    }
-
-    private func truncatedSnippet(_ text: String, maxLength: Int) -> String {
-        guard text.count > maxLength else { return text }
-
-        let upperBound = text.index(text.startIndex, offsetBy: maxLength)
-        let prefix = String(text[..<upperBound])
-
-        if let lastSpace = prefix.lastIndex(of: " ") {
-            let trimmed = String(prefix[..<lastSpace]).trimmingCharacters(in: .whitespacesAndNewlines)
-            return trimmed + " ..."
-        }
-
-        return prefix + " ..."
-    }
-
-    private func condensedWhitespace(_ text: String) -> String {
-        text
-            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private func firstMatchIndex(in text: String, queryTokens: Set<String>) -> String.Index? {
-        guard queryTokens.isEmpty == false else { return nil }
-
-        for range in wordRanges(in: text) {
-            let rawToken = String(text[range]).lowercased()
-            let canonical = canonicalSearchToken(rawToken)
-            if queryTokens.contains(canonical) {
-                return range.lowerBound
-            }
-        }
-
-        return nil
-    }
-
-    private func highlightedSnippet(
-        _ text: String,
-        queryTokens: Set<String>
-    ) -> AttributedString {
-        var attributed = AttributedString(text)
-        guard text.isEmpty == false else { return attributed }
-        guard queryTokens.isEmpty == false else { return attributed }
-
-        for range in wordRanges(in: text) {
-            let rawToken = String(text[range]).lowercased()
-            let canonical = canonicalSearchToken(rawToken)
-            guard queryTokens.contains(canonical) else { continue }
-
-            if let attributedRange = Range(range, in: attributed) {
-                attributed[attributedRange].inlinePresentationIntent = .stronglyEmphasized
-            }
-        }
-
-        return attributed
-    }
-
-    private func wordRanges(in text: String) -> [Range<String.Index>] {
-        guard let regex = try? NSRegularExpression(pattern: "[A-Za-z0-9]+") else { return [] }
-        let fullRange = NSRange(text.startIndex..<text.endIndex, in: text)
-
-        return regex.matches(in: text, range: fullRange).compactMap { match in
-            Range(match.range, in: text)
+    private func leafTopicNavigationLink(_ topic: GeneratedHelpLeafTopic) -> some View {
+        NavigationLink {
+            HelpTopicDetailView(topic: topic)
+        } label: {
+            Text(topic.title)
         }
     }
 
-    private func canonicalSearchToken(_ token: String) -> String {
-        var value = token
+    @ViewBuilder
+    private func faqAnswerCard(_ answer: HelpFAQAnswer) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(answer.title)
+                .font(.headline)
 
-        if value.hasSuffix("ies"), value.count > 4 {
-            value = String(value.dropLast(3)) + "y"
-        } else if value.hasSuffix("s"), value.count > 3 {
-            value = String(value.dropLast())
-        }
+            Text(answer.narrative)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
 
-        return value
-    }
-}
+            HStack(spacing: 8) {
+                Text(confidenceLabel(for: answer.confidence))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
 
-private struct HelpSearchResult: Identifiable {
-    let topic: GeneratedHelpLeafTopic
-    let matchedSectionID: String?
-    let matchedSectionTitle: String?
-
-    var id: String {
-        topic.id
-    }
-}
-
-// MARK: - Search Row UI
-
-private struct HelpSearchResultDisclosureRow: View {
-    let topic: GeneratedHelpLeafTopic
-    let sectionTitle: String?
-    let previewSnippet: AttributedString
-    let expandedSnippet: AttributedString
-    @Binding var isExpanded: Bool
-
-    var body: some View {
-        DisclosureGroup(isExpanded: $isExpanded) {
-            VStack(alignment: .leading, spacing: 10) {
-                if expandedSnippet.characters.isEmpty == false {
-                    Text(expandedSnippet)
-                        .font(.subheadline)
+                if let sectionTitle = answer.match.sectionTitle,
+                   sectionTitle.isEmpty == false
+                {
+                    Text("|")
+                        .font(.caption)
                         .foregroundStyle(.secondary)
+                    Text(sectionTitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
+            }
 
+            if let topic = GeneratedHelpContent.leafTopic(for: answer.match.topicID) {
                 NavigationLink {
                     HelpTopicDetailView(topic: topic)
                 } label: {
@@ -358,27 +152,18 @@ private struct HelpSearchResultDisclosureRow: View {
                         .font(.subheadline.weight(.semibold))
                 }
             }
-            .padding(.top, 6)
-        } label: {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(topic.title)
-                    .font(.body.weight(.semibold))
+        }
+        .padding(.vertical, 4)
+    }
 
-                if let sectionTitle, sectionTitle.isEmpty == false {
-                    Text(sectionTitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-
-                if previewSnippet.characters.isEmpty == false {
-                    Text(previewSnippet)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                }
-            }
-            .padding(.vertical, 2)
+    private func confidenceLabel(for confidence: HelpFAQConfidence) -> String {
+        switch confidence {
+        case .high:
+            return "Best match"
+        case .medium:
+            return "Likely match"
+        case .low:
+            return "Low confidence"
         }
     }
 }

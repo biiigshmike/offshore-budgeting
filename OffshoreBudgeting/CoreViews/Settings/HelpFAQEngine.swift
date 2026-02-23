@@ -30,15 +30,6 @@ struct HelpFAQResolution: Equatable {
     let confidence: HelpFAQConfidence
 }
 
-struct HelpFAQTopicMatch: Equatable {
-    let topicID: String
-    let topicTitle: String
-    let sectionID: String
-    let sectionTitle: String?
-    let score: Int
-    let coverage: Double
-}
-
 // MARK: - FAQ Engine
 
 struct HelpFAQEngine {
@@ -149,30 +140,6 @@ struct HelpFAQEngine {
         )
 
         return HelpFAQResolution(answer: answer, suggestions: [], confidence: confidence)
-    }
-
-    func rankedTopicMatches(
-        for prompt: String,
-        topics: [GeneratedHelpLeafTopic]
-    ) -> [HelpFAQTopicMatch] {
-        let normalizedPrompt = normalized(prompt)
-        guard normalizedPrompt.isEmpty == false else { return [] }
-
-        let ranked = rankedTopics(for: normalizedPrompt, topics: topics)
-        return ranked.map { candidate in
-            HelpFAQTopicMatch(
-                topicID: candidate.topic.id,
-                topicTitle: candidate.topic.title,
-                sectionID: candidate.section.id,
-                sectionTitle: candidate.section.header,
-                score: candidate.score,
-                coverage: candidate.coverage
-            )
-        }
-    }
-
-    func queryTokens(for prompt: String) -> Set<String> {
-        tokenSet(from: prompt)
     }
 
     // MARK: - Ranking
