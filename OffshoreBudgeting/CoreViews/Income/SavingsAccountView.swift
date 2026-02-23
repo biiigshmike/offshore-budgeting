@@ -467,8 +467,11 @@ private struct SavingsLedgerEntryFormView: View {
     @State private var amountText: String = ""
     @State private var note: String = ""
     @State private var kind: SavingsLedgerEntryKind = .manualAdjustment
+    @State private var isTransferToTrueSavings: Bool = false
 
     @State private var showingInvalidAmount: Bool = false
+
+    private let transferDefaultNote: String = "Transfer to True Savings"
 
     private var saveTitle: String {
         entry == nil ? "Add Savings Entry" : "Edit Savings Entry"
@@ -488,11 +491,28 @@ private struct SavingsLedgerEntryFormView: View {
 
                 TextField("Note", text: $note)
 
+                Toggle("Move to True Savings", isOn: $isTransferToTrueSavings)
+                    .onChange(of: isTransferToTrueSavings) { _, isEnabled in
+                        guard isEnabled else { return }
+                        kind = .manualAdjustment
+                        if note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            note = transferDefaultNote
+                        }
+                        normalizeAmountTextForTransfer()
+                    }
+
+                if isTransferToTrueSavings {
+                    Text("This saves a negative manual adjustment so your running total reflects spendable savings.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+
                 Picker("Type", selection: $kind) {
                     Text("Manual").tag(SavingsLedgerEntryKind.manualAdjustment)
                     Text("Period Close").tag(SavingsLedgerEntryKind.periodClose)
                     Text("Expense Offset").tag(SavingsLedgerEntryKind.expenseOffset)
                 }
+                .disabled(isTransferToTrueSavings)
             }
 
             if let account {
@@ -532,6 +552,11 @@ private struct SavingsLedgerEntryFormView: View {
                 amountText = CurrencyFormatter.editingString(from: entry.amount)
                 note = entry.note
                 kind = entry.kind
+                isTransferToTrueSavings = (
+                    entry.kind == .manualAdjustment &&
+                    entry.amount < 0 &&
+                    entry.note == transferDefaultNote
+                )
             }
         }
     }
@@ -542,7 +567,32 @@ private struct SavingsLedgerEntryFormView: View {
             return
         }
 
-        onSave(date, amount, note.trimmingCharacters(in: .whitespacesAndNewlines), kind)
+        var finalAmount = amount
+        var finalNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        var finalKind = kind
+
+        if isTransferToTrueSavings {
+            finalAmount = amount > 0 ? -amount : amount
+            if finalNote.isEmpty {
+                finalNote = transferDefaultNote
+            }
+            finalKind = .manualAdjustment
+        }
+
+        onSave(date, finalAmount, finalNote, finalKind)
         dismiss()
+    }
+
+    private func normalizeAmountTextForTransfer() {
+        guard
+            let parsedAmount = CurrencyFormatter.parseAmount(
+                amountText.trimmingCharacters(in: .whitespacesAndNewlines)
+            ),
+            parsedAmount > 0
+        else {
+            return
+        }
+
+        amountText = CurrencyFormatter.editingString(from: -parsedAmount)
     }
 }
