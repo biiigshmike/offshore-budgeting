@@ -567,7 +567,7 @@ struct BudgetDetailView: View {
         .searchFocused($searchFocused)
 
         .toolbar {
-            if #available(iOS 26.0, macCatalyst 26.0, *), isPhone == false {
+            if #available(iOS 26.0, macCatalyst 26.0, *) {
                 ToolbarItemGroup(placement: .primaryAction) {
                     budgetDisplayToolbarButton
                     budgetActionsToolbarButton
@@ -579,16 +579,10 @@ struct BudgetDetailView: View {
                     addTransactionToolbarButton
                 }
             } else {
-                ToolbarItem(placement: .topBarTrailing) {
-                    addTransactionToolbarButton
-                }
-
-                ToolbarItem(placement: .primaryAction) {
+                ToolbarItemGroup(placement: .primaryAction) {
                     budgetDisplayToolbarButton
-                }
-
-                ToolbarItem(placement: .primaryAction) {
                     budgetActionsToolbarButton
+                    addTransactionToolbarButton
                 }
             }
         }
