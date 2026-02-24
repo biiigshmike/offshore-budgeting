@@ -946,7 +946,7 @@ struct CardDetailView: View {
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
-        if #available(iOS 26.0, macCatalyst 26.0, *), isPhone == false {
+        if #available(iOS 26.0, macCatalyst 26.0, *) {
             ToolbarItemGroup(placement: .primaryAction) {
                 cardDisplayToolbarButton
                 cardActionsToolbarButton
@@ -958,16 +958,10 @@ struct CardDetailView: View {
                 addToolbarButton
             }
         } else {
-            ToolbarItem(placement: .topBarTrailing) {
-                addToolbarButton
-            }
-
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItemGroup(placement: .primaryAction) {
                 cardDisplayToolbarButton
-            }
-
-            ToolbarItem(placement: .primaryAction) {
                 cardActionsToolbarButton
+                addToolbarButton
             }
         }
     }
