@@ -52,7 +52,7 @@ struct SettingsReleaseLogsView: View {
     static let releaseSections: [ReleaseSection] = [
         ReleaseSection(
             version: "2.3.1",
-            build: "10",
+            build: "11",
             items: [
                 ReleaseItem(
                     systemImage: "wand.and.sparkles.inverse",
