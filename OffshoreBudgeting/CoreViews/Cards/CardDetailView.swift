@@ -77,10 +77,6 @@ struct CardDetailView: View {
         #endif
     }
 
-    private var shouldSyncCommandSurface: Bool {
-        isPhone == false
-    }
-
     // MARK: - Derived Data
 
     private static let tipItems: [PostBoardingTipItem] = [
@@ -535,9 +531,7 @@ struct CardDetailView: View {
             }
             .onAppear {
                 isVisible = true
-                if shouldSyncCommandSurface {
-                    commandHub.activate(.cardDetail)
-                }
+                commandHub.activate(.cardDetail)
                 initializeDateRangeIfNeeded()
                 if !didApplyDefaultsOnAppear {
                     hideFuturePlannedExpensesInView = hideFuturePlannedExpensesDefault
@@ -563,16 +557,13 @@ struct CardDetailView: View {
             .onDisappear {
                 isVisible = false
                 searchFocused = false
-                if shouldSyncCommandSurface {
-                    commandHub.deactivate(.cardDetail)
-                }
+                commandHub.deactivate(.cardDetail)
                 searchRebuildTask?.cancel()
 #if DEBUG
                 debugLog("onDisappear")
 #endif
             }
             .onReceive(commandHub.$sequence) { _ in
-                guard shouldSyncCommandSurface else { return }
                 guard commandHub.surface == .cardDetail else { return }
                 handleCommand(commandHub.latestCommandID)
             }

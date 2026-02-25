@@ -125,32 +125,47 @@ struct AppCommandAvailability: Equatable {
     var cardsSortContext: AppCardsSortCommandContext = .cards
 }
 
+enum AppCommandHubPolicy: Equatable {
+    case enabled
+    case disabled
+}
+
 // MARK: - Hub
 
 @MainActor
 final class AppCommandHub: ObservableObject {
+    private let policy: AppCommandHubPolicy
+
     @Published private(set) var surface: AppCommandSurface = .none
     @Published private(set) var availability: AppCommandAvailability = .init()
     @Published private(set) var activeSectionRaw: String = AppSection.home.rawValue
     @Published private(set) var sequence: Int = 0
     private(set) var latestCommandID: String = ""
 
+    init(policy: AppCommandHubPolicy = .enabled) {
+        self.policy = policy
+    }
+
     func activate(_ surface: AppCommandSurface) {
+        guard policy == .enabled else { return }
         guard self.surface != surface else { return }
         self.surface = surface
     }
 
     func deactivate(_ surface: AppCommandSurface) {
+        guard policy == .enabled else { return }
         guard self.surface == surface else { return }
         self.surface = .none
     }
 
     func setBudgetDetailCanCreateTransaction(_ canCreate: Bool) {
+        guard policy == .enabled else { return }
         guard availability.budgetDetailCanCreateTransaction != canCreate else { return }
         availability.budgetDetailCanCreateTransaction = canCreate
     }
 
     func setIncomeDeletionAvailability(canDeleteActual: Bool, canDeletePlanned: Bool) {
+        guard policy == .enabled else { return }
         guard availability.incomeCanDeleteActual != canDeleteActual
                 || availability.incomeCanDeletePlanned != canDeletePlanned else { return }
 
@@ -159,6 +174,7 @@ final class AppCommandHub: ObservableObject {
     }
 
     func setCardsSortContext(_ context: AppCardsSortCommandContext) {
+        guard policy == .enabled else { return }
         guard availability.cardsSortContext != context else { return }
         availability.cardsSortContext = context
     }
@@ -169,6 +185,7 @@ final class AppCommandHub: ObservableObject {
     }
 
     func setActiveSectionRaw(_ sectionRaw: String) {
+        guard policy == .enabled else { return }
         guard activeSectionRaw != sectionRaw else { return }
         activeSectionRaw = sectionRaw
     }

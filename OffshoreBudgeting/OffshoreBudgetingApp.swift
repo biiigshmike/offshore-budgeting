@@ -298,7 +298,18 @@ private struct WindowSceneRootView: View {
     @Binding var modelContainer: ModelContainer
     let initialSectionOverride: AppSection?
 
-    @StateObject private var commandHub: AppCommandHub = AppCommandHub()
+    @StateObject private var commandHub: AppCommandHub = Self.makeCommandHub()
+
+    private static func makeCommandHub() -> AppCommandHub {
+        #if targetEnvironment(macCatalyst)
+        return AppCommandHub(policy: .enabled)
+        #elseif canImport(UIKit)
+        let policy: AppCommandHubPolicy = UIDevice.current.userInterfaceIdiom == .phone ? .disabled : .enabled
+        return AppCommandHub(policy: policy)
+        #else
+        return AppCommandHub(policy: .enabled)
+        #endif
+    }
 
     private var shouldUseFocusedSceneObject: Bool {
         #if targetEnvironment(macCatalyst)

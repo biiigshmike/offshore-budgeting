@@ -62,10 +62,6 @@ struct BudgetDetailView: View {
         false
         #endif
     }
-
-    private var shouldSyncCommandSurface: Bool {
-        isPhone == false
-    }
     
     // MARK: - Search
     
@@ -487,9 +483,7 @@ struct BudgetDetailView: View {
         mainContent
             .onAppear {
                 isVisible = true
-                if shouldSyncCommandSurface {
-                    commandHub.activate(.budgetDetail)
-                }
+                commandHub.activate(.budgetDetail)
                 updateBudgetDetailCommandAvailability()
                 if !didApplyDefaultsOnAppear {
                     hideFuturePlannedExpensesInView = hideFuturePlannedExpensesDefault
@@ -515,10 +509,8 @@ struct BudgetDetailView: View {
             .onDisappear {
                 isVisible = false
                 searchFocused = false
-                if shouldSyncCommandSurface {
-                    commandHub.deactivate(.budgetDetail)
-                    commandHub.setBudgetDetailCanCreateTransaction(false)
-                }
+                commandHub.deactivate(.budgetDetail)
+                commandHub.setBudgetDetailCanCreateTransaction(false)
                 searchRebuildTask?.cancel()
 #if DEBUG
                 debugLog("onDisappear")
@@ -528,7 +520,6 @@ struct BudgetDetailView: View {
                 updateBudgetDetailCommandAvailability()
             }
             .onReceive(commandHub.$sequence) { _ in
-                guard shouldSyncCommandSurface else { return }
                 guard commandHub.surface == .budgetDetail else { return }
                 handleCommand(commandHub.latestCommandID)
             }
@@ -1373,7 +1364,6 @@ struct BudgetDetailView: View {
     }
 
     private func updateBudgetDetailCommandAvailability() {
-        guard shouldSyncCommandSurface else { return }
         commandHub.setBudgetDetailCanCreateTransaction(!linkedCards.isEmpty)
     }
 
