@@ -52,6 +52,27 @@ struct SettingsReleaseLogsView: View {
     static let releaseSections: [ReleaseSection] = [
         ReleaseSection(
             version: "2.3.1",
+            build: "12",
+            items: [
+                ReleaseItem(
+                    systemImage: "wand.and.sparkles.inverse",
+                    title: "Quality of Life Improvements",
+                    description: "2.3.1 includes quality of life improvements."
+                ),
+                ReleaseItem(
+                    systemImage: "banknote.fill",
+                    title: "Enhancements to Savings Account",
+                    description: "The in-app, workspace-scoped Savings Account now supports adding negative manual entries to transfer any amount of the running balance 'out' of the savings account to reflect when funds are moved to your actual bank's savings account."
+                ),
+                ReleaseItem(
+                    systemImage: "slider.horizontal.below.rectangle",
+                    title: "Splitting Transactions",
+                    description: "Splitting transactions now supports splitting by percentage using a slider. This makes it so that the split amount value can be calculated easily."
+                )
+            ]
+        ),
+        ReleaseSection(
+            version: "2.3.1",
             build: "11",
             items: [
                 ReleaseItem(
