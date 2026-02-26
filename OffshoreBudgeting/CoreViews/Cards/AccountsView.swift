@@ -36,6 +36,8 @@ struct AccountsView: View {
 
     @State private var selectedSegment: Segment = .cards
     @State private var isSegmentControlExpanded: Bool = false
+    @State private var showingAddCardFromAccounts: Bool = false
+    @State private var showingAddAllocationAccountFromAccounts: Bool = false
     @Namespace private var glassNamespace
 
     @AppStorage("sort.cards.mode") private var cardsSortModeRaw: String = "az"
@@ -98,6 +100,16 @@ struct AccountsView: View {
                 }
             }
         }
+        .sheet(isPresented: $showingAddCardFromAccounts) {
+            NavigationStack {
+                AddCardView(workspace: workspace)
+            }
+        }
+        .sheet(isPresented: $showingAddAllocationAccountFromAccounts) {
+            NavigationStack {
+                AddAllocationAccountView(workspace: workspace)
+            }
+        }
         .onAppear {
             updateCommandSurface()
         }
@@ -135,8 +147,18 @@ struct AccountsView: View {
     private var addToolbarButton: some View {
         Button {
             switch selectedSegment {
-            case .cards, .sharedBalances:
-                commandHub.dispatch(AppCommandID.Cards.newCard)
+            case .cards:
+                if isPhone {
+                    showingAddCardFromAccounts = true
+                } else {
+                    commandHub.dispatch(AppCommandID.Cards.newCard)
+                }
+            case .sharedBalances:
+                if isPhone {
+                    showingAddAllocationAccountFromAccounts = true
+                } else {
+                    commandHub.dispatch(AppCommandID.Cards.newCard)
+                }
             case .savings:
                 commandHub.dispatch(AppCommandID.Savings.newEntry)
             }
