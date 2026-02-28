@@ -16,6 +16,19 @@ import CloudKit
 /// - SettingsHelpView -> "Repeat Onboarding" sets didCompleteOnboarding = false
 /// - SettingsGeneralView -> "Reset & Erase Content" sets didCompleteOnboarding = false
 struct OnboardingView: View {
+
+    private enum Step: Int {
+        case welcome = 0
+        case workspaces = 1
+        case privacy = 2
+        case gestures = 3
+        case categories = 4
+        case cards = 5
+        case presets = 6
+        case income = 7
+        case budgets = 8
+        case quickActions = 9
+    }
     
     // MARK: - Persisted State
     
@@ -33,6 +46,8 @@ struct OnboardingView: View {
     
     @AppStorage("onboarding_didChooseDataSource") private var didChooseDataSource: Bool = false
     @AppStorage("onboarding_didPressGetStarted") private var didPressGetStarted: Bool = false
+    @AppStorage("general_defaultBudgetingPeriod")
+    private var defaultBudgetingPeriodRaw: String = BudgetingPeriod.monthly.rawValue
     
     // MARK: - SwiftData
     
@@ -58,6 +73,7 @@ struct OnboardingView: View {
     @State private var isCheckingICloudForGetStarted: Bool = false
     @State private var showingRestartRequired: Bool = false
     @State private var didChooseICloudFromGetStarted: Bool = false
+    @State private var showingStarterBudgetPrompt: Bool = false
     
     // Drives the “wake up” background motion on the welcome step.
     @State private var isExitingWelcome: Bool = false
@@ -74,6 +90,10 @@ struct OnboardingView: View {
     
     private var isICloudBootstrapping: Bool {
         ICloudBootstrap.isBootstrapping(useICloud: activeUseICloud, startedAt: iCloudBootstrapStartedAt)
+    }
+
+    private var finalStepValue: Int {
+        Step.quickActions.rawValue
     }
     
     var body: some View {
@@ -139,6 +159,19 @@ struct OnboardingView: View {
         } message: {
             Text("This Apple ID can sync existing Offshore data from iCloud. You can always switch later from Manage Workspaces.")
         }
+        .alert("Create a Starter Budget?", isPresented: $showingStarterBudgetPrompt) {
+            Button("Create Budget") {
+                if let workspace = currentWorkspace {
+                    _ = createStarterBudgetIfNeeded(in: workspace)
+                }
+                completeOnboarding()
+            }
+            Button("Skip", role: .cancel) {
+                completeOnboarding()
+            }
+        } message: {
+            Text("You can finish now, or create a starter budget so Home has planning context right away.")
+        }
         .sheet(isPresented: $showingRestartRequired) {
             RestartRequiredView(
                 title: "Restart Required",
@@ -174,23 +207,32 @@ struct OnboardingView: View {
     @ViewBuilder
     private var stepBody: some View {
         switch onboardingStep {
-        case 0:
+        case Step.welcome.rawValue:
             welcomeStep
-            
-        case 1:
+
+        case Step.workspaces.rawValue:
             workspaceStep
-            
-        case 2:
+
+        case Step.privacy.rawValue:
             privacyAndSyncStep
-            
-        case 3:
+
+        case Step.gestures.rawValue:
+            gesturesStep
+
+        case Step.categories.rawValue:
             categoriesStep
-            
-        case 4:
+
+        case Step.cards.rawValue:
             cardsStep
 
-        case 5:
+        case Step.presets.rawValue:
             presetsStep
+
+        case Step.income.rawValue:
+            incomeStep
+
+        case Step.budgets.rawValue:
+            budgetsStep
 
         default:
             quickActionsStep
@@ -267,8 +309,28 @@ struct OnboardingView: View {
         )
     }
     
-    // MARK: - Step 4: Categories
-    
+    // MARK: - Step 4: Gestures & Editing
+
+    private var gesturesStep: some View {
+        Group {
+            if let ws = currentWorkspace {
+                OnboardingGestureTrainingStep(workspace: ws)
+            } else {
+                if isICloudBootstrapping {
+                    iCloudRestorePlaceholder
+                } else {
+                    ContentUnavailableView(
+                        "No Workspace",
+                        systemImage: "person.fill",
+                        description: Text("Create a workspace first.")
+                    )
+                }
+            }
+        }
+    }
+
+    // MARK: - Step 5: Categories
+
     private var categoriesStep: some View {
         Group {
             if let ws = currentWorkspace {
@@ -287,7 +349,7 @@ struct OnboardingView: View {
         }
     }
     
-    // MARK: - Step 5: Cards
+    // MARK: - Step 6: Cards
     
     private var cardsStep: some View {
         Group {
@@ -306,9 +368,9 @@ struct OnboardingView: View {
             }
         }
     }
-    
-    // MARK: - Step 6: Presets
-    
+
+    // MARK: - Step 7: Presets
+
     private var presetsStep: some View {
         Group {
             if let ws = currentWorkspace {
@@ -327,7 +389,47 @@ struct OnboardingView: View {
         }
     }
 
-    // MARK: - Step 7: Quick Actions
+    // MARK: - Step 8: Income
+
+    private var incomeStep: some View {
+        Group {
+            if let ws = currentWorkspace {
+                OnboardingIncomeStep(workspace: ws)
+            } else {
+                if isICloudBootstrapping {
+                    iCloudRestorePlaceholder
+                } else {
+                    ContentUnavailableView(
+                        "No Workspace",
+                        systemImage: "person.fill",
+                        description: Text("Create a workspace first.")
+                    )
+                }
+            }
+        }
+    }
+
+    // MARK: - Step 9: Budgets
+
+    private var budgetsStep: some View {
+        Group {
+            if let ws = currentWorkspace {
+                OnboardingBudgetsStep(workspace: ws)
+            } else {
+                if isICloudBootstrapping {
+                    iCloudRestorePlaceholder
+                } else {
+                    ContentUnavailableView(
+                        "No Workspace",
+                        systemImage: "person.fill",
+                        description: Text("Create a workspace first.")
+                    )
+                }
+            }
+        }
+    }
+
+    // MARK: - Step 10: Quick Actions
 
     private var quickActionsStep: some View {
         QuickActionsInstallView(isOnboarding: true)
@@ -396,13 +498,13 @@ struct OnboardingView: View {
     
     
     private var primaryButtonTitle: String {
-        onboardingStep >= 6 ? "Done" : "Next"
+        onboardingStep >= finalStepValue ? "Done" : "Next"
     }
     
     private func primaryActionTapped() {
         // Step-specific gating
         switch onboardingStep {
-        case 1:
+        case Step.workspaces.rawValue:
             guard !workspaces.isEmpty else {
                 showingMissingWorkspaceAlert = true
                 return
@@ -412,7 +514,7 @@ struct OnboardingView: View {
                 selectedWorkspaceID = (workspaces.first?.id.uuidString ?? "")
             }
             
-        case 4:
+        case Step.cards.rawValue:
             // Require at least one card before presets.
             if let ws = currentWorkspace {
                 let hasCard = hasAtLeastOneCard(in: ws)
@@ -421,12 +523,29 @@ struct OnboardingView: View {
                     return
                 }
             }
-            
+
+        case Step.income.rawValue:
+            if let ws = currentWorkspace {
+                let hasIncome = hasAtLeastOneIncome(in: ws)
+                let hasBudget = hasAtLeastOneBudget(in: ws)
+                if hasIncome && !hasBudget {
+                    _ = createStarterBudgetIfNeeded(in: ws)
+                }
+            }
+
         default:
             break
         }
-        
-        if onboardingStep >= 6 {
+
+        if onboardingStep >= finalStepValue {
+            if let ws = currentWorkspace {
+                let hasIncome = hasAtLeastOneIncome(in: ws)
+                let hasBudget = hasAtLeastOneBudget(in: ws)
+                if !hasIncome && !hasBudget {
+                    showingStarterBudgetPrompt = true
+                    return
+                }
+            }
             completeOnboarding()
         } else {
             goNext()
@@ -454,7 +573,7 @@ struct OnboardingView: View {
     }
     
     private func goNext() {
-        onboardingStep = min(6, onboardingStep + 1)
+        onboardingStep = min(finalStepValue, onboardingStep + 1)
     }
     
     // MARK: - Get Started
@@ -544,6 +663,86 @@ struct OnboardingView: View {
         let cards = (try? modelContext.fetch(descriptor)) ?? []
         return !cards.isEmpty
     }
+
+    private func hasAtLeastOneIncome(in workspace: Workspace) -> Bool {
+        let workspaceID = workspace.id
+        let descriptor = FetchDescriptor<Income>(
+            predicate: #Predicate<Income> { $0.workspace?.id == workspaceID }
+        )
+        let incomes = (try? modelContext.fetch(descriptor)) ?? []
+        return !incomes.isEmpty
+    }
+
+    private func hasAtLeastOneBudget(in workspace: Workspace) -> Bool {
+        let workspaceID = workspace.id
+        let descriptor = FetchDescriptor<Budget>(
+            predicate: #Predicate<Budget> { $0.workspace?.id == workspaceID }
+        )
+        let budgets = (try? modelContext.fetch(descriptor)) ?? []
+        return !budgets.isEmpty
+    }
+
+    @discardableResult
+    private func createStarterBudgetIfNeeded(in workspace: Workspace) -> Budget? {
+        if hasAtLeastOneBudget(in: workspace) {
+            return nil
+        }
+
+        let period = BudgetingPeriod(rawValue: defaultBudgetingPeriodRaw) ?? .monthly
+        let range = period.defaultRange(containing: .now, calendar: .current)
+        let budgetName = BudgetNameSuggestion.suggestedName(
+            start: range.start,
+            end: range.end,
+            calendar: .current
+        )
+
+        let budget = Budget(
+            name: budgetName,
+            startDate: range.start,
+            endDate: range.end,
+            workspace: workspace
+        )
+        modelContext.insert(budget)
+
+        let workspaceID = workspace.id
+        let cardsDescriptor = FetchDescriptor<Card>(
+            predicate: #Predicate<Card> { $0.workspace?.id == workspaceID },
+            sortBy: [SortDescriptor(\Card.name, order: .forward)]
+        )
+        let presetsDescriptor = FetchDescriptor<Preset>(
+            predicate: #Predicate<Preset> { $0.workspace?.id == workspaceID },
+            sortBy: [SortDescriptor(\Preset.title, order: .forward)]
+        )
+
+        let cards = (try? modelContext.fetch(cardsDescriptor)) ?? []
+        let presets = ((try? modelContext.fetch(presetsDescriptor)) ?? []).filter { !$0.isArchived }
+
+        for card in cards {
+            modelContext.insert(BudgetCardLink(budget: budget, card: card))
+        }
+
+        for preset in presets {
+            modelContext.insert(BudgetPresetLink(budget: budget, preset: preset))
+            let dates = PresetScheduleEngine.occurrences(for: preset, in: budget)
+
+            for date in dates {
+                let plannedExpense = PlannedExpense(
+                    title: preset.title,
+                    plannedAmount: preset.plannedAmount,
+                    actualAmount: 0,
+                    expenseDate: date,
+                    workspace: workspace,
+                    card: preset.defaultCard,
+                    category: preset.defaultCategory,
+                    sourcePresetID: preset.id,
+                    sourceBudgetID: budget.id
+                )
+                modelContext.insert(plannedExpense)
+            }
+        }
+
+        return budget
+    }
     
     // MARK: - Skip prompt
     
@@ -610,6 +809,8 @@ private struct OnboardingWorkspaceStep: View {
     @Environment(\.modelContext) private var modelContext
 
     @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
+    @AppStorage("general_defaultBudgetingPeriod")
+    private var defaultBudgetingPeriodRaw: String = BudgetingPeriod.monthly.rawValue
 
     private enum SheetRoute: Identifiable {
         case add
@@ -639,27 +840,46 @@ private struct OnboardingWorkspaceStep: View {
             )
 
             List {
-                WorkspaceListRows(
-                    workspaces: workspaces,
-                    selectedWorkspaceID: selectedWorkspaceID,
-                    usesICloud: usesICloud,
-                    isICloudBootstrapping: isICloudBootstrapping,
-                    showsSelectionHint: false,
-                    onSelect: { workspace in
-                        selectedWorkspaceID = workspace.id.uuidString
-                    },
-                    onEdit: { workspace in
-                        sheetRoute = .edit(workspace)
-                    },
-                    onDelete: { workspace in
-                        requestDelete(workspace)
+                Section("Workspaces") {
+                    WorkspaceListRows(
+                        workspaces: workspaces,
+                        selectedWorkspaceID: selectedWorkspaceID,
+                        usesICloud: usesICloud,
+                        isICloudBootstrapping: isICloudBootstrapping,
+                        showsSelectionHint: false,
+                        onSelect: { workspace in
+                            selectedWorkspaceID = workspace.id.uuidString
+                        },
+                        onEdit: { workspace in
+                            sheetRoute = .edit(workspace)
+                        },
+                        onDelete: { workspace in
+                            requestDelete(workspace)
+                        }
+                    )
+                }
+
+                Section {
+                    Picker("Default Budgeting Period", selection: defaultBudgetingPeriodBinding) {
+                        ForEach(BudgetingPeriod.allCases) { period in
+                            Text(period.displayTitle)
+                                .tag(period)
+                        }
                     }
-                )
+                    .pickerStyle(.menu)
+
+                    Toggle("Confirm Before Deleting", isOn: $confirmBeforeDeleting)
+                    .tint(Color("AccentColor"))
+                } header: {
+                    Text("Workspace Behaviors")
+                } footer: {
+                    Text("You can change these later in Settings.")
+                }
             }
             .listStyle(.insetGrouped)
             .scrollContentBackground(.hidden)
             .background(Color(.systemBackground))
-            .frame(minHeight: 220)
+            .frame(minHeight: 340)
 
             if #available(iOS 26.0, *) {
                 Button {
@@ -750,6 +970,13 @@ private struct OnboardingWorkspaceStep: View {
     private func ensureInitialSelection() {
         guard selectedWorkspaceID.isEmpty else { return }
         selectedWorkspaceID = workspaces.first?.id.uuidString ?? ""
+    }
+
+    private var defaultBudgetingPeriodBinding: Binding<BudgetingPeriod> {
+        Binding(
+            get: { BudgetingPeriod(rawValue: defaultBudgetingPeriodRaw) ?? .monthly },
+            set: { defaultBudgetingPeriodRaw = $0.rawValue }
+        )
     }
 
     @ViewBuilder
@@ -1128,50 +1355,15 @@ private struct OnboardingCardsStep: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            
+
             header(
                 title: "Cards",
                 subtitle: "Cards represent where spending happens, debit, credit, cash, or any account you track."
             )
-            
-            List {
-                if cards.isEmpty {
-                    ContentUnavailableView(
-                        "No Cards Yet",
-                        systemImage: "creditcard",
-                        description: Text("Create at least one card to continue.")
-                    )
-                } else {
-                    ForEach(cards) { card in
-                        HStack(spacing: 12) {
-                            Image(systemName: "creditcard.fill")
-                                .foregroundStyle(.secondary)
-                            Text(card.name)
-                        }
-                        .padding(.vertical, 6)
-                        .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                            Button {
-                                sheetRoute = .edit(card)
-                            } label: {
-                                Label("Edit", systemImage: "pencil")
-                            }
-                            .tint(Color("AccentColor"))
-                        }
-                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                            Button(role: .destructive) {
-                                deleteCardWithOptionalConfirm(card)
-                            } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
-                            .tint(Color("OffshoreDepth"))
-                        }
-                    }
-                }
-            }
-            .listStyle(.insetGrouped)
-            .scrollContentBackground(.hidden)
-            .background(Color(.systemBackground))
-            .frame(minHeight: 260)
+
+            cardsGrid
+                .frame(minHeight: 260)
+
             if #available(iOS 26.0, *) {
                 Button {
                     sheetRoute = .add
@@ -1191,7 +1383,7 @@ private struct OnboardingCardsStep: View {
                 .buttonStyle(.borderedProminent)
                 .tint(.accentColor)
             }
-            
+
             Spacer(minLength: 0)
         }
         .sheet(item: $sheetRoute) { route in
@@ -1216,6 +1408,52 @@ private struct OnboardingCardsStep: View {
             }
         } message: {
             Text("This deletes the card and all of its expenses.")
+        }
+    }
+
+    private var columns: [GridItem] {
+        [GridItem(.adaptive(minimum: 240), spacing: 12)]
+    }
+
+    private var cardsGrid: some View {
+        ScrollView {
+            LazyVGrid(columns: columns, spacing: 14) {
+                if cards.isEmpty {
+                    ContentUnavailableView(
+                        "No Cards Yet",
+                        systemImage: "creditcard",
+                        description: Text("Create at least one card to continue.")
+                    )
+                    .frame(maxWidth: .infinity)
+                } else {
+                    ForEach(cards) { card in
+                        cardTile(card)
+                    }
+                }
+            }
+        }
+    }
+
+    private func cardTile(_ card: Card) -> some View {
+        CardVisualView(
+            title: card.name,
+            theme: CardThemeOption(rawValue: card.theme) ?? .ruby,
+            effect: CardEffectOption(rawValue: card.effect) ?? .plastic
+        )
+        .contextMenu {
+            Button {
+                sheetRoute = .edit(card)
+            } label: {
+                Label("Edit", systemImage: "pencil")
+            }
+            .tint(Color("AccentColor"))
+
+            Button(role: .destructive) {
+                deleteCardWithOptionalConfirm(card)
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+            .tint(Color("OffshoreDepth"))
         }
     }
 
@@ -1265,7 +1503,7 @@ private struct OnboardingCardsStep: View {
 
         modelContext.delete(card)
     }
-    
+
     @ViewBuilder
     private func header(title: String, subtitle: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -1356,6 +1594,24 @@ private struct OnboardingPresetsStep: View {
                                 Label("Edit", systemImage: "pencil")
                             }
                             .tint(Color("AccentColor"))
+
+                            if preset.isArchived {
+                                Button {
+                                    preset.isArchived = false
+                                    preset.archivedAt = nil
+                                } label: {
+                                    Label("Unarchive", systemImage: "arrow.uturn.backward")
+                                }
+                                .tint(.green)
+                            } else {
+                                Button {
+                                    preset.isArchived = true
+                                    preset.archivedAt = .now
+                                } label: {
+                                    Label("Archive", systemImage: "archivebox")
+                                }
+                                .tint(Color("OffshoreSand"))
+                            }
                         }
                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                             Button(role: .destructive) {
@@ -1461,6 +1717,473 @@ private struct OnboardingPresetsStep: View {
         }
     }
     
+    @ViewBuilder
+    private func header(title: String, subtitle: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.title2.weight(.bold))
+            Text(subtitle)
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
+// MARK: - Step: Gestures & Editing
+
+private struct OnboardingGestureTrainingStep: View {
+
+    let workspace: Workspace
+
+    @Query private var cards: [Card]
+    @Query private var presets: [Preset]
+    @Query private var variableExpenses: [VariableExpense]
+
+    @State private var cardInstruction: String = "Long press the card to open contextual actions."
+    @State private var expenseInstruction: String = "Swipe either direction to edit or delete."
+    @State private var presetInstruction: String = "Swipe either direction to edit, archive, or delete."
+
+    init(workspace: Workspace) {
+        self.workspace = workspace
+        let workspaceID = workspace.id
+        _cards = Query(
+            filter: #Predicate<Card> { $0.workspace?.id == workspaceID },
+            sort: [SortDescriptor(\Card.name, order: .forward)]
+        )
+        _presets = Query(
+            filter: #Predicate<Preset> { $0.workspace?.id == workspaceID },
+            sort: [SortDescriptor(\Preset.title, order: .forward)]
+        )
+        _variableExpenses = Query(
+            filter: #Predicate<VariableExpense> { $0.workspace?.id == workspaceID },
+            sort: [SortDescriptor(\VariableExpense.transactionDate, order: .reverse)]
+        )
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+
+            header(
+                title: "Gestures & Editing",
+                subtitle: "Take a moment and familiarize yourself with the edit and delete gestures inside Offshore."
+            )
+
+            List {
+                Section {
+                    CardVisualView(
+                        title: demoCard.name,
+                        theme: CardThemeOption(rawValue: demoCard.theme) ?? .ruby,
+                        effect: CardEffectOption(rawValue: demoCard.effect) ?? .plastic
+                    )
+                    .contentShape(Rectangle())
+                    .onLongPressGesture {
+                        cardInstruction = "Long press detected. Open actions from the card context menu."
+                    }
+                    .contextMenu {
+                        Button {
+                            cardInstruction = "Card Edit action selected."
+                        } label: {
+                            Label("Edit", systemImage: "pencil")
+                        }
+
+                        Button(role: .destructive) {
+                            cardInstruction = "Card Delete action selected."
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
+                } header: {
+                    Text("Card")
+                } footer: {
+                    Text(cardInstruction)
+                }
+
+                Section {
+                    expenseDemoRow
+                } header: {
+                    Text("Expense")
+                } footer: {
+                    Text(expenseInstruction)
+                }
+
+                Section {
+                    presetDemoRow
+                } header: {
+                    Text("Preset")
+                } footer: {
+                    Text(presetInstruction)
+                }
+            }
+            .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .background(Color(.systemBackground))
+            .frame(minHeight: 320)
+
+            Spacer(minLength: 0)
+        }
+    }
+
+    private var demoCard: Card {
+        cards.first ?? Card(name: "Everyday Card", theme: CardThemeOption.ruby.rawValue, effect: CardEffectOption.plastic.rawValue, workspace: workspace)
+    }
+
+    private var demoExpense: VariableExpense {
+        if let existing = variableExpenses.first {
+            return existing
+        }
+        let category = Category(name: "Groceries", hexColor: "#22C55E", workspace: workspace)
+        return VariableExpense(
+            descriptionText: "Local Market",
+            amount: 48.90,
+            transactionDate: .now,
+            workspace: workspace,
+            card: demoCard,
+            category: category
+        )
+    }
+
+    private var demoPreset: Preset {
+        presets.first ?? Preset(
+            title: "Rent",
+            plannedAmount: 1400,
+            frequencyRaw: RecurrenceFrequency.monthly.rawValue,
+            workspace: workspace,
+            defaultCard: demoCard,
+            defaultCategory: nil
+        )
+    }
+
+    private var expenseDemoRow: some View {
+        SharedVariableExpenseRow(expense: demoExpense)
+            .contentShape(Rectangle())
+            .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                Button {
+                    expenseInstruction = "Leading swipe opened Edit."
+                } label: {
+                    Label("Edit", systemImage: "pencil")
+                }
+                .tint(Color("AccentColor"))
+            }
+            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                Button(role: .destructive) {
+                    expenseInstruction = "Trailing swipe opened Delete."
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+                .tint(Color("OffshoreDepth"))
+            }
+    }
+
+    private var presetDemoRow: some View {
+        PresetRowView(preset: demoPreset, assignedBudgetsCount: 1)
+            .contentShape(Rectangle())
+            .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                Button {
+                    presetInstruction = "Leading swipe opened Edit."
+                } label: {
+                    Label("Edit", systemImage: "pencil")
+                }
+                .tint(Color("AccentColor"))
+
+                Button {
+                    presetInstruction = "Leading swipe opened Archive."
+                } label: {
+                    Label("Archive", systemImage: "archivebox")
+                }
+                .tint(Color("OffshoreSand"))
+            }
+            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                Button(role: .destructive) {
+                    presetInstruction = "Trailing swipe opened Delete."
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+                .tint(Color("OffshoreDepth"))
+            }
+    }
+
+    @ViewBuilder
+    private func header(title: String, subtitle: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.title2.weight(.bold))
+            Text(subtitle)
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
+// MARK: - Step: Income
+
+private struct OnboardingIncomeStep: View {
+
+    private enum IncomeKind: String, CaseIterable, Identifiable {
+        case planned = "Planned"
+        case actual = "Actual"
+
+        var id: String { rawValue }
+
+        var isPlanned: Bool {
+            self == .planned
+        }
+    }
+
+    let workspace: Workspace
+
+    @Environment(\.modelContext) private var modelContext
+
+    @Query private var incomes: [Income]
+
+    @State private var incomeKind: IncomeKind = .planned
+    @State private var source: String = ""
+    @State private var amountText: String = ""
+    @State private var date: Date = .now
+
+    @State private var showingInvalidAmountAlert: Bool = false
+
+    init(workspace: Workspace) {
+        self.workspace = workspace
+        let workspaceID = workspace.id
+
+        _incomes = Query(
+            filter: #Predicate<Income> { $0.workspace?.id == workspaceID },
+            sort: [SortDescriptor(\Income.date, order: .reverse)]
+        )
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+
+            header(
+                title: "Income",
+                subtitle: "Capture planned or actual income before first launch."
+            )
+
+            List {
+                Section {
+                    Picker("Income Type", selection: $incomeKind) {
+                        ForEach(IncomeKind.allCases) { kind in
+                            Text(kind.rawValue).tag(kind)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
+                    TextField("Source", text: $source)
+                    TextField("Amount", text: $amountText)
+                        .keyboardType(.decimalPad)
+
+                    DatePicker("Date", selection: $date, displayedComponents: .date)
+                        .datePickerStyle(.compact)
+                } header: {
+                    Text("Quick Income Capture")
+                } footer: {
+                    Text("You can change this later in Income.")
+                }
+
+                Section("Income Added") {
+                    if incomes.isEmpty {
+                        Text("No income added during onboarding.")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(incomes.prefix(3)) { income in
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(income.source)
+                                    Text(income.isPlanned ? "Planned" : "Actual")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Text(income.amount, format: CurrencyFormatter.currencyStyle())
+                                    .fontWeight(.semibold)
+                            }
+                        }
+                    }
+                }
+            }
+            .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .background(Color(.systemBackground))
+            .frame(minHeight: 340)
+
+            if #available(iOS 26.0, *) {
+                Button {
+                    addIncome()
+                } label: {
+                    Label("Add Income", systemImage: "plus")
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.glassProminent)
+                .tint(.accentColor)
+            } else {
+                Button {
+                    addIncome()
+                } label: {
+                    Label("Add Income", systemImage: "plus")
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.accentColor)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .alert("Invalid Amount", isPresented: $showingInvalidAmountAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("Enter an amount greater than 0 to add income.")
+        }
+    }
+
+    private var trimmedSource: String {
+        source.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func addIncome() {
+        guard let amount = CurrencyFormatter.parseAmount(amountText), amount > 0 else {
+            showingInvalidAmountAlert = true
+            return
+        }
+
+        let finalSource = trimmedSource.isEmpty ? "Income" : trimmedSource
+        let income = Income(
+            source: finalSource,
+            amount: amount,
+            date: Calendar.current.startOfDay(for: date),
+            isPlanned: incomeKind.isPlanned,
+            isException: false,
+            workspace: workspace,
+            series: nil
+        )
+        modelContext.insert(income)
+
+        source = ""
+        amountText = ""
+    }
+
+    @ViewBuilder
+    private func header(title: String, subtitle: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.title2.weight(.bold))
+            Text(subtitle)
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
+// MARK: - Step: Budgets
+
+private struct OnboardingBudgetsStep: View {
+
+    let workspace: Workspace
+
+    @Environment(\.modelContext) private var modelContext
+    @AppStorage("general_defaultBudgetingPeriod")
+    private var defaultBudgetingPeriodRaw: String = BudgetingPeriod.monthly.rawValue
+
+    @Query private var budgets: [Budget]
+
+    @State private var showingAddBudgetSheet: Bool = false
+    @State private var showingDeleteConfirm: Bool = false
+    @State private var pendingDelete: (() -> Void)? = nil
+
+    init(workspace: Workspace) {
+        self.workspace = workspace
+        let workspaceID = workspace.id
+
+        _budgets = Query(
+            filter: #Predicate<Budget> { $0.workspace?.id == workspaceID },
+            sort: [SortDescriptor(\Budget.startDate, order: .reverse)]
+        )
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            header(
+                title: "Budgets",
+                subtitle: "Create a budget now, or continue and add one later."
+            )
+
+            List {
+                Section("Budgets") {
+                    if budgets.isEmpty {
+                        Text("No budgets yet.")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(budgets) { budget in
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(budget.name)
+                                    .font(.body.weight(.semibold))
+                                Text(budgetRangeLabel(for: budget))
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button(role: .destructive) {
+                                    pendingDelete = { modelContext.delete(budget) }
+                                    showingDeleteConfirm = true
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                                .tint(Color("OffshoreDepth"))
+                            }
+                        }
+                    }
+                }
+            }
+            .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .background(Color(.systemBackground))
+            .frame(minHeight: 320)
+
+            Text("Default period: \((BudgetingPeriod(rawValue: defaultBudgetingPeriodRaw) ?? .monthly).displayTitle)")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+
+            if #available(iOS 26.0, *) {
+                Button {
+                    showingAddBudgetSheet = true
+                } label: {
+                    Label("Create Budget", systemImage: "plus")
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.glassProminent)
+                .tint(.accentColor)
+            } else {
+                Button {
+                    showingAddBudgetSheet = true
+                } label: {
+                    Label("Create Budget", systemImage: "plus")
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.accentColor)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .sheet(isPresented: $showingAddBudgetSheet) {
+            NavigationStack {
+                AddBudgetView(workspace: workspace)
+            }
+        }
+        .alert("Delete Budget?", isPresented: $showingDeleteConfirm) {
+            Button("Delete", role: .destructive) {
+                pendingDelete?()
+                pendingDelete = nil
+            }
+            Button("Cancel", role: .cancel) {
+                pendingDelete = nil
+            }
+        }
+    }
+
+    private func budgetRangeLabel(for budget: Budget) -> String {
+        let start = budget.startDate.formatted(date: .abbreviated, time: .omitted)
+        let end = budget.endDate.formatted(date: .abbreviated, time: .omitted)
+        return "\(start) - \(end)"
+    }
+
     @ViewBuilder
     private func header(title: String, subtitle: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
