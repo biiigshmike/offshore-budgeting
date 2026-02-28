@@ -1231,7 +1231,7 @@ private struct OnboardingCategoriesStep: View {
             
             header(
                 title: "Categories",
-                subtitle: "Categories help you understand where money goes, groceries, rent, fuel, and more."
+                subtitle: "Categories help you understand where money goes, such as groceries, rent, fuel, and more."
             )
             
             List {
@@ -1358,7 +1358,7 @@ private struct OnboardingCardsStep: View {
 
             header(
                 title: "Cards",
-                subtitle: "Cards represent where spending happens, debit, credit, cash, or any account you track."
+                subtitle: "Cards are where debits and credits are tracked for any account you wish to add."
             )
 
             cardsGrid
@@ -1566,7 +1566,7 @@ private struct OnboardingPresetsStep: View {
             
             header(
                 title: "Presets",
-                subtitle: "Presets are reusable templates for recurring bills, rent, subscriptions, and more."
+                subtitle: "Presets are reusable templates for recurring expenses, like rent, subscriptions, etc."
             )
             
             List {
@@ -1742,9 +1742,9 @@ private struct OnboardingGestureTrainingStep: View {
     @Query private var presets: [Preset]
     @Query private var variableExpenses: [VariableExpense]
 
-    @State private var cardInstruction: String = "Long press the card to open contextual actions."
-    @State private var expenseInstruction: String = "Swipe either direction to edit or delete."
-    @State private var presetInstruction: String = "Swipe either direction to edit, archive, or delete."
+    @State private var cardInstruction: String = "Long press the card to edit or delete."
+    @State private var expenseInstruction: String = "Swipe right to edit, swipe left to delete."
+    @State private var presetInstruction: String = "Swipe right to edit or archive, swipe left to delete."
 
     init(workspace: Workspace) {
         self.workspace = workspace
