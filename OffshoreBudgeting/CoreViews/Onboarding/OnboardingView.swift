@@ -1412,7 +1412,7 @@ private struct OnboardingCardsStep: View {
     }
 
     private var columns: [GridItem] {
-        [GridItem(.adaptive(minimum: 240), spacing: 12)]
+        [GridItem(.adaptive(minimum: 260), spacing: 16)]
     }
 
     private var cardsGrid: some View {
@@ -1431,6 +1431,9 @@ private struct OnboardingCardsStep: View {
                     }
                 }
             }
+            .padding(.horizontal, 2)
+            .padding(.top, 4)
+            .padding(.bottom, 10)
         }
     }
 
@@ -1438,7 +1441,8 @@ private struct OnboardingCardsStep: View {
         CardVisualView(
             title: card.name,
             theme: CardThemeOption(rawValue: card.theme) ?? .ruby,
-            effect: CardEffectOption(rawValue: card.effect) ?? .plastic
+            effect: CardEffectOption(rawValue: card.effect) ?? .plastic,
+            showsShadow: false
         )
         .contextMenu {
             Button {
