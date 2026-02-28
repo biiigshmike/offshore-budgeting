@@ -72,7 +72,7 @@ struct SettingsReleaseLogsView: View {
                 ReleaseItem(
                     systemImage: "inset.filled.capsule",
                     title: "Category Selection",
-                    description: "While viewing expenses on the Budgets or Accounts tab, categories are now capable of handling multiple selections for filtering instead of just one at a time in the previous release."
+                    description: "While viewing expenses on the Budgets or Accounts tab, categories are now capable of handling multiple selections for filtering instead of just one at a time."
                 )
             ]
         ),
