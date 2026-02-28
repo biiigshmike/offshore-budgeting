@@ -68,6 +68,11 @@ struct SettingsReleaseLogsView: View {
                     systemImage: "person.2.fill",
                     title: "Improvements to Reconciliations",
                     description: "Addresses an issue where offsetting an expense via a Reconciliation account would not allow the full available amount to be used."
+                ),
+                ReleaseItem(
+                    systemImage: "inset.filled.capsule",
+                    title: "Category Selection",
+                    description: "While viewing expenses on the Budgets or Accounts tab, categories now support multiple selections for filtering instead of the prior of only one selection at a time."
                 )
             ]
         ),
