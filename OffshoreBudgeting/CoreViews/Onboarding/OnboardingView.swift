@@ -1934,14 +1934,29 @@ private struct OnboardingIncomeStep: View {
     let workspace: Workspace
 
     @Environment(\.modelContext) private var modelContext
+    @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
 
     @Query private var incomes: [Income]
+
+    private enum SheetRoute: Identifiable {
+        case edit(Income)
+
+        var id: String {
+            switch self {
+            case .edit(let income):
+                return "edit-\(income.id.uuidString)"
+            }
+        }
+    }
 
     @State private var incomeKind: IncomeKind = .planned
     @State private var source: String = ""
     @State private var amountText: String = ""
     @State private var date: Date = .now
 
+    @State private var sheetRoute: SheetRoute? = nil
+    @State private var showingIncomeDeleteConfirm: Bool = false
+    @State private var pendingIncomeDelete: (() -> Void)? = nil
     @State private var showingInvalidAmountAlert: Bool = false
 
     init(workspace: Workspace) {
@@ -1988,7 +2003,7 @@ private struct OnboardingIncomeStep: View {
                         Text("No income added during onboarding.")
                             .foregroundStyle(.secondary)
                     } else {
-                        ForEach(incomes.prefix(3)) { income in
+                        ForEach(incomes) { income in
                             HStack {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(income.source)
@@ -1999,6 +2014,23 @@ private struct OnboardingIncomeStep: View {
                                 Spacer()
                                 Text(income.amount, format: CurrencyFormatter.currencyStyle())
                                     .fontWeight(.semibold)
+                            }
+                            .contentShape(Rectangle())
+                            .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                                Button {
+                                    sheetRoute = .edit(income)
+                                } label: {
+                                    Label("Edit", systemImage: "pencil")
+                                }
+                                .tint(Color("AccentColor"))
+                            }
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button(role: .destructive) {
+                                    deleteIncomeWithOptionalConfirm(income)
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                                .tint(Color("OffshoreDepth"))
                             }
                         }
                     }
@@ -2036,6 +2068,23 @@ private struct OnboardingIncomeStep: View {
         } message: {
             Text("Enter an amount greater than 0 to add income.")
         }
+        .sheet(item: $sheetRoute) { route in
+            switch route {
+            case .edit(let income):
+                NavigationStack {
+                    EditIncomeView(workspace: workspace, income: income)
+                }
+            }
+        }
+        .alert("Delete?", isPresented: $showingIncomeDeleteConfirm) {
+            Button("Delete", role: .destructive) {
+                pendingIncomeDelete?()
+                pendingIncomeDelete = nil
+            }
+            Button("Cancel", role: .cancel) {
+                pendingIncomeDelete = nil
+            }
+        }
     }
 
     private var trimmedSource: String {
@@ -2064,6 +2113,25 @@ private struct OnboardingIncomeStep: View {
         amountText = ""
     }
 
+    private func deleteIncomeWithOptionalConfirm(_ income: Income) {
+        if confirmBeforeDeleting {
+            pendingIncomeDelete = {
+                deleteIncome(income)
+            }
+            showingIncomeDeleteConfirm = true
+        } else {
+            deleteIncome(income)
+        }
+    }
+
+    private func deleteIncome(_ income: Income) {
+        modelContext.delete(income)
+
+        if case .edit(let editingIncome) = sheetRoute, editingIncome.id == income.id {
+            sheetRoute = nil
+        }
+    }
+
     @ViewBuilder
     private func header(title: String, subtitle: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -2082,12 +2150,27 @@ private struct OnboardingBudgetsStep: View {
     let workspace: Workspace
 
     @Environment(\.modelContext) private var modelContext
+    @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
     @AppStorage("general_defaultBudgetingPeriod")
     private var defaultBudgetingPeriodRaw: String = BudgetingPeriod.monthly.rawValue
 
     @Query private var budgets: [Budget]
 
-    @State private var showingAddBudgetSheet: Bool = false
+    private enum SheetRoute: Identifiable {
+        case add
+        case edit(Budget)
+
+        var id: String {
+            switch self {
+            case .add:
+                return "add"
+            case .edit(let budget):
+                return "edit-\(budget.id.uuidString)"
+            }
+        }
+    }
+
+    @State private var sheetRoute: SheetRoute? = nil
     @State private var showingDeleteConfirm: Bool = false
     @State private var pendingDelete: (() -> Void)? = nil
 
@@ -2122,10 +2205,17 @@ private struct OnboardingBudgetsStep: View {
                                     .font(.footnote)
                                     .foregroundStyle(.secondary)
                             }
+                            .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                                Button {
+                                    sheetRoute = .edit(budget)
+                                } label: {
+                                    Label("Edit", systemImage: "pencil")
+                                }
+                                .tint(Color("AccentColor"))
+                            }
                             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                 Button(role: .destructive) {
-                                    pendingDelete = { modelContext.delete(budget) }
-                                    showingDeleteConfirm = true
+                                    deleteBudgetWithOptionalConfirm(budget)
                                 } label: {
                                     Label("Delete", systemImage: "trash")
                                 }
@@ -2146,7 +2236,7 @@ private struct OnboardingBudgetsStep: View {
 
             if #available(iOS 26.0, *) {
                 Button {
-                    showingAddBudgetSheet = true
+                    sheetRoute = .add
                 } label: {
                     Label("Create Budget", systemImage: "plus")
                         .frame(maxWidth: .infinity, minHeight: 44)
@@ -2155,7 +2245,7 @@ private struct OnboardingBudgetsStep: View {
                 .tint(.accentColor)
             } else {
                 Button {
-                    showingAddBudgetSheet = true
+                    sheetRoute = .add
                 } label: {
                     Label("Create Budget", systemImage: "plus")
                         .frame(maxWidth: .infinity, minHeight: 44)
@@ -2166,9 +2256,16 @@ private struct OnboardingBudgetsStep: View {
 
             Spacer(minLength: 0)
         }
-        .sheet(isPresented: $showingAddBudgetSheet) {
-            NavigationStack {
-                AddBudgetView(workspace: workspace)
+        .sheet(item: $sheetRoute) { route in
+            switch route {
+            case .add:
+                NavigationStack {
+                    AddBudgetView(workspace: workspace)
+                }
+            case .edit(let budget):
+                NavigationStack {
+                    EditBudgetView(workspace: workspace, budget: budget)
+                }
             }
         }
         .alert("Delete Budget?", isPresented: $showingDeleteConfirm) {
@@ -2180,6 +2277,34 @@ private struct OnboardingBudgetsStep: View {
                 pendingDelete = nil
             }
         }
+    }
+
+    private func deleteBudgetWithOptionalConfirm(_ budget: Budget) {
+        if confirmBeforeDeleting {
+            pendingDelete = {
+                deleteBudgetAndGeneratedPlannedExpenses(budget)
+            }
+            showingDeleteConfirm = true
+        } else {
+            deleteBudgetAndGeneratedPlannedExpenses(budget)
+        }
+    }
+
+    private func deleteBudgetAndGeneratedPlannedExpenses(_ budget: Budget) {
+        let budgetID: UUID? = budget.id
+        let descriptor = FetchDescriptor<PlannedExpense>(
+            predicate: #Predicate { expense in
+                expense.sourceBudgetID == budgetID
+            }
+        )
+
+        if let expenses = try? modelContext.fetch(descriptor) {
+            for expense in expenses {
+                PlannedExpenseDeletionService.delete(expense, modelContext: modelContext)
+            }
+        }
+
+        modelContext.delete(budget)
     }
 
     private func budgetRangeLabel(for budget: Budget) -> String {

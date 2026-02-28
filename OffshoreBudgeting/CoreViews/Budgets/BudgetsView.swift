@@ -15,9 +15,24 @@ struct BudgetsView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.appCommandHub) private var commandHub
 
+    @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
     @AppStorage("sort.budgets.mode") private var sortModeRaw: String = BudgetsListSortMode.dateDesc.rawValue
 
     @Query private var budgets: [Budget]
+
+    private enum SheetRoute: Identifiable {
+        case add
+        case edit(Budget)
+
+        var id: String {
+            switch self {
+            case .add:
+                return "add"
+            case .edit(let budget):
+                return "edit-\(budget.id.uuidString)"
+            }
+        }
+    }
 
     // MARK: - UI State
 
@@ -28,7 +43,9 @@ struct BudgetsView: View {
     @State private var searchText: String = ""
     @FocusState private var searchFocused: Bool
 
-    @State private var showingAddBudget: Bool = false
+    @State private var sheetRoute: SheetRoute? = nil
+    @State private var showingDeleteConfirm: Bool = false
+    @State private var pendingDelete: (() -> Void)? = nil
 
     init(workspace: Workspace) {
         self.workspace = workspace
@@ -211,9 +228,25 @@ struct BudgetsView: View {
                 }
             }
         }
-        .sheet(isPresented: $showingAddBudget) {
-            NavigationStack {
-                AddBudgetView(workspace: workspace)
+        .sheet(item: $sheetRoute) { route in
+            switch route {
+            case .add:
+                NavigationStack {
+                    AddBudgetView(workspace: workspace)
+                }
+            case .edit(let budget):
+                NavigationStack {
+                    EditBudgetView(workspace: workspace, budget: budget)
+                }
+            }
+        }
+        .alert("Delete Budget?", isPresented: $showingDeleteConfirm) {
+            Button("Delete", role: .destructive) {
+                pendingDelete?()
+                pendingDelete = nil
+            }
+            Button("Cancel", role: .cancel) {
+                pendingDelete = nil
             }
         }
         .onAppear {
@@ -243,7 +276,7 @@ struct BudgetsView: View {
     @ViewBuilder
     private var addToolbarButton: some View {
         Button {
-            showingAddBudget = true
+            sheetRoute = .add
         } label: {
             Image(systemName: "plus")
         }
@@ -309,7 +342,7 @@ struct BudgetsView: View {
     }
 
     private func openNewBudget() {
-        showingAddBudget = true
+        sheetRoute = .add
     }
 
     private func handleCommand(_ commandID: String) {
@@ -348,6 +381,22 @@ struct BudgetsView: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .swipeActions(edge: .leading, allowsFullSwipe: false) {
+            Button {
+                sheetRoute = .edit(budget)
+            } label: {
+                Label("Edit", systemImage: "pencil")
+            }
+            .tint(Color("AccentColor"))
+        }
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            Button(role: .destructive) {
+                deleteBudgetWithOptionalConfirm(budget)
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+            .tint(Color("OffshoreDepth"))
+        }
     }
 
     private func formattedDateRange(start: Date, end: Date) -> String {
@@ -357,6 +406,34 @@ struct BudgetsView: View {
         formatter.dateStyle = .medium
         formatter.timeStyle = .none
         return formatter.string(from: start, to: end)
+    }
+
+    private func deleteBudgetWithOptionalConfirm(_ budget: Budget) {
+        if confirmBeforeDeleting {
+            pendingDelete = {
+                deleteBudgetAndGeneratedPlannedExpenses(budget)
+            }
+            showingDeleteConfirm = true
+        } else {
+            deleteBudgetAndGeneratedPlannedExpenses(budget)
+        }
+    }
+
+    private func deleteBudgetAndGeneratedPlannedExpenses(_ budget: Budget) {
+        let budgetID: UUID? = budget.id
+        let descriptor = FetchDescriptor<PlannedExpense>(
+            predicate: #Predicate { expense in
+                expense.sourceBudgetID == budgetID
+            }
+        )
+
+        if let expenses = try? modelContext.fetch(descriptor) {
+            for expense in expenses {
+                PlannedExpenseDeletionService.delete(expense, modelContext: modelContext)
+            }
+        }
+
+        modelContext.delete(budget)
     }
 }
 
