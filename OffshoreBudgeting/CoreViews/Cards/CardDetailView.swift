@@ -60,7 +60,7 @@ struct CardDetailView: View {
     @State private var appliedEndDate: Date = .now
     @State private var isApplyingQuickRange: Bool = false
 
-    @State private var selectedCategoryID: UUID? = nil
+    @State private var selectedCategoryIDs: Set<UUID> = []
 
     @State private var expenseScope: ExpenseScope = .unified
     @State private var sortMode: SortMode = .dateDesc
@@ -93,7 +93,7 @@ struct CardDetailView: View {
         PostBoardingTipItem(
             systemImage: "tag",
             title: "Categories",
-            detail: "Tap a category to filter expenses by that category alone, then tap the same category again to clear your selection."
+            detail: "Tap one or more categories to filter expenses. Tap a selected category again to clear just that selection."
         ),
         PostBoardingTipItem(
             systemImage: "tray.and.arrow.down.fill",
@@ -203,12 +203,13 @@ struct CardDetailView: View {
             return d >= start && d <= end
         }
         let variableCategoryFiltered: [VariableExpense]
-        if let selectedCategoryID {
-            variableCategoryFiltered = variableDateFiltered.filter { expense in
-                expense.category?.id == selectedCategoryID
-            }
-        } else {
+        if selectedCategoryIDs.isEmpty {
             variableCategoryFiltered = variableDateFiltered
+        } else {
+            variableCategoryFiltered = variableDateFiltered.filter { expense in
+                guard let categoryID = expense.category?.id else { return false }
+                return selectedCategoryIDs.contains(categoryID)
+            }
         }
         let variableFilteredForCurrentControls: [VariableExpense]
         if query.isEmpty {
@@ -247,12 +248,13 @@ struct CardDetailView: View {
             return d >= start && d <= end
         }
         let plannedCategoryFiltered: [PlannedExpense]
-        if let selectedCategoryID {
-            plannedCategoryFiltered = plannedDateFiltered.filter { expense in
-                expense.category?.id == selectedCategoryID
-            }
-        } else {
+        if selectedCategoryIDs.isEmpty {
             plannedCategoryFiltered = plannedDateFiltered
+        } else {
+            plannedCategoryFiltered = plannedDateFiltered.filter { expense in
+                guard let categoryID = expense.category?.id else { return false }
+                return selectedCategoryIDs.contains(categoryID)
+            }
         }
         let plannedFilteredForCurrentControls: [PlannedExpense]
         if query.isEmpty {
@@ -605,7 +607,7 @@ struct CardDetailView: View {
     }
 
     private struct DerivedRebuildInputs: Equatable {
-        let selectedCategoryID: UUID?
+        let selectedCategoryIDs: Set<UUID>
         let expenseScope: ExpenseScope
         let sortMode: SortMode
         let hideFuturePlannedExpensesInView: Bool
@@ -621,7 +623,7 @@ struct CardDetailView: View {
 
     private var derivedRebuildInputs: DerivedRebuildInputs {
         DerivedRebuildInputs(
-            selectedCategoryID: selectedCategoryID,
+            selectedCategoryIDs: selectedCategoryIDs,
             expenseScope: expenseScope,
             sortMode: sortMode,
             hideFuturePlannedExpensesInView: hideFuturePlannedExpensesInView,
@@ -680,7 +682,11 @@ struct CardDetailView: View {
         parts.append("card-detail")
         parts.append(workspace.id.uuidString)
         parts.append(card.id.uuidString)
-        parts.append(selectedCategoryID?.uuidString ?? "none")
+        if selectedCategoryIDs.isEmpty {
+            parts.append("none")
+        } else {
+            parts.append(selectedCategoryIDs.map(\.uuidString).sorted().joined(separator: ","))
+        }
         parts.append(expenseScope.rawValue)
         parts.append(sortMode.rawValue)
         parts.append(hideFuturePlannedExpensesInView ? "1" : "0")
@@ -770,15 +776,24 @@ struct CardDetailView: View {
         Section {
             CategoryChipsRow(
                 categories: derived.availableCategoriesForChips,
-                selectedID: $selectedCategoryID
+                selectedIDs: $selectedCategoryIDs
             )
         } header: {
-            Text("Categories")
+            HStack {
+                Text("Categories")
+                Spacer()
+                if !selectedCategoryIDs.isEmpty {
+                    Button("Clear") {
+                        selectedCategoryIDs.removeAll()
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
         } footer: {
             Text(
-                selectedCategoryID == nil
-                ? "Single-press a category to filter expenses."
-                : "Make another selection or tap the selected chip again to clear."
+                selectedCategoryIDs.isEmpty
+                ? "Single-press categories to filter expenses."
+                : "Tap selected chips to clear one at a time, or use Clear to reset all."
             )
         }
     }
@@ -1056,8 +1071,11 @@ struct CardDetailView: View {
             }
             return "No visible expenses. Future variable expenses are hidden."
         }
-        if selectedCategoryID != nil {
-            return "No expenses match the selected category in this date range."
+        if !selectedCategoryIDs.isEmpty {
+            if selectedCategoryIDs.count == 1 {
+                return "No expenses match the selected category in this date range."
+            }
+            return "No expenses match the selected categories in this date range."
         }
         return "No expenses yet for this date range."
     }
@@ -1511,7 +1529,7 @@ private struct DatePillButton: View {
 
 private struct CategoryChipsRow: View {
     let categories: [Category]
-    @Binding var selectedID: UUID?
+    @Binding var selectedIDs: Set<UUID>
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -1520,7 +1538,7 @@ private struct CategoryChipsRow: View {
                     Chip(
                         title: category.name,
                         dotHex: category.hexColor,
-                        isSelected: selectedID == category.id
+                        isSelected: selectedIDs.contains(category.id)
                     ) {
                         toggle(category.id)
                     }
@@ -1531,10 +1549,10 @@ private struct CategoryChipsRow: View {
     }
 
     private func toggle(_ id: UUID) {
-        if selectedID == id {
-            selectedID = nil
+        if selectedIDs.contains(id) {
+            selectedIDs.remove(id)
         } else {
-            selectedID = id
+            selectedIDs.insert(id)
         }
     }
 }

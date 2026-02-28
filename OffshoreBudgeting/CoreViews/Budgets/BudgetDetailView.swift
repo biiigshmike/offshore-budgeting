@@ -47,7 +47,7 @@ struct BudgetDetailView: View {
     
     // MARK: - UI State
     
-    @State private var selectedCategoryID: UUID? = nil
+    @State private var selectedCategoryIDs: Set<UUID> = []
     @State private var expenseScope: ExpenseScope = .unified
     @State private var sortMode: BudgetSortMode = .dateDesc
     @State private var hideFuturePlannedExpensesInView: Bool = false
@@ -111,7 +111,7 @@ struct BudgetDetailView: View {
         PostBoardingTipItem(
             systemImage: "tag",
             title: "Categories",
-            detail: "Tap a category to filter expenses by that category alone, then tap the same category again to clear your selection."
+            detail: "Tap one or more categories to filter expenses. Tap a selected category again to clear just that selection."
         ),
         PostBoardingTipItem(
             systemImage: "ellipsis",
@@ -294,18 +294,24 @@ struct BudgetDetailView: View {
         }
 
         let plannedCategoryFiltered: [PlannedExpense]
-        if let selectedCategoryID {
-            plannedCategoryFiltered = plannedExpensesInBudget.filter { $0.category?.id == selectedCategoryID }
-        } else {
+        if selectedCategoryIDs.isEmpty {
             plannedCategoryFiltered = plannedExpensesInBudget
+        } else {
+            plannedCategoryFiltered = plannedExpensesInBudget.filter {
+                guard let categoryID = $0.category?.id else { return false }
+                return selectedCategoryIDs.contains(categoryID)
+            }
         }
         let plannedFilteredForCurrentControls = plannedCategoryFiltered.filter { matchesSearch($0) }
 
         let variableCategoryFiltered: [VariableExpense]
-        if let selectedCategoryID {
-            variableCategoryFiltered = variableExpensesInBudget.filter { $0.category?.id == selectedCategoryID }
-        } else {
+        if selectedCategoryIDs.isEmpty {
             variableCategoryFiltered = variableExpensesInBudget
+        } else {
+            variableCategoryFiltered = variableExpensesInBudget.filter {
+                guard let categoryID = $0.category?.id else { return false }
+                return selectedCategoryIDs.contains(categoryID)
+            }
         }
         let variableFilteredForCurrentControls = variableCategoryFiltered.filter { matchesSearch($0) }
 
@@ -688,7 +694,7 @@ struct BudgetDetailView: View {
     }
 
     private struct DerivedRebuildInputs: Equatable {
-        let selectedCategoryID: UUID?
+        let selectedCategoryIDs: Set<UUID>
         let expenseScope: ExpenseScope
         let sortMode: BudgetSortMode
         let hideFuturePlannedExpensesInView: Bool
@@ -708,7 +714,7 @@ struct BudgetDetailView: View {
 
     private var derivedRebuildInputs: DerivedRebuildInputs {
         DerivedRebuildInputs(
-            selectedCategoryID: selectedCategoryID,
+            selectedCategoryIDs: selectedCategoryIDs,
             expenseScope: expenseScope,
             sortMode: sortMode,
             hideFuturePlannedExpensesInView: hideFuturePlannedExpensesInView,
@@ -783,7 +789,11 @@ struct BudgetDetailView: View {
         parts.append("budget-detail")
         parts.append(workspace.id.uuidString)
         parts.append(budget.id.uuidString)
-        parts.append(selectedCategoryID?.uuidString ?? "none")
+        if selectedCategoryIDs.isEmpty {
+            parts.append("none")
+        } else {
+            parts.append(selectedCategoryIDs.map(\.uuidString).sorted().joined(separator: ","))
+        }
         parts.append(expenseScope.rawValue)
         parts.append(sortMode.rawValue)
         parts.append(hideFuturePlannedExpensesInView ? "1" : "0")
@@ -883,7 +893,7 @@ struct BudgetDetailView: View {
             Section {
                 BudgetCategoryChipsRow(
                     categories: derived.categoriesInBudget,
-                    selectedID: $selectedCategoryID,
+                    selectedIDs: $selectedCategoryIDs,
                     onLongPressCategory: { category in
                         let input = CategoryLimitEditorInput(
                             category: category,
@@ -894,9 +904,18 @@ struct BudgetDetailView: View {
                     }
                 )
             } header: {
-                Text("Categories")
+                HStack {
+                    Text("Categories")
+                    Spacer()
+                    if !selectedCategoryIDs.isEmpty {
+                        Button("Clear") {
+                            selectedCategoryIDs.removeAll()
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
             } footer: {
-                Text("Single-press a category filter expenses; long-press to edit its spending limit.")
+                Text("Single-press categories to filter expenses; tap selected chips to clear one. Long-press to edit category limits.")
             }
         }
     }
@@ -1546,7 +1565,7 @@ private struct BudgetSummaryBucketCard: View {
 
 private struct BudgetCategoryChipsRow: View {
     let categories: [Category]
-    @Binding var selectedID: UUID?
+    @Binding var selectedIDs: Set<UUID>
     var onLongPressCategory: ((Category) -> Void)? = nil
 
     var body: some View {
@@ -1556,7 +1575,7 @@ private struct BudgetCategoryChipsRow: View {
                     BudgetChip(
                         title: category.name,
                         dotHex: category.hexColor,
-                        isSelected: selectedID == category.id
+                        isSelected: selectedIDs.contains(category.id)
                     ) {
                         toggle(category.id)
                     } onLongPress: {
@@ -1569,10 +1588,10 @@ private struct BudgetCategoryChipsRow: View {
     }
 
     private func toggle(_ id: UUID) {
-        if selectedID == id {
-            selectedID = nil
+        if selectedIDs.contains(id) {
+            selectedIDs.remove(id)
         } else {
-            selectedID = id
+            selectedIDs.insert(id)
         }
     }
 }
