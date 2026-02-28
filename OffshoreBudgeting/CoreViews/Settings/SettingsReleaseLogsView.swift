@@ -55,9 +55,9 @@ struct SettingsReleaseLogsView: View {
             build: "14",
             items: [
                 ReleaseItem(
-                    systemImage: "wand.and.sparkles.inverse",
-                    title: "Quality of Life Improvements",
-                    description: "Swipe gestures enabled on the budgets list while on the Budgets tab."
+                    systemImage: "hand.tap.fill",
+                    title: "Swipe to Edit or Delete",
+                    description: "Swipe gestures are now available for use on the budgets list while the Budgets tab is active."
                 ),
                 ReleaseItem(
                     systemImage: "pencil.and.list.clipboard",
