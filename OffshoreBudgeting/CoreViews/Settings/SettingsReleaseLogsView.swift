@@ -62,7 +62,7 @@ struct SettingsReleaseLogsView: View {
                 ReleaseItem(
                     systemImage: "pencil.and.list.clipboard",
                     title: "Enhancements to Onboarding",
-                    description: "Onboarding now has additional steps included to walk new users through how use the swipe  and long-press gestures for editing and deleting. The onboarding process now allows for the capture of Income and creation of Budgets."
+                    description: "Onboarding now has additional steps included to walk new users through how use the swipe and long-press gestures for editing and deleting. The onboarding process now allows for the capture of Income and creation of Budgets. Also, toggles that were buried in Settings are now offered at relevant stages during the onboarding process."
                 ),
                 ReleaseItem(
                     systemImage: "person.2.fill",
