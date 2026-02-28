@@ -63,6 +63,11 @@ struct SettingsReleaseLogsView: View {
                     systemImage: "pencil.and.list.clipboard",
                     title: "Enhancements to Onboarding",
                     description: "Onboarding now has additional steps included to walk new users through how use the swipe  and long-press gestures for editing and deleting. The onboarding process now allows for the capture of Income and creation of Budgets."
+                ),
+                ReleaseItem(
+                    systemImage: "person.2.fill",
+                    title: "Improvements to Reconciliations",
+                    description: "Addresses an issue where offsetting an expense via a Reconciliation account would not allow the full available amount to be used."
                 )
             ]
         ),
