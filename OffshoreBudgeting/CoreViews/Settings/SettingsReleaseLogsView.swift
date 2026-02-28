@@ -51,6 +51,22 @@ struct SettingsReleaseLogsView: View {
 
     static let releaseSections: [ReleaseSection] = [
         ReleaseSection(
+            version: "2.3.2",
+            build: "14",
+            items: [
+                ReleaseItem(
+                    systemImage: "wand.and.sparkles.inverse",
+                    title: "Quality of Life Improvements",
+                    description: "Swipe gestures enabled on the budgets list while on the Budgets tab."
+                ),
+                ReleaseItem(
+                    systemImage: "pencil.and.list.clipboard",
+                    title: "Enhancements to Onboarding",
+                    description: "Onboarding now has additional steps included to walk new users through how use the swipe  and long-press gestures for editing and deleting. The onboarding process now allows for the capture of Income and creation of Budgets."
+                )
+            ]
+        ),
+        ReleaseSection(
             version: "2.3.1",
             build: "13",
             items: [
