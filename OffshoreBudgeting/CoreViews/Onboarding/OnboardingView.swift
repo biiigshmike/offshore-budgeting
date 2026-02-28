@@ -1736,22 +1736,78 @@ private struct OnboardingPresetsStep: View {
 
 private struct OnboardingGestureTrainingStep: View {
 
+    private enum GestureDemoSegment: String, CaseIterable, Identifiable {
+        case budget = "Budget"
+        case card = "Card"
+        case reconciliation = "Reconciliation"
+        case income = "Income"
+        case expense = "Expense"
+        case preset = "Preset"
+        case category = "Category"
+
+        var id: String { rawValue }
+
+        var symbolName: String {
+            switch self {
+            case .budget:
+                return "chart.pie.fill"
+            case .card:
+                return "creditcard.fill"
+            case .reconciliation:
+                return "person.2.fill"
+            case .income:
+                return "calendar"
+            case .expense:
+                return "dollarsign"
+            case .preset:
+                return "list.bullet.rectangle"
+            case .category:
+                return "tag.fill"
+            }
+        }
+    }
+
     let workspace: Workspace
 
+    @Query private var budgets: [Budget]
     @Query private var cards: [Card]
+    @Query private var allocationAccounts: [AllocationAccount]
+    @Query private var incomes: [Income]
     @Query private var presets: [Preset]
     @Query private var variableExpenses: [VariableExpense]
+    @Query private var categories: [Category]
 
+    @State private var selectedSegment: GestureDemoSegment = .budget
+
+    @State private var budgetInstruction: String = "Swipe right to edit, swipe left to delete."
     @State private var cardInstruction: String = "Long press the card to edit or delete."
+    @State private var reconciliationInstruction: String = "Long press the reconciliation tile to edit or delete."
+    @State private var incomeInstruction: String = "Swipe right to edit, swipe left to delete."
     @State private var expenseInstruction: String = "Swipe right to edit, swipe left to delete."
     @State private var presetInstruction: String = "Swipe right to edit or archive, swipe left to delete."
+    @State private var categoryInstruction: String = "Swipe right to edit, swipe left to delete."
 
     init(workspace: Workspace) {
         self.workspace = workspace
         let workspaceID = workspace.id
+
+        _budgets = Query(
+            filter: #Predicate<Budget> { $0.workspace?.id == workspaceID },
+            sort: [SortDescriptor(\Budget.startDate, order: .reverse)]
+        )
         _cards = Query(
             filter: #Predicate<Card> { $0.workspace?.id == workspaceID },
             sort: [SortDescriptor(\Card.name, order: .forward)]
+        )
+        _allocationAccounts = Query(
+            filter: #Predicate<AllocationAccount> {
+                $0.workspace?.id == workspaceID && $0.isArchived == false
+            },
+            sort: [SortDescriptor(\AllocationAccount.name, order: .forward)]
+        )
+        _incomes = Query(
+            filter: #Predicate<Income> { $0.workspace?.id == workspaceID },
+            sort: [SortDescriptor(\Income.date, order: .reverse)]
         )
         _presets = Query(
             filter: #Predicate<Preset> { $0.workspace?.id == workspaceID },
@@ -1760,6 +1816,10 @@ private struct OnboardingGestureTrainingStep: View {
         _variableExpenses = Query(
             filter: #Predicate<VariableExpense> { $0.workspace?.id == workspaceID },
             sort: [SortDescriptor(\VariableExpense.transactionDate, order: .reverse)]
+        )
+        _categories = Query(
+            filter: #Predicate<Category> { $0.workspace?.id == workspaceID },
+            sort: [SortDescriptor(\Category.name, order: .forward)]
         )
     }
 
@@ -1773,48 +1833,23 @@ private struct OnboardingGestureTrainingStep: View {
 
             List {
                 Section {
-                    CardVisualView(
-                        title: demoCard.name,
-                        theme: CardThemeOption(rawValue: demoCard.theme) ?? .ruby,
-                        effect: CardEffectOption(rawValue: demoCard.effect) ?? .plastic
-                    )
-                    .contentShape(Rectangle())
-                    .onLongPressGesture {
-                        cardInstruction = "Long press detected. Open actions from the card context menu."
-                    }
-                    .contextMenu {
-                        Button {
-                            cardInstruction = "Card Edit action selected."
-                        } label: {
-                            Label("Edit", systemImage: "pencil")
+                    Picker("Sample", selection: $selectedSegment) {
+                        ForEach(GestureDemoSegment.allCases) { segment in
+                            Image(systemName: segment.symbolName)
+                                .accessibilityLabel(segment.rawValue)
+                                .tag(segment)
                         }
+                    }
+                    .pickerStyle(.segmented)
 
-                        Button(role: .destructive) {
-                            cardInstruction = "Card Delete action selected."
-                        } label: {
-                            Label("Delete", systemImage: "trash")
-                        }
-                    }
-                } header: {
-                    Text("Card")
-                } footer: {
-                    Text(cardInstruction)
                 }
 
                 Section {
-                    expenseDemoRow
+                    selectedDemoRow
                 } header: {
-                    Text("Expense")
+                    Text(selectedSegment.rawValue)
                 } footer: {
-                    Text(expenseInstruction)
-                }
-
-                Section {
-                    presetDemoRow
-                } header: {
-                    Text("Preset")
-                } footer: {
-                    Text(presetInstruction)
+                    Text(selectedInstruction)
                 }
             }
             .listStyle(.insetGrouped)
@@ -1826,34 +1861,242 @@ private struct OnboardingGestureTrainingStep: View {
         }
     }
 
+    private var selectedInstruction: String {
+        switch selectedSegment {
+        case .budget:
+            return budgetInstruction
+        case .card:
+            return cardInstruction
+        case .reconciliation:
+            return reconciliationInstruction
+        case .income:
+            return incomeInstruction
+        case .expense:
+            return expenseInstruction
+        case .preset:
+            return presetInstruction
+        case .category:
+            return categoryInstruction
+        }
+    }
+
+    @ViewBuilder
+    private var selectedDemoRow: some View {
+        switch selectedSegment {
+        case .budget:
+            budgetDemoRow
+        case .card:
+            CardVisualView(
+                title: demoCard.name,
+                theme: CardThemeOption(rawValue: demoCard.theme) ?? .ruby,
+                effect: CardEffectOption(rawValue: demoCard.effect) ?? .plastic
+            )
+            .contentShape(Rectangle())
+            .onLongPressGesture {
+                cardInstruction = "Long press detected. Open actions from the card context menu."
+            }
+            .contextMenu {
+                Button {
+                    cardInstruction = "Card Edit action selected."
+                } label: {
+                    Label("Edit", systemImage: "pencil")
+                }
+
+                Button(role: .destructive) {
+                    cardInstruction = "Card Delete action selected."
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+            }
+        case .reconciliation:
+            reconciliationDemoRow
+        case .income:
+            incomeDemoRow
+        case .expense:
+            expenseDemoRow
+        case .preset:
+            presetDemoRow
+        case .category:
+            categoryDemoRow
+        }
+    }
+
+    private var demoBudget: Budget {
+        if let existing = budgets.first {
+            return existing
+        }
+
+        let range = BudgetingPeriod.monthly.defaultRange(containing: .now)
+        return Budget(
+            name: currentMonthYearFallbackBudgetName(),
+            startDate: range.start,
+            endDate: range.end,
+            workspace: workspace
+        )
+    }
+
+    private var demoCategory: Category {
+        categories.first ?? Category(name: "Groceries", hexColor: "#22C55E", workspace: workspace)
+    }
+
     private var demoCard: Card {
-        cards.first ?? Card(name: "Everyday Card", theme: CardThemeOption.ruby.rawValue, effect: CardEffectOption.plastic.rawValue, workspace: workspace)
+        cards.first ?? Card(name: "Apple Card", theme: CardThemeOption.ruby.rawValue, effect: CardEffectOption.plastic.rawValue, workspace: workspace)
+    }
+
+    private var demoReconciliation: AllocationAccount {
+        allocationAccounts.first ?? AllocationAccount(name: "Jim", hexColor: "#3B82F6", workspace: workspace)
+    }
+
+    private var demoIncome: Income {
+        if let existing = incomes.first {
+            return existing
+        }
+
+        return Income(
+            source: "Paycheck",
+            amount: 2200,
+            date: .now,
+            isPlanned: false,
+            isException: false,
+            workspace: workspace,
+            series: nil,
+            card: demoCard
+        )
     }
 
     private var demoExpense: VariableExpense {
         if let existing = variableExpenses.first {
             return existing
         }
-        let category = Category(name: "Groceries", hexColor: "#22C55E", workspace: workspace)
+
         return VariableExpense(
-            descriptionText: "Local Market",
+            descriptionText: "Trader Joe's",
             amount: 48.90,
-            transactionDate: .now,
+            transactionDate: Calendar.current.startOfDay(for: .now),
             workspace: workspace,
             card: demoCard,
-            category: category
+            category: demoCategory
         )
     }
 
     private var demoPreset: Preset {
-        presets.first ?? Preset(
+        let now = Date.now
+        let month = Calendar.current.component(.month, from: now)
+        let day = Calendar.current.component(.day, from: now)
+
+        return presets.first ?? Preset(
             title: "Rent",
             plannedAmount: 1400,
-            frequencyRaw: RecurrenceFrequency.monthly.rawValue,
+            frequencyRaw: RecurrenceFrequency.yearly.rawValue,
+            yearlyMonth: month,
+            yearlyDayOfMonth: day,
             workspace: workspace,
             defaultCard: demoCard,
-            defaultCategory: nil
+            defaultCategory: demoCategory
         )
+    }
+
+    private var budgetDemoRow: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(demoBudget.name)
+                .font(.body.weight(.semibold))
+            Text(budgetRangeLabel(for: demoBudget))
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+        .contentShape(Rectangle())
+        .swipeActions(edge: .leading, allowsFullSwipe: false) {
+            Button {
+                budgetInstruction = "Leading swipe opened Edit."
+            } label: {
+                Label("Edit", systemImage: "pencil")
+            }
+            .tint(Color("AccentColor"))
+        }
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            Button(role: .destructive) {
+                budgetInstruction = "Trailing swipe opened Delete."
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+            .tint(Color("OffshoreDepth"))
+        }
+    }
+
+    private var reconciliationDemoRow: some View {
+        ZStack(alignment: .bottomLeading) {
+            Text(AllocationLedgerService.balance(for: demoReconciliation), format: CurrencyFormatter.currencyStyle())
+                .font(.title2.weight(.semibold))
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+
+            Text(demoReconciliation.name)
+                .font(.headline)
+                .lineLimit(2)
+                .padding(16)
+        }
+        .aspectRatio(1.586, contentMode: .fit)
+        .frame(maxWidth: .infinity, minHeight: 155, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill((Color(hex: demoReconciliation.hexColor) ?? .blue).opacity(0.25))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke((Color(hex: demoReconciliation.hexColor) ?? .blue).opacity(0.6), lineWidth: 1)
+        )
+        .contentShape(Rectangle())
+        .onLongPressGesture {
+            reconciliationInstruction = "Long press detected. Open actions from the reconciliation context menu."
+        }
+        .contextMenu {
+            Button {
+                reconciliationInstruction = "Reconciliation Edit action selected."
+            } label: {
+                Label("Edit", systemImage: "pencil")
+            }
+
+            Button(role: .destructive) {
+                reconciliationInstruction = "Reconciliation Delete action selected."
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+    }
+
+    private var incomeDemoRow: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(demoIncome.source)
+                    .font(.headline)
+
+                Text(demoIncome.isPlanned ? "Planned" : "Actual")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            Text(demoIncome.amount, format: CurrencyFormatter.currencyStyle())
+                .foregroundStyle(demoIncome.isPlanned ? .orange : .blue)
+                .font(.headline)
+        }
+        .contentShape(Rectangle())
+        .swipeActions(edge: .leading, allowsFullSwipe: false) {
+            Button {
+                incomeInstruction = "Leading swipe opened Edit."
+            } label: {
+                Label("Edit", systemImage: "pencil")
+            }
+            .tint(Color("AccentColor"))
+        }
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            Button(role: .destructive) {
+                incomeInstruction = "Trailing swipe opened Delete."
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+            .tint(Color("OffshoreDepth"))
+        }
     }
 
     private var expenseDemoRow: some View {
@@ -1903,6 +2146,48 @@ private struct OnboardingGestureTrainingStep: View {
                 }
                 .tint(Color("OffshoreDepth"))
             }
+    }
+
+    private var categoryDemoRow: some View {
+        HStack(spacing: 12) {
+            Circle()
+                .fill(Color(hex: demoCategory.hexColor) ?? .secondary)
+                .frame(width: 10, height: 10)
+
+            Text(demoCategory.name)
+        }
+        .padding(.vertical, 6)
+        .contentShape(Rectangle())
+        .swipeActions(edge: .leading, allowsFullSwipe: false) {
+            Button {
+                categoryInstruction = "Leading swipe opened Edit."
+            } label: {
+                Label("Edit", systemImage: "pencil")
+            }
+            .tint(Color("AccentColor"))
+        }
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            Button(role: .destructive) {
+                categoryInstruction = "Trailing swipe opened Delete."
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+            .tint(Color("OffshoreDepth"))
+        }
+    }
+
+    private func budgetRangeLabel(for budget: Budget) -> String {
+        let start = budget.startDate.formatted(date: .abbreviated, time: .omitted)
+        let end = budget.endDate.formatted(date: .abbreviated, time: .omitted)
+        return "\(start) - \(end)"
+    }
+
+    private func currentMonthYearFallbackBudgetName() -> String {
+        let formatter = DateFormatter()
+        formatter.locale = .autoupdatingCurrent
+        formatter.calendar = .autoupdatingCurrent
+        formatter.setLocalizedDateFormatFromTemplate("MMMM y")
+        return formatter.string(from: .now)
     }
 
     @ViewBuilder
