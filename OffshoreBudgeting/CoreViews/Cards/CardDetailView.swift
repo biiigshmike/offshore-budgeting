@@ -1016,7 +1016,11 @@ struct CardDetailView: View {
                     isOn: $excludeFuturePlannedExpensesFromCalculationsInView
                 )
             } label: {
-                Label("Planned Expense Display", systemImage: "calendar.badge")
+                if #available(iOS 26.0, *) {
+                    Label("Planned Expense Display", systemImage: "calendar.badge")
+                } else {
+                    Label("Planned Expense Display", systemImage: "calendar.badge.clock")
+                }
             }
 
             Menu {
