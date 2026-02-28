@@ -27,7 +27,7 @@ struct AllocationAccountDetailView: View {
     @State private var settlementActionErrorMessage: String = ""
 
     private var balance: Double {
-        AllocationLedgerService.balance(for: account)
+        CurrencyFormatter.normalizedCurrencyDisplayValue(AllocationLedgerService.balance(for: account))
     }
 
     private var ledgerRows: [AllocationLedgerService.LedgerRow] {
@@ -307,7 +307,10 @@ struct AllocationAccountDetailView: View {
 
             Spacer(minLength: 12)
 
-            Text(row.amount, format: CurrencyFormatter.currencyStyle())
+            Text(
+                CurrencyFormatter.normalizedCurrencyDisplayValue(row.amount),
+                format: CurrencyFormatter.currencyStyle()
+            )
                 .font(.body.weight(.semibold))
         }
         .padding(.vertical, 2)
@@ -581,7 +584,7 @@ private struct EditSharedBalanceEntryView: View {
 
             if actionMode == .offset, let selectedAccount {
                 let available = availableOffsetBalance(for: selectedAccount)
-                guard amount <= available else { return false }
+                guard CurrencyFormatter.isLessThanOrEqualCurrency(amount, available) else { return false }
             }
 
             return true
@@ -646,7 +649,10 @@ private struct EditSharedBalanceEntryView: View {
                         Text("Available Balance")
                             .foregroundStyle(.secondary)
                         Spacer()
-                        Text(AllocationLedgerService.balance(for: selectedAccount), format: CurrencyFormatter.currencyStyle())
+                        Text(
+                            CurrencyFormatter.normalizedCurrencyDisplayValue(AllocationLedgerService.balance(for: selectedAccount)),
+                            format: CurrencyFormatter.currencyStyle()
+                        )
                             .fontWeight(.semibold)
                     }
                 }
@@ -761,7 +767,7 @@ private struct EditSharedBalanceEntryView: View {
 
                 if actionMode == .offset {
                     let available = availableOffsetBalance(for: selectedAccount)
-                    guard rawAmount <= available else {
+                    guard CurrencyFormatter.isLessThanOrEqualCurrency(rawAmount, available) else {
                         showingInvalidAmountAlert = true
                         return
                     }

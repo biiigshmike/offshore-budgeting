@@ -244,7 +244,7 @@ struct AddExpenseView: View {
                     return
                 }
                 let available = max(0, AllocationLedgerService.balance(for: selectedOffsetAccount))
-                guard parsed <= available else {
+                guard CurrencyFormatter.isLessThanOrEqualCurrency(parsed, available) else {
                     showingInvalidOffsetAlert = true
                     return
                 }
@@ -266,7 +266,7 @@ struct AddExpenseView: View {
                     showingInvalidSavingsOffsetAlert = true
                     return
                 }
-                guard parsed <= availableSavingsBalance else {
+                guard CurrencyFormatter.isLessThanOrEqualCurrency(parsed, availableSavingsBalance) else {
                     showingInvalidSavingsOffsetAlert = true
                     return
                 }

@@ -286,7 +286,10 @@ struct ExpenseFormView: View {
                         Text("Available Balance")
                             .foregroundStyle(.secondary)
                         Spacer()
-                        Text(AllocationLedgerService.balance(for: account), format: CurrencyFormatter.currencyStyle())
+                        Text(
+                            CurrencyFormatter.normalizedCurrencyDisplayValue(AllocationLedgerService.balance(for: account)),
+                            format: CurrencyFormatter.currencyStyle()
+                        )
                             .fontWeight(.semibold)
                     }
                 }
@@ -421,7 +424,7 @@ struct ExpenseFormView: View {
             return "Amount can't exceed the expense amount."
         }
 
-        guard parsed <= availableSavingsBalance else {
+        guard CurrencyFormatter.isLessThanOrEqualCurrency(parsed, availableSavingsBalance) else {
             return "Amount can't exceed available savings."
         }
 
@@ -460,7 +463,7 @@ struct ExpenseFormView: View {
         if mode == .offset,
            let account = allocationAccounts.first(where: { $0.id == selectedAccountID }) {
             let available = max(0, AllocationLedgerService.balance(for: account))
-            guard parsedAmount <= available else {
+            guard CurrencyFormatter.isLessThanOrEqualCurrency(parsedAmount, available) else {
                 return "Amount can't exceed available balance."
             }
         }

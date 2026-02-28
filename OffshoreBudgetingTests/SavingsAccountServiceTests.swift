@@ -527,6 +527,115 @@ struct SavingsAccountServiceTests {
         #expect(account.total == 300)
     }
 
+    // MARK: - Currency Boundary
+
+    @Test func currencyBoundary_allowsExactOffset_whenAvailableHasFloatingResidue() throws {
+        let context = try makeContext()
+
+        let ws = Workspace(name: "WS", hexColor: "#3B82F6")
+        let card = Card(name: "Visa", workspace: ws)
+        let cat = Category(name: "General", hexColor: "#22AA66", workspace: ws)
+
+        context.insert(ws)
+        context.insert(card)
+        context.insert(cat)
+
+        let account = SavingsAccountService.ensureSavingsAccount(for: ws, modelContext: context)
+        SavingsAccountService.addManualAdjustment(
+            workspace: ws,
+            account: account,
+            date: makeDate(2026, 6, 1),
+            amount: 0.3,
+            note: "Seed",
+            modelContext: context
+        )
+        SavingsAccountService.addManualAdjustment(
+            workspace: ws,
+            account: account,
+            date: makeDate(2026, 6, 2),
+            amount: -0.2,
+            note: "Seed",
+            modelContext: context
+        )
+
+        let variable = VariableExpense(
+            descriptionText: "Coffee",
+            amount: 0.1,
+            transactionDate: makeDate(2026, 6, 4),
+            workspace: ws,
+            card: card,
+            category: cat
+        )
+        context.insert(variable)
+        try context.save()
+
+        let applied = SavingsAccountService.upsertSavingsOffset(
+            workspace: ws,
+            variableExpense: variable,
+            offsetAmount: 0.1,
+            note: "Boundary",
+            date: variable.transactionDate,
+            modelContext: context
+        )
+
+        #expect(applied)
+        #expect(variable.savingsLedgerEntry != nil)
+        #expect(CurrencyFormatter.roundedToCurrency(variable.savingsLedgerEntry?.amount ?? 0) == -0.1)
+    }
+
+    @Test func currencyBoundary_rejectsOffset_whenRequestedExceedsAvailableByOneCent() throws {
+        let context = try makeContext()
+
+        let ws = Workspace(name: "WS", hexColor: "#3B82F6")
+        let card = Card(name: "Visa", workspace: ws)
+        let cat = Category(name: "General", hexColor: "#22AA66", workspace: ws)
+
+        context.insert(ws)
+        context.insert(card)
+        context.insert(cat)
+
+        let account = SavingsAccountService.ensureSavingsAccount(for: ws, modelContext: context)
+        SavingsAccountService.addManualAdjustment(
+            workspace: ws,
+            account: account,
+            date: makeDate(2026, 6, 1),
+            amount: 0.3,
+            note: "Seed",
+            modelContext: context
+        )
+        SavingsAccountService.addManualAdjustment(
+            workspace: ws,
+            account: account,
+            date: makeDate(2026, 6, 2),
+            amount: -0.2,
+            note: "Seed",
+            modelContext: context
+        )
+
+        let variable = VariableExpense(
+            descriptionText: "Coffee",
+            amount: 1.0,
+            transactionDate: makeDate(2026, 6, 4),
+            workspace: ws,
+            card: card,
+            category: cat
+        )
+        context.insert(variable)
+        try context.save()
+
+        let applied = SavingsAccountService.upsertSavingsOffset(
+            workspace: ws,
+            variableExpense: variable,
+            offsetAmount: 0.11,
+            note: "Boundary",
+            date: variable.transactionDate,
+            modelContext: context
+        )
+
+        #expect(!applied)
+        #expect(variable.savingsLedgerEntry == nil)
+    }
+
     // MARK: - Negative Guard
 
     @Test func negativeSavings_rejectsOffsetRequests_forVariableAndPlanned() throws {

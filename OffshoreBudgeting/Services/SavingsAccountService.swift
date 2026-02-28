@@ -588,7 +588,8 @@ enum SavingsAccountService {
     ) -> Bool {
         guard requested > 0 else { return false }
         guard available > 0 else { return false }
-        return requested <= available && requested <= expenseAmount
+        return CurrencyFormatter.isLessThanOrEqualCurrency(requested, available)
+            && CurrencyFormatter.isLessThanOrEqualCurrency(requested, expenseAmount)
     }
 
     private static func recalculateAccountTotal(

@@ -145,6 +145,24 @@ enum CurrencyFormatter {
         return (value * factor).rounded() / factor
     }
 
+    // MARK: - Public: Currency Comparisons
+
+    /// Compares values after rounding to the selected currency's minor units.
+    static func isLessThanOrEqualCurrency(_ lhs: Double, _ rhs: Double) -> Bool {
+        roundedToCurrency(lhs) <= roundedToCurrency(rhs)
+    }
+
+    /// Compares values after rounding to the selected currency's minor units.
+    static func isGreaterThanCurrency(_ lhs: Double, _ rhs: Double) -> Bool {
+        roundedToCurrency(lhs) > roundedToCurrency(rhs)
+    }
+
+    /// Normalizes values for display by removing floating residue and `-0.00`.
+    static func normalizedCurrencyDisplayValue(_ value: Double) -> Double {
+        let rounded = roundedToCurrency(value)
+        return rounded == 0 ? 0 : rounded
+    }
+
     // MARK: - Public: CSV String
 
     /// Stable numeric output for CSV exports:

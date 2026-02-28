@@ -155,7 +155,7 @@ struct EditPlannedExpenseView: View {
                 if mode == .offset,
                    let selectedOffsetAccount = allocationAccounts.first(where: { $0.id == selectedAccountID }) {
                     let available = availableOffsetBalance(for: selectedOffsetAccount)
-                    guard parsedSharedAmount <= available else {
+                    guard CurrencyFormatter.isLessThanOrEqualCurrency(parsedSharedAmount, available) else {
                         return false
                     }
                 }
@@ -177,7 +177,7 @@ struct EditPlannedExpenseView: View {
                     return false
                 }
 
-                guard parsed <= availableSavingsBalance else {
+                guard CurrencyFormatter.isLessThanOrEqualCurrency(parsed, availableSavingsBalance) else {
                     return false
                 }
             }
@@ -408,7 +408,10 @@ struct EditPlannedExpenseView: View {
                         Text("Available Balance")
                             .foregroundStyle(.secondary)
                         Spacer()
-                        Text(AllocationLedgerService.balance(for: account), format: CurrencyFormatter.currencyStyle())
+                        Text(
+                            CurrencyFormatter.normalizedCurrencyDisplayValue(AllocationLedgerService.balance(for: account)),
+                            format: CurrencyFormatter.currencyStyle()
+                        )
                             .fontWeight(.semibold)
                     }
                 }
@@ -441,7 +444,7 @@ struct EditPlannedExpenseView: View {
                     Text("Available Savings")
                         .foregroundStyle(.secondary)
                     Spacer()
-                    Text(availableSavingsBalance, format: CurrencyFormatter.currencyStyle())
+                    Text(normalizedAvailableSavingsBalance, format: CurrencyFormatter.currencyStyle())
                         .fontWeight(.semibold)
                 }
             }
@@ -453,6 +456,10 @@ struct EditPlannedExpenseView: View {
             }
         }
         .disabled(activeSharedBalanceMode != nil)
+    }
+
+    private var normalizedAvailableSavingsBalance: Double {
+        CurrencyFormatter.normalizedCurrencyDisplayValue(availableSavingsBalance)
     }
 
     private var sharedBalanceModeBinding: Binding<SharedBalanceMode?> {
@@ -521,7 +528,7 @@ struct EditPlannedExpenseView: View {
         if mode == .offset,
            let account = allocationAccounts.first(where: { $0.id == selectedAccountID }) {
             let available = availableOffsetBalance(for: account)
-            guard parsedAmount <= available else {
+            guard CurrencyFormatter.isLessThanOrEqualCurrency(parsedAmount, available) else {
                 return "Amount can't exceed available balance."
             }
         }
@@ -705,7 +712,7 @@ struct EditPlannedExpenseView: View {
                     return
                 }
                 let available = availableOffsetBalance(for: selectedOffsetAccount)
-                guard parsed <= available else {
+                guard CurrencyFormatter.isLessThanOrEqualCurrency(parsed, available) else {
                     showingInvalidOffsetAmountAlert = true
                     return
                 }
@@ -725,7 +732,7 @@ struct EditPlannedExpenseView: View {
                     showingInvalidSavingsOffsetAmountAlert = true
                     return
                 }
-                guard parsed <= availableSavingsBalance else {
+                guard CurrencyFormatter.isLessThanOrEqualCurrency(parsed, availableSavingsBalance) else {
                     showingInvalidSavingsOffsetAmountAlert = true
                     return
                 }

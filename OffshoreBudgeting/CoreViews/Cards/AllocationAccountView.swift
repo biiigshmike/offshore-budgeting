@@ -257,7 +257,7 @@ private struct AllocationAccountTileView: View {
     let account: AllocationAccount
 
     private var balance: Double {
-        AllocationLedgerService.balance(for: account)
+        CurrencyFormatter.normalizedCurrencyDisplayValue(AllocationLedgerService.balance(for: account))
     }
 
     var body: some View {

@@ -262,7 +262,7 @@ struct EditExpenseView: View {
                     return
                 }
                 let available = availableOffsetBalance(for: selectedOffsetAccount)
-                guard parsed <= available else {
+                guard CurrencyFormatter.isLessThanOrEqualCurrency(parsed, available) else {
                     showingInvalidOffsetAlert = true
                     return
                 }
@@ -284,7 +284,7 @@ struct EditExpenseView: View {
                     showingInvalidSavingsOffsetAlert = true
                     return
                 }
-                guard parsed <= availableSavingsBalance else {
+                guard CurrencyFormatter.isLessThanOrEqualCurrency(parsed, availableSavingsBalance) else {
                     showingInvalidSavingsOffsetAlert = true
                     return
                 }
