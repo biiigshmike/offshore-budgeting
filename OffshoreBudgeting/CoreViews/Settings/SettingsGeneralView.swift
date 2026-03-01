@@ -28,7 +28,6 @@ struct SettingsGeneralView: View {
     @AppStorage("general_excludeFutureVariableExpensesFromCalculations")
     private var excludeFutureVariableExpensesFromCalculations: Bool = false
 
-    @AppStorage("tips_resetToken") private var tipsResetToken: Int = 0
     @State private var eraseResultMessage: String = ""
 
     @State private var activeAlert: ActiveAlert? = nil
@@ -49,6 +48,7 @@ struct SettingsGeneralView: View {
     @State private var searchText: String = ""
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(PostBoardingTipsStore.self) private var postBoardingTipsStore
 
     var body: some View {
         List {
@@ -127,7 +127,7 @@ struct SettingsGeneralView: View {
             Section("Maintenance") {
                 NavigationLink {
                     SettingsMaintenanceView(
-                        onResetTips: { activeAlert = .tipsResetConfirm },
+                        onResetTipsConfirmed: { postBoardingTipsStore.resetTips() },
                         onRepeatOnboarding: { activeAlert = .repeatOnboardingConfirm },
                         onEraseContent: { activeAlert = .eraseConfirm }
                     )
@@ -140,24 +140,6 @@ struct SettingsGeneralView: View {
         .navigationTitle("General")
         .alert(item: $activeAlert) { alert in
             switch alert {
-            case .tipsResetConfirm:
-                Alert(
-                    title: Text("Reset Tips & Hints?"),
-                    message: Text("This will make tips and hints appear again."),
-                    primaryButton: .destructive(Text("Reset")) {
-                        tipsResetToken += 1
-                        DispatchQueue.main.async {
-                            activeAlert = .tipsResetResult
-                        }
-                    },
-                    secondaryButton: .cancel()
-                )
-            case .tipsResetResult:
-                Alert(
-                    title: Text("Tips & Hints Reset"),
-                    message: Text("Tips and hints will be shown again."),
-                    dismissButton: .default(Text("OK"))
-                )
             case .repeatOnboardingConfirm:
                 Alert(
                     title: Text("Repeat Onboarding?"),
@@ -266,7 +248,7 @@ struct SettingsGeneralView: View {
             requireBiometrics = false
 
             // Optional: bring tips back to a clean baseline
-            tipsResetToken = 0
+            postBoardingTipsStore.resetToBaselineForErase()
 
             let newToken = UUID().uuidString
             DispatchQueue.main.async {
@@ -287,19 +269,15 @@ struct SettingsGeneralView: View {
 }
 
 private enum ActiveAlert: Identifiable {
-    case tipsResetConfirm
-    case tipsResetResult
     case repeatOnboardingConfirm
     case eraseConfirm
     case eraseResult
 
     var id: Int {
         switch self {
-        case .tipsResetConfirm: return 1
-        case .tipsResetResult: return 2
-        case .repeatOnboardingConfirm: return 3
-        case .eraseConfirm: return 4
-        case .eraseResult: return 5
+        case .repeatOnboardingConfirm: return 1
+        case .eraseConfirm: return 2
+        case .eraseResult: return 3
         }
     }
 }
@@ -308,9 +286,10 @@ private enum ActiveAlert: Identifiable {
 
 private struct SettingsMaintenanceView: View {
 
-    let onResetTips: () -> Void
+    let onResetTipsConfirmed: () -> Void
     let onRepeatOnboarding: () -> Void
     let onEraseContent: () -> Void
+    @State private var activeMaintenanceAlert: MaintenanceAlert? = nil
 
     var body: some View {
         List {
@@ -318,7 +297,7 @@ private struct SettingsMaintenanceView: View {
                 maintenanceButton(
                     title: "Reset Tips & Hints",
                     tint: .orange,
-                    action: onResetTips
+                    action: { activeMaintenanceAlert = .resetConfirm }
                 )
                 .listRowSeparator(.hidden)
 
@@ -339,6 +318,28 @@ private struct SettingsMaintenanceView: View {
         }
         .listStyle(.insetGrouped)
         .navigationTitle("Maintenance")
+        .alert(item: $activeMaintenanceAlert) { alert in
+            switch alert {
+            case .resetConfirm:
+                Alert(
+                    title: Text("Reset Tips & Hints?"),
+                    message: Text("This will make tips and hints appear again."),
+                    primaryButton: .destructive(Text("Reset")) {
+                        onResetTipsConfirmed()
+                        DispatchQueue.main.async {
+                            activeMaintenanceAlert = .resetResult
+                        }
+                    },
+                    secondaryButton: .cancel()
+                )
+            case .resetResult:
+                Alert(
+                    title: Text("Tips & Hints Reset"),
+                    message: Text("Tips and hints will be shown again."),
+                    dismissButton: .default(Text("OK"))
+                )
+            }
+        }
     }
 
     @ViewBuilder
@@ -357,6 +358,18 @@ private struct SettingsMaintenanceView: View {
             }
             .buttonStyle(.borderedProminent)
             .tint(tint)
+        }
+    }
+
+    private enum MaintenanceAlert: Identifiable {
+        case resetConfirm
+        case resetResult
+
+        var id: Int {
+            switch self {
+            case .resetConfirm: return 1
+            case .resetResult: return 2
+            }
         }
     }
 }

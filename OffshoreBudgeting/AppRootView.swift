@@ -85,6 +85,7 @@ struct AppRootView: View {
     @State private var didApplyInitialSection: Bool = false
     @State private var showingHelpSheet: Bool = false
     @State private var detailSnapshotCache = DetailViewSnapshotCache()
+    @State private var postBoardingTipActivationCycle: Int = 0
 
     @Environment(\.appCommandHub) private var commandHub
 
@@ -158,6 +159,7 @@ struct AppRootView: View {
             handleCommand(commandHub.latestCommandID)
         }
         .onChange(of: selectedSectionRaw) { _, newValue in
+            postBoardingTipActivationCycle &+= 1
             if shouldSyncActiveSectionToCommandHub {
                 commandHub.setActiveSectionRaw(newValue)
             }
@@ -187,6 +189,8 @@ struct AppRootView: View {
             NavigationStack(path: $homePath) {
                 homeRootView
             }
+            .environment(\.postBoardingTipPresenterIsActive, selectedSection == .home)
+            .environment(\.postBoardingTipActivationCycle, postBoardingTipActivationCycle)
             .homeAssistantHost(workspace: workspace)
             .tabItem { Label(AppSection.home.rawValue, systemImage: AppSection.home.systemImage) }
             .tag(AppSection.home)
@@ -194,24 +198,32 @@ struct AppRootView: View {
             NavigationStack(path: $budgetsPath) {
                 BudgetsView(workspace: workspace)
             }
+            .environment(\.postBoardingTipPresenterIsActive, selectedSection == .budgets)
+            .environment(\.postBoardingTipActivationCycle, postBoardingTipActivationCycle)
             .tabItem { Label(AppSection.budgets.rawValue, systemImage: AppSection.budgets.systemImage) }
             .tag(AppSection.budgets)
 
             NavigationStack(path: $incomePath) {
                 IncomeWorkspaceView(workspace: workspace)
             }
+            .environment(\.postBoardingTipPresenterIsActive, selectedSection == .income)
+            .environment(\.postBoardingTipActivationCycle, postBoardingTipActivationCycle)
             .tabItem { Label(AppSection.income.rawValue, systemImage: AppSection.income.systemImage) }
             .tag(AppSection.income)
 
             NavigationStack(path: $cardsPath) {
                 AccountsView(workspace: workspace)
             }
+            .environment(\.postBoardingTipPresenterIsActive, selectedSection == .cards)
+            .environment(\.postBoardingTipActivationCycle, postBoardingTipActivationCycle)
             .tabItem { Label(AppSection.cards.title, systemImage: AppSection.cards.systemImage) }
             .tag(AppSection.cards)
 
             NavigationStack(path: $settingsPath) {
                 SettingsView(workspace: workspace, selectedWorkspaceID: $selectedWorkspaceID)
             }
+            .environment(\.postBoardingTipPresenterIsActive, selectedSection == .settings)
+            .environment(\.postBoardingTipActivationCycle, postBoardingTipActivationCycle)
             .tabItem { Label(AppSection.settings.rawValue, systemImage: AppSection.settings.systemImage) }
             .tag(AppSection.settings)
         }
@@ -233,6 +245,8 @@ struct AppRootView: View {
             NavigationStack(path: selectedSectionPath) {
                 sectionRootView
             }
+            .environment(\.postBoardingTipPresenterIsActive, true)
+            .environment(\.postBoardingTipActivationCycle, postBoardingTipActivationCycle)
             .id(selectedSection)
         }
         .homeAssistantHost(

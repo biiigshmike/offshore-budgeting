@@ -37,6 +37,7 @@ struct OffshoreBudgetingApp: App {
     // MARK: - iCloud Opt-In State
 
     @AppStorage("app_rootResetToken") private var rootResetToken: String = UUID().uuidString
+    @State private var postBoardingTipsStore = PostBoardingTipsStore()
 
     // MARK: - ModelContainer
 
@@ -73,6 +74,7 @@ struct OffshoreBudgetingApp: App {
         WindowGroup(for: AppWindowContext.self) { windowContext in
             WindowSceneRootView(
                 modelContainer: $modelContainer,
+                postBoardingTipsStore: postBoardingTipsStore,
                 initialSectionOverride: initialSection(from: windowContext.wrappedValue)
             )
                 .id(rootResetToken)
@@ -296,6 +298,7 @@ struct OffshoreBudgetingApp: App {
 
 private struct WindowSceneRootView: View {
     @Binding var modelContainer: ModelContainer
+    let postBoardingTipsStore: PostBoardingTipsStore
     let initialSectionOverride: AppSection?
 
     @StateObject private var commandHub: AppCommandHub = Self.makeCommandHub()
@@ -327,6 +330,7 @@ private struct WindowSceneRootView: View {
             initialSectionOverride: initialSectionOverride
         )
         .environment(\.appCommandHub, commandHub)
+        .environment(postBoardingTipsStore)
 
         if shouldUseFocusedSceneObject {
             root.focusedSceneObject(commandHub)

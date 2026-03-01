@@ -7,6 +7,26 @@
 
 import SwiftUI
 
+private struct PostBoardingTipPresenterIsActiveKey: EnvironmentKey {
+    static let defaultValue: Bool = true
+}
+
+private struct PostBoardingTipActivationCycleKey: EnvironmentKey {
+    static let defaultValue: Int = 0
+}
+
+extension EnvironmentValues {
+    var postBoardingTipPresenterIsActive: Bool {
+        get { self[PostBoardingTipPresenterIsActiveKey.self] }
+        set { self[PostBoardingTipPresenterIsActiveKey.self] = newValue }
+    }
+
+    var postBoardingTipActivationCycle: Int {
+        get { self[PostBoardingTipActivationCycleKey.self] }
+        set { self[PostBoardingTipActivationCycleKey.self] = newValue }
+    }
+}
+
 // MARK: - PostBoardingTip Item Model
 
 struct PostBoardingTipItem: Identifiable, Equatable {
@@ -65,33 +85,51 @@ private struct PostBoardingTipModifier: ViewModifier {
 
     @AppStorage("didCompleteOnboarding") private var didCompleteOnboarding: Bool = false
 
-    // Controlled by SettingsGeneralView -> "Reset Tips & Hints"
-    @AppStorage("tips_resetToken") private var tipsResetToken: Int = 0
-
-    // Persisted seen keys
-    @AppStorage("tips_seenKeys") private var seenKeysCSV: String = ""
-    @AppStorage("tips_seen_lastResetToken") private var lastResetToken: Int = 0
     @AppStorage("releaseLogs_seenReleaseIDs") private var seenReleaseIDsCSV: String = ""
 
+    @Environment(\.postBoardingTipPresenterIsActive) private var postBoardingTipPresenterIsActive
+    @Environment(\.postBoardingTipActivationCycle) private var postBoardingTipActivationCycle
+    @Environment(PostBoardingTipsStore.self) private var postBoardingTipsStore
+
     @State private var showingTip: Bool = false
+    @State private var didAcknowledgeTip: Bool = false
 
     func body(content: Content) -> some View {
         let base = content
             .onAppear {
-                normalizeForResetIfNeeded()
-                showingTip = shouldShowTip()
+                refreshPresentationForCurrentEligibility(deferPresentation: true)
             }
-            .onChange(of: tipsResetToken) { _, _ in
-                normalizeForResetIfNeeded()
-                showingTip = shouldShowTip()
+            .onChange(of: postBoardingTipsStore.changeSerial) { _, _ in
+                refreshPresentationForCurrentEligibility(deferPresentation: true)
+            }
+            .onChange(of: didCompleteOnboarding) { _, _ in
+                refreshPresentationForCurrentEligibility(deferPresentation: true)
+            }
+            .onChange(of: seenReleaseIDsCSV) { _, _ in
+                refreshPresentationForCurrentEligibility(deferPresentation: true)
+            }
+            .onChange(of: postBoardingTipActivationCycle) { _, _ in
+                refreshPresentationForCurrentEligibility(deferPresentation: true)
+            }
+            .onChange(of: postBoardingTipPresenterIsActive) { _, isActive in
+                if isActive {
+                    refreshPresentationForCurrentEligibility(deferPresentation: true)
+                } else {
+                    showingTip = false
+                    didAcknowledgeTip = false
+                }
             }
 
         if shouldAttachSheet {
-            base.sheet(isPresented: $showingTip, onDismiss: markSeen) {
+            base.sheet(isPresented: $showingTip, onDismiss: handleTipDismissal) {
                 TipSheet(
                     title: title,
                     items: items,
-                    buttonTitle: buttonTitle
+                    buttonTitle: buttonTitle,
+                    onContinue: {
+                        didAcknowledgeTip = true
+                        showingTip = false
+                    }
                 )
             }
         } else {
@@ -104,27 +142,18 @@ private struct PostBoardingTipModifier: ViewModifier {
     /// cause sluggish or conflicted presentation of other sheets.
     private var shouldAttachSheet: Bool {
         guard didCompleteOnboarding else { return false }
+        guard postBoardingTipPresenterIsActive else { return false }
         guard !items.isEmpty else { return false }
         guard hasPendingCurrentReleaseLog == false else { return false }
-
-        let seen = Set(seenKeysCSV.split(separator: ",").map { String($0) })
-        return !seen.contains(key)
-    }
-
-    private func normalizeForResetIfNeeded() {
-        guard lastResetToken != tipsResetToken else { return }
-        // New reset token, clear seen keys.
-        seenKeysCSV = ""
-        lastResetToken = tipsResetToken
+        return postBoardingTipsStore.hasSeen(key) == false
     }
 
     private func shouldShowTip() -> Bool {
         guard didCompleteOnboarding else { return false }
+        guard postBoardingTipPresenterIsActive else { return false }
         guard !items.isEmpty else { return false }
         guard hasPendingCurrentReleaseLog == false else { return false }
-
-        let seen = Set(seenKeysCSV.split(separator: ",").map { String($0) })
-        return !seen.contains(key)
+        return postBoardingTipsStore.hasSeen(key) == false
     }
 
     private var hasPendingCurrentReleaseLog: Bool {
@@ -134,9 +163,30 @@ private struct PostBoardingTipModifier: ViewModifier {
     }
 
     private func markSeen() {
-        var seen = Set(seenKeysCSV.split(separator: ",").map { String($0) })
-        seen.insert(key)
-        seenKeysCSV = seen.sorted().joined(separator: ",")
+        postBoardingTipsStore.markSeen(key)
+    }
+
+    private func handleTipDismissal() {
+        if didAcknowledgeTip {
+            markSeen()
+        }
+        didAcknowledgeTip = false
+    }
+
+    private func refreshPresentationForCurrentEligibility(deferPresentation: Bool = false) {
+        if deferPresentation {
+            DispatchQueue.main.async {
+                refreshPresentationForCurrentEligibility(deferPresentation: false)
+            }
+            return
+        }
+
+        if postBoardingTipPresenterIsActive {
+            showingTip = shouldShowTip()
+        } else {
+            showingTip = false
+            didAcknowledgeTip = false
+        }
     }
 }
 
@@ -147,8 +197,7 @@ private struct TipSheet: View {
     let title: String
     let items: [PostBoardingTipItem]
     let buttonTitle: String
-
-    @Environment(\.dismiss) private var dismiss
+    let onContinue: () -> Void
 
     var body: some View {
         VStack(spacing: 18) {
@@ -179,7 +228,7 @@ private struct TipSheet: View {
 
             if #available(iOS 26.0, *) {
                 Button {
-                    dismiss()
+                    onContinue()
                 } label: {
                     Text(buttonTitle)
                         .frame(maxWidth: .infinity, minHeight: 52)
@@ -190,7 +239,7 @@ private struct TipSheet: View {
                 .padding(.bottom, 18)
             } else {
                 Button {
-                    dismiss()
+                    onContinue()
                 } label: {
                     Text(buttonTitle)
                         .frame(maxWidth: .infinity, minHeight: 52)
