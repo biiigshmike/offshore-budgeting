@@ -54,13 +54,19 @@ final class ShoppingModeManager: ObservableObject {
         }
     }
 
-    func start(hours: Int) {
+    func start(hours: Int) async -> ShoppingModeStartResult {
+        let blockers = await ShoppingModeReadinessEvaluator.shared.evaluate()
+        guard blockers.isEmpty else {
+            return .blocked(blockers)
+        }
+
         SpendingSessionStore.activate(hours: hours)
         refreshIfExpired()
         ShoppingModeSuggestionService.shared.clearCooldownsIfSessionChanged(newSessionID: status.sessionID)
         ShoppingModeLocationService.shared.startMonitoringIfPossible()
 
         startOrRefreshLiveActivity()
+        return .started(expiresAt: status.expiresAt ?? .now)
     }
 
     func end() {
@@ -219,33 +225,6 @@ struct ShoppingModeMerchant: Equatable {
 enum ShoppingModeMerchantCatalog {
     static let maxMonitoredRegions = ShoppingModeTuning.maxMonitoredRegions
     static let searchRadiusMeters: Double = ShoppingModeTuning.localSearchRadiusMeters
-
-    static let fallbackMerchants: [ShoppingModeMerchant] = [
-        ShoppingModeMerchant(
-            id: "starbucks_1",
-            name: "Starbucks",
-            latitude: 37.785834,
-            longitude: -122.406417,
-            radiusMeters: 120,
-            categoryHint: "Coffee"
-        ),
-        ShoppingModeMerchant(
-            id: "target_1",
-            name: "Target",
-            latitude: 37.784216,
-            longitude: -122.407150,
-            radiusMeters: 180,
-            categoryHint: "Shopping"
-        ),
-        ShoppingModeMerchant(
-            id: "costco_1",
-            name: "Costco",
-            latitude: 37.770367,
-            longitude: -122.391302,
-            radiusMeters: 220,
-            categoryHint: "Groceries"
-        )
-    ]
 }
 
 // MARK: - ShoppingModeTuning
@@ -255,7 +234,13 @@ enum ShoppingModeTuning {
     static let localSearchRadiusMeters: Double = 2_500
     static let refreshDistanceMeters: Double = 250
     static let minimumRefreshIntervalSeconds: TimeInterval = 120
-    static let startupNudgeEnabled = false
+    static let poiRetryIntervalSeconds: TimeInterval = 60
+    static let maxPOIRetryAttempts = 3
+    static let startupInsideCollectionWindowSeconds: TimeInterval = 1
+    static let startupRouteSelectionMaxCandidates = 5
+    static let startupRouteLookupTimeoutSeconds: TimeInterval = 2
+    static let startupRouteOutlierCrowMultiplier: Double = 4
+    static let startupRouteOutlierExtraMeters: Double = 300
     static let globalNotificationCooldownSeconds: TimeInterval = 10 * 60
     static let perMerchantNotificationCooldownSeconds: TimeInterval = 15 * 60
 }

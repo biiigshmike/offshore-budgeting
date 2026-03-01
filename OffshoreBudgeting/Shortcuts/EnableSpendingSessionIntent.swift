@@ -38,13 +38,15 @@ struct EnableSpendingSessionIntent: AppIntent {
     }
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        let expirationDate = await MainActor.run { () -> Date in
-            ShoppingModeManager.shared.start(hours: duration.hours)
-            return ShoppingModeManager.shared.status.expiresAt ?? Date.now
+        let result = await ShoppingModeManager.shared.start(hours: duration.hours)
+        switch result {
+        case .started(let expiresAt):
+            let timeText = expiresAt.formatted(date: .omitted, time: .shortened)
+            return .result(dialog: IntentDialog(stringLiteral: "Excursion mode is active until \(timeText)."))
+        case .blocked(let blockers):
+            let details = blockers.map(\.message).joined(separator: " ")
+            return .result(dialog: IntentDialog(stringLiteral: "Excursion mode could not start. \(details)"))
         }
-
-        let timeText = expirationDate.formatted(date: .omitted, time: .shortened)
-        return .result(dialog: IntentDialog(stringLiteral: "Excursion mode is active until \(timeText)."))
     }
 }
 

@@ -46,7 +46,7 @@ final class ShoppingModeSuggestionService {
             return
         }
 
-        var map = (defaults.dictionary(forKey: Key.lastFiredByMerchant) as? [String: Double]) ?? [:]
+        let map = (defaults.dictionary(forKey: Key.lastFiredByMerchant) as? [String: Double]) ?? [:]
         let lastMerchantFire = map[merchant.id].map(Date.init(timeIntervalSince1970:))
 
         if let lastMerchantFire,
@@ -55,53 +55,34 @@ final class ShoppingModeSuggestionService {
             return
         }
 
-        map[merchant.id] = now.timeIntervalSince1970
-        defaults.set(map, forKey: Key.lastFiredByMerchant)
-        defaults.set(now.timeIntervalSince1970, forKey: Key.lastGlobalFireAt)
-
         Task { @MainActor in
             let service = LocalNotificationService()
-            try? await service.scheduleShoppingModeSuggestionNotification(merchantName: merchant.name)
+            do {
+                try await service.scheduleShoppingModeSuggestionNotification(merchantName: merchant.name)
+                self.recordSuccessfulFire(merchantID: merchant.id, now: now)
+            } catch {
+                debugLog("Suggestion scheduling failed for \(merchant.name): \(error.localizedDescription)")
+            }
         }
     }
 
     #if canImport(CoreLocation)
     @discardableResult
-    func sendStartupNudgeIfEligible(
-        merchants: [ShoppingModeMerchant],
-        userCoordinate: CLLocationCoordinate2D,
+    func sendStartupNudge(
+        merchant: ShoppingModeMerchant,
         sessionID: String?,
         now: Date = .now
-    ) -> ShoppingModeMerchant? {
-        guard ShoppingModeTuning.startupNudgeEnabled else {
-            debugLog("Startup nudge suppressed: disabled by tuning")
-            return nil
-        }
-
-        guard let sessionID else { return nil }
-        guard SpendingSessionStore.isActive(now: now) else { return nil }
+    ) -> Bool {
+        guard let sessionID else { return false }
+        guard SpendingSessionStore.isActive(now: now) else { return false }
 
         if defaults.string(forKey: Key.startupNudgedSessionID) == sessionID {
-            return nil
+            return false
         }
 
-        let userLocation = CLLocation(latitude: userCoordinate.latitude, longitude: userCoordinate.longitude)
-        let closestEligible = merchants
-            .compactMap { merchant -> (ShoppingModeMerchant, CLLocationDistance)? in
-                let merchantLocation = CLLocation(latitude: merchant.latitude, longitude: merchant.longitude)
-                let distance = userLocation.distance(from: merchantLocation)
-                let threshold = min(max(merchant.radiusMeters, 120), 220)
-                guard distance <= threshold else { return nil }
-                return (merchant, distance)
-            }
-            .min(by: { $0.1 < $1.1 })?
-            .0
-
-        guard let closestEligible else { return nil }
-
         defaults.set(sessionID, forKey: Key.startupNudgedSessionID)
-        handleRegionEntry(merchant: closestEligible, now: now)
-        return closestEligible
+        handleRegionEntry(merchant: merchant, now: now)
+        return true
     }
     #endif
 
@@ -109,6 +90,13 @@ final class ShoppingModeSuggestionService {
         let raw = defaults.double(forKey: Key.lastGlobalFireAt)
         guard raw > 0 else { return nil }
         return Date(timeIntervalSince1970: raw)
+    }
+
+    private func recordSuccessfulFire(merchantID: String, now: Date) {
+        var map = (defaults.dictionary(forKey: Key.lastFiredByMerchant) as? [String: Double]) ?? [:]
+        map[merchantID] = now.timeIntervalSince1970
+        defaults.set(map, forKey: Key.lastFiredByMerchant)
+        defaults.set(now.timeIntervalSince1970, forKey: Key.lastGlobalFireAt)
     }
 
     private func debugLog(_ message: String) {

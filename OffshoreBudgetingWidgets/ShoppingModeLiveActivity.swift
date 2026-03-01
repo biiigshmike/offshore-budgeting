@@ -28,20 +28,16 @@ struct ShoppingModeLiveActivity: Widget {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.white)
             } compactTrailing: {
-                CompactCountdownText(endDate: context.state.endDate)
+                CompactCountdownText(
+                    startDate: context.attributes.startDate,
+                    endDate: context.state.endDate
+                )
                     .foregroundStyle(.white)
+                    .frame(width: 40, alignment: .trailing)
             } minimal: {
-                ViewThatFits {
-                    HStack(spacing: 2) {
-                        Image(systemName: "sailboat.fill")
-                            .font(.caption2.weight(.semibold))
-                        MinimalCountdownText(endDate: context.state.endDate)
-                    }
+                Image(systemName: "sailboat.fill")
+                    .font(.caption2.weight(.semibold))
                     .foregroundStyle(.white)
-
-                    Image(systemName: "sailboat.fill")
-                        .foregroundStyle(.white)
-                }
             }
         }
     }
@@ -394,7 +390,7 @@ private struct CountdownRing: View {
     let progressColor: Color
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { context in
+        TimelineView(.periodic(from: .now, by: 60)) { context in
             let progress = ringProgress(now: context.date)
 
             ZStack {
@@ -426,45 +422,19 @@ private struct LockScreenRingTimerText: View {
     let endDate: Date
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { context in
-            ViewThatFits(in: .horizontal) {
-                Text(lockScreenHourMinuteSecondText(now: context.date))
-                Text(lockScreenHourMinuteText(now: context.date))
-                Text(lockScreenMinuteSecondText(now: context.date))
-            }
-            .font(.system(size: 14, weight: .medium, design: .rounded))
-            .monospacedDigit()
-            .lineLimit(1)
-            .foregroundStyle(ShoppingModeLiveActivityPalette.primaryText)
-            .minimumScaleFactor(0.8)
-            .frame(maxWidth: 52)
-        }
-    }
-
-    private func lockScreenHourMinuteSecondText(now: Date) -> String {
-        let totalSeconds = max(0, Int(ceil(endDate.timeIntervalSince(now))))
-        let hours = totalSeconds / 3600
-        let minutes = (totalSeconds % 3600) / 60
-        let seconds = totalSeconds % 60
-        let minuteText = minutes < 10 ? "0\(minutes)" : "\(minutes)"
-        let secondText = seconds < 10 ? "0\(seconds)" : "\(seconds)"
-        return "\(hours):\(minuteText):\(secondText)"
-    }
-
-    private func lockScreenHourMinuteText(now: Date) -> String {
-        let totalSeconds = max(0, Int(ceil(endDate.timeIntervalSince(now))))
-        let hours = totalSeconds / 3600
-        let minutes = (totalSeconds % 3600) / 60
-        let minuteText = minutes < 10 ? "0\(minutes)" : "\(minutes)"
-        return "\(hours):\(minuteText)"
-    }
-
-    private func lockScreenMinuteSecondText(now: Date) -> String {
-        let totalSeconds = max(0, Int(ceil(endDate.timeIntervalSince(now))))
-        let minutes = totalSeconds / 60
-        let seconds = totalSeconds % 60
-        let secondText = seconds < 10 ? "0\(seconds)" : "\(seconds)"
-        return "\(minutes):\(secondText)"
+        Text(
+            timerInterval: Date.now...endDate,
+            pauseTime: nil,
+            countsDown: true,
+            showsHours: true
+        )
+        .font(.system(size: 14, weight: .medium, design: .rounded))
+        .monospacedDigit()
+        .lineLimit(1)
+        .foregroundStyle(ShoppingModeLiveActivityPalette.primaryText)
+        .minimumScaleFactor(0.8)
+        .multilineTextAlignment(.center)
+        .frame(width: 52, alignment: .center)
     }
 }
 
@@ -476,113 +446,41 @@ private struct ExpandedRingTimerText: View {
     let maxWidth: CGFloat
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { context in
-            ViewThatFits(in: .horizontal) {
-                Text(expandedHourMinuteSecondText(now: context.date))
-                Text(expandedHourMinuteText(now: context.date))
-                Text(expandedMinuteSecondText(now: context.date))
-            }
-            .font(.system(size: fontSize, weight: .semibold, design: .rounded))
-            .monospacedDigit()
-            .lineLimit(1)
-            .foregroundStyle(ShoppingModeLiveActivityPalette.primaryText)
-            .minimumScaleFactor(0.8)
-            .frame(maxWidth: maxWidth)
-        }
-    }
-
-    private func expandedHourMinuteSecondText(now: Date) -> String {
-        let totalSeconds = max(0, Int(ceil(endDate.timeIntervalSince(now))))
-        let hours = totalSeconds / 3600
-        let minutes = (totalSeconds % 3600) / 60
-        let seconds = totalSeconds % 60
-        let minuteText = minutes < 10 ? "0\(minutes)" : "\(minutes)"
-        let secondText = seconds < 10 ? "0\(seconds)" : "\(seconds)"
-        return "\(hours):\(minuteText):\(secondText)"
-    }
-
-    private func expandedHourMinuteText(now: Date) -> String {
-        let totalSeconds = max(0, Int(ceil(endDate.timeIntervalSince(now))))
-        let hours = totalSeconds / 3600
-        let minutes = (totalSeconds % 3600) / 60
-        let minuteText = minutes < 10 ? "0\(minutes)" : "\(minutes)"
-        return "\(hours):\(minuteText)"
-    }
-
-    private func expandedMinuteSecondText(now: Date) -> String {
-        let totalSeconds = max(0, Int(ceil(endDate.timeIntervalSince(now))))
-        let minutes = totalSeconds / 60
-        let seconds = totalSeconds % 60
-        let secondText = seconds < 10 ? "0\(seconds)" : "\(seconds)"
-        return "\(minutes):\(secondText)"
-    }
-}
-
-// MARK: - MinimalCountdownText
-
-private struct MinimalCountdownText: View {
-    let endDate: Date
-
-    var body: some View {
-        TimelineView(.periodic(from: .now, by: 60)) { context in
-            Text(shortRemainingText(now: context.date))
-                .font(.caption2.weight(.semibold))
-                .monospacedDigit()
-                .foregroundStyle(.white)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-        }
-    }
-
-    private func shortRemainingText(now: Date) -> String {
-        let remaining = max(0, endDate.timeIntervalSince(now))
-        if remaining <= 0 {
-            return "0m"
-        }
-        let totalMinutes = max(0, Int(ceil(remaining / 60)))
-        let hours = totalMinutes / 60
-        let minutes = totalMinutes % 60
-
-        if hours > 0 {
-            if minutes >= 30 {
-                return "\(hours + 1)h"
-            }
-            return "\(hours)h"
-        }
-        return "\(max(1, minutes))m"
+        Text(
+            timerInterval: Date.now...endDate,
+            pauseTime: nil,
+            countsDown: true,
+            showsHours: true
+        )
+        .font(.system(size: fontSize, weight: .semibold, design: .rounded))
+        .monospacedDigit()
+        .lineLimit(1)
+        .foregroundStyle(ShoppingModeLiveActivityPalette.primaryText)
+        .minimumScaleFactor(0.8)
+        .multilineTextAlignment(.center)
+        .frame(width: maxWidth, alignment: .center)
     }
 }
 
 // MARK: - CompactCountdownText
 
 private struct CompactCountdownText: View {
+    let startDate: Date
     let endDate: Date
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { context in
-            Text(compactRemainingText(now: context.date))
-                .monospacedDigit()
-                .font(.caption2.weight(.semibold))
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-                .foregroundStyle(.white)
-        }
-    }
-
-    private func compactRemainingText(now: Date) -> String {
-        let remaining = max(0, endDate.timeIntervalSince(now))
-        let totalSeconds = Int(remaining.rounded(.up))
-        let hours = totalSeconds / 3600
-        let minutes = (totalSeconds % 3600) / 60
-        let seconds = totalSeconds % 60
-
-        if hours > 0 {
-            let minuteText = minutes < 10 ? "0\(minutes)" : "\(minutes)"
-            return "\(hours):\(minuteText)"
-        }
-
-        let secondText = seconds < 10 ? "0\(seconds)" : "\(seconds)"
-        return "\(minutes):\(secondText)"
+        Text(
+            timerInterval: startDate...endDate,
+            pauseTime: nil,
+            countsDown: true,
+            showsHours: false
+        )
+        .monospacedDigit()
+        .font(.caption2.weight(.semibold))
+        .lineLimit(1)
+        .minimumScaleFactor(0.7)
+        .foregroundStyle(.white)
+        .frame(width: 34, alignment: .trailing)
     }
 }
 #endif

@@ -142,13 +142,13 @@ struct SettingsNotificationsView: View {
 
                     Menu("Start Excursion Mode") {
                         Button("1 hour") {
-                            shoppingModeManager.start(hours: 1)
+                            Task { await startExcursionMode(hours: 1) }
                         }
                         Button("2 hours") {
-                            shoppingModeManager.start(hours: 2)
+                            Task { await startExcursionMode(hours: 2) }
                         }
                         Button("4 hours") {
-                            shoppingModeManager.start(hours: 4)
+                            Task { await startExcursionMode(hours: 4) }
                         }
                     }
                 }
@@ -377,6 +377,17 @@ struct SettingsNotificationsView: View {
                 showingErrorAlert = true
                 return
             }
+        }
+    }
+
+    private func startExcursionMode(hours: Int) async {
+        let result = await shoppingModeManager.start(hours: hours)
+        switch result {
+        case .started:
+            return
+        case .blocked(let blockers):
+            errorMessage = blockers.map(\.message).joined(separator: "\n")
+            showingErrorAlert = true
         }
     }
 

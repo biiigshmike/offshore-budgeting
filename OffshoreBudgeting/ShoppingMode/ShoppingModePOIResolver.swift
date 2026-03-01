@@ -22,7 +22,6 @@ final class ShoppingModePOIResolver {
     private struct Candidate {
         let merchant: ShoppingModeMerchant
         let distanceMeters: CLLocationDistance
-        let score: Double
         let seedHits: Int
         let categoryBonus: Double
     }
@@ -59,77 +58,136 @@ final class ShoppingModePOIResolver {
         var accumulators: [CandidateAccumulator] = []
 
         for seed in seeds {
-            let request = MKLocalSearch.Request()
-            request.naturalLanguageQuery = seed.query
-            request.resultTypes = .pointOfInterest
-            request.region = MKCoordinateRegion(
+            let response = await runLocalSearch(
+                query: seed.query,
                 center: center,
-                latitudinalMeters: searchRadiusMeters,
-                longitudinalMeters: searchRadiusMeters
+                searchRadiusMeters: searchRadiusMeters
             )
-
-            guard let response = try? await MKLocalSearch(request: request).start() else {
-                continue
-            }
-
-            for item in response.mapItems {
-                let name = item.name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                guard !name.isEmpty else { continue }
-
-                let coordinate = item.placemark.coordinate
-                guard CLLocationCoordinate2DIsValid(coordinate) else { continue }
-
-                let normalizedName = normalizeName(name)
-                if let idx = existingAccumulatorIndex(
-                    in: accumulators,
-                    normalizedName: normalizedName,
-                    coordinate: coordinate
-                ) {
-                    accumulators[idx].matchedSeedQueries.insert(seed.query)
-                    accumulators[idx].radiusMeters = min(accumulators[idx].radiusMeters, seed.radiusMeters)
-                    accumulators[idx].categoryHint = preferredCategoryHint(
-                        existing: accumulators[idx].categoryHint,
-                        incoming: seed.categoryHint
-                    )
-                } else {
-                    accumulators.append(
-                        CandidateAccumulator(
-                            name: name,
-                            normalizedName: normalizedName,
-                            coordinate: coordinate,
-                            radiusMeters: seed.radiusMeters,
-                            categoryHint: seed.categoryHint,
-                            matchedSeedQueries: [seed.query]
-                        )
-                    )
-                }
-            }
+            absorb(
+                responseItems: response,
+                into: &accumulators,
+                seedQuery: seed.query,
+                seedCategoryHint: seed.categoryHint,
+                seedRadiusMeters: seed.radiusMeters
+            )
         }
+
+        // I add a generic POI sweep so we do not miss nearby places that seed terms fail to capture.
+        let genericResponse = await runLocalSearch(
+            query: nil,
+            center: center,
+            searchRadiusMeters: searchRadiusMeters
+        )
+        absorb(
+            responseItems: genericResponse,
+            into: &accumulators,
+            seedQuery: nil,
+            seedCategoryHint: "General",
+            seedRadiusMeters: 140
+        )
 
         let candidates = accumulators.map { accumulator in
-            makeCandidate(from: accumulator, center: center, searchRadiusMeters: searchRadiusMeters)
+            makeCandidate(from: accumulator, center: center)
         }
 
-        let sorted = candidates.sorted { lhs, rhs in
-            if lhs.score == rhs.score {
-                return lhs.distanceMeters < rhs.distanceMeters
-            }
-            return lhs.score > rhs.score
-        }
+        let sorted = sortCandidatesNearestFirst(candidates)
 
-        for candidate in sorted.prefix(10) {
+        for (index, candidate) in sorted.prefix(10).enumerated() {
             debugLog(
-                "Candidate -> \(candidate.merchant.name) distance=\(Int(candidate.distanceMeters))m score=\(String(format: "%.1f", candidate.score)) seedHits=\(candidate.seedHits) categoryBonus=\(Int(candidate.categoryBonus))"
+                "Rank \(index + 1) -> \(candidate.merchant.name) distance=\(Int(candidate.distanceMeters))m seedHits=\(candidate.seedHits) categoryBonus=\(Int(candidate.categoryBonus))"
             )
         }
 
         return Array(sorted.prefix(maxResults).map(\.merchant))
     }
 
-    private func makeCandidate(
-        from accumulator: CandidateAccumulator,
+    private func runLocalSearch(
+        query: String?,
         center: CLLocationCoordinate2D,
         searchRadiusMeters: Double
+    ) async -> [MKMapItem] {
+        let request = MKLocalSearch.Request()
+        request.naturalLanguageQuery = query
+        request.resultTypes = .pointOfInterest
+        request.region = MKCoordinateRegion(
+            center: center,
+            latitudinalMeters: searchRadiusMeters,
+            longitudinalMeters: searchRadiusMeters
+        )
+
+        guard let response = try? await MKLocalSearch(request: request).start() else {
+            return []
+        }
+
+        return response.mapItems
+    }
+
+    private func absorb(
+        responseItems: [MKMapItem],
+        into accumulators: inout [CandidateAccumulator],
+        seedQuery: String?,
+        seedCategoryHint: String,
+        seedRadiusMeters: Double
+    ) {
+        for item in responseItems {
+            let name = item.name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            guard !name.isEmpty else { continue }
+
+            let coordinate = item.placemark.coordinate
+            guard CLLocationCoordinate2DIsValid(coordinate) else { continue }
+
+            let normalizedName = normalizeName(name)
+            if let idx = existingAccumulatorIndex(
+                in: accumulators,
+                normalizedName: normalizedName,
+                coordinate: coordinate
+            ) {
+                if let seedQuery {
+                    accumulators[idx].matchedSeedQueries.insert(seedQuery)
+                }
+                accumulators[idx].radiusMeters = min(accumulators[idx].radiusMeters, seedRadiusMeters)
+                accumulators[idx].categoryHint = preferredCategoryHint(
+                    existing: accumulators[idx].categoryHint,
+                    incoming: seedCategoryHint
+                )
+            } else {
+                var matches: Set<String> = []
+                if let seedQuery {
+                    matches.insert(seedQuery)
+                }
+
+                accumulators.append(
+                    CandidateAccumulator(
+                        name: name,
+                        normalizedName: normalizedName,
+                        coordinate: coordinate,
+                        radiusMeters: seedRadiusMeters,
+                        categoryHint: seedCategoryHint,
+                        matchedSeedQueries: matches
+                    )
+                )
+            }
+        }
+    }
+
+    private func sortCandidatesNearestFirst(_ candidates: [Candidate]) -> [Candidate] {
+        candidates.sorted { lhs, rhs in
+            if lhs.distanceMeters != rhs.distanceMeters {
+                return lhs.distanceMeters < rhs.distanceMeters
+            }
+            if lhs.seedHits != rhs.seedHits {
+                return lhs.seedHits > rhs.seedHits
+            }
+            if lhs.categoryBonus != rhs.categoryBonus {
+                return lhs.categoryBonus > rhs.categoryBonus
+            }
+            return lhs.merchant.name.localizedCaseInsensitiveCompare(rhs.merchant.name) == .orderedAscending
+        }
+    }
+
+    private func makeCandidate(
+        from accumulator: CandidateAccumulator,
+        center: CLLocationCoordinate2D
     ) -> Candidate {
         let merchant = ShoppingModeMerchant(
             id: makeMerchantID(
@@ -146,16 +204,10 @@ final class ShoppingModePOIResolver {
 
         let distance = distanceMeters(from: center, to: merchant)
         let categoryBonus = categoryRelevanceScore(for: accumulator.categoryHint)
-        let seedHitBonus = min(Double(max(0, accumulator.matchedSeedQueries.count - 1)) * 12, 24)
-
-        let normalizedDistance = min(max(distance / max(searchRadiusMeters, 1), 0), 1)
-        let distanceScore = (1 - normalizedDistance) * 100
-        let finalScore = distanceScore + categoryBonus + seedHitBonus
 
         return Candidate(
             merchant: merchant,
             distanceMeters: distance,
-            score: finalScore,
             seedHits: accumulator.matchedSeedQueries.count,
             categoryBonus: categoryBonus
         )
