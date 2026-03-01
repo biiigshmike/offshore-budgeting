@@ -131,12 +131,22 @@ struct CardsView: View {
         }
         .postBoardingTip(
             key: "tip.cards.v1",
-            title: "Cards",
+            title: "Accounts",
             items: [
                 PostBoardingTipItem(
                     systemImage: "creditcard.fill",
                     title: "Cards",
-                    detail: "Browse stored cards. Single press to open a card to add expense and to view and filter spending. Long press a card to edit or delete it."
+                    detail: "Manage your credit and debit cards. Open a card to track spending, add expenses, and review card activity."
+                ),
+                PostBoardingTipItem(
+                    systemImage: "person.2.fill",
+                    title: "Reconciliations",
+                    detail: "Use Reconciliations to track shared balances, split amounts, and settle up clearly."
+                ),
+                PostBoardingTipItem(
+                    systemImage: "banknote.fill",
+                    title: "Savings",
+                    detail: "Use Savings to record deposits and withdrawals so your savings progress stays visible over time."
                 )
             ]
         )
