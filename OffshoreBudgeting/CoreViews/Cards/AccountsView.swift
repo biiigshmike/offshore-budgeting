@@ -42,6 +42,7 @@ struct AccountsView: View {
 
     @AppStorage("sort.cards.mode") private var cardsSortModeRaw: String = "az"
     @AppStorage("sort.sharedBalances.mode") private var sharedBalancesSortModeRaw: String = "az"
+    @AppStorage(AppShortcutNavigationStore.pendingAccountsSegmentKey) private var pendingAccountsSegmentRaw: String = ""
 
     @Environment(\.appCommandHub) private var commandHub
 
@@ -111,7 +112,11 @@ struct AccountsView: View {
             }
         }
         .onAppear {
+            consumePendingAccountsSegmentIfNeeded()
             updateCommandSurface()
+        }
+        .onChange(of: pendingAccountsSegmentRaw) { _, _ in
+            consumePendingAccountsSegmentIfNeeded()
         }
         .onChange(of: selectedSegment) { _, _ in
             if isSegmentControlExpanded {
@@ -141,6 +146,17 @@ struct AccountsView: View {
         case .savings:
             commandHub.deactivate(.cards)
         }
+    }
+
+    private func consumePendingAccountsSegmentIfNeeded() {
+        let pending = pendingAccountsSegmentRaw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !pending.isEmpty else { return }
+
+        if let segment = Segment(pendingSegmentRaw: pending) {
+            selectedSegment = segment
+        }
+
+        pendingAccountsSegmentRaw = ""
     }
 
     @ViewBuilder
@@ -271,6 +287,21 @@ struct AccountsView: View {
 
     private var navigationTitleText: String {
         selectedSegment.rawValue
+    }
+}
+
+private extension AccountsView.Segment {
+    init?(pendingSegmentRaw: String) {
+        switch pendingSegmentRaw {
+        case AppShortcutNavigationStore.PendingAccountsSegment.cards.rawValue:
+            self = .cards
+        case AppShortcutNavigationStore.PendingAccountsSegment.sharedBalances.rawValue:
+            self = .sharedBalances
+        case AppShortcutNavigationStore.PendingAccountsSegment.savings.rawValue:
+            self = .savings
+        default:
+            return nil
+        }
     }
 }
 

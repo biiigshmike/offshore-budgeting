@@ -3,6 +3,12 @@ import SwiftData
 import Charts
 
 struct SavingsAccountView: View {
+    private enum SavingsTrendMode: String, CaseIterable, Identifiable {
+        case runningTotal = "Running Total"
+        case currentPeriod = "Current Period"
+
+        var id: String { rawValue }
+    }
 
     let workspace: Workspace
 
@@ -31,6 +37,7 @@ struct SavingsAccountView: View {
     @State private var searchText: String = ""
     @FocusState private var searchFocused: Bool
     @State private var lastHandledCommandSequence: Int? = nil
+    @State private var selectedTrendMode: SavingsTrendMode = .runningTotal
 
     init(workspace: Workspace) {
         self.workspace = workspace
@@ -88,7 +95,7 @@ struct SavingsAccountView: View {
         account?.total ?? 0
     }
 
-    private var chartPoints: [SavingsChartPoint] {
+    private var currentPeriodChartPoints: [SavingsChartPoint] {
         let rangeStart = normalizedStart(appliedStartDate)
         let rangeEnd = normalizedEnd(appliedEndDate)
 
@@ -125,6 +132,42 @@ struct SavingsAccountView: View {
             .map { day in
                 SavingsChartPoint(date: day, total: totalsByDay[day] ?? 0)
             }
+    }
+
+    private var runningTotalChartPoints: [SavingsChartPoint] {
+        let entriesAsc = accountScopedEntries.sorted { lhs, rhs in
+            if lhs.date == rhs.date {
+                return lhs.createdAt < rhs.createdAt
+            }
+            return lhs.date < rhs.date
+        }
+
+        guard !entriesAsc.isEmpty else { return [] }
+
+        var runningTotal: Double = 0
+        var totalsByDay: [Date: Double] = [:]
+
+        for entry in entriesAsc {
+            runningTotal += entry.amount
+            let day = Calendar.current.startOfDay(for: entry.date)
+            totalsByDay[day] = runningTotal
+        }
+
+        return totalsByDay
+            .keys
+            .sorted()
+            .map { day in
+                SavingsChartPoint(date: day, total: totalsByDay[day] ?? 0)
+            }
+    }
+
+    private var activeChartPoints: [SavingsChartPoint] {
+        switch selectedTrendMode {
+        case .runningTotal:
+            return runningTotalChartPoints
+        case .currentPeriod:
+            return currentPeriodChartPoints
+        }
     }
 
     var body: some View {
@@ -250,15 +293,28 @@ struct SavingsAccountView: View {
             Text("Savings Trend")
                 .font(.headline.weight(.semibold))
 
-            if chartPoints.isEmpty {
+            Picker("Trend", selection: $selectedTrendMode) {
+                ForEach(SavingsTrendMode.allCases) { mode in
+                    Text(mode.rawValue).tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
+            .accessibilityLabel("Savings Trend Mode")
+
+            if activeChartPoints.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("No savings history in this date range.")
-                    Text("Running Total still reflects your full ledger balance.")
+                    if selectedTrendMode == .runningTotal {
+                        Text("No savings history yet.")
+                        Text("Add savings entries to start your running total trend.")
+                    } else {
+                        Text("No savings history in this date range.")
+                        Text("Running Total still reflects your full ledger balance.")
+                    }
                 }
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, minHeight: 200, alignment: .topLeading)
             } else {
-                Chart(chartPoints) { point in
+                Chart(activeChartPoints) { point in
                     LineMark(
                         x: .value("Date", point.date),
                         y: .value("Total", point.total)

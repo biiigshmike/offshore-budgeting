@@ -4,10 +4,17 @@ import Foundation
 
 enum AppShortcutNavigationStore {
     static let pendingSectionKey = "shortcuts_pendingSection"
+    static let pendingAccountsSegmentKey = "shortcuts_pendingAccountsSegment"
     static let pendingActionKey = "shortcuts_pendingAction"
     static let pendingImportClipboardTextKey = "shortcuts_pendingImportClipboardText"
     static let pendingImportCardIDKey = "shortcuts_pendingImportCardID"
     static let pendingExpenseDescriptionKey = "shortcuts_pendingExpenseDescription"
+
+    enum PendingAccountsSegment: String {
+        case cards = "cards"
+        case sharedBalances = "shared_balances"
+        case savings = "savings"
+    }
 
     enum PendingAction: String {
         case openIncomeImportReview = "open_income_import_review"

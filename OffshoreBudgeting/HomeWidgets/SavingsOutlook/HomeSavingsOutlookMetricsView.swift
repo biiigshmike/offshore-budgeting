@@ -89,19 +89,23 @@ struct HomeSavingsOutlookMetricsView: View {
                     accent: accent
                 )
 
-                NavigationLink {
-                    SavingsAccountView(workspace: workspace)
-                } label: {
-                    HStack {
-                        Text("Open Savings Account")
-                            .foregroundStyle(.primary)
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .foregroundStyle(.secondary)
+                if #available(iOS 26.0, macCatalyst 26.0, *) {
+                    Button {
+                        routeToAccountsSavings()
+                    } label: {
+                        openSavingsAccountLabel
                     }
-                    .padding(.vertical, 8)
+                    .buttonStyle(.glassProminent)
+                    .tint(Color("AccentColor"))
+                } else {
+                    Button {
+                        routeToAccountsSavings()
+                    } label: {
+                        openSavingsAccountLabel
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Color("AccentColor"))
                 }
-                .buttonStyle(.plain)
 
                 Spacer(minLength: 12)
             }
@@ -157,6 +161,24 @@ struct HomeSavingsOutlookMetricsView: View {
             Text(value, format: CurrencyFormatter.currencyStyle())
                 .font(.title3.weight(.semibold))
         }
+    }
+
+    private var openSavingsAccountLabel: some View {
+        HStack {
+            Text("Open Savings Account")
+        }
+        .frame(maxWidth: .infinity, minHeight: 44)
+    }
+
+    private func routeToAccountsSavings() {
+        UserDefaults.standard.set(
+            AppShortcutNavigationStore.PendingAccountsSegment.savings.rawValue,
+            forKey: AppShortcutNavigationStore.pendingAccountsSegmentKey
+        )
+        UserDefaults.standard.set(
+            AppSection.cards.rawValue,
+            forKey: AppShortcutNavigationStore.pendingSectionKey
+        )
     }
 
     // MARK: - Picker
