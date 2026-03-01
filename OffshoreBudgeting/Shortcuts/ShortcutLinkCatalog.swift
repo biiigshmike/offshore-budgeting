@@ -17,15 +17,6 @@ struct ShortcutLinkItem: Identifiable {
 enum ShortcutLinkCatalog {
     static let shortcuts: [ShortcutLinkItem] = [
         ShortcutLinkItem(
-            id: "add-expense",
-            title: "Add Expense to Offshore",
-            subtitle: "Quickly log a new expense from Control Center or Lock Screen.",
-            systemImageName: "creditcard.fill",
-            url: URL(string: "https://www.icloud.com/shortcuts/5284c3fd6597408d9db06ad74371dc98")!,
-            platformNote: nil,
-            setupInstructions: nil
-        ),
-        ShortcutLinkItem(
             id: "start-excursion-mode",
             title: "Start Excursion Mode",
             subtitle: "Start your spending session with one tap.",
@@ -33,28 +24,10 @@ enum ShortcutLinkCatalog {
             url: URL(string: "https://www.icloud.com/shortcuts/c20b32cc454345558fb828e679aec1f7")!,
             platformNote: nil,
             setupInstructions: nil
-        ),
-        ShortcutLinkItem(
-            id: "add-income",
-            title: "Add Income to Offshore",
-            subtitle: "Quickly log an income entry.",
-            systemImageName: "dollarsign",
-            url: URL(string: "https://www.icloud.com/shortcuts/aab8aa44d1294828bf966b79c0178b44")!,
-            platformNote: nil,
-            setupInstructions: nil
         )
     ]
 
     static let triggerShortcuts: [ShortcutLinkItem] = [
-        ShortcutLinkItem(
-            id: "tap-apple-card",
-            title: "Add Expense From Tap To Pay",
-            subtitle: "Install this shortcut, then run it from your Wallet pass or payment card automation.",
-            systemImageName: "wallet.bifold",
-            url: URL(string: "https://www.icloud.com/shortcuts/489287c73246442086c7c8cb2d77ac4a")!,
-            platformNote: "Supported on: iPhone",
-            setupInstructions: "When I tap any Wallet pass or payment card -> Run Immediately -> Create New Shortcut -> Search for \"Run Shortcut\" -> Add Expense From Tap To Pay -> Down Arrow -> Input: Choose Variable -> Shortcut Input -> Save."
-        ),
         ShortcutLinkItem(
             id: "amazon-ordered",
             title: "Add Amazon Expense From Amazon.com",

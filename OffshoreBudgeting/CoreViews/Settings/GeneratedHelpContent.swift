@@ -447,27 +447,54 @@ enum GeneratedHelpContent {
                 textSection(
                     id: "introduction-quick-actions-1",
                     header: "What Quick Actions Are",
-                    body: "Quick Actions are optional Apple Shortcuts that speed up repeat workflows like logging income or expenses from triggers you already see every day. They reduce taps, improve consistency, and make capture feel less manual.\n\nOffshore still works fully without automations, so this is an efficiency layer, not a requirement. If you want to scale your setup over time, start with one or two automations and add the rest after they are working reliably."
+                    body: "Quick Actions are optional Apple Shortcuts that make repeat tasks faster. Offshore works fully without them, so treat automations as a convenience layer.\n\nFor Tap-to-Pay logging, setup is per device. Build and test the automation on each device where you want it to run."
                 ),
                 textSection(
                     id: "introduction-quick-actions-2",
-                    header: "Where To Set Them Up",
-                    body: "Open Quick Actions in Settings to install each Offshore shortcut first. Then open Apple Shortcuts and create a personal automation that runs the matching Offshore shortcut.\n\nFor each automation, the core mapping step is the same after you choose \"Run Shortcut\": press the Down Arrow, set Input to Choose Variable, then choose Shortcut Input. This makes sure trigger text gets passed into the Offshore shortcut correctly."
+                    header: "Recommended Setup Pattern",
+                    body: "For best control, create one transaction automation per card and per category. Example: Apple Card + Food & Drink is one automation, then Apple Card + Transportation is another.\n\nThis avoids category confusion and keeps behavior predictable."
                 ),
-                textSection(
+                mediaSection(
                     id: "introduction-quick-actions-3",
-                    header: "How To Use Them Safely",
-                    body: "Use these literal trigger setups once the matching shortcuts are installed:\n\nExpense automations:\n\n1. Add Expense From Tap To Pay\nTrigger: When I tap any Wallet pass or payment card.\nSetup:\n- Run Immediately.\n- Create New Shortcut.\n- Search for \"Run Shortcut\".\n- Choose \"Add Expense From Tap To Pay\".\n- Press the Down Arrow.\n- Set Input to Choose Variable.\n- Choose \"Shortcut Input\".\n- Save.\n\n2. Add Amazon Expense From Amazon.com\nTrigger: When I get an email with subject containing \"Ordered:\" from auto-confirm@amazon.com.\nSetup:\n- Run Immediately.\n- Create New Shortcut.\n- Search for \"Run Shortcut\".\n- Choose \"Add Amazon Expense From Amazon.com\".\n- Press the Down Arrow.\n- Set Input to Choose Variable.\n- Choose \"Shortcut Input\".\n- Save.\n\nIncome automations:\n\n3. Add Income From An Email\nTrigger: When I get an email with subject containing \"credited to your account\".\nSetup:\n- Run Immediately.\n- Create New Shortcut.\n- Search for \"Run Shortcut\".\n- Choose \"Add Income From An Email\".\n- Press the Down Arrow.\n- Set Input to Choose Variable.\n- Choose \"Shortcut Input\".\n- Save.\n\n4. Add Income From An SMS Message\nTrigger: When message contains \"credited to your account ending in x1234\".\nSetup:\n- Run Immediately.\n- Create New Shortcut.\n- Search for \"Run Shortcut\".\n- Choose \"Add Income From An SMS Message\".\n- Press the Down Arrow.\n- Set Input to Choose Variable.\n- Choose \"Shortcut Input\".\n- Save."
-                ),
-                textSection(
-                    id: "introduction-quick-actions-4",
-                    header: "Verify Reliability",
-                    body: "After setup, test each automation once with realistic input and verify the created record in Offshore immediately. Confirm destination, amount parsing, and category behavior before you trust daily usage.\n\nIf one automation fails, simplify and retest that single flow before changing others. Reliable automation should feel boring and predictable once it is configured correctly."
+                    header: "Tap To Pay Automation Steps",
+                    body: "Use this sequence in Apple Shortcuts:\n\n1. Open Shortcuts > Automation > Create Personal Automation > Transaction.\n2. Under When I tap, select one card and deselect the others.\n3. Select one category and deselect the others.\n4. Leave merchants unfiltered unless you want stricter control.\n5. Set Run Immediately.\n6. Tap Next, then tap Create New Shortcut.\n7. Search actions for Offshore \"Add Expense\" and add it.\n8. In Amount, choose Select Variable > Shortcut Input, then tap the token and switch detail from Transaction to Amount.\n9. In Card, choose the fixed card used for this automation.\n10. In Category, choose the fixed Offshore category for this automation.\n11. In Merchant, choose Select Variable > Shortcut Input, then switch detail to Merchant.\n12. In Date, choose Current Date.\n13. Turn off Show When Run, then save.\n14. Repeat this pattern for the remaining card/category combinations you want.",
+                    media: [
+                        mediaItem(
+                            id: "introduction-quick-actions-3-image-1",
+                            assetName: "Help/CoreScreens/Settings/Quick Actions/tap-automation-1",
+                            bodyText: "Open the Transaction automation trigger and start a new personal automation. This is where Tap-to-Pay setup begins for a device.",
+                            fullscreenCaptionText: "Start with Transaction automation."
+                        ),
+                        mediaItem(
+                            id: "introduction-quick-actions-3-image-2",
+                            assetName: "Help/CoreScreens/Settings/Quick Actions/tap-automation-2",
+                            bodyText: "Select one card and one category only. Deselect the rest so each automation has a clear purpose.",
+                            fullscreenCaptionText: "Use one card and one category per automation."
+                        ),
+                        mediaItem(
+                            id: "introduction-quick-actions-3-image-3",
+                            assetName: "Help/CoreScreens/Settings/Quick Actions/tap-automation-3",
+                            bodyText: "Add Offshore Add Expense and map Amount from Shortcut Input. Ensure the token detail shows Amount, not Transaction.",
+                            fullscreenCaptionText: "Map Amount from Shortcut Input."
+                        ),
+                        mediaItem(
+                            id: "introduction-quick-actions-3-image-4",
+                            assetName: "Help/CoreScreens/Settings/Quick Actions/tap-automation-4",
+                            bodyText: "Map Merchant from Shortcut Input and set Date to Current Date. Set Card and Category as fixed values for this automation.",
+                            fullscreenCaptionText: "Map Merchant and set Current Date."
+                        ),
+                        mediaItem(
+                            id: "introduction-quick-actions-3-image-5",
+                            assetName: "Help/CoreScreens/Settings/Quick Actions/tap-automation-5",
+                            bodyText: "Disable Show When Run, save, and repeat for the next card/category pair. Build the rest using the same pattern.",
+                            fullscreenCaptionText: "Save and repeat for remaining mappings."
+                        )
+                    ]
                 ),
                 textSection(
                     id: "introduction-quick-actions-5",
                     header: "Quick Action Pitfalls",
-                    body: "Avoid changing multiple trigger rules at the same time before each one is proven. Most issues come from input mapping or trigger text mismatch, not from Offshore itself.\n\nYou can customize trigger phrases later, but keep the text format consistent with what your shortcut expects so parsing stays stable. Make one change at a time, retest, and then continue.\n\nIf you are using iCloud Sync, only enable automations on one of your devices to avoid automating adding duplicate entries."
+                    body: "Test each new automation once before creating the next one. Most failures come from wrong variable detail selection in Amount or Merchant.\n\nIf data looks wrong, edit only one field, retest, and continue. Keep changes incremental so troubleshooting stays easy."
                 )
             ]
         ),
@@ -1094,7 +1121,54 @@ enum GeneratedHelpContent {
                 textSection(
                     id: "settings-quick-actions-1",
                     header: "Install and Use Quick Actions",
-                    body: "Quick Actions is your install hub for all Offshore shortcuts and automation links. Install the shortcuts first, then build automations in Apple Shortcuts using the steps below.\n\nExpense automations:\n\n1. Add Expense From Tap To Pay\nTrigger: When I tap any Wallet pass or payment card.\nSetup:\n- Run Immediately.\n- Create New Shortcut.\n- Search for \"Run Shortcut\".\n- Choose \"Add Expense From Tap To Pay\".\n- Press the Down Arrow.\n- Set Input to Choose Variable.\n- Choose \"Shortcut Input\".\n- Save.\n\n2. Add Amazon Expense From Amazon.com\nTrigger: When I get an email with subject containing \"Ordered:\" from auto-confirm@amazon.com.\nSetup:\n- Run Immediately.\n- Create New Shortcut.\n- Search for \"Run Shortcut\".\n- Choose \"Add Amazon Expense From Amazon.com\".\n- Press the Down Arrow.\n- Set Input to Choose Variable.\n- Choose \"Shortcut Input\".\n- Save.\n\nIncome automations:\n\n3. Add Income From An Email\nTrigger: When I get an email with subject containing \"credited to your account\".\nSetup:\n- Run Immediately.\n- Create New Shortcut.\n- Search for \"Run Shortcut\".\n- Choose \"Add Income From An Email\".\n- Press the Down Arrow.\n- Set Input to Choose Variable.\n- Choose \"Shortcut Input\".\n- Save.\n\n4. Add Income From An SMS Message\nTrigger: When message contains \"credited to your account ending in x1234\".\nSetup:\n- Run Immediately.\n- Create New Shortcut.\n- Search for \"Run Shortcut\".\n- Choose \"Add Income From An SMS Message\".\n- Press the Down Arrow.\n- Set Input to Choose Variable.\n- Choose \"Shortcut Input\".\n- Save.\n\nFriendly note: You can customize trigger phrases later, but keep the input format consistent with what each shortcut expects and retest after every change."
+                    body: "Quick Actions is the install hub for Offshore shortcut links. For Tap-to-Pay, use Apple Shortcuts Transaction automation and Offshore Add Expense intent.\n\nSetup is per device."
+                ),
+                textSection(
+                    id: "settings-quick-actions-2",
+                    header: "Tap To Pay: Controlled Setup",
+                    body: "For higher reliability, configure one card and one category per automation:\n\n1. Shortcuts > Automation > Create Personal Automation > Transaction.\n2. Select one card and one category only.\n3. Set Run Immediately.\n4. Tap Next > Create New Shortcut.\n5. Add Offshore Add Expense intent.\n6. Amount: Select Variable > Shortcut Input, then switch token detail to Amount.\n7. Card: set the fixed card for this automation.\n8. Category: set the fixed category for this automation.\n9. Merchant: Select Variable > Shortcut Input, then switch token detail to Merchant.\n10. Date: set Current Date.\n11. Turn off Show When Run and save.\n12. Repeat for remaining card/category combinations."
+                ),
+                mediaSection(
+                    id: "settings-quick-actions-3",
+                    header: "Tap To Pay Screenshots",
+                    body: "Add these screenshots to provide a visual walkthrough for new users.",
+                    media: [
+                        mediaItem(
+                            id: "settings-quick-actions-3-image-1",
+                            assetName: "Help/CoreScreens/Settings/Quick Actions/tap-automation-1",
+                            bodyText: "Transaction automation trigger selected in Shortcuts.",
+                            fullscreenCaptionText: "Choose Transaction automation."
+                        ),
+                        mediaItem(
+                            id: "settings-quick-actions-3-image-2",
+                            assetName: "Help/CoreScreens/Settings/Quick Actions/tap-automation-2",
+                            bodyText: "One card and one category selected for controlled mapping.",
+                            fullscreenCaptionText: "Select one card and one category."
+                        ),
+                        mediaItem(
+                            id: "settings-quick-actions-3-image-3",
+                            assetName: "Help/CoreScreens/Settings/Quick Actions/tap-automation-3",
+                            bodyText: "Amount field mapped from Shortcut Input with detail set to Amount.",
+                            fullscreenCaptionText: "Set Amount from Shortcut Input."
+                        ),
+                        mediaItem(
+                            id: "settings-quick-actions-3-image-4",
+                            assetName: "Help/CoreScreens/Settings/Quick Actions/tap-automation-4",
+                            bodyText: "Merchant mapped from Shortcut Input and Date set to Current Date.",
+                            fullscreenCaptionText: "Set Merchant and Date mappings."
+                        ),
+                        mediaItem(
+                            id: "settings-quick-actions-3-image-5",
+                            assetName: "Help/CoreScreens/Settings/Quick Actions/tap-automation-5",
+                            bodyText: "Final automation saved with Show When Run turned off.",
+                            fullscreenCaptionText: "Save and repeat for next mapping."
+                        )
+                    ]
+                ),
+                textSection(
+                    id: "settings-quick-actions-4",
+                    header: "Reliability Tips",
+                    body: "Test after each automation is created. If parsing fails, recheck that Amount and Merchant are mapped to the correct Shortcut Input detail.\n\nMake one change at a time, retest, and keep going."
                 )
             ]
         ),

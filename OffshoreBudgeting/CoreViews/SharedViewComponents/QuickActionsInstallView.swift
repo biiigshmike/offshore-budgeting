@@ -30,7 +30,6 @@ struct QuickActionsInstallView: View {
             
             List {
                 shortcutsSection
-                triggerShortcutsSection
                 helpSection
             }
             .listStyle(.insetGrouped)
@@ -60,11 +59,6 @@ struct QuickActionsInstallView: View {
             ForEach(ShortcutLinkCatalog.shortcuts) { item in
                 linkButton(for: item)
             }
-        }
-    }
-    
-    private var triggerShortcutsSection: some View {
-        Section("Shortcuts for Automations") {
             ForEach(ShortcutLinkCatalog.triggerShortcuts) { item in
                 linkButton(for: item)
             }
