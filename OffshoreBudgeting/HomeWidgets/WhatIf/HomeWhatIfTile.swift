@@ -12,6 +12,7 @@ struct HomeWhatIfTile: View {
 
 
     let workspace: Workspace
+    let budgets: [Budget]
     let categories: [Category]
     let incomes: [Income]
     let plannedExpenses: [PlannedExpense]
@@ -31,19 +32,19 @@ struct HomeWhatIfTile: View {
     private var actualIncomeTotal: Double {
         incomes
             .filter { !$0.isPlanned && isInRange($0.date) }
-            .reduce(0) { $0 + $1.amount }
+            .reduce(0) { $0 + safeCurrencyValue($1.amount) }
     }
 
     private var plannedExpensesEffectiveTotal: Double {
         plannedExpenses
             .filter { isInRange($0.expenseDate) }
-            .reduce(0) { $0 + SavingsMathService.plannedBudgetImpactAmount(for: $1) }
+            .reduce(0) { $0 + safeCurrencyValue(SavingsMathService.plannedBudgetImpactAmount(for: $1)) }
     }
 
     private var variableExpensesTotal: Double {
         variableExpenses
             .filter { isInRange($0.transactionDate) }
-            .reduce(0) { $0 + SavingsMathService.variableBudgetImpactAmount(for: $1) }
+            .reduce(0) { $0 + safeCurrencyValue(SavingsMathService.variableBudgetImpactAmount(for: $1)) }
     }
 
     private var actualSavings: Double {
@@ -58,8 +59,8 @@ struct HomeWhatIfTile: View {
         let savings: Double
     }
 
-    private var baselineByCategoryID: [UUID: Double] {
-        buildBaselineByCategoryID()
+    private var baselineBoundsByCategoryID: [UUID: WhatIfScenarioStore.WhatIfCategoryBounds] {
+        buildBaselineBoundsByCategoryID()
     }
 
     private var pinnedPreviewItems: [PinnedPreviewItem] {
@@ -75,14 +76,17 @@ struct HomeWhatIfTile: View {
             guard let info = allInfos.first(where: { $0.id == id }) else { return nil }
             guard let overrides = scenarioStore.loadGlobalScenario(scenarioID: id) else { return nil }
 
-            let scenarioByCategoryID = scenarioStore.applyGlobalScenario(
+            let scenarioBoundsByCategoryID = scenarioStore.applyGlobalScenario(
                 overrides: overrides,
-                baselineByCategoryID: baselineByCategoryID,
+                baselineByCategoryID: baselineBoundsByCategoryID,
                 categories: ids
             )
 
-            let spend = categories.reduce(0) { $0 + (scenarioByCategoryID[$1.id, default: 0]) }
-            let savings = actualIncomeTotal - spend
+            let spend = categories.reduce(0) { partial, category in
+                let bounds = scenarioBoundsByCategoryID[category.id, default: .init(min: 0, max: 0)]
+                return partial + safeCurrencyValue(bounds.resolvedScenarioSpend(fallback: bounds.midpoint))
+            }
+            let savings = safeCurrencyValue(actualIncomeTotal - spend)
             return PinnedPreviewItem(id: id, name: info.name, savings: savings)
         }
     }
@@ -210,7 +214,25 @@ struct HomeWhatIfTile: View {
         AppDateFormat.abbreviatedDate(date)
     }
 
-    private func buildBaselineByCategoryID() -> [UUID: Double] {
+    private func buildBaselineBoundsByCategoryID() -> [UUID: WhatIfScenarioStore.WhatIfCategoryBounds] {
+        let spentByCategoryID = buildBaselineSpendByCategoryID()
+        let limitByCategoryID = buildLimitByCategoryID()
+
+        var result: [UUID: WhatIfScenarioStore.WhatIfCategoryBounds] = [:]
+        result.reserveCapacity(categories.count)
+
+        for category in categories {
+            let spent = spentByCategoryID[category.id, default: 0]
+            let limit = limitByCategoryID[category.id]
+            let minValue = limit?.minAmount ?? spent
+            let maxValue = limit?.maxAmount ?? spent
+            result[category.id] = .init(min: minValue, max: maxValue, scenarioSpend: spent)
+        }
+
+        return result
+    }
+
+    private func buildBaselineSpendByCategoryID() -> [UUID: Double] {
         var plannedByCategoryID: [UUID: Double] = [:]
         var variableByCategoryID: [UUID: Double] = [:]
 
@@ -234,5 +256,24 @@ struct HomeWhatIfTile: View {
         }
 
         return result
+    }
+
+    private func buildLimitByCategoryID() -> [UUID: BudgetCategoryLimit] {
+        let range = DateRange(start: startDate, end: endDate, calendar: .current)
+        let activeBudget = BudgetRangeOverlap.pickActiveBudget(from: budgets, for: range, calendar: .current)
+        let limits = activeBudget?.categoryLimits ?? []
+
+        var lookup: [UUID: BudgetCategoryLimit] = [:]
+        lookup.reserveCapacity(limits.count)
+        for limit in limits {
+            guard let category = limit.category else { continue }
+            lookup[category.id] = limit
+        }
+        return lookup
+    }
+
+    private func safeCurrencyValue(_ value: Double) -> Double {
+        guard value.isFinite else { return 0 }
+        return CurrencyFormatter.roundedToCurrency(value)
     }
 }

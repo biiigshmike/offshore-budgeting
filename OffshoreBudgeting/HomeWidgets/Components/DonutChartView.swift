@@ -32,7 +32,11 @@ struct DonutSlice: Identifiable, Equatable {
     ) {
         self.id = id
         self.title = title
-        self.value = value
+        if value.isFinite {
+            self.value = max(0, value)
+        } else {
+            self.value = 0
+        }
         self.color = color
         self.role = role
     }
@@ -238,7 +242,10 @@ struct DonutChartView: View {
     // MARK: - Helpers
 
     private var totalValue: Double {
-        slices.reduce(0) { $0 + $1.value }
+        slices.reduce(0) { partial, slice in
+            let safe = slice.value.isFinite ? max(0, slice.value) : 0
+            return partial + safe
+        }
     }
 
     private func percent(for slice: DonutSlice) -> Double {

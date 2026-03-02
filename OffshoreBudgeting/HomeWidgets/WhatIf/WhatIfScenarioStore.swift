@@ -38,6 +38,43 @@ struct WhatIfScenarioStore {
         var createdAt: Double
     }
 
+    struct WhatIfCategoryBounds: Codable, Equatable {
+        var min: Double
+        var max: Double
+        var scenarioSpend: Double?
+
+        init(min: Double, max: Double, scenarioSpend: Double? = nil) {
+            self.min = min
+            self.max = max
+            self.scenarioSpend = scenarioSpend
+            normalize()
+        }
+
+        mutating func normalize() {
+            let safeMin = CurrencyFormatter.roundedToCurrency(Swift.max(0, min))
+            let safeMax = CurrencyFormatter.roundedToCurrency(Swift.max(0, max))
+            if safeMin <= safeMax {
+                min = safeMin
+                max = safeMax
+            } else {
+                min = safeMax
+                max = safeMin
+            }
+
+            if let scenarioSpend {
+                self.scenarioSpend = CurrencyFormatter.roundedToCurrency(Swift.max(0, scenarioSpend))
+            }
+        }
+
+        var midpoint: Double {
+            CurrencyFormatter.roundedToCurrency((min + max) / 2)
+        }
+
+        func resolvedScenarioSpend(fallback: Double) -> Double {
+            CurrencyFormatter.roundedToCurrency(Swift.max(0, scenarioSpend ?? fallback))
+        }
+    }
+
     // MARK: - Keys (range-based)
 
     private func rangeKey(startDate: Date, endDate: Date) -> String {
@@ -222,12 +259,44 @@ struct WhatIfScenarioStore {
 
     // Global scenarios store "overrides" by category.
     // When applying to a date range:
-    // scenarioAmount = overrideAmount ?? baselineActualAmount
+    // scenarioBounds = overrideBounds ?? baselineBounds
     struct GlobalScenarioInfo: Codable, Identifiable, Equatable {
         var id: UUID
         var name: String
         var lastAccessed: Double
         var createdAt: Double
+        var isSystemDefault: Bool = false
+
+        enum CodingKeys: String, CodingKey {
+            case id
+            case name
+            case lastAccessed
+            case createdAt
+            case isSystemDefault
+        }
+
+        init(
+            id: UUID,
+            name: String,
+            lastAccessed: Double,
+            createdAt: Double,
+            isSystemDefault: Bool = false
+        ) {
+            self.id = id
+            self.name = name
+            self.lastAccessed = lastAccessed
+            self.createdAt = createdAt
+            self.isSystemDefault = isSystemDefault
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            id = try container.decode(UUID.self, forKey: .id)
+            name = try container.decode(String.self, forKey: .name)
+            lastAccessed = try container.decode(Double.self, forKey: .lastAccessed)
+            createdAt = try container.decode(Double.self, forKey: .createdAt)
+            isSystemDefault = try container.decodeIfPresent(Bool.self, forKey: .isSystemDefault) ?? false
+        }
     }
 
     private func globalIndexKey() -> String {
@@ -318,7 +387,41 @@ struct WhatIfScenarioStore {
         setPinnedGlobalScenarioIDs(current)
     }
 
-    func createGlobalScenario(name: String, overrides: [UUID: Double] = [:]) -> GlobalScenarioInfo {
+    func globalDefaultScenarioID() -> UUID? {
+        let items = loadGlobalIndex()
+        if let existing = items.first(where: { $0.isSystemDefault }) {
+            return existing.id
+        }
+
+        if let legacyDefault = items.first(where: { $0.name.localizedCaseInsensitiveCompare("Default") == .orderedSame }) {
+            var migrated = legacyDefault
+            migrated.isSystemDefault = true
+            upsertGlobalIndex(migrated)
+            return migrated.id
+        }
+
+        return nil
+    }
+
+    func ensureDefaultGlobalScenario(defaultName: String = "Default") -> GlobalScenarioInfo {
+        if let id = globalDefaultScenarioID(),
+           let existing = listGlobalScenarios().first(where: { $0.id == id })
+        {
+            return existing
+        }
+
+        return createGlobalScenario(
+            name: defaultName,
+            overrides: [:],
+            isSystemDefault: true
+        )
+    }
+
+    func createGlobalScenario(
+        name: String,
+        overrides: [UUID: WhatIfCategoryBounds] = [:],
+        isSystemDefault: Bool = false
+    ) -> GlobalScenarioInfo {
         let now = Date().timeIntervalSince1970
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
 
@@ -326,7 +429,8 @@ struct WhatIfScenarioStore {
             id: UUID(),
             name: trimmed.isEmpty ? "Scenario" : trimmed,
             lastAccessed: now,
-            createdAt: now
+            createdAt: now,
+            isSystemDefault: isSystemDefault
         )
 
         saveGlobalPayload(overrides, scenarioID: info.id)
@@ -340,7 +444,11 @@ struct WhatIfScenarioStore {
         guard let idx = items.firstIndex(where: { $0.id == scenarioID }) else { return }
 
         let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
-        items[idx].name = trimmed.isEmpty ? items[idx].name : trimmed
+        if items[idx].isSystemDefault {
+            items[idx].name = "Default"
+        } else {
+            items[idx].name = trimmed.isEmpty ? items[idx].name : trimmed
+        }
         saveGlobalIndex(items)
     }
 
@@ -375,28 +483,54 @@ struct WhatIfScenarioStore {
         }
     }
 
-    func loadGlobalScenario(scenarioID: UUID) -> [UUID: Double]? {
+    func loadGlobalScenario(scenarioID: UUID) -> [UUID: WhatIfCategoryBounds]? {
         bumpGlobalLastAccessed(scenarioID: scenarioID)
 
         guard let data = UserDefaults.standard.data(forKey: globalPayloadKey(scenarioID: scenarioID)) else { return nil }
         let decoded = try? JSONDecoder().decode(GlobalScenarioPayload.self, from: data)
-        return decoded?.overridesByCategoryID
+        if let decoded {
+            return sanitizeBoundsMap(decoded.overridesByCategoryID)
+        }
+
+        // Legacy migration: old payload was [UUID: Double] where value was one category amount.
+        if let legacy = try? JSONDecoder().decode(LegacyGlobalScenarioPayload.self, from: data) {
+            let migrated = legacy.overridesByCategoryID.mapValues { WhatIfCategoryBounds(min: $0, max: $0) }
+            let cleaned = sanitizeBoundsMap(migrated)
+            saveGlobalPayload(cleaned, scenarioID: scenarioID)
+            return cleaned
+        }
+
+        return nil
     }
 
-    func saveGlobalScenario(_ overridesByCategoryID: [UUID: Double], scenarioID: UUID) {
-        saveGlobalPayload(overridesByCategoryID, scenarioID: scenarioID)
+    func saveGlobalScenario(_ overridesByCategoryID: [UUID: WhatIfCategoryBounds], scenarioID: UUID) {
+        saveGlobalPayload(sanitizeBoundsMap(overridesByCategoryID), scenarioID: scenarioID)
         bumpGlobalLastAccessed(scenarioID: scenarioID)
     }
 
     // Apply global overrides to a baseline for a specific date range
-    func applyGlobalScenario(overrides: [UUID: Double], baselineByCategoryID: [UUID: Double], categories: [UUID]) -> [UUID: Double] {
-        var result: [UUID: Double] = [:]
+    func applyGlobalScenario(
+        overrides: [UUID: WhatIfCategoryBounds],
+        baselineByCategoryID: [UUID: WhatIfCategoryBounds],
+        categories: [UUID]
+    ) -> [UUID: WhatIfCategoryBounds] {
+        var result: [UUID: WhatIfCategoryBounds] = [:]
         result.reserveCapacity(categories.count)
 
         for id in categories {
-            let baseline = baselineByCategoryID[id, default: 0]
-            let override = overrides[id]
-            result[id] = max(0, override ?? baseline)
+            let baseline = baselineByCategoryID[id, default: WhatIfCategoryBounds(min: 0, max: 0)]
+            if let override = overrides[id] {
+                let fallbackScenarioSpend = baseline.scenarioSpend ?? baseline.midpoint
+                var merged = WhatIfCategoryBounds(
+                    min: override.min,
+                    max: override.max,
+                    scenarioSpend: override.scenarioSpend ?? fallbackScenarioSpend
+                )
+                merged.normalize()
+                result[id] = merged
+            } else {
+                result[id] = sanitizeBounds(baseline)
+            }
         }
 
         return result
@@ -431,7 +565,24 @@ struct WhatIfScenarioStore {
         saveGlobalIndex(items)
     }
 
-    private func saveGlobalPayload(_ overridesByCategoryID: [UUID: Double], scenarioID: UUID) {
+    private func sanitizeBounds(_ bounds: WhatIfCategoryBounds) -> WhatIfCategoryBounds {
+        var cleaned = bounds
+        cleaned.normalize()
+        return cleaned
+    }
+
+    private func sanitizeBoundsMap(_ map: [UUID: WhatIfCategoryBounds]) -> [UUID: WhatIfCategoryBounds] {
+        var cleaned: [UUID: WhatIfCategoryBounds] = [:]
+        cleaned.reserveCapacity(map.count)
+
+        for (key, value) in map {
+            cleaned[key] = sanitizeBounds(value)
+        }
+
+        return cleaned
+    }
+
+    private func saveGlobalPayload(_ overridesByCategoryID: [UUID: WhatIfCategoryBounds], scenarioID: UUID) {
         let payload = GlobalScenarioPayload(
             scenarioID: scenarioID,
             overridesByCategoryID: overridesByCategoryID
@@ -451,6 +602,11 @@ private struct ScenarioPayload: Codable {
 }
 
 private struct GlobalScenarioPayload: Codable {
+    let scenarioID: UUID
+    let overridesByCategoryID: [UUID: WhatIfScenarioStore.WhatIfCategoryBounds]
+}
+
+private struct LegacyGlobalScenarioPayload: Codable {
     let scenarioID: UUID
     let overridesByCategoryID: [UUID: Double]
 }

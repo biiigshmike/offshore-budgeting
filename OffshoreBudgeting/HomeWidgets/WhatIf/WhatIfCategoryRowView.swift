@@ -11,32 +11,25 @@ struct WhatIfCategoryRowView: View {
 
     let categoryName: String
     let categoryHex: String
-    let baselineAmount: Double
+    let baselineMinAmount: Double
+    let baselineMaxAmount: Double
+    let baselineScenarioSpendAmount: Double
 
-    @Binding var amount: Double
+    @Binding var minAmount: Double
+    @Binding var maxAmount: Double
+    @Binding var scenarioSpendAmount: Double
 
-    let step: Double
     let currencyCode: String
 
-    @State private var text: String = ""
-    @FocusState private var isFocused: Bool
+    @State private var minText: String = ""
+    @State private var maxText: String = ""
+    @State private var scenarioText: String = ""
+    @FocusState private var focusedField: FocusField?
 
-    // Controls sizing
-    private let buttonSize: CGFloat = 32
-    private let fieldWidth: CGFloat = 110
-    private let controlSpacing: CGFloat = 10
-    private let resetButtonSize: CGFloat = 28
-    private let editedBadgeReserveHeight: CGFloat = 20
-
-    private var controlGroupWidth: CGFloat {
-        // minus + spacing + field + spacing + reset + spacing + plus
-        buttonSize
-        + controlSpacing
-        + fieldWidth
-        + controlSpacing
-        + resetButtonSize
-        + controlSpacing
-        + buttonSize
+    private enum FocusField: Hashable {
+        case min
+        case max
+        case scenario
     }
 
     private var dotColor: Color {
@@ -44,100 +37,139 @@ struct WhatIfCategoryRowView: View {
     }
 
     private var isDirty: Bool {
-        abs(amount - baselineAmount) > 0.000_1
-    }
-    
-    private var badgeTextLeadingInset: CGFloat {
-        10 /* dot width */ + 10 /* spacing between dot and text */
+        abs(minAmount - baselineMinAmount) > 0.000_1
+        || abs(maxAmount - baselineMaxAmount) > 0.000_1
+        || abs(scenarioSpendAmount - baselineScenarioSpendAmount) > 0.000_1
     }
 
     var body: some View {
-        GeometryReader { geo in
-            let availableWidth = geo.size.width
-            let labelWidth = max(120, availableWidth - controlGroupWidth - 12)
-            
-            HStack(alignment: .center, spacing: 12) {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Circle()
+                    .fill(dotColor)
+                    .frame(width: 10, height: 10)
 
-                // MARK: - Left column (name + actual, badge as overlay)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(categoryName)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .minimumScaleFactor(0.85)
 
-                HStack(alignment: .center, spacing: 10) {
-                    Circle()
-                        .fill(dotColor)
-                        .frame(width: 10, height: 10)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(categoryName)
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.primary)
-                            .minimumScaleFactor(0.85)
-
-                        Text("Actual: \(formatCurrency(baselineAmount))")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .minimumScaleFactor(0.85)
-                    }
-                    .frame(maxHeight: .infinity, alignment: .center) // keeps the two lines centered
-                }
-                .frame(width: labelWidth, alignment: .leading)
-                .padding(.bottom, editedBadgeReserveHeight) // reserve the space no matter what
-                .overlay(alignment: .bottomLeading) {
-                    editedBadge
-                        .padding(.leading, badgeTextLeadingInset)
-                        .opacity(isDirty ? 1 : 0)
-                        .accessibilityHidden(!isDirty)
+                    Text("Actual: \(formattedBaselineRange)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .minimumScaleFactor(0.85)
                 }
 
                 Spacer(minLength: 0)
 
-                // MARK: - Controls
-
-                HStack(spacing: controlSpacing) {
-
-                    RepeatPressButton(
-                        systemName: "minus",
-                        accessibilityLabel: "Decrease",
-                        size: buttonSize,
-                        onFire: { adjust(-step) }
-                    )
-
-                    TextField("", text: $text)
-                        .focused($isFocused)
-                        .keyboardType(.decimalPad)
-                        .multilineTextAlignment(.trailing)
-                        .font(.subheadline.weight(.semibold))
-                        .frame(width: fieldWidth)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                        .onChange(of: text) { _, newValue in
-                            guard isFocused else { return }
-                            if let parsed = CurrencyFormatter.parseAmount(newValue) {
-                                amount = max(0, CurrencyFormatter.roundedToCurrency(parsed))
-                            }
-                        }
-                        .onChange(of: amount) { _, newValue in
-                            guard !isFocused else { return }
-                            text = CurrencyFormatter.editingString(from: newValue)
-                        }
-                        .onAppear {
-                            text = CurrencyFormatter.editingString(from: amount)
-                        }
-
-                    RepeatPressButton(
-                        systemName: "plus",
-                        accessibilityLabel: "Increase",
-                        size: buttonSize,
-                        onFire: { adjust(step) }
-                    )
+                if isDirty {
+                    editedBadge
                 }
             }
-            .frame(width: availableWidth, alignment: .leading)
+
+            HStack(spacing: 10) {
+                minField
+                maxField
+                scenarioField
+            }
         }
-        // Increased slightly so the 3rd line (Edited) doesn’t clip.
-        .frame(height: 66)
+        .padding(.vertical, 4)
+        .onAppear {
+            refreshTexts()
+        }
+        .onChange(of: minAmount) { _, _ in
+            guard focusedField != .min else { return }
+            refreshTexts()
+        }
+        .onChange(of: maxAmount) { _, _ in
+            guard focusedField != .max else { return }
+            refreshTexts()
+        }
+        .onChange(of: scenarioSpendAmount) { _, _ in
+            guard focusedField != .scenario else { return }
+            refreshTexts()
+        }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(categoryName)
-        .accessibilityValue(formatCurrency(amount))
+        .accessibilityValue("Min \(formatCurrency(minAmount)), Max \(formatCurrency(maxAmount)), Scenario \(formatCurrency(scenarioSpendAmount))")
+    }
+
+    private var minField: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Min")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            TextField("", text: $minText)
+                .focused($focusedField, equals: .min)
+                .keyboardType(.decimalPad)
+                .multilineTextAlignment(.trailing)
+                .font(.subheadline.weight(.semibold))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .onChange(of: minText) { _, newValue in
+                    guard focusedField == .min else { return }
+                    if let parsed = CurrencyFormatter.parseAmount(newValue) {
+                        minAmount = max(0, CurrencyFormatter.roundedToCurrency(parsed))
+                    }
+                }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var maxField: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Max")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            TextField("", text: $maxText)
+                .focused($focusedField, equals: .max)
+                .keyboardType(.decimalPad)
+                .multilineTextAlignment(.trailing)
+                .font(.subheadline.weight(.semibold))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .onChange(of: maxText) { _, newValue in
+                    guard focusedField == .max else { return }
+                    if let parsed = CurrencyFormatter.parseAmount(newValue) {
+                        maxAmount = max(0, CurrencyFormatter.roundedToCurrency(parsed))
+                    }
+                }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var scenarioField: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Scenario")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            TextField("", text: $scenarioText)
+                .focused($focusedField, equals: .scenario)
+                .keyboardType(.decimalPad)
+                .multilineTextAlignment(.trailing)
+                .font(.subheadline.weight(.semibold))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .onChange(of: scenarioText) { _, newValue in
+                    guard focusedField == .scenario else { return }
+                    if let parsed = CurrencyFormatter.parseAmount(newValue) {
+                        scenarioSpendAmount = max(0, CurrencyFormatter.roundedToCurrency(parsed))
+                    }
+                }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var formattedBaselineRange: String {
+        if abs(baselineMinAmount - baselineMaxAmount) < 0.000_1 {
+            return formatCurrency(baselineMinAmount)
+        }
+
+        return "\(formatCurrency(baselineMinAmount)) - \(formatCurrency(baselineMaxAmount))"
     }
 
     // MARK: - Badge
@@ -158,21 +190,10 @@ struct WhatIfCategoryRowView: View {
 
     // MARK: - Helpers
 
-    private func resetToBaseline() {
-        amount = max(0, CurrencyFormatter.roundedToCurrency(baselineAmount))
-
-        if !isFocused {
-            text = CurrencyFormatter.editingString(from: amount)
-        }
-    }
-
-    private func adjust(_ delta: Double) {
-        let next = max(0, CurrencyFormatter.roundedToCurrency(amount + delta))
-        amount = next
-
-        if !isFocused {
-            text = CurrencyFormatter.editingString(from: amount)
-        }
+    private func refreshTexts() {
+        minText = CurrencyFormatter.editingString(from: minAmount)
+        maxText = CurrencyFormatter.editingString(from: maxAmount)
+        scenarioText = CurrencyFormatter.editingString(from: scenarioSpendAmount)
     }
 
     private func formatCurrency(_ value: Double) -> String {
@@ -180,73 +201,5 @@ struct WhatIfCategoryRowView: View {
             .currency(code: currencyCode)
             .presentation(.standard)
         )
-    }
-}
-
-// MARK: - Press-and-hold repeating button
-
-private struct RepeatPressButton: View {
-
-    let systemName: String
-    let accessibilityLabel: String
-    let size: CGFloat
-    let onFire: () -> Void
-
-    private let initialDelay: TimeInterval = 0.35
-    private let repeatInterval: TimeInterval = 0.08
-
-    @State private var isPressing: Bool = false
-    @State private var timer: Timer? = nil
-
-    var body: some View {
-        Button {
-            onFire()
-        } label: {
-            Image(systemName: systemName)
-                .font(.system(size: 12, weight: .semibold))
-                .frame(width: size, height: size)
-                .background(.thinMaterial, in: Capsule())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(accessibilityLabel)
-        .simultaneousGesture(
-            LongPressGesture(minimumDuration: 0.20)
-                .onEnded { _ in
-                    startRepeating()
-                }
-        )
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in
-                    if isPressing == false { isPressing = true }
-                }
-                .onEnded { _ in
-                    stopRepeating()
-                }
-        )
-        .onDisappear { stopRepeating() }
-    }
-
-    private func startRepeating() {
-        stopRepeating()
-        isPressing = true
-
-        onFire()
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + initialDelay) {
-            guard isPressing else { return }
-            timer = Timer.scheduledTimer(withTimeInterval: repeatInterval, repeats: true) { _ in
-                onFire()
-            }
-            if let timer {
-                RunLoop.main.add(timer, forMode: .common)
-            }
-        }
-    }
-
-    private func stopRepeating() {
-        isPressing = false
-        timer?.invalidate()
-        timer = nil
     }
 }
