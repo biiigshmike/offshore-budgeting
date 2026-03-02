@@ -287,6 +287,161 @@ struct SavingsAccountServiceTests {
         #expect(periodCloseEntriesAfterMarchRun.first?.amount == 1200)
     }
 
+    @Test func autoCapture_repairsDuplicatePeriodCloseEntries_keepingOldest() throws {
+        let context = try makeContext()
+
+        let ws = Workspace(name: "WS", hexColor: "#3B82F6")
+        context.insert(ws)
+
+        let account = SavingsAccountService.ensureSavingsAccount(for: ws, modelContext: context)
+        account.didBackfillHistory = true
+        account.autoCaptureThroughDate = makeDate(2026, 1, 31)
+
+        let oldest = SavingsLedgerEntry(
+            date: makeDate(2026, 1, 31),
+            amount: 500,
+            note: "Period close Jan",
+            kindRaw: SavingsLedgerEntryKind.periodClose.rawValue,
+            periodStartDate: makeDate(2026, 1, 1),
+            periodEndDate: makeDate(2026, 1, 31),
+            createdAt: makeDate(2026, 2, 1),
+            updatedAt: makeDate(2026, 2, 1),
+            workspace: ws,
+            account: account
+        )
+        let duplicate = SavingsLedgerEntry(
+            date: makeDate(2026, 1, 31),
+            amount: 500,
+            note: "Period close Jan duplicate",
+            kindRaw: SavingsLedgerEntryKind.periodClose.rawValue,
+            periodStartDate: makeDate(2026, 1, 1),
+            periodEndDate: makeDate(2026, 1, 31),
+            createdAt: makeDate(2026, 2, 2),
+            updatedAt: makeDate(2026, 2, 2),
+            workspace: ws,
+            account: account
+        )
+        context.insert(oldest)
+        context.insert(duplicate)
+        try context.save()
+
+        SavingsAccountService.runAutoCaptureIfNeeded(
+            for: ws,
+            defaultBudgetingPeriodRaw: BudgetingPeriod.monthly.rawValue,
+            incomes: [],
+            plannedExpenses: [],
+            variableExpenses: [],
+            modelContext: context,
+            now: makeDate(2026, 2, 15)
+        )
+
+        let entries = try fetchAll(SavingsLedgerEntry.self, in: context)
+            .filter { $0.kind == .periodClose }
+        #expect(entries.count == 1)
+        #expect(entries.first?.id == oldest.id)
+    }
+
+    @Test func autoCapture_repairsExactDuplicateManualAdjustments_keepingOldest() throws {
+        let context = try makeContext()
+
+        let ws = Workspace(name: "WS", hexColor: "#3B82F6")
+        context.insert(ws)
+
+        let account = SavingsAccountService.ensureSavingsAccount(for: ws, modelContext: context)
+        account.didBackfillHistory = true
+        account.autoCaptureThroughDate = makeDate(2026, 1, 31)
+
+        let oldest = SavingsLedgerEntry(
+            date: makeDate(2026, 1, 20),
+            amount: 125,
+            note: "Emergency Fund",
+            kindRaw: SavingsLedgerEntryKind.manualAdjustment.rawValue,
+            createdAt: makeDate(2026, 1, 20),
+            updatedAt: makeDate(2026, 1, 20),
+            workspace: ws,
+            account: account
+        )
+        let duplicate = SavingsLedgerEntry(
+            date: makeDate(2026, 1, 20),
+            amount: 125.00,
+            note: "Emergency   Fund",
+            kindRaw: SavingsLedgerEntryKind.manualAdjustment.rawValue,
+            createdAt: makeDate(2026, 1, 21),
+            updatedAt: makeDate(2026, 1, 21),
+            workspace: ws,
+            account: account
+        )
+        context.insert(oldest)
+        context.insert(duplicate)
+        try context.save()
+
+        SavingsAccountService.runAutoCaptureIfNeeded(
+            for: ws,
+            defaultBudgetingPeriodRaw: BudgetingPeriod.monthly.rawValue,
+            incomes: [],
+            plannedExpenses: [],
+            variableExpenses: [],
+            modelContext: context,
+            now: makeDate(2026, 2, 15)
+        )
+
+        let entries = try fetchAll(SavingsLedgerEntry.self, in: context)
+            .filter { $0.kind == .manualAdjustment }
+        #expect(entries.count == 1)
+        #expect(entries.first?.id == oldest.id)
+    }
+
+    @Test func autoCapture_keepsDistinctManualAdjustments_whenNotesDiffer() throws {
+        let context = try makeContext()
+
+        let ws = Workspace(name: "WS", hexColor: "#3B82F6")
+        context.insert(ws)
+
+        let account = SavingsAccountService.ensureSavingsAccount(for: ws, modelContext: context)
+        account.didBackfillHistory = true
+        account.autoCaptureThroughDate = makeDate(2026, 1, 31)
+
+        context.insert(
+            SavingsLedgerEntry(
+                date: makeDate(2026, 1, 20),
+                amount: 125,
+                note: "Emergency Fund",
+                kindRaw: SavingsLedgerEntryKind.manualAdjustment.rawValue,
+                createdAt: makeDate(2026, 1, 20),
+                updatedAt: makeDate(2026, 1, 20),
+                workspace: ws,
+                account: account
+            )
+        )
+        context.insert(
+            SavingsLedgerEntry(
+                date: makeDate(2026, 1, 20),
+                amount: 125,
+                note: "Vacation",
+                kindRaw: SavingsLedgerEntryKind.manualAdjustment.rawValue,
+                createdAt: makeDate(2026, 1, 21),
+                updatedAt: makeDate(2026, 1, 21),
+                workspace: ws,
+                account: account
+            )
+        )
+        try context.save()
+
+        SavingsAccountService.runAutoCaptureIfNeeded(
+            for: ws,
+            defaultBudgetingPeriodRaw: BudgetingPeriod.monthly.rawValue,
+            incomes: [],
+            plannedExpenses: [],
+            variableExpenses: [],
+            modelContext: context,
+            now: makeDate(2026, 2, 15)
+        )
+
+        let entries = try fetchAll(SavingsLedgerEntry.self, in: context)
+            .filter { $0.kind == .manualAdjustment }
+        #expect(entries.count == 2)
+    }
+
     // MARK: - Integrity
 
     @Test func normalization_mergesDuplicateSavingsAccounts_andReassignsWorkspaceEntries() throws {
@@ -361,6 +516,8 @@ struct SavingsAccountServiceTests {
 
         #expect(report.mergedAccountsCount == 1)
         #expect(report.reassignedEntriesCount == 2)
+        #expect(report.dedupedPeriodCloseCount == 0)
+        #expect(report.dedupedManualAdjustmentCount == 0)
         #expect(report.recalculatedTotal == 125)
     }
 

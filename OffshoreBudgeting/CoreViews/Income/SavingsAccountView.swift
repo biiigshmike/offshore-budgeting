@@ -522,7 +522,6 @@ private struct SavingsLedgerEntryFormView: View {
     @State private var date: Date = .now
     @State private var amountText: String = ""
     @State private var note: String = ""
-    @State private var kind: SavingsLedgerEntryKind = .manualAdjustment
     @State private var isTransferToTrueSavings: Bool = false
 
     @State private var showingInvalidAmount: Bool = false
@@ -531,6 +530,23 @@ private struct SavingsLedgerEntryFormView: View {
 
     private var saveTitle: String {
         entry == nil ? "Add Savings Entry" : "Edit Savings Entry"
+    }
+
+    private var isEditingSystemManagedEntry: Bool {
+        guard let entry else { return false }
+        return entry.kind == .periodClose || entry.kind == .expenseOffset
+    }
+
+    private var displayedTypeLabel: String {
+        let targetKind: SavingsLedgerEntryKind = entry?.kind ?? .manualAdjustment
+        switch targetKind {
+        case .periodClose:
+            return "Period Close"
+        case .manualAdjustment:
+            return "Manual"
+        case .expenseOffset:
+            return "Expense Offset"
+        }
     }
 
     var body: some View {
@@ -550,7 +566,6 @@ private struct SavingsLedgerEntryFormView: View {
                 Toggle("Move to True Savings", isOn: $isTransferToTrueSavings)
                     .onChange(of: isTransferToTrueSavings) { _, isEnabled in
                         guard isEnabled else { return }
-                        kind = .manualAdjustment
                         if note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                             note = transferDefaultNote
                         }
@@ -563,12 +578,12 @@ private struct SavingsLedgerEntryFormView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                Picker("Type", selection: $kind) {
-                    Text("Manual").tag(SavingsLedgerEntryKind.manualAdjustment)
-                    Text("Period Close").tag(SavingsLedgerEntryKind.periodClose)
-                    Text("Expense Offset").tag(SavingsLedgerEntryKind.expenseOffset)
+                HStack {
+                    Text("Type")
+                    Spacer()
+                    Text(displayedTypeLabel)
+                        .foregroundStyle(.secondary)
                 }
-                .disabled(isTransferToTrueSavings)
             }
 
             if let account {
@@ -607,7 +622,6 @@ private struct SavingsLedgerEntryFormView: View {
                 date = entry.date
                 amountText = CurrencyFormatter.editingString(from: entry.amount)
                 note = entry.note
-                kind = entry.kind
                 isTransferToTrueSavings = (
                     entry.kind == .manualAdjustment &&
                     entry.amount < 0 &&
@@ -625,9 +639,9 @@ private struct SavingsLedgerEntryFormView: View {
 
         var finalAmount = amount
         var finalNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
-        var finalKind = kind
+        var finalKind: SavingsLedgerEntryKind = entry?.kind ?? .manualAdjustment
 
-        if isTransferToTrueSavings {
+        if isTransferToTrueSavings && !isEditingSystemManagedEntry {
             finalAmount = amount > 0 ? -amount : amount
             if finalNote.isEmpty {
                 finalNote = transferDefaultNote

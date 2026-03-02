@@ -9,6 +9,8 @@ enum SavingsAccountService {
     struct SavingsNormalizationReport {
         let mergedAccountsCount: Int
         let reassignedEntriesCount: Int
+        let dedupedPeriodCloseCount: Int
+        let dedupedManualAdjustmentCount: Int
         let recalculatedTotal: Double
     }
 
@@ -53,6 +55,8 @@ enum SavingsAccountService {
             return SavingsNormalizationReport(
                 mergedAccountsCount: 0,
                 reassignedEntriesCount: 0,
+                dedupedPeriodCloseCount: 0,
+                dedupedManualAdjustmentCount: 0,
                 recalculatedTotal: 0
             )
         }
@@ -76,6 +80,15 @@ enum SavingsAccountService {
             didMutate = true
         }
 
+        let dedupeReport = repairDuplicateEntries(
+            for: workspace,
+            preferredAccount: primaryAccount,
+            modelContext: modelContext
+        )
+        if dedupeReport.didMutate {
+            didMutate = true
+        }
+
         let previousTotal = primaryAccount.total
         recalculateAccountTotal(accountID: primaryAccount.id, modelContext: modelContext)
         if primaryAccount.total != previousTotal {
@@ -87,12 +100,16 @@ enum SavingsAccountService {
 
         trace(
             "Normalization mergedAccounts=\(mergedAccountsCount) " +
-            "reassignedEntries=\(reassignedEntriesCount) total=\(primaryAccount.total)"
+            "reassignedEntries=\(reassignedEntriesCount) " +
+            "dedupedPeriodClose=\(dedupeReport.periodCloseDeletedCount) " +
+            "dedupedManual=\(dedupeReport.manualDeletedCount) total=\(primaryAccount.total)"
         )
 
         return SavingsNormalizationReport(
             mergedAccountsCount: mergedAccountsCount,
             reassignedEntriesCount: reassignedEntriesCount,
+            dedupedPeriodCloseCount: dedupeReport.periodCloseDeletedCount,
+            dedupedManualAdjustmentCount: dedupeReport.manualDeletedCount,
             recalculatedTotal: primaryAccount.total
         )
     }
@@ -139,11 +156,24 @@ enum SavingsAccountService {
     ) {
         let account = ensureSavingsAccount(for: workspace, modelContext: modelContext)
         let period = BudgetingPeriod(rawValue: defaultBudgetingPeriodRaw) ?? .monthly
+        let workspaceID = workspace.id
 
         trace(
             "Auto-capture start workspace=\(workspace.name) period=\(period.rawValue) " +
             "incomes=\(incomes.count) planned=\(plannedExpenses.count) variable=\(variableExpenses.count)"
         )
+
+        let dedupeReport = repairDuplicateEntries(
+            for: workspace,
+            preferredAccount: account,
+            modelContext: modelContext
+        )
+        if dedupeReport.didMutate {
+            trace(
+                "Auto-capture repaired duplicates periodClose=\(dedupeReport.periodCloseDeletedCount) " +
+                "manual=\(dedupeReport.manualDeletedCount)"
+            )
+        }
 
         let currentRange = periodRange(containing: now, period: period)
         guard let latestClosedRange = previousRange(before: currentRange.start, period: period) else {
@@ -189,7 +219,12 @@ enum SavingsAccountService {
 
         var cursor = captureStartRange
         while let currentRange = cursor, currentRange.start <= latestClosedRange.start {
-            if !periodCloseExists(account: account, start: currentRange.start, end: currentRange.end) {
+            if !periodCloseExists(
+                workspaceID: workspaceID,
+                start: currentRange.start,
+                end: currentRange.end,
+                modelContext: modelContext
+            ) {
                 let delta = periodDelta(
                     in: currentRange,
                     incomes: incomes,
@@ -471,7 +506,12 @@ enum SavingsAccountService {
         )
 
         while cursor.start <= latest.start {
-            if !periodCloseExists(account: account, start: cursor.start, end: cursor.end) {
+            if !periodCloseExists(
+                workspaceID: workspace.id,
+                start: cursor.start,
+                end: cursor.end,
+                modelContext: modelContext
+            ) {
                 let delta = periodDelta(
                     in: cursor,
                     incomes: incomes,
@@ -540,10 +580,115 @@ enum SavingsAccountService {
         return (try? modelContext.fetch(descriptor)) ?? []
     }
 
-    private static func periodCloseExists(account: SavingsAccount, start: Date, end: Date) -> Bool {
-        (account.entries ?? []).contains { entry in
-            entry.kind == .periodClose
-            && Calendar.current.isDate(entry.periodStartDate ?? .distantPast, inSameDayAs: start)
+    private struct DuplicateRepairReport {
+        var periodCloseDeletedCount: Int = 0
+        var manualDeletedCount: Int = 0
+
+        var didMutate: Bool {
+            periodCloseDeletedCount > 0 || manualDeletedCount > 0
+        }
+    }
+
+    private struct PeriodCloseDeduplicationKey: Hashable {
+        let periodStart: Date
+        let periodEnd: Date
+    }
+
+    private struct ManualDeduplicationKey: Hashable {
+        let accountID: UUID?
+        let day: Date
+        let roundedAmount: Double
+        let normalizedNote: String
+    }
+
+    private static func repairDuplicateEntries(
+        for workspace: Workspace,
+        preferredAccount: SavingsAccount,
+        modelContext: ModelContext
+    ) -> DuplicateRepairReport {
+        var report = DuplicateRepairReport()
+        var entries = workspaceSavingsEntries(for: workspace, modelContext: modelContext)
+        if entries.isEmpty { return report }
+
+        entries.sort { lhs, rhs in
+            if lhs.createdAt == rhs.createdAt {
+                return lhs.id.uuidString < rhs.id.uuidString
+            }
+            return lhs.createdAt < rhs.createdAt
+        }
+
+        var firstPeriodCloseByKey: [PeriodCloseDeduplicationKey: SavingsLedgerEntry] = [:]
+        for entry in entries {
+            guard entry.kind == .periodClose else { continue }
+            guard
+                let periodStartDate = entry.periodStartDate,
+                let periodEndDate = entry.periodEndDate
+            else {
+                continue
+            }
+            let key = PeriodCloseDeduplicationKey(
+                periodStart: Calendar.current.startOfDay(for: periodStartDate),
+                periodEnd: Calendar.current.startOfDay(for: periodEndDate)
+            )
+            if firstPeriodCloseByKey[key] == nil {
+                firstPeriodCloseByKey[key] = entry
+                continue
+            }
+            modelContext.delete(entry)
+            report.periodCloseDeletedCount += 1
+        }
+
+        entries = entries.filter { $0.kind == .manualAdjustment }
+        var firstManualByKey: [ManualDeduplicationKey: SavingsLedgerEntry] = [:]
+        for entry in entries {
+            let key = ManualDeduplicationKey(
+                accountID: entry.account?.id,
+                day: Calendar.current.startOfDay(for: entry.date),
+                roundedAmount: CurrencyFormatter.roundedToCurrency(entry.amount),
+                normalizedNote: normalizeManualNoteForDeduplication(entry.note)
+            )
+            if firstManualByKey[key] == nil {
+                firstManualByKey[key] = entry
+                continue
+            }
+            modelContext.delete(entry)
+            report.manualDeletedCount += 1
+        }
+
+        if report.didMutate {
+            recalculateAccountTotal(accountID: preferredAccount.id, modelContext: modelContext)
+            trace(
+                "Duplicate repair removed periodClose=\(report.periodCloseDeletedCount) " +
+                "manual=\(report.manualDeletedCount)"
+            )
+        }
+        return report
+    }
+
+    private static func normalizeManualNoteForDeduplication(_ note: String) -> String {
+        note
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .split(whereSeparator: { $0.isWhitespace })
+            .joined(separator: " ")
+    }
+
+    private static func periodCloseExists(
+        workspaceID: UUID,
+        start: Date,
+        end: Date,
+        modelContext: ModelContext
+    ) -> Bool {
+        let periodCloseRaw = SavingsLedgerEntryKind.periodClose.rawValue
+        let descriptor = FetchDescriptor<SavingsLedgerEntry>(
+            predicate: #Predicate<SavingsLedgerEntry> { entry in
+                entry.workspace?.id == workspaceID &&
+                entry.kindRaw == periodCloseRaw
+            }
+        )
+        let entries = (try? modelContext.fetch(descriptor)) ?? []
+        return entries.contains { entry in
+            Calendar.current.isDate(entry.periodStartDate ?? .distantPast, inSameDayAs: start)
             && Calendar.current.isDate(entry.periodEndDate ?? .distantPast, inSameDayAs: end)
         }
     }
