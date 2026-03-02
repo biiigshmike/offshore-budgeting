@@ -225,6 +225,7 @@ struct HomeView: View {
         .navigationDestination(isPresented: $isShowingWhatIfPlanner) {
             WhatIfScenarioPlannerView(
                 workspace: workspace,
+                budgets: budgets,
                 categories: categories,
                 incomes: incomes,
                 plannedExpenses: calculationPlannedExpensesForHome,
@@ -563,6 +564,7 @@ struct HomeView: View {
     private var whatIfWidget: some View {
         HomeWhatIfTile(
             workspace: workspace,
+            budgets: budgets,
             categories: categories,
             incomes: incomes,
             plannedExpenses: calculationPlannedExpensesForHome,
