@@ -244,136 +244,134 @@ struct WhatIfScenarioPlannerView: View {
     }
 
     var body: some View {
-        List {
-            Section {
-                headerBlock
+        ScrollViewReader { proxy in
+            List {
+                Section {
+                    headerBlock
+                        .listRowSeparator(.hidden)
+
+                    DonutChartView(
+                        slices: donutSlices,
+                        innerRadiusRatio: 0.70,
+                        centerTitle: savingsLabel,
+                        centerValueText: CurrencyFormatter.string(from: savingsValueMagnitude),
+                        showsLegend: false
+                    )
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 260)
                     .listRowSeparator(.hidden)
+                    .animation(.snappy(duration: 0.25), value: donutSlices)
+                    .animation(.snappy(duration: 0.25), value: scenarioOutcomeForDonut)
 
-                DonutChartView(
-                    slices: donutSlices,
-                    innerRadiusRatio: 0.70,
-                    centerTitle: savingsLabel,
-                    centerValueText: CurrencyFormatter.string(from: savingsValueMagnitude),
-                    showsLegend: false
-                )
-                .frame(maxWidth: .infinity)
-                .frame(height: 260)
-                .listRowSeparator(.hidden)
-                .animation(.snappy(duration: 0.25), value: donutSlices)
-                .animation(.snappy(duration: 0.25), value: scenarioOutcomeForDonut)
+                    scenarioMetaRow
+                        .listRowSeparator(.hidden)
+                }
 
-                scenarioMetaRow
-                    .listRowSeparator(.hidden)
-            }
+                Section("Categories") {
+                    if categories.isEmpty {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("No categories yet")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.primary)
 
-            Section("Categories") {
-                if categories.isEmpty {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("No categories yet")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.primary)
-
-                        Text("Create categories first, then come back to plan scenarios.")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    .padding(.vertical, 6)
-                } else {
-                    ForEach(categories) { category in
-                        WhatIfCategoryRowView(
-                            categoryName: category.name,
-                            categoryHex: category.hexColor,
-                            baselineMinAmount: baselineBoundsByCategoryID[category.id, default: .init(min: 0, max: 0)].min,
-                            baselineMaxAmount: baselineBoundsByCategoryID[category.id, default: .init(min: 0, max: 0)].max,
-                            baselineScenarioSpendAmount: baselineBoundsByCategoryID[category.id, default: .init(min: 0, max: 0)].resolvedScenarioSpend(
-                                fallback: baselineBoundsByCategoryID[category.id, default: .init(min: 0, max: 0)].midpoint
-                            ),
-                            minAmount: minBindingForCategory(category.id),
-                            maxAmount: maxBindingForCategory(category.id),
-                            scenarioSpendAmount: scenarioBindingForCategory(category.id),
-                            currencyCode: CurrencyFormatter.currencyCode
-                        )
-                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                            Button {
-                                resetCategoryToBaseline(category.id)
-                            } label: {
-                                Label("Reset", systemImage: "arrow.counterclockwise")
+                            Text("Create categories first, then come back to plan scenarios.")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .padding(.vertical, 6)
+                    } else {
+                        ForEach(categories) { category in
+                            WhatIfCategoryRowView(
+                                categoryName: category.name,
+                                categoryHex: category.hexColor,
+                                baselineMinAmount: baselineBoundsByCategoryID[category.id, default: .init(min: 0, max: 0)].min,
+                                baselineMaxAmount: baselineBoundsByCategoryID[category.id, default: .init(min: 0, max: 0)].max,
+                                baselineScenarioSpendAmount: baselineBoundsByCategoryID[category.id, default: .init(min: 0, max: 0)].resolvedScenarioSpend(
+                                    fallback: baselineBoundsByCategoryID[category.id, default: .init(min: 0, max: 0)].midpoint
+                                ),
+                                minAmount: minBindingForCategory(category.id),
+                                maxAmount: maxBindingForCategory(category.id),
+                                scenarioSpendAmount: scenarioBindingForCategory(category.id),
+                                currencyCode: CurrencyFormatter.currencyCode,
+                                onEditingBegan: { scrollCategoryIntoView(category.id, with: proxy) }
+                            )
+                            .id(category.id)
+                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                Button {
+                                    resetCategoryToBaseline(category.id)
+                                } label: {
+                                    Label("Reset", systemImage: "arrow.counterclockwise")
+                                }
+                                .tint(.secondary)
                             }
-                            .tint(.secondary)
                         }
                     }
                 }
             }
-        }
-        .onReceive(pinnedChangePublisher) { _ in
-            pinnedRefreshTick += 1
-        }
-        .listStyle(.insetGrouped)
-        .navigationTitle("What If?")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                VStack(spacing: 2) {
-                    Text("What If?")
-                        .font(.headline)
-                    Text(subtitleText)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+            .scrollDismissesKeyboard(.interactively)
+            .onReceive(pinnedChangePublisher) { _ in
+                pinnedRefreshTick += 1
+            }
+            .listStyle(.insetGrouped)
+            .navigationTitle("What If?")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    VStack(spacing: 2) {
+                        Text("What If?")
+                            .font(.headline)
+                        Text(subtitleText)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
-            }
 
-            ToolbarItem(placement: .topBarTrailing) {
-                scenarioMenu
-            }
+                ToolbarItem(placement: .topBarTrailing) {
+                    scenarioMenu
+                }
 
+            }
             #if canImport(UIKit)
-            ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-                Button("Done") { hideKeyboard() }
-                    .font(.subheadline.weight(.semibold))
-            }
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 10)
+                    .onChanged { _ in hideKeyboard() }
+            )
             #endif
-        }
-        #if canImport(UIKit)
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 10)
-                .onChanged { _ in hideKeyboard() }
-        )
-        #endif
-        .onAppear {
-            loadEverythingIfNeeded()
-        }
-        .onChange(of: selectedScenarioID) { _, newValue in
-            guard didLoad, let id = newValue else { return }
-            loadScenarioIntoUI(id: id)
-        }
-        .alert("New Scenario", isPresented: $showNewScenarioPrompt) {
-            TextField("Name", text: $newScenarioName)
-            Button("Create") { createScenario() }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Create a named scenario for this workspace.")
-        }
-        .alert("Rename Scenario", isPresented: $showRenamePrompt) {
-            TextField("Name", text: $renameScenarioName)
-            Button("Save") { renameScenario() }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Rename the current scenario.")
-        }
-        .alert("Duplicate Scenario", isPresented: $showDuplicatePrompt) {
-            TextField("Name", text: $duplicateScenarioName)
-            Button("Duplicate") { duplicateScenario() }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Make a copy of the current scenario.")
-        }
-        .alert("Delete this scenario?", isPresented: $showDeleteConfirm) {
-            Button("Delete Scenario", role: .destructive) { deleteScenario() }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This cannot be undone.")
+            .onAppear {
+                loadEverythingIfNeeded()
+            }
+            .onChange(of: selectedScenarioID) { _, newValue in
+                guard didLoad, let id = newValue else { return }
+                loadScenarioIntoUI(id: id)
+            }
+            .alert("New Scenario", isPresented: $showNewScenarioPrompt) {
+                TextField("Name", text: $newScenarioName)
+                Button("Create") { createScenario() }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Create a named scenario for this workspace.")
+            }
+            .alert("Rename Scenario", isPresented: $showRenamePrompt) {
+                TextField("Name", text: $renameScenarioName)
+                Button("Save") { renameScenario() }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Rename the current scenario.")
+            }
+            .alert("Duplicate Scenario", isPresented: $showDuplicatePrompt) {
+                TextField("Name", text: $duplicateScenarioName)
+                Button("Duplicate") { duplicateScenario() }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Make a copy of the current scenario.")
+            }
+            .alert("Delete this scenario?", isPresented: $showDeleteConfirm) {
+                Button("Delete Scenario", role: .destructive) { deleteScenario() }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This cannot be undone.")
+            }
         }
     }
 
@@ -999,6 +997,18 @@ struct WhatIfScenarioPlannerView: View {
         }
 
         return "\(CurrencyFormatter.string(from: range.lowerBound)) - \(CurrencyFormatter.string(from: range.upperBound))"
+    }
+
+    private func scrollCategoryIntoView(_ categoryID: UUID, with proxy: ScrollViewProxy) {
+        withAnimation(.easeOut(duration: 0.20)) {
+            proxy.scrollTo(categoryID, anchor: .center)
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+            withAnimation(.easeOut(duration: 0.20)) {
+                proxy.scrollTo(categoryID, anchor: .center)
+            }
+        }
     }
     
     private var pinnedChangePublisher: NotificationCenter.Publisher {

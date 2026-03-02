@@ -20,6 +20,7 @@ struct WhatIfCategoryRowView: View {
     @Binding var scenarioSpendAmount: Double
 
     let currencyCode: String
+    let onEditingBegan: () -> Void
 
     @State private var minText: String = ""
     @State private var maxText: String = ""
@@ -89,6 +90,20 @@ struct WhatIfCategoryRowView: View {
         .onChange(of: scenarioSpendAmount) { _, _ in
             guard focusedField != .scenario else { return }
             refreshTexts()
+        }
+        .onChange(of: focusedField) { oldField, newField in
+            if let oldField {
+                commitField(oldField)
+            }
+            if let newField {
+                prepareFieldForEditing(newField)
+                onEditingBegan()
+            }
+        }
+        .onSubmit {
+            if let focusedField {
+                commitField(focusedField)
+            }
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(categoryName)
@@ -194,6 +209,50 @@ struct WhatIfCategoryRowView: View {
         minText = CurrencyFormatter.editingString(from: minAmount)
         maxText = CurrencyFormatter.editingString(from: maxAmount)
         scenarioText = CurrencyFormatter.editingString(from: scenarioSpendAmount)
+    }
+
+    private func prepareFieldForEditing(_ field: FocusField) {
+        switch field {
+        case .min:
+            if CurrencyFormatter.roundedToCurrency(minAmount) == 0 {
+                minText = ""
+            }
+        case .max:
+            if CurrencyFormatter.roundedToCurrency(maxAmount) == 0 {
+                maxText = ""
+            }
+        case .scenario:
+            if CurrencyFormatter.roundedToCurrency(scenarioSpendAmount) == 0 {
+                scenarioText = ""
+            }
+        }
+    }
+
+    private func commitField(_ field: FocusField) {
+        switch field {
+        case .min:
+            minAmount = committedAmount(from: minText, currentValue: minAmount)
+            minText = CurrencyFormatter.editingString(from: minAmount)
+        case .max:
+            maxAmount = committedAmount(from: maxText, currentValue: maxAmount)
+            maxText = CurrencyFormatter.editingString(from: maxAmount)
+        case .scenario:
+            scenarioSpendAmount = committedAmount(from: scenarioText, currentValue: scenarioSpendAmount)
+            scenarioText = CurrencyFormatter.editingString(from: scenarioSpendAmount)
+        }
+    }
+
+    private func committedAmount(from text: String, currentValue: Double) -> Double {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            return 0
+        }
+
+        if let parsed = CurrencyFormatter.parseAmount(trimmed) {
+            return max(0, CurrencyFormatter.roundedToCurrency(parsed))
+        }
+
+        return max(0, CurrencyFormatter.roundedToCurrency(currentValue))
     }
 
     private func formatCurrency(_ value: Double) -> String {
