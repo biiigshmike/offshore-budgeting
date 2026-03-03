@@ -289,35 +289,41 @@ struct SavingsAccountServiceTests {
 
     @Test func autoCapture_repairsDuplicatePeriodCloseEntries_keepingOldest() throws {
         let context = try makeContext()
+        let calendar = Calendar.current
+        let janStart = calendar.date(from: DateComponents(year: 2026, month: 1, day: 1)) ?? .distantPast
+        let janEnd = calendar.date(from: DateComponents(year: 2026, month: 1, day: 31)) ?? .distantPast
+        let createdOldest = calendar.date(from: DateComponents(year: 2026, month: 2, day: 1)) ?? .distantPast
+        let createdDuplicate = calendar.date(from: DateComponents(year: 2026, month: 2, day: 2)) ?? .distantPast
+        let captureNow = calendar.date(from: DateComponents(year: 2026, month: 2, day: 15)) ?? .distantPast
 
         let ws = Workspace(name: "WS", hexColor: "#3B82F6")
         context.insert(ws)
 
         let account = SavingsAccountService.ensureSavingsAccount(for: ws, modelContext: context)
         account.didBackfillHistory = true
-        account.autoCaptureThroughDate = makeDate(2026, 1, 31)
+        account.autoCaptureThroughDate = janEnd
 
         let oldest = SavingsLedgerEntry(
-            date: makeDate(2026, 1, 31),
+            date: janEnd,
             amount: 500,
             note: "Period close Jan",
             kindRaw: SavingsLedgerEntryKind.periodClose.rawValue,
-            periodStartDate: makeDate(2026, 1, 1),
-            periodEndDate: makeDate(2026, 1, 31),
-            createdAt: makeDate(2026, 2, 1),
-            updatedAt: makeDate(2026, 2, 1),
+            periodStartDate: janStart,
+            periodEndDate: janEnd,
+            createdAt: createdOldest,
+            updatedAt: createdOldest,
             workspace: ws,
             account: account
         )
         let duplicate = SavingsLedgerEntry(
-            date: makeDate(2026, 1, 31),
+            date: janEnd,
             amount: 500,
             note: "Period close Jan duplicate",
             kindRaw: SavingsLedgerEntryKind.periodClose.rawValue,
-            periodStartDate: makeDate(2026, 1, 1),
-            periodEndDate: makeDate(2026, 1, 31),
-            createdAt: makeDate(2026, 2, 2),
-            updatedAt: makeDate(2026, 2, 2),
+            periodStartDate: janStart,
+            periodEndDate: janEnd,
+            createdAt: createdDuplicate,
+            updatedAt: createdDuplicate,
             workspace: ws,
             account: account
         )
@@ -332,11 +338,11 @@ struct SavingsAccountServiceTests {
             plannedExpenses: [],
             variableExpenses: [],
             modelContext: context,
-            now: makeDate(2026, 2, 15)
+            now: captureNow
         )
 
         let entries = try fetchAll(SavingsLedgerEntry.self, in: context)
-            .filter { $0.kind == .periodClose }
+            .filter { $0.workspace?.id == ws.id && $0.kind == .periodClose }
         #expect(entries.count == 1)
         #expect(entries.first?.id == oldest.id)
     }
@@ -386,7 +392,7 @@ struct SavingsAccountServiceTests {
         )
 
         let entries = try fetchAll(SavingsLedgerEntry.self, in: context)
-            .filter { $0.kind == .manualAdjustment }
+            .filter { $0.workspace?.id == ws.id && $0.kind == .manualAdjustment }
         #expect(entries.count == 1)
         #expect(entries.first?.id == oldest.id)
     }
