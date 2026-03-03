@@ -476,7 +476,7 @@ struct CardDetailView: View {
             .navigationTitle(card.name)
             .searchable(
                 text: $searchText,
-                placement: .navigationBarDrawer(displayMode: isPhone ? .automatic : .always),
+                placement: .navigationBarDrawer(displayMode: .always),
                 prompt: "Search"
             )
             .searchFocused($searchFocused)

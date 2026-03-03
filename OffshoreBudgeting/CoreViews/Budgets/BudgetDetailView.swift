@@ -558,7 +558,7 @@ struct BudgetDetailView: View {
 
         .searchable(
             text: $searchText,
-            placement: .navigationBarDrawer(displayMode: isPhone ? .automatic : .always),
+            placement: .navigationBarDrawer(displayMode: .always),
             prompt: "Search"
         )
         .searchFocused($searchFocused)
