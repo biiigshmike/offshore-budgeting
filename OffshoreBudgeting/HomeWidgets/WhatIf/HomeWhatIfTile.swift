@@ -8,7 +8,8 @@
 import SwiftUI
 
 struct HomeWhatIfTile: View {
-    @State private var pinnedRefreshTick: Int = 0
+    @State private var cachedPinnedPreviewItems: [PinnedPreviewItem] = []
+    @State private var hasLoadedPinnedPreviews: Bool = false
 
 
     let workspace: Workspace
@@ -25,6 +26,18 @@ struct HomeWhatIfTile: View {
 
     private var scenarioStore: WhatIfScenarioStore {
         WhatIfScenarioStore(workspaceID: workspace.id)
+    }
+
+    // MARK: - Scenario (pinned previews)
+
+    private struct PinnedPreviewItem: Identifiable {
+        let id: UUID
+        let name: String
+        let savings: Double
+    }
+
+    private var baselineBoundsByCategoryID: [UUID: WhatIfScenarioStore.WhatIfCategoryBounds] {
+        buildBaselineBoundsByCategoryID()
     }
 
     // MARK: - Totals (baseline)
@@ -51,47 +64,6 @@ struct HomeWhatIfTile: View {
         actualIncomeTotal - (plannedExpensesEffectiveTotal + variableExpensesTotal)
     }
 
-    // MARK: - Scenario (pinned previews)
-
-    private struct PinnedPreviewItem: Identifiable {
-        let id: UUID
-        let name: String
-        let savings: Double
-    }
-
-    private var baselineBoundsByCategoryID: [UUID: WhatIfScenarioStore.WhatIfCategoryBounds] {
-        buildBaselineBoundsByCategoryID()
-    }
-
-    private var pinnedPreviewItems: [PinnedPreviewItem] {
-        _ = pinnedRefreshTick
-        let pinnedIDs = Array(scenarioStore.loadPinnedGlobalScenarioIDs().prefix(3))
-        guard pinnedIDs.isEmpty == false else { return [] }
-
-        // Name lookup is cheap and avoids repeatedly sorting in the UI.
-        let allInfos = scenarioStore.listGlobalScenarios()
-        let ids = categories.map { $0.id }
-
-        return pinnedIDs.compactMap { id in
-            guard let info = allInfos.first(where: { $0.id == id }) else { return nil }
-            guard let overrides = scenarioStore.loadGlobalScenario(scenarioID: id) else { return nil }
-
-            let scenarioBoundsByCategoryID = scenarioStore.applyGlobalScenario(
-                overrides: overrides.overridesByCategoryID,
-                baselineByCategoryID: baselineBoundsByCategoryID,
-                categories: ids
-            )
-
-            let spend = categories.reduce(0) { partial, category in
-                let bounds = scenarioBoundsByCategoryID[category.id, default: .init(min: 0, max: 0)]
-                return partial + safeCurrencyValue(bounds.resolvedScenarioSpend(fallback: bounds.midpoint))
-            }
-            let scenarioActualIncome = overrides.actualIncomeOverride ?? actualIncomeTotal
-            let savings = safeCurrencyValue(scenarioActualIncome - spend)
-            return PinnedPreviewItem(id: id, name: info.name, savings: savings)
-        }
-    }
-
     private var displayValue: Double {
         // Home headline stays “Actual Savings”. Pinned scenarios are previews underneath.
         actualSavings
@@ -103,6 +75,18 @@ struct HomeWhatIfTile: View {
 
     private var subtitleText: String {
         "\(formattedDate(startDate)) - \(formattedDate(endDate))"
+    }
+
+    private var refreshInputToken: Int {
+        var hasher = Hasher()
+        hasher.combine(startDate.timeIntervalSinceReferenceDate)
+        hasher.combine(endDate.timeIntervalSinceReferenceDate)
+        hasher.combine(budgets.count)
+        hasher.combine(categories.count)
+        hasher.combine(incomes.count)
+        hasher.combine(plannedExpenses.count)
+        hasher.combine(variableExpenses.count)
+        return hasher.finalize()
     }
 
     var body: some View {
@@ -145,12 +129,18 @@ struct HomeWhatIfTile: View {
         .onTapGesture {
             onOpenPlanner(nil)
         }
+        .onAppear {
+            refreshPinnedPreviews()
+        }
+        .onChange(of: refreshInputToken) { _, _ in
+            refreshPinnedPreviews()
+        }
         .onReceive(
             NotificationCenter.default.publisher(
                 for: WhatIfScenarioStore.pinnedGlobalScenariosDidChangeName(workspaceID: workspace.id)
             )
         ) { _ in
-            pinnedRefreshTick += 1
+            refreshPinnedPreviews()
         }
         .accessibilityLabel("What If?")
         .accessibilityValue(CurrencyFormatter.string(from: displayValue))
@@ -160,7 +150,7 @@ struct HomeWhatIfTile: View {
 
     @ViewBuilder
     private var pinnedPreviews: some View {
-        let previews = pinnedPreviewItems
+        let previews = hasLoadedPinnedPreviews ? cachedPinnedPreviewItems : []
 
         if previews.isEmpty {
             Text("Pin up to 3 scenarios from inside the planner to preview them here.")
@@ -276,5 +266,45 @@ struct HomeWhatIfTile: View {
     private func safeCurrencyValue(_ value: Double) -> Double {
         guard value.isFinite else { return 0 }
         return CurrencyFormatter.roundedToCurrency(value)
+    }
+
+    private func refreshPinnedPreviews() {
+        let pinnedIDs = Array(scenarioStore.loadPinnedGlobalScenarioIDs().prefix(3))
+        guard pinnedIDs.isEmpty == false else {
+            cachedPinnedPreviewItems = []
+            hasLoadedPinnedPreviews = true
+            return
+        }
+
+        // I snapshot these once so each pinned scenario can reuse the same baseline work.
+        let allInfos = scenarioStore.listGlobalScenarios()
+        let categoryIDs = categories.map { $0.id }
+        let baseline = baselineBoundsByCategoryID
+        let baselineActualIncome = actualIncomeTotal
+
+        var previews: [PinnedPreviewItem] = []
+        previews.reserveCapacity(pinnedIDs.count)
+
+        for id in pinnedIDs {
+            guard let info = allInfos.first(where: { $0.id == id }) else { continue }
+            guard let overrides = scenarioStore.loadGlobalScenario(scenarioID: id, touchAccessTime: false) else { continue }
+
+            let scenarioBoundsByCategoryID = scenarioStore.applyGlobalScenario(
+                overrides: overrides.overridesByCategoryID,
+                baselineByCategoryID: baseline,
+                categories: categoryIDs
+            )
+
+            let spend = categories.reduce(0) { partial, category in
+                let bounds = scenarioBoundsByCategoryID[category.id, default: .init(min: 0, max: 0)]
+                return partial + safeCurrencyValue(bounds.resolvedScenarioSpend(fallback: bounds.midpoint))
+            }
+            let scenarioActualIncome = overrides.actualIncomeOverride ?? baselineActualIncome
+            let savings = safeCurrencyValue(scenarioActualIncome - spend)
+            previews.append(PinnedPreviewItem(id: id, name: info.name, savings: savings))
+        }
+
+        cachedPinnedPreviewItems = previews
+        hasLoadedPinnedPreviews = true
     }
 }

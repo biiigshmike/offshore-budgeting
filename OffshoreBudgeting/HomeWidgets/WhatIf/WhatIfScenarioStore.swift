@@ -503,8 +503,10 @@ struct WhatIfScenarioStore {
         }
     }
 
-    func loadGlobalScenario(scenarioID: UUID) -> GlobalScenarioOverrides? {
-        bumpGlobalLastAccessed(scenarioID: scenarioID)
+    func loadGlobalScenario(scenarioID: UUID, touchAccessTime: Bool = true) -> GlobalScenarioOverrides? {
+        if touchAccessTime {
+            bumpGlobalLastAccessed(scenarioID: scenarioID)
+        }
 
         guard let data = UserDefaults.standard.data(forKey: globalPayloadKey(scenarioID: scenarioID)) else { return nil }
         let decoded = try? JSONDecoder().decode(GlobalScenarioPayload.self, from: data)
