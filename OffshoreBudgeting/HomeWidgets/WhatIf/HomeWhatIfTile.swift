@@ -77,7 +77,7 @@ struct HomeWhatIfTile: View {
             guard let overrides = scenarioStore.loadGlobalScenario(scenarioID: id) else { return nil }
 
             let scenarioBoundsByCategoryID = scenarioStore.applyGlobalScenario(
-                overrides: overrides,
+                overrides: overrides.overridesByCategoryID,
                 baselineByCategoryID: baselineBoundsByCategoryID,
                 categories: ids
             )
@@ -86,7 +86,8 @@ struct HomeWhatIfTile: View {
                 let bounds = scenarioBoundsByCategoryID[category.id, default: .init(min: 0, max: 0)]
                 return partial + safeCurrencyValue(bounds.resolvedScenarioSpend(fallback: bounds.midpoint))
             }
-            let savings = safeCurrencyValue(actualIncomeTotal - spend)
+            let scenarioActualIncome = overrides.actualIncomeOverride ?? actualIncomeTotal
+            let savings = safeCurrencyValue(scenarioActualIncome - spend)
             return PinnedPreviewItem(id: id, name: info.name, savings: savings)
         }
     }

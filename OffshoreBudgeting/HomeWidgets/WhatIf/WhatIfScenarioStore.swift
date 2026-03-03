@@ -75,6 +75,26 @@ struct WhatIfScenarioStore {
         }
     }
 
+    struct GlobalScenarioOverrides: Codable, Equatable {
+        var overridesByCategoryID: [UUID: WhatIfCategoryBounds]
+        var plannedIncomeOverride: Double?
+        var actualIncomeOverride: Double?
+
+        init(
+            overridesByCategoryID: [UUID: WhatIfCategoryBounds] = [:],
+            plannedIncomeOverride: Double? = nil,
+            actualIncomeOverride: Double? = nil
+        ) {
+            self.overridesByCategoryID = overridesByCategoryID
+            self.plannedIncomeOverride = plannedIncomeOverride
+            self.actualIncomeOverride = actualIncomeOverride
+        }
+
+        static var empty: GlobalScenarioOverrides {
+            GlobalScenarioOverrides()
+        }
+    }
+
     // MARK: - Keys (range-based)
 
     private func rangeKey(startDate: Date, endDate: Date) -> String {
@@ -412,14 +432,14 @@ struct WhatIfScenarioStore {
 
         return createGlobalScenario(
             name: defaultName,
-            overrides: [:],
+            overrides: .empty,
             isSystemDefault: true
         )
     }
 
     func createGlobalScenario(
         name: String,
-        overrides: [UUID: WhatIfCategoryBounds] = [:],
+        overrides: GlobalScenarioOverrides = .empty,
         isSystemDefault: Bool = false
     ) -> GlobalScenarioInfo {
         let now = Date().timeIntervalSince1970
@@ -433,7 +453,7 @@ struct WhatIfScenarioStore {
             isSystemDefault: isSystemDefault
         )
 
-        saveGlobalPayload(overrides, scenarioID: info.id)
+        saveGlobalPayload(sanitizeGlobalOverrides(overrides), scenarioID: info.id)
         upsertGlobalIndex(info)
         UserDefaults.standard.set(info.id.uuidString, forKey: globalSelectedKey())
         return info
@@ -483,19 +503,26 @@ struct WhatIfScenarioStore {
         }
     }
 
-    func loadGlobalScenario(scenarioID: UUID) -> [UUID: WhatIfCategoryBounds]? {
+    func loadGlobalScenario(scenarioID: UUID) -> GlobalScenarioOverrides? {
         bumpGlobalLastAccessed(scenarioID: scenarioID)
 
         guard let data = UserDefaults.standard.data(forKey: globalPayloadKey(scenarioID: scenarioID)) else { return nil }
         let decoded = try? JSONDecoder().decode(GlobalScenarioPayload.self, from: data)
         if let decoded {
-            return sanitizeBoundsMap(decoded.overridesByCategoryID)
+            let overrides = GlobalScenarioOverrides(
+                overridesByCategoryID: decoded.overridesByCategoryID,
+                plannedIncomeOverride: decoded.plannedIncomeOverride,
+                actualIncomeOverride: decoded.actualIncomeOverride
+            )
+            return sanitizeGlobalOverrides(overrides)
         }
 
         // Legacy migration: old payload was [UUID: Double] where value was one category amount.
         if let legacy = try? JSONDecoder().decode(LegacyGlobalScenarioPayload.self, from: data) {
             let migrated = legacy.overridesByCategoryID.mapValues { WhatIfCategoryBounds(min: $0, max: $0) }
-            let cleaned = sanitizeBoundsMap(migrated)
+            let cleaned = sanitizeGlobalOverrides(
+                GlobalScenarioOverrides(overridesByCategoryID: migrated)
+            )
             saveGlobalPayload(cleaned, scenarioID: scenarioID)
             return cleaned
         }
@@ -503,8 +530,8 @@ struct WhatIfScenarioStore {
         return nil
     }
 
-    func saveGlobalScenario(_ overridesByCategoryID: [UUID: WhatIfCategoryBounds], scenarioID: UUID) {
-        saveGlobalPayload(sanitizeBoundsMap(overridesByCategoryID), scenarioID: scenarioID)
+    func saveGlobalScenario(_ overrides: GlobalScenarioOverrides, scenarioID: UUID) {
+        saveGlobalPayload(sanitizeGlobalOverrides(overrides), scenarioID: scenarioID)
         bumpGlobalLastAccessed(scenarioID: scenarioID)
     }
 
@@ -582,10 +609,25 @@ struct WhatIfScenarioStore {
         return cleaned
     }
 
-    private func saveGlobalPayload(_ overridesByCategoryID: [UUID: WhatIfCategoryBounds], scenarioID: UUID) {
+    private func sanitizeIncomeOverride(_ value: Double?) -> Double? {
+        guard let value, value.isFinite else { return nil }
+        return CurrencyFormatter.roundedToCurrency(Swift.max(0, value))
+    }
+
+    private func sanitizeGlobalOverrides(_ overrides: GlobalScenarioOverrides) -> GlobalScenarioOverrides {
+        GlobalScenarioOverrides(
+            overridesByCategoryID: sanitizeBoundsMap(overrides.overridesByCategoryID),
+            plannedIncomeOverride: sanitizeIncomeOverride(overrides.plannedIncomeOverride),
+            actualIncomeOverride: sanitizeIncomeOverride(overrides.actualIncomeOverride)
+        )
+    }
+
+    private func saveGlobalPayload(_ overrides: GlobalScenarioOverrides, scenarioID: UUID) {
         let payload = GlobalScenarioPayload(
             scenarioID: scenarioID,
-            overridesByCategoryID: overridesByCategoryID
+            overridesByCategoryID: overrides.overridesByCategoryID,
+            plannedIncomeOverride: overrides.plannedIncomeOverride,
+            actualIncomeOverride: overrides.actualIncomeOverride
         )
 
         let data = (try? JSONEncoder().encode(payload)) ?? Data()
@@ -604,6 +646,8 @@ private struct ScenarioPayload: Codable {
 private struct GlobalScenarioPayload: Codable {
     let scenarioID: UUID
     let overridesByCategoryID: [UUID: WhatIfScenarioStore.WhatIfCategoryBounds]
+    let plannedIncomeOverride: Double?
+    let actualIncomeOverride: Double?
 }
 
 private struct LegacyGlobalScenarioPayload: Codable {

@@ -54,6 +54,8 @@ struct WhatIfScenarioPlannerView: View {
 
     // Scenario values rendered in UI (override ?? baseline)
     @State private var scenarioBoundsByCategoryID: [UUID: WhatIfScenarioStore.WhatIfCategoryBounds] = [:]
+    @State private var scenarioPlannedIncomeTotal: Double = 0
+    @State private var scenarioActualIncomeTotal: Double = 0
 
     // Global scenario list + selection
     @State private var scenarios: [WhatIfScenarioStore.GlobalScenarioInfo] = []
@@ -137,15 +139,15 @@ struct WhatIfScenarioPlannerView: View {
     }
 
     private var actualIncomeOutcomeRange: ClosedRange<Double> {
-        (actualIncomeTotal - scenarioMaxSpendTotal)...(actualIncomeTotal - scenarioMinSpendTotal)
+        (scenarioActualIncomeTotal - scenarioMaxSpendTotal)...(scenarioActualIncomeTotal - scenarioMinSpendTotal)
     }
 
     private var plannedIncomeOutcomeRange: ClosedRange<Double> {
-        (plannedIncomeTotal - scenarioMaxSpendTotal)...(plannedIncomeTotal - scenarioMinSpendTotal)
+        (scenarioPlannedIncomeTotal - scenarioMaxSpendTotal)...(scenarioPlannedIncomeTotal - scenarioMinSpendTotal)
     }
 
     private var scenarioOutcomeForDonut: Double {
-        describedAsCurrencySafe(actualIncomeTotal - scenarioSpendTotal)
+        describedAsCurrencySafe(scenarioActualIncomeTotal - scenarioSpendTotal)
     }
 
     private var subtitleText: String {
@@ -179,8 +181,10 @@ struct WhatIfScenarioPlannerView: View {
         Outcome (Actual Income): \(formatRange(actualIncomeOutcomeRange))
         Outcome (Planned Income): \(formatRange(plannedIncomeOutcomeRange))
         Actual Savings: \(CurrencyFormatter.string(from: actualSavings))
-        Actual Income: \(CurrencyFormatter.string(from: actualIncomeTotal))
-        Planned Income: \(CurrencyFormatter.string(from: plannedIncomeTotal))
+        Entered Actual Income: \(CurrencyFormatter.string(from: actualIncomeTotal))
+        Entered Planned Income: \(CurrencyFormatter.string(from: plannedIncomeTotal))
+        Scenario Actual Income: \(CurrencyFormatter.string(from: scenarioActualIncomeTotal))
+        Scenario Planned Income: \(CurrencyFormatter.string(from: scenarioPlannedIncomeTotal))
 
         """
 
@@ -208,6 +212,10 @@ struct WhatIfScenarioPlannerView: View {
         rows.append("\"Outcome Actual Income Max\",\(CurrencyFormatter.csvNumberString(from: actualIncomeOutcomeRange.upperBound))")
         rows.append("\"Outcome Planned Income Min\",\(CurrencyFormatter.csvNumberString(from: plannedIncomeOutcomeRange.lowerBound))")
         rows.append("\"Outcome Planned Income Max\",\(CurrencyFormatter.csvNumberString(from: plannedIncomeOutcomeRange.upperBound))")
+        rows.append("\"Entered Actual Income\",\(CurrencyFormatter.csvNumberString(from: actualIncomeTotal))")
+        rows.append("\"Entered Planned Income\",\(CurrencyFormatter.csvNumberString(from: plannedIncomeTotal))")
+        rows.append("\"Scenario Actual Income\",\(CurrencyFormatter.csvNumberString(from: scenarioActualIncomeTotal))")
+        rows.append("\"Scenario Planned Income\",\(CurrencyFormatter.csvNumberString(from: scenarioPlannedIncomeTotal))")
         return rows.joined(separator: "\n")
     }
 
@@ -265,6 +273,27 @@ struct WhatIfScenarioPlannerView: View {
 
                     scenarioMetaRow
                         .listRowSeparator(.hidden)
+                }
+
+                Section("Income") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        WhatIfIncomeRowView(
+                            baselinePlannedAmount: plannedIncomeTotal,
+                            baselineActualAmount: actualIncomeTotal,
+                            plannedAmount: scenarioPlannedIncomeBinding,
+                            actualAmount: scenarioActualIncomeBinding,
+                            currencyCode: CurrencyFormatter.currencyCode
+                        )
+                    }
+                    .padding(.vertical, 4)
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                        Button {
+                            resetIncomeToBaseline()
+                        } label: {
+                            Label("Reset", systemImage: "arrow.counterclockwise")
+                        }
+                        .tint(.secondary)
+                    }
                 }
 
                 Section("Categories") {
@@ -606,6 +635,7 @@ struct WhatIfScenarioPlannerView: View {
             loadScenarioIntoUI(id: chosen)
         } else {
             overridesByCategoryID = [:]
+            resetScenarioIncomeToBaseline()
             rebuildScenarioFromOverrides(animated: false)
         }
 
@@ -714,8 +744,10 @@ struct WhatIfScenarioPlannerView: View {
         lines.append("")
         lines.append("Outcome (Actual Income): \(formatRange(actualIncomeOutcomeRange))")
         lines.append("Outcome (Planned Income): \(formatRange(plannedIncomeOutcomeRange))")
-        lines.append("Actual Income: \(CurrencyFormatter.string(from: actualIncomeTotal))")
-        lines.append("Planned Income: \(CurrencyFormatter.string(from: plannedIncomeTotal))")
+        lines.append("Entered Actual Income: \(CurrencyFormatter.string(from: actualIncomeTotal))")
+        lines.append("Entered Planned Income: \(CurrencyFormatter.string(from: plannedIncomeTotal))")
+        lines.append("Scenario Actual Income: \(CurrencyFormatter.string(from: scenarioActualIncomeTotal))")
+        lines.append("Scenario Planned Income: \(CurrencyFormatter.string(from: scenarioPlannedIncomeTotal))")
         lines.append("Actual Savings: \(CurrencyFormatter.string(from: actualSavings))")
         lines.append("")
         lines.append("Categories")
@@ -732,8 +764,10 @@ struct WhatIfScenarioPlannerView: View {
     }
 
     private func loadScenarioIntoUI(id: UUID) {
-        let loadedOverrides = store.loadGlobalScenario(scenarioID: id) ?? [:]
-        overridesByCategoryID = sanitizeOverrides(loadedOverrides)
+        let loadedOverrides = store.loadGlobalScenario(scenarioID: id) ?? .empty
+        overridesByCategoryID = sanitizeOverrides(loadedOverrides.overridesByCategoryID)
+        scenarioPlannedIncomeTotal = loadedOverrides.plannedIncomeOverride ?? plannedIncomeTotal
+        scenarioActualIncomeTotal = loadedOverrides.actualIncomeOverride ?? actualIncomeTotal
 
         store.setSelectedGlobalScenarioID(id)
         scenarios = store.listGlobalScenarios()
@@ -746,10 +780,11 @@ struct WhatIfScenarioPlannerView: View {
     }
 
     private func createScenario() {
-        let created = store.createGlobalScenario(name: newScenarioName, overrides: [:])
+        let created = store.createGlobalScenario(name: newScenarioName, overrides: .empty)
         scenarios = store.listGlobalScenarios()
         selectedScenarioID = created.id
         overridesByCategoryID = [:]
+        resetScenarioIncomeToBaseline()
         rebuildScenarioFromOverrides(animated: true)
         didLoad = true
     }
@@ -787,6 +822,7 @@ struct WhatIfScenarioPlannerView: View {
             loadScenarioIntoUI(id: next)
         } else {
             overridesByCategoryID = [:]
+            resetScenarioIncomeToBaseline()
             rebuildScenarioFromOverrides(animated: true)
         }
     }
@@ -796,6 +832,11 @@ struct WhatIfScenarioPlannerView: View {
     private func resetCategoryToBaseline(_ categoryID: UUID) {
         overridesByCategoryID.removeValue(forKey: categoryID)
         rebuildScenarioFromOverrides(animated: true)
+        persistIfReady()
+    }
+
+    private func resetIncomeToBaseline() {
+        resetScenarioIncomeToBaseline()
         persistIfReady()
     }
 
@@ -816,6 +857,12 @@ struct WhatIfScenarioPlannerView: View {
         }
 
         rebuildScenarioFromOverrides(animated: false)
+        persistIfReady()
+    }
+
+    private func setScenarioIncome(planned newPlanned: Double, actual newActual: Double) {
+        scenarioPlannedIncomeTotal = max(0, CurrencyFormatter.roundedToCurrency(newPlanned))
+        scenarioActualIncomeTotal = max(0, CurrencyFormatter.roundedToCurrency(newActual))
         persistIfReady()
     }
 
@@ -853,7 +900,7 @@ struct WhatIfScenarioPlannerView: View {
 
     private func persistIfReady() {
         guard didLoad, let id = selectedScenarioID else { return }
-        store.saveGlobalScenario(overridesByCategoryID, scenarioID: id)
+        store.saveGlobalScenario(currentScenarioOverrides(), scenarioID: id)
         scenarios = store.listGlobalScenarios()
     }
 
@@ -898,6 +945,24 @@ struct WhatIfScenarioPlannerView: View {
                     let bounds = scenarioBoundsByCategoryID[id, default: .init(min: 0, max: 0)]
                     setScenarioValues(min: bounds.min, max: bounds.max, scenarioSpend: newValue, for: id)
                 }
+            }
+        )
+    }
+
+    private var scenarioPlannedIncomeBinding: Binding<Double> {
+        Binding(
+            get: { scenarioPlannedIncomeTotal },
+            set: { newValue in
+                setScenarioIncome(planned: newValue, actual: scenarioActualIncomeTotal)
+            }
+        )
+    }
+
+    private var scenarioActualIncomeBinding: Binding<Double> {
+        Binding(
+            get: { scenarioActualIncomeTotal },
+            set: { newValue in
+                setScenarioIncome(planned: scenarioPlannedIncomeTotal, actual: newValue)
             }
         )
     }
@@ -983,6 +1048,34 @@ struct WhatIfScenarioPlannerView: View {
 
     private func effectivePlannedExpenseAmount(_ expense: PlannedExpense) -> Double {
         describedAsCurrencySafe(expense.effectiveAmount())
+    }
+
+    private func resetScenarioIncomeToBaseline() {
+        scenarioPlannedIncomeTotal = plannedIncomeTotal
+        scenarioActualIncomeTotal = actualIncomeTotal
+    }
+
+    private func currentScenarioOverrides() -> WhatIfScenarioStore.GlobalScenarioOverrides {
+        let plannedOverride = incomeOverrideValue(
+            scenarioValue: scenarioPlannedIncomeTotal,
+            baselineValue: plannedIncomeTotal
+        )
+        let actualOverride = incomeOverrideValue(
+            scenarioValue: scenarioActualIncomeTotal,
+            baselineValue: actualIncomeTotal
+        )
+
+        return WhatIfScenarioStore.GlobalScenarioOverrides(
+            overridesByCategoryID: overridesByCategoryID,
+            plannedIncomeOverride: plannedOverride,
+            actualIncomeOverride: actualOverride
+        )
+    }
+
+    private func incomeOverrideValue(scenarioValue: Double, baselineValue: Double) -> Double? {
+        let roundedScenario = CurrencyFormatter.roundedToCurrency(max(0, scenarioValue))
+        let roundedBaseline = CurrencyFormatter.roundedToCurrency(max(0, baselineValue))
+        return abs(roundedScenario - roundedBaseline) < 0.000_1 ? nil : roundedScenario
     }
 
     // This keeps behavior stable if any values ever drift negative/NaN.
