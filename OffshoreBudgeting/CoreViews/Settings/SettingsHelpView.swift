@@ -843,22 +843,31 @@ private struct HelpSectionFullscreenViewer: View {
                     .foregroundStyle(.white)
                     .lineLimit(1)
             }
-
+            
             Spacer()
-
-            Button {
-                dismiss()
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.title3)
-                    .foregroundStyle(.white.opacity(0.9))
+            
+            if #available(iOS 26.0, *) {
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark")
+                        .frame(width: 33, height: 33)
+                }
+                .buttonStyle(.glass)
+                .buttonBorderShape(.circle)
+                .accessibilityLabel(Text("Close"))
+            } else {
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .frame(width: 33, height: 33)
+                }
+                .buttonStyle(.plain)
+                .buttonBorderShape(.circle)
+                .accessibilityLabel(Text("Close"))
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel(Text("Close"))
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 14)
-        .padding(.bottom, 10)
     }
 }
 
