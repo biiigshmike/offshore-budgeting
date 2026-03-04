@@ -457,37 +457,61 @@ enum GeneratedHelpContent {
                 mediaSection(
                     id: "introduction-quick-actions-3",
                     header: "Tap To Pay Automation Steps",
-                    body: "Use this sequence in Apple Shortcuts:\n\n1. Open Shortcuts > Automation > Create Personal Automation > Transaction.\n2. Under When I tap, select one card and deselect the others.\n3. Select one category and deselect the others.\n4. Leave merchants unfiltered unless you want stricter control.\n5. Set Run Immediately.\n6. Tap Next, then tap Create New Shortcut.\n7. Search actions for Offshore \"Add Expense\" and add it.\n8. In Amount, choose Select Variable > Shortcut Input, then tap the token and switch detail from Transaction to Amount.\n9. In Card, choose the fixed card used for this automation.\n10. In Category, choose the fixed Offshore category for this automation.\n11. In Merchant, choose Select Variable > Shortcut Input, then switch detail to Merchant.\n12. In Date, choose Current Date.\n13. Turn off Show When Run, then save.\n14. Repeat this pattern for the remaining card/category combinations you want.",
+                    body: "Use this sequence in Apple Shortcuts:\n\n1. Open the Shortcuts app, tap the Automation tab, then tap New Automation.\n2. On this screen, scroll down and choose Wallet: When I Tap a Wallet Card or Pass.\n3. Choose one card for this automation. For best results, select one category per card at a time. Scroll to the bottom, set Run Immediately instead of Run After Confirmation, and make sure Notify When Run is turned off for the least interruptive experience.\n4. On the When I Tap... screen, tap Create New Shortcut in the Get Started section.\n5. Search for Offshore Add Expense and select it.\n6. Your screen should look something like this at this point.\n7. To pass the transaction amount and merchant details, tap the Amount field and choose Select Variable. Then choose Shortcut Input.\n8. Once Shortcut Input is passed, change the variable in the Amount field to Amount and tap Return. Repeat for Merchant: select the field, choose Shortcut Input, and change the variable to Merchant.\n9. The completed shortcut should look something like this. Amount and Merchant are now being passed correctly. Choose the card from Offshore's Accounts tab for Card, choose the category you want Tap to Pay to route to, set Date to Current Date, tap Return, then tap Save.\n\nRepeat these steps for the remaining 6 category types offered by Wallet automation for each card. The setup effort is well worth it once everything is in place.",
                     media: [
                         mediaItem(
                             id: "introduction-quick-actions-3-image-1",
                             assetName: "Help/CoreScreens/Settings/Quick Actions/tap-automation-1",
-                            bodyText: "Open the Transaction automation trigger and start a new personal automation. This is where Tap-to-Pay setup begins for a device.",
-                            fullscreenCaptionText: "Start with Transaction automation."
+                            bodyText: "Open the Shortcuts app, tap the Automation tab, then tap New Automation.",
+                            fullscreenCaptionText: "Step 1: Open Automation and start a new automation."
                         ),
                         mediaItem(
                             id: "introduction-quick-actions-3-image-2",
                             assetName: "Help/CoreScreens/Settings/Quick Actions/tap-automation-2",
-                            bodyText: "Select one card and one category only. Deselect the rest so each automation has a clear purpose.",
-                            fullscreenCaptionText: "Use one card and one category per automation."
+                            bodyText: "On this screen, scroll down and choose Wallet: When I Tap a Wallet Card or Pass.",
+                            fullscreenCaptionText: "Step 2: Choose the Wallet tap trigger."
                         ),
                         mediaItem(
                             id: "introduction-quick-actions-3-image-3",
                             assetName: "Help/CoreScreens/Settings/Quick Actions/tap-automation-3",
-                            bodyText: "Add Offshore Add Expense and map Amount from Shortcut Input. Ensure the token detail shows Amount, not Transaction.",
-                            fullscreenCaptionText: "Map Amount from Shortcut Input."
+                            bodyText: "Choose one card for this automation, select one category for best results, set Run Immediately, and turn off Notify When Run.",
+                            fullscreenCaptionText: "Step 3: Select one card and one category, then set run options."
                         ),
                         mediaItem(
                             id: "introduction-quick-actions-3-image-4",
                             assetName: "Help/CoreScreens/Settings/Quick Actions/tap-automation-4",
-                            bodyText: "Map Merchant from Shortcut Input and set Date to Current Date. Set Card and Category as fixed values for this automation.",
-                            fullscreenCaptionText: "Map Merchant and set Current Date."
+                            bodyText: "On the When I Tap... screen, tap Create New Shortcut in the Get Started section.",
+                            fullscreenCaptionText: "Step 4: Create a new shortcut."
                         ),
                         mediaItem(
                             id: "introduction-quick-actions-3-image-5",
                             assetName: "Help/CoreScreens/Settings/Quick Actions/tap-automation-5",
-                            bodyText: "Disable Show When Run, save, and repeat for the next card/category pair. Build the rest using the same pattern.",
-                            fullscreenCaptionText: "Save and repeat for remaining mappings."
+                            bodyText: "Search for Offshore Add Expense and select it.",
+                            fullscreenCaptionText: "Step 5: Add Offshore Add Expense."
+                        ),
+                        mediaItem(
+                            id: "introduction-quick-actions-3-image-6",
+                            assetName: "Help/CoreScreens/Settings/Quick Actions/tap-automation-6",
+                            bodyText: "Your screen should look something like this at this point.",
+                            fullscreenCaptionText: "Step 6: Confirm your setup looks right so far."
+                        ),
+                        mediaItem(
+                            id: "introduction-quick-actions-3-image-7",
+                            assetName: "Help/CoreScreens/Settings/Quick Actions/tap-automation-7",
+                            bodyText: "To pass transaction amount and merchant details, tap the Amount field, choose Select Variable, then choose Shortcut Input.",
+                            fullscreenCaptionText: "Step 7: Pass Shortcut Input into Amount."
+                        ),
+                        mediaItem(
+                            id: "introduction-quick-actions-3-image-8",
+                            assetName: "Help/CoreScreens/Settings/Quick Actions/tap-automation-8",
+                            bodyText: "Change the Amount field variable to Amount and tap Return. Repeat for Merchant by selecting the Merchant field, choosing Shortcut Input, and changing the variable to Merchant.",
+                            fullscreenCaptionText: "Step 8: Map Amount and Merchant variables."
+                        ),
+                        mediaItem(
+                            id: "introduction-quick-actions-3-image-9",
+                            assetName: "Help/CoreScreens/Settings/Quick Actions/tap-automation-9",
+                            bodyText: "The completed shortcut should pass Amount and Merchant correctly. Choose Card and Category in Offshore, set Date to Current Date, tap Return, then tap Save.",
+                            fullscreenCaptionText: "Step 9: Finalize fields and save automation."
                         )
                     ]
                 ),
@@ -1126,7 +1150,7 @@ enum GeneratedHelpContent {
                 textSection(
                     id: "settings-quick-actions-2",
                     header: "Tap To Pay: Controlled Setup",
-                    body: "For higher reliability, configure one card and one category per automation:\n\n1. Shortcuts > Automation > Create Personal Automation > Transaction.\n2. Select one card and one category only.\n3. Set Run Immediately.\n4. Tap Next > Create New Shortcut.\n5. Add Offshore Add Expense intent.\n6. Amount: Select Variable > Shortcut Input, then switch token detail to Amount.\n7. Card: set the fixed card for this automation.\n8. Category: set the fixed category for this automation.\n9. Merchant: Select Variable > Shortcut Input, then switch token detail to Merchant.\n10. Date: set Current Date.\n11. Turn off Show When Run and save.\n12. Repeat for remaining card/category combinations."
+                    body: "Use this sequence in Apple Shortcuts:\n\n1. Open the Shortcuts app, tap the Automation tab, then tap New Automation.\n2. On this screen, scroll down and choose Wallet: When I Tap a Wallet Card or Pass.\n3. Choose one card for this automation. For best results, select one category per card at a time. Scroll to the bottom, set Run Immediately instead of Run After Confirmation, and make sure Notify When Run is turned off for the least interruptive experience.\n4. On the When I Tap... screen, tap Create New Shortcut in the Get Started section.\n5. Search for Offshore Add Expense and select it.\n6. Your screen should look something like this at this point.\n7. To pass the transaction amount and merchant details, tap the Amount field and choose Select Variable. Then choose Shortcut Input.\n8. Once Shortcut Input is passed, change the variable in the Amount field to Amount and tap Return. Repeat for Merchant: select the field, choose Shortcut Input, and change the variable to Merchant.\n9. The completed shortcut should look something like this. Amount and Merchant are now being passed correctly. Choose the card from Offshore's Accounts tab for Card, choose the category you want Tap to Pay to route to, set Date to Current Date, tap Return, then tap Save.\n\nRepeat these steps for the remaining 6 category types offered by Wallet automation for each card. The setup effort is well worth it once everything is in place."
                 ),
                 mediaSection(
                     id: "settings-quick-actions-3",
@@ -1136,32 +1160,56 @@ enum GeneratedHelpContent {
                         mediaItem(
                             id: "settings-quick-actions-3-image-1",
                             assetName: "Help/CoreScreens/Settings/Quick Actions/tap-automation-1",
-                            bodyText: "Transaction automation trigger selected in Shortcuts.",
-                            fullscreenCaptionText: "Choose Transaction automation."
+                            bodyText: "Open the Shortcuts app, tap the Automation tab, then tap New Automation.",
+                            fullscreenCaptionText: "Step 1: Open Automation and start a new automation."
                         ),
                         mediaItem(
                             id: "settings-quick-actions-3-image-2",
                             assetName: "Help/CoreScreens/Settings/Quick Actions/tap-automation-2",
-                            bodyText: "One card and one category selected for controlled mapping.",
-                            fullscreenCaptionText: "Select one card and one category."
+                            bodyText: "On this screen, scroll down and choose Wallet: When I Tap a Wallet Card or Pass.",
+                            fullscreenCaptionText: "Step 2: Choose the Wallet tap trigger."
                         ),
                         mediaItem(
                             id: "settings-quick-actions-3-image-3",
                             assetName: "Help/CoreScreens/Settings/Quick Actions/tap-automation-3",
-                            bodyText: "Amount field mapped from Shortcut Input with detail set to Amount.",
-                            fullscreenCaptionText: "Set Amount from Shortcut Input."
+                            bodyText: "Choose one card for this automation, select one category for best results, set Run Immediately, and turn off Notify When Run.",
+                            fullscreenCaptionText: "Step 3: Select one card and one category, then set run options."
                         ),
                         mediaItem(
                             id: "settings-quick-actions-3-image-4",
                             assetName: "Help/CoreScreens/Settings/Quick Actions/tap-automation-4",
-                            bodyText: "Merchant mapped from Shortcut Input and Date set to Current Date.",
-                            fullscreenCaptionText: "Set Merchant and Date mappings."
+                            bodyText: "On the When I Tap... screen, tap Create New Shortcut in the Get Started section.",
+                            fullscreenCaptionText: "Step 4: Create a new shortcut."
                         ),
                         mediaItem(
                             id: "settings-quick-actions-3-image-5",
                             assetName: "Help/CoreScreens/Settings/Quick Actions/tap-automation-5",
-                            bodyText: "Final automation saved with Show When Run turned off.",
-                            fullscreenCaptionText: "Save and repeat for next mapping."
+                            bodyText: "Search for Offshore Add Expense and select it.",
+                            fullscreenCaptionText: "Step 5: Add Offshore Add Expense."
+                        ),
+                        mediaItem(
+                            id: "settings-quick-actions-3-image-6",
+                            assetName: "Help/CoreScreens/Settings/Quick Actions/tap-automation-6",
+                            bodyText: "Your screen should look something like this at this point.",
+                            fullscreenCaptionText: "Step 6: Confirm your setup looks right so far."
+                        ),
+                        mediaItem(
+                            id: "settings-quick-actions-3-image-7",
+                            assetName: "Help/CoreScreens/Settings/Quick Actions/tap-automation-7",
+                            bodyText: "To pass transaction amount and merchant details, tap the Amount field, choose Select Variable, then choose Shortcut Input.",
+                            fullscreenCaptionText: "Step 7: Pass Shortcut Input into Amount."
+                        ),
+                        mediaItem(
+                            id: "settings-quick-actions-3-image-8",
+                            assetName: "Help/CoreScreens/Settings/Quick Actions/tap-automation-8",
+                            bodyText: "Change the Amount field variable to Amount and tap Return. Repeat for Merchant by selecting the Merchant field, choosing Shortcut Input, and changing the variable to Merchant.",
+                            fullscreenCaptionText: "Step 8: Map Amount and Merchant variables."
+                        ),
+                        mediaItem(
+                            id: "settings-quick-actions-3-image-9",
+                            assetName: "Help/CoreScreens/Settings/Quick Actions/tap-automation-9",
+                            bodyText: "The completed shortcut should pass Amount and Merchant correctly. Choose Card and Category in Offshore, set Date to Current Date, tap Return, then tap Save.",
+                            fullscreenCaptionText: "Step 9: Finalize fields and save automation."
                         )
                     ]
                 ),
