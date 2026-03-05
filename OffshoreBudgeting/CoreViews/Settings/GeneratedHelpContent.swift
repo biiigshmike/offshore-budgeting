@@ -7,6 +7,24 @@
 //
 
 import Foundation
+#if canImport(UIKit)
+import UIKit
+#endif
+
+enum GeneratedHelpAudience {
+    case phone
+    case nonPhone
+
+    static var current: GeneratedHelpAudience {
+        #if targetEnvironment(macCatalyst)
+        return .nonPhone
+        #elseif canImport(UIKit)
+        return UIDevice.current.userInterfaceIdiom == .phone ? .phone : .nonPhone
+        #else
+        return .nonPhone
+        #endif
+    }
+}
 
 enum GeneratedHelpDestinationGroup: String {
     case gettingStarted
@@ -1325,6 +1343,13 @@ enum GeneratedHelpContent {
 
         return lookup
     }()
+    private static let iPhoneOnlyQuickActionsSectionIDs: Set<String> = [
+        "introduction-quick-actions-3",
+        "settings-quick-actions-2",
+        "settings-quick-actions-3"
+    ]
+    private static let introductionQuickActionsNoteSectionID: String = "introduction-quick-actions-nonphone-note"
+    private static let settingsQuickActionsNoteSectionID: String = "settings-quick-actions-nonphone-note"
 
     static var gettingStartedDestinations: [GeneratedHelpDestination] {
         destinations.filter { $0.group == .gettingStarted }
@@ -1344,6 +1369,73 @@ enum GeneratedHelpContent {
 
     static func leafTopics(for destination: GeneratedHelpDestination) -> [GeneratedHelpLeafTopic] {
         destination.leafTopicIDs.compactMap { leafTopicsByID[$0] }
+    }
+
+    static func visibleLeafTopics(for audience: GeneratedHelpAudience = .current) -> [GeneratedHelpLeafTopic] {
+        allLeafTopics.map { filteredTopic($0, for: audience) }
+    }
+
+    static func visibleLeafTopic(
+        for id: String,
+        audience: GeneratedHelpAudience = .current
+    ) -> GeneratedHelpLeafTopic? {
+        guard let topic = leafTopicsByID[id] else { return nil }
+        return filteredTopic(topic, for: audience)
+    }
+
+    static func visibleLeafTopics(
+        for destination: GeneratedHelpDestination,
+        audience: GeneratedHelpAudience = .current
+    ) -> [GeneratedHelpLeafTopic] {
+        destination.leafTopicIDs.compactMap { visibleLeafTopic(for: $0, audience: audience) }
+    }
+
+    private static func filteredTopic(
+        _ topic: GeneratedHelpLeafTopic,
+        for audience: GeneratedHelpAudience
+    ) -> GeneratedHelpLeafTopic {
+        guard audience == .nonPhone else { return topic }
+
+        var filteredSections = topic.sections.filter {
+            iPhoneOnlyQuickActionsSectionIDs.contains($0.id) == false
+        }
+
+        if topic.id == "introduction-quick-actions" {
+            filteredSections = insertingNonPhoneQuickActionsNote(
+                into: filteredSections,
+                noteSectionID: introductionQuickActionsNoteSectionID
+            )
+        } else if topic.id == "settings-quick-actions" {
+            filteredSections = insertingNonPhoneQuickActionsNote(
+                into: filteredSections,
+                noteSectionID: settingsQuickActionsNoteSectionID
+            )
+        }
+
+        return GeneratedHelpLeafTopic(
+            id: topic.id,
+            destinationID: topic.destinationID,
+            title: topic.title,
+            sections: filteredSections
+        )
+    }
+
+    private static func insertingNonPhoneQuickActionsNote(
+        into sections: [GeneratedHelpSection],
+        noteSectionID: String
+    ) -> [GeneratedHelpSection] {
+        guard sections.contains(where: { $0.id == noteSectionID }) == false else { return sections }
+
+        let noteSection = textSection(
+            id: noteSectionID,
+            header: "Tap To Pay Automation Availability",
+            body: "Tap To Pay automation setup steps are currently available on iPhone only.\n\nOpen this help topic on iPhone to view the full step-by-step setup walkthrough."
+        )
+
+        var updatedSections = sections
+        let insertIndex = min(1, updatedSections.count)
+        updatedSections.insert(noteSection, at: insertIndex)
+        return updatedSections
     }
 }
 

@@ -13,11 +13,15 @@ struct SettingsHelpView: View {
         normalizedSearchText.isEmpty == false
     }
 
+    private var visibleTopics: [GeneratedHelpLeafTopic] {
+        GeneratedHelpContent.visibleLeafTopics()
+    }
+
     private var faqResolution: HelpFAQResolution? {
         guard isSearching else { return nil }
         return faqEngine.resolve(
             prompt: normalizedSearchText,
-            topics: GeneratedHelpContent.allLeafTopics
+            topics: visibleTopics
         )
     }
 
@@ -25,7 +29,7 @@ struct SettingsHelpView: View {
         guard isSearching else { return [] }
         return faqEngine.rankedTopicMatches(
             for: normalizedSearchText,
-            topics: GeneratedHelpContent.allLeafTopics
+            topics: visibleTopics
         )
     }
 
@@ -52,7 +56,7 @@ struct SettingsHelpView: View {
         }
 
         return rankedMatches.compactMap { match in
-            guard let topic = GeneratedHelpContent.leafTopic(for: match.topicID) else {
+            guard let topic = GeneratedHelpContent.visibleLeafTopic(for: match.topicID) else {
                 return nil
             }
 
@@ -390,7 +394,7 @@ private struct HelpDestinationTopicsView: View {
 
     var body: some View {
         List {
-            ForEach(GeneratedHelpContent.leafTopics(for: destination)) { topic in
+            ForEach(GeneratedHelpContent.visibleLeafTopics(for: destination)) { topic in
                 NavigationLink {
                     HelpTopicDetailView(topic: topic)
                 } label: {
@@ -420,7 +424,7 @@ struct HelpTopicDetailView: View {
     }
 
     private var currentTopic: GeneratedHelpLeafTopic {
-        GeneratedHelpContent.leafTopic(for: currentTopicID) ?? topic
+        GeneratedHelpContent.visibleLeafTopic(for: currentTopicID) ?? topic
     }
 
     private var orderedTopicsInDestination: [GeneratedHelpLeafTopic] {
@@ -428,7 +432,7 @@ struct HelpTopicDetailView: View {
             return [currentTopic]
         }
 
-        let topics = GeneratedHelpContent.leafTopics(for: destination)
+        let topics = GeneratedHelpContent.visibleLeafTopics(for: destination)
         return topics.isEmpty ? [currentTopic] : topics
     }
 

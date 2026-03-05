@@ -10,7 +10,7 @@ struct QuickActionsInstallView: View {
     @State private var openedItemIDs: Set<String> = []
     
     private var quickActionsHelpTopic: GeneratedHelpLeafTopic? {
-        GeneratedHelpContent.leafTopic(for: "introduction-quick-actions")
+        GeneratedHelpContent.visibleLeafTopic(for: "introduction-quick-actions")
     }
     
     init(isOnboarding: Bool = false) {

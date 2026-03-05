@@ -171,6 +171,49 @@ struct HelpFAQEngineTests {
         #expect(first.first == "notifications")
     }
 
+    // MARK: - Content Visibility
+
+    @Test func visibleLeafTopic_nonPhone_hidesIntroductionTapToPaySteps_andAddsAvailabilityNote() {
+        let topic = GeneratedHelpContent.visibleLeafTopic(
+            for: "introduction-quick-actions",
+            audience: .nonPhone
+        )
+
+        #expect(topic != nil)
+
+        let sectionIDs = Set(topic?.sections.map(\.id) ?? [])
+        #expect(sectionIDs.contains("introduction-quick-actions-3") == false)
+        #expect(sectionIDs.contains("introduction-quick-actions-nonphone-note"))
+    }
+
+    @Test func visibleLeafTopic_nonPhone_hidesSettingsTapToPaySteps_andAddsAvailabilityNote() {
+        let topic = GeneratedHelpContent.visibleLeafTopic(
+            for: "settings-quick-actions",
+            audience: .nonPhone
+        )
+
+        #expect(topic != nil)
+
+        let sectionIDs = Set(topic?.sections.map(\.id) ?? [])
+        #expect(sectionIDs.contains("settings-quick-actions-2") == false)
+        #expect(sectionIDs.contains("settings-quick-actions-3") == false)
+        #expect(sectionIDs.contains("settings-quick-actions-nonphone-note"))
+    }
+
+    @Test func visibleLeafTopic_phone_keepsTapToPaySteps_withoutAvailabilityNote() {
+        let topic = GeneratedHelpContent.visibleLeafTopic(
+            for: "settings-quick-actions",
+            audience: .phone
+        )
+
+        #expect(topic != nil)
+
+        let sectionIDs = Set(topic?.sections.map(\.id) ?? [])
+        #expect(sectionIDs.contains("settings-quick-actions-2"))
+        #expect(sectionIDs.contains("settings-quick-actions-3"))
+        #expect(sectionIDs.contains("settings-quick-actions-nonphone-note") == false)
+    }
+
     // MARK: - Helpers
 
     private func makeTopic(
