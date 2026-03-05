@@ -52,17 +52,22 @@ struct SettingsReleaseLogsView: View {
     static let releaseSections: [ReleaseSection] = [
         ReleaseSection(
             version: "2.3.2",
-            build: "14",
+            build: "16",
             items: [
                 ReleaseItem(
-                    systemImage: "hand.tap.fill",
-                    title: "Swipe to Edit or Delete",
-                    description: "Swipe gestures are now available for use on the budgets list while the Budgets tab is active."
+                    systemImage: "pencil.and.list.clipboard",
+                    title: "Onboarding Experience",
+                    description: "The onboarding process now supports setting up the entire budgeting workspace. Previously, only select features were configured during onboarding."
                 ),
                 ReleaseItem(
-                    systemImage: "pencil.and.list.clipboard",
-                    title: "Enhancements to Onboarding",
-                    description: "Onboarding now has additional steps included to walk new users through how use the swipe and long-press gestures for editing and deleting. The onboarding process now allows for the capture of Income and creation of Budgets. Also, toggles that were buried in Settings are now offered at relevant stages during the onboarding process."
+                    systemImage: "sailboat.fill",
+                    title: "Excursion Mode",
+                    description: "Excursion Mode has been refined to deliver more precise notifications near relevant points of interest, while still processing everything 100% on-device."
+                ),
+                ReleaseItem(
+                    systemImage: "questionmark.text.page.fill",
+                    title: "What If? Scenario Planner",
+                    description: "The What If? planner now supports using income in scenarios, instead of only adjusting spending by category. The planner also loads with the current period’s minimum and maximum category caps from active budgets, and includes a field to enter a desired scenario value."
                 ),
                 ReleaseItem(
                     systemImage: "person.2.fill",
@@ -70,9 +75,24 @@ struct SettingsReleaseLogsView: View {
                     description: "Addresses an issue where offsetting an expense via a Reconciliation account would not allow the full available amount to be used."
                 ),
                 ReleaseItem(
+                    systemImage: "banknote.fill",
+                    title: "Savings Account",
+                    description: "The Savings Account graph now offers two views: Running Total and Current Period."
+                ),
+                ReleaseItem(
+                    systemImage: "hand.tap.fill",
+                    title: "Swipe to Edit or Delete",
+                    description: "Swipe gestures are now available for use on the budgets list while the Budgets tab is active."
+                ),
+                ReleaseItem(
                     systemImage: "inset.filled.capsule",
                     title: "Category Selection",
-                    description: "While viewing expenses on the Budgets or Accounts tab, categories are now capable of handling multiple selections for filtering instead of just one at a time."
+                    description: "When viewing the details for a selected budget or card, multiple categories can now be selected for filtering. Previously, only one category could be selected at a time."
+                ),
+                ReleaseItem(
+                    systemImage: "bolt.circle.fill",
+                    title: "Quick Actions",
+                    description: "The Quick Actions options for Add Income to Offshore, Add Expense to Offshore, and Tap to Pay have been removed.\n\nWhile the goal was to share Tap to Pay automations through Shortcuts, reliable setup proved difficult. The Help Guide now includes step-by-step instructions to configure these automations manually on the device you want to use with Tap to Pay."
                 )
             ]
         ),
