@@ -56,7 +56,7 @@ struct WhatIfCategoryRowView: View {
                         .foregroundStyle(.primary)
                         .minimumScaleFactor(0.85)
 
-                    Text("Actual: \(formattedBaselineRange)")
+                    Text(baselineSummaryText)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .minimumScaleFactor(0.85)
@@ -118,11 +118,8 @@ struct WhatIfCategoryRowView: View {
             TextField("", text: $minText)
                 .focused($focusedField, equals: .min)
                 .keyboardType(.decimalPad)
-                .multilineTextAlignment(.trailing)
-                .font(.subheadline.weight(.semibold))
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .multilineTextAlignment(.leading)
+                .textFieldStyle(.automatic)
                 .onChange(of: minText) { _, newValue in
                     guard focusedField == .min else { return }
                     if let parsed = CurrencyFormatter.parseAmount(newValue) {
@@ -141,11 +138,8 @@ struct WhatIfCategoryRowView: View {
             TextField("", text: $maxText)
                 .focused($focusedField, equals: .max)
                 .keyboardType(.decimalPad)
-                .multilineTextAlignment(.trailing)
-                .font(.subheadline.weight(.semibold))
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .multilineTextAlignment(.leading)
+                .textFieldStyle(.automatic)
                 .onChange(of: maxText) { _, newValue in
                     guard focusedField == .max else { return }
                     if let parsed = CurrencyFormatter.parseAmount(newValue) {
@@ -164,11 +158,8 @@ struct WhatIfCategoryRowView: View {
             TextField("", text: $scenarioText)
                 .focused($focusedField, equals: .scenario)
                 .keyboardType(.decimalPad)
-                .multilineTextAlignment(.trailing)
-                .font(.subheadline.weight(.semibold))
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .multilineTextAlignment(.leading)
+                .textFieldStyle(.automatic)
                 .onChange(of: scenarioText) { _, newValue in
                     guard focusedField == .scenario else { return }
                     if let parsed = CurrencyFormatter.parseAmount(newValue) {
@@ -179,12 +170,12 @@ struct WhatIfCategoryRowView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var formattedBaselineRange: String {
+    private var baselineSummaryText: String {
         if abs(baselineMinAmount - baselineMaxAmount) < 0.000_1 {
-            return formatCurrency(baselineMinAmount)
+            return "Actual: \(formatCurrency(baselineMinAmount))"
         }
 
-        return "\(formatCurrency(baselineMinAmount)) - \(formatCurrency(baselineMaxAmount))"
+        return "Min: \(formatCurrency(baselineMinAmount)) • Max: \(formatCurrency(baselineMaxAmount))"
     }
 
     // MARK: - Badge

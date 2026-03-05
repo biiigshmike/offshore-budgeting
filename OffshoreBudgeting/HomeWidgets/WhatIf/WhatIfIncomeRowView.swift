@@ -84,11 +84,8 @@ struct WhatIfIncomeRowView: View {
             TextField("", text: $plannedText)
                 .focused($focusedField, equals: .planned)
                 .keyboardType(.decimalPad)
-                .multilineTextAlignment(.trailing)
-                .font(.subheadline.weight(.semibold))
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .multilineTextAlignment(.leading)
+                .textFieldStyle(.automatic)
                 .onChange(of: plannedText) { _, newValue in
                     guard focusedField == .planned else { return }
                     if let parsed = CurrencyFormatter.parseAmount(newValue) {
@@ -107,11 +104,8 @@ struct WhatIfIncomeRowView: View {
             TextField("", text: $actualText)
                 .focused($focusedField, equals: .actual)
                 .keyboardType(.decimalPad)
-                .multilineTextAlignment(.trailing)
-                .font(.subheadline.weight(.semibold))
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .multilineTextAlignment(.leading)
+                .textFieldStyle(.automatic)
                 .onChange(of: actualText) { _, newValue in
                     guard focusedField == .actual else { return }
                     if let parsed = CurrencyFormatter.parseAmount(newValue) {
