@@ -472,14 +472,20 @@ struct BudgetDetailView: View {
     private func expensesTitleText(_ derived: BudgetDetailDerivedState) -> Text {
         switch expenseScope {
         case .planned:
-            return Text("Planned Expenses • \(derived.plannedExpensesPlannedTotal, format: CurrencyFormatter.currencyStyle())")
+            let format = String(localized: "budgetDetail.expensesTitle.planned", defaultValue: "Planned Expenses • %@", comment: "Budget detail list title for planned expenses.")
+            let value = CurrencyFormatter.string(from: derived.plannedExpensesPlannedTotal)
+            return Text(String(format: format, locale: Locale.current, value))
             
         case .unified:
             let unifiedTotal = derived.plannedExpensesEffectiveTotal + derived.variableExpensesTotal
-            return Text("All Expenses • \(unifiedTotal, format: CurrencyFormatter.currencyStyle())")
+            let format = String(localized: "budgetDetail.expensesTitle.unified", defaultValue: "All Expenses • %@", comment: "Budget detail list title for unified expenses.")
+            let value = CurrencyFormatter.string(from: unifiedTotal)
+            return Text(String(format: format, locale: Locale.current, value))
             
         case .variable:
-            return Text("Variable Expenses • \(derived.variableExpensesTotal, format: CurrencyFormatter.currencyStyle())")
+            let format = String(localized: "budgetDetail.expensesTitle.variable", defaultValue: "Variable Expenses • %@", comment: "Budget detail list title for variable expenses.")
+            let value = CurrencyFormatter.string(from: derived.variableExpensesTotal)
+            return Text(String(format: format, locale: Locale.current, value))
         }
     }
     
@@ -559,7 +565,7 @@ struct BudgetDetailView: View {
         .searchable(
             text: $searchText,
             placement: .navigationBarDrawer(displayMode: .always),
-            prompt: "Search"
+            prompt: String(localized: "common.search", defaultValue: "Search", comment: "Label for search actions.")
         )
         .searchFocused($searchFocused)
 
@@ -587,36 +593,36 @@ struct BudgetDetailView: View {
         // MARK: - Deletion UI
 
         .alert(
-            "Delete Budget?",
+            String(localized: "budgetDetail.deleteBudget.title", defaultValue: "Delete Budget?", comment: "Alert title for deleting a budget."),
             isPresented: $showingBudgetDeleteOptionsDialog
         ) {
-            Button("Keep All Expenses") {
+            Button(String(localized: "budgetDetail.deleteBudget.keepAll", defaultValue: "Keep All Expenses", comment: "Delete budget option to keep expenses.")) {
                 deleteBudgetOnly()
             }
 
-            Button("Delete Budget-Planned Expenses", role: .destructive) {
+            Button(String(localized: "budgetDetail.deleteBudget.removeGenerated", defaultValue: "Delete Budget-Planned Expenses", comment: "Delete budget option to remove generated planned expenses."), role: .destructive) {
                 deleteBudgetAndHandleGeneratedPlannedExpenses()
             }
 
-            Button("Cancel", role: .cancel) { }
+            Button(String(localized: "common.cancel", defaultValue: "Cancel", comment: "Cancel action label."), role: .cancel) { }
         } message: {
-            Text("This budget created planned expenses on your cards. What should Offshore do with them?")
+            Text(String(localized: "budgetDetail.deleteBudget.message", defaultValue: "This budget created planned expenses on your cards. What should Offshore do with them?", comment: "Delete budget options message."))
         }
 
-        .alert("Delete?", isPresented: $showingBudgetDeleteConfirm) {
-            Button("Delete", role: .destructive) {
+        .alert(String(localized: "common.deleteQuestion", defaultValue: "Delete?", comment: "Generic delete confirmation title."), isPresented: $showingBudgetDeleteConfirm) {
+            Button(String(localized: "common.delete", defaultValue: "Delete", comment: "Delete action label."), role: .destructive) {
                 pendingBudgetDelete?()
                 pendingBudgetDelete = nil
             }
-            Button("Cancel", role: .cancel) {
+            Button(String(localized: "common.cancel", defaultValue: "Cancel", comment: "Cancel action label."), role: .cancel) {
                 pendingBudgetDelete = nil
             }
         }
 
-        .alert("Nothing to delete", isPresented: $showingNothingToDeleteAlert) {
-            Button("OK", role: .cancel) { }
+        .alert(String(localized: "budgetDetail.nothingToDelete.title", defaultValue: "Nothing to delete", comment: "Alert title when nothing can be deleted."), isPresented: $showingNothingToDeleteAlert) {
+            Button(String(localized: "common.ok", defaultValue: "OK", comment: "OK action label."), role: .cancel) { }
         } message: {
-            Text("These planned expenses have actual spending recorded.")
+            Text(String(localized: "budgetDetail.nothingToDelete.message", defaultValue: "These planned expenses have actual spending recorded.", comment: "Alert message when deletion is blocked due recorded spending."))
         }
 
         .alert("Delete?", isPresented: $showingExpenseDeleteConfirm) {
@@ -853,33 +859,33 @@ struct BudgetDetailView: View {
         Section {
             VStack(spacing: 12) {
                 BudgetSummaryBucketCard(
-                    title: "Income",
+                    title: String(localized: "app.section.income", defaultValue: "Income", comment: "Main tab title for the Income section."),
                     titleColor: .blue,
                     rows: [
-                        .init(label: "Planned Income", value: derived.plannedIncomeTotal),
-                        .init(label: "Actual Income", value: derived.actualIncomeTotal)
+                        .init(label: String(localized: "budgetDetail.summary.plannedIncome", defaultValue: "Planned Income", comment: "Budget detail summary row for planned income."), value: derived.plannedIncomeTotal),
+                        .init(label: String(localized: "budgetDetail.summary.actualIncome", defaultValue: "Actual Income", comment: "Budget detail summary row for actual income."), value: derived.actualIncomeTotal)
                     ]
                 )
 
                 BudgetSummaryBucketCard(
-                    title: "Expenses",
+                    title: String(localized: "budgetDetail.summary.expenses", defaultValue: "Expenses", comment: "Budget detail summary card title for expenses."),
                     titleColor: .orange,
                     rows: expenseRowsForCurrentSelection(derived)
                 )
 
                 BudgetSummaryBucketCard(
-                    title: "Savings",
+                    title: String(localized: "accounts.segment.savings", defaultValue: "Savings", comment: "Accounts section segment for savings."),
                     titleColor: .green,
                     rows: [
-                        .init(label: "Max Savings", value: derived.maxSavings),
-                        .init(label: "Projected Savings", value: derived.projectedSavings),
-                        .init(label: "Actual Savings", value: derived.actualSavings)
+                        .init(label: String(localized: "budgetDetail.summary.maxSavings", defaultValue: "Max Savings", comment: "Budget detail summary row for max savings."), value: derived.maxSavings),
+                        .init(label: String(localized: "budgetDetail.summary.projectedSavings", defaultValue: "Projected Savings", comment: "Budget detail summary row for projected savings."), value: derived.projectedSavings),
+                        .init(label: String(localized: "budgetDetail.summary.actualSavings", defaultValue: "Actual Savings", comment: "Budget detail summary row for actual savings."), value: derived.actualSavings)
                     ]
                 )
             }
             .padding(.vertical, 4)
         } header: {
-            Text("Overview • \(budgetDateRangeLabel)")
+            Text(String(format: String(localized: "budgetDetail.overviewHeader", defaultValue: "Overview • %@", comment: "Budget detail overview section header with date range."), locale: Locale.current, budgetDateRangeLabel))
         } footer: {
             if let footnote = presetRequiresCardFootnote {
                 Text(footnote)
@@ -905,41 +911,41 @@ struct BudgetDetailView: View {
                 )
             } header: {
                 HStack {
-                    Text("Categories")
+                    Text(String(localized: "categories.title", defaultValue: "Categories", comment: "Title for categories section."))
                     Spacer()
                     if !selectedCategoryIDs.isEmpty {
-                        Button("Clear") {
+                        Button(String(localized: "common.clear", defaultValue: "Clear", comment: "Action to clear a selection.")) {
                             selectedCategoryIDs.removeAll()
                         }
                         .buttonStyle(.plain)
                     }
                 }
             } footer: {
-                Text("Single-press categories to filter expenses; tap selected chips to clear one. Long-press to edit category limits.")
+                Text(String(localized: "budgetDetail.categories.footer", defaultValue: "Single-press categories to filter expenses; tap selected chips to clear one. Long-press to edit category limits.", comment: "Footer guidance for budget detail category chips."))
             }
         }
     }
 
     private var typeAndSortSection: some View {
         Section {
-            Picker("Type", selection: $expenseScope) {
-                Text("Planned").tag(ExpenseScope.planned)
-                Text("Unified").tag(ExpenseScope.unified)
-                Text("Variable").tag(ExpenseScope.variable)
+            Picker(String(localized: "common.type", defaultValue: "Type", comment: "Label for type picker."), selection: $expenseScope) {
+                Text(String(localized: "expenseScope.planned", defaultValue: "Planned", comment: "Expense scope option for planned expenses.")).tag(ExpenseScope.planned)
+                Text(String(localized: "expenseScope.unified", defaultValue: "Unified", comment: "Expense scope option for unified expenses.")).tag(ExpenseScope.unified)
+                Text(String(localized: "expenseScope.variable", defaultValue: "Variable", comment: "Expense scope option for variable expenses.")).tag(ExpenseScope.variable)
             }
             .pickerStyle(.segmented)
 
-            Picker("Sort", selection: $sortMode) {
+            Picker(String(localized: "common.sort", defaultValue: "Sort", comment: "Label for sort actions."), selection: $sortMode) {
                 Text("A–Z").tag(BudgetSortMode.az)
                 Text("Z–A").tag(BudgetSortMode.za)
                 Text("\(CurrencyFormatter.currencySymbol)↑").tag(BudgetSortMode.amountAsc)
                 Text("\(CurrencyFormatter.currencySymbol)↓").tag(BudgetSortMode.amountDesc)
-                Text("Date ↑").tag(BudgetSortMode.dateAsc)
-                Text("Date ↓").tag(BudgetSortMode.dateDesc)
+                Text("F↑").tag(BudgetSortMode.dateAsc)
+                Text("F↓").tag(BudgetSortMode.dateDesc)
             }
             .pickerStyle(.segmented)
         } header: {
-            Text("Sort")
+            Text(String(localized: "common.sort", defaultValue: "Sort", comment: "Label for sort actions."))
         }
     }
 
@@ -988,10 +994,22 @@ struct BudgetDetailView: View {
     @ViewBuilder
     private func expenseListSectionFooter(_ derived: BudgetDetailDerivedState) -> some View {
         if derived.hiddenFuturePlannedExpenseCount > 0 {
-            Text("\(derived.hiddenFuturePlannedExpenseCount.formatted()) future planned expenses are hidden.")
+            Text(
+                String(
+                    format: String(localized: "budgetDetail.hiddenFuturePlanned", defaultValue: "%@ future planned expenses are hidden.", comment: "Footer text indicating hidden future planned expenses."),
+                    locale: Locale.current,
+                    derived.hiddenFuturePlannedExpenseCount.formatted()
+                )
+            )
         }
         if derived.hiddenFutureVariableExpenseCount > 0 {
-            Text("\(derived.hiddenFutureVariableExpenseCount.formatted()) future variable expenses are hidden.")
+            Text(
+                String(
+                    format: String(localized: "budgetDetail.hiddenFutureVariable", defaultValue: "%@ future variable expenses are hidden.", comment: "Footer text indicating hidden future variable expenses."),
+                    locale: Locale.current,
+                    derived.hiddenFutureVariableExpenseCount.formatted()
+                )
+            )
         }
     }
 
@@ -1072,7 +1090,7 @@ struct BudgetDetailView: View {
         } label: {
             Image(systemName: "plus")
         }
-        .accessibilityLabel("Add Expense")
+        .accessibilityLabel(String(localized: "expense.add", defaultValue: "Add Expense", comment: "Accessibility label for adding an expense."))
         .disabled(linkedCards.isEmpty)
     }
 
@@ -1082,13 +1100,13 @@ struct BudgetDetailView: View {
             Button {
                 activeModal = .managePresets
             } label: {
-                Label("Manage Presets", systemImage: "list.bullet.rectangle")
+                Label(String(localized: "settings.managePresets", defaultValue: "Manage Presets", comment: "Menu action to manage presets."), systemImage: "list.bullet.rectangle")
             }
 
             Button {
                 activeModal = .manageCards
             } label: {
-                Label("Manage Cards", systemImage: "creditcard")
+                Label(String(localized: "budgetDetail.manageCards", defaultValue: "Manage Cards", comment: "Menu action to manage linked cards."), systemImage: "creditcard")
             }
 
             Divider()
@@ -1096,51 +1114,51 @@ struct BudgetDetailView: View {
             Button {
                 activeModal = .editBudget
             } label: {
-                Label("Edit Budget", systemImage: "pencil")
+                Label(String(localized: "budgetDetail.editBudget", defaultValue: "Edit Budget", comment: "Menu action to edit the current budget."), systemImage: "pencil")
             }
             .tint(Color("AccentColor"))
             Button(role: .destructive) {
                 handleDeleteBudgetTapped()
             } label: {
-                Label("Delete Budget", systemImage: "trash")
+                Label(String(localized: "budgetDetail.deleteBudget.action", defaultValue: "Delete Budget", comment: "Menu action to delete the current budget."), systemImage: "trash")
             }
             .tint(Color("OffshoreDepth"))
         } label: {
             Image(systemName: "ellipsis")
         }
-        .accessibilityLabel("Budget Actions")
+        .accessibilityLabel(String(localized: "budgetDetail.actions", defaultValue: "Budget Actions", comment: "Accessibility label for budget actions menu."))
     }
 
     @ViewBuilder
     private var budgetDisplayToolbarButton: some View {
         Menu {
             Menu {
-                Toggle("Hide Future Planned Expenses", isOn: $hideFuturePlannedExpensesInView)
+                Toggle(String(localized: "expenseDisplay.hideFuturePlanned", defaultValue: "Hide Future Planned Expenses", comment: "Toggle label to hide future planned expenses."), isOn: $hideFuturePlannedExpensesInView)
                 Toggle(
-                    "Exclude Future Planned Expenses from Totals",
+                    String(localized: "expenseDisplay.excludeFuturePlanned", defaultValue: "Exclude Future Planned Expenses from Totals", comment: "Toggle label to exclude future planned expenses from totals."),
                     isOn: $excludeFuturePlannedExpensesFromCalculationsInView
                 )
             } label: {
                 if #available(iOS 26.0, *) {
-                    Label("Planned Expense Display", systemImage: "calendar.badge")
+                    Label(String(localized: "expenseDisplay.planned.title", defaultValue: "Planned Expense Display", comment: "Menu label for planned expense display options."), systemImage: "calendar.badge")
                 } else {
-                    Label("Planned Expense Display", systemImage: "calendar.badge.clock")
+                    Label(String(localized: "expenseDisplay.planned.title", defaultValue: "Planned Expense Display", comment: "Menu label for planned expense display options."), systemImage: "calendar.badge.clock")
                 }
             }
 
             Menu {
-                Toggle("Hide Future Variable Expenses", isOn: $hideFutureVariableExpensesInView)
+                Toggle(String(localized: "expenseDisplay.hideFutureVariable", defaultValue: "Hide Future Variable Expenses", comment: "Toggle label to hide future variable expenses."), isOn: $hideFutureVariableExpensesInView)
                 Toggle(
-                    "Exclude Future Variable Expenses from Totals",
+                    String(localized: "expenseDisplay.excludeFutureVariable", defaultValue: "Exclude Future Variable Expenses from Totals", comment: "Toggle label to exclude future variable expenses from totals."),
                     isOn: $excludeFutureVariableExpensesFromCalculationsInView
                 )
             } label: {
-                Label("Variable Expense Display", systemImage: "chart.xyaxis.line")
+                Label(String(localized: "expenseDisplay.variable.title", defaultValue: "Variable Expense Display", comment: "Menu label for variable expense display options."), systemImage: "chart.xyaxis.line")
             }
         } label: {
             Image(systemName: "eye")
         }
-        .accessibilityLabel("Expense Display")
+        .accessibilityLabel(String(localized: "expense.display", defaultValue: "Expense Display", comment: "Accessibility label for expense display menu."))
     }
 
     // MARK: - Expenses bucket rows (reactive)
@@ -1149,21 +1167,21 @@ struct BudgetDetailView: View {
         switch expenseScope {
         case .planned:
             return [
-                .init(label: "Planned Total", value: derived.plannedExpensesPlannedTotal),
-                .init(label: "Actual Total", value: derived.plannedExpensesActualTotal)
+                .init(label: String(localized: "budgetDetail.total.planned", defaultValue: "Planned Total", comment: "Summary row label for planned total."), value: derived.plannedExpensesPlannedTotal),
+                .init(label: String(localized: "budgetDetail.total.actual", defaultValue: "Actual Total", comment: "Summary row label for actual total."), value: derived.plannedExpensesActualTotal)
             ]
 
         case .variable:
             return [
-                .init(label: "Variable Total", value: derived.variableExpensesTotal),
+                .init(label: String(localized: "budgetDetail.total.variable", defaultValue: "Variable Total", comment: "Summary row label for variable total."), value: derived.variableExpensesTotal),
             ]
 
         case .unified:
             let unifiedTotal = derived.plannedExpensesEffectiveTotal + derived.variableExpensesTotal
             return [
-                .init(label: "Planned Total", value: derived.plannedExpensesEffectiveTotal),
-                .init(label: "Variable Total", value: derived.variableExpensesTotal),
-                .init(label: "Unified Total", value: unifiedTotal)
+                .init(label: String(localized: "budgetDetail.total.planned", defaultValue: "Planned Total", comment: "Summary row label for planned total."), value: derived.plannedExpensesEffectiveTotal),
+                .init(label: String(localized: "budgetDetail.total.variable", defaultValue: "Variable Total", comment: "Summary row label for variable total."), value: derived.variableExpensesTotal),
+                .init(label: String(localized: "budgetDetail.total.unified", defaultValue: "Unified Total", comment: "Summary row label for unified total."), value: unifiedTotal)
             ]
         }
     }

@@ -107,12 +107,24 @@ struct WhatIfCategoryRowView: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(categoryName)
-        .accessibilityValue("Min \(formatCurrency(minAmount)), Max \(formatCurrency(maxAmount)), Scenario \(formatCurrency(scenarioSpendAmount))")
+        .accessibilityValue(
+            String(
+                format: String(
+                    localized: "whatIf.categoryRow.accessibilityValueFormat",
+                    defaultValue: "Min %1$@, Max %2$@, Scenario %3$@",
+                    comment: "Accessibility summary for What If category row."
+                ),
+                locale: .current,
+                formatCurrency(minAmount),
+                formatCurrency(maxAmount),
+                formatCurrency(scenarioSpendAmount)
+            )
+        )
     }
 
     private var minField: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Min")
+            Text(String(localized: "common.min", defaultValue: "Min", comment: "Common label for minimum value."))
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
             TextField("", text: $minText)
@@ -132,7 +144,7 @@ struct WhatIfCategoryRowView: View {
 
     private var maxField: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Max")
+            Text(String(localized: "common.max", defaultValue: "Max", comment: "Common label for maximum value."))
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
             TextField("", text: $maxText)
@@ -152,7 +164,7 @@ struct WhatIfCategoryRowView: View {
 
     private var scenarioField: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Scenario")
+            Text(String(localized: "whatIf.scenario", defaultValue: "Scenario", comment: "Label for scenario value field in What If category row."))
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
             TextField("", text: $scenarioText)
@@ -172,16 +184,33 @@ struct WhatIfCategoryRowView: View {
 
     private var baselineSummaryText: String {
         if abs(baselineMinAmount - baselineMaxAmount) < 0.000_1 {
-            return "Actual: \(formatCurrency(baselineMinAmount))"
+            return String(
+                format: String(
+                    localized: "whatIf.categoryRow.actualFormat",
+                    defaultValue: "Actual: %1$@",
+                    comment: "Baseline summary format for actual value."
+                ),
+                locale: .current,
+                formatCurrency(baselineMinAmount)
+            )
         }
 
-        return "Min: \(formatCurrency(baselineMinAmount)) • Max: \(formatCurrency(baselineMaxAmount))"
+        return String(
+            format: String(
+                localized: "whatIf.categoryRow.minMaxFormat",
+                defaultValue: "Min: %1$@ • Max: %2$@",
+                comment: "Baseline summary format showing minimum and maximum values."
+            ),
+            locale: .current,
+            formatCurrency(baselineMinAmount),
+            formatCurrency(baselineMaxAmount)
+        )
     }
 
     // MARK: - Badge
 
     private var editedBadge: some View {
-        Text("Edited")
+        Text(String(localized: "common.edited", defaultValue: "Edited", comment: "Badge label indicating a value has been edited."))
             .font(.caption2.weight(.semibold))
             .foregroundStyle(.secondary)
             .padding(.horizontal, 8)
@@ -191,7 +220,7 @@ struct WhatIfCategoryRowView: View {
                 Capsule()
                     .strokeBorder(.secondary.opacity(0.25), lineWidth: 1)
             }
-            .accessibilityLabel("Edited")
+            .accessibilityLabel(String(localized: "common.edited", defaultValue: "Edited", comment: "Badge label indicating a value has been edited."))
     }
 
     // MARK: - Helpers

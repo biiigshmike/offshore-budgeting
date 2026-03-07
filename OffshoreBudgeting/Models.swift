@@ -22,11 +22,16 @@ enum BudgetingPeriod: String, CaseIterable, Identifiable {
 
     var displayTitle: String {
         switch self {
-        case .daily: return "Daily"
-        case .weekly: return "Weekly"
-        case .monthly: return "Monthly"
-        case .quarterly: return "Quarterly"
-        case .yearly: return "Yearly"
+        case .daily:
+            return String(localized: "budgetingPeriod.daily", defaultValue: "Daily", comment: "Label for daily budgeting period.")
+        case .weekly:
+            return String(localized: "budgetingPeriod.weekly", defaultValue: "Weekly", comment: "Label for weekly budgeting period.")
+        case .monthly:
+            return String(localized: "budgetingPeriod.monthly", defaultValue: "Monthly", comment: "Label for monthly budgeting period.")
+        case .quarterly:
+            return String(localized: "budgetingPeriod.quarterly", defaultValue: "Quarterly", comment: "Label for quarterly budgeting period.")
+        case .yearly:
+            return String(localized: "budgetingPeriod.yearly", defaultValue: "Yearly", comment: "Label for yearly budgeting period.")
         }
     }
 
@@ -256,11 +261,16 @@ enum RecurrenceFrequency: String, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .none: return "None"
-        case .daily: return "Daily"
-        case .weekly: return "Weekly"
-        case .monthly: return "Monthly"
-        case .yearly: return "Yearly"
+        case .none:
+            return String(localized: "recurrence.none", defaultValue: "None", comment: "Recurrence frequency option for no repeat.")
+        case .daily:
+            return String(localized: "recurrence.daily", defaultValue: "Daily", comment: "Recurrence frequency option for daily repeat.")
+        case .weekly:
+            return String(localized: "recurrence.weekly", defaultValue: "Weekly", comment: "Recurrence frequency option for weekly repeat.")
+        case .monthly:
+            return String(localized: "recurrence.monthly", defaultValue: "Monthly", comment: "Recurrence frequency option for monthly repeat.")
+        case .yearly:
+            return String(localized: "recurrence.yearly", defaultValue: "Yearly", comment: "Recurrence frequency option for yearly repeat.")
         }
     }
 }

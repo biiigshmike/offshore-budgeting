@@ -15,8 +15,10 @@ enum HomeTileSize: String, CaseIterable, Codable, Equatable {
 
     var title: String {
         switch self {
-        case .small: return "Small"
-        case .wide: return "Wide"
+        case .small:
+            return String(localized: "homeTileSize.small", defaultValue: "Small", comment: "Home tile size option label for small.")
+        case .wide:
+            return String(localized: "homeTileSize.wide", defaultValue: "Wide", comment: "Home tile size option label for wide.")
         }
     }
 }

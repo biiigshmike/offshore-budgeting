@@ -27,9 +27,21 @@ struct HomeEditPinnedCardsView: View {
 
                 // MARK: - Pinned on Home (combined)
 
-                Section("Pinned on Home") {
+                Section(
+                    String(
+                        localized: "homeEdit.section.pinnedOnDashboard",
+                        defaultValue: "Pinned on Dashboard",
+                        comment: "Section title for items currently pinned to the Home dashboard."
+                    )
+                ) {
                     if pinnedItems.isEmpty {
-                        Text("Nothing is pinned yet.")
+                        Text(
+                            String(
+                                localized: "homeEdit.empty.pinned",
+                                defaultValue: "Nothing is pinned yet.",
+                                comment: "Empty-state message when no cards or widgets are pinned on Home."
+                            )
+                        )
                             .foregroundStyle(.secondary)
                     } else {
                         ForEach($pinnedItems) { $item in
@@ -44,7 +56,13 @@ struct HomeEditPinnedCardsView: View {
 
                 // MARK: - Available Widgets
 
-                Section("Available Widgets") {
+                Section(
+                    String(
+                        localized: "homeEdit.section.availableWidgets",
+                        defaultValue: "Available Panels",
+                        comment: "Section title for widgets available to pin to Home."
+                    )
+                ) {
                     let pinnedWidgetSet = Set(pinnedItems.compactMap { item -> HomeWidgetID? in
                         if case .widget(let w, _) = item { return w }
                         return nil
@@ -53,7 +71,13 @@ struct HomeEditPinnedCardsView: View {
                     let availableWidgets = HomeWidgetID.allCases.filter { !pinnedWidgetSet.contains($0) }
 
                     if availableWidgets.isEmpty {
-                        Text("All widgets are pinned.")
+                        Text(
+                            String(
+                                localized: "homeEdit.empty.availableWidgets",
+                                defaultValue: "All panels are pinned.",
+                                comment: "Message shown when there are no additional widgets available to pin."
+                            )
+                        )
                             .foregroundStyle(.secondary)
                     } else {
                         ForEach(availableWidgets) { widget in
@@ -75,7 +99,13 @@ struct HomeEditPinnedCardsView: View {
 
                 // MARK: - Available Cards
 
-                Section("Available Cards") {
+                Section(
+                    String(
+                        localized: "homeEdit.section.availableCards",
+                        defaultValue: "Available Cards",
+                        comment: "Section title for cards available to pin to Home."
+                    )
+                ) {
                     let pinnedCardSet = Set(pinnedItems.compactMap { item -> UUID? in
                         if case .card(let id, _) = item { return id }
                         return nil
@@ -84,7 +114,13 @@ struct HomeEditPinnedCardsView: View {
                     let availableCards = cards.filter { !pinnedCardSet.contains($0.id) }
 
                     if availableCards.isEmpty {
-                        Text("All cards are pinned.")
+                        Text(
+                            String(
+                                localized: "homeEdit.empty.availableCards",
+                                defaultValue: "All cards are pinned.",
+                                comment: "Message shown when there are no additional cards available to pin."
+                            )
+                        )
                             .foregroundStyle(.secondary)
                     } else {
                         ForEach(availableCards) { card in
@@ -104,7 +140,13 @@ struct HomeEditPinnedCardsView: View {
                     }
                 }
             }
-            .navigationTitle("Edit Home")
+            .navigationTitle(
+                String(
+                    localized: "homeEdit.navigationTitle",
+                    defaultValue: "Edit Dashboard",
+                    comment: "Navigation title for editing Home pinned items."
+                )
+            )
             .environment(\.editMode, $editMode)
             .onDisappear {
                 editMode = .inactive
@@ -125,9 +167,22 @@ struct HomeEditPinnedCardsView: View {
                         }
                     } label: {
                         if isEditing {
-                            Label("Done", systemImage: "checkmark")
+                            Label(
+                                String(
+                                    localized: "common.done",
+                                    defaultValue: "Done",
+                                    comment: "Generic action label to finish editing."
+                                ),
+                                systemImage: "checkmark"
+                            )
                         } else {
-                            Text("Edit")
+                            Text(
+                                String(
+                                    localized: "common.edit",
+                                    defaultValue: "Edit",
+                                    comment: "Generic action label to start editing."
+                                )
+                            )
                         }
                     }
                 }
@@ -151,7 +206,14 @@ struct HomeEditPinnedCardsView: View {
             if showsTileSizePicker {
                 Spacer()
 
-                Picker("Size", selection: sizeBinding) {
+                Picker(
+                    String(
+                        localized: "homeEdit.picker.size",
+                        defaultValue: "Size",
+                        comment: "Label for the home tile size picker."
+                    ),
+                    selection: sizeBinding
+                ) {
                     ForEach(HomeTileSize.allCases, id: \.self) { size in
                         Text(size.title).tag(size)
                     }
@@ -170,7 +232,12 @@ struct HomeEditPinnedCardsView: View {
         case .widget(let widget, _):
             return widget.title
         case .card(let id, _):
-            return cards.first(where: { $0.id == id })?.name ?? "Missing Card"
+            return cards.first(where: { $0.id == id })?.name
+                ?? String(
+                    localized: "homeEdit.missingCard",
+                    defaultValue: "Missing Card",
+                    comment: "Fallback title when a pinned card can no longer be found."
+                )
         }
     }
 

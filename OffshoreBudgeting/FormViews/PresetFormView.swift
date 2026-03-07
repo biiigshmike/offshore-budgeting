@@ -173,6 +173,9 @@ struct PresetFormView: View {
     
     private func ordinal(_ number: Int) -> String {
         let n = abs(number)
+        if Locale.current.identifier.hasPrefix("es") {
+            return localizedInt(n)
+        }
         let formatter = NumberFormatter()
         formatter.numberStyle = .ordinal
         formatter.locale = .current

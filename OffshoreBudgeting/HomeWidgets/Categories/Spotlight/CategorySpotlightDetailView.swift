@@ -56,9 +56,17 @@ struct CategorySpotlightDetailView: View {
 
     private var showAllButtonTitle: String {
         if showsAll {
-            return "Hide All Categories"
+            return String(localized: "homeWidget.categorySpotlight.hideAllCategories", defaultValue: "Hide All Categories", comment: "Button title to collapse full category list.")
         } else {
-            return "Show All Categories (\(localizedInt(result.metrics.count)))"
+            return String(
+                format: String(
+                    localized: "homeWidget.categorySpotlight.showAllCategoriesFormat",
+                    defaultValue: "Show All Categories (%1$@)",
+                    comment: "Button title to expand full category list with count."
+                ),
+                locale: .current,
+                localizedInt(result.metrics.count)
+            )
         }
     }
 
@@ -78,7 +86,7 @@ struct CategorySpotlightDetailView: View {
 
                     if let topMetric {
                         VStack(spacing: 4) {
-                            Text("Top Category")
+                            Text(String(localized: "homeWidget.categorySpotlight.topCategory", defaultValue: "Top Category", comment: "Label for top category in detail view."))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
 
@@ -94,7 +102,7 @@ struct CategorySpotlightDetailView: View {
 
                     HStack {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("Total spent")
+                            Text(String(localized: "homeWidget.categorySpotlight.totalSpentLowercase", defaultValue: "Total spent", comment: "Label for total spent in category spotlight detail view."))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
 
@@ -128,16 +136,16 @@ struct CategorySpotlightDetailView: View {
                     )
                 }
             } header: {
-                Text("Spending by Category")
+                Text(String(localized: "homeWidget.categorySpotlight.spendingByCategory", defaultValue: "Spending by Category", comment: "Section header for category spending list."))
             }
         }
         .listStyle(.insetGrouped)
-        .navigationTitle("Category Spotlight")
+        .navigationTitle(String(localized: "homeWidget.categorySpotlight", defaultValue: "Category Spotlight", comment: "Pinned home widget title for category spotlight."))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .principal) {
                 VStack(spacing: 2) {
-                    Text("Category Spotlight")
+                    Text(String(localized: "homeWidget.categorySpotlight", defaultValue: "Category Spotlight", comment: "Pinned home widget title for category spotlight."))
                         .font(.headline)
                     Text(subtitle)
                         .font(.caption)

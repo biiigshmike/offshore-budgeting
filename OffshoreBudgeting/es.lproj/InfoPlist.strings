@@ -1,0 +1,5 @@
+"CFBundleDisplayName" = "Offshore";
+"NSFaceIDUsageDescription" = "Usa Face ID para bloquear la app y proteger datos sensibles de presupuesto.";
+"NSLocationAlwaysAndWhenInUseUsageDescription" = "Offshore usa tu ubicación en Modo excursión para sugerir registrar compras cuando estés cerca de puntos de interés, incluso en segundo plano.";
+"NSLocationWhenInUseUsageDescription" = "Offshore usa tu ubicación durante Modo excursión para detectar puntos de interés cercanos y sugerir un registro rápido de gastos.";
+"NSPhotoLibraryUsageDescription" = "Offshore usa las fotos que selecciones para importar transacciones o ingresos desde capturas de pantalla.";

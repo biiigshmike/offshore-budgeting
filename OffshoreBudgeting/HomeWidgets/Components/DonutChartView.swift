@@ -85,7 +85,7 @@ struct DonutChartView: View {
             }
         }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Category breakdown")
+        .accessibilityLabel(String(localized: "homeWidget.categoryBreakdown", defaultValue: "Category breakdown", comment: "Accessibility label for category donut chart."))
     }
 
     // MARK: - Charts
@@ -168,7 +168,7 @@ struct DonutChartView: View {
     private var emptyState: some View {
         VStack(spacing: 6) {
 
-            Text("No spending data found in this range.")
+            Text(String(localized: "homeWidget.categorySpotlight.noDataInRange", defaultValue: "No spending data found in this range.", comment: "Message shown when no category spending data exists for selected range."))
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

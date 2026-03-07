@@ -119,15 +119,15 @@ struct BudgetsView: View {
         List {
             if budgets.isEmpty {
                 ContentUnavailableView(
-                    "No Budgets Yet",
+                    String(localized: "budgets.empty.title", defaultValue: "No Budgets Yet", comment: "Empty state title when no budgets exist."),
                     systemImage: "chart.pie",
-                    description: Text("Create a budget to start planning spending.")
+                    description: Text(String(localized: "budgets.empty.message", defaultValue: "Create a budget to start planning spending.", comment: "Empty state message when no budgets exist."))
                 )
             } else if filteredBudgets.isEmpty {
                 ContentUnavailableView(
-                    "No Results",
+                    String(localized: "common.noResults", defaultValue: "No Results", comment: "Empty state title for no search results."),
                     systemImage: "magnifyingglass",
-                    description: Text("Try a different search.")
+                    description: Text(String(localized: "common.tryDifferentSearch", defaultValue: "Try a different search.", comment: "Prompt to try a different search query."))
                 )
             } else {
 
@@ -136,7 +136,11 @@ struct BudgetsView: View {
                 if !activeBudgets.isEmpty {
                     Section {
                         BucketDisclosureRow(
-                            title: "Active Budgets (\(localizedInt(activeBudgets.count)))",
+                            title: bucketTitle(
+                                key: "budgets.bucket.active",
+                                defaultValue: "Active Budgets (%@)",
+                                count: activeBudgets.count
+                            ),
                             isExpanded: $activeExpanded
                         )
 
@@ -151,7 +155,11 @@ struct BudgetsView: View {
                 if !upcomingBudgets.isEmpty {
                     Section {
                         BucketDisclosureRow(
-                            title: "Upcoming Budgets (\(localizedInt(upcomingBudgets.count)))",
+                            title: bucketTitle(
+                                key: "budgets.bucket.upcoming",
+                                defaultValue: "Upcoming Budgets (%@)",
+                                count: upcomingBudgets.count
+                            ),
                             isExpanded: $upcomingExpanded
                         )
 
@@ -166,7 +174,11 @@ struct BudgetsView: View {
                 if !pastBudgets.isEmpty {
                     Section {
                         BucketDisclosureRow(
-                            title: "Past Budgets (\(localizedInt(pastBudgets.count)))",
+                            title: bucketTitle(
+                                key: "budgets.bucket.past",
+                                defaultValue: "Past Budgets (%@)",
+                                count: pastBudgets.count
+                            ),
                             isExpanded: $pastExpanded
                         )
 
@@ -181,30 +193,30 @@ struct BudgetsView: View {
         }
         .postBoardingTip(
             key: "tip.budgets.v1",
-            title: "Budgets",
+            title: String(localized: "app.section.budgets", defaultValue: "Budgets", comment: "Main tab title for the Budgets section."),
             items: [
                 PostBoardingTipItem(
                     systemImage: "chart.pie.fill",
-                    title: "Budgets",
-                    detail: "Create and view your budgets here. Press a budget and you will be taken to it's detail view."
+                    title: String(localized: "app.section.budgets", defaultValue: "Budgets", comment: "Main tab title for the Budgets section."),
+                    detail: String(localized: "budgets.tip.overview.detail", defaultValue: "Create and view your budgets here. Press a budget and you will be taken to its detail view.", comment: "Tip text describing budgets overview.")
                 ),
                 PostBoardingTipItem(
                     systemImage: "list.triangle",
-                    title: "View & Sort",
-                    detail: "Active • happening now\nUpcoming • starts later\nPast • ended"
+                    title: String(localized: "budgets.tip.viewSort.title", defaultValue: "View & Sort", comment: "Tip title for viewing and sorting budgets."),
+                    detail: String(localized: "budgets.tip.viewSort.detail", defaultValue: "Active • happening now\nUpcoming • starts later\nPast • ended", comment: "Tip detail explaining budget buckets.")
                 ),
                 PostBoardingTipItem(
                     systemImage: "magnifyingglass",
-                    title: "Search",
-                    detail: "Use the search bar to search budgets by title or date."
+                    title: String(localized: "common.search", defaultValue: "Search", comment: "Label for search actions."),
+                    detail: String(localized: "budgets.tip.search.detail", defaultValue: "Use the search bar to search budgets by title or date.", comment: "Tip detail for searching budgets.")
                 )
             ]
         )
-        .navigationTitle("Budgets")
+        .navigationTitle(String(localized: "app.section.budgets", defaultValue: "Budgets", comment: "Main tab title for the Budgets section."))
         .searchable(
             text: $searchText,
             placement: .navigationBarDrawer(displayMode: .always),
-            prompt: "Search"
+            prompt: String(localized: "common.search", defaultValue: "Search", comment: "Label for search actions.")
         )
         .searchFocused($searchFocused)
         .toolbar {
@@ -280,20 +292,20 @@ struct BudgetsView: View {
         } label: {
             Image(systemName: "plus")
         }
-        .accessibilityLabel("Add Budget")
+        .accessibilityLabel(String(localized: "budgets.add", defaultValue: "Add Budget", comment: "Accessibility label for adding a budget."))
     }
 
     @ViewBuilder
     private var sortToolbarButton: some View {
         Menu {
-            sortMenuButton(title: "A-Z", mode: .az)
-            sortMenuButton(title: "Z-A", mode: .za)
-            sortMenuButton(title: "Date ↑", mode: .dateAsc)
-            sortMenuButton(title: "Date ↓", mode: .dateDesc)
+            sortMenuButton(title: "A–Z", mode: .az)
+            sortMenuButton(title: "Z–A", mode: .za)
+            sortMenuButton(title: "F↑", mode: .dateAsc)
+            sortMenuButton(title: "F↓", mode: .dateDesc)
         } label: {
             Image(systemName: "arrow.up.arrow.down")
         }
-        .accessibilityLabel("Sort")
+        .accessibilityLabel(String(localized: "common.sort", defaultValue: "Sort", comment: "Accessibility label for sort actions."))
     }
 
     private func sortMenuButton(title: String, mode: BudgetsListSortMode) -> some View {
@@ -339,6 +351,11 @@ struct BudgetsView: View {
 
     private func localizedInt(_ value: Int) -> String {
         AppNumberFormat.integer(value)
+    }
+
+    private func bucketTitle(key: String, defaultValue: String, count: Int) -> String {
+        let format = Bundle.main.localizedString(forKey: key, value: defaultValue, table: nil)
+        return String(format: format, locale: Locale.current, localizedInt(count))
     }
 
     private func openNewBudget() {

@@ -230,7 +230,7 @@ struct HomeCategoryAvailabilityTile: View {
                 .buttonStyle(.plain)
                 .disabled(current == 0)
                 .opacity(current == 0 ? 0.4 : 1.0)
-                .accessibilityLabel("Previous page")
+                .accessibilityLabel(String(localized: "common.previousPage", defaultValue: "Previous page", comment: "Accessibility label for previous page control."))
 
                 Spacer()
 
@@ -246,7 +246,7 @@ struct HomeCategoryAvailabilityTile: View {
                 .buttonStyle(.plain)
                 .disabled(current >= totalPages - 1)
                 .opacity(current >= totalPages - 1 ? 0.4 : 1.0)
-                .accessibilityLabel("Next page")
+                .accessibilityLabel(String(localized: "common.nextPage", defaultValue: "Next page", comment: "Accessibility label for next page control."))
             }
         }
         .frame(maxWidth: .infinity)

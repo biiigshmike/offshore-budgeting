@@ -33,9 +33,9 @@ struct CategoryAvailabilityRowView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
-                    labelLine(title: "Max", value: maxText)
-                    labelLine(title: "Available", value: availableText)
-                    labelLine(title: "Spent", value: spentText)
+                    labelLine(title: String(localized: "common.max", defaultValue: "Max", comment: "Common label for maximum value."), value: maxText)
+                    labelLine(title: String(localized: "common.available", defaultValue: "Available", comment: "Common label for available amount."), value: availableText)
+                    labelLine(title: String(localized: "common.spent", defaultValue: "Spent", comment: "Common label for spent amount."), value: spentText)
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -112,21 +112,21 @@ struct CategoryAvailabilityRowView: View {
     private var statusTag: some View {
         Group {
             if metric.maxAmount == nil {
-                Text("Unlimited")
+                Text(String(localized: "homeWidget.categoryAvailability.unlimited", defaultValue: "Unlimited", comment: "Status tag for categories without a spending limit."))
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(.secondary)
             } else {
                 switch status {
                 case .over:
-                    Text("Over")
+                    Text(String(localized: "homeWidget.categoryAvailability.over", defaultValue: "Over", comment: "Status tag for category over spending limit."))
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(.red)
                 case .near:
-                    Text("Near")
+                    Text(String(localized: "homeWidget.categoryAvailability.near", defaultValue: "Near", comment: "Status tag for category near spending limit."))
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(.orange)
                 case .ok:
-                    Text("OK")
+                    Text(String(localized: "homeWidget.categoryAvailability.ok", defaultValue: "OK", comment: "Status tag for category within spending limit."))
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(.secondary)
                 }
@@ -158,21 +158,31 @@ struct CategoryAvailabilityRowView: View {
     // MARK: - Accessibility
 
     private var accessibilityValueText: String {
-        "Max \(maxText), Available \(availableText), Spent \(spentText)"
+        String(
+            format: String(
+                localized: "homeWidget.categoryAvailability.accessibilityValueFormat",
+                defaultValue: "Max %1$@, Available %2$@, Spent %3$@",
+                comment: "Accessibility summary for category availability row."
+            ),
+            locale: .current,
+            maxText,
+            availableText,
+            spentText
+        )
     }
 
     private var accessibilityHintText: String {
         if metric.maxAmount == nil {
-            return "No maximum set for this category."
+            return String(localized: "homeWidget.categoryAvailability.hint.noMax", defaultValue: "No maximum set for this category.", comment: "Accessibility hint when category has no maximum.")
         }
 
         switch status {
         case .over:
-            return "You are over the maximum for this category."
+            return String(localized: "homeWidget.categoryAvailability.hint.over", defaultValue: "You are over the maximum for this category.", comment: "Accessibility hint when category is over maximum.")
         case .near:
-            return "You are close to the maximum for this category."
+            return String(localized: "homeWidget.categoryAvailability.hint.near", defaultValue: "You are close to the maximum for this category.", comment: "Accessibility hint when category is near maximum.")
         case .ok:
-            return "Spending is within the maximum for this category."
+            return String(localized: "homeWidget.categoryAvailability.hint.ok", defaultValue: "Spending is within the maximum for this category.", comment: "Accessibility hint when category is within maximum.")
         }
     }
 }

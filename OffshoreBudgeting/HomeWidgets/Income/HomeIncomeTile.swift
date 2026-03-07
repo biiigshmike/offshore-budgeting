@@ -52,7 +52,7 @@ struct HomeIncomeTile: View {
             )
         } label: {
             HomeTileContainer(
-                title: "Income",
+                title: String(localized: "homeWidget.income", defaultValue: "Income", comment: "Pinned home widget title for income metrics."),
                 subtitle: dateRangeSubtitle,
                 accent: .blue,
                 showsChevron: true
@@ -61,7 +61,7 @@ struct HomeIncomeTile: View {
 
                     HStack(alignment: .firstTextBaseline, spacing: 14) {
                         metricBlock(
-                            title: "Actual Income",
+                            title: String(localized: "homeWidget.income.actualIncome", defaultValue: "Actual Income", comment: "Metric label for actual income."),
                             value: actualTotal,
                             isEmphasized: false
                         )
@@ -69,7 +69,7 @@ struct HomeIncomeTile: View {
                         Spacer(minLength: 0)
 
                         metricBlock(
-                            title: "Planned Income",
+                            title: String(localized: "homeWidget.income.plannedIncome", defaultValue: "Planned Income", comment: "Metric label for planned income."),
                             value: plannedTotal,
                             isEmphasized: false
                         )
@@ -83,8 +83,8 @@ struct HomeIncomeTile: View {
             }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Income")
-        .accessibilityHint("Opens income metrics")
+        .accessibilityLabel(String(localized: "homeWidget.income", defaultValue: "Income", comment: "Pinned home widget title for income metrics."))
+        .accessibilityHint(String(localized: "homeWidget.income.accessibilityHint", defaultValue: "Opens income metrics", comment: "Accessibility hint for opening income widget details."))
     }
 
     // MARK: - UI Helpers
@@ -142,8 +142,18 @@ private struct HomeIncomeGaugeRow: View {
                 .frame(minWidth: 44, alignment: .trailing)
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Income progress")
-        .accessibilityValue("\(percentText) of planned")
+        .accessibilityLabel(String(localized: "homeWidget.income.progressLabel", defaultValue: "Income progress", comment: "Accessibility label for income progress gauge."))
+        .accessibilityValue(
+            String(
+                format: String(
+                    localized: "homeWidget.income.progressValueFormat",
+                    defaultValue: "%1$@ of planned",
+                    comment: "Accessibility value format for income progress gauge."
+                ),
+                locale: .current,
+                percentText
+            )
+        )
     }
 }
 

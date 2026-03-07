@@ -3,11 +3,22 @@ import SwiftUI
 struct AccountsView: View {
 
     enum Segment: String, CaseIterable, Identifiable {
-        case cards = "Cards"
-        case sharedBalances = "Reconciliations"
-        case savings = "Savings"
+        case cards
+        case sharedBalances
+        case savings
 
         var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .cards:
+                return String(localized: "accounts.segment.cards", defaultValue: "Cards", comment: "Accounts section segment for cards.")
+            case .sharedBalances:
+                return String(localized: "accounts.segment.reconciliations", defaultValue: "Reconciliations", comment: "Accounts section segment for reconciliations.")
+            case .savings:
+                return String(localized: "accounts.segment.savings", defaultValue: "Savings", comment: "Accounts section segment for savings.")
+            }
+        }
 
         var symbolName: String {
             switch self {
@@ -190,52 +201,52 @@ struct AccountsView: View {
         case .cards:
             Menu {
                 sortMenuButton(
-                    title: "A-Z",
+                    title: "A–Z",
                     isSelected: cardsSortModeRaw == "az",
                     commandID: AppCommandID.Cards.sortAZ
                 )
                 sortMenuButton(
-                    title: "Z-A",
+                    title: "Z–A",
                     isSelected: cardsSortModeRaw == "za",
                     commandID: AppCommandID.Cards.sortZA
                 )
             } label: {
                 Image(systemName: "arrow.up.arrow.down")
             }
-            .accessibilityLabel("Sort")
+            .accessibilityLabel(String(localized: "common.sort", defaultValue: "Sort", comment: "Accessibility label for sort actions."))
         case .sharedBalances:
             Menu {
                 sortMenuButton(
-                    title: "A-Z",
+                    title: "A–Z",
                     isSelected: sharedBalancesSortModeRaw == "az",
                     commandID: AppCommandID.SharedBalances.sortAZ
                 )
                 sortMenuButton(
-                    title: "Z-A",
+                    title: "Z–A",
                     isSelected: sharedBalancesSortModeRaw == "za",
                     commandID: AppCommandID.SharedBalances.sortZA
                 )
                 sortMenuButton(
-                    title: "$ \u{2191}",
+                    title: "$↑",
                     isSelected: sharedBalancesSortModeRaw == "amountAsc",
                     commandID: AppCommandID.SharedBalances.sortAmountAsc
                 )
                 sortMenuButton(
-                    title: "$ \u{2193}",
+                    title: "$↓",
                     isSelected: sharedBalancesSortModeRaw == "amountDesc",
                     commandID: AppCommandID.SharedBalances.sortAmountDesc
                 )
             } label: {
                 Image(systemName: "arrow.up.arrow.down")
             }
-            .accessibilityLabel("Sort")
+            .accessibilityLabel(String(localized: "common.sort", defaultValue: "Sort", comment: "Accessibility label for sort actions."))
         case .savings:
             Button {
             } label: {
                 Image(systemName: "arrow.up.arrow.down")
             }
             .disabled(true)
-            .accessibilityLabel("Sort Unavailable")
+            .accessibilityLabel(String(localized: "accounts.sortUnavailable", defaultValue: "Sort Unavailable", comment: "Accessibility label when sort is not available."))
         }
     }
 
@@ -246,7 +257,7 @@ struct AccountsView: View {
                     selectedSegment = segment
                 } label: {
                     HStack {
-                        Text(segment.rawValue)
+                        Text(segment.title)
                         if selectedSegment == segment {
                             Spacer()
                             Image(systemName: "checkmark")
@@ -255,9 +266,9 @@ struct AccountsView: View {
                 }
             }
         } label: {
-            Text(selectedSegment.rawValue)
+            Text(selectedSegment.title)
         }
-        .accessibilityLabel("Section")
+        .accessibilityLabel(String(localized: "common.section", defaultValue: "Section", comment: "Accessibility label for section picker."))
     }
 
     private func sortMenuButton(title: String, isSelected: Bool, commandID: String) -> some View {
@@ -277,16 +288,16 @@ struct AccountsView: View {
     private var addButtonAccessibilityLabel: String {
         switch selectedSegment {
         case .cards:
-            return "Add Card"
+            return String(localized: "accounts.addCard", defaultValue: "Add Card", comment: "Accessibility label for add card action.")
         case .sharedBalances:
-            return "Add Reconciliation"
+            return String(localized: "accounts.addReconciliation", defaultValue: "Add Reconciliation", comment: "Accessibility label for add reconciliation action.")
         case .savings:
-            return "Add Savings Entry"
+            return String(localized: "accounts.addSavingsEntry", defaultValue: "Add Savings Entry", comment: "Accessibility label for add savings entry action.")
         }
     }
 
     private var navigationTitleText: String {
-        selectedSegment.rawValue
+        selectedSegment.title
     }
 }
 
@@ -360,6 +371,6 @@ private struct AccountsGlassSegmentControl: View {
         }
         .glassEffectID(segment.id, in: namespace)
         .glassEffectTransition(.matchedGeometry)
-        .accessibilityLabel(segment.rawValue)
+        .accessibilityLabel(segment.title)
     }
 }

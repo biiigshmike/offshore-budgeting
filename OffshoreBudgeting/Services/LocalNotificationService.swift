@@ -212,8 +212,13 @@ final class LocalNotificationService: ObservableObject {
         guard !trimmed.isEmpty else { return }
 
         let content = UNMutableNotificationContent()
-        content.title = "Offshore Budgeting"
-        content.body = "Want to log your \(trimmed) purchase to keep your books tidy?"
+        content.title = Self.localizedAppName
+        let bodyTemplate = String(
+            localized: "notification.shoppingModeSuggestion.body",
+            defaultValue: "Want to log your %@ purchase to keep your books tidy?",
+            comment: "Notification body asking user to log a nearby purchase. Placeholder is merchant name."
+        )
+        content.body = String(format: bodyTemplate, locale: .current, trimmed)
         content.sound = .default
         content.categoryIdentifier = NotificationCategory.shoppingModeSuggestion
         content.userInfo = [
@@ -256,8 +261,12 @@ final class LocalNotificationService: ObservableObject {
         if dailyExpenseEnabled {
             try await scheduleDailyNotification(
                 identifier: NotificationID.dailyExpenseReminder,
-                title: "Offshore Budgeting",
-                body: "Keep the books tidy and balanced. Log any variable expenses today.",
+                title: Self.localizedAppName,
+                body: String(
+                    localized: "notification.dailyExpense.body",
+                    defaultValue: "Keep the books tidy and balanced. Log any variable expenses today.",
+                    comment: "Daily reminder notification body for logging expenses."
+                ),
                 hour: hour,
                 minute: minute,
                 categoryIdentifier: NotificationCategory.dailyExpenseReminder,
@@ -279,8 +288,12 @@ final class LocalNotificationService: ObservableObject {
             try await scheduleOneOffNotifications(
                 days: days,
                 identifierPrefix: NotificationID.plannedIncomeReminder,
-                title: "Offshore Budgeting",
-                body: "Income is planned to arrive offshore today. Verify any deposits and log actual income.",
+                title: Self.localizedAppName,
+                body: String(
+                    localized: "notification.plannedIncome.body",
+                    defaultValue: "Income is planned to arrive offshore today. Verify any deposits and log actual income.",
+                    comment: "Notification body for planned income reminder."
+                ),
                 categoryIdentifier: NotificationCategory.plannedIncomeReminder,
                 userInfo: [UserInfoKey.notificationKind: NotificationKind.plannedIncomeReminder.rawValue],
                 hour: hour,
@@ -301,7 +314,7 @@ final class LocalNotificationService: ObservableObject {
             try await scheduleOneOffNotifications(
                 days: days,
                 identifierPrefix: NotificationID.presetDueReminder,
-                title: "Offshore Budgeting",
+                title: Self.localizedAppName,
                 bodyForDay: { day in
                     Self.presetDueBody(
                         presetNames: presetNamesByDay[day] ?? [],
@@ -532,7 +545,11 @@ final class LocalNotificationService: ObservableObject {
         let total = uniqueSorted.count
 
         guard total > 0 else {
-            return "Preset expenses due."
+            return String(
+                localized: "notification.presetDue.empty",
+                defaultValue: "Preset expenses due.",
+                comment: "Fallback preset due notification body when no specific preset names are available."
+            )
         }
 
         let clampedMaxNames = max(0, min(2, maxNamesShown))
@@ -542,16 +559,45 @@ final class LocalNotificationService: ObservableObject {
             let remaining = max(0, total - shownCount)
 
             if total == 1 {
-                return "Preset expected to set sail: \(uniqueSorted[0])"
+                let singleTemplate = String(
+                    localized: "notification.presetDue.single",
+                    defaultValue: "Preset expected to set sail: %@",
+                    comment: "Preset due notification body when exactly one preset name is due."
+                )
+                return String(format: singleTemplate, locale: .current, uniqueSorted[0])
             }
 
             if shown.isEmpty {
-                return "\(localizedInt(total)) presets due"
+                return String(
+                    format: String(
+                        localized: "notification.presetDue.count",
+                        defaultValue: "%@ presets due",
+                        comment: "Preset due notification body with only a count. Placeholder is localized number."
+                    ),
+                    locale: .current,
+                    localizedInt(total)
+                )
             }
 
-            var body = "Presets docking from your account today: \(shown.joined(separator: ", "))"
+            var body = String(
+                format: String(
+                    localized: "notification.presetDue.list",
+                    defaultValue: "Presets docking from your account today: %@",
+                    comment: "Preset due notification body listing due preset names."
+                ),
+                locale: .current,
+                shown.joined(separator: ", ")
+            )
             if remaining > 0 {
-                body += " +\(localizedInt(remaining)) more"
+                body += String(
+                    format: String(
+                        localized: "notification.presetDue.more",
+                        defaultValue: " +%@ more",
+                        comment: "Suffix for additional preset count in notification body. Placeholder is localized number."
+                    ),
+                    locale: .current,
+                    localizedInt(remaining)
+                )
             }
             return body
         }
@@ -563,7 +609,31 @@ final class LocalNotificationService: ObservableObject {
             }
         }
 
-        return total == 1 ? "Preset due" : "\(localizedInt(total)) presets due"
+        if total == 1 {
+            return String(
+                localized: "notification.presetDue.shortSingle",
+                defaultValue: "Preset due",
+                comment: "Short fallback preset due body when content must be brief."
+            )
+        }
+
+        return String(
+            format: String(
+                localized: "notification.presetDue.count",
+                defaultValue: "%@ presets due",
+                comment: "Preset due notification body with only a count. Placeholder is localized number."
+            ),
+            locale: .current,
+            localizedInt(total)
+        )
+    }
+
+    private static var localizedAppName: String {
+        String(
+            localized: "notification.appName",
+            defaultValue: "Offshore Budgeting",
+            comment: "App name used as notification title."
+        )
     }
 
     private static func localizedInt(_ value: Int) -> String {

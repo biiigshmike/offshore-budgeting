@@ -41,16 +41,16 @@ enum HomeAssistantPersonaCatalog {
             return HomeAssistantPersonaProfile(
                 id: .marina,
                 displayName: "Marina",
-                summary: "Grounded, quick, practical, and bestie energy.",
-                greetingTitle: "Hi, I’m Marina.",
-                greetingSubtitle: "Ask me for quick answers from your budget data.",
-                noDataTitle: "No activity in this range yet.",
-                noDataSubtitle: "Try a different date range or add more expenses.",
-                unresolvedPromptTitle: "I can help with that once I have a clearer budgeting prompt.",
-                unresolvedPromptSubtitle: "Try asking about spend totals, top categories, month-over-month change, or largest expenses.",
+                summary: String(localized: "assistant.persona.summary", defaultValue: "Grounded, quick, practical, and bestie energy.", comment: "Short summary for Marina persona."),
+                greetingTitle: String(localized: "assistant.persona.greetingTitle", defaultValue: "Hi, I’m Marina.", comment: "Greeting title for Marina persona."),
+                greetingSubtitle: String(localized: "assistant.persona.greetingSubtitle", defaultValue: "Ask me for quick answers from your budget data.", comment: "Greeting subtitle for Marina persona."),
+                noDataTitle: String(localized: "assistant.persona.noDataTitle", defaultValue: "No activity in this range yet.", comment: "No-data title for Marina persona."),
+                noDataSubtitle: String(localized: "assistant.persona.noDataSubtitle", defaultValue: "Try a different date range or add more expenses.", comment: "No-data subtitle for Marina persona."),
+                unresolvedPromptTitle: String(localized: "assistant.persona.unresolvedTitle", defaultValue: "I can help with that once I have a clearer budgeting prompt.", comment: "Unresolved prompt title for Marina persona."),
+                unresolvedPromptSubtitle: String(localized: "assistant.persona.unresolvedSubtitle", defaultValue: "Try asking about spend totals, top categories, month-over-month change, or largest expenses.", comment: "Unresolved prompt subtitle for Marina persona."),
                 previewLines: [
-                    "Bestie check: You spent $1,350 this month. We can work with that.",
-                    "Top category is Dining at $420. Let's keep it cute and grounded."
+                    String(localized: "assistant.persona.preview.1", defaultValue: "Bestie check: You spent $1,350 this month. We can work with that.", comment: "Preview line for Marina persona."),
+                    String(localized: "assistant.persona.preview.2", defaultValue: "Top category is Dining at $420. Let's keep it cute and grounded.", comment: "Preview line for Marina persona.")
                 ]
             )
         }
@@ -74,7 +74,7 @@ struct HomeAssistantPersonaResponseRules: Equatable {
 
     static let marina = HomeAssistantPersonaResponseRules(
         isMarinaEnabled: true,
-        rulesFooterLine: "Rules/Model: MarinaResponseRules v1.0 (non-LLM)"
+        rulesFooterLine: String(localized: "assistant.persona.rulesFooter", defaultValue: "Rules/Model: MarinaResponseRules v1.0 (non-LLM)", comment: "Footer line showing Marina response rules model.")
     )
 }
 

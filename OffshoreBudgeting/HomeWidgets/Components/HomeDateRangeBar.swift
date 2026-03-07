@@ -21,9 +21,9 @@ struct HomeDateRangeBar: View {
             Spacer(minLength: 0)
 
             HStack(spacing: 10) {
-                PillDatePickerField(title: "Start Date", date: $draftStartDate)
+                PillDatePickerField(title: String(localized: "home.dateRange.startDate", defaultValue: "Start Date", comment: "Label for start date picker on Home date range bar."), date: $draftStartDate)
                     .layoutPriority(1)
-                PillDatePickerField(title: "End Date", date: $draftEndDate)
+                PillDatePickerField(title: String(localized: "home.dateRange.endDate", defaultValue: "End Date", comment: "Label for end date picker on Home date range bar."), date: $draftEndDate)
                     .layoutPriority(1)
 
                 Button(action: onApply) {
@@ -39,7 +39,7 @@ struct HomeDateRangeBar: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(!isApplyEnabled)
-                .accessibilityLabel("Apply date range")
+                .accessibilityLabel(String(localized: "home.dateRange.apply", defaultValue: "Apply date range", comment: "Accessibility label for applying home date range filter."))
 
                 Menu {
                     CalendarQuickRangeMenuItems { preset in
@@ -52,7 +52,7 @@ struct HomeDateRangeBar: View {
                         .background(Circle().fill(Color.secondary.opacity(0.1)))
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Quick ranges")
+                .accessibilityLabel(String(localized: "home.dateRange.quickRanges", defaultValue: "Quick ranges", comment: "Accessibility label for quick date ranges menu on Home."))
             }
 
             Spacer(minLength: 0)

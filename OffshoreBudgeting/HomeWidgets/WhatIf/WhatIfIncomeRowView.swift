@@ -72,13 +72,24 @@ struct WhatIfIncomeRowView: View {
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Income")
-        .accessibilityValue("Planned \(formatCurrency(plannedAmount)), Actual \(formatCurrency(actualAmount))")
+        .accessibilityLabel(String(localized: "homeWidget.income", defaultValue: "Income", comment: "Pinned home widget title for income metrics."))
+        .accessibilityValue(
+            String(
+                format: String(
+                    localized: "whatIf.incomeRow.accessibilityValueFormat",
+                    defaultValue: "Planned %1$@, Actual %2$@",
+                    comment: "Accessibility summary for What If income row."
+                ),
+                locale: .current,
+                formatCurrency(plannedAmount),
+                formatCurrency(actualAmount)
+            )
+        )
     }
 
     private var plannedField: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Planned")
+            Text(String(localized: "common.planned", defaultValue: "Planned", comment: "Common label for planned values."))
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
             TextField("", text: $plannedText)
@@ -98,7 +109,7 @@ struct WhatIfIncomeRowView: View {
 
     private var actualField: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Actual")
+            Text(String(localized: "common.actual", defaultValue: "Actual", comment: "Common label for actual values."))
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
             TextField("", text: $actualText)
@@ -119,7 +130,7 @@ struct WhatIfIncomeRowView: View {
     // MARK: - Badge
 
     private var editedBadge: some View {
-        Text("Edited")
+        Text(String(localized: "common.edited", defaultValue: "Edited", comment: "Badge label indicating a value has been edited."))
             .font(.caption2.weight(.semibold))
             .foregroundStyle(.secondary)
             .padding(.horizontal, 8)
@@ -129,7 +140,7 @@ struct WhatIfIncomeRowView: View {
                 Capsule()
                     .strokeBorder(.secondary.opacity(0.25), lineWidth: 1)
             }
-            .accessibilityLabel("Edited")
+            .accessibilityLabel(String(localized: "common.edited", defaultValue: "Edited", comment: "Badge label indicating a value has been edited."))
     }
 
     // MARK: - Helpers

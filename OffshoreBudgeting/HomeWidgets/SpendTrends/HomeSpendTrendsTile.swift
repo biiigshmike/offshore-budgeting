@@ -42,7 +42,11 @@ struct HomeSpendTrendsTile: View {
             )
         } label: {
             HomeTileContainer(
-                title: "Spend Trends",
+                title: String(
+                    localized: "homeWidget.spendTrends.title",
+                    defaultValue: "Spend Trends",
+                    comment: "Widget title for the spend trends Home tile."
+                ),
                 subtitle: "\(formattedDate(startDate)) - \(formattedDate(endDate))",
                 accent: .purple,
                 showsChevron: true
@@ -50,7 +54,13 @@ struct HomeSpendTrendsTile: View {
                 VStack(alignment: .leading, spacing: 10) {
 
                     if result.buckets.allSatisfy({ $0.total <= 0 }) {
-                        Text("No spending data found in this range.")
+                        Text(
+                            String(
+                                localized: "homeWidget.spendTrends.noDataInRange",
+                                defaultValue: "No spending data found in this range.",
+                                comment: "Message shown when there is no spending data for the selected range."
+                            )
+                        )
                             .foregroundStyle(.secondary)
                     } else {
                         miniChart(result: result)
@@ -60,8 +70,20 @@ struct HomeSpendTrendsTile: View {
             }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Spend Trends")
-        .accessibilityHint("View spending trends for this period")
+        .accessibilityLabel(
+            String(
+                localized: "homeWidget.spendTrends.accessibilityLabel",
+                defaultValue: "Spend Trends",
+                comment: "Accessibility label for the spend trends widget tile."
+            )
+        )
+        .accessibilityHint(
+            String(
+                localized: "homeWidget.spendTrends.accessibilityHint",
+                defaultValue: "View spending trends for this period",
+                comment: "Accessibility hint for opening spend trends details from the Home tile."
+            )
+        )
     }
 
     // MARK: - Mini chart
@@ -107,13 +129,35 @@ struct HomeSpendTrendsTile: View {
     private func highestSummary(result: HomeSpendTrendsAggregator.Result) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             if let highest = result.highestBucket {
-                Text("Highest: \(highest.label) • \(highest.total, format: CurrencyFormatter.currencyStyle())")
+                Text(
+                    String(
+                        format: String(
+                            localized: "homeWidget.spendTrends.highestSummaryFormat",
+                            defaultValue: "Highest: %1$@ • %2$@",
+                            comment: "Summary line showing highest spending bucket and amount."
+                        ),
+                        locale: .current,
+                        highest.label,
+                        highest.total.formatted(CurrencyFormatter.currencyStyle())
+                    )
+                )
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.secondary)
             }
 
             if let top = result.topCategoryInHighestBucket {
-                Text("Top: \(top.name) • \(top.amount, format: CurrencyFormatter.currencyStyle())")
+                Text(
+                    String(
+                        format: String(
+                            localized: "homeWidget.spendTrends.topSummaryFormat",
+                            defaultValue: "Top: %1$@ • %2$@",
+                            comment: "Summary line showing the top category and amount in the highest bucket."
+                        ),
+                        locale: .current,
+                        top.name,
+                        top.amount.formatted(CurrencyFormatter.currencyStyle())
+                    )
+                )
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }

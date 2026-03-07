@@ -108,7 +108,7 @@ enum GeneratedHelpContent {
     static let destinations: [GeneratedHelpDestination] = [
         GeneratedHelpDestination(
             id: "introduction",
-            title: "Introduction",
+            title: "Introducción",
             group: .gettingStarted,
             iconSystemName: "exclamationmark.bubble",
             iconStyle: .blue,
@@ -127,7 +127,7 @@ enum GeneratedHelpContent {
         ),
         GeneratedHelpDestination(
             id: "home",
-            title: "Home",
+            title: "Panel",
             group: .coreScreens,
             iconSystemName: "house.fill",
             iconStyle: .purple,
@@ -140,7 +140,7 @@ enum GeneratedHelpContent {
         ),
         GeneratedHelpDestination(
             id: "budgets",
-            title: "Budgets",
+            title: "Presupuestos",
             group: .coreScreens,
             iconSystemName: "chart.pie.fill",
             iconStyle: .blue,
@@ -152,7 +152,7 @@ enum GeneratedHelpContent {
         ),
         GeneratedHelpDestination(
             id: "income",
-            title: "Income",
+            title: "Ingresos",
             group: .coreScreens,
             iconSystemName: "calendar",
             iconStyle: .red,
@@ -164,7 +164,7 @@ enum GeneratedHelpContent {
         ),
         GeneratedHelpDestination(
             id: "accounts",
-            title: "Accounts",
+            title: "Cuentas",
             group: .coreScreens,
             iconSystemName: "creditcard.fill",
             iconStyle: .green,
@@ -178,7 +178,7 @@ enum GeneratedHelpContent {
         ),
         GeneratedHelpDestination(
             id: "settings",
-            title: "Settings",
+            title: "Ajustes",
             group: .coreScreens,
             iconSystemName: "gear",
             iconStyle: .gray,
@@ -634,14 +634,14 @@ enum GeneratedHelpContent {
             sections: [
                 mediaSection(
                     id: "home-marina-1",
-                    header: "Marina Assistant",
-                    body: "Marina is your conversational helper for turning raw numbers into clear next steps. Ask focused questions about a period, category, card, or savings direction to get practical guidance quickly.\n\nMarina also pairs well with your create, update, and cleanup workflow. Use the + button on the owning screen when you need to add a new record, then use edit or delete actions in that same screen to finish cleanup. Marina helps you decide what to do, and the destination screens help you do it accurately.\n\nA strong routine is simple: ask one question, take one action, then verify the result. This keeps guidance actionable and prevents overload.",
+                    header: "Asistente Marina",
+                    body: "Marina es tu asistente conversacional para convertir números en próximos pasos claros. Haz preguntas concretas sobre periodos, categorías, tarjetas o la dirección de tus ahorros para recibir orientación práctica rápidamente.\n\nMarina también encaja con tu flujo de crear, actualizar y limpiar datos. Usa el botón + en la pantalla dueña del registro cuando necesites agregar algo nuevo, y luego usa editar o eliminar en esa misma pantalla para cerrar el ciclo. Marina te ayuda a decidir qué hacer, y las pantallas de destino te ayudan a hacerlo con precisión.\n\nUna rutina sólida es simple: haz una pregunta, toma una acción y verifica el resultado. Así mantienes la guía accionable y evitas sobrecarga.",
                     media: [
                         mediaItem(
                             id: "home-marina-1-image-1",
                             assetName: "Help/CoreScreens/Home/Marina/marina",
-                            bodyText: "Marina is opened from Home for a conversational review flow. Ask concise prompts about trends, savings direction, or variance, then open the related screen to take action. When you need to add something new, use the + button in that screen. For changes later, use edit and delete there as well so your records stay clean and traceable.",
-                            fullscreenCaptionText: "Ask Marina for guidance, then use +, edit, or delete in the owning screen to complete the workflow."
+                            bodyText: "Marina se abre desde Panel para un flujo de revisión conversacional. Haz preguntas breves sobre tendencias, dirección de ahorro o variaciones, y luego abre la pantalla relacionada para actuar. Cuando necesites agregar algo nuevo, usa el botón + en esa pantalla. Para cambios posteriores, usa también editar y eliminar allí para mantener tus registros limpios y trazables.",
+                            fullscreenCaptionText: "Pídele orientación a Marina y luego usa +, editar o eliminar en la pantalla dueña para completar el flujo."
                         )
                     ]
                 )
@@ -650,7 +650,7 @@ enum GeneratedHelpContent {
         GeneratedHelpLeafTopic(
             id: "home-widgets",
             destinationID: "home",
-            title: "Widgets",
+            title: "Paneles",
             sections: [
                 mediaSection(
                     id: "home-widgets-overview",

@@ -1,0 +1,332 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "%@" : {
+
+    },
+    "%@ • %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ • %2$@"
+          }
+        }
+      }
+    },
+    "1 Month" : {
+
+    },
+    "1 Week" : {
+
+    },
+    "1 Year" : {
+
+    },
+    "30 min" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "30 min"
+          }
+        }
+      }
+    },
+    "Active until %@" : {
+
+    },
+    "Actual" : {
+
+    },
+    "Actual %@" : {
+
+    },
+    "Actual: %@" : {
+
+    },
+    "Card" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cuenta"
+          }
+        }
+      }
+    },
+    "Card Widget" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Widget de cuenta"
+          }
+        }
+      }
+    },
+    "Configuration" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Configuración"
+          }
+        }
+      }
+    },
+    "Configure the period shown in the Income widget." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Configura el período que se muestra en el widget de ingresos."
+          }
+        }
+      }
+    },
+    "Default Period" : {
+
+    },
+    "Ends %@" : {
+
+    },
+    "Excursion Mode" : {
+
+    },
+    "Expenses" : {
+
+    },
+    "Favorite Emoji" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Emoji favorito"
+          }
+        }
+      }
+    },
+    "Highest %@" : {
+
+    },
+    "Income" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ingresos"
+          }
+        }
+      }
+    },
+    "Income progress" : {
+
+    },
+    "Income Widget" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Widget de ingresos"
+          }
+        }
+      }
+    },
+    "Next Planned Expense" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siguiente gasto planificado"
+          }
+        }
+      }
+    },
+    "Next Planned Expense Widget" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Widget de siguiente gasto planificado"
+          }
+        }
+      }
+    },
+    "No card data found in this range." : {
+
+    },
+    "No card data found." : {
+
+    },
+    "No income data found in this range." : {
+
+    },
+    "No income data found." : {
+
+    },
+    "No recent entries." : {
+
+    },
+    "No recent expenses." : {
+
+    },
+    "No recent income entries." : {
+
+    },
+    "No spending data found for this period." : {
+
+    },
+    "No upcoming planned expenses found for this period." : {
+
+    },
+    "Offshore" : {
+
+    },
+    "Open Offshore to generate widget data for this period." : {
+
+    },
+    "Period" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Período"
+          }
+        }
+      }
+    },
+    "Planned" : {
+
+    },
+    "Planned %@" : {
+
+    },
+    "Planned: %@" : {
+
+    },
+    "Q" : {
+
+    },
+    "Recent" : {
+
+    },
+    "Recent Income" : {
+
+    },
+    "Show a card and its expenses for a selected period." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Muestra una cuenta y sus gastos para un período seleccionado."
+          }
+        }
+      }
+    },
+    "Show a card preview with spending for a selected period." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Muestra una vista previa de una cuenta con gasto para un período seleccionado."
+          }
+        }
+      }
+    },
+    "Show spend trends for all cards or a selected card." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Muestra tendencias de gasto para todas las cuentas o una cuenta seleccionada."
+          }
+        }
+      }
+    },
+    "Show the next planned expense for all cards or a selected card." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Muestra el siguiente gasto planificado para todas las cuentas o una cuenta seleccionada."
+          }
+        }
+      }
+    },
+    "Show upcoming planned expenses for all cards or a selected card." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Muestra próximos gastos planificados para todas las cuentas o una cuenta seleccionada."
+          }
+        }
+      }
+    },
+    "Spend Trends" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tendencias de gasto"
+          }
+        }
+      }
+    },
+    "Spend Trends Widget" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Widget de tendencias de gasto"
+          }
+        }
+      }
+    },
+    "Stop" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Detener"
+          }
+        }
+      }
+    },
+    "This is an example widget." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este es un widget de ejemplo."
+          }
+        }
+      }
+    },
+    "Top %@" : {
+
+    },
+    "Track planned vs actual income for a selected period." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sigue ingresos planificados frente a reales para un período seleccionado."
+          }
+        }
+      }
+    },
+    "Track spending trends and top categories for a selected period." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sigue tendencias de gasto y categorías principales para un período seleccionado."
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

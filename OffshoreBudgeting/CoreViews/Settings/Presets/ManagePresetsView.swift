@@ -361,12 +361,12 @@ struct ManagePresetsView: View {
     @ViewBuilder
     private var sortToolbarButton: some View {
         Menu {
-            sortMenuButton(title: "A-Z", mode: .az)
-            sortMenuButton(title: "Z-A", mode: .za)
-            sortMenuButton(title: "Date ↑", mode: .dateAsc)
-            sortMenuButton(title: "Date ↓", mode: .dateDesc)
-            sortMenuButton(title: "$ ↑", mode: .amountAsc)
-            sortMenuButton(title: "$ ↓", mode: .amountDesc)
+            sortMenuButton(title: "A–Z", mode: .az)
+            sortMenuButton(title: "Z–A", mode: .za)
+            sortMenuButton(title: "F↑", mode: .dateAsc)
+            sortMenuButton(title: "F↓", mode: .dateDesc)
+            sortMenuButton(title: "$↑", mode: .amountAsc)
+            sortMenuButton(title: "$↓", mode: .amountDesc)
         } label: {
             Image(systemName: "arrow.up.arrow.down")
         }

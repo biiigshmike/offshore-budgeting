@@ -167,8 +167,8 @@ struct ManageCategoriesView: View {
     @ViewBuilder
     private var sortToolbarButton: some View {
         Menu {
-            sortMenuButton(title: "A-Z", mode: .az)
-            sortMenuButton(title: "Z-A", mode: .za)
+            sortMenuButton(title: "A–Z", mode: .az)
+            sortMenuButton(title: "Z–A", mode: .za)
         } label: {
             Image(systemName: "arrow.up.arrow.down")
         }

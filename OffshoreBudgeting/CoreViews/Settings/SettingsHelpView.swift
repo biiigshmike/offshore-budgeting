@@ -71,9 +71,9 @@ struct SettingsHelpView: View {
     var body: some View {
         List {
             if isSearching {
-                Section("Results") {
+                Section(String(localized: "help.results", defaultValue: "Results", comment: "Section title for help search results.")) {
                     if displayedSearchResults.isEmpty {
-                        Text("No matching help topics.")
+                        Text(String(localized: "help.noMatches", defaultValue: "No matching help topics.", comment: "Message shown when no help topics match search."))
                             .foregroundStyle(.secondary)
                     } else {
                         ForEach(displayedSearchResults) { result in
@@ -94,13 +94,13 @@ struct SettingsHelpView: View {
                     }
                 }
             } else {
-                Section("Getting Started") {
+                Section(String(localized: "help.gettingStarted", defaultValue: "Getting Started", comment: "Section title for getting started help topics.")) {
                     ForEach(GeneratedHelpContent.gettingStartedDestinations) { destination in
                         destinationNavigationLink(destination)
                     }
                 }
 
-                Section("Core Screens") {
+                Section(String(localized: "help.coreScreens", defaultValue: "Core Screens", comment: "Section title for core screen help topics.")) {
                     ForEach(GeneratedHelpContent.coreScreenDestinations) { destination in
                         destinationNavigationLink(destination)
                     }
@@ -108,11 +108,11 @@ struct SettingsHelpView: View {
             }
         }
         .listStyle(.insetGrouped)
-        .navigationTitle("Help")
+        .navigationTitle(String(localized: "help.title", defaultValue: "Help", comment: "Title for help screen."))
         .searchable(
             text: $searchText,
             placement: .navigationBarDrawer(displayMode: .always),
-            prompt: "Search or ask a help question"
+            prompt: String(localized: "help.searchPrompt", defaultValue: "Search or ask a help question", comment: "Search prompt in help screen.")
         )
         .onChange(of: searchText) { _, _ in
             expandedTopicIDs = []
@@ -358,7 +358,7 @@ private struct HelpSearchResultDisclosureRow: View {
                 NavigationLink {
                     HelpTopicDetailView(topic: topic)
                 } label: {
-                    Label("Open Topic", systemImage: "arrow.right.circle")
+                    Label(String(localized: "help.openTopic", defaultValue: "Open Topic", comment: "Action to open a help topic."), systemImage: "arrow.right.circle")
                         .font(.subheadline.weight(.semibold))
                 }
             }
@@ -583,11 +583,11 @@ private struct HelpTopicPagerBar: View {
     }
 
     private var previousDisplayTitle: String {
-        previousTitle ?? "Start of Section"
+        previousTitle ?? String(localized: "help.startOfSection", defaultValue: "Start of Section", comment: "Label shown when there is no previous help topic.")
     }
 
     private var nextDisplayTitle: String {
-        nextTitle ?? "End of Section"
+        nextTitle ?? String(localized: "help.endOfSection", defaultValue: "End of Section", comment: "Label shown when there is no next help topic.")
     }
 
     var body: some View {
@@ -601,7 +601,7 @@ private struct HelpTopicPagerBar: View {
                     tint: backTint
                 ) {
                     VStack(spacing: 3) {
-                        Text("Back")
+                        Text(String(localized: "common.back", defaultValue: "Back", comment: "Back action label."))
                             .font(.footnote.weight(.semibold))
                         Text(previousDisplayTitle)
                             .font(.body.weight(.semibold))
@@ -615,7 +615,7 @@ private struct HelpTopicPagerBar: View {
                     tint: nextTint
                 ) {
                     VStack(spacing: 3) {
-                        Text("Next")
+                        Text(String(localized: "common.next", defaultValue: "Next", comment: "Next action label."))
                             .font(.footnote.weight(.semibold))
                         Text(nextDisplayTitle)
                             .font(.body.weight(.semibold))

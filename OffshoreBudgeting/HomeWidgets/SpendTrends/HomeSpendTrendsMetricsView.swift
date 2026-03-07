@@ -81,7 +81,13 @@ struct HomeSpendTrendsMetricsView: View {
         .toolbar {
             ToolbarItem(placement: .principal) {
                 VStack(spacing: 2) {
-                    Text("Spend Trends")
+                    Text(
+                        String(
+                            localized: "homeWidget.spendTrends.title",
+                            defaultValue: "Spend Trends",
+                            comment: "Widget title for the spend trends experience."
+                        )
+                    )
                         .font(.headline.weight(.semibold))
                         .foregroundStyle(.primary)
 
@@ -101,8 +107,13 @@ struct HomeSpendTrendsMetricsView: View {
         selectedCard: Card?
     ) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-
-            Text("Total Spending")
+            Text(
+                String(
+                    localized: "homeWidget.spendTrends.totalSpending",
+                    defaultValue: "Total Spending",
+                    comment: "Summary metric label for total spending."
+                )
+            )
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 
@@ -115,13 +126,26 @@ struct HomeSpendTrendsMetricsView: View {
     // MARK: - Picker
 
     private var periodPicker: some View {
-        Picker("Period", selection: $selectedPeriod) {
+        Picker(
+            String(
+                localized: "homeWidget.spendTrends.period",
+                defaultValue: "Period",
+                comment: "Picker label for spend trends period."
+            ),
+            selection: $selectedPeriod
+        ) {
             ForEach(HomeSpendTrendsAggregator.Period.allCases) { p in
                 Text(p.rawValue).tag(p)
             }
         }
         .pickerStyle(.segmented)
-        .accessibilityLabel("Period")
+        .accessibilityLabel(
+            String(
+                localized: "homeWidget.spendTrends.period",
+                defaultValue: "Period",
+                comment: "Accessibility label for spend trends period picker."
+            )
+        )
     }
 
     // MARK: - Card carousel (replaces Menu)
@@ -132,7 +156,11 @@ struct HomeSpendTrendsMetricsView: View {
                 Text(
                     selectedCardID
                         .flatMap { id in cards.first(where: { $0.id == id })?.name }
-                    ?? "All Cards"
+                    ?? String(
+                        localized: "homeWidget.spendTrends.allCards",
+                        defaultValue: "All Cards",
+                        comment: "Filter value indicating spend trends includes all cards."
+                    )
                 )
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.secondary)
@@ -152,12 +180,24 @@ struct HomeSpendTrendsMetricsView: View {
                             toggleCardSelection(card)
                         }
                         .accessibilityLabel(selectedCardID == card.id ? "\(card.name), selected" : card.name)
-                        .accessibilityHint("Double tap to filter spend trends to this card. Tap again to clear and return to period P.")
+                        .accessibilityHint(
+                            String(
+                                localized: "homeWidget.spendTrends.cardHint",
+                                defaultValue: "Double tap to filter spend trends to this card. Tap again to clear and return to period P.",
+                                comment: "Accessibility hint for selecting a card in spend trends."
+                            )
+                        )
                     }
                 }
                 .padding(6)
             }
-            Text("Press a card to view spending by category for the selected card. Press it again to clear your selection.")
+            Text(
+                String(
+                    localized: "homeWidget.spendTrends.cardInstruction",
+                    defaultValue: "Press a card to view spending by category for the selected card. Press it again to clear your selection.",
+                    comment: "Instruction text for using card filter in spend trends."
+                )
+            )
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .padding(.top, 2)
@@ -180,13 +220,25 @@ struct HomeSpendTrendsMetricsView: View {
 
     private func chartCard(result: HomeSpendTrendsAggregator.Result) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Spending")
+            Text(
+                String(
+                    localized: "homeWidget.spendTrends.spending",
+                    defaultValue: "Spending",
+                    comment: "Section title for spend chart."
+                )
+            )
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.secondary)
 
             if result.buckets.allSatisfy({ $0.total <= 0 }) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("No savings data in this range.")
+                    Text(
+                        String(
+                            localized: "homeWidget.spendTrends.noDataInRange",
+                            defaultValue: "No spending data found in this range.",
+                            comment: "Message shown when there is no spending data for the selected range."
+                        )
+                    )
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, minHeight: 240, alignment: .center)
@@ -261,13 +313,35 @@ struct HomeSpendTrendsMetricsView: View {
         VStack(alignment: .leading, spacing: 6) {
 
             if let highest = result.highestBucket {
-                Text("Highest: \(highest.label) • \(highest.total, format: CurrencyFormatter.currencyStyle())")
+                Text(
+                    String(
+                        format: String(
+                            localized: "homeWidget.spendTrends.highestSummaryFormat",
+                            defaultValue: "Highest: %1$@ • %2$@",
+                            comment: "Summary line showing highest spending bucket and amount."
+                        ),
+                        locale: .current,
+                        highest.label,
+                        highest.total.formatted(CurrencyFormatter.currencyStyle())
+                    )
+                )
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.secondary)
             }
 
             if let top = result.topCategoryInHighestBucket {
-                Text("Top: \(top.name) • \(top.amount, format: CurrencyFormatter.currencyStyle())")
+                Text(
+                    String(
+                        format: String(
+                            localized: "homeWidget.spendTrends.topSummaryFormat",
+                            defaultValue: "Top: %1$@ • %2$@",
+                            comment: "Summary line showing the top category and amount in the highest bucket."
+                        ),
+                        locale: .current,
+                        top.name,
+                        top.amount.formatted(CurrencyFormatter.currencyStyle())
+                    )
+                )
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }

@@ -66,7 +66,7 @@ struct HomeCategorySpotlightTile: View {
             )
         } label: {
             HomeTileContainer(
-                title: "Category Spotlight",
+                title: String(localized: "homeWidget.categorySpotlight", defaultValue: "Category Spotlight", comment: "Pinned home widget title for category spotlight."),
                 subtitle: subtitle,
                 accent: accentColor,
                 showsChevron: true
@@ -75,14 +75,14 @@ struct HomeCategorySpotlightTile: View {
             }
         }
         .buttonStyle(.plain)
-        .accessibilityHint("Opens category spending breakdown")
+        .accessibilityHint(String(localized: "homeWidget.categorySpotlight.accessibilityHint", defaultValue: "Opens category spending breakdown", comment: "Accessibility hint for opening category spotlight detail."))
     }
 
     @ViewBuilder
     private var content: some View {
         if metricsResult.metrics.isEmpty || metricsResult.totalSpent <= 0 {
             VStack(alignment: .leading, spacing: 6) {
-                Text("No spending data found in this range.")
+                Text(String(localized: "homeWidget.categorySpotlight.noDataInRange", defaultValue: "No spending data found in this range.", comment: "Message shown when no category spending data exists for selected range."))
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -97,11 +97,11 @@ struct HomeCategorySpotlightTile: View {
                     showsLegend: false
                 )
                 .frame(width: 150, height: 150)
-                .accessibilityLabel("Donut chart")
+                .accessibilityLabel(String(localized: "homeWidget.categorySpotlight.donutChartLabel", defaultValue: "Donut chart", comment: "Accessibility label for category spotlight donut chart."))
 
                 VStack(alignment: .leading, spacing: 10) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Total Spent")
+                        Text(String(localized: "homeWidget.categorySpotlight.totalSpent", defaultValue: "Total Spent", comment: "Label for total spent in category spotlight widget."))
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
 

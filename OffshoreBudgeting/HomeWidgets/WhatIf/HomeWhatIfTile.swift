@@ -91,7 +91,7 @@ struct HomeWhatIfTile: View {
 
     var body: some View {
         HomeTileContainer(
-            title: "What If?",
+            title: String(localized: "homeWidget.whatIf", defaultValue: "What If?", comment: "Pinned home widget title for what-if planner."),
             subtitle: subtitleText,
             accent: valueColor,
             showsChevron: false,
@@ -108,7 +108,7 @@ struct HomeWhatIfTile: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .center, spacing: 10) {
                     VStack(alignment: .center, spacing: 6) {
-                        Text("Actual Savings")
+                        Text(String(localized: "homeWidget.whatIf.actualSavings", defaultValue: "Actual Savings", comment: "Headline label for actual savings in What If tile."))
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
 
@@ -142,10 +142,10 @@ struct HomeWhatIfTile: View {
         ) { _ in
             refreshPinnedPreviews()
         }
-        .accessibilityLabel("What If?")
+        .accessibilityLabel(String(localized: "homeWidget.whatIf", defaultValue: "What If?", comment: "Pinned home widget title for what-if planner."))
         .accessibilityValue(CurrencyFormatter.string(from: displayValue))
         .accessibilityAddTraits(.isButton)
-        .accessibilityHint("Opens What If planner")
+        .accessibilityHint(String(localized: "homeWidget.whatIf.accessibilityHint", defaultValue: "Opens What If planner", comment: "Accessibility hint for opening the What If planner."))
     }
 
     @ViewBuilder
@@ -153,13 +153,13 @@ struct HomeWhatIfTile: View {
         let previews = hasLoadedPinnedPreviews ? cachedPinnedPreviewItems : []
 
         if previews.isEmpty {
-            Text("Pin up to 3 scenarios from inside the planner to preview them here.")
+            Text(String(localized: "homeWidget.whatIf.emptyPinned", defaultValue: "Pin up to 3 scenarios from inside the planner to preview them here.", comment: "Empty-state helper text for What If pinned scenarios."))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         } else {
             VStack(alignment: .leading, spacing: 8) {
-                Text("Pinned")
+                Text(String(localized: "homeWidget.whatIf.pinnedLabel", defaultValue: "Pinned", comment: "Label for pinned scenario preview section."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
 

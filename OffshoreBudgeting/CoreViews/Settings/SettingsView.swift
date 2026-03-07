@@ -41,7 +41,7 @@ struct SettingsView: View {
             managementCategoriesSection
             managementPresetsSection
         }
-        .navigationTitle("Settings")
+        .navigationTitle(String(localized: "app.section.settings", defaultValue: "Settings", comment: "Main tab title for the Settings section."))
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 workspaceTrailingNavBarItem
@@ -66,7 +66,7 @@ struct SettingsView: View {
                 SettingsHelpView()
             } label: {
                 SettingsRow(
-                    title: "Help",
+                    title: String(localized: "help.title", defaultValue: "Help", comment: "Title for help screen."),
                     systemImage: "questionmark.circle",
                     tint: Color(.systemGray)
                 )
@@ -91,7 +91,7 @@ struct SettingsView: View {
                     .font(.headline)
                     .foregroundStyle(.primary)
 
-                Text("About")
+                Text(String(localized: "settings.about", defaultValue: "About", comment: "Title for about screen."))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
@@ -107,7 +107,7 @@ struct SettingsView: View {
                 SettingsGeneralView()
             } label: {
                 SettingsRow(
-                    title: "General",
+                    title: String(localized: "settings.general", defaultValue: "General", comment: "Title for general settings."),
                     systemImage: "gear",
                     tint: Color(.systemGray)
                 )
@@ -117,7 +117,7 @@ struct SettingsView: View {
                 SettingsPrivacyView()
             } label: {
                 SettingsRow(
-                    title: "Privacy",
+                    title: String(localized: "settings.privacy", defaultValue: "Privacy", comment: "Title for privacy settings."),
                     systemImage: "faceid",
                     tint: Color(.systemBlue)
                 )
@@ -127,7 +127,7 @@ struct SettingsView: View {
                 SettingsNotificationsView(workspaceID: workspace.id)
             } label: {
                 SettingsRow(
-                    title: "Notifications",
+                    title: String(localized: "settings.notifications", defaultValue: "Notifications", comment: "Title for notifications settings."),
                     systemImage: "bell.badge",
                     tint: Color(.systemRed)
                 )
@@ -137,7 +137,7 @@ struct SettingsView: View {
                 SettingsiCloudView()
             } label: {
                 SettingsRow(
-                    title: "iCloud",
+                    title: String(localized: "settings.icloud", defaultValue: "iCloud", comment: "Title for iCloud settings."),
                     systemImage: "icloud",
                     tint: Color(.systemBlue)
                 )
@@ -155,7 +155,7 @@ struct SettingsView: View {
                 QuickActionsInstallView()
             } label: {
                 SettingsRow(
-                    title: "Quick Actions",
+                    title: String(localized: "settings.quickActions", defaultValue: "Quick Actions", comment: "Title for quick actions settings."),
                     systemImage: "bolt.circle",
                     tint: .green
                 )
@@ -173,7 +173,7 @@ struct SettingsView: View {
                 ManageCategoriesView(workspace: workspace)
             } label: {
                 SettingsRow(
-                    title: "Manage Categories",
+                    title: String(localized: "settings.manageCategories", defaultValue: "Manage Categories", comment: "Title for manage categories row."),
                     systemImage: "tag",
                     tint: .purple
                 )
@@ -191,7 +191,7 @@ struct SettingsView: View {
                 ManagePresetsView(workspace: workspace)
             } label: {
                 SettingsRow(
-                    title: "Manage Presets",
+                    title: String(localized: "settings.managePresets", defaultValue: "Manage Presets", comment: "Title for manage presets row."),
                     systemImage: "list.bullet.rectangle",
                     tint: .orange
                 )
@@ -213,7 +213,7 @@ struct SettingsView: View {
             Button {
                 showingWorkspaceManager = true
             } label: {
-                Label("Manage Workspaces", systemImage: "person.fill")
+                Label(String(localized: "settings.manageWorkspaces", defaultValue: "Manage Workspaces", comment: "Menu action to open workspace manager."), systemImage: "person.fill")
             }
         } label: {
             WorkspaceToolbarMenuLabel(
@@ -221,8 +221,8 @@ struct SettingsView: View {
                 systemImage: "person.fill"
             )
         }
-        .accessibilityLabel("Workspaces")
-        .accessibilityHint("Switch workspaces or manage them")
+        .accessibilityLabel(String(localized: "settings.workspaces", defaultValue: "Workspaces", comment: "Accessibility label for workspace menu."))
+        .accessibilityHint(String(localized: "settings.workspaces.hint", defaultValue: "Switch workspaces or manage them", comment: "Accessibility hint for workspace menu."))
         .tint(.primary)
         .controlSize(.large)
 
@@ -236,7 +236,7 @@ struct SettingsView: View {
     @ViewBuilder
     private var workspaceSwitcherMenuContent: some View {
         if !workspaces.isEmpty {
-            Section("Switch Workspace") {
+            Section(String(localized: "settings.switchWorkspace", defaultValue: "Switch Workspace", comment: "Section title for switching workspace.")) {
                 ForEach(workspaces) { ws in
                     Button {
                         selectedWorkspaceID = ws.id.uuidString

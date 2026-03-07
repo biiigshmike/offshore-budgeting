@@ -59,9 +59,9 @@ struct HomeCardSummaryTile: View {
                     .frame(width: 120)
 
                     VStack(alignment: .leading, spacing: 8) {
-                        metricRow(title: "Total", value: metrics.total, isEmphasized: false)
-                        metricRow(title: "Planned", value: metrics.plannedTotal, isEmphasized: false)
-                        metricRow(title: "Variable", value: metrics.variableTotal, isEmphasized: false)
+                        metricRow(title: String(localized: "common.total", defaultValue: "Total", comment: "Common label for totals."), value: metrics.total, isEmphasized: false)
+                        metricRow(title: String(localized: "common.planned", defaultValue: "Planned", comment: "Common label for planned values."), value: metrics.plannedTotal, isEmphasized: false)
+                        metricRow(title: String(localized: "common.variable", defaultValue: "Variable", comment: "Common label for variable values."), value: metrics.variableTotal, isEmphasized: false)
                     }
 
                     Spacer(minLength: 0)
@@ -69,8 +69,18 @@ struct HomeCardSummaryTile: View {
             }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(card.name) summary")
-        .accessibilityHint("Opens card details")
+        .accessibilityLabel(
+            String(
+                format: String(
+                    localized: "homeWidget.cardSummary.accessibilityLabelFormat",
+                    defaultValue: "%1$@ summary",
+                    comment: "Accessibility label format for card summary widget."
+                ),
+                locale: .current,
+                card.name
+            )
+        )
+        .accessibilityHint(String(localized: "homeWidget.cardSummary.accessibilityHint", defaultValue: "Opens card details", comment: "Accessibility hint for opening card details from Home card widget."))
     }
 
     private func metricRow(title: String, value: Double, isEmphasized: Bool) -> some View {

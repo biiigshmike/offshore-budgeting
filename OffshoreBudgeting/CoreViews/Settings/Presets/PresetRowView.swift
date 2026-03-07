@@ -140,6 +140,9 @@ private enum PresetScheduleFormatter {
 
     private static func ordinalDay(_ day: Int) -> String {
         let d = max(1, min(31, day))
+        if Locale.current.identifier.hasPrefix("es") {
+            return localizedInt(d)
+        }
         let formatter = NumberFormatter()
         formatter.numberStyle = .ordinal
         formatter.locale = .current

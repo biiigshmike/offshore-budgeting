@@ -275,7 +275,7 @@ struct WhatIfScenarioPlannerView: View {
                         .listRowSeparator(.hidden)
                 }
 
-                Section("Income") {
+                Section(String(localized: "homeWidget.income", defaultValue: "Income", comment: "Pinned home widget title for income metrics.")) {
                     VStack(alignment: .leading, spacing: 8) {
                         WhatIfIncomeRowView(
                             baselinePlannedAmount: plannedIncomeTotal,
@@ -290,20 +290,20 @@ struct WhatIfScenarioPlannerView: View {
                         Button {
                             resetIncomeToBaseline()
                         } label: {
-                            Label("Reset", systemImage: "arrow.counterclockwise")
+                            Label(String(localized: "common.reset", defaultValue: "Reset", comment: "Common action label to reset values."), systemImage: "arrow.counterclockwise")
                         }
                         .tint(.secondary)
                     }
                 }
 
-                Section("Categories") {
+                Section(String(localized: "common.categories", defaultValue: "Categories", comment: "Common section title for categories.")) {
                     if categories.isEmpty {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("No categories yet")
+                            Text(String(localized: "whatIf.noCategoriesYet", defaultValue: "No categories yet", comment: "Empty-state title when no categories exist for What If planner."))
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(.primary)
 
-                            Text("Create categories first, then come back to plan scenarios.")
+                            Text(String(localized: "whatIf.createCategoriesFirst", defaultValue: "Create categories first, then come back to plan scenarios.", comment: "Empty-state helper text for What If planner when no categories exist."))
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -330,7 +330,7 @@ struct WhatIfScenarioPlannerView: View {
                                 Button {
                                     resetCategoryToBaseline(category.id)
                                 } label: {
-                                    Label("Reset", systemImage: "arrow.counterclockwise")
+                                    Label(String(localized: "common.reset", defaultValue: "Reset", comment: "Common action label to reset values."), systemImage: "arrow.counterclockwise")
                                 }
                                 .tint(.secondary)
                             }
@@ -343,12 +343,12 @@ struct WhatIfScenarioPlannerView: View {
                 pinnedRefreshTick += 1
             }
             .listStyle(.insetGrouped)
-            .navigationTitle("What If?")
+            .navigationTitle(String(localized: "homeWidget.whatIf", defaultValue: "What If?", comment: "Pinned home widget title for what-if planner."))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     VStack(spacing: 2) {
-                        Text("What If?")
+                        Text(String(localized: "homeWidget.whatIf", defaultValue: "What If?", comment: "Pinned home widget title for what-if planner."))
                             .font(.headline)
                         Text(subtitleText)
                             .font(.caption)
@@ -374,32 +374,32 @@ struct WhatIfScenarioPlannerView: View {
                 guard didLoad, let id = newValue else { return }
                 loadScenarioIntoUI(id: id)
             }
-            .alert("New Scenario", isPresented: $showNewScenarioPrompt) {
-                TextField("Name", text: $newScenarioName)
-                Button("Create") { createScenario() }
-                Button("Cancel", role: .cancel) {}
+            .alert(String(localized: "whatIf.alert.newScenarioTitle", defaultValue: "New Scenario", comment: "Alert title for creating a new What If scenario."), isPresented: $showNewScenarioPrompt) {
+                TextField(String(localized: "common.name", defaultValue: "Name", comment: "Common label for a name field."), text: $newScenarioName)
+                Button(String(localized: "common.create", defaultValue: "Create", comment: "Common action to create an item.")) { createScenario() }
+                Button(String(localized: "common.cancel", defaultValue: "Cancel", comment: "Common cancel action label."), role: .cancel) {}
             } message: {
-                Text("Create a named scenario for this workspace.")
+                Text(String(localized: "whatIf.alert.newScenarioMessage", defaultValue: "Create a named scenario for this workspace.", comment: "Alert message for creating a new What If scenario."))
             }
-            .alert("Rename Scenario", isPresented: $showRenamePrompt) {
-                TextField("Name", text: $renameScenarioName)
-                Button("Save") { renameScenario() }
-                Button("Cancel", role: .cancel) {}
+            .alert(String(localized: "whatIf.alert.renameScenarioTitle", defaultValue: "Rename Scenario", comment: "Alert title for renaming a What If scenario."), isPresented: $showRenamePrompt) {
+                TextField(String(localized: "common.name", defaultValue: "Name", comment: "Common label for a name field."), text: $renameScenarioName)
+                Button(String(localized: "common.save", defaultValue: "Save", comment: "Common action to save changes.")) { renameScenario() }
+                Button(String(localized: "common.cancel", defaultValue: "Cancel", comment: "Common cancel action label."), role: .cancel) {}
             } message: {
-                Text("Rename the current scenario.")
+                Text(String(localized: "whatIf.alert.renameScenarioMessage", defaultValue: "Rename the current scenario.", comment: "Alert message for renaming a What If scenario."))
             }
-            .alert("Duplicate Scenario", isPresented: $showDuplicatePrompt) {
-                TextField("Name", text: $duplicateScenarioName)
-                Button("Duplicate") { duplicateScenario() }
-                Button("Cancel", role: .cancel) {}
+            .alert(String(localized: "whatIf.alert.duplicateScenarioTitle", defaultValue: "Duplicate Scenario", comment: "Alert title for duplicating a What If scenario."), isPresented: $showDuplicatePrompt) {
+                TextField(String(localized: "common.name", defaultValue: "Name", comment: "Common label for a name field."), text: $duplicateScenarioName)
+                Button(String(localized: "common.duplicate", defaultValue: "Duplicate", comment: "Common action label for duplicating.")) { duplicateScenario() }
+                Button(String(localized: "common.cancel", defaultValue: "Cancel", comment: "Common cancel action label."), role: .cancel) {}
             } message: {
-                Text("Make a copy of the current scenario.")
+                Text(String(localized: "whatIf.alert.duplicateScenarioMessage", defaultValue: "Make a copy of the current scenario.", comment: "Alert message for duplicating a What If scenario."))
             }
-            .alert("Delete this scenario?", isPresented: $showDeleteConfirm) {
-                Button("Delete Scenario", role: .destructive) { deleteScenario() }
-                Button("Cancel", role: .cancel) {}
+            .alert(String(localized: "whatIf.alert.deleteScenarioTitle", defaultValue: "Delete this scenario?", comment: "Alert title for deleting a What If scenario."), isPresented: $showDeleteConfirm) {
+                Button(String(localized: "whatIf.deleteScenario", defaultValue: "Delete Scenario", comment: "Destructive action label to delete selected scenario."), role: .destructive) { deleteScenario() }
+                Button(String(localized: "common.cancel", defaultValue: "Cancel", comment: "Common cancel action label."), role: .cancel) {}
             } message: {
-                Text("This cannot be undone.")
+                Text(String(localized: "common.cannotBeUndone", defaultValue: "This cannot be undone.", comment: "Common destructive action warning."))
             }
         }
     }
@@ -408,7 +408,7 @@ struct WhatIfScenarioPlannerView: View {
 
     private var headerBlock: some View {
         VStack(alignment: .leading, spacing: 10) {
-            LabeledContent("Scenario") {
+            LabeledContent(String(localized: "whatIf.scenario", defaultValue: "Scenario", comment: "Label for current scenario in What If header.")) {
                 Text(selectedScenarioName)
                     .font(.body.weight(.semibold))
                     .foregroundStyle(.primary)
@@ -419,7 +419,7 @@ struct WhatIfScenarioPlannerView: View {
             Divider()
 
             VStack(alignment: .leading, spacing: 8) {
-                LabeledContent("Actual Income") {
+                LabeledContent(String(localized: "homeWidget.income.actualIncome", defaultValue: "Actual Income", comment: "Metric label for actual income.")) {
                     Text(actualIncomeTotal, format: CurrencyFormatter.currencyStyle())
                         .font(.body.weight(.semibold))
                         .foregroundStyle(.primary)
@@ -427,7 +427,7 @@ struct WhatIfScenarioPlannerView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 
-                LabeledContent("Planned Income") {
+                LabeledContent(String(localized: "homeWidget.income.plannedIncome", defaultValue: "Planned Income", comment: "Metric label for planned income.")) {
                     Text(plannedIncomeTotal, format: CurrencyFormatter.currencyStyle())
                         .font(.body.weight(.semibold))
                         .foregroundStyle(.primary)
@@ -435,7 +435,7 @@ struct WhatIfScenarioPlannerView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 
-                LabeledContent("Actual Savings") {
+                LabeledContent(String(localized: "homeWidget.whatIf.actualSavings", defaultValue: "Actual Savings", comment: "Headline label for actual savings in What If tile.")) {
                     Text(actualSavings, format: CurrencyFormatter.currencyStyle())
                         .font(.body.weight(.semibold))
                         .foregroundStyle(actualSavings >= 0 ? .green : .red)
@@ -466,7 +466,7 @@ struct WhatIfScenarioPlannerView: View {
                 Image(systemName: "square.and.arrow.up")
                     .font(.system(size: 14, weight: .semibold))
             }
-            .accessibilityLabel("Export")
+            .accessibilityLabel(String(localized: "common.export", defaultValue: "Export", comment: "Common action label for export."))
         }
         .padding(.vertical, 4)
         .sheet(item: $exportSheetRoute) { route in
@@ -509,29 +509,29 @@ struct WhatIfScenarioPlannerView: View {
             NavigationStack {
                 List {
                     Section {
-                        Button("Export as CSV") {
+                        Button(String(localized: "export.csv", defaultValue: "Export as CSV", comment: "Export action label for CSV format.")) {
                             dismiss()
                             onSelect(.csv)
                         }
 
-                        Button("Export as PDF") {
+                        Button(String(localized: "export.pdf", defaultValue: "Export as PDF", comment: "Export action label for PDF format.")) {
                             dismiss()
                             onSelect(.pdf)
                         }
 
-                        Button("Export as Text") {
+                        Button(String(localized: "export.text", defaultValue: "Export as Text", comment: "Export action label for plain text format.")) {
                             dismiss()
                             onSelect(.txt)
                         }
                     } header: {
-                        Text("Choose a file format.")
+                        Text(String(localized: "export.chooseFileFormat", defaultValue: "Choose a file format.", comment: "Section header prompting user to choose export format."))
                     }
                 }
-                .navigationTitle("Export")
+                .navigationTitle(String(localized: "common.export", defaultValue: "Export", comment: "Common action label for export."))
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
-                        Button("Close") { dismiss() }
+                        Button(String(localized: "common.close", defaultValue: "Close", comment: "Common action label to close a sheet.")) { dismiss() }
                     }
                 }
             }
@@ -544,7 +544,7 @@ struct WhatIfScenarioPlannerView: View {
 
     private var scenarioMenu: some View {
         Menu {
-            Section("Scenarios") {
+            Section(String(localized: "whatIf.scenarios", defaultValue: "Scenarios", comment: "Section title listing available What If scenarios.")) {
                 ForEach(scenarios) { s in
                     Button {
                         selectScenario(s.id)
@@ -565,13 +565,13 @@ struct WhatIfScenarioPlannerView: View {
                     Button {
                         store.setGlobalScenarioPinned(selectedScenarioID, isPinned: false)
                     } label: {
-                        Label("Unpin from Home", systemImage: "pin.slash")
+                        Label(String(localized: "whatIf.unpinFromHome", defaultValue: "Unpin from Home", comment: "Menu action to unpin selected scenario from Home."), systemImage: "pin.slash")
                     }
                 } else {
                     Button {
                         store.setGlobalScenarioPinned(selectedScenarioID, isPinned: true)
                     } label: {
-                        Label("Pin to Home", systemImage: "pin")
+                        Label(String(localized: "whatIf.pinToHome", defaultValue: "Pin to Home", comment: "Menu action to pin selected scenario to Home."), systemImage: "pin")
                     }
                 }
 
@@ -579,17 +579,17 @@ struct WhatIfScenarioPlannerView: View {
             }
 
             Button {
-                newScenarioName = "Scenario"
+                newScenarioName = String(localized: "whatIf.scenario", defaultValue: "Scenario", comment: "Default name prefix for What If scenarios.")
                 showNewScenarioPrompt = true
             } label: {
-                Label("New Scenario", systemImage: "plus")
+                Label(String(localized: "whatIf.newScenario", defaultValue: "New Scenario", comment: "Menu action to create a new What If scenario."), systemImage: "plus")
             }
 
             Button {
                 duplicateScenarioName = "\(selectedScenarioName) Copy"
                 showDuplicatePrompt = true
             } label: {
-                Label("Duplicate", systemImage: "doc.on.doc")
+                Label(String(localized: "common.duplicate", defaultValue: "Duplicate", comment: "Common action label for duplicating."), systemImage: "doc.on.doc")
             }
             .disabled(selectedScenarioID == nil)
 
@@ -597,7 +597,7 @@ struct WhatIfScenarioPlannerView: View {
                 renameScenarioName = selectedScenarioName
                 showRenamePrompt = true
             } label: {
-                Label("Rename", systemImage: "pencil")
+                Label(String(localized: "common.rename", defaultValue: "Rename", comment: "Common action label for renaming."), systemImage: "pencil")
             }
             .tint(Color("AccentColor"))
             .disabled(selectedScenarioID == nil)
@@ -605,15 +605,15 @@ struct WhatIfScenarioPlannerView: View {
             Button(role: .destructive) {
                 showDeleteConfirm = true
             } label: {
-                Label("Delete", systemImage: "trash")
+                Label(String(localized: "common.delete", defaultValue: "Delete", comment: "Common action label for deleting."), systemImage: "trash")
             }
             .tint(Color("OffshoreDepth"))
             .disabled(scenarios.count <= 1 || selectedScenarioID == nil)
 
         } label: {
-            Image(systemName: "ellipsis")
-                .font(.system(size: 16, weight: .semibold))
-                .accessibilityLabel("Scenario options")
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 16, weight: .semibold))
+                    .accessibilityLabel(String(localized: "whatIf.scenarioOptions", defaultValue: "Scenario options", comment: "Accessibility label for scenario options menu."))
         }
     }
 

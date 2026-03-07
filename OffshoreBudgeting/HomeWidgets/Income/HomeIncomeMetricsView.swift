@@ -94,7 +94,7 @@ struct HomeIncomeMetricsView: View {
         .toolbar {
             ToolbarItem(placement: .principal) {
                 VStack(spacing: 2) {
-                    Text("Income")
+                    Text(String(localized: "homeWidget.income", defaultValue: "Income", comment: "Pinned home widget title for income metrics."))
                         .font(.headline.weight(.semibold))
                         .foregroundStyle(.primary)
 
@@ -116,14 +116,24 @@ struct HomeIncomeMetricsView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
-                summaryMetric(title: "Actual", value: actualTotal)
+                summaryMetric(title: String(localized: "common.actual", defaultValue: "Actual", comment: "Common label for actual values."), value: actualTotal)
 
                 Spacer(minLength: 0)
 
-                summaryMetric(title: "Planned", value: plannedTotal)
+                summaryMetric(title: String(localized: "common.planned", defaultValue: "Planned", comment: "Common label for planned values."), value: plannedTotal)
             }
 
-            Text("Progress: \(percentText)")
+            Text(
+                String(
+                    format: String(
+                        localized: "homeWidget.income.progressTextFormat",
+                        defaultValue: "Progress: %1$@",
+                        comment: "Progress text format for income metrics header."
+                    ),
+                    locale: .current,
+                    percentText
+                )
+            )
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.secondary)
         }
@@ -143,25 +153,25 @@ struct HomeIncomeMetricsView: View {
     // MARK: - Picker
 
     private var periodPicker: some View {
-        Picker("Period", selection: $selectedPeriod) {
+        Picker(String(localized: "homeWidget.income.period", defaultValue: "Period", comment: "Period picker label for income widget metrics."), selection: $selectedPeriod) {
             ForEach(Period.allCases) { p in
                 Text(p.rawValue).tag(p)
             }
         }
         .pickerStyle(.segmented)
-        .accessibilityLabel("Period")
+        .accessibilityLabel(String(localized: "homeWidget.income.period", defaultValue: "Period", comment: "Period picker accessibility label for income widget metrics."))
     }
 
     // MARK: - Chart
 
     private func chartCard(points: [IncomeBarPoint], granularity: BucketGranularity) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Trends")
+            Text(String(localized: "homeWidget.income.trends", defaultValue: "Trends", comment: "Section title for income trends chart."))
                 .font(.headline.weight(.semibold))
 
             if points.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("No income data found in this range.")
+                    Text(String(localized: "homeWidget.income.noDataInRange", defaultValue: "No income data found in this range.", comment: "Message shown when no income exists in selected range."))
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, minHeight: 240, alignment: .center)
@@ -171,11 +181,11 @@ struct HomeIncomeMetricsView: View {
 
                 Chart(points) { point in
                     BarMark(
-                        x: .value("Date", point.date, unit: chartUnit(for: granularity)),
-                        y: .value("Amount", point.amount)
+                        x: .value(String(localized: "common.date", defaultValue: "Date", comment: "Axis label for date."), point.date, unit: chartUnit(for: granularity)),
+                        y: .value(String(localized: "common.amount", defaultValue: "Amount", comment: "Axis label for amount."), point.amount)
                     )
-                    .foregroundStyle(by: .value("Type", point.kind))
-                    .position(by: .value("Type", point.kind))
+                    .foregroundStyle(by: .value(String(localized: "common.type", defaultValue: "Type", comment: "Legend label for type."), point.kind))
+                    .position(by: .value(String(localized: "common.type", defaultValue: "Type", comment: "Legend label for type."), point.kind))
                 }
                 .chartYAxis {
                     AxisMarks(position: .leading) {
@@ -276,8 +286,8 @@ struct HomeIncomeMetricsView: View {
             let planned = sum(isPlanned: true, from: bucket.start, to: bucket.end)
             let actual = sum(isPlanned: false, from: bucket.start, to: bucket.end)
 
-            points.append(IncomeBarPoint(date: bucket.start, kind: "Planned", amount: planned))
-            points.append(IncomeBarPoint(date: bucket.start, kind: "Actual", amount: actual))
+            points.append(IncomeBarPoint(date: bucket.start, kind: String(localized: "common.planned", defaultValue: "Planned", comment: "Common label for planned values."), amount: planned))
+            points.append(IncomeBarPoint(date: bucket.start, kind: String(localized: "common.actual", defaultValue: "Actual", comment: "Common label for actual values."), amount: actual))
         }
 
         if points.allSatisfy({ $0.amount == 0 }) {

@@ -294,14 +294,14 @@ struct HomeAssistantPanelView: View {
                                 .frame(width: 33, height: 33)
                                 .buttonStyle(.glass)
                         }
-                        .accessibilityLabel("Close Assistant")
+                        .accessibilityLabel(String(localized: "assistant.close", defaultValue: "Close Assistant", comment: "Accessibility label for closing assistant."))
                     } else {
                         Button(action: onDismiss) {
                             Image(systemName: "xmark")
                                 .font(.body.weight(.semibold))
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("Close Assistant")
+                        .accessibilityLabel(String(localized: "assistant.close", defaultValue: "Close Assistant", comment: "Accessibility label for closing assistant."))
                     }
                 }
                 
@@ -310,21 +310,21 @@ struct HomeAssistantPanelView: View {
                         Button {
                             isShowingClearConversationAlert = true
                         } label: {
-                            Text("Clear")
+                            Text(String(localized: "common.clear", defaultValue: "Clear", comment: "Action to clear a selection."))
                                 .frame(height: 33)
                                 .buttonStyle(.glass)
                         }
                         .disabled(answers.isEmpty)
-                        .accessibilityLabel("Clear Chat")
+                        .accessibilityLabel(String(localized: "assistant.clearChat", defaultValue: "Clear Chat", comment: "Accessibility label for clearing assistant chat."))
                     } else {
                         Button {
                             isShowingClearConversationAlert = true
                         } label: {
-                            Text("Clear")
+                            Text(String(localized: "common.clear", defaultValue: "Clear", comment: "Action to clear a selection."))
                         }
                         .buttonStyle(.plain)
                         .disabled(answers.isEmpty)
-                        .accessibilityLabel("Clear Chat")
+                        .accessibilityLabel(String(localized: "assistant.clearChat", defaultValue: "Clear Chat", comment: "Accessibility label for clearing assistant chat."))
                     }
                 }
             }
@@ -336,9 +336,9 @@ struct HomeAssistantPanelView: View {
             .tint(Color("AccentColor"))
             .toolbarBackground(panelHeaderBackgroundStyle, for: .navigationBar)
             .toolbarBackground(navigationBarVisibility, for: .navigationBar)
-            .alert("Are you sure you want to clear your chat history?", isPresented: $isShowingClearConversationAlert) {
-                Button("Cancel", role: .cancel) {}
-                Button("Clear", role: .destructive) {
+            .alert(String(localized: "assistant.clearHistory.confirmation", defaultValue: "Are you sure you want to clear your chat history?", comment: "Confirmation prompt before clearing assistant chat history."), isPresented: $isShowingClearConversationAlert) {
+                Button(String(localized: "common.cancel", defaultValue: "Cancel", comment: "Cancel action label."), role: .cancel) {}
+                Button(String(localized: "common.clear", defaultValue: "Clear", comment: "Action to clear a selection."), role: .destructive) {
                     clearConversation()
                 }
             }
@@ -356,35 +356,35 @@ struct HomeAssistantPanelView: View {
     private var inputSection: some View {
         HStack(spacing: 8) {
             Menu {
-                Section("Create New") {
+                Section(String(localized: "assistant.createNew.section", defaultValue: "Create New", comment: "Section title for assistant create-new menu.")) {
                     Button {
                         handleCreateMenuSelection(.budget)
                     } label: {
-                        Label("Budget", systemImage: "chart.pie.fill")
+                        Label(String(localized: "app.section.budgets", defaultValue: "Budgets", comment: "Main tab title for the Budgets section."), systemImage: "chart.pie.fill")
                     }
                     
                     Button {
                         handleCreateMenuSelection(.income)
                     } label: {
-                        Label("Income", systemImage: "calendar")
+                        Label(String(localized: "app.section.income", defaultValue: "Income", comment: "Main tab title for the Income section."), systemImage: "calendar")
                     }
                     
                     Button {
                         handleCreateMenuSelection(.card)
                     } label: {
-                        Label("Card", systemImage: "creditcard")
+                        Label(String(localized: "common.card", defaultValue: "Card", comment: "Label for card entity."), systemImage: "creditcard")
                     }
                     
                     Button {
                         handleCreateMenuSelection(.preset)
                     } label: {
-                        Label("Preset", systemImage: "list.bullet.rectangle")
+                        Label(String(localized: "common.preset", defaultValue: "Preset", comment: "Label for preset entity."), systemImage: "list.bullet.rectangle")
                     }
                     
                     Button {
                         handleCreateMenuSelection(.category)
                     } label: {
-                        Label("Category", systemImage: "tag.fill")
+                        Label(String(localized: "categories.title.singular", defaultValue: "Category", comment: "Label for category entity."), systemImage: "tag.fill")
                     }
                 }
             } label: {
@@ -393,7 +393,7 @@ struct HomeAssistantPanelView: View {
                     .frame(width: 33, height: 33)
             }
             .modifier(AssistantIconButtonModifier())
-            .accessibilityLabel("Create New")
+            .accessibilityLabel(String(localized: "assistant.createNew.section", defaultValue: "Create New", comment: "Section title for assistant create-new menu."))
             
             promptTextField
             
@@ -406,7 +406,7 @@ struct HomeAssistantPanelView: View {
             }
             .modifier(AssistantIconButtonModifier())
             .disabled(trimmedPromptText.isEmpty)
-            .accessibilityLabel("Submit Question")
+            .accessibilityLabel(String(localized: "assistant.submitQuestion", defaultValue: "Submit Question", comment: "Accessibility label for submitting assistant question."))
         }
         .padding(.horizontal, 16)
         .padding(.bottom, 10)
@@ -477,7 +477,7 @@ struct HomeAssistantPanelView: View {
     @ViewBuilder
     private var promptTextField: some View {
         if #available(iOS 26.0, *) {
-            TextField("Message Marina", text: $promptText)
+            TextField(String(localized: "assistant.messagePrompt", defaultValue: "Message Marina", comment: "Prompt placeholder for assistant message input."), text: $promptText)
                 .textFieldStyle(.automatic)
                 .focused($isPromptFieldFocused)
                 .padding(.horizontal, 12)
@@ -491,7 +491,7 @@ struct HomeAssistantPanelView: View {
                     submitPrompt()
                 }
         } else {
-            TextField("Message Marina", text: $promptText)
+            TextField(String(localized: "assistant.messagePrompt", defaultValue: "Message Marina", comment: "Prompt placeholder for assistant message input."), text: $promptText)
                 .textFieldStyle(.automatic)
                 .focused($isPromptFieldFocused)
                 .frame(minHeight: 44)
@@ -701,7 +701,11 @@ struct HomeAssistantPanelView: View {
                         }
                         .buttonStyle(.glass)
                         .buttonBorderShape(.circle)
-                        .accessibilityLabel(followUpsCollapsed ? "Show follow-up suggestions" : "Hide follow-up suggestions")
+                        .accessibilityLabel(
+                            followUpsCollapsed
+                                ? String(localized: "assistant.followups.show", defaultValue: "Show follow-up suggestions", comment: "Accessibility label to expand follow-up suggestions.")
+                                : String(localized: "assistant.followups.hide", defaultValue: "Hide follow-up suggestions", comment: "Accessibility label to collapse follow-up suggestions.")
+                        )
                     } else {
                         Button {
                             withAnimation(.easeInOut(duration: 0.2)) {
@@ -718,7 +722,11 @@ struct HomeAssistantPanelView: View {
                             Circle()
                                 .stroke(Color.secondary.opacity(0.25), lineWidth: 1)
                         }
-                        .accessibilityLabel(followUpsCollapsed ? "Show follow-up suggestions" : "Hide follow-up suggestions")
+                        .accessibilityLabel(
+                            followUpsCollapsed
+                                ? String(localized: "assistant.followups.show", defaultValue: "Show follow-up suggestions", comment: "Accessibility label to expand follow-up suggestions.")
+                                : String(localized: "assistant.followups.hide", defaultValue: "Hide follow-up suggestions", comment: "Accessibility label to collapse follow-up suggestions.")
+                        )
                     }
                 }
             }
@@ -1163,7 +1171,7 @@ struct HomeAssistantPanelView: View {
         guard command.isPlannedIncome != nil else {
             pendingIncomeKindPlan = command
             appendMutationMessage(
-                title: "Quick clarification",
+                title: String(localized: "assistant.quickClarification", defaultValue: "Quick clarification", comment: "Assistant clarification card title."),
                 subtitle: "Should I log this income as planned or actual?",
                 rows: [
                     HomeAnswerRow(title: "1", value: "Planned"),
@@ -1296,7 +1304,7 @@ struct HomeAssistantPanelView: View {
             pendingCategoryColorHex = colorResolution.hex
             pendingCategoryColorName = colorResolution.name
             appendMutationMessage(
-                title: "Quick clarification",
+                title: String(localized: "assistant.quickClarification", defaultValue: "Quick clarification", comment: "Assistant clarification card title."),
                 subtitle: "I mapped that color to \(colorResolution.name) (\(colorResolution.hex)). Reply yes to use it or no to keep default blue.",
                 rows: []
             )
@@ -1579,7 +1587,7 @@ struct HomeAssistantPanelView: View {
         pendingExpenseDisambiguationPlan = command
         pendingExpenseCandidates = candidates
         appendMutationMessage(
-            title: "Quick clarification",
+            title: String(localized: "assistant.quickClarification", defaultValue: "Quick clarification", comment: "Assistant clarification card title."),
             subtitle: "Pick the expense to delete.",
             rows: candidates.enumerated().map { index, expense in
                 HomeAnswerRow(title: "\(index + 1)", value: expenseDisplayLabel(expense))
@@ -1601,7 +1609,7 @@ struct HomeAssistantPanelView: View {
         pendingIncomeDisambiguationPlan = command
         pendingIncomeCandidates = candidates
         appendMutationMessage(
-            title: "Quick clarification",
+            title: String(localized: "assistant.quickClarification", defaultValue: "Quick clarification", comment: "Assistant clarification card title."),
             subtitle: "Pick the income entry to delete.",
             rows: candidates.enumerated().map { index, income in
                 HomeAnswerRow(title: "\(index + 1)", value: incomeDisplayLabel(income))
@@ -1957,7 +1965,7 @@ struct HomeAssistantPanelView: View {
     
     private func presentPlannedExpenseAmountTargetPrompt() {
         appendMutationMessage(
-            title: "Quick clarification",
+            title: String(localized: "assistant.quickClarification", defaultValue: "Quick clarification", comment: "Assistant clarification card title."),
             subtitle: "Should I update the planned amount or the actual amount?",
             rows: [
                 HomeAnswerRow(title: "1", value: "Planned amount"),
@@ -2012,7 +2020,7 @@ struct HomeAssistantPanelView: View {
         
         guard let resolved else {
             appendMutationMessage(
-                title: "Quick clarification",
+                title: String(localized: "assistant.quickClarification", defaultValue: "Quick clarification", comment: "Assistant clarification card title."),
                 subtitle: "Reply planned or actual.",
                 rows: [
                     HomeAnswerRow(title: "1", value: "Planned"),
@@ -2098,7 +2106,7 @@ struct HomeAssistantPanelView: View {
         
         guard confirms || rejects else {
             appendMutationMessage(
-                title: "Quick clarification",
+                title: String(localized: "assistant.quickClarification", defaultValue: "Quick clarification", comment: "Assistant clarification card title."),
                 subtitle: "Reply yes to use \(pendingCategoryColorName ?? "that color"), or no to use default blue.",
                 rows: []
             )
@@ -2153,7 +2161,7 @@ struct HomeAssistantPanelView: View {
                 return
             }
             appendMutationMessage(
-                title: "Quick clarification",
+                title: String(localized: "assistant.quickClarification", defaultValue: "Quick clarification", comment: "Assistant clarification card title."),
                 subtitle: "Reply yes to style this card, or no to keep defaults.",
                 rows: []
             )
@@ -2634,7 +2642,7 @@ struct HomeAssistantPanelView: View {
         }
         
         appendMutationMessage(
-            title: "Quick clarification",
+            title: String(localized: "assistant.quickClarification", defaultValue: "Quick clarification", comment: "Assistant clarification card title."),
             subtitle: "Which card should I use for this expense?",
             rows: rows
         )
@@ -2646,7 +2654,7 @@ struct HomeAssistantPanelView: View {
             HomeAnswerRow(title: "\(index + 1)", value: expenseDisplayLabel(expense))
         }
         appendMutationMessage(
-            title: "Quick clarification",
+            title: String(localized: "assistant.quickClarification", defaultValue: "Quick clarification", comment: "Assistant clarification card title."),
             subtitle: "I found multiple matching expenses. Pick one by number.",
             rows: rows
         )
@@ -2660,7 +2668,7 @@ struct HomeAssistantPanelView: View {
             )
         }
         appendMutationMessage(
-            title: "Quick clarification",
+            title: String(localized: "assistant.quickClarification", defaultValue: "Quick clarification", comment: "Assistant clarification card title."),
             subtitle: "I found multiple matching planned expenses. Pick one by number.",
             rows: rows
         )
@@ -2671,7 +2679,7 @@ struct HomeAssistantPanelView: View {
             HomeAnswerRow(title: "\(index + 1)", value: card.name)
         }
         appendMutationMessage(
-            title: "Quick clarification",
+            title: String(localized: "assistant.quickClarification", defaultValue: "Quick clarification", comment: "Assistant clarification card title."),
             subtitle: "Which card should be the default for this preset?",
             rows: rows
         )
@@ -2695,7 +2703,7 @@ struct HomeAssistantPanelView: View {
             HomeAnswerRow(title: "\(index + 1)", value: incomeDisplayLabel(income))
         }
         appendMutationMessage(
-            title: "Quick clarification",
+            title: String(localized: "assistant.quickClarification", defaultValue: "Quick clarification", comment: "Assistant clarification card title."),
             subtitle: "I found multiple matching income entries. Pick one by number.",
             rows: rows
         )
@@ -2706,7 +2714,7 @@ struct HomeAssistantPanelView: View {
             HomeAnswerRow(title: "\(index + 1)", value: cardDisplayLabel(card))
         }
         appendMutationMessage(
-            title: "Quick clarification",
+            title: String(localized: "assistant.quickClarification", defaultValue: "Quick clarification", comment: "Assistant clarification card title."),
             subtitle: "I found multiple matching cards. Pick one to \(action).",
             rows: rows
         )
@@ -3303,7 +3311,7 @@ struct HomeAssistantPanelView: View {
             queryID: UUID(),
             kind: .message,
             userPrompt: userPrompt,
-            title: "Quick clarification",
+            title: String(localized: "assistant.quickClarification", defaultValue: "Quick clarification", comment: "Assistant clarification card title."),
             subtitle: clarificationPlan.subtitle,
             primaryValue: nil,
             rows: []

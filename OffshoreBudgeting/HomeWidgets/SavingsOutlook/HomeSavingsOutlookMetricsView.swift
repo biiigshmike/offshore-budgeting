@@ -117,7 +117,7 @@ struct HomeSavingsOutlookMetricsView: View {
         .toolbar {
             ToolbarItem(placement: .principal) {
                 VStack(spacing: 2) {
-                    Text("Savings Outlook")
+                    Text(String(localized: "homeWidget.savingsOutlook", defaultValue: "Savings Outlook", comment: "Pinned home widget title for savings outlook."))
                         .font(.headline.weight(.semibold))
                         .foregroundStyle(.primary)
 
@@ -139,11 +139,11 @@ struct HomeSavingsOutlookMetricsView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
-                summaryMetric(title: "Projected", value: projectedTotal)
+                summaryMetric(title: String(localized: "homeSavingsOutlook.projected", defaultValue: "Projected", comment: "Short label for projected value."), value: projectedTotal)
 
                 Spacer(minLength: 0)
 
-                summaryMetric(title: "Actual", value: actualTotal)
+                summaryMetric(title: String(localized: "homeSavingsOutlook.actual", defaultValue: "Actual", comment: "Short label for actual value."), value: actualTotal)
             }
 
             Text(progressLine)
@@ -165,7 +165,7 @@ struct HomeSavingsOutlookMetricsView: View {
 
     private var openSavingsAccountLabel: some View {
         HStack {
-            Text("Open Savings Account")
+            Text(String(localized: "homeSavingsOutlook.openSavingsAccount", defaultValue: "Open Savings Account", comment: "Button title to open savings account screen."))
         }
         .frame(maxWidth: .infinity, minHeight: 44)
     }
@@ -184,25 +184,25 @@ struct HomeSavingsOutlookMetricsView: View {
     // MARK: - Picker
 
     private var periodPicker: some View {
-        Picker("Period", selection: $selectedPeriod) {
+        Picker(String(localized: "common.period", defaultValue: "Period", comment: "Label for period picker."), selection: $selectedPeriod) {
             ForEach(Period.allCases) { p in
                 Text(p.rawValue).tag(p)
             }
         }
         .pickerStyle(.segmented)
-        .accessibilityLabel("Period")
+        .accessibilityLabel(String(localized: "common.period", defaultValue: "Period", comment: "Label for period picker."))
     }
 
     // MARK: - Chart
 
     private func chartCard(points: [SavingsPoint], granularity: BucketGranularity, accent: Color) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Trends")
+            Text(String(localized: "homeSavingsOutlook.trends", defaultValue: "Trends", comment: "Section title for savings outlook trend chart."))
                 .font(.headline.weight(.semibold))
 
             if points.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("No savings data found in this range.")
+                    Text(String(localized: "homeSavingsOutlook.noData", defaultValue: "No savings data found in this range.", comment: "Message shown when no savings data is available for the selected period."))
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, minHeight: 240, alignment: .center)

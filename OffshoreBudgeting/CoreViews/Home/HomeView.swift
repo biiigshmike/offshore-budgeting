@@ -193,12 +193,12 @@ struct HomeView: View {
                         VStack(spacing: 12) {
                             if pinnedItems.isEmpty {
                                 HomeTileContainer(
-                                    title: "Home",
+                                    title: String(localized: "app.section.home", defaultValue: "Home", comment: "Main tab title for the Home section."),
                                     subtitle: dateRangeSubtitle,
                                     accent: .primary,
                                     showsChevron: false
                                 ) {
-                                    Text("Tap Edit to pin widgets and cards to Home.")
+                                    Text(String(localized: "home.emptyPinned.message", defaultValue: "Tap Edit to pin widgets and cards to Home.", comment: "Message when no home items are pinned."))
                                         .foregroundStyle(.secondary)
                                         .fixedSize(horizontal: false, vertical: true)
                                 }
@@ -237,26 +237,26 @@ struct HomeView: View {
         }
         .postBoardingTip(
             key: "tip.home.v1",
-            title: "Home",
+            title: String(localized: "app.section.home", defaultValue: "Home", comment: "Main tab title for the Home section."),
             items: [
                 PostBoardingTipItem(
                     systemImage: "house.fill",
-                    title: "Dashboard",
-                    detail: "Home is your landing page. This is the first screen you see when opening the app."
+                    title: String(localized: "home.tip.dashboard.title", defaultValue: "Dashboard", comment: "Home tip title for dashboard overview."),
+                    detail: String(localized: "home.tip.dashboard.detail", defaultValue: "Home is your landing page. This is the first screen you see when opening the app.", comment: "Home tip detail for dashboard overview.")
                 ),
                 PostBoardingTipItem(
                     systemImage: "rectangle.grid.2x2",
-                    title: "Widgets",
-                    detail: "Tap any widget to open deeper metrics. Use Edit to pin, reorder, or remove widgets."
+                    title: String(localized: "home.widgets.header", defaultValue: "Widgets", comment: "Header title for home widgets section."),
+                    detail: String(localized: "home.tip.widgets.detail", defaultValue: "Tap any widget to open deeper metrics. Use Edit to pin, reorder, or remove widgets.", comment: "Home tip detail for widgets usage.")
                 ),
                 PostBoardingTipItem(
                     systemImage: "calendar",
-                    title: "Date Range",
-                    detail: "Use the date controls at the top to change the time period shown across all widgets."
+                    title: String(localized: "home.tip.dateRange.title", defaultValue: "Date Range", comment: "Home tip title for date range controls."),
+                    detail: String(localized: "home.tip.dateRange.detail", defaultValue: "Use the date controls at the top to change the time period shown across all widgets.", comment: "Home tip detail for date range controls.")
                 )
             ]
         )
-        .navigationTitle("Home")
+        .navigationTitle(String(localized: "app.section.home", defaultValue: "Home", comment: "Main tab title for the Home section."))
         .toolbar {
             if #available(iOS 26.0, macCatalyst 26.0, *) {
                 ToolbarItemGroup(placement: .primaryAction) {
@@ -876,32 +876,32 @@ struct HomeView: View {
     private var homeActionsToolbarButton: some View {
         Menu {
             Menu {
-                Toggle("Hide Future Planned Expenses", isOn: $hideFuturePlannedExpensesInView)
+                Toggle(String(localized: "expenseDisplay.hideFuturePlanned", defaultValue: "Hide Future Planned Expenses", comment: "Toggle label to hide future planned expenses."), isOn: $hideFuturePlannedExpensesInView)
                 Toggle(
-                    "Exclude Future Planned Expenses from Totals",
+                    String(localized: "expenseDisplay.excludeFuturePlanned", defaultValue: "Exclude Future Planned Expenses from Totals", comment: "Toggle label to exclude future planned expenses from totals."),
                     isOn: $excludeFuturePlannedExpensesFromCalculationsInView
                 )
             } label: {
                 if #available(iOS 26.0, *) {
-                    Label("Planned Expense Display", systemImage: "calendar.badge")
+                    Label(String(localized: "expenseDisplay.planned.title", defaultValue: "Planned Expense Display", comment: "Menu label for planned expense display options."), systemImage: "calendar.badge")
                 } else {
-                    Label("Planned Expense Display", systemImage: "calendar.badge.clock")
+                    Label(String(localized: "expenseDisplay.planned.title", defaultValue: "Planned Expense Display", comment: "Menu label for planned expense display options."), systemImage: "calendar.badge.clock")
                 }
             }
 
             Menu {
-                Toggle("Hide Future Variable Expenses", isOn: $hideFutureVariableExpensesInView)
+                Toggle(String(localized: "expenseDisplay.hideFutureVariable", defaultValue: "Hide Future Variable Expenses", comment: "Toggle label to hide future variable expenses."), isOn: $hideFutureVariableExpensesInView)
                 Toggle(
-                    "Exclude Future Variable Expenses from Totals",
+                    String(localized: "expenseDisplay.excludeFutureVariable", defaultValue: "Exclude Future Variable Expenses from Totals", comment: "Toggle label to exclude future variable expenses from totals."),
                     isOn: $excludeFutureVariableExpensesFromCalculationsInView
                 )
             } label: {
-                Label("Variable Expense Display", systemImage: "chart.xyaxis.line")
+                Label(String(localized: "expenseDisplay.variable.title", defaultValue: "Variable Expense Display", comment: "Menu label for variable expense display options."), systemImage: "chart.xyaxis.line")
             }
         } label: {
             Image(systemName: "eye")
         }
-        .accessibilityLabel("Home Actions")
+        .accessibilityLabel(String(localized: "home.actions", defaultValue: "Home Actions", comment: "Accessibility label for home actions menu."))
     }
 
     @available(iOS 26.0, macCatalyst 26.0, *)
@@ -910,7 +910,7 @@ struct HomeView: View {
             Image(systemName: "figure.wave")
         }
         .buttonStyle(.glassProminent)
-        .accessibilityLabel("Open Assistant")
+        .accessibilityLabel(String(localized: "assistant.open", defaultValue: "Open Assistant", comment: "Accessibility label for opening assistant."))
     }
 
     private var assistantToolbarButtonLegacy: some View {
@@ -919,12 +919,12 @@ struct HomeView: View {
         }
         .buttonStyle(.borderedProminent)
         .tint(Color("AccentColor"))
-        .accessibilityLabel("Open Assistant")
+        .accessibilityLabel(String(localized: "assistant.open", defaultValue: "Open Assistant", comment: "Accessibility label for opening assistant."))
     }
 
     private var widgetsHeader: some View {
         HStack(alignment: .firstTextBaseline) {
-            Text("Widgets")
+            Text(String(localized: "home.widgets.header", defaultValue: "Widgets", comment: "Header title for home widgets section."))
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(.primary)
 
@@ -933,7 +933,7 @@ struct HomeView: View {
             Button {
                 isEditingWidgets = true
             } label: {
-                Text("Edit")
+                Text(String(localized: "common.edit", defaultValue: "Edit", comment: "Edit action label."))
                     .font(.subheadline.weight(.semibold))
                     .padding(.horizontal, 14)
                     .padding(.vertical, 8)

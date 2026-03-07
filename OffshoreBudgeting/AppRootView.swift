@@ -23,10 +23,36 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
 
     var title: String {
         switch self {
+        case .home:
+            return String(
+                localized: "app.section.home",
+                defaultValue: "Home",
+                comment: "Main tab title for the Home section."
+            )
+        case .budgets:
+            return String(
+                localized: "app.section.budgets",
+                defaultValue: "Budgets",
+                comment: "Main tab title for the Budgets section."
+            )
+        case .income:
+            return String(
+                localized: "app.section.income",
+                defaultValue: "Income",
+                comment: "Main tab title for the Income section."
+            )
         case .cards:
-            return "Accounts"
-        default:
-            return rawValue
+            return String(
+                localized: "app.section.cards",
+                defaultValue: "Accounts",
+                comment: "Main tab title for the Accounts section."
+            )
+        case .settings:
+            return String(
+                localized: "app.section.settings",
+                defaultValue: "Settings",
+                comment: "Main tab title for the Settings section."
+            )
         }
     }
 
@@ -172,7 +198,13 @@ struct AppRootView: View {
                 SettingsHelpView()
                     .toolbar {
                         ToolbarItem(placement: .cancellationAction) {
-                            Button("Done") {
+                            Button(
+                                String(
+                                    localized: "common.done",
+                                    defaultValue: "Done",
+                                    comment: "Generic action label to finish and close a sheet."
+                                )
+                            ) {
                                 showingHelpSheet = false
                             }
                         }
@@ -192,7 +224,7 @@ struct AppRootView: View {
             .environment(\.postBoardingTipPresenterIsActive, selectedSection == .home)
             .environment(\.postBoardingTipActivationCycle, postBoardingTipActivationCycle)
             .homeAssistantHost(workspace: workspace)
-            .tabItem { Label(AppSection.home.rawValue, systemImage: AppSection.home.systemImage) }
+            .tabItem { Label(AppSection.home.title, systemImage: AppSection.home.systemImage) }
             .tag(AppSection.home)
 
             NavigationStack(path: $budgetsPath) {
@@ -200,7 +232,7 @@ struct AppRootView: View {
             }
             .environment(\.postBoardingTipPresenterIsActive, selectedSection == .budgets)
             .environment(\.postBoardingTipActivationCycle, postBoardingTipActivationCycle)
-            .tabItem { Label(AppSection.budgets.rawValue, systemImage: AppSection.budgets.systemImage) }
+            .tabItem { Label(AppSection.budgets.title, systemImage: AppSection.budgets.systemImage) }
             .tag(AppSection.budgets)
 
             NavigationStack(path: $incomePath) {
@@ -208,7 +240,7 @@ struct AppRootView: View {
             }
             .environment(\.postBoardingTipPresenterIsActive, selectedSection == .income)
             .environment(\.postBoardingTipActivationCycle, postBoardingTipActivationCycle)
-            .tabItem { Label(AppSection.income.rawValue, systemImage: AppSection.income.systemImage) }
+            .tabItem { Label(AppSection.income.title, systemImage: AppSection.income.systemImage) }
             .tag(AppSection.income)
 
             NavigationStack(path: $cardsPath) {
@@ -224,7 +256,7 @@ struct AppRootView: View {
             }
             .environment(\.postBoardingTipPresenterIsActive, selectedSection == .settings)
             .environment(\.postBoardingTipActivationCycle, postBoardingTipActivationCycle)
-            .tabItem { Label(AppSection.settings.rawValue, systemImage: AppSection.settings.systemImage) }
+            .tabItem { Label(AppSection.settings.title, systemImage: AppSection.settings.systemImage) }
             .tag(AppSection.settings)
         }
     }

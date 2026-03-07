@@ -44,7 +44,7 @@ struct HomeNextPlannedExpenseTile: View {
             ManagePresetsView(workspace: workspace, highlightedPresetID: presetID)
         } label: {
             HomeTileContainer(
-                title: "Next Planned Expense",
+                title: String(localized: "homeWidget.nextPlannedExpense", defaultValue: "Next Planned Expense", comment: "Pinned home widget title for next planned expense."),
                 subtitle: dateRangeSubtitle,
                 accent: .orange,
                 showsChevron: true
@@ -52,7 +52,7 @@ struct HomeNextPlannedExpenseTile: View {
                 HStack(alignment: .center, spacing: 14) {
 
                     CardVisualView(
-                        title: card?.name ?? "Card",
+                        title: card?.name ?? String(localized: "homeWidget.nextPlannedExpense.fallbackCardName", defaultValue: "Card", comment: "Fallback card name in next planned expense widget."),
                         theme: themeOption,
                         effect: effectOption,
                         minHeight: nil,
@@ -74,8 +74,8 @@ struct HomeNextPlannedExpenseTile: View {
                             .foregroundStyle(.secondary)
 
                         VStack(spacing: 6) {
-                            metricRow(title: "Planned", value: plannedText, isEmphasized: false)
-                            metricRow(title: "Actual", value: actualText, isEmphasized: false)
+                            metricRow(title: String(localized: "common.planned", defaultValue: "Planned", comment: "Common label for planned values."), value: plannedText, isEmphasized: false)
+                            metricRow(title: String(localized: "common.actual", defaultValue: "Actual", comment: "Common label for actual values."), value: actualText, isEmphasized: false)
                         }
                         .padding(.top, 2)
                     }
@@ -87,7 +87,7 @@ struct HomeNextPlannedExpenseTile: View {
         .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityLabel)
-        .accessibilityHint("Opens Presets and pins this expense at the top.")
+        .accessibilityHint(String(localized: "homeWidget.nextPlannedExpense.accessibilityHint", defaultValue: "Opens Presets and pins this expense at the top.", comment: "Accessibility hint for next planned expense widget."))
     }
 
     private func metricRow(title: String, value: String, isEmphasized: Bool) -> some View {
@@ -113,6 +113,17 @@ struct HomeNextPlannedExpenseTile: View {
     }
 
     private var accessibilityLabel: String {
-        "Next planned expense. \(expense.title). Date \(dateText). Planned \(plannedText). Actual \(actualText)."
+        String(
+            format: String(
+                localized: "homeWidget.nextPlannedExpense.accessibilityLabelFormat",
+                defaultValue: "Next planned expense. %1$@. Date %2$@. Planned %3$@. Actual %4$@.",
+                comment: "Accessibility label format for next planned expense widget."
+            ),
+            locale: .current,
+            expense.title,
+            dateText,
+            plannedText,
+            actualText
+        )
     }
 }

@@ -408,6 +408,9 @@ struct EditBudgetView: View {
 
     private func ordinalDay(_ day: Int) -> String {
         let clamped = min(31, max(1, day))
+        if Locale.current.identifier.hasPrefix("es") {
+            return localizedInt(clamped)
+        }
         let formatter = NumberFormatter()
         formatter.numberStyle = .ordinal
         formatter.locale = .current

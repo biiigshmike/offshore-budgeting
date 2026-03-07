@@ -20,13 +20,20 @@ enum HomeWidgetID: String, CaseIterable, Identifiable, Codable {
 
     var title: String {
         switch self {
-        case .income: return "Income"
-        case .savingsOutlook: return "Savings Outlook"
-        case .nextPlannedExpense: return "Next Planned Expense"
-        case .categorySpotlight: return "Category Spotlight"
-        case .categoryAvailability: return "Category Availability"
-        case .whatIf: return "What If?"
-        case .spendTrends: return "Spend Trends"
+        case .income:
+            return String(localized: "homeWidget.income", defaultValue: "Income", comment: "Pinned home widget title for income metrics.")
+        case .savingsOutlook:
+            return String(localized: "homeWidget.savingsOutlook", defaultValue: "Savings Outlook", comment: "Pinned home widget title for savings outlook.")
+        case .nextPlannedExpense:
+            return String(localized: "homeWidget.nextPlannedExpense", defaultValue: "Next Planned Expense", comment: "Pinned home widget title for next planned expense.")
+        case .categorySpotlight:
+            return String(localized: "homeWidget.categorySpotlight", defaultValue: "Category Spotlight", comment: "Pinned home widget title for category spotlight.")
+        case .categoryAvailability:
+            return String(localized: "homeWidget.categoryAvailability", defaultValue: "Category Availability", comment: "Pinned home widget title for category availability.")
+        case .whatIf:
+            return String(localized: "homeWidget.whatIf", defaultValue: "What If?", comment: "Pinned home widget title for what-if planner.")
+        case .spendTrends:
+            return String(localized: "homeWidget.spendTrends", defaultValue: "Spend Trends", comment: "Pinned home widget title for spending trends.")
         }
     }
 }

@@ -118,7 +118,7 @@ struct HomeSavingsOutlookTile: View {
             )
         } label: {
             HomeTileContainer(
-                title: "Savings Outlook",
+                title: String(localized: "homeWidget.savingsOutlook", defaultValue: "Savings Outlook", comment: "Pinned home widget title for savings outlook."),
                 subtitle: dateRangeSubtitle,
                 accent: accentColor,
                 showsChevron: true
@@ -127,7 +127,7 @@ struct HomeSavingsOutlookTile: View {
 
                     HStack(alignment: .firstTextBaseline, spacing: 14) {
                         metricBlock(
-                            title: "Projected Savings",
+                            title: String(localized: "budgetDetail.summary.projectedSavings", defaultValue: "Projected Savings", comment: "Budget detail summary row for projected savings."),
                             value: projectedSavings,
                             valueColor: .primary
                         )
@@ -135,7 +135,7 @@ struct HomeSavingsOutlookTile: View {
                         Spacer(minLength: 0)
 
                         metricBlock(
-                            title: "Actual Savings",
+                            title: String(localized: "budgetDetail.summary.actualSavings", defaultValue: "Actual Savings", comment: "Budget detail summary row for actual savings."),
                             value: actualSavings,
                             valueColor: actualValueColor
                         )
@@ -152,8 +152,8 @@ struct HomeSavingsOutlookTile: View {
             }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Savings Outlook")
-        .accessibilityHint("Opens savings metrics")
+        .accessibilityLabel(String(localized: "homeWidget.savingsOutlook", defaultValue: "Savings Outlook", comment: "Pinned home widget title for savings outlook."))
+        .accessibilityHint(String(localized: "homeSavingsOutlook.openHint", defaultValue: "Opens savings metrics", comment: "Accessibility hint for opening savings outlook metrics."))
     }
 
     // MARK: - UI Helpers
@@ -217,7 +217,7 @@ private struct HomeSavingsGaugeRow: View {
                 .minimumScaleFactor(0.75)
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Savings progress")
+        .accessibilityLabel(String(localized: "homeSavingsOutlook.progress", defaultValue: "Savings progress", comment: "Accessibility label for savings progress gauge."))
         .accessibilityValue(accessibilityValueText)
     }
 
