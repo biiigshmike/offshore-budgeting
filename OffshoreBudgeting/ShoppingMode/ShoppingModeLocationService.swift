@@ -69,6 +69,26 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
         debugLog("Loaded persisted monitored merchants: \(monitoredMerchantsByRegionID.count)")
     }
 
+    func requestAuthorizationForExcursionMode() {
+        let status = locationManager.authorizationStatus
+        cachedAuthorizationStatus = status
+
+        switch status {
+        case .notDetermined:
+            requestedAlwaysUpgrade = true
+            debugLog("Requesting initial When In Use authorization for Excursion Mode")
+            locationManager.requestWhenInUseAuthorization()
+        case .authorizedWhenInUse:
+            requestedAlwaysUpgrade = true
+            debugLog("Requesting Always authorization upgrade for Excursion Mode")
+            locationManager.requestAlwaysAuthorization()
+        case .authorizedAlways, .restricted, .denied:
+            break
+        @unknown default:
+            break
+        }
+    }
+
     func startMonitoringIfPossible() {
         guard SpendingSessionStore.isActive() else {
             debugLog("Shopping Mode inactive, stopping all monitored regions")
@@ -79,20 +99,23 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
         guard CLLocationManager.isMonitoringAvailable(for: CLCircularRegion.self) else { return }
 
         let status = locationManager.authorizationStatus
+        cachedAuthorizationStatus = status
         debugLog("Starting monitoring flow with authorization status: \(status.rawValue)")
         switch status {
         case .notDetermined:
-            requestedAlwaysUpgrade = true
-            debugLog("Requesting When In Use authorization")
-            locationManager.requestWhenInUseAuthorization()
+            requestAuthorizationForExcursionMode()
         case .authorizedWhenInUse:
-            if requestedAlwaysUpgrade == false {
-                requestedAlwaysUpgrade = true
+            if requestedAlwaysUpgrade {
+                requestedAlwaysUpgrade = false
+                debugLog("Requesting Always authorization upgrade")
+                locationManager.requestAlwaysAuthorization()
+            } else {
+                debugLog("Authorized When In Use only. Waiting for App Settings upgrade to Always")
+                stopMonitoringAllRegions()
             }
-            debugLog("Requesting Always authorization upgrade")
-            locationManager.requestAlwaysAuthorization()
         case .authorizedAlways:
             requestedAlwaysUpgrade = false
+            setBackgroundLocationUpdatesEnabled(true)
             locationManager.startUpdatingLocation()
             debugLog("Authorized Always. Refreshing nearby monitored merchants")
             refreshNearbyMonitoredMerchants(trigger: .startup)
@@ -110,6 +133,7 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
         for region in locationManager.monitoredRegions {
             locationManager.stopMonitoring(for: region)
         }
+        setBackgroundLocationUpdatesEnabled(false)
         locationManager.stopUpdatingLocation()
         locationWaitTask?.cancel()
         locationWaitTask = nil
@@ -128,7 +152,8 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
     }
 
     func currentAuthorizationStatus() -> CLAuthorizationStatus {
-        cachedAuthorizationStatus
+        cachedAuthorizationStatus = locationManager.authorizationStatus
+        return cachedAuthorizationStatus
     }
 
     private func refreshNearbyMonitoredMerchants(trigger: RefreshTrigger) {
@@ -202,6 +227,7 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
         monitoredMerchantsByRegionID = map
         persistMerchants(map)
         if SpendingSessionStore.isActive() {
+            setBackgroundLocationUpdatesEnabled(true)
             locationManager.startUpdatingLocation()
         }
     }
@@ -275,6 +301,7 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
         debugLog("Authorization changed: \(status.rawValue)")
 
         if status == .authorizedWhenInUse && requestedAlwaysUpgrade {
+            requestedAlwaysUpgrade = false
             manager.requestAlwaysAuthorization()
             return
         }
@@ -285,6 +312,7 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
         }
 
         if status == .denied || status == .restricted {
+            requestedAlwaysUpgrade = false
             stopMonitoringAllRegions()
             return
         }
@@ -342,6 +370,12 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
     private func debugLog(_ message: String) {
         #if DEBUG
         print("[ShoppingModeLocationService] \(message)")
+        #endif
+    }
+
+    private func setBackgroundLocationUpdatesEnabled(_ isEnabled: Bool) {
+        #if canImport(UIKit) && !targetEnvironment(macCatalyst)
+        locationManager.allowsBackgroundLocationUpdates = isEnabled
         #endif
     }
 

@@ -1,5 +1,8 @@
 import AppIntents
 import Foundation
+#if canImport(CoreLocation)
+import CoreLocation
+#endif
 
 #if canImport(ActivityKit) && !targetEnvironment(macCatalyst)
 import ActivityKit
@@ -38,6 +41,17 @@ struct EnableSpendingSessionIntent: AppIntent {
     }
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
+        #if canImport(CoreLocation)
+        let locationStatus = CLLocationManager().authorizationStatus
+        if locationStatus != .authorizedAlways {
+            return .result(
+                dialog: IntentDialog(
+                    stringLiteral: "Excursion mode needs Location access set to Always Allow. Open Offshore and start Excursion Mode once to finish setup in the app."
+                )
+            )
+        }
+        #endif
+
         let result = await ShoppingModeManager.shared.start(hours: duration.hours)
         switch result {
         case .started(let expiresAt):

@@ -17,7 +17,6 @@ import ActivityKit
 
 enum ShoppingModeStartBlocker: String, Equatable, CaseIterable {
     case notificationsNotAuthorized
-    case locationAlwaysNotGranted
     case liveActivitiesDisabled
     case backgroundRefreshUnavailable
 
@@ -25,8 +24,6 @@ enum ShoppingModeStartBlocker: String, Equatable, CaseIterable {
         switch self {
         case .notificationsNotAuthorized:
             return "Enable Notifications for Offshore in System Settings."
-        case .locationAlwaysNotGranted:
-            return "Set Location access to Always Allow for Excursion Mode."
         case .liveActivitiesDisabled:
             return "Enable Live Activities for Offshore in System Settings."
         case .backgroundRefreshUnavailable:
@@ -57,13 +54,6 @@ final class ShoppingModeReadinessEvaluator {
         if Self.isNotificationAuthorized(notificationSettings.authorizationStatus) == false {
             blockers.append(.notificationsNotAuthorized)
         }
-
-        #if canImport(CoreLocation)
-        let locationStatus = CLLocationManager().authorizationStatus
-        if locationStatus != .authorizedAlways {
-            blockers.append(.locationAlwaysNotGranted)
-        }
-        #endif
 
         #if canImport(UIKit)
         if UIApplication.shared.backgroundRefreshStatus != .available {

@@ -18,10 +18,15 @@ import CoreLocation
 import Photos
 #endif
 
+#if canImport(PhotosUI)
+import PhotosUI
+#endif
+
 #if canImport(ActivityKit) && !targetEnvironment(macCatalyst)
 import ActivityKit
 #endif
 
+@MainActor
 struct SettingsPrivacyView: View {
 
     @AppStorage("privacy_requireBiometrics") private var requireBiometrics: Bool = false
@@ -31,8 +36,18 @@ struct SettingsPrivacyView: View {
     // Stored as a timestamp so AppLockGate can detect “just authenticated”.
     @AppStorage("privacy_lastSuccessfulAuthAt") private var lastSuccessfulAuthAt: Double = 0
 
+    @Environment(\.scenePhase) private var scenePhase
+
     // Toggle UI state to authenticate before committing to AppStorage.
     @State private var requireBiometricsToggle: Bool = false
+
+    #if canImport(CoreLocation)
+    @State private var locationPermissionState: CLAuthorizationStatus = .notDetermined
+    #endif
+
+    #if canImport(Photos)
+    @State private var photosPermissionState: PHAuthorizationStatus = .notDetermined
+    #endif
 
     @State private var showingEnableError: Bool = false
     @State private var enableErrorMessage: String = ""
@@ -64,7 +79,6 @@ struct SettingsPrivacyView: View {
             Section {
                 Toggle(biometricToggleTitle, isOn: $requireBiometricsToggle)
                     .tint(Color("AccentColor"))
-
                     .disabled(!biometricsToggleIsEnabled)
 
                 if !biometricsToggleIsEnabled {
@@ -81,17 +95,8 @@ struct SettingsPrivacyView: View {
             // MARK: - System Permissions
 
             Section {
-                permissionRow(
-                    title: "Location",
-                    status: locationPermissionStatus,
-                    description: "Allows Offshore to use Location Services during Excursion Mode to nudge you to log expenses before you forget.\nNote: Location Services are not needed to use the core functionalities of Offshore."
-                )
-
-                permissionRow(
-                    title: "Photos",
-                    status: photosPermissionStatus,
-                    description: "Allows importing screenshots from your Photos Library for quicker income and expense entry."
-                )
+                locationPermissionRow
+                photosPermissionRow
 
                 permissionRow(
                     title: "Live Activities",
@@ -119,13 +124,18 @@ struct SettingsPrivacyView: View {
             } header: {
                 Text("System Permissions")
             } footer: {
-                Text("Offshore reflects Apple’s on-device permission system status. You can change any permission at anytime in App Settings.")
+                Text("Offshore reflects Apple’s on-device permission system status. You can change any permission at any time in App Settings.")
             }
         }
         .listStyle(.insetGrouped)
         .navigationTitle("Privacy")
         .onAppear {
             requireBiometricsToggle = requireBiometrics
+            refreshPermissionStates()
+        }
+        .onChange(of: scenePhase) { _, newValue in
+            guard newValue == .active else { return }
+            refreshPermissionStates()
         }
         .onChange(of: requireBiometrics) { _, newValue in
             // Keep UI toggle in sync if changed elsewhere.
@@ -141,7 +151,6 @@ struct SettingsPrivacyView: View {
                 return
             }
 
-            // Turning ON: authenticate first, then commit.
             Task {
                 await attemptEnableBiometricLock()
             }
@@ -152,6 +161,97 @@ struct SettingsPrivacyView: View {
             Text(enableErrorMessage)
         }
     }
+
+    // MARK: - Permission Rows
+
+    @ViewBuilder
+    private var locationPermissionRow: some View {
+        #if canImport(CoreLocation)
+        VStack(alignment: .leading, spacing: 8) {
+            LabeledContent("Location", value: locationPermissionStatusText)
+
+            Text("Allows Offshore to use Location Services during Excursion Mode to nudge you to log expenses before you forget.\nNote: Location Services are not needed to use the core functionalities of Offshore.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+
+            switch locationPermissionState {
+            case .notDetermined:
+                Button("Enable for Excursion Mode") {
+                    ShoppingModeLocationService.shared.requestAuthorizationForExcursionMode()
+                }
+            case .authorizedWhenInUse:
+                Button("Upgrade in App Settings") {
+                    openSystemSettings()
+                }
+            case .denied, .restricted:
+                Button("Manage in App Settings") {
+                    openSystemSettings()
+                }
+            case .authorizedAlways:
+                EmptyView()
+            @unknown default:
+                EmptyView()
+            }
+        }
+        #else
+        permissionRow(
+            title: "Location",
+            status: "Unavailable",
+            description: "Allows Offshore to use Location Services during Excursion Mode to nudge you to log expenses before you forget.\nNote: Location Services are not needed to use the core functionalities of Offshore."
+        )
+        #endif
+    }
+
+    @ViewBuilder
+    private var photosPermissionRow: some View {
+        #if canImport(Photos)
+        VStack(alignment: .leading, spacing: 8) {
+            LabeledContent("Photos", value: photosPermissionStatusText)
+
+            Text("Allows importing screenshots from your Photos Library for quicker income and expense entry.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+
+            switch photosPermissionState {
+            case .notDetermined:
+                Button("Allow Full Photo Access") {
+                    Task {
+                        _ = await PhotoLibraryAccessManager.shared.requestReadWriteAuthorization()
+                        refreshPermissionStates()
+                    }
+                }
+            case .limited:
+                if PhotoLibraryAccessManager.shared.canManageLimitedLibrarySelection {
+                    Button("Manage Selected Photos") {
+                        if PhotoLibraryAccessManager.shared.presentLimitedLibraryPicker() == false {
+                            openSystemSettings()
+                        }
+                    }
+                }
+
+                Button("Open App Settings") {
+                    openSystemSettings()
+                }
+            case .denied, .restricted:
+                Button("Manage in App Settings") {
+                    openSystemSettings()
+                }
+            case .authorized:
+                EmptyView()
+            @unknown default:
+                EmptyView()
+            }
+        }
+        #else
+        permissionRow(
+            title: "Photos",
+            status: "Unavailable",
+            description: "Allows importing screenshots from your Photos Library for quicker income and expense entry."
+        )
+        #endif
+    }
+
+    // MARK: - Biometric Flow
 
     @MainActor
     private func attemptEnableBiometricLock() async {
@@ -175,7 +275,6 @@ struct SettingsPrivacyView: View {
                 requireBiometrics = true
                 requireBiometricsToggle = true
             } else {
-                // User canceled, keep it off quietly.
                 requireBiometrics = false
                 requireBiometricsToggle = false
             }
@@ -198,16 +297,19 @@ struct SettingsPrivacyView: View {
 
     // MARK: - Permission Status
 
-    private var locationPermissionStatus: String {
+    private func refreshPermissionStates() {
         #if canImport(CoreLocation)
-        let status: CLAuthorizationStatus
-        if #available(iOS 14.0, macCatalyst 14.0, *) {
-            status = CLLocationManager().authorizationStatus
-        } else {
-            status = CLLocationManager.authorizationStatus()
-        }
+        locationPermissionState = ShoppingModeLocationService.shared.currentAuthorizationStatus()
+        #endif
 
-        switch status {
+        #if canImport(Photos)
+        photosPermissionState = PhotoLibraryAccessManager.shared.authorizationStatus()
+        #endif
+    }
+
+    private var locationPermissionStatusText: String {
+        #if canImport(CoreLocation)
+        switch locationPermissionState {
         case .authorizedAlways:
             return "Always Allow"
         case .authorizedWhenInUse:
@@ -217,7 +319,7 @@ struct SettingsPrivacyView: View {
         case .restricted:
             return "Restricted"
         case .notDetermined:
-            return "Not Determined"
+            return "Not Requested Yet"
         @unknown default:
             return "Unknown"
         }
@@ -226,18 +328,11 @@ struct SettingsPrivacyView: View {
         #endif
     }
 
-    private var photosPermissionStatus: String {
+    private var photosPermissionStatusText: String {
         #if canImport(Photos)
-        let status: PHAuthorizationStatus
-        if #available(iOS 14.0, macCatalyst 14.0, *) {
-            status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
-        } else {
-            status = PHPhotoLibrary.authorizationStatus()
-        }
-
-        switch status {
+        switch photosPermissionState {
         case .authorized:
-            return "Allowed"
+            return "Full Access"
         case .limited:
             return "Limited"
         case .denied:
@@ -245,7 +340,7 @@ struct SettingsPrivacyView: View {
         case .restricted:
             return "Restricted"
         case .notDetermined:
-            return "Not Determined"
+            return "Picker Only"
         @unknown default:
             return "Unknown"
         }
@@ -284,7 +379,7 @@ struct SettingsPrivacyView: View {
     }
 
     private var cellularDataStatus: String {
-        return "Manage in App Settings"
+        "Manage in App Settings"
     }
 
     @ViewBuilder
@@ -298,6 +393,90 @@ struct SettingsPrivacyView: View {
         }
     }
 }
+
+// MARK: - PhotoLibraryAccessManager
+
+#if canImport(Photos)
+@MainActor
+final class PhotoLibraryAccessManager {
+    static let shared = PhotoLibraryAccessManager()
+
+    private init() {}
+
+    func authorizationStatus() -> PHAuthorizationStatus {
+        if #available(iOS 14.0, macCatalyst 14.0, *) {
+            return PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        } else {
+            return PHPhotoLibrary.authorizationStatus()
+        }
+    }
+
+    func requestReadWriteAuthorization() async -> PHAuthorizationStatus {
+        if #available(iOS 14.0, macCatalyst 14.0, *) {
+            return await withCheckedContinuation { continuation in
+                PHPhotoLibrary.requestAuthorization(for: .readWrite) { status in
+                    continuation.resume(returning: status)
+                }
+            }
+        } else {
+            return await withCheckedContinuation { continuation in
+                PHPhotoLibrary.requestAuthorization { status in
+                    continuation.resume(returning: status)
+                }
+            }
+        }
+    }
+
+    var canManageLimitedLibrarySelection: Bool {
+        #if canImport(UIKit) && !targetEnvironment(macCatalyst)
+        return true
+        #else
+        return false
+        #endif
+    }
+
+    @discardableResult
+    func presentLimitedLibraryPicker() -> Bool {
+        #if canImport(UIKit) && !targetEnvironment(macCatalyst)
+        guard let presenter = topViewController() else { return false }
+        PHPhotoLibrary.shared().presentLimitedLibraryPicker(from: presenter)
+        return true
+        #else
+        return false
+        #endif
+    }
+
+    #if canImport(UIKit) && !targetEnvironment(macCatalyst)
+    private func topViewController() -> UIViewController? {
+        let connectedScenes = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+        let foregroundScene = connectedScenes.first { $0.activationState == .foregroundActive }
+        let rootViewController = foregroundScene?
+            .windows
+            .first(where: \.isKeyWindow)?
+            .rootViewController
+
+        return topViewController(from: rootViewController)
+    }
+
+    private func topViewController(from root: UIViewController?) -> UIViewController? {
+        if let navigationController = root as? UINavigationController {
+            return topViewController(from: navigationController.visibleViewController)
+        }
+
+        if let tabBarController = root as? UITabBarController {
+            return topViewController(from: tabBarController.selectedViewController)
+        }
+
+        if let presentedViewController = root?.presentedViewController {
+            return topViewController(from: presentedViewController)
+        }
+
+        return root
+    }
+    #endif
+}
+#endif
 
 #Preview("Settings Privacy") {
     NavigationStack {
