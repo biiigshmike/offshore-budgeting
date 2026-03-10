@@ -11,7 +11,18 @@ enum SpendingSessionStore {
 
     static func activate(hours: Int, now: Date = .now) {
         let clampedHours = min(max(1, hours), 12)
-        let expiresAt = now.addingTimeInterval(TimeInterval(clampedHours * 3600))
+        activate(duration: TimeInterval(clampedHours * 3600), now: now)
+    }
+
+    #if DEBUG
+    static func activate(minutes: Int, now: Date = .now) {
+        let clampedMinutes = min(max(1, minutes), 240)
+        activate(duration: TimeInterval(clampedMinutes * 60), now: now)
+    }
+    #endif
+
+    private static func activate(duration: TimeInterval, now: Date) {
+        let expiresAt = now.addingTimeInterval(duration)
         UserDefaults.standard.set(now.timeIntervalSince1970, forKey: Key.startedAt)
         UserDefaults.standard.set(expiresAt.timeIntervalSince1970, forKey: Key.expiresAt)
         UserDefaults.standard.set(UUID().uuidString, forKey: Key.sessionID)

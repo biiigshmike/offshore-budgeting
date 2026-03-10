@@ -88,6 +88,9 @@
     "Default Period" : {
 
     },
+    "Done" : {
+
+    },
     "Ends %@" : {
 
     },
@@ -212,6 +215,9 @@
 
     },
     "Recent Income" : {
+
+    },
+    "Session ended" : {
 
     },
     "Show a card and its expenses for a selected period." : {

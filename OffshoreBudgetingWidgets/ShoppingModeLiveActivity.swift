@@ -21,7 +21,7 @@ struct ShoppingModeLiveActivity: Widget {
                     ShoppingModeExpandedIslandTimerView(context: context)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    ShoppingModeExpandedIslandActionsView()
+                    ShoppingModeExpandedIslandActionsView(endDate: context.state.endDate)
                 }
             } compactLeading: {
                 Image(systemName: "sailboat.fill")
@@ -49,7 +49,15 @@ private struct ShoppingModeLockScreenLiveActivityView: View {
     let context: ActivityViewContext<ShoppingModeActivityAttributes>
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        TimelineView(.periodic(from: .now, by: 1)) { timeline in
+            content(now: timeline.date)
+        }
+    }
+
+    private func content(now: Date) -> some View {
+        let isExpired = ExcursionLiveActivityPhase.isExpired(endDate: context.state.endDate, now: now)
+
+        return VStack(alignment: .leading, spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 4) {
                     Image(systemName: "sailboat.fill")
@@ -79,45 +87,54 @@ private struct ShoppingModeLockScreenLiveActivityView: View {
                 }
 
                 ViewThatFits(in: .horizontal) {
-                    Text("Active until \(context.state.endDate, format: .dateTime.hour().minute())")
-                        .font(.footnote.weight(.medium))
-                        .foregroundStyle(ShoppingModeLiveActivityPalette.secondaryText)
-                        .lineLimit(1)
+                    if isExpired {
+                        Text("Session ended")
+                            .font(.footnote.weight(.medium))
+                            .foregroundStyle(ShoppingModeLiveActivityPalette.secondaryText)
+                            .lineLimit(1)
+                    } else {
+                        Text("Active until \(context.state.endDate, format: .dateTime.hour().minute())")
+                            .font(.footnote.weight(.medium))
+                            .foregroundStyle(ShoppingModeLiveActivityPalette.secondaryText)
+                            .lineLimit(1)
 
-                    Text("Ends \(context.state.endDate, format: .dateTime.hour().minute())")
-                        .font(.footnote.weight(.medium))
-                        .foregroundStyle(ShoppingModeLiveActivityPalette.secondaryText)
-                        .lineLimit(1)
+                        Text("Ends \(context.state.endDate, format: .dateTime.hour().minute())")
+                            .font(.footnote.weight(.medium))
+                            .foregroundStyle(ShoppingModeLiveActivityPalette.secondaryText)
+                            .lineLimit(1)
+                    }
 
                     EmptyView()
                 }
             }
             .padding(.trailing, 90)
 
-            HStack(spacing: 8) {
-                if let stopURL = ExcursionDeepLink.stopURL {
-                    Link(destination: stopURL) {
-                        Label("Stop", systemImage: "stop.fill")
-                            .font(.headline.weight(.semibold))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.9)
-                            .frame(maxWidth: .infinity, minHeight: 32)
-                            .background(ShoppingModeLiveActivityPalette.controlFill, in: Capsule())
-                            .foregroundStyle(ShoppingModeLiveActivityPalette.primaryText)
-                            .contentShape(Rectangle())
+            if isExpired == false {
+                HStack(spacing: 8) {
+                    if let stopURL = ExcursionDeepLink.stopURL {
+                        Link(destination: stopURL) {
+                            Label("Stop", systemImage: "stop.fill")
+                                .font(.headline.weight(.semibold))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.9)
+                                .frame(maxWidth: .infinity, minHeight: 32)
+                                .background(ShoppingModeLiveActivityPalette.controlFill, in: Capsule())
+                                .foregroundStyle(ShoppingModeLiveActivityPalette.primaryText)
+                                .contentShape(Rectangle())
+                        }
                     }
-                }
 
-                if let extendURL = ExcursionDeepLink.extendThirtyURL {
-                    Link(destination: extendURL) {
-                        Label("30 min", systemImage: "plus")
-                            .font(.headline.weight(.semibold))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.9)
-                            .frame(maxWidth: .infinity, minHeight: 32)
-                            .background(ShoppingModeLiveActivityPalette.controlFill, in: Capsule())
-                            .foregroundStyle(ShoppingModeLiveActivityPalette.primaryText)
-                            .contentShape(Rectangle())
+                    if let extendURL = ExcursionDeepLink.extendThirtyURL {
+                        Link(destination: extendURL) {
+                            Label("30 min", systemImage: "plus")
+                                .font(.headline.weight(.semibold))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.9)
+                                .frame(maxWidth: .infinity, minHeight: 32)
+                                .background(ShoppingModeLiveActivityPalette.controlFill, in: Capsule())
+                                .foregroundStyle(ShoppingModeLiveActivityPalette.primaryText)
+                                .contentShape(Rectangle())
+                        }
                     }
                 }
             }
@@ -125,20 +142,27 @@ private struct ShoppingModeLockScreenLiveActivityView: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
         .overlay(alignment: .topTrailing) {
-            ZStack {
-                CountdownRing(
-                    startDate: context.attributes.startDate,
-                    endDate: context.state.endDate,
-                    lineWidth: 4.0,
-                    trackColor: ShoppingModeLiveActivityPalette.ringTrack,
-                    progressColor: ShoppingModeLiveActivityPalette.ringProgress
-                )
+            if isExpired {
+                FinishedTimerBadge()
+                    .frame(width: 66, height: 66)
+                    .padding(.top, 10)
+                    .padding(.trailing, 12)
+            } else {
+                ZStack {
+                    CountdownRing(
+                        startDate: context.attributes.startDate,
+                        endDate: context.state.endDate,
+                        lineWidth: 4.0,
+                        trackColor: ShoppingModeLiveActivityPalette.ringTrack,
+                        progressColor: ShoppingModeLiveActivityPalette.ringProgress
+                    )
 
-                LockScreenRingTimerText(endDate: context.state.endDate)
+                    LockScreenRingTimerText(endDate: context.state.endDate)
+                }
+                .frame(width: 66, height: 66)
+                .padding(.top, 10)
+                .padding(.trailing, 12)
             }
-            .frame(width: 66, height: 66)
-            .padding(.top, 10)
-            .padding(.trailing, 12)
         }
     }
 }
@@ -223,16 +247,20 @@ private struct ShoppingModeExpandedIslandLeadingContentView: View {
     let context: ActivityViewContext<ShoppingModeActivityAttributes>
 
     var body: some View {
-        ViewThatFits(in: .horizontal) {
-            leadingContent(metrics: .large)
-            leadingContent(metrics: .medium)
-            leadingContent(metrics: .small)
+        TimelineView(.periodic(from: .now, by: 1)) { timeline in
+            ViewThatFits(in: .horizontal) {
+                leadingContent(metrics: .large, now: timeline.date)
+                leadingContent(metrics: .medium, now: timeline.date)
+                leadingContent(metrics: .small, now: timeline.date)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func leadingContent(metrics: ExpandedIslandMetrics) -> some View {
-        VStack(alignment: .leading, spacing: metrics.topRowSpacing) {
+    private func leadingContent(metrics: ExpandedIslandMetrics, now: Date) -> some View {
+        let isExpired = ExcursionLiveActivityPhase.isExpired(endDate: context.state.endDate, now: now)
+
+        return VStack(alignment: .leading, spacing: metrics.topRowSpacing) {
             HStack(spacing: metrics.brandRowSpacing) {
                 Image(systemName: "sailboat.fill")
                     .font(.system(size: metrics.brandIconSize, weight: .semibold))
@@ -255,15 +283,22 @@ private struct ShoppingModeExpandedIslandLeadingContentView: View {
 
                 // I intentionally degrade subtitle before timer text to preserve title hierarchy.
                 ViewThatFits(in: .horizontal) {
-                    Text("Active until \(context.state.endDate, format: .dateTime.hour().minute())")
-                        .font(.system(size: metrics.subtitleSize, weight: .medium, design: .rounded))
-                        .foregroundStyle(ShoppingModeLiveActivityPalette.secondaryText)
-                        .lineLimit(1)
+                    if isExpired {
+                        Text("Session ended")
+                            .font(.system(size: metrics.subtitleSize, weight: .medium, design: .rounded))
+                            .foregroundStyle(ShoppingModeLiveActivityPalette.secondaryText)
+                            .lineLimit(1)
+                    } else {
+                        Text("Active until \(context.state.endDate, format: .dateTime.hour().minute())")
+                            .font(.system(size: metrics.subtitleSize, weight: .medium, design: .rounded))
+                            .foregroundStyle(ShoppingModeLiveActivityPalette.secondaryText)
+                            .lineLimit(1)
 
-                    Text("Ends \(context.state.endDate, format: .dateTime.hour().minute())")
-                        .font(.system(size: metrics.subtitleSize, weight: .medium, design: .rounded))
-                        .foregroundStyle(ShoppingModeLiveActivityPalette.secondaryText)
-                        .lineLimit(1)
+                        Text("Ends \(context.state.endDate, format: .dateTime.hour().minute())")
+                            .font(.system(size: metrics.subtitleSize, weight: .medium, design: .rounded))
+                            .foregroundStyle(ShoppingModeLiveActivityPalette.secondaryText)
+                            .lineLimit(1)
+                    }
 
                     EmptyView()
                 }
@@ -281,29 +316,37 @@ private struct ShoppingModeExpandedIslandTimerView: View {
     let context: ActivityViewContext<ShoppingModeActivityAttributes>
 
     var body: some View {
-        ViewThatFits {
-            timer(metrics: .large)
-            timer(metrics: .medium)
-            timer(metrics: .small)
+        TimelineView(.periodic(from: .now, by: 1)) { timeline in
+            ViewThatFits {
+                timer(metrics: .large, now: timeline.date)
+                timer(metrics: .medium, now: timeline.date)
+                timer(metrics: .small, now: timeline.date)
+            }
+            .frame(maxHeight: .infinity, alignment: .topTrailing)
         }
-        .frame(maxHeight: .infinity, alignment: .topTrailing)
     }
 
-    private func timer(metrics: ExpandedIslandMetrics) -> some View {
-        ZStack {
-            CountdownRing(
-                startDate: context.attributes.startDate,
-                endDate: context.state.endDate,
-                lineWidth: metrics.timerLineWidth,
-                trackColor: ShoppingModeLiveActivityPalette.ringTrack,
-                progressColor: ShoppingModeLiveActivityPalette.ringProgress
-            )
+    private func timer(metrics: ExpandedIslandMetrics, now: Date) -> some View {
+        let isExpired = ExcursionLiveActivityPhase.isExpired(endDate: context.state.endDate, now: now)
 
-            ExpandedRingTimerText(
-                endDate: context.state.endDate,
-                fontSize: metrics.timerFontSize,
-                maxWidth: metrics.timerTextMaxWidth
-            )
+        return ZStack {
+            if isExpired {
+                FinishedTimerBadge(fontSize: metrics.timerFontSize)
+            } else {
+                CountdownRing(
+                    startDate: context.attributes.startDate,
+                    endDate: context.state.endDate,
+                    lineWidth: metrics.timerLineWidth,
+                    trackColor: ShoppingModeLiveActivityPalette.ringTrack,
+                    progressColor: ShoppingModeLiveActivityPalette.ringProgress
+                )
+
+                ExpandedRingTimerText(
+                    endDate: context.state.endDate,
+                    fontSize: metrics.timerFontSize,
+                    maxWidth: metrics.timerTextMaxWidth
+                )
+            }
         }
         .frame(width: metrics.timerDiameter, height: metrics.timerDiameter)
         .padding(.top, metrics.timerTopOffset)
@@ -313,11 +356,19 @@ private struct ShoppingModeExpandedIslandTimerView: View {
 // MARK: - ShoppingModeExpandedIslandActionsView
 
 private struct ShoppingModeExpandedIslandActionsView: View {
+    let endDate: Date
+
     var body: some View {
-        ViewThatFits(in: .horizontal) {
-            actionRow(metrics: .large)
-            actionRow(metrics: .medium)
-            actionRow(metrics: .small)
+        TimelineView(.periodic(from: .now, by: 1)) { timeline in
+            if ExcursionLiveActivityPhase.isExpired(endDate: endDate, now: timeline.date) == false {
+                ViewThatFits(in: .horizontal) {
+                    actionRow(metrics: .large)
+                    actionRow(metrics: .medium)
+                    actionRow(metrics: .small)
+                }
+            } else {
+                EmptyView()
+            }
         }
     }
 
@@ -369,6 +420,12 @@ private enum ExcursionDeepLink {
 
 // MARK: - ShoppingModeLiveActivityPalette
 
+private enum ExcursionLiveActivityPhase {
+    static func isExpired(endDate: Date, now: Date) -> Bool {
+        now >= endDate
+    }
+}
+
 private enum ShoppingModeLiveActivityPalette {
     static let surface = Color(.black)
     static let border = Color.white.opacity(0.08)
@@ -390,7 +447,7 @@ private struct CountdownRing: View {
     let progressColor: Color
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 60)) { context in
+        TimelineView(.periodic(from: .now, by: 1)) { context in
             let progress = ringProgress(now: context.date)
 
             ZStack {
@@ -411,8 +468,27 @@ private struct CountdownRing: View {
     private func ringProgress(now: Date) -> CGFloat {
         let total = max(1, endDate.timeIntervalSince(startDate))
         let remaining = max(0, endDate.timeIntervalSince(now))
-        let elapsed = total - remaining
-        return CGFloat(min(max(elapsed / total, 0), 1))
+        return CGFloat(min(max(remaining / total, 0), 1))
+    }
+}
+
+// MARK: - FinishedTimerBadge
+
+private struct FinishedTimerBadge: View {
+    var fontSize: CGFloat = 12
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(ShoppingModeLiveActivityPalette.ringTrack, lineWidth: 3)
+
+            Text("Done")
+                .font(.system(size: fontSize, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(ShoppingModeLiveActivityPalette.primaryText)
+                .minimumScaleFactor(0.7)
+                .lineLimit(1)
+        }
     }
 }
 
@@ -422,19 +498,32 @@ private struct LockScreenRingTimerText: View {
     let endDate: Date
 
     var body: some View {
-        Text(
-            timerInterval: Date.now...endDate,
-            pauseTime: nil,
-            countsDown: true,
-            showsHours: true
-        )
-        .font(.system(size: 14, weight: .medium, design: .rounded))
-        .monospacedDigit()
-        .lineLimit(1)
-        .foregroundStyle(ShoppingModeLiveActivityPalette.primaryText)
-        .minimumScaleFactor(0.8)
-        .multilineTextAlignment(.center)
-        .frame(width: 52, alignment: .center)
+        TimelineView(.periodic(from: .now, by: 1)) { timeline in
+            if ExcursionLiveActivityPhase.isExpired(endDate: endDate, now: timeline.date) {
+                Text("Done")
+                    .font(.system(size: 14, weight: .medium, design: .rounded))
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .foregroundStyle(ShoppingModeLiveActivityPalette.primaryText)
+                    .minimumScaleFactor(0.8)
+                    .multilineTextAlignment(.center)
+                    .frame(width: 52, alignment: .center)
+            } else {
+                Text(
+                    timerInterval: timeline.date...endDate,
+                    pauseTime: nil,
+                    countsDown: true,
+                    showsHours: true
+                )
+                .font(.system(size: 14, weight: .medium, design: .rounded))
+                .monospacedDigit()
+                .lineLimit(1)
+                .foregroundStyle(ShoppingModeLiveActivityPalette.primaryText)
+                .minimumScaleFactor(0.8)
+                .multilineTextAlignment(.center)
+                .frame(width: 52, alignment: .center)
+            }
+        }
     }
 }
 
@@ -446,19 +535,32 @@ private struct ExpandedRingTimerText: View {
     let maxWidth: CGFloat
 
     var body: some View {
-        Text(
-            timerInterval: Date.now...endDate,
-            pauseTime: nil,
-            countsDown: true,
-            showsHours: true
-        )
-        .font(.system(size: fontSize, weight: .semibold, design: .rounded))
-        .monospacedDigit()
-        .lineLimit(1)
-        .foregroundStyle(ShoppingModeLiveActivityPalette.primaryText)
-        .minimumScaleFactor(0.8)
-        .multilineTextAlignment(.center)
-        .frame(width: maxWidth, alignment: .center)
+        TimelineView(.periodic(from: .now, by: 1)) { timeline in
+            if ExcursionLiveActivityPhase.isExpired(endDate: endDate, now: timeline.date) {
+                Text("Done")
+                    .font(.system(size: fontSize, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .foregroundStyle(ShoppingModeLiveActivityPalette.primaryText)
+                    .minimumScaleFactor(0.8)
+                    .multilineTextAlignment(.center)
+                    .frame(width: maxWidth, alignment: .center)
+            } else {
+                Text(
+                    timerInterval: timeline.date...endDate,
+                    pauseTime: nil,
+                    countsDown: true,
+                    showsHours: true
+                )
+                .font(.system(size: fontSize, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .lineLimit(1)
+                .foregroundStyle(ShoppingModeLiveActivityPalette.primaryText)
+                .minimumScaleFactor(0.8)
+                .multilineTextAlignment(.center)
+                .frame(width: maxWidth, alignment: .center)
+            }
+        }
     }
 }
 
@@ -469,18 +571,30 @@ private struct CompactCountdownText: View {
     let endDate: Date
 
     var body: some View {
-        Text(
-            timerInterval: startDate...endDate,
-            pauseTime: nil,
-            countsDown: true,
-            showsHours: false
-        )
-        .monospacedDigit()
-        .font(.caption2.weight(.semibold))
-        .lineLimit(1)
-        .minimumScaleFactor(0.7)
-        .foregroundStyle(.white)
-        .frame(width: 34, alignment: .trailing)
+        TimelineView(.periodic(from: .now, by: 1)) { timeline in
+            if ExcursionLiveActivityPhase.isExpired(endDate: endDate, now: timeline.date) {
+                Text("Done")
+                    .monospacedDigit()
+                    .font(.caption2.weight(.semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .foregroundStyle(.white)
+                    .frame(width: 34, alignment: .trailing)
+            } else {
+                Text(
+                    timerInterval: timeline.date...endDate,
+                    pauseTime: nil,
+                    countsDown: true,
+                    showsHours: false
+                )
+                .monospacedDigit()
+                .font(.caption2.weight(.semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .foregroundStyle(.white)
+                .frame(width: 34, alignment: .trailing)
+            }
+        }
     }
 }
 #endif

@@ -141,6 +141,11 @@ struct SettingsNotificationsView: View {
                     }
 
                     Menu("Start Excursion Mode") {
+                        #if DEBUG
+                        Button("1 minute (DEBUG)") {
+                            Task { await startDebugExcursionMode(minutes: 1) }
+                        }
+                        #endif
                         Button("1 hour") {
                             Task { await startExcursionMode(hours: 1) }
                         }
@@ -390,6 +395,19 @@ struct SettingsNotificationsView: View {
             showingErrorAlert = true
         }
     }
+
+    #if DEBUG
+    private func startDebugExcursionMode(minutes: Int) async {
+        let result = await shoppingModeManager.startDebug(minutes: minutes)
+        switch result {
+        case .started:
+            return
+        case .blocked(let blockers):
+            errorMessage = blockers.map(\.message).joined(separator: "\n")
+            showingErrorAlert = true
+        }
+    }
+    #endif
 
     private var locationStatusText: String {
         #if canImport(CoreLocation)
