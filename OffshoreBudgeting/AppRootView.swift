@@ -189,9 +189,6 @@ struct AppRootView: View {
             if shouldSyncActiveSectionToCommandHub {
                 commandHub.setActiveSectionRaw(newValue)
             }
-#if DEBUG
-            debugLog("selectedSectionRaw=\(newValue) pathDepths=\(pathDepthSummary)")
-#endif
         }
         .sheet(isPresented: $showingHelpSheet) {
             NavigationStack {
@@ -223,7 +220,6 @@ struct AppRootView: View {
             }
             .environment(\.postBoardingTipPresenterIsActive, selectedSection == .home)
             .environment(\.postBoardingTipActivationCycle, postBoardingTipActivationCycle)
-            .homeAssistantHost(workspace: workspace)
             .tabItem { Label(AppSection.home.title, systemImage: AppSection.home.systemImage) }
             .tag(AppSection.home)
 
@@ -348,13 +344,4 @@ struct AppRootView: View {
         HomeView(workspace: workspace)
     }
 
-#if DEBUG
-    private var pathDepthSummary: String {
-        "home:\(homePath.count),budgets:\(budgetsPath.count),income:\(incomePath.count),cards:\(cardsPath.count),settings:\(settingsPath.count)"
-    }
-
-    private func debugLog(_ message: String) {
-        print("[AppRootView:\(workspace.id.uuidString)] \(message)")
-    }
-#endif
 }

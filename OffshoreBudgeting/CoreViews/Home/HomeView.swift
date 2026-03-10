@@ -66,6 +66,7 @@ struct HomeView: View {
 
     @State private var isShowingWhatIfPlanner: Bool = false
     @State private var whatIfInitialScenarioID: UUID? = nil
+    @State private var isShowingAssistantPanel: Bool = false
 
     // MARK: - Data Fixups
 
@@ -235,6 +236,13 @@ struct HomeView: View {
                 initialScenarioID: whatIfInitialScenarioID
             )
         }
+        .fullScreenCover(isPresented: $isShowingAssistantPanel, onDismiss: dismissAssistantPanel) {
+            HomeAssistantPanelView(
+                workspace: workspace,
+                onDismiss: dismissAssistantPanel,
+                shouldUseLargeMinimumSize: false
+            )
+        }
         .postBoardingTip(
             key: "tip.home.v1",
             title: String(localized: "app.section.home", defaultValue: "Home", comment: "Main tab title for the Home section."),
@@ -263,7 +271,7 @@ struct HomeView: View {
                     homeActionsToolbarButton
                 }
 
-                if assistantToolbarContext.isToolbarButtonVisible {
+                if showsAssistantToolbarButton {
                     ToolbarSpacer(.flexible, placement: .primaryAction)
 
                     ToolbarItemGroup(placement: .primaryAction) {
@@ -275,7 +283,7 @@ struct HomeView: View {
                     homeActionsToolbarButton
                 }
 
-                if assistantToolbarContext.isToolbarButtonVisible {
+                if showsAssistantToolbarButton {
                     ToolbarItem(placement: .primaryAction) {
                         assistantToolbarButtonLegacy
                     }
@@ -308,6 +316,7 @@ struct HomeView: View {
             excludeFutureVariableExpensesFromCalculationsInView = excludeFutureVariableExpensesFromCalculationsDefault
         }
         .onDisappear {
+            dismissAssistantPanel()
             if shouldSyncCommandSurface {
                 commandHub.deactivate(.home)
             }
@@ -334,6 +343,18 @@ struct HomeView: View {
     private func openWhatIfPlanner(_ initialScenarioID: UUID?) {
         whatIfInitialScenarioID = initialScenarioID
         isShowingWhatIfPlanner = true
+    }
+
+    private func presentAssistantPanel() {
+        if isPhone {
+            isShowingAssistantPanel = true
+        } else {
+            assistantToolbarContext.openAssistant()
+        }
+    }
+
+    private func dismissAssistantPanel() {
+        isShowingAssistantPanel = false
     }
 
     private func handleCommand(_ commandID: String) {
@@ -904,9 +925,17 @@ struct HomeView: View {
         .accessibilityLabel(String(localized: "home.actions", defaultValue: "Home Actions", comment: "Accessibility label for home actions menu."))
     }
 
+    private var showsAssistantToolbarButton: Bool {
+        if isPhone {
+            return true
+        }
+
+        return assistantToolbarContext.isToolbarButtonVisible
+    }
+
     @available(iOS 26.0, macCatalyst 26.0, *)
     private var assistantToolbarButtoniOS26: some View {
-        Button(action: assistantToolbarContext.openAssistant) {
+        Button(action: presentAssistantPanel) {
             Image(systemName: "figure.wave")
         }
         .buttonStyle(.glassProminent)
@@ -914,7 +943,7 @@ struct HomeView: View {
     }
 
     private var assistantToolbarButtonLegacy: some View {
-        Button(action: assistantToolbarContext.openAssistant) {
+        Button(action: presentAssistantPanel) {
             Image(systemName: "figure.wave")
         }
         .buttonStyle(.borderedProminent)
