@@ -72,14 +72,6 @@ final class ShoppingModeManager: ObservableObject {
         }
     }
 
-    #if DEBUG
-    func startDebug(minutes: Int) async -> ShoppingModeStartResult {
-        await startSession(durationLabel: "\(minutes) minute DEBUG") {
-            SpendingSessionStore.activate(minutes: minutes)
-        }
-    }
-    #endif
-
     private func startSession(
         durationLabel: String,
         activate: () -> Void
