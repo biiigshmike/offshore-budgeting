@@ -578,7 +578,7 @@ struct HomeView: View {
     @ViewBuilder
     private var nextPlannedExpenseWidget: some View {
         if let next = HomeNextPlannedExpenseFinder.nextExpense(
-            from: visiblePlannedExpensesForHome,
+            from: plannedExpensesForHome,
             in: appliedStartDate,
             to: appliedEndDate
         ) {
