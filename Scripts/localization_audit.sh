@@ -96,6 +96,7 @@ source_coverage_issues = 0
 
 es_equals_key_items: list[str] = []
 es_equals_en_items: list[str] = []
+es_missing_items: list[str] = []
 placeholder_mismatch_items: list[str] = []
 variant_issue_items: list[str] = []
 glossary_issue_items: list[str] = []
@@ -111,6 +112,7 @@ for key, entry in strings.items():
 
     if es_value is None:
         es_missing += 1
+        es_missing_items.append(key)
         continue
 
     if es_value == key and key not in es_equals_key_allowlist:
@@ -185,6 +187,18 @@ source_watchlist = {
         'Section("Getting Started")',
         'Section("Core Screens")',
     ],
+    "OffshoreBudgeting/CoreViews/Settings/SettingsGeneralView.swift": [
+        'private func maintenanceButton(title: String, tint: Color, action: @escaping () -> Void)',
+    ],
+    "OffshoreBudgeting/CoreViews/Settings/SettingsPrivacyView.swift": [
+        'private func permissionRow(title: String, status: String, description: String)',
+    ],
+}
+
+source_regex_watchlist = {
+    "OffshoreBudgeting/CoreViews/Settings/SettingsView.swift": [
+        r'SettingsRow\(\s*title:\s*"',
+    ],
 }
 
 for relative_path, blocked_values in source_watchlist.items():
@@ -197,6 +211,16 @@ for relative_path, blocked_values in source_watchlist.items():
             source_coverage_issues += 1
             source_issue_items.append(f"{relative_path} contains '{blocked}'")
 
+for relative_path, blocked_patterns in source_regex_watchlist.items():
+    source_path = Path(relative_path)
+    if not source_path.exists():
+        continue
+    content = source_path.read_text(encoding="utf-8")
+    for blocked_pattern in blocked_patterns:
+        if re.search(blocked_pattern, content, re.MULTILINE | re.DOTALL):
+            source_coverage_issues += 1
+            source_issue_items.append(f"{relative_path} matches /{blocked_pattern}/")
+
 print(f"catalog: {catalog_path}")
 print(f"total keys: {total}")
 print(f"es missing: {es_missing}")
@@ -207,6 +231,11 @@ print(f"variant coverage issues: {variant_coverage_issues}")
 print(f"glossary issues: {glossary_issues}")
 print(f"widget coverage issues: {widget_coverage_issues}")
 print(f"source coverage issues: {source_coverage_issues}")
+
+if es_missing_items:
+    print("\\nMissing es items:")
+    for item in es_missing_items[:50]:
+        print(f"- {item}")
 
 if es_equals_key_items:
     print("\\nTop es==key items:")

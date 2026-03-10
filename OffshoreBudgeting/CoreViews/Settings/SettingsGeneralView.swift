@@ -343,7 +343,7 @@ private struct SettingsMaintenanceView: View {
     }
 
     @ViewBuilder
-    private func maintenanceButton(title: String, tint: Color, action: @escaping () -> Void) -> some View {
+    private func maintenanceButton(title: LocalizedStringKey, tint: Color, action: @escaping () -> Void) -> some View {
         if #available(iOS 26.0, *) {
             Button(action: action) {
                 Text(title)

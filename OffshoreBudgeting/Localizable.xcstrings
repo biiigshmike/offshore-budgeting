@@ -700,12 +700,36 @@
       }
     },
     "Allow Full Photo Access" : {
-
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permitir acceso completo a Fotos"
+          }
+        }
+      }
     },
     "Allows importing screenshots from your Photos Library for quicker income and expense entry." : {
-
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permite importar capturas de pantalla desde tu fototeca para registrar ingresos y gastos mas rapido."
+          }
+        }
+      }
     },
     "Allows Offshore to use Location Services during Excursion Mode to nudge you to log expenses before you forget.\nNote: Location Services are not needed to use the core functionalities of Offshore." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permite que Offshore use Servicios de ubicacion durante Modo excursion para recordarte registrar gastos antes de que se te olviden.\nNota: Servicios de ubicacion no son necesarios para usar las funciones principales de Offshore."
+          }
+        }
+      }
+    },
+    "Allows Offshore to use mobile data during Excursion Mode when Wi-Fi may be unavailable.\nNote: Cellular Data is not needed to use the core functionalities of Offshore." : {
 
     },
     "Also remove presets?" : {
@@ -1376,6 +1400,9 @@
           }
         }
       }
+    },
+    "Background App Refresh" : {
+
     },
     "Balance" : {
       "localizations" : {
@@ -2332,6 +2359,9 @@
           }
         }
       }
+    },
+    "Cellular Data" : {
+
     },
     "Choose a card for this expense." : {
       "localizations" : {
@@ -4177,7 +4207,14 @@
       }
     },
     "Enable for Excursion Mode" : {
-
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activar para Modo excursion"
+          }
+        }
+      }
     },
     "Enable iCloud" : {
       "localizations" : {
@@ -4330,7 +4367,14 @@
       }
     },
     "Excursion mode needs Location access set to Always Allow. Open Offshore and start Excursion Mode once to finish setup in the app." : {
-
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modo excursion necesita acceso a Ubicacion en Permitir siempre. Abre Offshore y activa Modo excursion una vez para terminar la configuracion en la app."
+          }
+        }
+      }
     },
     "Excursion mode stopped." : {
       "localizations" : {
@@ -5006,6 +5050,9 @@
           }
         }
       }
+    },
+    "Helps Excursion Mode continue monitoring reliably when Offshore is not in the foreground." : {
+
     },
     "Hide follow-up suggestions" : {
       "extractionState" : "stale",
@@ -6974,8 +7021,18 @@
         }
       }
     },
-    "Location" : {
+    "Live Activities" : {
 
+    },
+    "Location" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ubicacion"
+          }
+        }
+      }
     },
     "Log Expense" : {
       "localizations" : {
@@ -7030,7 +7087,15 @@
       }
     },
     "Manage in App Settings" : {
-
+      "comment" : "Button-like status text shown when the user must manage a permission in App Settings.",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gestionar en Ajustes de la app"
+          }
+        }
+      }
     },
     "Manage Presets" : {
       "extractionState" : "stale",
@@ -7044,7 +7109,14 @@
       }
     },
     "Manage Selected Photos" : {
-
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gestionar fotos seleccionadas"
+          }
+        }
+      }
     },
     "Manage Workspaces" : {
       "extractionState" : "stale",
@@ -7990,7 +8062,14 @@
       }
     },
     "Offshore reflects Apple’s on-device permission system status. You can change any permission at any time in App Settings." : {
-
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offshore refleja el estado del sistema de permisos en el dispositivo de Apple. Puedes cambiar cualquier permiso en cualquier momento desde Ajustes de la app."
+          }
+        }
+      }
     },
     "Offshore reflects Apple’s on-device permission system status. You can change any permission at anytime in App Settings." : {
       "extractionState" : "stale",
@@ -8295,7 +8374,14 @@
       }
     },
     "Photos" : {
-
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fotos"
+          }
+        }
+      }
     },
     "Pick where your data is stored. You can switch later from Manage Workspaces." : {
       "localizations" : {
@@ -8732,6 +8818,222 @@
         }
       }
     },
+    "privacy.permissionStatus.allowed" : {
+      "comment" : "Permission status when a capability is allowed.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Allowed"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Permitido"
+          }
+        }
+      }
+    },
+    "privacy.permissionStatus.alwaysAllow" : {
+      "comment" : "Permission status when location access is always allowed.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Always Allow"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Permitir siempre"
+          }
+        }
+      }
+    },
+    "privacy.permissionStatus.denied" : {
+      "comment" : "Permission status when access has been denied.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Denied"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Denegado"
+          }
+        }
+      }
+    },
+    "privacy.permissionStatus.fullAccess" : {
+      "comment" : "Permission status when photo library access is fully allowed.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Full Access"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Acceso completo"
+          }
+        }
+      }
+    },
+    "privacy.permissionStatus.limited" : {
+      "comment" : "Permission status when photo library access is limited.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Limited"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Limitado"
+          }
+        }
+      }
+    },
+    "privacy.permissionStatus.notRequestedYet" : {
+      "comment" : "Permission status when access has not been requested yet.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Not Requested Yet"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Aun no solicitado"
+          }
+        }
+      }
+    },
+    "privacy.permissionStatus.off" : {
+      "comment" : "Permission status when a capability is turned off.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Off"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Desactivado"
+          }
+        }
+      }
+    },
+    "privacy.permissionStatus.pickerOnly" : {
+      "comment" : "Permission status when the user has only granted picker-based photo access.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Picker Only"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Solo selector"
+          }
+        }
+      }
+    },
+    "privacy.permissionStatus.restricted" : {
+      "comment" : "Permission status when access is restricted by the system.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Restricted"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Restringido"
+          }
+        }
+      }
+    },
+    "privacy.permissionStatus.unavailable" : {
+      "comment" : "Permission status shown when a capability is unavailable on the current platform.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Unavailable"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "No disponible"
+          }
+        }
+      }
+    },
+    "privacy.permissionStatus.unknown" : {
+      "comment" : "Fallback permission status when the system returns an unknown value.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Unknown"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Desconocido"
+          }
+        }
+      }
+    },
+    "privacy.permissionStatus.whileUsingApp" : {
+      "comment" : "Permission status when location access is only allowed while using the app.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "While Using App"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Mientras usas la app"
+          }
+        }
+      }
+    },
     "Progress: %@" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -9002,6 +9304,16 @@
         }
       }
     },
+    "Repeat Onboarding" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Repetir onboarding"
+          }
+        }
+      }
+    },
     "Repeat Onboarding?" : {
       "localizations" : {
         "es" : {
@@ -9032,6 +9344,16 @@
         }
       }
     },
+    "Reset & Erase Content" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restablecer y borrar contenido"
+          }
+        }
+      }
+    },
     "Reset & Erase Content applies to on-device data. You’re currently using iCloud, so you’ll need to switch to On Device and restart first." : {
       "localizations" : {
         "es" : {
@@ -9058,6 +9380,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Restablecimiento completado"
+          }
+        }
+      }
+    },
+    "Reset Tips & Hints" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restablecer consejos y ayudas"
           }
         }
       }
@@ -9804,6 +10136,9 @@
           }
         }
       }
+    },
+    "Shows Excursion Mode status and timing on your Lock Screen while the session is active." : {
+
     },
     "Single-press categories to filter expenses; tap selected chips to clear one. Long-press to edit category limits." : {
       "extractionState" : "stale",
@@ -10760,7 +11095,14 @@
       }
     },
     "Upgrade in App Settings" : {
-
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actualizar en Ajustes de la app"
+          }
+        }
+      }
     },
     "Use iCloud" : {
       "localizations" : {

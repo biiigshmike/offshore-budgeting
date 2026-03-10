@@ -311,20 +311,20 @@ struct SettingsPrivacyView: View {
         #if canImport(CoreLocation)
         switch locationPermissionState {
         case .authorizedAlways:
-            return "Always Allow"
+            return String(localized: "privacy.permissionStatus.alwaysAllow", defaultValue: "Always Allow", comment: "Permission status when location access is always allowed.")
         case .authorizedWhenInUse:
-            return "While Using App"
+            return String(localized: "privacy.permissionStatus.whileUsingApp", defaultValue: "While Using App", comment: "Permission status when location access is only allowed while using the app.")
         case .denied:
-            return "Denied"
+            return String(localized: "privacy.permissionStatus.denied", defaultValue: "Denied", comment: "Permission status when access has been denied.")
         case .restricted:
-            return "Restricted"
+            return String(localized: "privacy.permissionStatus.restricted", defaultValue: "Restricted", comment: "Permission status when access is restricted by the system.")
         case .notDetermined:
-            return "Not Requested Yet"
+            return String(localized: "privacy.permissionStatus.notRequestedYet", defaultValue: "Not Requested Yet", comment: "Permission status when access has not been requested yet.")
         @unknown default:
-            return "Unknown"
+            return String(localized: "privacy.permissionStatus.unknown", defaultValue: "Unknown", comment: "Fallback permission status when the system returns an unknown value.")
         }
         #else
-        return "Unavailable"
+        return String(localized: "privacy.permissionStatus.unavailable", defaultValue: "Unavailable", comment: "Permission status shown when a capability is unavailable on the current platform.")
         #endif
     }
 
@@ -332,32 +332,36 @@ struct SettingsPrivacyView: View {
         #if canImport(Photos)
         switch photosPermissionState {
         case .authorized:
-            return "Full Access"
+            return String(localized: "privacy.permissionStatus.fullAccess", defaultValue: "Full Access", comment: "Permission status when photo library access is fully allowed.")
         case .limited:
-            return "Limited"
+            return String(localized: "privacy.permissionStatus.limited", defaultValue: "Limited", comment: "Permission status when photo library access is limited.")
         case .denied:
-            return "Denied"
+            return String(localized: "privacy.permissionStatus.denied", defaultValue: "Denied", comment: "Permission status when access has been denied.")
         case .restricted:
-            return "Restricted"
+            return String(localized: "privacy.permissionStatus.restricted", defaultValue: "Restricted", comment: "Permission status when access is restricted by the system.")
         case .notDetermined:
-            return "Picker Only"
+            return String(localized: "privacy.permissionStatus.pickerOnly", defaultValue: "Picker Only", comment: "Permission status when the user has only granted picker-based photo access.")
         @unknown default:
-            return "Unknown"
+            return String(localized: "privacy.permissionStatus.unknown", defaultValue: "Unknown", comment: "Fallback permission status when the system returns an unknown value.")
         }
         #else
-        return "Unavailable"
+        return String(localized: "privacy.permissionStatus.unavailable", defaultValue: "Unavailable", comment: "Permission status shown when a capability is unavailable on the current platform.")
         #endif
     }
 
     private var liveActivitiesStatus: String {
         #if canImport(ActivityKit) && !targetEnvironment(macCatalyst)
         if #available(iOS 16.1, *) {
-            return ActivityAuthorizationInfo().areActivitiesEnabled ? "Allowed" : "Off"
+            if ActivityAuthorizationInfo().areActivitiesEnabled {
+                return String(localized: "privacy.permissionStatus.allowed", defaultValue: "Allowed", comment: "Permission status when a capability is allowed.")
+            } else {
+                return String(localized: "privacy.permissionStatus.off", defaultValue: "Off", comment: "Permission status when a capability is turned off.")
+            }
         } else {
-            return "Unavailable"
+            return String(localized: "privacy.permissionStatus.unavailable", defaultValue: "Unavailable", comment: "Permission status shown when a capability is unavailable on the current platform.")
         }
         #else
-        return "Unavailable"
+        return String(localized: "privacy.permissionStatus.unavailable", defaultValue: "Unavailable", comment: "Permission status shown when a capability is unavailable on the current platform.")
         #endif
     }
 
@@ -365,27 +369,31 @@ struct SettingsPrivacyView: View {
         #if canImport(UIKit)
         switch UIApplication.shared.backgroundRefreshStatus {
         case .available:
-            return "Allowed"
+            return String(localized: "privacy.permissionStatus.allowed", defaultValue: "Allowed", comment: "Permission status when a capability is allowed.")
         case .denied:
-            return "Off"
+            return String(localized: "privacy.permissionStatus.off", defaultValue: "Off", comment: "Permission status when a capability is turned off.")
         case .restricted:
-            return "Restricted"
+            return String(localized: "privacy.permissionStatus.restricted", defaultValue: "Restricted", comment: "Permission status when access is restricted by the system.")
         @unknown default:
-            return "Unknown"
+            return String(localized: "privacy.permissionStatus.unknown", defaultValue: "Unknown", comment: "Fallback permission status when the system returns an unknown value.")
         }
         #else
-        return "Unavailable"
+        return String(localized: "privacy.permissionStatus.unavailable", defaultValue: "Unavailable", comment: "Permission status shown when a capability is unavailable on the current platform.")
         #endif
     }
 
     private var cellularDataStatus: String {
-        "Manage in App Settings"
+        String(localized: "Manage in App Settings", defaultValue: "Manage in App Settings", comment: "Button-like status text shown when the user must manage a permission in App Settings.")
     }
 
     @ViewBuilder
-    private func permissionRow(title: String, status: String, description: String) -> some View {
+    private func permissionRow(title: LocalizedStringKey, status: String, description: LocalizedStringKey) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            LabeledContent(title, value: status)
+            LabeledContent {
+                Text(status)
+            } label: {
+                Text(title)
+            }
 
             Text(description)
                 .font(.footnote)
