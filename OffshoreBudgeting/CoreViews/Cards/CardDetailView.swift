@@ -812,8 +812,8 @@ struct CardDetailView: View {
                 Text("Z–A").tag(SortMode.za)
                 Text("\(CurrencyFormatter.currencySymbol)↑").tag(SortMode.amountAsc)
                 Text("\(CurrencyFormatter.currencySymbol)↓").tag(SortMode.amountDesc)
-                Text("F↑").tag(SortMode.dateAsc)
-                Text("F↓").tag(SortMode.dateDesc)
+                Text("Date ↑").tag(SortMode.dateAsc)
+                Text("Date ↓").tag(SortMode.dateDesc)
             }
             .pickerStyle(.segmented)
         } header: {

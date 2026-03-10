@@ -470,7 +470,7 @@
     },
     "accounts.sortUnavailable" : {
       "comment" : "Accessibility label when sort is not available.",
-      "extractionState" : "extracted_with_value",
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -3607,7 +3607,7 @@
       }
     },
     "Date ↑" : {
-      "extractionState" : "stale",
+      "comment" : "Ascending date sort label.",
       "localizations" : {
         "es" : {
           "stringUnit" : {
@@ -3618,7 +3618,7 @@
       }
     },
     "Date ↓" : {
-      "extractionState" : "stale",
+      "comment" : "Descending date sort label.",
       "localizations" : {
         "es" : {
           "stringUnit" : {
@@ -4723,6 +4723,7 @@
       }
     },
     "F↑" : {
+      "extractionState" : "stale",
       "localizations" : {
         "es" : {
           "stringUnit" : {
@@ -4733,6 +4734,7 @@
       }
     },
     "F↓" : {
+      "extractionState" : "stale",
       "localizations" : {
         "es" : {
           "stringUnit" : {

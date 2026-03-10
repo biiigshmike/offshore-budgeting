@@ -2,6 +2,68 @@ import SwiftUI
 import SwiftData
 import Charts
 
+enum SavingsLedgerSortMode: String {
+    case az
+    case za
+    case amountAsc
+    case amountDesc
+    case dateAsc
+    case dateDesc
+
+    func sorted(entries: [SavingsLedgerEntry]) -> [SavingsLedgerEntry] {
+        entries.sorted { lhs, rhs in
+            compare(lhs, rhs)
+        }
+    }
+
+    private func compare(_ lhs: SavingsLedgerEntry, _ rhs: SavingsLedgerEntry) -> Bool {
+        switch self {
+        case .az:
+            let result = lhs.ledgerDisplayTitle.localizedCaseInsensitiveCompare(rhs.ledgerDisplayTitle)
+            if result != .orderedSame {
+                return result == .orderedAscending
+            }
+            return descendingTieBreak(lhs, rhs)
+        case .za:
+            let result = lhs.ledgerDisplayTitle.localizedCaseInsensitiveCompare(rhs.ledgerDisplayTitle)
+            if result != .orderedSame {
+                return result == .orderedDescending
+            }
+            return descendingTieBreak(lhs, rhs)
+        case .amountAsc:
+            if lhs.amount != rhs.amount {
+                return lhs.amount < rhs.amount
+            }
+            return descendingTieBreak(lhs, rhs)
+        case .amountDesc:
+            if lhs.amount != rhs.amount {
+                return lhs.amount > rhs.amount
+            }
+            return descendingTieBreak(lhs, rhs)
+        case .dateAsc:
+            if lhs.date != rhs.date {
+                return lhs.date < rhs.date
+            }
+            if lhs.createdAt != rhs.createdAt {
+                return lhs.createdAt < rhs.createdAt
+            }
+            return lhs.id.uuidString < rhs.id.uuidString
+        case .dateDesc:
+            return descendingTieBreak(lhs, rhs)
+        }
+    }
+
+    private func descendingTieBreak(_ lhs: SavingsLedgerEntry, _ rhs: SavingsLedgerEntry) -> Bool {
+        if lhs.date != rhs.date {
+            return lhs.date > rhs.date
+        }
+        if lhs.createdAt != rhs.createdAt {
+            return lhs.createdAt > rhs.createdAt
+        }
+        return lhs.id.uuidString > rhs.id.uuidString
+    }
+}
+
 struct SavingsAccountView: View {
     private enum SavingsTrendMode: String, CaseIterable, Identifiable {
         case runningTotal = "Running Total"
@@ -15,6 +77,7 @@ struct SavingsAccountView: View {
     @AppStorage("general_defaultBudgetingPeriod")
     private var defaultBudgetingPeriodRaw: String = BudgetingPeriod.monthly.rawValue
     @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
+    @AppStorage("sort.savings.mode") private var sortModeRaw: String = SavingsLedgerSortMode.dateDesc.rawValue
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.appCommandHub) private var commandHub
@@ -63,23 +126,31 @@ struct SavingsAccountView: View {
         return savingsEntries.filter { $0.account?.id == accountID }
     }
 
+    private var sortMode: SavingsLedgerSortMode {
+        SavingsLedgerSortMode(rawValue: sortModeRaw) ?? .dateDesc
+    }
+
+    private func setSortMode(_ mode: SavingsLedgerSortMode) {
+        sortModeRaw = mode.rawValue
+    }
+
     private var displayRows: [SavingsLedgerEntry] {
         let dateFiltered = accountScopedEntries
             .filter { entry in
                 entry.date >= normalizedStart(appliedStartDate) && entry.date <= normalizedEnd(appliedEndDate)
             }
-            .sorted { lhs, rhs in
-                if lhs.date == rhs.date {
-                    return lhs.createdAt > rhs.createdAt
-                }
-                return lhs.date > rhs.date
-            }
 
         let trimmedSearch = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedSearch.isEmpty else { return dateFiltered }
-        return dateFiltered.filter { entry in
-            entryMatchesSearch(entry, query: trimmedSearch)
+        let filteredRows: [SavingsLedgerEntry]
+        if trimmedSearch.isEmpty {
+            filteredRows = dateFiltered
+        } else {
+            filteredRows = dateFiltered.filter { entry in
+                entryMatchesSearch(entry, query: trimmedSearch)
+            }
         }
+
+        return sortMode.sorted(entries: filteredRows)
     }
 
     private var isDateDirty: Bool {
@@ -393,10 +464,9 @@ struct SavingsAccountView: View {
     private func entryMatchesSearch(_ entry: SavingsLedgerEntry, query: String) -> Bool {
         let normalized = query.lowercased()
 
-        let typeLabel = kindLabel(for: entry.kind)
         let searchableFields = [
             entry.note,
-            typeLabel,
+            entry.ledgerKindLabel,
             AppDateFormat.abbreviatedDate(entry.date),
             AppDateFormat.numericDate(entry.date),
             CurrencyFormatter.string(from: entry.amount),
@@ -407,17 +477,6 @@ struct SavingsAccountView: View {
 
         return searchableFields.contains { field in
             field.lowercased().contains(normalized)
-        }
-    }
-
-    private func kindLabel(for kind: SavingsLedgerEntryKind) -> String {
-        switch kind {
-        case .periodClose:
-            return "Period Close"
-        case .manualAdjustment:
-            return "Manual Adjustment"
-        case .expenseOffset:
-            return "Expense Offset"
         }
     }
 
@@ -465,9 +524,42 @@ struct SavingsAccountView: View {
     }
 
     private func handleCommand(_ commandID: String) {
-        guard commandID == AppCommandID.Savings.newEntry else { return }
-        editingEntry = nil
-        showingEntrySheet = true
+        switch commandID {
+        case AppCommandID.Savings.newEntry:
+            editingEntry = nil
+            showingEntrySheet = true
+        case AppCommandID.Savings.sortAZ:
+            setSortMode(.az)
+        case AppCommandID.Savings.sortZA:
+            setSortMode(.za)
+        case AppCommandID.Savings.sortAmountAsc:
+            setSortMode(.amountAsc)
+        case AppCommandID.Savings.sortAmountDesc:
+            setSortMode(.amountDesc)
+        case AppCommandID.Savings.sortDateAsc:
+            setSortMode(.dateAsc)
+        case AppCommandID.Savings.sortDateDesc:
+            setSortMode(.dateDesc)
+        default:
+            break
+        }
+    }
+}
+
+extension SavingsLedgerEntry {
+    var ledgerKindLabel: String {
+        switch kind {
+        case .periodClose:
+            return "Period Close"
+        case .manualAdjustment:
+            return "Manual Adjustment"
+        case .expenseOffset:
+            return "Expense Offset"
+        }
+    }
+
+    var ledgerDisplayTitle: String {
+        note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? ledgerKindLabel : note
     }
 }
 
@@ -481,20 +573,13 @@ private struct SavingsLedgerRow: View {
     let entry: SavingsLedgerEntry
 
     private var subtitle: String {
-        switch entry.kind {
-        case .periodClose:
-            return "Period Close"
-        case .manualAdjustment:
-            return "Manual Adjustment"
-        case .expenseOffset:
-            return "Expense Offset"
-        }
+        entry.ledgerKindLabel
     }
 
     var body: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(entry.note.isEmpty ? subtitle : entry.note)
+                Text(entry.ledgerDisplayTitle)
                     .font(.headline)
 
                 Text("\(subtitle) • \(AppDateFormat.abbreviatedDate(entry.date))")

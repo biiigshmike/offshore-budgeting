@@ -53,6 +53,7 @@ struct AccountsView: View {
 
     @AppStorage("sort.cards.mode") private var cardsSortModeRaw: String = "az"
     @AppStorage("sort.sharedBalances.mode") private var sharedBalancesSortModeRaw: String = "az"
+    @AppStorage("sort.savings.mode") private var savingsSortModeRaw: String = SavingsLedgerSortMode.dateDesc.rawValue
     @AppStorage(AppShortcutNavigationStore.pendingAccountsSegmentKey) private var pendingAccountsSegmentRaw: String = ""
 
     @Environment(\.appCommandHub) private var commandHub
@@ -137,7 +138,12 @@ struct AccountsView: View {
         }
         .onDisappear {
             if shouldSyncCommandSurface {
-                commandHub.deactivate(.cards)
+                switch selectedSegment {
+                case .cards, .sharedBalances:
+                    commandHub.deactivate(.cards)
+                case .savings:
+                    commandHub.deactivate(.savings)
+                }
             }
         }
     }
@@ -155,7 +161,7 @@ struct AccountsView: View {
             commandHub.activate(.cards)
             commandHub.setCardsSortContext(.sharedBalances)
         case .savings:
-            commandHub.deactivate(.cards)
+            commandHub.activate(.savings)
         }
     }
 
@@ -241,12 +247,41 @@ struct AccountsView: View {
             }
             .accessibilityLabel(String(localized: "common.sort", defaultValue: "Sort", comment: "Accessibility label for sort actions."))
         case .savings:
-            Button {
+            Menu {
+                sortMenuButton(
+                    title: "A–Z",
+                    isSelected: savingsSortModeRaw == SavingsLedgerSortMode.az.rawValue,
+                    commandID: AppCommandID.Savings.sortAZ
+                )
+                sortMenuButton(
+                    title: "Z–A",
+                    isSelected: savingsSortModeRaw == SavingsLedgerSortMode.za.rawValue,
+                    commandID: AppCommandID.Savings.sortZA
+                )
+                sortMenuButton(
+                    title: "\(CurrencyFormatter.currencySymbol)↑",
+                    isSelected: savingsSortModeRaw == SavingsLedgerSortMode.amountAsc.rawValue,
+                    commandID: AppCommandID.Savings.sortAmountAsc
+                )
+                sortMenuButton(
+                    title: "\(CurrencyFormatter.currencySymbol)↓",
+                    isSelected: savingsSortModeRaw == SavingsLedgerSortMode.amountDesc.rawValue,
+                    commandID: AppCommandID.Savings.sortAmountDesc
+                )
+                sortMenuButton(
+                    title: String(localized: "Date ↑", defaultValue: "Date ↑", comment: "Ascending date sort label."),
+                    isSelected: savingsSortModeRaw == SavingsLedgerSortMode.dateAsc.rawValue,
+                    commandID: AppCommandID.Savings.sortDateAsc
+                )
+                sortMenuButton(
+                    title: String(localized: "Date ↓", defaultValue: "Date ↓", comment: "Descending date sort label."),
+                    isSelected: savingsSortModeRaw == SavingsLedgerSortMode.dateDesc.rawValue,
+                    commandID: AppCommandID.Savings.sortDateDesc
+                )
             } label: {
                 Image(systemName: "arrow.up.arrow.down")
             }
-            .disabled(true)
-            .accessibilityLabel(String(localized: "accounts.sortUnavailable", defaultValue: "Sort Unavailable", comment: "Accessibility label when sort is not available."))
+            .accessibilityLabel(String(localized: "common.sort", defaultValue: "Sort", comment: "Accessibility label for sort actions."))
         }
     }
 

@@ -300,8 +300,8 @@ struct BudgetsView: View {
         Menu {
             sortMenuButton(title: "A–Z", mode: .az)
             sortMenuButton(title: "Z–A", mode: .za)
-            sortMenuButton(title: "F↑", mode: .dateAsc)
-            sortMenuButton(title: "F↓", mode: .dateDesc)
+            sortMenuButton(title: "Date ↑", mode: .dateAsc)
+            sortMenuButton(title: "Date ↓", mode: .dateDesc)
         } label: {
             Image(systemName: "arrow.up.arrow.down")
         }

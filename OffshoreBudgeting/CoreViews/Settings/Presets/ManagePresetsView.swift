@@ -363,8 +363,8 @@ struct ManagePresetsView: View {
         Menu {
             sortMenuButton(title: "A–Z", mode: .az)
             sortMenuButton(title: "Z–A", mode: .za)
-            sortMenuButton(title: "F↑", mode: .dateAsc)
-            sortMenuButton(title: "F↓", mode: .dateDesc)
+            sortMenuButton(title: "Date ↑", mode: .dateAsc)
+            sortMenuButton(title: "Date ↓", mode: .dateDesc)
             sortMenuButton(title: "$↑", mode: .amountAsc)
             sortMenuButton(title: "$↓", mode: .amountDesc)
         } label: {

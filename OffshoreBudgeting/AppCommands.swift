@@ -75,6 +75,12 @@ enum AppCommandID {
 
     enum Savings {
         static let newEntry = "savings.new_entry"
+        static let sortAZ = "savings.sort.az"
+        static let sortZA = "savings.sort.za"
+        static let sortAmountAsc = "savings.sort.amount_asc"
+        static let sortAmountDesc = "savings.sort.amount_desc"
+        static let sortDateAsc = "savings.sort.date_asc"
+        static let sortDateDesc = "savings.sort.date_desc"
     }
 
     enum CardDetail {
@@ -108,6 +114,7 @@ enum AppCommandSurface: Equatable {
     case budgetDetail
     case income
     case cards
+    case savings
     case cardDetail
 }
 
@@ -337,6 +344,14 @@ struct OffshoreAppCommands: Commands {
                     shortcut: KeyboardShortcut("n", modifiers: [.command])
                 )
             ]
+        case .savings:
+            return [
+                AppMenuCommandItem(
+                    id: AppCommandID.Savings.newEntry,
+                    title: "New Savings Entry",
+                    shortcut: KeyboardShortcut("n", modifiers: [.command])
+                )
+            ]
         case .cardDetail:
             return [
                 AppMenuCommandItem(
@@ -399,7 +414,7 @@ struct OffshoreAppCommands: Commands {
                     role: .destructive
                 )
             ]
-        case .none, .budgets, .presets, .categories, .cards:
+        case .none, .budgets, .presets, .categories, .cards, .savings:
             return []
         }
     }
@@ -516,6 +531,39 @@ struct OffshoreAppCommands: Commands {
                     )
                 ]
             }
+        case .savings:
+            return [
+                AppMenuCommandItem(
+                    id: AppCommandID.Savings.sortAZ,
+                    title: "Sort A-Z",
+                    shortcut: KeyboardShortcut("1", modifiers: [.command, .option])
+                ),
+                AppMenuCommandItem(
+                    id: AppCommandID.Savings.sortZA,
+                    title: "Sort Z-A",
+                    shortcut: KeyboardShortcut("2", modifiers: [.command, .option])
+                ),
+                AppMenuCommandItem(
+                    id: AppCommandID.Savings.sortAmountAsc,
+                    title: "Sort $↑",
+                    shortcut: KeyboardShortcut("3", modifiers: [.command, .option])
+                ),
+                AppMenuCommandItem(
+                    id: AppCommandID.Savings.sortAmountDesc,
+                    title: "Sort $↓",
+                    shortcut: KeyboardShortcut("4", modifiers: [.command, .option])
+                ),
+                AppMenuCommandItem(
+                    id: AppCommandID.Savings.sortDateAsc,
+                    title: "Sort Date ↑",
+                    shortcut: KeyboardShortcut("5", modifiers: [.command, .option])
+                ),
+                AppMenuCommandItem(
+                    id: AppCommandID.Savings.sortDateDesc,
+                    title: "Sort Date ↓",
+                    shortcut: KeyboardShortcut("6", modifiers: [.command, .option])
+                )
+            ]
         case .budgetDetail:
             return [
                 AppMenuCommandItem(

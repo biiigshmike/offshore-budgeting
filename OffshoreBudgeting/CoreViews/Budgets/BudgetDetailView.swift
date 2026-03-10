@@ -940,8 +940,8 @@ struct BudgetDetailView: View {
                 Text("Z–A").tag(BudgetSortMode.za)
                 Text("\(CurrencyFormatter.currencySymbol)↑").tag(BudgetSortMode.amountAsc)
                 Text("\(CurrencyFormatter.currencySymbol)↓").tag(BudgetSortMode.amountDesc)
-                Text("F↑").tag(BudgetSortMode.dateAsc)
-                Text("F↓").tag(BudgetSortMode.dateDesc)
+                Text("Date ↑").tag(BudgetSortMode.dateAsc)
+                Text("Date ↓").tag(BudgetSortMode.dateDesc)
             }
             .pickerStyle(.segmented)
         } header: {

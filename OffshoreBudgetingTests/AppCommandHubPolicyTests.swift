@@ -22,6 +22,9 @@ struct AppCommandHubPolicyTests {
         hub.activate(.budgetDetail)
         #expect(hub.surface == .budgetDetail)
 
+        hub.activate(.savings)
+        #expect(hub.surface == .savings)
+
         hub.setBudgetDetailCanCreateTransaction(true)
         #expect(hub.availability.budgetDetailCanCreateTransaction)
 
@@ -48,10 +51,12 @@ struct AppCommandHubPolicyTests {
         let initialSequence = hub.sequence
 
         hub.activate(.cardDetail)
+        hub.activate(.savings)
         hub.setBudgetDetailCanCreateTransaction(true)
         hub.setIncomeDeletionAvailability(canDeleteActual: true, canDeletePlanned: true)
         hub.setCardsSortContext(.sharedBalances)
         hub.setActiveSectionRaw(AppSection.settings.rawValue)
+        hub.deactivate(.savings)
         hub.deactivate(.cardDetail)
 
         #expect(hub.surface == .none)

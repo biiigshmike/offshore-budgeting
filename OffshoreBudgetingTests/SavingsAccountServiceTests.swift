@@ -996,4 +996,91 @@ struct SavingsAccountServiceTests {
         #expect(remainingEntries.isEmpty)
         #expect(account.total == 0)
     }
+
+    @Test func savingsLedgerSortMode_titleSort_usesVisibleRowTitle() {
+        let blankNote = SavingsLedgerEntry(
+            date: makeDate(2026, 8, 3),
+            amount: 10,
+            note: "",
+            kindRaw: SavingsLedgerEntryKind.periodClose.rawValue,
+            createdAt: makeDate(2026, 8, 3)
+        )
+        let alpha = SavingsLedgerEntry(
+            date: makeDate(2026, 8, 2),
+            amount: 20,
+            note: "Alpha",
+            kindRaw: SavingsLedgerEntryKind.manualAdjustment.rawValue,
+            createdAt: makeDate(2026, 8, 2)
+        )
+        let zulu = SavingsLedgerEntry(
+            date: makeDate(2026, 8, 1),
+            amount: 30,
+            note: "Zulu",
+            kindRaw: SavingsLedgerEntryKind.expenseOffset.rawValue,
+            createdAt: makeDate(2026, 8, 1)
+        )
+
+        let entries = [blankNote, zulu, alpha]
+
+        #expect(SavingsLedgerSortMode.az.sorted(entries: entries).map(\.ledgerDisplayTitle) == ["Alpha", "Period Close", "Zulu"])
+        #expect(SavingsLedgerSortMode.za.sorted(entries: entries).map(\.ledgerDisplayTitle) == ["Zulu", "Period Close", "Alpha"])
+    }
+
+    @Test func savingsLedgerSortMode_amountSort_ordersByAmount() {
+        let small = SavingsLedgerEntry(
+            date: makeDate(2026, 8, 1),
+            amount: 5,
+            note: "Small",
+            kindRaw: SavingsLedgerEntryKind.manualAdjustment.rawValue,
+            createdAt: makeDate(2026, 8, 1)
+        )
+        let medium = SavingsLedgerEntry(
+            date: makeDate(2026, 8, 2),
+            amount: 25,
+            note: "Medium",
+            kindRaw: SavingsLedgerEntryKind.manualAdjustment.rawValue,
+            createdAt: makeDate(2026, 8, 2)
+        )
+        let large = SavingsLedgerEntry(
+            date: makeDate(2026, 8, 3),
+            amount: 100,
+            note: "Large",
+            kindRaw: SavingsLedgerEntryKind.manualAdjustment.rawValue,
+            createdAt: makeDate(2026, 8, 3)
+        )
+
+        let entries = [medium, large, small]
+
+        #expect(SavingsLedgerSortMode.amountAsc.sorted(entries: entries).map(\.amount) == [5, 25, 100])
+        #expect(SavingsLedgerSortMode.amountDesc.sorted(entries: entries).map(\.amount) == [100, 25, 5])
+    }
+
+    @Test func savingsLedgerSortMode_dateSort_isStableForSameDayEntries() {
+        let olderCreatedAt = SavingsLedgerEntry(
+            date: makeDate(2026, 8, 4),
+            amount: 10,
+            note: "Older",
+            kindRaw: SavingsLedgerEntryKind.manualAdjustment.rawValue,
+            createdAt: makeDate(2026, 8, 4)
+        )
+        let newerCreatedAt = SavingsLedgerEntry(
+            date: makeDate(2026, 8, 4),
+            amount: 20,
+            note: "Newer",
+            kindRaw: SavingsLedgerEntryKind.manualAdjustment.rawValue,
+            createdAt: makeDate(2026, 8, 5)
+        )
+        let earlierDate = SavingsLedgerEntry(
+            date: makeDate(2026, 8, 1),
+            amount: 30,
+            note: "Earlier Date",
+            kindRaw: SavingsLedgerEntryKind.manualAdjustment.rawValue,
+            createdAt: makeDate(2026, 8, 1)
+        )
+
+        let entries = [olderCreatedAt, earlierDate, newerCreatedAt]
+
+        #expect(SavingsLedgerSortMode.dateAsc.sorted(entries: entries).map(\.note) == ["Earlier Date", "Older", "Newer"])
+        #expect(SavingsLedgerSortMode.dateDesc.sorted(entries: entries).map(\.note) == ["Newer", "Older", "Earlier Date"])
+    }
 }
