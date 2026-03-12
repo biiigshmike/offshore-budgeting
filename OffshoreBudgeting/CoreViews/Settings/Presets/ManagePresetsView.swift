@@ -361,16 +361,16 @@ struct ManagePresetsView: View {
     @ViewBuilder
     private var sortToolbarButton: some View {
         Menu {
-            sortMenuButton(title: "A–Z", mode: .az)
-            sortMenuButton(title: "Z–A", mode: .za)
-            sortMenuButton(title: "Date ↑", mode: .dateAsc)
-            sortMenuButton(title: "Date ↓", mode: .dateDesc)
-            sortMenuButton(title: "$↑", mode: .amountAsc)
-            sortMenuButton(title: "$↓", mode: .amountDesc)
+            sortMenuButton(title: String(localized: "A–Z", defaultValue: "A–Z", comment: "Ascending alphabetic sort label."), mode: .az)
+            sortMenuButton(title: String(localized: "Z–A", defaultValue: "Z–A", comment: "Descending alphabetic sort label."), mode: .za)
+            sortMenuButton(title: String(localized: "Date ↑", defaultValue: "Date ↑", comment: "Ascending date sort label."), mode: .dateAsc)
+            sortMenuButton(title: String(localized: "Date ↓", defaultValue: "Date ↓", comment: "Descending date sort label."), mode: .dateDesc)
+            sortMenuButton(title: String(localized: "$↑", defaultValue: "$↑", comment: "Ascending amount sort label."), mode: .amountAsc)
+            sortMenuButton(title: String(localized: "$↓", defaultValue: "$↓", comment: "Descending amount sort label."), mode: .amountDesc)
         } label: {
             Image(systemName: "arrow.up.arrow.down")
         }
-        .accessibilityLabel("Sort")
+        .accessibilityLabel(String(localized: "Sort", defaultValue: "Sort", comment: "Accessibility label for sort menu."))
     }
 
     private func sortMenuButton(title: String, mode: PresetSortMode) -> some View {

@@ -235,6 +235,32 @@ private struct AppMenuCommandItem: Identifiable {
     }
 }
 
+private extension String {
+    static var localizedSortAZ: String {
+        String(localized: "Sort A-Z", defaultValue: "Sort A-Z", comment: "App command title for ascending alphabetic sort.")
+    }
+
+    static var localizedSortZA: String {
+        String(localized: "Sort Z-A", defaultValue: "Sort Z-A", comment: "App command title for descending alphabetic sort.")
+    }
+
+    static var localizedSortDateAsc: String {
+        String(localized: "Sort Date ↑", defaultValue: "Sort Date ↑", comment: "App command title for ascending date sort.")
+    }
+
+    static var localizedSortDateDesc: String {
+        String(localized: "Sort Date ↓", defaultValue: "Sort Date ↓", comment: "App command title for descending date sort.")
+    }
+
+    static var localizedSortAmountAsc: String {
+        String(localized: "Sort $↑", defaultValue: "Sort $↑", comment: "App command title for ascending amount sort.")
+    }
+
+    static var localizedSortAmountDesc: String {
+        String(localized: "Sort $↓", defaultValue: "Sort $↓", comment: "App command title for descending amount sort.")
+    }
+}
+
 // MARK: - Commands
 
 struct OffshoreAppCommands: Commands {
@@ -427,22 +453,22 @@ struct OffshoreAppCommands: Commands {
             return [
                 AppMenuCommandItem(
                     id: AppCommandID.Budgets.sortAZ,
-                    title: "Sort A-Z",
+                    title: .localizedSortAZ,
                     shortcut: KeyboardShortcut("1", modifiers: [.command, .option])
                 ),
                 AppMenuCommandItem(
                     id: AppCommandID.Budgets.sortZA,
-                    title: "Sort Z-A",
+                    title: .localizedSortZA,
                     shortcut: KeyboardShortcut("2", modifiers: [.command, .option])
                 ),
                 AppMenuCommandItem(
                     id: AppCommandID.Budgets.sortDateAsc,
-                    title: "Sort Date ↑",
+                    title: .localizedSortDateAsc,
                     shortcut: KeyboardShortcut("3", modifiers: [.command, .option])
                 ),
                 AppMenuCommandItem(
                     id: AppCommandID.Budgets.sortDateDesc,
-                    title: "Sort Date ↓",
+                    title: .localizedSortDateDesc,
                     shortcut: KeyboardShortcut("4", modifiers: [.command, .option])
                 )
             ]
@@ -450,32 +476,32 @@ struct OffshoreAppCommands: Commands {
             return [
                 AppMenuCommandItem(
                     id: AppCommandID.Presets.sortAZ,
-                    title: "Sort A-Z",
+                    title: .localizedSortAZ,
                     shortcut: KeyboardShortcut("1", modifiers: [.command, .option])
                 ),
                 AppMenuCommandItem(
                     id: AppCommandID.Presets.sortZA,
-                    title: "Sort Z-A",
+                    title: .localizedSortZA,
                     shortcut: KeyboardShortcut("2", modifiers: [.command, .option])
                 ),
                 AppMenuCommandItem(
                     id: AppCommandID.Presets.sortDateAsc,
-                    title: "Sort Date ↑",
+                    title: .localizedSortDateAsc,
                     shortcut: KeyboardShortcut("3", modifiers: [.command, .option])
                 ),
                 AppMenuCommandItem(
                     id: AppCommandID.Presets.sortDateDesc,
-                    title: "Sort Date ↓",
+                    title: .localizedSortDateDesc,
                     shortcut: KeyboardShortcut("4", modifiers: [.command, .option])
                 ),
                 AppMenuCommandItem(
                     id: AppCommandID.Presets.sortAmountAsc,
-                    title: "Sort $↑",
+                    title: .localizedSortAmountAsc,
                     shortcut: KeyboardShortcut("5", modifiers: [.command, .option])
                 ),
                 AppMenuCommandItem(
                     id: AppCommandID.Presets.sortAmountDesc,
-                    title: "Sort $↓",
+                    title: .localizedSortAmountDesc,
                     shortcut: KeyboardShortcut("6", modifiers: [.command, .option])
                 )
             ]
@@ -483,12 +509,12 @@ struct OffshoreAppCommands: Commands {
             return [
                 AppMenuCommandItem(
                     id: AppCommandID.Categories.sortAZ,
-                    title: "Sort A-Z",
+                    title: .localizedSortAZ,
                     shortcut: KeyboardShortcut("1", modifiers: [.command, .option])
                 ),
                 AppMenuCommandItem(
                     id: AppCommandID.Categories.sortZA,
-                    title: "Sort Z-A",
+                    title: .localizedSortZA,
                     shortcut: KeyboardShortcut("2", modifiers: [.command, .option])
                 )
             ]
@@ -498,12 +524,12 @@ struct OffshoreAppCommands: Commands {
                 return [
                     AppMenuCommandItem(
                         id: AppCommandID.Cards.sortAZ,
-                        title: "Sort A-Z",
+                        title: .localizedSortAZ,
                         shortcut: KeyboardShortcut("1", modifiers: [.command, .option])
                     ),
                     AppMenuCommandItem(
                         id: AppCommandID.Cards.sortZA,
-                        title: "Sort Z-A",
+                        title: .localizedSortZA,
                         shortcut: KeyboardShortcut("2", modifiers: [.command, .option])
                     )
                 ]
@@ -511,22 +537,22 @@ struct OffshoreAppCommands: Commands {
                 return [
                     AppMenuCommandItem(
                         id: AppCommandID.SharedBalances.sortAZ,
-                        title: "Sort A-Z",
+                        title: .localizedSortAZ,
                         shortcut: KeyboardShortcut("1", modifiers: [.command, .option])
                     ),
                     AppMenuCommandItem(
                         id: AppCommandID.SharedBalances.sortZA,
-                        title: "Sort Z-A",
+                        title: .localizedSortZA,
                         shortcut: KeyboardShortcut("2", modifiers: [.command, .option])
                     ),
                     AppMenuCommandItem(
                         id: AppCommandID.SharedBalances.sortAmountAsc,
-                        title: "Sort $↑",
+                        title: .localizedSortAmountAsc,
                         shortcut: KeyboardShortcut("3", modifiers: [.command, .option])
                     ),
                     AppMenuCommandItem(
                         id: AppCommandID.SharedBalances.sortAmountDesc,
-                        title: "Sort $↓",
+                        title: .localizedSortAmountDesc,
                         shortcut: KeyboardShortcut("4", modifiers: [.command, .option])
                     )
                 ]
@@ -535,32 +561,32 @@ struct OffshoreAppCommands: Commands {
             return [
                 AppMenuCommandItem(
                     id: AppCommandID.Savings.sortAZ,
-                    title: "Sort A-Z",
+                    title: .localizedSortAZ,
                     shortcut: KeyboardShortcut("1", modifiers: [.command, .option])
                 ),
                 AppMenuCommandItem(
                     id: AppCommandID.Savings.sortZA,
-                    title: "Sort Z-A",
+                    title: .localizedSortZA,
                     shortcut: KeyboardShortcut("2", modifiers: [.command, .option])
                 ),
                 AppMenuCommandItem(
                     id: AppCommandID.Savings.sortAmountAsc,
-                    title: "Sort $↑",
+                    title: .localizedSortAmountAsc,
                     shortcut: KeyboardShortcut("3", modifiers: [.command, .option])
                 ),
                 AppMenuCommandItem(
                     id: AppCommandID.Savings.sortAmountDesc,
-                    title: "Sort $↓",
+                    title: .localizedSortAmountDesc,
                     shortcut: KeyboardShortcut("4", modifiers: [.command, .option])
                 ),
                 AppMenuCommandItem(
                     id: AppCommandID.Savings.sortDateAsc,
-                    title: "Sort Date ↑",
+                    title: .localizedSortDateAsc,
                     shortcut: KeyboardShortcut("5", modifiers: [.command, .option])
                 ),
                 AppMenuCommandItem(
                     id: AppCommandID.Savings.sortDateDesc,
-                    title: "Sort Date ↓",
+                    title: .localizedSortDateDesc,
                     shortcut: KeyboardShortcut("6", modifiers: [.command, .option])
                 )
             ]
@@ -568,32 +594,32 @@ struct OffshoreAppCommands: Commands {
             return [
                 AppMenuCommandItem(
                     id: AppCommandID.BudgetDetail.sortAZ,
-                    title: "Sort A-Z",
+                    title: .localizedSortAZ,
                     shortcut: KeyboardShortcut("1", modifiers: [.command, .option])
                 ),
                 AppMenuCommandItem(
                     id: AppCommandID.BudgetDetail.sortZA,
-                    title: "Sort Z-A",
+                    title: .localizedSortZA,
                     shortcut: KeyboardShortcut("2", modifiers: [.command, .option])
                 ),
                 AppMenuCommandItem(
                     id: AppCommandID.BudgetDetail.sortAmountAsc,
-                    title: "Sort $↑",
+                    title: .localizedSortAmountAsc,
                     shortcut: KeyboardShortcut("3", modifiers: [.command, .option])
                 ),
                 AppMenuCommandItem(
                     id: AppCommandID.BudgetDetail.sortAmountDesc,
-                    title: "Sort $↓",
+                    title: .localizedSortAmountDesc,
                     shortcut: KeyboardShortcut("4", modifiers: [.command, .option])
                 ),
                 AppMenuCommandItem(
                     id: AppCommandID.BudgetDetail.sortDateAsc,
-                    title: "Sort Date ↑",
+                    title: .localizedSortDateAsc,
                     shortcut: KeyboardShortcut("5", modifiers: [.command, .option])
                 ),
                 AppMenuCommandItem(
                     id: AppCommandID.BudgetDetail.sortDateDesc,
-                    title: "Sort Date ↓",
+                    title: .localizedSortDateDesc,
                     shortcut: KeyboardShortcut("6", modifiers: [.command, .option])
                 ),
             ] + expenseDisplayItems
@@ -601,32 +627,32 @@ struct OffshoreAppCommands: Commands {
             return [
                 AppMenuCommandItem(
                     id: AppCommandID.CardDetail.sortAZ,
-                    title: "Sort A-Z",
+                    title: .localizedSortAZ,
                     shortcut: KeyboardShortcut("1", modifiers: [.command, .option])
                 ),
                 AppMenuCommandItem(
                     id: AppCommandID.CardDetail.sortZA,
-                    title: "Sort Z-A",
+                    title: .localizedSortZA,
                     shortcut: KeyboardShortcut("2", modifiers: [.command, .option])
                 ),
                 AppMenuCommandItem(
                     id: AppCommandID.CardDetail.sortAmountAsc,
-                    title: "Sort $↑",
+                    title: .localizedSortAmountAsc,
                     shortcut: KeyboardShortcut("3", modifiers: [.command, .option])
                 ),
                 AppMenuCommandItem(
                     id: AppCommandID.CardDetail.sortAmountDesc,
-                    title: "Sort $↓",
+                    title: .localizedSortAmountDesc,
                     shortcut: KeyboardShortcut("4", modifiers: [.command, .option])
                 ),
                 AppMenuCommandItem(
                     id: AppCommandID.CardDetail.sortDateAsc,
-                    title: "Sort Date ↑",
+                    title: .localizedSortDateAsc,
                     shortcut: KeyboardShortcut("5", modifiers: [.command, .option])
                 ),
                 AppMenuCommandItem(
                     id: AppCommandID.CardDetail.sortDateDesc,
-                    title: "Sort Date ↓",
+                    title: .localizedSortDateDesc,
                     shortcut: KeyboardShortcut("6", modifiers: [.command, .option])
                 ),
             ] + expenseDisplayItems

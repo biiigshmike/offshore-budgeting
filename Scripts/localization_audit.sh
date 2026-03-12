@@ -205,10 +205,37 @@ de_equals_key_allowlist = {
     "sort.dateShort.desc",
 }
 
+ar_equals_key_allowlist = {
+    "",
+    "%@",
+    "%@ - %@",
+    "%@ • %@",
+    "%@, %@",
+    "%@:",
+    "%@↑",
+    "%@↓",
+    "$ ↑",
+    "$ ↓",
+    "$↑",
+    "$↓",
+    "0%",
+    "100%",
+    "Apple Card",
+    "Marina",
+    "Offshore",
+    "Offshore Widgets",
+    "Z-A",
+    "iCloud",
+    "notification.appName",
+    "settings.icloud",
+    "•",
+}
+
 equals_key_allowlist = {
     "es": es_equals_key_allowlist,
     "fr": fr_equals_key_allowlist,
     "de": de_equals_key_allowlist,
+    "ar": ar_equals_key_allowlist,
 }.get(target_locale, set())
 
 variant_pairs = [
@@ -463,6 +490,19 @@ source_watchlist = {
     ],
     "OffshoreBudgeting/CoreViews/Settings/Presets/ManagePresetsView.swift": [
         'Section("Next Planned Expense")',
+        'sortMenuButton(title: "A–Z", mode: .az)',
+        'sortMenuButton(title: "Z–A", mode: .za)',
+        'sortMenuButton(title: "Date ↑", mode: .dateAsc)',
+        'sortMenuButton(title: "Date ↓", mode: .dateDesc)',
+        '.accessibilityLabel("Sort")',
+    ],
+    "OffshoreBudgeting/AppCommands.swift": [
+        'title: "Sort A-Z"',
+        'title: "Sort Z-A"',
+        'title: "Sort Date ↑"',
+        'title: "Sort Date ↓"',
+        'title: "Sort $↑"',
+        'title: "Sort $↓"',
     ],
     "OffshoreBudgeting/CoreViews/Settings/SettingsGeneralView.swift": [
         'private func maintenanceButton(title: String, tint: Color, action: @escaping () -> Void)',
