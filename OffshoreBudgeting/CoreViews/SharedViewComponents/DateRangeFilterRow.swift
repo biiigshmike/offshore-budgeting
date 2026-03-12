@@ -8,19 +8,27 @@ struct DateRangeFilterRow: View {
     let onTapGo: () -> Void
     let onSelectQuickRange: (CalendarQuickRangePreset) -> Void
 
+    private var startDateTitle: String {
+        String(localized: "dateRange.short.start", defaultValue: "Start", comment: "Short title for the start date picker pill.")
+    }
+
+    private var endDateTitle: String {
+        String(localized: "dateRange.short.end", defaultValue: "End", comment: "Short title for the end date picker pill.")
+    }
+
     var body: some View {
         HStack(spacing: 0) {
             Spacer(minLength: 0)
 
             HStack(spacing: 10) {
-                PillDatePickerField(title: "Start Date", date: $draftStartDate)
+                PillDatePickerField(title: startDateTitle, date: $draftStartDate)
                     .layoutPriority(1)
 
-                PillDatePickerField(title: "End Date", date: $draftEndDate)
+                PillDatePickerField(title: endDateTitle, date: $draftEndDate)
                     .layoutPriority(1)
 
                 DateRangeIconCircleButton(systemName: "arrow.right", isEnabled: isGoEnabled, action: onTapGo)
-                    .accessibilityLabel("Apply Date Range")
+                    .accessibilityLabel(String(localized: "Apply Date Range", defaultValue: "Apply Date Range", comment: "Accessibility label for applying the selected date range."))
 
                 Menu {
                     CalendarQuickRangeMenuItems { preset in
@@ -29,7 +37,7 @@ struct DateRangeFilterRow: View {
                 } label: {
                     DateRangeIconCircleLabel(systemName: "calendar")
                 }
-                .accessibilityLabel("Quick Date Ranges")
+                .accessibilityLabel(String(localized: "Quick Date Ranges", defaultValue: "Quick Date Ranges", comment: "Accessibility label for quick date range presets."))
             }
 
             Spacer(minLength: 0)

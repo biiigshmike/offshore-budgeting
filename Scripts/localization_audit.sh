@@ -231,11 +231,55 @@ ar_equals_key_allowlist = {
     "•",
 }
 
+pt_br_equals_key_allowlist = {
+    "",
+    "%@",
+    "%@ - %@",
+    "%@ • %@",
+    "%@, %@",
+    "%@:",
+    "%@↑",
+    "%@↓",
+    "$ ↑",
+    "$ ↓",
+    "$↑",
+    "$↓",
+    "0%",
+    "100%",
+    "A-Z",
+    "A–Z",
+    "Apple Card",
+    "F↑",
+    "F↓",
+    "Marina",
+    "Offshore",
+    "Offshore Widgets",
+    "cardEffect.metal",
+    "OK",
+    "Status",
+    "Total",
+    "Widgets",
+    "Z-A",
+    "Z–A",
+    "cardTheme.aqua",
+    "common.ok",
+    "common.total",
+    "home.widgets.header",
+    "homeWidget.categoryAvailability.ok",
+    "iCloud",
+    "notification.appName",
+    "settings.icloud",
+    "sort.dateShort.asc",
+    "sort.dateShort.desc",
+    "•",
+}
+
 equals_key_allowlist = {
     "es": es_equals_key_allowlist,
     "fr": fr_equals_key_allowlist,
     "de": de_equals_key_allowlist,
     "ar": ar_equals_key_allowlist,
+    "pt-BR": pt_br_equals_key_allowlist,
 }.get(target_locale, set())
 
 variant_pairs = [
@@ -262,6 +306,18 @@ required_widget_keys = [
     "Show a card preview with spending for a selected period.",
     "Show upcoming planned expenses for all cards or a selected card.",
 ]
+
+plist_supported_locales = {"es", "fr", "de", "ar", "pt-BR"}
+app_plist_required_keys = {
+    "CFBundleDisplayName",
+    "NSFaceIDUsageDescription",
+    "NSLocationAlwaysAndWhenInUseUsageDescription",
+    "NSLocationWhenInUseUsageDescription",
+    "NSPhotoLibraryUsageDescription",
+}
+widget_plist_required_keys = {
+    "CFBundleDisplayName",
+}
 
 def extract_placeholders(text: str) -> list[str]:
     return sorted(placeholder_pattern.findall(text or ""))
@@ -332,6 +388,20 @@ def extract_about_strings(source_path: Path) -> list[str]:
 
     return list(seen.keys())
 
+
+def parse_strings_file(source_path: Path) -> dict[str, str]:
+    if not source_path.exists():
+        return {}
+
+    content = source_path.read_text(encoding="utf-8")
+    pattern = re.compile(r'"((?:[^"\\]|\\.)*)"\s*=\s*"((?:[^"\\]|\\.)*)";')
+    parsed: dict[str, str] = {}
+    for match in pattern.finditer(content):
+        key = json.loads(f'"{match.group(1)}"')
+        value = json.loads(f'"{match.group(2)}"')
+        parsed[key] = value
+    return parsed
+
 total = len(strings)
 missing_count = 0
 equals_key_count = 0
@@ -340,6 +410,7 @@ placeholder_mismatches = 0
 variant_coverage_issues = 0
 glossary_issues = 0
 widget_coverage_issues = 0
+plist_coverage_issues = 0
 source_coverage_issues = 0
 
 equals_key_items: list[str] = []
@@ -349,6 +420,7 @@ placeholder_mismatch_items: list[str] = []
 variant_issue_items: list[str] = []
 glossary_issue_items: list[str] = []
 widget_issue_items: list[str] = []
+plist_issue_items: list[str] = []
 source_issue_items: list[str] = []
 
 for key, entry in strings.items():
@@ -406,6 +478,27 @@ if widget_catalog_path.exists():
 else:
     widget_coverage_issues += 1
     widget_issue_items.append("missing OffshoreBudgetingWidgets/Localizable.xcstrings")
+
+if target_locale in plist_supported_locales:
+    plist_targets: list[tuple[Path, set[str]]] = []
+    if catalog_path == app_catalog_path:
+        plist_targets.append((Path(f"OffshoreBudgeting/{target_locale}.lproj/InfoPlist.strings"), app_plist_required_keys))
+        plist_targets.append((Path(f"OffshoreBudgetingWidgets/{target_locale}.lproj/InfoPlist.strings"), widget_plist_required_keys))
+    elif catalog_path == widget_catalog_path:
+        plist_targets.append((Path(f"OffshoreBudgetingWidgets/{target_locale}.lproj/InfoPlist.strings"), widget_plist_required_keys))
+
+    for plist_path, required_keys in plist_targets:
+        parsed = parse_strings_file(plist_path)
+        if not plist_path.exists():
+            plist_coverage_issues += 1
+            plist_issue_items.append(f"missing {plist_path}")
+            continue
+
+        for required_key in sorted(required_keys):
+            value = parsed.get(required_key, "")
+            if not isinstance(value, str) or not value.strip():
+                plist_coverage_issues += 1
+                plist_issue_items.append(f"{plist_path} missing {required_key}")
 
 if catalog_path == app_catalog_path:
     for source_text in extract_generated_help_strings(generated_help_path):
@@ -471,6 +564,12 @@ source_watchlist = {
     ],
     "OffshoreBudgeting/CoreViews/Home/HomeAssistantFoundation.swift": [
         'return "I’ll help you stay encouraged and grounded with quick, practical reads on your spending and trends."',
+    ],
+    "OffshoreBudgeting/CoreViews/SharedViewComponents/DateRangeFilterRow.swift": [
+        'PillDatePickerField(title: "Start Date", date: $draftStartDate)',
+        'PillDatePickerField(title: "End Date", date: $draftEndDate)',
+        '.accessibilityLabel("Apply Date Range")',
+        '.accessibilityLabel("Quick Date Ranges")',
     ],
     "OffshoreBudgeting/CoreViews/Income/SavingsAccountView.swift": [
         'case runningTotal = "Running Total"',
@@ -562,6 +661,7 @@ print(f"placeholder mismatches: {placeholder_mismatches}")
 print(f"variant coverage issues: {variant_coverage_issues}")
 print(f"glossary issues: {glossary_issues}")
 print(f"widget coverage issues: {widget_coverage_issues}")
+print(f"plist coverage issues: {plist_coverage_issues}")
 print(f"source coverage issues: {source_coverage_issues}")
 
 if missing_items:
@@ -599,6 +699,11 @@ if widget_issue_items:
     for item in widget_issue_items[:20]:
         print(f"- {item}")
 
+if plist_issue_items:
+    print("\\nPlist coverage issues:")
+    for item in plist_issue_items[:20]:
+        print(f"- {item}")
+
 if source_issue_items:
     print("\\nSource coverage issues:")
     for item in source_issue_items[:20]:
@@ -612,6 +717,7 @@ if (
     or variant_coverage_issues > 0
     or glossary_issues > 0
     or widget_coverage_issues > 0
+    or plist_coverage_issues > 0
     or source_coverage_issues > 0
 ):
     sys.exit(1)

@@ -20,6 +20,12 @@
             "state": "translated",
             "value": "%@"
           }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@"
+          }
         }
       }
     },
@@ -44,6 +50,12 @@
           }
         },
         "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ - %2$@"
+          }
+        },
+        "pt-BR": {
           "stringUnit": {
             "state": "translated",
             "value": "%1$@ - %2$@"
@@ -76,6 +88,12 @@
             "state": "translated",
             "value": "%1$@ • %2$@"
           }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ • %2$@"
+          }
         }
       }
     },
@@ -97,6 +115,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "1 شهر"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 mês"
           }
         }
       }
@@ -120,6 +144,12 @@
             "state": "translated",
             "value": "1 أسبوع"
           }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 semana"
+          }
         }
       }
     },
@@ -141,6 +171,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "1 سنة"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 ano"
           }
         }
       }
@@ -176,6 +212,12 @@
             "state": "translated",
             "value": "30 دقيقة"
           }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "30 minutos"
+          }
         }
       }
     },
@@ -203,6 +245,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "نشط حتى %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ativo até %@"
           }
         }
       }
@@ -232,6 +280,12 @@
             "state": "translated",
             "value": "فِعلي"
           }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Real"
+          }
         }
       }
     },
@@ -259,6 +313,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "الفعلي %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ real"
           }
         }
       }
@@ -288,6 +348,12 @@
             "state": "translated",
             "value": "الفعلي: %@"
           }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Real: %@"
+          }
         }
       }
     },
@@ -315,6 +381,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "بطاقة"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cartão"
           }
         }
       }
@@ -344,6 +416,12 @@
             "state": "translated",
             "value": "القطعة البطاقة"
           }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Widget de cartão"
+          }
         }
       }
     },
@@ -371,6 +449,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "إعدادات"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Configuração"
           }
         }
       }
@@ -400,6 +484,12 @@
             "state": "translated",
             "value": "قم بتكوين الفترة الموضحة في أداة الدخل."
           }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Configure o período mostrado no widget Renda."
+          }
         }
       }
     },
@@ -421,6 +511,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "الفترة الافتراضية"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Período padrão"
           }
         }
       }
@@ -450,6 +546,12 @@
             "state": "translated",
             "value": "منتهي"
           }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Feito"
+          }
         }
       }
     },
@@ -477,6 +579,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "ينتهي %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Termina %@"
           }
         }
       }
@@ -506,6 +614,12 @@
             "state": "translated",
             "value": "وضع الرحلة"
           }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modo Excursão"
+          }
         }
       }
     },
@@ -534,6 +648,12 @@
             "state": "translated",
             "value": "نفقات"
           }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Despesas"
+          }
         }
       }
     },
@@ -561,6 +681,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "الرموز التعبيرية المفضلة"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Emoji favorito"
           }
         }
       }
@@ -596,6 +722,12 @@
             "state": "translated",
             "value": "أعلى %@"
           }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ mais alto"
+          }
         }
       }
     },
@@ -623,6 +755,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "دخل"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Renda"
           }
         }
       }
@@ -652,6 +790,12 @@
             "state": "translated",
             "value": "القطعة الدخل"
           }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Widget de renda"
+          }
         }
       }
     },
@@ -673,6 +817,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "تقدم الدخل"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Progresso da renda"
           }
         }
       }
@@ -702,6 +852,12 @@
             "state": "translated",
             "value": "المصروف المخطط التالي"
           }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Próxima despesa planejada"
+          }
         }
       }
     },
@@ -730,6 +886,12 @@
             "state": "translated",
             "value": "أداة المصروف المخطط التالي"
           }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Widget de próxima despesa planejada"
+          }
         }
       }
     },
@@ -751,6 +913,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "لم يتم العثور على بيانات البطاقة في هذا النطاق."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nenhum dado de cartão encontrado neste intervalo."
           }
         }
       }
@@ -774,6 +942,12 @@
             "state": "translated",
             "value": "لم يتم العثور على بيانات البطاقة."
           }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nenhum dado do cartão encontrado."
+          }
         }
       }
     },
@@ -796,6 +970,12 @@
             "state": "translated",
             "value": "لم يتم العثور على بيانات الدخل في هذا النطاق."
           }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nenhum dado de renda encontrado nesta faixa."
+          }
         }
       }
     },
@@ -817,6 +997,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "لم يتم العثور على بيانات الدخل."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nenhum dado de renda encontrado."
           }
         }
       }
@@ -846,6 +1032,12 @@
             "state": "translated",
             "value": "لا توجد إدخالات الأخيرة."
           }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nenhuma entrada recente."
+          }
         }
       }
     },
@@ -873,6 +1065,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "لا توجد نفقات الأخيرة."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sem despesas recentes."
           }
         }
       }
@@ -902,6 +1100,12 @@
             "state": "translated",
             "value": "لا توجد إدخالات الدخل الأخيرة."
           }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nenhuma entrada de renda recente."
+          }
         }
       }
     },
@@ -924,6 +1128,12 @@
             "state": "translated",
             "value": "لم يتم العثور على بيانات الإنفاق لهذه الفترة."
           }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não foram encontrados dados de gastos para este período."
+          }
         }
       }
     },
@@ -945,6 +1155,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "لم يتم العثور على أي نفقات مخططة قادمة لهذه الفترة."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nenhuma despesa planejada futura encontrada para este período."
           }
         }
       }
@@ -970,6 +1186,12 @@
           }
         },
         "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Offshore"
+          }
+        },
+        "pt-BR": {
           "stringUnit": {
             "state": "translated",
             "value": "Offshore"
@@ -1008,6 +1230,12 @@
             "state": "translated",
             "value": "على الهدف"
           }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No alvo"
+          }
         }
       }
     },
@@ -1029,6 +1257,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "افتح Offshore لإنشاء بيانات عنصر واجهة المستخدم لهذه الفترة."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abra Offshore para gerar dados de widget para este período."
           }
         }
       }
@@ -1064,6 +1298,12 @@
             "state": "translated",
             "value": "أكثر من %@"
           }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sobre %@"
+          }
         }
       }
     },
@@ -1091,6 +1331,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "فترة"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Período"
           }
         }
       }
@@ -1120,6 +1366,12 @@
             "state": "translated",
             "value": "المخطط لها"
           }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Planejado"
+          }
         }
       }
     },
@@ -1148,6 +1400,12 @@
             "state": "translated",
             "value": "%@ المخطط لها"
           }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ planejado"
+          }
         }
       }
     },
@@ -1175,6 +1433,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "المخطط: %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Planejado: %@"
           }
         }
       }
@@ -1210,6 +1474,12 @@
             "state": "translated",
             "value": "التقدم %@"
           }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Progresso %@"
+          }
         }
       }
     },
@@ -1244,6 +1514,12 @@
             "state": "translated",
             "value": "تقدم -"
           }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Progresso -"
+          }
         }
       }
     },
@@ -1265,6 +1541,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "س"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "P"
           }
         }
       }
@@ -1294,6 +1576,12 @@
             "state": "translated",
             "value": "مؤخرًا"
           }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recente"
+          }
         }
       }
     },
@@ -1321,6 +1609,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "الدخل الأخير"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Renda recente"
           }
         }
       }
@@ -1356,6 +1650,12 @@
             "state": "translated",
             "value": "المتبقية %@"
           }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restante %@"
+          }
         }
       }
     },
@@ -1383,6 +1683,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "انتهت الجلسة"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sessão encerrada"
           }
         }
       }
@@ -1412,6 +1718,12 @@
             "state": "translated",
             "value": "إبراز البطاقة ومصروفاتها لفترة محددة."
           }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostre um cartão e suas despesas para um período selecionado."
+          }
         }
       }
     },
@@ -1439,6 +1751,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "إظهار معاينة البطاقة مع الإنفاق لفترة محددة."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostre uma prévia do cartão com os gastos de um período selecionado."
           }
         }
       }
@@ -1468,6 +1786,12 @@
             "state": "translated",
             "value": "إظهار اتجاهات الإنفاق لجميع البطاقات أو البطاقة المحددة."
           }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostre tendências de gastos para todos os cartões ou para um cartão selecionado."
+          }
         }
       }
     },
@@ -1495,6 +1819,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "إظهار المصاريف المخططة التالية لجميع البطاقات أو البطاقة المحددة."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostre a próxima despesa planejada para todos os cartões ou para um cartão selecionado."
           }
         }
       }
@@ -1524,6 +1854,12 @@
             "state": "translated",
             "value": "إظهار النفقات المخططة القادمة لجميع البطاقات أو البطاقة المحددة."
           }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostre as próximas despesas planejadas para todos os cartões ou para um cartão selecionado."
+          }
         }
       }
     },
@@ -1552,6 +1888,12 @@
             "state": "translated",
             "value": "اتجاهات الإنفاق"
           }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tendências de gastos"
+          }
         }
       }
     },
@@ -1579,6 +1921,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "أداة اتجاهات الإنفاق"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Widget de tendências de gastos"
           }
         }
       }
@@ -1614,6 +1962,12 @@
             "state": "translated",
             "value": "قف"
           }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parar"
+          }
         }
       }
     },
@@ -1641,6 +1995,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "هذا هو القطعة سبيل المثال."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este é um widget de exemplo."
           }
         }
       }
@@ -1676,6 +2036,12 @@
             "state": "translated",
             "value": "أعلى %@"
           }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Topo %@"
+          }
         }
       }
     },
@@ -1704,6 +2070,12 @@
             "state": "translated",
             "value": "تتبع الدخل المخطط مقابل الدخل الفعلي لفترة محددة."
           }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Acompanhe a receita planejada versus a real para um período selecionado."
+          }
         }
       }
     },
@@ -1731,6 +2103,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "تتبع اتجاهات الإنفاق وأهم الفئات لفترة محددة."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Acompanhe as tendências de gastos e as principais categorias para um período selecionado."
           }
         }
       }

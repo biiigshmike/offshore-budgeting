@@ -1,0 +1,5 @@
+"CFBundleDisplayName" = "Offshore";
+"NSFaceIDUsageDescription" = "استخدم Face ID لقفل التطبيق وحماية بيانات الميزانية الحساسة.";
+"NSLocationAlwaysAndWhenInUseUsageDescription" = "يستخدم Offshore موقعك في وضع الرحلات لاقتراح تسجيل المشتريات عندما تكون بالقرب من نقاط الاهتمام، حتى في الخلفية.";
+"NSLocationWhenInUseUsageDescription" = "يستخدم Offshore موقعك أثناء وضع الرحلات لاكتشاف نقاط الاهتمام القريبة واقتراح تسجيل سريع للمصروفات.";
+"NSPhotoLibraryUsageDescription" = "يستخدم Offshore الصور التي تحددها لاستيراد المعاملات أو الدخل من لقطات الشاشة.";
