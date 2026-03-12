@@ -274,12 +274,50 @@ pt_br_equals_key_allowlist = {
     "•",
 }
 
+zh_hans_equals_key_allowlist = {
+    "",
+    "%@",
+    "%@ - %@",
+    "%@ • %@",
+    "%@, %@",
+    "%@:",
+    "%@↑",
+    "%@↓",
+    "$ ↑",
+    "$ ↓",
+    "$↑",
+    "$↓",
+    "0%",
+    "100%",
+    "A-Z",
+    "A–Z",
+    "Apple Card",
+    "F↑",
+    "F↓",
+    "Marina",
+    "Offshore",
+    "Offshore Widgets",
+    "Z-A",
+    "Z–A",
+    "iCloud",
+    "notification.appName",
+    "settings.icloud",
+    "sort.dateShort.asc",
+    "sort.dateShort.desc",
+    "cardEffect.metal",
+    "cardTheme.aqua",
+    "cardTheme.aster",
+    "cardTheme.ultraviolet",
+    "•",
+}
+
 equals_key_allowlist = {
     "es": es_equals_key_allowlist,
     "fr": fr_equals_key_allowlist,
     "de": de_equals_key_allowlist,
     "ar": ar_equals_key_allowlist,
     "pt-BR": pt_br_equals_key_allowlist,
+    "zh-Hans": zh_hans_equals_key_allowlist,
 }.get(target_locale, set())
 
 variant_pairs = [
@@ -307,7 +345,7 @@ required_widget_keys = [
     "Show upcoming planned expenses for all cards or a selected card.",
 ]
 
-plist_supported_locales = {"es", "fr", "de", "ar", "pt-BR"}
+plist_supported_locales = {"es", "fr", "de", "ar", "pt-BR", "zh-Hans"}
 app_plist_required_keys = {
     "CFBundleDisplayName",
     "NSFaceIDUsageDescription",

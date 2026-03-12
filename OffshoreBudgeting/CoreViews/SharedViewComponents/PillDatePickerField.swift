@@ -26,6 +26,19 @@ private enum PillPickerPopoverMetrics {
     static let timePickerHeight: CGFloat = 200
 }
 
+private enum PillPickerTextMetrics {
+    static let horizontalPadding: CGFloat = 12
+    static let minimumScaleFactor: CGFloat = 0.75
+
+    #if canImport(UIKit)
+    static var basePointSize: CGFloat {
+        UIFont.preferredFont(forTextStyle: .subheadline).pointSize
+    }
+    #else
+    static let basePointSize: CGFloat = 15
+    #endif
+}
+
 private enum PillPickerPlatform {
     static var isMacCatalyst: Bool {
         #if targetEnvironment(macCatalyst)
@@ -65,6 +78,7 @@ struct PillDatePickerField: View {
 
     var minimumDate: Date?
     var maximumDate: Date?
+    var synchronizedTextScale: CGFloat?
 
     @State private var isPresented = false
 
@@ -72,12 +86,14 @@ struct PillDatePickerField: View {
         title: String,
         date: Binding<Date>,
         minimumDate: Date? = nil,
-        maximumDate: Date? = nil
+        maximumDate: Date? = nil,
+        synchronizedTextScale: CGFloat? = nil
     ) {
         self.title = title
         self._date = date
         self.minimumDate = minimumDate
         self.maximumDate = maximumDate
+        self.synchronizedTextScale = synchronizedTextScale
     }
 
     private var isPhone: Bool {
@@ -114,13 +130,13 @@ struct PillDatePickerField: View {
             isPresented = true
         } label: {
             Text(text)
-                .font(.subheadline.weight(.semibold))
+                .font(textFont(scaleFactor: synchronizedTextScale ?? 1))
                 .foregroundStyle(.primary)
                 .multilineTextAlignment(.center)
-                .lineLimit(2)
+                .lineLimit(1)
+                .minimumScaleFactor(PillPickerTextMetrics.minimumScaleFactor)
                 .allowsTightening(true)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, 12)
+                .padding(.horizontal, PillPickerTextMetrics.horizontalPadding)
                 .padding(.vertical, 10)
                 .background(Color.secondary.opacity(0.1), in: Capsule())
         }
@@ -249,6 +265,11 @@ struct PillDatePickerField: View {
 
     private func formattedDate(_ date: Date) -> String {
         AppDateFormat.abbreviatedDate(date)
+    }
+
+    private func textFont(scaleFactor: CGFloat) -> Font {
+        let clampedScaleFactor = max(PillPickerTextMetrics.minimumScaleFactor, min(scaleFactor, 1))
+        return .system(size: PillPickerTextMetrics.basePointSize * clampedScaleFactor, weight: .semibold)
     }
 }
 

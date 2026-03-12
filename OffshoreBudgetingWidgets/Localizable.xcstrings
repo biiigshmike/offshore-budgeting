@@ -26,6 +26,12 @@
             "state": "translated",
             "value": "%@"
           }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@"
+          }
         }
       }
     },
@@ -56,6 +62,12 @@
           }
         },
         "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ - %2$@"
+          }
+        },
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "%1$@ - %2$@"
@@ -94,6 +106,12 @@
             "state": "translated",
             "value": "%1$@ • %2$@"
           }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ • %2$@"
+          }
         }
       }
     },
@@ -121,6 +139,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "1 mês"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1个月"
           }
         }
       }
@@ -150,6 +174,12 @@
             "state": "translated",
             "value": "1 semana"
           }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1周"
+          }
         }
       }
     },
@@ -177,6 +207,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "1 ano"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1年"
           }
         }
       }
@@ -218,6 +254,12 @@
             "state": "translated",
             "value": "30 minutos"
           }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "30 分钟"
+          }
         }
       }
     },
@@ -251,6 +293,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ativo até %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有效直至 %@"
           }
         }
       }
@@ -286,6 +334,12 @@
             "state": "translated",
             "value": "Real"
           }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "实际"
+          }
         }
       }
     },
@@ -319,6 +373,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@ real"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "实际%@"
           }
         }
       }
@@ -354,6 +414,12 @@
             "state": "translated",
             "value": "Real: %@"
           }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "实际：%@"
+          }
         }
       }
     },
@@ -387,6 +453,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Cartão"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "卡片"
           }
         }
       }
@@ -422,6 +494,12 @@
             "state": "translated",
             "value": "Widget de cartão"
           }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "卡片小组件"
+          }
         }
       }
     },
@@ -455,6 +533,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Configuração"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "配置"
           }
         }
       }
@@ -490,6 +574,12 @@
             "state": "translated",
             "value": "Configure o período mostrado no widget Renda."
           }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "配置收入小部件中显示的期间。"
+          }
         }
       }
     },
@@ -517,6 +607,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Período padrão"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "默认期间"
           }
         }
       }
@@ -552,6 +648,12 @@
             "state": "translated",
             "value": "Feito"
           }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完成"
+          }
         }
       }
     },
@@ -585,6 +687,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Termina %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "结束 %@"
           }
         }
       }
@@ -620,6 +728,12 @@
             "state": "translated",
             "value": "Modo Excursão"
           }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "游览模式"
+          }
         }
       }
     },
@@ -654,6 +768,12 @@
             "state": "translated",
             "value": "Despesas"
           }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "支出"
+          }
         }
       }
     },
@@ -687,6 +807,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Emoji favorito"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最喜欢的表情符号"
           }
         }
       }
@@ -728,6 +854,12 @@
             "state": "translated",
             "value": "%@ mais alto"
           }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最高%@"
+          }
         }
       }
     },
@@ -761,6 +893,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Renda"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "收入"
           }
         }
       }
@@ -796,6 +934,12 @@
             "state": "translated",
             "value": "Widget de renda"
           }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "收入小组件"
+          }
         }
       }
     },
@@ -823,6 +967,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Progresso da renda"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "收入进展"
           }
         }
       }
@@ -858,6 +1008,12 @@
             "state": "translated",
             "value": "Próxima despesa planejada"
           }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下一笔计划支出"
+          }
         }
       }
     },
@@ -892,6 +1048,12 @@
             "state": "translated",
             "value": "Widget de próxima despesa planejada"
           }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下一笔计划支出小组件"
+          }
         }
       }
     },
@@ -919,6 +1081,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Nenhum dado de cartão encontrado neste intervalo."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在此范围内未找到卡片数据。"
           }
         }
       }
@@ -948,6 +1116,12 @@
             "state": "translated",
             "value": "Nenhum dado do cartão encontrado."
           }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未找到卡片数据。"
+          }
         }
       }
     },
@@ -976,6 +1150,12 @@
             "state": "translated",
             "value": "Nenhum dado de renda encontrado nesta faixa."
           }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在此范围内未找到收入数据。"
+          }
         }
       }
     },
@@ -1003,6 +1183,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Nenhum dado de renda encontrado."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未找到收入数据。"
           }
         }
       }
@@ -1038,6 +1224,12 @@
             "state": "translated",
             "value": "Nenhuma entrada recente."
           }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有最近的条目。"
+          }
         }
       }
     },
@@ -1071,6 +1263,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sem despesas recentes."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有最近的支出。"
           }
         }
       }
@@ -1106,6 +1304,12 @@
             "state": "translated",
             "value": "Nenhuma entrada de renda recente."
           }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有最近的收入条目。"
+          }
         }
       }
     },
@@ -1134,6 +1338,12 @@
             "state": "translated",
             "value": "Não foram encontrados dados de gastos para este período."
           }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未找到此期间的支出数据。"
+          }
         }
       }
     },
@@ -1161,6 +1371,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Nenhuma despesa planejada futura encontrada para este período."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未找到此期间即将发生的计划支出。"
           }
         }
       }
@@ -1192,6 +1408,12 @@
           }
         },
         "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Offshore"
+          }
+        },
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "Offshore"
@@ -1236,6 +1458,12 @@
             "state": "translated",
             "value": "No alvo"
           }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "达到目标"
+          }
         }
       }
     },
@@ -1263,6 +1491,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Abra Offshore para gerar dados de widget para este período."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开 Offshore 以生成此期间的小组件数据。"
           }
         }
       }
@@ -1304,6 +1538,12 @@
             "state": "translated",
             "value": "Sobre %@"
           }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "超过%@"
+          }
         }
       }
     },
@@ -1337,6 +1577,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Período"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "期间"
           }
         }
       }
@@ -1372,6 +1618,12 @@
             "state": "translated",
             "value": "Planejado"
           }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "计划"
+          }
         }
       }
     },
@@ -1406,6 +1658,12 @@
             "state": "translated",
             "value": "%@ planejado"
           }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "计划%@"
+          }
         }
       }
     },
@@ -1439,6 +1697,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Planejado: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "计划：%@"
           }
         }
       }
@@ -1480,6 +1744,12 @@
             "state": "translated",
             "value": "Progresso %@"
           }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "进度%@"
+          }
         }
       }
     },
@@ -1520,6 +1790,12 @@
             "state": "translated",
             "value": "Progresso -"
           }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "进步 -"
+          }
         }
       }
     },
@@ -1547,6 +1823,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "P"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "问"
           }
         }
       }
@@ -1582,6 +1864,12 @@
             "state": "translated",
             "value": "Recente"
           }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最近"
+          }
         }
       }
     },
@@ -1615,6 +1903,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Renda recente"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最近收入"
           }
         }
       }
@@ -1656,6 +1950,12 @@
             "state": "translated",
             "value": "Restante %@"
           }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "剩余%@"
+          }
         }
       }
     },
@@ -1689,6 +1989,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sessão encerrada"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "会议结束"
           }
         }
       }
@@ -1724,6 +2030,12 @@
             "state": "translated",
             "value": "Mostre um cartão e suas despesas para um período selecionado."
           }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示某张卡及其在选定期间内的费用。"
+          }
         }
       }
     },
@@ -1757,6 +2069,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mostre uma prévia do cartão com os gastos de um período selecionado."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示卡片预览以及选定时间段内的支出。"
           }
         }
       }
@@ -1792,6 +2110,12 @@
             "state": "translated",
             "value": "Mostre tendências de gastos para todos os cartões ou para um cartão selecionado."
           }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示所有卡或选定卡的支出趋势。"
+          }
         }
       }
     },
@@ -1825,6 +2149,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mostre a próxima despesa planejada para todos os cartões ou para um cartão selecionado."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示所有卡或选定卡的下一个计划费用。"
           }
         }
       }
@@ -1860,6 +2190,12 @@
             "state": "translated",
             "value": "Mostre as próximas despesas planejadas para todos os cartões ou para um cartão selecionado."
           }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示所有卡或所选卡即将发生的计划费用。"
+          }
         }
       }
     },
@@ -1894,6 +2230,12 @@
             "state": "translated",
             "value": "Tendências de gastos"
           }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "支出趋势"
+          }
         }
       }
     },
@@ -1927,6 +2269,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Widget de tendências de gastos"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "支出趋势小组件"
           }
         }
       }
@@ -1968,6 +2316,12 @@
             "state": "translated",
             "value": "Parar"
           }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "停止"
+          }
         }
       }
     },
@@ -2001,6 +2355,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Este é um widget de exemplo."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这是一个示例小部件。"
           }
         }
       }
@@ -2042,6 +2402,12 @@
             "state": "translated",
             "value": "Topo %@"
           }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "顶部 %@"
+          }
         }
       }
     },
@@ -2076,6 +2442,12 @@
             "state": "translated",
             "value": "Acompanhe a receita planejada versus a real para um período selecionado."
           }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "跟踪选定期间的计划收入与实际收入。"
+          }
         }
       }
     },
@@ -2109,6 +2481,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Acompanhe as tendências de gastos e as principais categorias para um período selecionado."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "跟踪选定时期内的支出趋势和热门类别。"
           }
         }
       }

@@ -1,0 +1,5 @@
+"CFBundleDisplayName" = "Offshore";
+"NSFaceIDUsageDescription" = "使用 Face ID 锁定应用并保护敏感预算数据。";
+"NSLocationAlwaysAndWhenInUseUsageDescription" = "Offshore 会在远足模式中使用你的位置信息，在你靠近兴趣点时建议你记录购买项目，即使应用在后台也是如此。";
+"NSLocationWhenInUseUsageDescription" = "Offshore 会在远足模式中使用你的位置信息来检测附近的兴趣点，并建议你快速记录支出。";
+"NSPhotoLibraryUsageDescription" = "Offshore 会使用你选择的照片，从屏幕截图中导入交易或收入。";
