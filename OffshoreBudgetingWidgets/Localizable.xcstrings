@@ -8,6 +8,12 @@
             "state": "translated",
             "value": "%@"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@"
+          }
         }
       }
     },
@@ -20,6 +26,12 @@
           }
         },
         "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ - %2$@"
+          }
+        },
+        "de": {
           "stringUnit": {
             "state": "translated",
             "value": "%1$@ - %2$@"
@@ -40,6 +52,12 @@
             "state": "translated",
             "value": "%1$@ • %2$@"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ • %2$@"
+          }
         }
       }
     },
@@ -49,6 +67,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "1 Mois"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 Monat"
           }
         }
       }
@@ -60,6 +84,12 @@
             "state": "translated",
             "value": "1 semaine"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 Woche"
+          }
         }
       }
     },
@@ -69,6 +99,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "1 Année"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 Jahr"
           }
         }
       }
@@ -92,6 +128,12 @@
             "state": "translated",
             "value": "30 min"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "30 Min"
+          }
         }
       }
     },
@@ -107,6 +149,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Actif jusqu’a %@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktiv bis %@"
           }
         }
       }
@@ -124,6 +172,12 @@
             "state": "translated",
             "value": "Reel"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tatsächlich"
+          }
         }
       }
     },
@@ -139,6 +193,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Reel %@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tatsächlich %@"
           }
         }
       }
@@ -156,6 +216,12 @@
             "state": "translated",
             "value": "Reel : %@"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktuell: %@"
+          }
         }
       }
     },
@@ -171,6 +237,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Carte"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Karte"
           }
         }
       }
@@ -188,6 +260,12 @@
             "state": "translated",
             "value": "Widget Carte"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Karten-Widget"
+          }
         }
       }
     },
@@ -203,6 +281,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Configuration"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konfiguration"
           }
         }
       }
@@ -220,6 +304,12 @@
             "state": "translated",
             "value": "Configure the period shown in the Revenu widget."
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konfigurieren Sie den im Einkommens-Widget angezeigten Zeitraum."
+          }
         }
       }
     },
@@ -229,6 +319,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Par défaut Période"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Standardzeitraum"
           }
         }
       }
@@ -246,6 +342,12 @@
             "state": "translated",
             "value": "Termine"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fertig"
+          }
         }
       }
     },
@@ -261,6 +363,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Se termine a %@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Endet %@"
           }
         }
       }
@@ -278,6 +386,12 @@
             "state": "translated",
             "value": "Mode Excursion"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ausflugsmodus"
+          }
         }
       }
     },
@@ -294,6 +408,12 @@
             "state": "translated",
             "value": "Depenses"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ausgaben"
+          }
         }
       }
     },
@@ -309,6 +429,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Emoji favori"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lieblings-Emoji"
           }
         }
       }
@@ -332,6 +458,12 @@
             "state": "translated",
             "value": "Pic %@"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Höchster %@"
+          }
         }
       }
     },
@@ -347,6 +479,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Revenu"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Einkommen"
           }
         }
       }
@@ -364,6 +502,12 @@
             "state": "translated",
             "value": "Widget Revenus"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Einkommens-Widget"
+          }
         }
       }
     },
@@ -373,6 +517,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Revenu progress"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Einkommensfortschritt"
           }
         }
       }
@@ -390,6 +540,12 @@
             "state": "translated",
             "value": "Prochaine dépense prévue"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nächste geplante Ausgabe"
+          }
         }
       }
     },
@@ -406,6 +562,12 @@
             "state": "translated",
             "value": "Widget Prochaine dépense prévue"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Widget „Nächste geplante Ausgabe“."
+          }
         }
       }
     },
@@ -415,6 +577,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Aucune donnée de carte trouvée dans cette plage."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In diesem Bereich wurden keine Kartendaten gefunden."
           }
         }
       }
@@ -426,6 +594,12 @@
             "state": "translated",
             "value": "Aucune donnée de carte trouvée."
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keine Kartendaten gefunden."
+          }
         }
       }
     },
@@ -436,6 +610,12 @@
             "state": "translated",
             "value": "Aucune donnée de revenu trouvée dans cette plage."
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In diesem Bereich wurden keine Einkommensdaten gefunden."
+          }
         }
       }
     },
@@ -445,6 +625,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Aucune donnée de revenu trouvée."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keine Einkommensdaten gefunden."
           }
         }
       }
@@ -462,6 +648,12 @@
             "state": "translated",
             "value": "Aucune entree recente."
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keine aktuellen Einträge."
+          }
         }
       }
     },
@@ -477,6 +669,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Aucune depense recente."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keine aktuellen Ausgaben."
           }
         }
       }
@@ -494,6 +692,12 @@
             "state": "translated",
             "value": "Aucune entree de revenu recente."
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keine aktuellen Einkommenseinträge."
+          }
         }
       }
     },
@@ -504,6 +708,12 @@
             "state": "translated",
             "value": "Aucune donnée de dépenses trouvée pour cette période."
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Für diesen Zeitraum wurden keine Ausgabendaten gefunden."
+          }
         }
       }
     },
@@ -513,6 +723,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Aucune dépense prévue à venir trouvée pour cette période."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Für diesen Zeitraum wurden keine bevorstehenden geplanten Ausgaben gefunden."
           }
         }
       }
@@ -526,6 +742,12 @@
           }
         },
         "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Offshore"
+          }
+        },
+        "de": {
           "stringUnit": {
             "state": "translated",
             "value": "Offshore"
@@ -552,6 +774,12 @@
             "state": "translated",
             "value": "Dans la cible"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Am Ziel"
+          }
         }
       }
     },
@@ -561,6 +789,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ouvrez Offshore pour générer les données du widget pour cette période."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Öffnen Sie Offshore, um Widget-Daten für diesen Zeitraum zu generieren."
           }
         }
       }
@@ -584,6 +818,12 @@
             "state": "translated",
             "value": "Depassement %@"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Über %@"
+          }
         }
       }
     },
@@ -599,6 +839,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Période"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zeitraum"
           }
         }
       }
@@ -616,6 +862,12 @@
             "state": "translated",
             "value": "Prevu"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Geplant"
+          }
         }
       }
     },
@@ -632,6 +884,12 @@
             "state": "translated",
             "value": "Prevu %@"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Geplant %@"
+          }
         }
       }
     },
@@ -647,6 +905,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Prevu : %@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Geplant: %@"
           }
         }
       }
@@ -670,6 +934,12 @@
             "state": "translated",
             "value": "Progression %@"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fortschritt %@"
+          }
         }
       }
     },
@@ -692,6 +962,12 @@
             "state": "translated",
             "value": "Progression —"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fortschritt –"
+          }
         }
       }
     },
@@ -701,6 +977,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "T"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "F"
           }
         }
       }
@@ -718,6 +1000,12 @@
             "state": "translated",
             "value": "Récent"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Neu"
+          }
         }
       }
     },
@@ -733,6 +1021,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Revenus recents"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktuelles Einkommen"
           }
         }
       }
@@ -756,6 +1050,12 @@
             "state": "translated",
             "value": "Reste %@"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verbleibende %@"
+          }
         }
       }
     },
@@ -771,6 +1071,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Session terminee"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sitzung beendet"
           }
         }
       }
@@ -788,6 +1094,12 @@
             "state": "translated",
             "value": "Afficher a card and its expenses for a selected period."
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zeigen Sie eine Karte und ihre Ausgaben für einen ausgewählten Zeitraum an."
+          }
         }
       }
     },
@@ -803,6 +1115,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Affiche un aperçu d’une carte avec les dépenses pour une période choisie."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zeigen Sie eine Kartenvorschau mit Ausgaben für einen ausgewählten Zeitraum an."
           }
         }
       }
@@ -820,6 +1138,12 @@
             "state": "translated",
             "value": "Afficher spend trends for all cards or a selected card."
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ausgabentrends für alle Karten oder eine ausgewählte Karte anzeigen."
+          }
         }
       }
     },
@@ -835,6 +1159,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Afficher the next planned expense for all cards or a selected card."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zeigt die nächste geplante Ausgabe für alle Karten oder eine ausgewählte Karte an."
           }
         }
       }
@@ -852,6 +1182,12 @@
             "state": "translated",
             "value": "Affiche les dépenses prévues à venir pour toutes les cartes ou pour une carte choisie."
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zeigen Sie anstehende geplante Ausgaben für alle Karten oder eine ausgewählte Karte an."
+          }
         }
       }
     },
@@ -868,6 +1204,12 @@
             "state": "translated",
             "value": "Tendances des dépenses"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ausgabentrends"
+          }
         }
       }
     },
@@ -883,6 +1225,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Widget Tendances des dépenses"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Widget „Ausgabentrends“."
           }
         }
       }
@@ -906,6 +1254,12 @@
             "state": "translated",
             "value": "Arreter"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stopp"
+          }
         }
       }
     },
@@ -921,6 +1275,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ceci est un widget d’exemple."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dies ist ein Beispiel-Widget."
           }
         }
       }
@@ -944,6 +1304,12 @@
             "state": "translated",
             "value": "Principal %@"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oben %@"
+          }
         }
       }
     },
@@ -960,6 +1326,12 @@
             "state": "translated",
             "value": "Suivez les revenus prévus et réels pour une période choisie."
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verfolgen Sie geplante und tatsächliche Einnahmen für einen ausgewählten Zeitraum."
+          }
         }
       }
     },
@@ -975,6 +1347,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Suivez les tendances de dépenses et les principales catégories pour une période choisie."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verfolgen Sie Ausgabentrends und Top-Kategorien für einen ausgewählten Zeitraum."
           }
         }
       }

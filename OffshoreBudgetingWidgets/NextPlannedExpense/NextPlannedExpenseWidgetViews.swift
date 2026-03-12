@@ -7,11 +7,11 @@
 
 import SwiftUI
 
-private func nextPlannedLocalized(_ key: String) -> String {
+func nextPlannedLocalized(_ key: String) -> String {
     NSLocalizedString(key, comment: "")
 }
 
-private func nextPlannedLocalizedFormat(_ key: String, _ arguments: CVarArg...) -> String {
+func nextPlannedLocalizedFormat(_ key: String, _ arguments: CVarArg...) -> String {
     String(format: NSLocalizedString(key, comment: ""), locale: Locale.current, arguments)
 }
 
@@ -217,7 +217,7 @@ struct NextPlannedExpenseWidgetMediumView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             WidgetHeaderView(
-                title: snapshot.title,
+                title: nextPlannedLocalized("Next Planned Expense"),
                 periodToken: snapshot.periodToken,
                 rangeText: snapshot.rangeText,
                 style: .stacked
@@ -245,7 +245,7 @@ struct NextPlannedExpenseWidgetLargeView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             WidgetHeaderView(
-                title: snapshot.title,
+                title: nextPlannedLocalized("Next Planned Expense"),
                 periodToken: snapshot.periodToken,
                 rangeText: snapshot.rangeText,
                 style: .stacked
@@ -279,7 +279,7 @@ struct NextPlannedExpenseWidgetExtraLargeView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             WidgetHeaderView(
-                title: snapshot.title,
+                title: nextPlannedLocalized("Next Planned Expense"),
                 periodToken: snapshot.periodToken,
                 rangeText: snapshot.rangeText,
                 style: .singleLine

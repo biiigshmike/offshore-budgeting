@@ -44,7 +44,7 @@ struct HomeNextPlannedExpenseTile: View {
             ManagePresetsView(workspace: workspace, highlightedPresetID: presetID)
         } label: {
             HomeTileContainer(
-                title: String(localized: "homeWidget.nextPlannedExpense", defaultValue: "Next Planned Expense", comment: "Pinned home widget title for next planned expense."),
+                title: String(localized: "Next Planned Expense", defaultValue: "Next Planned Expense", comment: "Pinned home widget title for next planned expense."),
                 subtitle: dateRangeSubtitle,
                 accent: .orange,
                 showsChevron: true

@@ -651,7 +651,11 @@ struct HomeAssistantPanelView: View {
     }
     
     private var personaTransitionDescription: String {
-        "I’ll help you stay encouraged and grounded with quick, practical reads on your spending and trends."
+        String(
+            localized: "assistant.persona.transitionDescription",
+            defaultValue: "I’ll help you stay encouraged and grounded with quick, practical reads on your spending and trends.",
+            comment: "Introductory Marina description shown in the empty assistant state."
+        )
     }
     
     private func dismissEmptySuggestionDrawer() {

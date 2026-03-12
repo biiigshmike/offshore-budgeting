@@ -23,8 +23,10 @@ struct ExpenseFormView: View {
 
         var title: String {
             switch self {
-            case .split: return "Split"
-            case .offset: return "Offset"
+            case .split:
+                return String(localized: "Split", defaultValue: "Split", comment: "Shared-balance action label for splitting an expense.")
+            case .offset:
+                return String(localized: "Offset", defaultValue: "Offset", comment: "Shared-balance action label for offsetting an expense.")
             }
         }
     }

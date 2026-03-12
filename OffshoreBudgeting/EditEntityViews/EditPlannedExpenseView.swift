@@ -18,8 +18,10 @@ struct EditPlannedExpenseView: View {
 
         var title: String {
             switch self {
-            case .split: return "Split"
-            case .offset: return "Offset"
+            case .split:
+                return String(localized: "Split", defaultValue: "Split", comment: "Shared-balance action label for splitting a planned expense.")
+            case .offset:
+                return String(localized: "Offset", defaultValue: "Offset", comment: "Shared-balance action label for offsetting a planned expense.")
             }
         }
     }

@@ -63,7 +63,7 @@ struct NextPlannedExpenseWidgetEntryView: View {
 private struct NextPlannedExpenseEmptyStateSmall: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            WidgetHeaderView(title: "Next Planned Expense", periodToken: "", rangeText: "")
+            WidgetHeaderView(title: nextPlannedLocalized("Next Planned Expense"), periodToken: "", rangeText: "")
 
             Text("No upcoming planned expenses found for this period.")
                 .font(.headline.weight(.semibold))
@@ -82,7 +82,7 @@ private struct NextPlannedExpenseEmptyStateMedium: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             WidgetHeaderView(
-                title: "Next Planned Expense",
+                title: nextPlannedLocalized("Next Planned Expense"),
                 periodToken: periodToken,
                 rangeText: rangeText,
                 style: .stacked
@@ -108,7 +108,7 @@ private struct NextPlannedExpenseEmptyStateLarge: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             WidgetHeaderView(
-                title: "Next Planned Expense",
+                title: nextPlannedLocalized("Next Planned Expense"),
                 periodToken: periodToken,
                 rangeText: rangeText,
                 style: .singleLine
@@ -133,7 +133,7 @@ private struct NextPlannedExpenseEmptyStateExtraLarge: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             WidgetHeaderView(
-                title: "Next Planned Expense",
+                title: nextPlannedLocalized("Next Planned Expense"),
                 periodToken: periodToken,
                 rangeText: rangeText,
                 style: .singleLine

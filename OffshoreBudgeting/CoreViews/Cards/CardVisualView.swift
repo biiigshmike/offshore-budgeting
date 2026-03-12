@@ -19,10 +19,14 @@ enum CardEffectOption: String, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .plastic: return "Plastic"
-        case .metal: return "Metal"
-        case .holographic: return "Holographic"
-        case .glass: return "Glass"
+        case .plastic:
+            return String(localized: "cardEffect.plastic", defaultValue: "Plastic", comment: "Display name for the plastic card effect option.")
+        case .metal:
+            return String(localized: "cardEffect.metal", defaultValue: "Metal", comment: "Display name for the metal card effect option.")
+        case .holographic:
+            return String(localized: "cardEffect.holographic", defaultValue: "Holographic", comment: "Display name for the holographic card effect option.")
+        case .glass:
+            return String(localized: "cardEffect.glass", defaultValue: "Glass", comment: "Display name for the glass card effect option.")
         }
     }
 }
@@ -44,7 +48,32 @@ enum CardThemeOption: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 
     var displayName: String {
-        rawValue.prefix(1).uppercased() + rawValue.dropFirst()
+        switch self {
+        case .ruby:
+            return String(localized: "cardTheme.ruby", defaultValue: "Ruby", comment: "Display name for the ruby card theme option.")
+        case .aqua:
+            return String(localized: "cardTheme.aqua", defaultValue: "Aqua", comment: "Display name for the aqua card theme option.")
+        case .ultraviolet:
+            return String(localized: "cardTheme.ultraviolet", defaultValue: "Ultraviolet", comment: "Display name for the ultraviolet card theme option.")
+        case .charcoal:
+            return String(localized: "cardTheme.charcoal", defaultValue: "Charcoal", comment: "Display name for the charcoal card theme option.")
+        case .seafoam:
+            return String(localized: "cardTheme.seafoam", defaultValue: "Seafoam", comment: "Display name for the seafoam card theme option.")
+        case .sunset:
+            return String(localized: "cardTheme.sunset", defaultValue: "Sunset", comment: "Display name for the sunset card theme option.")
+        case .midnight:
+            return String(localized: "cardTheme.midnight", defaultValue: "Midnight", comment: "Display name for the midnight card theme option.")
+        case .emerald:
+            return String(localized: "cardTheme.emerald", defaultValue: "Emerald", comment: "Display name for the emerald card theme option.")
+        case .sunrise:
+            return String(localized: "cardTheme.sunrise", defaultValue: "Sunrise", comment: "Display name for the sunrise card theme option.")
+        case .fuschia:
+            return String(localized: "cardTheme.fuschia", defaultValue: "Fuschia", comment: "Display name for the fuschia card theme option.")
+        case .periwinkle:
+            return String(localized: "cardTheme.periwinkle", defaultValue: "Periwinkle", comment: "Display name for the periwinkle card theme option.")
+        case .aster:
+            return String(localized: "cardTheme.aster", defaultValue: "Aster", comment: "Display name for the aster card theme option.")
+        }
     }
 }
 

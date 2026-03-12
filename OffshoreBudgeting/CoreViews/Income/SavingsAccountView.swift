@@ -65,11 +65,27 @@ enum SavingsLedgerSortMode: String {
 }
 
 struct SavingsAccountView: View {
-    private enum SavingsTrendMode: String, CaseIterable, Identifiable {
-        case runningTotal = "Running Total"
-        case currentPeriod = "Current Period"
+    private enum SavingsTrendMode: CaseIterable, Identifiable {
+        case runningTotal
+        case currentPeriod
 
-        var id: String { rawValue }
+        var id: String {
+            switch self {
+            case .runningTotal:
+                return "runningTotal"
+            case .currentPeriod:
+                return "currentPeriod"
+            }
+        }
+
+        var title: String {
+            switch self {
+            case .runningTotal:
+                return String(localized: "Running Total", defaultValue: "Running Total", comment: "Segment label for the running total savings trend view.")
+            case .currentPeriod:
+                return String(localized: "Current Period", defaultValue: "Current Period", comment: "Segment label for the current period savings trend view.")
+            }
+        }
     }
 
     let workspace: Workspace
@@ -262,7 +278,7 @@ struct SavingsAccountView: View {
 
             Section("Savings Account") {
                 HStack {
-                    Text("Running Total")
+                    Text(String(localized: "Running Total", defaultValue: "Running Total", comment: "Label for the running total savings value."))
                     Spacer()
                     Text(runningTotal, format: CurrencyFormatter.currencyStyle())
                         .font(.headline)
@@ -361,16 +377,16 @@ struct SavingsAccountView: View {
 
     private var savingsChartSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Savings Trend")
+            Text(String(localized: "Savings Trend", defaultValue: "Savings Trend", comment: "Section title for the savings trend chart."))
                 .font(.headline.weight(.semibold))
 
             Picker("Trend", selection: $selectedTrendMode) {
                 ForEach(SavingsTrendMode.allCases) { mode in
-                    Text(mode.rawValue).tag(mode)
+                    Text(mode.title).tag(mode)
                 }
             }
             .pickerStyle(.segmented)
-            .accessibilityLabel("Savings Trend Mode")
+            .accessibilityLabel(String(localized: "Savings Trend Mode", defaultValue: "Savings Trend Mode", comment: "Accessibility label for the savings trend mode picker."))
 
             if activeChartPoints.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {

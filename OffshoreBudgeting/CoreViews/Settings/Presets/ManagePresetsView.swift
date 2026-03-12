@@ -127,7 +127,7 @@ struct ManagePresetsView: View {
             } else {
 
                 if let pinned = highlightedPreset {
-                    Section("Next Planned Expense") {
+                    Section(String(localized: "Next Planned Expense", defaultValue: "Next Planned Expense", comment: "Section title for the next planned expense preset spotlight.")) {
                         let assignedCount = assignedBudgetCountsByPresetID[pinned.id, default: 0]
 
                         VStack(alignment: .leading, spacing: 6) {

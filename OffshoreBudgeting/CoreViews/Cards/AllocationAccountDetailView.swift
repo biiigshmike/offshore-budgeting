@@ -463,9 +463,12 @@ private struct EditSharedBalanceEntryView: View {
 
         var title: String {
             switch self {
-            case .none: return "None"
-            case .split: return "Split"
-            case .offset: return "Offset"
+            case .none:
+                return String(localized: "action.none", defaultValue: "None", comment: "Action label for no reconciliation adjustment.")
+            case .split:
+                return String(localized: "Split", defaultValue: "Split", comment: "Shared-balance action label for splitting a linked reconciliation entry.")
+            case .offset:
+                return String(localized: "Offset", defaultValue: "Offset", comment: "Shared-balance action label for offsetting a linked reconciliation entry.")
             }
         }
     }

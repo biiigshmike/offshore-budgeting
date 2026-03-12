@@ -64,6 +64,11 @@ es_equals_key_allowlist = {
     "•",
     "iCloud",
     "notification.appName",
+    "cardEffect.metal",
+    "cardTheme.aqua",
+    "cardTheme.aster",
+    "sort.dateShort.asc",
+    "sort.dateShort.desc",
 }
 
 fr_equals_key_allowlist = {
@@ -134,14 +139,76 @@ fr_equals_key_allowlist = {
     "expenseScope.variable",
     "home.widgets.header",
     "homeWidget.categoryAvailability.ok",
+    "sort.dateShort.asc",
+    "sort.dateShort.desc",
     "settings.icloud",
     "settings.notifications",
     "app.section.budgets",
+    "cardEffect.metal",
+    "cardTheme.aqua",
+    "cardTheme.aster",
+    "cardTheme.ultraviolet",
+}
+
+de_equals_key_allowlist = {
+    "",
+    "%@",
+    "%@ - %@",
+    "%@ • %@",
+    "%@, %@",
+    "%@:",
+    "%@↑",
+    "%@↓",
+    "$ ↑",
+    "$ ↓",
+    "$↑",
+    "$↓",
+    "0%",
+    "100%",
+    "A-Z",
+    "A–Z",
+    "Apple Card",
+    "Budget",
+    "Budgets",
+    "F↓",
+    "Marina",
+    "Max",
+    "Min",
+    "Name",
+    "OK",
+    "Offshore",
+    "Offshore Widgets",
+    "Screenshot",
+    "Status",
+    "Trend",
+    "Trends",
+    "Version",
+    "What If",
+    "Widgets",
+    "Z-A",
+    "Z–A",
+    "app.section.budgets",
+    "common.max",
+    "common.min",
+    "common.name",
+    "home.widgets.header",
+    "homeSavingsOutlook.trends",
+    "homeWidget.income.trends",
+    "iCloud",
+    "notification.appName",
+    "settings.icloud",
+    "•",
+    "whatIf.categoryRow.minMaxFormat",
+    "cardTheme.aqua",
+    "cardTheme.aster",
+    "sort.dateShort.asc",
+    "sort.dateShort.desc",
 }
 
 equals_key_allowlist = {
     "es": es_equals_key_allowlist,
     "fr": fr_equals_key_allowlist,
+    "de": de_equals_key_allowlist,
 }.get(target_locale, set())
 
 variant_pairs = [
@@ -354,9 +421,36 @@ source_watchlist = {
         '.init(label: "Projected Savings"',
         '.init(label: "Actual Savings"',
     ],
+    "OffshoreBudgeting/CoreViews/Cards/CardDetailView.swift": [
+        'Text("Date ↑").tag(SortMode.dateAsc)',
+        'Text("Date ↓").tag(SortMode.dateDesc)',
+    ],
+    "OffshoreBudgeting/CoreViews/Cards/CardVisualView.swift": [
+        'case .plastic: return "Plastic"',
+        'case .metal: return "Metal"',
+        'case .holographic: return "Holographic"',
+        'case .glass: return "Glass"',
+        'rawValue.prefix(1).uppercased() + rawValue.dropFirst()',
+    ],
+    "OffshoreBudgeting/CoreViews/Cards/AllocationAccountDetailView.swift": [
+        'case .none: return "None"',
+        'case .split: return "Split"',
+        'case .offset: return "Offset"',
+    ],
     "OffshoreBudgeting/CoreViews/Home/HomeView.swift": [
         'Text("Widgets")',
         'Text("Tap Edit to pin widgets and cards to Home.")',
+        'title: "Next Planned Expense"',
+    ],
+    "OffshoreBudgeting/CoreViews/Home/HomeAssistantFoundation.swift": [
+        'return "I’ll help you stay encouraged and grounded with quick, practical reads on your spending and trends."',
+    ],
+    "OffshoreBudgeting/CoreViews/Income/SavingsAccountView.swift": [
+        'case runningTotal = "Running Total"',
+        'case currentPeriod = "Current Period"',
+        'Text(mode.rawValue).tag(mode)',
+        'Text("Running Total")',
+        'Text("Savings Trend")',
     ],
     "OffshoreBudgeting/CoreViews/Settings/SettingsView.swift": [
         'title: "Manage Categories"',
@@ -367,11 +461,28 @@ source_watchlist = {
         'Section("Getting Started")',
         'Section("Core Screens")',
     ],
+    "OffshoreBudgeting/CoreViews/Settings/Presets/ManagePresetsView.swift": [
+        'Section("Next Planned Expense")',
+    ],
     "OffshoreBudgeting/CoreViews/Settings/SettingsGeneralView.swift": [
         'private func maintenanceButton(title: String, tint: Color, action: @escaping () -> Void)',
     ],
     "OffshoreBudgeting/CoreViews/Settings/SettingsPrivacyView.swift": [
         'private func permissionRow(title: String, status: String, description: String)',
+    ],
+    "OffshoreBudgeting/EditEntityViews/EditPlannedExpenseView.swift": [
+        'case .split: return "Split"',
+        'case .offset: return "Offset"',
+    ],
+    "OffshoreBudgeting/FormViews/ExpenseFormView.swift": [
+        'case .split: return "Split"',
+        'case .offset: return "Offset"',
+    ],
+    "OffshoreBudgetingWidgets/NextPlannedExpense/NextPlannedExpenseWidgetEntryView.swift": [
+        'title: "Next Planned Expense"',
+    ],
+    "OffshoreBudgetingWidgets/NextPlannedExpense/NextPlannedExpenseWidgetViews.swift": [
+        'title: snapshot.title',
     ],
 }
 

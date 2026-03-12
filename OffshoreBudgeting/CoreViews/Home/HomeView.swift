@@ -611,7 +611,7 @@ struct HomeView: View {
             )
         } else {
             HomeTileContainer(
-                title: "Next Planned Expense",
+                title: String(localized: "Next Planned Expense", defaultValue: "Next Planned Expense", comment: "Home tile title for the next planned expense widget."),
                 subtitle: dateRangeSubtitle,
                 accent: .orange,
                 showsChevron: false
