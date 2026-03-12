@@ -10,6 +10,24 @@ struct ShortcutLinkItem: Identifiable {
     let url: URL
     let platformNote: String?
     let setupInstructions: String?
+
+    init(
+        id: String,
+        title: String,
+        subtitle: String,
+        systemImageName: String,
+        url: URL,
+        platformNote: String?,
+        setupInstructions: String?
+    ) {
+        self.id = id
+        self.title = NSLocalizedString(title, comment: "")
+        self.subtitle = NSLocalizedString(subtitle, comment: "")
+        self.systemImageName = systemImageName
+        self.url = url
+        self.platformNote = platformNote.map { NSLocalizedString($0, comment: "") }
+        self.setupInstructions = setupInstructions.map { NSLocalizedString($0, comment: "") }
+    }
 }
 
 // MARK: - ShortcutLinkCatalog

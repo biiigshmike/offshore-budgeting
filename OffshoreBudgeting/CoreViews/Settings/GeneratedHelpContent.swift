@@ -46,6 +46,20 @@ struct GeneratedHelpSectionMediaItem: Identifiable, Hashable {
     let displayTitle: String?
     let bodyText: String
     let fullscreenCaptionText: String?
+
+    init(
+        id: String,
+        assetName: String,
+        displayTitle: String?,
+        bodyText: String,
+        fullscreenCaptionText: String?
+    ) {
+        self.id = id
+        self.assetName = assetName
+        self.displayTitle = displayTitle.map { NSLocalizedString($0, comment: "") }
+        self.bodyText = NSLocalizedString(bodyText, comment: "")
+        self.fullscreenCaptionText = fullscreenCaptionText.map { NSLocalizedString($0, comment: "") }
+    }
 }
 
 struct GeneratedHelpSection: Identifiable, Hashable {
@@ -53,6 +67,13 @@ struct GeneratedHelpSection: Identifiable, Hashable {
     let header: String?
     let bodyText: String
     let mediaItems: [GeneratedHelpSectionMediaItem]
+
+    init(id: String, header: String?, bodyText: String, mediaItems: [GeneratedHelpSectionMediaItem]) {
+        self.id = id
+        self.header = header.map { NSLocalizedString($0, comment: "") }
+        self.bodyText = NSLocalizedString(bodyText, comment: "")
+        self.mediaItems = mediaItems
+    }
 }
 
 struct GeneratedHelpLeafTopic: Identifiable, Hashable {
@@ -60,6 +81,13 @@ struct GeneratedHelpLeafTopic: Identifiable, Hashable {
     let destinationID: String
     let title: String
     let sections: [GeneratedHelpSection]
+
+    init(id: String, destinationID: String, title: String, sections: [GeneratedHelpSection]) {
+        self.id = id
+        self.destinationID = destinationID
+        self.title = NSLocalizedString(title, comment: "")
+        self.sections = sections
+    }
 
     var searchableText: String {
         faqSearchText
@@ -97,10 +125,26 @@ struct GeneratedHelpDestination: Identifiable, Hashable {
     let iconSystemName: String
     let iconStyle: GeneratedHelpIconStyle
     let leafTopicIDs: [String]
+
+    init(
+        id: String,
+        title: String,
+        group: GeneratedHelpDestinationGroup,
+        iconSystemName: String,
+        iconStyle: GeneratedHelpIconStyle,
+        leafTopicIDs: [String]
+    ) {
+        self.id = id
+        self.title = NSLocalizedString(title, comment: "")
+        self.group = group
+        self.iconSystemName = iconSystemName
+        self.iconStyle = iconStyle
+        self.leafTopicIDs = leafTopicIDs
+    }
 }
 
 enum GeneratedHelpContent {
-    static let bookTitle: String = "Offshore Help"
+    static let bookTitle: String = NSLocalizedString("Offshore Help", comment: "")
     static let bookIdentifier: String = "com.mb.offshore.help"
 
     // MARK: - Destinations
@@ -108,7 +152,7 @@ enum GeneratedHelpContent {
     static let destinations: [GeneratedHelpDestination] = [
         GeneratedHelpDestination(
             id: "introduction",
-            title: "Introducción",
+            title: "Introduction",
             group: .gettingStarted,
             iconSystemName: "exclamationmark.bubble",
             iconStyle: .blue,
@@ -127,7 +171,7 @@ enum GeneratedHelpContent {
         ),
         GeneratedHelpDestination(
             id: "home",
-            title: "Panel",
+            title: "Home",
             group: .coreScreens,
             iconSystemName: "house.fill",
             iconStyle: .purple,
@@ -140,7 +184,7 @@ enum GeneratedHelpContent {
         ),
         GeneratedHelpDestination(
             id: "budgets",
-            title: "Presupuestos",
+            title: "Budgets",
             group: .coreScreens,
             iconSystemName: "chart.pie.fill",
             iconStyle: .blue,
@@ -152,7 +196,7 @@ enum GeneratedHelpContent {
         ),
         GeneratedHelpDestination(
             id: "income",
-            title: "Ingresos",
+            title: "Income",
             group: .coreScreens,
             iconSystemName: "calendar",
             iconStyle: .red,
@@ -164,7 +208,7 @@ enum GeneratedHelpContent {
         ),
         GeneratedHelpDestination(
             id: "accounts",
-            title: "Cuentas",
+            title: "Accounts",
             group: .coreScreens,
             iconSystemName: "creditcard.fill",
             iconStyle: .green,
@@ -178,7 +222,7 @@ enum GeneratedHelpContent {
         ),
         GeneratedHelpDestination(
             id: "settings",
-            title: "Ajustes",
+            title: "Settings",
             group: .coreScreens,
             iconSystemName: "gear",
             iconStyle: .gray,
@@ -634,14 +678,14 @@ enum GeneratedHelpContent {
             sections: [
                 mediaSection(
                     id: "home-marina-1",
-                    header: "Asistente Marina",
-                    body: "Marina es tu asistente conversacional para convertir números en próximos pasos claros. Haz preguntas concretas sobre periodos, categorías, tarjetas o la dirección de tus ahorros para recibir orientación práctica rápidamente.\n\nMarina también encaja con tu flujo de crear, actualizar y limpiar datos. Usa el botón + en la pantalla dueña del registro cuando necesites agregar algo nuevo, y luego usa editar o eliminar en esa misma pantalla para cerrar el ciclo. Marina te ayuda a decidir qué hacer, y las pantallas de destino te ayudan a hacerlo con precisión.\n\nUna rutina sólida es simple: haz una pregunta, toma una acción y verifica el resultado. Así mantienes la guía accionable y evitas sobrecarga.",
+                    header: "Marina Assistant",
+                    body: "Marina is your conversational assistant for turning numbers into clear next steps. Ask specific questions about periods, categories, cards, or your savings direction to get practical guidance quickly.\n\nMarina also fits into your flow of creating, updating, and cleaning up data. Use the + button on the screen that owns the record when you need to add something new, and then use edit or delete on that same screen to close the loop. Marina helps you decide what to do, and the destination screens help you do it accurately.\n\nA strong routine is simple: ask a question, take an action, and verify the result. That keeps the guidance actionable and avoids overload.",
                     media: [
                         mediaItem(
                             id: "home-marina-1-image-1",
                             assetName: "Help/CoreScreens/Home/Marina/marina",
-                            bodyText: "Marina se abre desde Panel para un flujo de revisión conversacional. Haz preguntas breves sobre tendencias, dirección de ahorro o variaciones, y luego abre la pantalla relacionada para actuar. Cuando necesites agregar algo nuevo, usa el botón + en esa pantalla. Para cambios posteriores, usa también editar y eliminar allí para mantener tus registros limpios y trazables.",
-                            fullscreenCaptionText: "Pídele orientación a Marina y luego usa +, editar o eliminar en la pantalla dueña para completar el flujo."
+                            bodyText: "Open Marina from Home for a conversational review flow. Ask short questions about trends, savings direction, or variances, then open the related screen to act. When you need to add something new, use the + button on that screen. For later changes, use edit and delete there as well so your records stay clean and traceable.",
+                            fullscreenCaptionText: "Ask Marina for guidance, then use +, edit, or delete on the owning screen to complete the flow."
                         )
                     ]
                 )
@@ -650,7 +694,7 @@ enum GeneratedHelpContent {
         GeneratedHelpLeafTopic(
             id: "home-widgets",
             destinationID: "home",
-            title: "Paneles",
+            title: "Widgets",
             sections: [
                 mediaSection(
                     id: "home-widgets-overview",

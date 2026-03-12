@@ -322,6 +322,7 @@
 			knownRegions = (
 				en,
 				es,
+				fr,
 				Base,
 			);
 			mainGroup = 4C96F8482F20523700541774;

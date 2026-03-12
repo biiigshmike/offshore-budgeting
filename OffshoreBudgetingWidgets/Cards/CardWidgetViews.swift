@@ -10,6 +10,19 @@ import WidgetKit
 
 // MARK: - Small
 
+private func cardWidgetLocalized(_ key: String) -> String {
+    NSLocalizedString(key, comment: "")
+}
+
+private func cardWidgetRangeText(_ periodToken: String, start: Date, end: Date) -> String {
+    String(
+        format: NSLocalizedString("%@ • %@", comment: ""),
+        locale: Locale.current,
+        periodToken,
+        formattedRange(start, end)
+    )
+}
+
 struct CardWidgetSmallView: View {
     let snapshot: CardWidgetSnapshot
 
@@ -23,14 +36,14 @@ struct CardWidgetSmallView: View {
                 .minimumScaleFactor(0.78)
                 .allowsTightening(true)
 
-            Text("\(snapshot.periodToken) • \(formattedRange(snapshot.rangeStart, snapshot.rangeEnd))")
+            Text(cardWidgetRangeText(snapshot.periodToken, start: snapshot.rangeStart, end: snapshot.rangeEnd))
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.9)
             Spacer()
             VStack(alignment: .leading, spacing: 4) {
-                Text("Expenses")
+                Text(cardWidgetLocalized("Expenses"))
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
 
@@ -67,7 +80,7 @@ struct CardWidgetMediumView: View {
                     .minimumScaleFactor(0.78)
                     .allowsTightening(true)
 
-                Text("\(snapshot.periodToken) • \(formattedRange(snapshot.rangeStart, snapshot.rangeEnd))")
+                Text(cardWidgetRangeText(snapshot.periodToken, start: snapshot.rangeStart, end: snapshot.rangeEnd))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -76,7 +89,7 @@ struct CardWidgetMediumView: View {
                 Spacer()
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Expenses")
+                    Text(cardWidgetLocalized("Expenses"))
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
 
@@ -141,7 +154,7 @@ struct CardWidgetLargeView: View {
             }
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("Expenses")
+                Text(cardWidgetLocalized("Expenses"))
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
 
@@ -185,7 +198,7 @@ struct CardWidgetExtraLargeView: View {
                 .frame(width: 292)
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Expenses")
+                    Text(cardWidgetLocalized("Expenses"))
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
 
@@ -200,7 +213,7 @@ struct CardWidgetExtraLargeView: View {
             }
 
             VStack(alignment: .leading, spacing: 10) {
-                Text("Recent")
+                Text(cardWidgetLocalized("Recent"))
                     .font(.headline.weight(.semibold))
                     .foregroundStyle(.primary)
 
@@ -211,7 +224,7 @@ struct CardWidgetExtraLargeView: View {
                         }
                     }
                 } else {
-                    Text("No recent expenses.")
+                    Text(cardWidgetLocalized("No recent expenses."))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }

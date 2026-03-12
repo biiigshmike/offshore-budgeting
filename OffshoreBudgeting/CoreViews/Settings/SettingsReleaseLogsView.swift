@@ -15,11 +15,24 @@ struct SettingsReleaseLogsView: View {
         let items: [ReleaseItem]
 
         var id: String { "\(version)-\(build)" }
-        var headerTitle: String { "What’s New • \(version) (Build \(localizedBuild))" }
+        var headerTitle: String {
+            String(
+                format: NSLocalizedString("What’s New • %@ (Build %@)", comment: ""),
+                locale: Locale.current,
+                version,
+                localizedBuild
+            )
+        }
 
         private var localizedBuild: String {
             guard let value = Int(build) else { return build }
             return value.formatted(.number)
+        }
+
+        init(version: String, build: String, items: [ReleaseItem]) {
+            self.version = version
+            self.build = build
+            self.items = items
         }
     }
 
@@ -29,6 +42,12 @@ struct SettingsReleaseLogsView: View {
         let description: String
 
         var id: String { "\(systemImage)|\(title)" }
+
+        init(systemImage: String, title: String, description: String) {
+            self.systemImage = systemImage
+            self.title = NSLocalizedString(title, comment: "")
+            self.description = NSLocalizedString(description, comment: "")
+        }
     }
 
     // MARK: - App Version

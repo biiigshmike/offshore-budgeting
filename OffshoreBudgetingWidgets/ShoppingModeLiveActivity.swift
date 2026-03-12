@@ -1,6 +1,14 @@
 import SwiftUI
 import WidgetKit
 
+private func liveActivityLocalized(_ key: String) -> String {
+    NSLocalizedString(key, comment: "")
+}
+
+private func liveActivityLocalizedFormat(_ key: String, _ arguments: CVarArg...) -> String {
+    String(format: NSLocalizedString(key, comment: ""), locale: Locale.current, arguments)
+}
+
 #if canImport(ActivityKit) && !targetEnvironment(macCatalyst)
 import ActivityKit
 
@@ -64,23 +72,23 @@ private struct ShoppingModeLockScreenLiveActivityView: View {
                         .font(.footnote.weight(.semibold))
                         .foregroundStyle(ShoppingModeLiveActivityPalette.brandAccent)
 
-                    Text("Offshore")
+                    Text(liveActivityLocalized("Offshore"))
                         .font(.headline.weight(.semibold))
                         .foregroundStyle(ShoppingModeLiveActivityPalette.primaryText)
                 }
 
                 ViewThatFits(in: .horizontal) {
-                    Text("Excursion Mode")
+                    Text(liveActivityLocalized("Excursion Mode"))
                         .font(.system(size: 34, weight: .bold, design: .rounded))
                         .foregroundStyle(ShoppingModeLiveActivityPalette.primaryText)
                         .lineLimit(1)
 
-                    Text("Excursion Mode")
+                    Text(liveActivityLocalized("Excursion Mode"))
                         .font(.system(size: 30, weight: .bold, design: .rounded))
                         .foregroundStyle(ShoppingModeLiveActivityPalette.primaryText)
                         .lineLimit(1)
 
-                    Text("Excursion Mode")
+                    Text(liveActivityLocalized("Excursion Mode"))
                         .font(.system(size: 26, weight: .bold, design: .rounded))
                         .foregroundStyle(ShoppingModeLiveActivityPalette.primaryText)
                         .lineLimit(1)
@@ -88,17 +96,17 @@ private struct ShoppingModeLockScreenLiveActivityView: View {
 
                 ViewThatFits(in: .horizontal) {
                     if isExpired {
-                        Text("Session ended")
+                        Text(liveActivityLocalized("Session ended"))
                             .font(.footnote.weight(.medium))
                             .foregroundStyle(ShoppingModeLiveActivityPalette.secondaryText)
                             .lineLimit(1)
                     } else {
-                        Text("Active until \(context.state.endDate, format: .dateTime.hour().minute())")
+                        Text(liveActivityLocalizedFormat("Active until %@", context.state.endDate.formatted(.dateTime.hour().minute())))
                             .font(.footnote.weight(.medium))
                             .foregroundStyle(ShoppingModeLiveActivityPalette.secondaryText)
                             .lineLimit(1)
 
-                        Text("Ends \(context.state.endDate, format: .dateTime.hour().minute())")
+                        Text(liveActivityLocalizedFormat("Ends %@", context.state.endDate.formatted(.dateTime.hour().minute())))
                             .font(.footnote.weight(.medium))
                             .foregroundStyle(ShoppingModeLiveActivityPalette.secondaryText)
                             .lineLimit(1)
@@ -113,7 +121,7 @@ private struct ShoppingModeLockScreenLiveActivityView: View {
                 HStack(spacing: 8) {
                     if let stopURL = ExcursionDeepLink.stopURL {
                         Link(destination: stopURL) {
-                            Label("Stop", systemImage: "stop.fill")
+                            Label(liveActivityLocalized("Stop"), systemImage: "stop.fill")
                                 .font(.headline.weight(.semibold))
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.9)
@@ -126,7 +134,7 @@ private struct ShoppingModeLockScreenLiveActivityView: View {
 
                     if let extendURL = ExcursionDeepLink.extendThirtyURL {
                         Link(destination: extendURL) {
-                            Label("30 min", systemImage: "plus")
+                            Label(liveActivityLocalized("30 min"), systemImage: "plus")
                                 .font(.headline.weight(.semibold))
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.9)
@@ -266,7 +274,7 @@ private struct ShoppingModeExpandedIslandLeadingContentView: View {
                     .font(.system(size: metrics.brandIconSize, weight: .semibold))
                     .foregroundStyle(ShoppingModeLiveActivityPalette.brandAccent)
 
-                Text("Offshore")
+                Text(liveActivityLocalized("Offshore"))
                     .font(.system(size: metrics.brandFontSize, weight: .semibold, design: .rounded))
                     .foregroundStyle(ShoppingModeLiveActivityPalette.primaryText)
                     .lineLimit(1)
@@ -274,7 +282,7 @@ private struct ShoppingModeExpandedIslandLeadingContentView: View {
             }
 
             VStack(alignment: .leading, spacing: 1) {
-                Text("Excursion Mode")
+                Text(liveActivityLocalized("Excursion Mode"))
                     .font(.system(size: metrics.titleSize, weight: .bold, design: .rounded))
                     .foregroundStyle(ShoppingModeLiveActivityPalette.primaryText)
                     .lineLimit(1)
@@ -284,17 +292,17 @@ private struct ShoppingModeExpandedIslandLeadingContentView: View {
                 // I intentionally degrade subtitle before timer text to preserve title hierarchy.
                 ViewThatFits(in: .horizontal) {
                     if isExpired {
-                        Text("Session ended")
+                        Text(liveActivityLocalized("Session ended"))
                             .font(.system(size: metrics.subtitleSize, weight: .medium, design: .rounded))
                             .foregroundStyle(ShoppingModeLiveActivityPalette.secondaryText)
                             .lineLimit(1)
                     } else {
-                        Text("Active until \(context.state.endDate, format: .dateTime.hour().minute())")
+                        Text(liveActivityLocalizedFormat("Active until %@", context.state.endDate.formatted(.dateTime.hour().minute())))
                             .font(.system(size: metrics.subtitleSize, weight: .medium, design: .rounded))
                             .foregroundStyle(ShoppingModeLiveActivityPalette.secondaryText)
                             .lineLimit(1)
 
-                        Text("Ends \(context.state.endDate, format: .dateTime.hour().minute())")
+                        Text(liveActivityLocalizedFormat("Ends %@", context.state.endDate.formatted(.dateTime.hour().minute())))
                             .font(.system(size: metrics.subtitleSize, weight: .medium, design: .rounded))
                             .foregroundStyle(ShoppingModeLiveActivityPalette.secondaryText)
                             .lineLimit(1)
@@ -376,7 +384,7 @@ private struct ShoppingModeExpandedIslandActionsView: View {
         HStack(spacing: metrics.actionsSpacing) {
             if let stopURL = ExcursionDeepLink.stopURL {
                 Link(destination: stopURL) {
-                    Label("Stop", systemImage: "stop.fill")
+                    Label(liveActivityLocalized("Stop"), systemImage: "stop.fill")
                         .font(.system(size: metrics.actionLabelSize, weight: .semibold, design: .rounded))
                         .lineLimit(1)
                         .minimumScaleFactor(0.9)
@@ -389,7 +397,7 @@ private struct ShoppingModeExpandedIslandActionsView: View {
 
             if let extendURL = ExcursionDeepLink.extendThirtyURL {
                 Link(destination: extendURL) {
-                    Label("30 min", systemImage: "plus")
+                    Label(liveActivityLocalized("30 min"), systemImage: "plus")
                         .font(.system(size: metrics.actionLabelSize, weight: .semibold, design: .rounded))
                         .lineLimit(1)
                         .minimumScaleFactor(0.9)
@@ -482,7 +490,7 @@ private struct FinishedTimerBadge: View {
             Circle()
                 .stroke(ShoppingModeLiveActivityPalette.ringTrack, lineWidth: 3)
 
-            Text("Done")
+            Text(liveActivityLocalized("Done"))
                 .font(.system(size: fontSize, weight: .semibold, design: .rounded))
                 .monospacedDigit()
                 .foregroundStyle(ShoppingModeLiveActivityPalette.primaryText)
@@ -500,7 +508,7 @@ private struct LockScreenRingTimerText: View {
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { timeline in
             if ExcursionLiveActivityPhase.isExpired(endDate: endDate, now: timeline.date) {
-                Text("Done")
+                Text(liveActivityLocalized("Done"))
                     .font(.system(size: 14, weight: .medium, design: .rounded))
                     .monospacedDigit()
                     .lineLimit(1)
@@ -537,7 +545,7 @@ private struct ExpandedRingTimerText: View {
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { timeline in
             if ExcursionLiveActivityPhase.isExpired(endDate: endDate, now: timeline.date) {
-                Text("Done")
+                Text(liveActivityLocalized("Done"))
                     .font(.system(size: fontSize, weight: .semibold, design: .rounded))
                     .monospacedDigit()
                     .lineLimit(1)
@@ -573,7 +581,7 @@ private struct CompactCountdownText: View {
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { timeline in
             if ExcursionLiveActivityPhase.isExpired(endDate: endDate, now: timeline.date) {
-                Text("Done")
+                Text(liveActivityLocalized("Done"))
                     .monospacedDigit()
                     .font(.caption2.weight(.semibold))
                     .lineLimit(1)

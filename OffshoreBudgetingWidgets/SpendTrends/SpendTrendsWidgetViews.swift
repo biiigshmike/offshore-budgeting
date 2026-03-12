@@ -7,11 +7,15 @@
 
 import SwiftUI
 
+private func spendTrendsLocalizedFormat(_ key: String, _ arguments: CVarArg...) -> String {
+    String(format: NSLocalizedString(key, comment: ""), locale: Locale.current, arguments)
+}
+
 private extension SpendTrendsWidgetSnapshot {
     var rangeText: String {
         let start = rangeStart.formatted(.dateTime.month(.abbreviated).day())
         let end = rangeEnd.formatted(.dateTime.month(.abbreviated).day())
-        return "\(start) - \(end)"
+        return spendTrendsLocalizedFormat("%@ - %@", start, end)
     }
 }
 
@@ -177,7 +181,7 @@ struct SpendTrendsWidgetSmallView: View {
                 .lineLimit(2)
                 .minimumScaleFactor(0.78)
 
-            Text("\(snapshot.periodToken) • \(snapshot.rangeText)")
+            Text(spendTrendsLocalizedFormat("%@ • %@", snapshot.periodToken, snapshot.rangeText))
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
@@ -220,7 +224,7 @@ struct SpendTrendsWidgetMediumView: View {
 
                 VStack(alignment: .leading, spacing: 3) {
                     if let highest = snapshot.highestBucket {
-                        Text("Highest \(highest.label)")
+                        Text(spendTrendsLocalizedFormat("Highest %@", highest.label))
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
@@ -231,7 +235,7 @@ struct SpendTrendsWidgetMediumView: View {
                             .foregroundStyle(.primary)
                             .lineLimit(1)
 
-                        Text("Top \(highest.topCategoryName)")
+                        Text(spendTrendsLocalizedFormat("Top %@", highest.topCategoryName))
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.secondary)
                             .lineLimit(1)

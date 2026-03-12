@@ -7,11 +7,19 @@
 
 import SwiftUI
 
+private func nextPlannedLocalized(_ key: String) -> String {
+    NSLocalizedString(key, comment: "")
+}
+
+private func nextPlannedLocalizedFormat(_ key: String, _ arguments: CVarArg...) -> String {
+    String(format: NSLocalizedString(key, comment: ""), locale: Locale.current, arguments)
+}
+
 private extension NextPlannedExpenseWidgetSnapshot {
     var rangeText: String {
         let start = rangeStart.formatted(.dateTime.month(.abbreviated).day())
         let end = rangeEnd.formatted(.dateTime.month(.abbreviated).day())
-        return "\(start) - \(end)"
+        return nextPlannedLocalizedFormat("%@ - %@", start, end)
     }
 }
 
@@ -32,12 +40,12 @@ private struct NextPlannedExpenseAmountsView: View {
     var body: some View {
         if compact {
             VStack(alignment: .leading, spacing: 3) {
-                Text("Planned: \(plannedAmount, format: nextPlannedExpenseCurrencyFormatStyle())")
+                Text(nextPlannedLocalizedFormat("Planned: %@", plannedAmount.formatted(nextPlannedExpenseCurrencyFormatStyle())))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
 
-                Text("Actual: \(actualAmount, format: nextPlannedExpenseCurrencyFormatStyle())")
+                Text(nextPlannedLocalizedFormat("Actual: %@", actualAmount.formatted(nextPlannedExpenseCurrencyFormatStyle())))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -45,7 +53,7 @@ private struct NextPlannedExpenseAmountsView: View {
         } else {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 8) {
-                    Text("Planned")
+                    Text(nextPlannedLocalized("Planned"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Spacer(minLength: 0)
@@ -56,7 +64,7 @@ private struct NextPlannedExpenseAmountsView: View {
                 }
 
                 HStack(spacing: 8) {
-                    Text("Actual")
+                    Text(nextPlannedLocalized("Actual"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Spacer(minLength: 0)
@@ -162,14 +170,14 @@ struct NextPlannedExpenseWidgetSmallView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text("Next Planned Expense")
+            Text(nextPlannedLocalized("Next Planned Expense"))
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(.primary)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
                 .minimumScaleFactor(0.85)
 
-            Text("\(snapshot.periodToken) • \(snapshot.rangeText)")
+            Text(nextPlannedLocalizedFormat("%@ • %@", snapshot.periodToken, snapshot.rangeText))
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
@@ -182,13 +190,13 @@ struct NextPlannedExpenseWidgetSmallView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
 
-                Text("Planned \(item.plannedAmount, format: nextPlannedExpenseCurrencyFormatStyle())")
+                Text(nextPlannedLocalizedFormat("Planned %@", item.plannedAmount.formatted(nextPlannedExpenseCurrencyFormatStyle())))
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
 
-                Text("Actual \(item.actualAmount, format: nextPlannedExpenseCurrencyFormatStyle())")
+                Text(nextPlannedLocalizedFormat("Actual %@", item.actualAmount.formatted(nextPlannedExpenseCurrencyFormatStyle())))
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)

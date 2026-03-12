@@ -9,6 +9,14 @@ import SwiftUI
 
 // MARK: - Helpers
 
+private func incomeWidgetLocalized(_ key: String) -> String {
+    NSLocalizedString(key, comment: "")
+}
+
+private func incomeWidgetLocalizedFormat(_ key: String, _ arguments: CVarArg...) -> String {
+    String(format: NSLocalizedString(key, comment: ""), locale: Locale.current, arguments)
+}
+
 private extension IncomeWidgetSnapshot {
     var rangeText: String {
         let start = rangeStart.formatted(.dateTime.month(.abbreviated).day())
@@ -55,16 +63,16 @@ private extension IncomeWidgetSnapshot {
     var percent: Double? { plannedTotal > 0 ? actualTotal / plannedTotal : nil }
 
     var progressText: String {
-        guard let pct = percent else { return "Progress —" }
+        guard let pct = percent else { return incomeWidgetLocalized("Progress —") }
         let formatted = pct.formatted(.percent.precision(.fractionLength(0)))
-        return "Progress \(formatted)"
+        return incomeWidgetLocalizedFormat("Progress %@", formatted)
     }
 
     var deltaText: String {
         let formatted = delta.formatted(incomeWidgetCurrencyFormatStyle())
-        if delta < 0 { return "Remaining \(formatted.replacingOccurrences(of: "-", with: ""))" }
-        if delta > 0 { return "Over \(formatted)" }
-        return "On target"
+        if delta < 0 { return incomeWidgetLocalizedFormat("Remaining %@", formatted.replacingOccurrences(of: "-", with: "")) }
+        if delta > 0 { return incomeWidgetLocalizedFormat("Over %@", formatted) }
+        return incomeWidgetLocalized("On target")
     }
 
     /// Small header uses no spaces around the separator to keep it short.
@@ -150,7 +158,7 @@ struct IncomeWidgetSmallView: View {
             .frame(maxWidth: .infinity)
             .frame(height: 14)
 
-            MetricValueView(title: "Actual", value: snapshot.actualTotal)
+            MetricValueView(title: incomeWidgetLocalized("Actual"), value: snapshot.actualTotal)
 
             Spacer(minLength: 0)
         }
@@ -184,8 +192,8 @@ struct IncomeWidgetMediumView: View {
             }
 
             VStack(alignment: .leading, spacing: 10) {
-                MetricValueView(title: "Planned", value: snapshot.plannedTotal)
-                MetricValueView(title: "Actual", value: snapshot.actualTotal)
+                MetricValueView(title: incomeWidgetLocalized("Planned"), value: snapshot.plannedTotal)
+                MetricValueView(title: incomeWidgetLocalized("Actual"), value: snapshot.actualTotal)
 
                 Spacer(minLength: 0)
             }
@@ -225,15 +233,15 @@ struct IncomeWidgetLargeView: View {
             .frame(height: 54)
 
             HStack(spacing: 12) {
-                MetricValueView(title: "Planned", value: snapshot.plannedTotal)
-                MetricValueView(title: "Actual", value: snapshot.actualTotal)
+                MetricValueView(title: incomeWidgetLocalized("Planned"), value: snapshot.plannedTotal)
+                MetricValueView(title: incomeWidgetLocalized("Actual"), value: snapshot.actualTotal)
 
                 Spacer(minLength: 0)
             }
 
             if let items = snapshot.recentItems, !items.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Recent Income")
+                    Text(incomeWidgetLocalized("Recent Income"))
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
 
@@ -244,7 +252,7 @@ struct IncomeWidgetLargeView: View {
                     }
                 }
             } else {
-                Text("No recent entries.")
+                Text(incomeWidgetLocalized("No recent entries."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -286,12 +294,12 @@ struct IncomeWidgetExtraLargeView: View {
 
             // Planned leading, Actual trailing
             HStack(alignment: .top) {
-                MetricValueView(title: "Planned", value: snapshot.plannedTotal)
+                MetricValueView(title: incomeWidgetLocalized("Planned"), value: snapshot.plannedTotal)
 
                 Spacer(minLength: 0)
 
                 VStack(alignment: .trailing, spacing: 4) {
-                    Text("Actual")
+                    Text(incomeWidgetLocalized("Actual"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -307,7 +315,7 @@ struct IncomeWidgetExtraLargeView: View {
 
             if let items = snapshot.recentItems, !items.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Recent Income")
+                    Text(incomeWidgetLocalized("Recent Income"))
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
 
@@ -318,7 +326,7 @@ struct IncomeWidgetExtraLargeView: View {
                     }
                 }
             } else {
-                Text("No recent income entries.")
+                Text(incomeWidgetLocalized("No recent income entries."))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }

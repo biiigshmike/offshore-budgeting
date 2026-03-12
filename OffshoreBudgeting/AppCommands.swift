@@ -228,7 +228,7 @@ private struct AppMenuCommandItem: Identifiable {
         role: ButtonRole? = nil
     ) {
         self.id = id
-        self.title = title
+        self.title = NSLocalizedString(title, comment: "")
         self.shortcut = shortcut
         self.isEnabled = isEnabled
         self.role = role
@@ -244,7 +244,7 @@ struct OffshoreAppCommands: Commands {
 
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
-            Button("New Window") {
+            Button(String(localized: "appCommands.newWindow", defaultValue: "New Window", comment: "Command menu item for opening a new app window.")) {
                 openNewWindow()
             }
             .keyboardShortcut("n", modifiers: [.command, .option])
