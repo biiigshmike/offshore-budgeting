@@ -72,45 +72,57 @@ struct AppCommandHubPolicyTests {
     }
 
     @Test func accountsSegments_mapToExpectedCommandRouting() {
-        #expect(
-            AccountsView.Segment.cards.commandConfiguration
-                == AccountsSegmentCommandConfiguration(
-                    surface: .cards,
-                    cardsSortContext: .cards
-                )
-        )
+        let cardsConfiguration = AccountsView.Segment.cards.commandConfiguration
+        switch cardsConfiguration.surface {
+        case .cards:
+            break
+        default:
+            Issue.record("Expected Cards segment to route to the cards command surface.")
+        }
+        #expect(cardsConfiguration.cardsSortContext == .cards)
 
-        #expect(
-            AccountsView.Segment.sharedBalances.commandConfiguration
-                == AccountsSegmentCommandConfiguration(
-                    surface: .cards,
-                    cardsSortContext: .sharedBalances
-                )
-        )
+        let sharedBalancesConfiguration = AccountsView.Segment.sharedBalances.commandConfiguration
+        switch sharedBalancesConfiguration.surface {
+        case .cards:
+            break
+        default:
+            Issue.record("Expected Shared Balances segment to route to the cards command surface.")
+        }
+        #expect(sharedBalancesConfiguration.cardsSortContext == .sharedBalances)
 
-        #expect(
-            AccountsView.Segment.savings.commandConfiguration
-                == AccountsSegmentCommandConfiguration(
-                    surface: .savings,
-                    cardsSortContext: nil
-                )
-        )
+        let savingsConfiguration = AccountsView.Segment.savings.commandConfiguration
+        switch savingsConfiguration.surface {
+        case .savings:
+            break
+        default:
+            Issue.record("Expected Savings segment to route to the savings command surface.")
+        }
+        #expect(savingsConfiguration.cardsSortContext == nil)
     }
 
     @Test func accountsPhoneSortTargets_mapToExpectedStorageTargets() {
-        #expect(
-            AccountsPhoneSortTarget.target(for: AppCommandID.Cards.sortZA)
-                == .cards("za")
-        )
+        let cardsTarget = AccountsPhoneSortTarget.target(for: AppCommandID.Cards.sortZA)
+        switch cardsTarget {
+        case .cards(let mode):
+            #expect(mode == "za")
+        default:
+            Issue.record("Expected Cards sort target for cards Z-A command.")
+        }
 
-        #expect(
-            AccountsPhoneSortTarget.target(for: AppCommandID.SharedBalances.sortAmountDesc)
-                == .sharedBalances("amountDesc")
-        )
+        let sharedBalancesTarget = AccountsPhoneSortTarget.target(for: AppCommandID.SharedBalances.sortAmountDesc)
+        switch sharedBalancesTarget {
+        case .sharedBalances(let mode):
+            #expect(mode == "amountDesc")
+        default:
+            Issue.record("Expected Shared Balances sort target for amount descending command.")
+        }
 
-        #expect(
-            AccountsPhoneSortTarget.target(for: AppCommandID.Savings.sortDateAsc)
-                == .savings(SavingsLedgerSortMode.dateAsc.rawValue)
-        )
+        let savingsTarget = AccountsPhoneSortTarget.target(for: AppCommandID.Savings.sortDateAsc)
+        switch savingsTarget {
+        case .savings(let mode):
+            #expect(mode == SavingsLedgerSortMode.dateAsc.rawValue)
+        default:
+            Issue.record("Expected Savings sort target for date ascending command.")
+        }
     }
 }

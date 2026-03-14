@@ -33,6 +33,43 @@ struct ContentViewResumeCoordinatorTests {
         reminderMinute: 0
     )
 
+    private func expectWidgetSignature(
+        _ actual: ContentViewWidgetRefreshSignature?,
+        equals expected: ContentViewWidgetRefreshSignature?
+    ) {
+        #expect(actual?.workspaceID == expected?.workspaceID)
+        #expect(actual?.defaultBudgetingPeriodRaw == expected?.defaultBudgetingPeriodRaw)
+        #expect(
+            actual?.excludeFuturePlannedExpensesFromCalculations
+                == expected?.excludeFuturePlannedExpensesFromCalculations
+        )
+        #expect(
+            actual?.excludeFutureVariableExpensesFromCalculations
+                == expected?.excludeFutureVariableExpensesFromCalculations
+        )
+    }
+
+    private func expectSavingsSignature(
+        _ actual: ContentViewSavingsRefreshSignature?,
+        equals expected: ContentViewSavingsRefreshSignature?
+    ) {
+        #expect(actual?.workspaceID == expected?.workspaceID)
+        #expect(actual?.defaultBudgetingPeriodRaw == expected?.defaultBudgetingPeriodRaw)
+    }
+
+    private func expectNotificationSignature(
+        _ actual: ContentViewNotificationRefreshSignature?,
+        equals expected: ContentViewNotificationRefreshSignature?
+    ) {
+        #expect(actual?.workspaceID == expected?.workspaceID)
+        #expect(actual?.notificationsEnabled == expected?.notificationsEnabled)
+        #expect(actual?.dailyExpenseReminderEnabled == expected?.dailyExpenseReminderEnabled)
+        #expect(actual?.plannedIncomeReminderEnabled == expected?.plannedIncomeReminderEnabled)
+        #expect(actual?.presetDueReminderEnabled == expected?.presetDueReminderEnabled)
+        #expect(actual?.reminderHour == expected?.reminderHour)
+        #expect(actual?.reminderMinute == expected?.reminderMinute)
+    }
+
     @Test func schedule_collapsesIdenticalPendingRequest() {
         var coordinator = ContentViewResumeCoordinator()
 
@@ -109,15 +146,155 @@ struct ContentViewResumeCoordinatorTests {
 
         coordinator.markWidgetRefreshCompleted(request)
         #expect(coordinator.pendingRequest?.widgetSignature == nil)
-        #expect(coordinator.pendingRequest?.savingsSignature == savingsSignature)
-        #expect(coordinator.pendingRequest?.notificationSignature == notificationSignature)
+        expectSavingsSignature(coordinator.pendingRequest?.savingsSignature, equals: savingsSignature)
+        expectNotificationSignature(
+            coordinator.pendingRequest?.notificationSignature,
+            equals: notificationSignature
+        )
 
         coordinator.markNotificationRefreshCompleted(request)
         #expect(coordinator.pendingRequest?.widgetSignature == nil)
         #expect(coordinator.pendingRequest?.notificationSignature == nil)
-        #expect(coordinator.pendingRequest?.savingsSignature == savingsSignature)
+        expectSavingsSignature(coordinator.pendingRequest?.savingsSignature, equals: savingsSignature)
 
         coordinator.markSavingsRefreshCompleted(request)
         #expect(coordinator.pendingRequest == nil)
+    }
+
+    @Test func planner_sceneBecameActive_sameDaySkipsWidgetAndSavingsWork() {
+        let plan = ContentViewDeferredRefreshPlanner.plan(
+            trigger: .sceneBecameActive,
+            widgetSignature: widgetSignature,
+            savingsSignature: savingsSignature,
+            notificationSignature: notificationSignature,
+            shouldRefreshWidgetsOnForeground: false,
+            shouldRefreshSavingsOnForeground: false
+        )
+
+        #expect(plan.widgetSignature == nil)
+        #expect(plan.savingsSignature == nil)
+        expectNotificationSignature(plan.notificationSignature, equals: notificationSignature)
+        #expect(plan.forceWidgetRefresh == false)
+        #expect(plan.forceSavingsRefresh == false)
+    }
+
+    @Test func planner_workspaceSelectionChangedKeepsRequestedWorkWithoutForcing() {
+        let plan = ContentViewDeferredRefreshPlanner.plan(
+            trigger: .workspaceSelectionChanged,
+            widgetSignature: widgetSignature,
+            savingsSignature: savingsSignature,
+            notificationSignature: notificationSignature,
+            shouldRefreshWidgetsOnForeground: false,
+            shouldRefreshSavingsOnForeground: false
+        )
+
+        expectWidgetSignature(plan.widgetSignature, equals: widgetSignature)
+        expectSavingsSignature(plan.savingsSignature, equals: savingsSignature)
+        expectNotificationSignature(plan.notificationSignature, equals: notificationSignature)
+        #expect(plan.forceWidgetRefresh == false)
+        #expect(plan.forceSavingsRefresh == false)
+        #expect(plan.forceNotificationRefresh == false)
+    }
+
+    @Test func planner_sceneBecameActive_dayRolloverForcesWidgetRefresh() {
+        let plan = ContentViewDeferredRefreshPlanner.plan(
+            trigger: .sceneBecameActive,
+            widgetSignature: widgetSignature,
+            savingsSignature: savingsSignature,
+            notificationSignature: nil,
+            shouldRefreshWidgetsOnForeground: true,
+            shouldRefreshSavingsOnForeground: false
+        )
+
+        expectWidgetSignature(plan.widgetSignature, equals: widgetSignature)
+        #expect(plan.savingsSignature == nil)
+        #expect(plan.forceWidgetRefresh)
+        #expect(plan.forceSavingsRefresh == false)
+    }
+
+    @Test func planner_sceneBecameActive_periodBoundaryForcesSavingsRefresh() {
+        let plan = ContentViewDeferredRefreshPlanner.plan(
+            trigger: .sceneBecameActive,
+            widgetSignature: widgetSignature,
+            savingsSignature: savingsSignature,
+            notificationSignature: nil,
+            shouldRefreshWidgetsOnForeground: false,
+            shouldRefreshSavingsOnForeground: true
+        )
+
+        #expect(plan.widgetSignature == nil)
+        expectSavingsSignature(plan.savingsSignature, equals: savingsSignature)
+        #expect(plan.forceWidgetRefresh == false)
+        #expect(plan.forceSavingsRefresh)
+    }
+
+    @Test func workspaceCountChanged_forcesRefreshButCollapsesIdenticalPendingWork() {
+        var coordinator = ContentViewResumeCoordinator()
+        let plan = ContentViewDeferredRefreshPlanner.plan(
+            trigger: .workspaceCountChanged,
+            widgetSignature: widgetSignature,
+            savingsSignature: savingsSignature,
+            notificationSignature: notificationSignature,
+            shouldRefreshWidgetsOnForeground: false,
+            shouldRefreshSavingsOnForeground: false
+        )
+
+        let first = coordinator.schedule(
+            widgetSignature: plan.widgetSignature,
+            savingsSignature: plan.savingsSignature,
+            notificationSignature: plan.notificationSignature,
+            forceWidgetRefresh: plan.forceWidgetRefresh,
+            forceSavingsRefresh: plan.forceSavingsRefresh,
+            forceNotificationRefresh: plan.forceNotificationRefresh
+        )
+        let second = coordinator.schedule(
+            widgetSignature: plan.widgetSignature,
+            savingsSignature: plan.savingsSignature,
+            notificationSignature: plan.notificationSignature,
+            forceWidgetRefresh: plan.forceWidgetRefresh,
+            forceSavingsRefresh: plan.forceSavingsRefresh,
+            forceNotificationRefresh: plan.forceNotificationRefresh
+        )
+
+        #expect(first != nil)
+        #expect(second == nil)
+
+        coordinator.markWidgetRefreshCompleted(first!)
+        coordinator.markNotificationRefreshCompleted(first!)
+        coordinator.markSavingsRefreshCompleted(first!)
+
+        let third = coordinator.schedule(
+            widgetSignature: plan.widgetSignature,
+            savingsSignature: plan.savingsSignature,
+            notificationSignature: plan.notificationSignature,
+            forceWidgetRefresh: plan.forceWidgetRefresh,
+            forceSavingsRefresh: plan.forceSavingsRefresh,
+            forceNotificationRefresh: plan.forceNotificationRefresh
+        )
+
+        #expect(third != nil)
+    }
+
+    @MainActor
+    @Test func sceneScopedResumeState_preservesCompletedWorkAcrossReconstruction() {
+        let resumeState = ContentViewResumeState()
+        let plan = ContentViewDeferredRefreshPlan(
+            widgetSignature: widgetSignature,
+            savingsSignature: nil,
+            notificationSignature: nil,
+            forceWidgetRefresh: false,
+            forceSavingsRefresh: false,
+            forceNotificationRefresh: false
+        )
+
+        let first = resumeState.schedule(plan: plan)!
+        resumeState.markWidgetRefreshCompleted(first, now: Date(timeIntervalSince1970: 0))
+
+        let reconstructedContentViewState = resumeState
+        let second = reconstructedContentViewState.schedule(plan: plan)
+        let expectedDayStart = Calendar.current.startOfDay(for: Date(timeIntervalSince1970: 0))
+
+        #expect(second == nil)
+        #expect(reconstructedContentViewState.lastWidgetRefreshDayStart == expectedDayStart)
     }
 }

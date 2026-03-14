@@ -10,9 +10,14 @@ import SwiftData
 
 struct ContentView: View {
     let initialSectionOverride: AppSection?
+    let resumeState: ContentViewResumeState
 
-    init(initialSectionOverride: AppSection? = nil) {
+    init(
+        initialSectionOverride: AppSection? = nil,
+        resumeState: ContentViewResumeState
+    ) {
         self.initialSectionOverride = initialSectionOverride
+        self.resumeState = resumeState
     }
 
     // MARK: - Selection
@@ -68,8 +73,6 @@ struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var notificationService = LocalNotificationService()
-    @State private var resumeCoordinator = ContentViewResumeCoordinator()
-    @State private var deferredResumeTask: Task<Void, Never>? = nil
 
     // MARK: - Body
 
@@ -126,6 +129,7 @@ struct ContentView: View {
             .onAppear {
                 performImmediateResumeWiring()
                 scheduleDeferredResumeRefresh(
+                    trigger: .initialAppear,
                     includesWidgets: true,
                     includesSavings: true,
                     includesNotifications: true
@@ -134,6 +138,7 @@ struct ContentView: View {
             .onChange(of: selectedWorkspaceID) { _, newValue in
                 syncSelectedWorkspaceToWidgetStores(newValue)
                 scheduleDeferredResumeRefresh(
+                    trigger: .workspaceSelectionChanged,
                     includesWidgets: true,
                     includesSavings: true,
                     includesNotifications: true
@@ -142,6 +147,7 @@ struct ContentView: View {
             .onChange(of: defaultBudgetingPeriodRaw) { _, _ in
                 syncGeneralSettingsToWidgets()
                 scheduleDeferredResumeRefresh(
+                    trigger: .settingsChanged,
                     includesWidgets: true,
                     includesSavings: true,
                     includesNotifications: false
@@ -153,6 +159,7 @@ struct ContentView: View {
             .onChange(of: excludeFuturePlannedExpensesFromCalculations) { _, _ in
                 syncGeneralSettingsToWidgets()
                 scheduleDeferredResumeRefresh(
+                    trigger: .settingsChanged,
                     includesWidgets: true,
                     includesSavings: false,
                     includesNotifications: false
@@ -164,6 +171,7 @@ struct ContentView: View {
             .onChange(of: excludeFutureVariableExpensesFromCalculations) { _, _ in
                 syncGeneralSettingsToWidgets()
                 scheduleDeferredResumeRefresh(
+                    trigger: .settingsChanged,
                     includesWidgets: true,
                     includesSavings: false,
                     includesNotifications: false
@@ -173,6 +181,7 @@ struct ContentView: View {
                 if newPhase == .active {
                     performImmediateResumeWiring()
                     scheduleDeferredResumeRefresh(
+                        trigger: .sceneBecameActive,
                         includesWidgets: true,
                         includesSavings: true,
                         includesNotifications: true
@@ -196,6 +205,7 @@ struct ContentView: View {
 
                 performImmediateResumeWiring()
                 scheduleDeferredResumeRefresh(
+                    trigger: .workspaceCountChanged,
                     includesWidgets: true,
                     includesSavings: true,
                     includesNotifications: true
@@ -241,37 +251,53 @@ struct ContentView: View {
 
     @MainActor
     private func scheduleDeferredResumeRefresh(
+        trigger: ContentViewResumeTrigger,
         includesWidgets: Bool,
         includesSavings: Bool,
         includesNotifications: Bool
     ) {
-        let request = resumeCoordinator.schedule(
+        let shouldRefreshWidgetsOnForeground = shouldRefreshWidgetsOnForeground()
+        let shouldRefreshSavingsOnForeground = shouldRefreshSavingsOnForeground()
+
+        let plan = ContentViewDeferredRefreshPlanner.plan(
+            trigger: trigger,
             widgetSignature: includesWidgets ? widgetRefreshSignature : nil,
             savingsSignature: includesSavings ? savingsRefreshSignature : nil,
-            notificationSignature: includesNotifications ? notificationRefreshSignature : nil
+            notificationSignature: includesNotifications ? notificationRefreshSignature : nil,
+            shouldRefreshWidgetsOnForeground: shouldRefreshWidgetsOnForeground,
+            shouldRefreshSavingsOnForeground: shouldRefreshSavingsOnForeground
         )
 
+        traceResume(
+            "schedule trigger=\(trigger.rawValue) " +
+            "widgets=\(plan.widgetSignature != nil) forceWidgets=\(plan.forceWidgetRefresh) " +
+            "savings=\(plan.savingsSignature != nil) forceSavings=\(plan.forceSavingsRefresh) " +
+            "notifications=\(plan.notificationSignature != nil)"
+        )
+
+        let request = resumeState.schedule(plan: plan)
         guard let request else { return }
 
-        deferredResumeTask?.cancel()
-        deferredResumeTask = Task {
+        resumeState.replaceDeferredResumeTask(Task {
             try? await Task.sleep(nanoseconds: ResumeScheduling.initialDelayNanos)
             guard Task.isCancelled == false else { return }
 
-            let shouldContinue = await MainActor.run { resumeCoordinator.isCurrent(request) }
+            let shouldContinue = await MainActor.run { resumeState.coordinator.isCurrent(request) }
             guard shouldContinue else { return }
 
             if request.widgetSignature != nil {
                 await MainActor.run {
                     refreshAllWidgetSnapshotsIfPossible()
-                    resumeCoordinator.markWidgetRefreshCompleted(request)
+                    resumeState.markWidgetRefreshCompleted(request)
+                    traceResume("completed widgets trigger=\(trigger.rawValue)")
                 }
             }
 
             if request.notificationSignature != nil {
                 await syncNotificationSchedulesIfPossible()
                 await MainActor.run {
-                    resumeCoordinator.markNotificationRefreshCompleted(request)
+                    resumeState.markNotificationRefreshCompleted(request)
+                    traceResume("completed notifications trigger=\(trigger.rawValue)")
                 }
             }
 
@@ -280,21 +306,38 @@ struct ContentView: View {
             try? await Task.sleep(nanoseconds: ResumeScheduling.savingsDelayNanos)
             guard Task.isCancelled == false else { return }
 
-            let shouldRunSavings = await MainActor.run { resumeCoordinator.isCurrent(request) }
+            let shouldRunSavings = await MainActor.run { resumeState.coordinator.isCurrent(request) }
             guard shouldRunSavings else { return }
 
             await MainActor.run {
                 runSavingsAutoCaptureIfPossible()
-                resumeCoordinator.markSavingsRefreshCompleted(request)
+                resumeState.markSavingsRefreshCompleted(request)
+                traceResume("completed savings trigger=\(trigger.rawValue)")
             }
-        }
+        })
     }
 
     @MainActor
     private func cancelDeferredResumeRefresh() {
-        deferredResumeTask?.cancel()
-        deferredResumeTask = nil
-        resumeCoordinator.cancelPending()
+        resumeState.cancelPending()
+    }
+
+    @MainActor
+    private func shouldRefreshWidgetsOnForeground(now: Date = .now) -> Bool {
+        guard resumeState.lastWidgetRefreshDayStart != nil else { return true }
+        let todayStart = Calendar.current.startOfDay(for: now)
+        return resumeState.lastWidgetRefreshDayStart != todayStart
+    }
+
+    @MainActor
+    private func shouldRefreshSavingsOnForeground(now: Date = .now) -> Bool {
+        guard let workspace = selectedWorkspace else { return false }
+        return SavingsAccountService.shouldRunForegroundAutoCapture(
+            for: workspace,
+            defaultBudgetingPeriodRaw: defaultBudgetingPeriodRaw,
+            modelContext: modelContext,
+            now: now
+        )
     }
 
     private var widgetRefreshSignature: ContentViewWidgetRefreshSignature? {
@@ -327,6 +370,13 @@ struct ContentView: View {
             reminderHour: reminderHour,
             reminderMinute: reminderMinute
         )
+    }
+
+    private func traceResume(_ message: String) {
+        #if DEBUG
+        guard UserDefaults.standard.bool(forKey: "debug_resumeTraceEnabled") else { return }
+        print("[ResumeTrace] \(message)")
+        #endif
     }
 
     @MainActor

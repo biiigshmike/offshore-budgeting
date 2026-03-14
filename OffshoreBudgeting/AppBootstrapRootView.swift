@@ -7,6 +7,7 @@ struct AppBootstrapRootView: View {
 
     @Binding var modelContainer: ModelContainer
     let initialSectionOverride: AppSection?
+    let resumeState: ContentViewResumeState
 
     @AppStorage("didCompleteOnboarding") private var didCompleteOnboarding: Bool = false
     @AppStorage("onboarding_didChooseDataSource") private var didChooseDataSource: Bool = false
@@ -38,7 +39,10 @@ struct AppBootstrapRootView: View {
                 didChooseDataSource = true
             }
         } else {
-            ContentView(initialSectionOverride: initialSectionOverride)
+            ContentView(
+                initialSectionOverride: initialSectionOverride,
+                resumeState: resumeState
+            )
         }
     }
 }

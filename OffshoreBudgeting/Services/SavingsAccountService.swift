@@ -264,6 +264,39 @@ enum SavingsAccountService {
         try? modelContext.save()
     }
 
+    static func shouldRunForegroundAutoCapture(
+        for workspace: Workspace,
+        defaultBudgetingPeriodRaw: String,
+        modelContext: ModelContext,
+        now: Date = .now
+    ) -> Bool {
+        guard let latestClosedPeriodEnd = latestClosedPeriodEnd(
+            defaultBudgetingPeriodRaw: defaultBudgetingPeriodRaw,
+            now: now
+        ) else {
+            return false
+        }
+
+        guard let account = workspaceSavingsAccounts(for: workspace, modelContext: modelContext).first else {
+            return false
+        }
+
+        guard let autoCaptureThroughDate = account.autoCaptureThroughDate else {
+            return true
+        }
+
+        return autoCaptureThroughDate < latestClosedPeriodEnd
+    }
+
+    static func latestClosedPeriodEnd(
+        defaultBudgetingPeriodRaw: String,
+        now: Date = .now
+    ) -> Date? {
+        let period = BudgetingPeriod(rawValue: defaultBudgetingPeriodRaw) ?? .monthly
+        let currentRange = periodRange(containing: now, period: period)
+        return previousRange(before: currentRange.start, period: period)?.end
+    }
+
     // MARK: - Ledger CRUD
 
     static func addManualAdjustment(

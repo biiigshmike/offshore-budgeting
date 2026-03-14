@@ -41,6 +41,19 @@ struct HomePinnedStoresTests {
         UserDefaults.standard.removeObject(forKey: pinnedWidgetsKey(workspaceID: workspaceID))
     }
 
+    private func itemDescriptor(_ item: HomePinnedItem) -> String {
+        switch item {
+        case .widget(let widget, let size):
+            return "widget:\(widget.rawValue):\(size.rawValue)"
+        case .card(let id, let size):
+            return "card:\(id.uuidString):\(size.rawValue)"
+        }
+    }
+
+    private func descriptors(_ items: [HomePinnedItem]) -> [String] {
+        items.map(itemDescriptor)
+    }
+
     // MARK: - Tests
 
     @Test func pinnedItems_removePinnedCard_removesOnlyThatCard() throws {
@@ -61,9 +74,9 @@ struct HomePinnedStoresTests {
         store.removePinnedCard(id: cardID1)
 
         let loaded = store.load()
-        #expect(loaded.contains(.widget(.income, .small)))
-        #expect(loaded.contains(.card(cardID2, .wide)))
-        #expect(loaded.contains(.card(cardID1, .small)) == false)
+        #expect(descriptors(loaded).contains("widget:\(HomeWidgetID.income.rawValue):\(HomeTileSize.small.rawValue)"))
+        #expect(descriptors(loaded).contains("card:\(cardID2.uuidString):\(HomeTileSize.wide.rawValue)"))
+        #expect(descriptors(loaded).contains("card:\(cardID1.uuidString):\(HomeTileSize.small.rawValue)") == false)
     }
 
     @Test func pinnedCards_removePinnedCardID_removesThatID() throws {
@@ -103,9 +116,9 @@ struct HomePinnedStoresTests {
         )
 
         #expect(
-            pinnedItems == [
-                .widget(.income, .wide),
-                .card(UUID(uuidString: "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA")!, .small)
+            descriptors(pinnedItems) == [
+                "widget:\(HomeWidgetID.income.rawValue):\(HomeTileSize.wide.rawValue)",
+                "card:AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA:\(HomeTileSize.small.rawValue)"
             ]
         )
     }
@@ -129,11 +142,11 @@ struct HomePinnedStoresTests {
         )
 
         #expect(
-            pinnedItems == [
-                .widget(.income, .small),
-                .widget(.whatIf, .small),
-                .card(UUID(uuidString: "11111111-1111-1111-1111-111111111111")!, .small),
-                .card(UUID(uuidString: "22222222-2222-2222-2222-222222222222")!, .small)
+            descriptors(pinnedItems) == [
+                "widget:\(HomeWidgetID.income.rawValue):\(HomeTileSize.small.rawValue)",
+                "widget:\(HomeWidgetID.whatIf.rawValue):\(HomeTileSize.small.rawValue)",
+                "card:11111111-1111-1111-1111-111111111111:\(HomeTileSize.small.rawValue)",
+                "card:22222222-2222-2222-2222-222222222222:\(HomeTileSize.small.rawValue)"
             ]
         )
     }
@@ -156,15 +169,15 @@ struct HomePinnedStoresTests {
         )
 
         #expect(
-            pinnedItems == [
-                .widget(.income, .small),
-                .card(UUID(uuidString: "33333333-3333-3333-3333-333333333333")!, .small),
-                .card(UUID(uuidString: "44444444-4444-4444-4444-444444444444")!, .small)
+            descriptors(pinnedItems) == [
+                "widget:\(HomeWidgetID.income.rawValue):\(HomeTileSize.small.rawValue)",
+                "card:33333333-3333-3333-3333-333333333333:\(HomeTileSize.small.rawValue)",
+                "card:44444444-4444-4444-4444-444444444444:\(HomeTileSize.small.rawValue)"
             ]
         )
     }
 
-    @Test func bootstrapPinnedItems_returnsEmptyOnlyWhenNoSourcesExist() {
+    @Test func bootstrapPinnedItems_returnsDefaultWidgetsWhenNoSourcesExist() {
         let defaults = makeDefaults()
         let workspaceID = UUID()
 
@@ -174,7 +187,16 @@ struct HomePinnedStoresTests {
             defaults: defaults
         )
 
-        #expect(pinnedItems.isEmpty)
+        #expect(
+            descriptors(pinnedItems) == [
+                "widget:\(HomeWidgetID.income.rawValue):\(HomeTileSize.small.rawValue)",
+                "widget:\(HomeWidgetID.savingsOutlook.rawValue):\(HomeTileSize.small.rawValue)",
+                "widget:\(HomeWidgetID.whatIf.rawValue):\(HomeTileSize.small.rawValue)",
+                "widget:\(HomeWidgetID.nextPlannedExpense.rawValue):\(HomeTileSize.small.rawValue)",
+                "widget:\(HomeWidgetID.categorySpotlight.rawValue):\(HomeTileSize.small.rawValue)",
+                "widget:\(HomeWidgetID.spendTrends.rawValue):\(HomeTileSize.small.rawValue)"
+            ]
+        )
     }
 
     @Test func layoutCapabilities_phoneNeverSupportsMultiColumn() throws {

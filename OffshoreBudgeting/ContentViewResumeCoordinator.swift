@@ -6,6 +6,67 @@
 //
 
 import Foundation
+import Combine
+
+enum ContentViewResumeTrigger: String, Equatable {
+    case initialAppear
+    case sceneBecameActive
+    case workspaceSelectionChanged
+    case workspaceCountChanged
+    case settingsChanged
+}
+
+struct ContentViewDeferredRefreshPlan: Equatable {
+    let widgetSignature: ContentViewWidgetRefreshSignature?
+    let savingsSignature: ContentViewSavingsRefreshSignature?
+    let notificationSignature: ContentViewNotificationRefreshSignature?
+    let forceWidgetRefresh: Bool
+    let forceSavingsRefresh: Bool
+    let forceNotificationRefresh: Bool
+}
+
+enum ContentViewDeferredRefreshPlanner {
+    static func plan(
+        trigger: ContentViewResumeTrigger,
+        widgetSignature: ContentViewWidgetRefreshSignature?,
+        savingsSignature: ContentViewSavingsRefreshSignature?,
+        notificationSignature: ContentViewNotificationRefreshSignature?,
+        shouldRefreshWidgetsOnForeground: Bool,
+        shouldRefreshSavingsOnForeground: Bool
+    ) -> ContentViewDeferredRefreshPlan {
+        switch trigger {
+        case .sceneBecameActive:
+            let resolvedWidgetSignature = shouldRefreshWidgetsOnForeground ? widgetSignature : nil
+            let resolvedSavingsSignature = shouldRefreshSavingsOnForeground ? savingsSignature : nil
+            return ContentViewDeferredRefreshPlan(
+                widgetSignature: resolvedWidgetSignature,
+                savingsSignature: resolvedSavingsSignature,
+                notificationSignature: notificationSignature,
+                forceWidgetRefresh: resolvedWidgetSignature != nil,
+                forceSavingsRefresh: resolvedSavingsSignature != nil,
+                forceNotificationRefresh: false
+            )
+        case .workspaceCountChanged:
+            return ContentViewDeferredRefreshPlan(
+                widgetSignature: widgetSignature,
+                savingsSignature: savingsSignature,
+                notificationSignature: notificationSignature,
+                forceWidgetRefresh: widgetSignature != nil,
+                forceSavingsRefresh: savingsSignature != nil,
+                forceNotificationRefresh: notificationSignature != nil
+            )
+        case .initialAppear, .workspaceSelectionChanged, .settingsChanged:
+            return ContentViewDeferredRefreshPlan(
+                widgetSignature: widgetSignature,
+                savingsSignature: savingsSignature,
+                notificationSignature: notificationSignature,
+                forceWidgetRefresh: false,
+                forceSavingsRefresh: false,
+                forceNotificationRefresh: false
+            )
+        }
+    }
+}
 
 struct ContentViewWidgetRefreshSignature: Equatable {
     let workspaceID: UUID
@@ -46,6 +107,54 @@ struct ContentViewDeferredRefreshRequest: Equatable {
     }
 }
 
+@MainActor
+final class ContentViewResumeState: ObservableObject {
+    var coordinator = ContentViewResumeCoordinator()
+    var deferredResumeTask: Task<Void, Never>? = nil
+    var lastWidgetRefreshDayStart: Date? = nil
+
+    func schedule(
+        plan: ContentViewDeferredRefreshPlan
+    ) -> ContentViewDeferredRefreshRequest? {
+        coordinator.schedule(
+            widgetSignature: plan.widgetSignature,
+            savingsSignature: plan.savingsSignature,
+            notificationSignature: plan.notificationSignature,
+            forceWidgetRefresh: plan.forceWidgetRefresh,
+            forceSavingsRefresh: plan.forceSavingsRefresh,
+            forceNotificationRefresh: plan.forceNotificationRefresh
+        )
+    }
+
+    func replaceDeferredResumeTask(_ task: Task<Void, Never>) {
+        deferredResumeTask?.cancel()
+        deferredResumeTask = task
+    }
+
+    func cancelPending() {
+        deferredResumeTask?.cancel()
+        deferredResumeTask = nil
+        coordinator.cancelPending()
+    }
+
+    func markWidgetRefreshCompleted(
+        _ request: ContentViewDeferredRefreshRequest,
+        now: Date = .now,
+        calendar: Calendar = .current
+    ) {
+        lastWidgetRefreshDayStart = calendar.startOfDay(for: now)
+        coordinator.markWidgetRefreshCompleted(request)
+    }
+
+    func markSavingsRefreshCompleted(_ request: ContentViewDeferredRefreshRequest) {
+        coordinator.markSavingsRefreshCompleted(request)
+    }
+
+    func markNotificationRefreshCompleted(_ request: ContentViewDeferredRefreshRequest) {
+        coordinator.markNotificationRefreshCompleted(request)
+    }
+}
+
 struct ContentViewResumeCoordinator {
     private(set) var latestGeneration: Int = 0
     private(set) var pendingRequest: ContentViewDeferredRefreshRequest? = nil
@@ -57,13 +166,28 @@ struct ContentViewResumeCoordinator {
     mutating func schedule(
         widgetSignature: ContentViewWidgetRefreshSignature?,
         savingsSignature: ContentViewSavingsRefreshSignature?,
-        notificationSignature: ContentViewNotificationRefreshSignature?
+        notificationSignature: ContentViewNotificationRefreshSignature?,
+        forceWidgetRefresh: Bool = false,
+        forceSavingsRefresh: Bool = false,
+        forceNotificationRefresh: Bool = false
     ) -> ContentViewDeferredRefreshRequest? {
         let candidate = ContentViewDeferredRefreshRequest(
             generation: latestGeneration + 1,
-            widgetSignature: normalized(widgetSignature, lastCompleted: lastCompletedWidgetSignature),
-            savingsSignature: normalized(savingsSignature, lastCompleted: lastCompletedSavingsSignature),
-            notificationSignature: normalized(notificationSignature, lastCompleted: lastCompletedNotificationSignature)
+            widgetSignature: normalized(
+                widgetSignature,
+                lastCompleted: lastCompletedWidgetSignature,
+                forceRefresh: forceWidgetRefresh
+            ),
+            savingsSignature: normalized(
+                savingsSignature,
+                lastCompleted: lastCompletedSavingsSignature,
+                forceRefresh: forceSavingsRefresh
+            ),
+            notificationSignature: normalized(
+                notificationSignature,
+                lastCompleted: lastCompletedNotificationSignature,
+                forceRefresh: forceNotificationRefresh
+            )
         )
 
         guard candidate.hasWork else { return nil }
@@ -133,8 +257,15 @@ struct ContentViewResumeCoordinator {
         clearPendingIfFinished()
     }
 
-    private func normalized<T: Equatable>(_ signature: T?, lastCompleted: T?) -> T? {
+    private func normalized<T: Equatable>(
+        _ signature: T?,
+        lastCompleted: T?,
+        forceRefresh: Bool
+    ) -> T? {
         guard let signature else { return nil }
+        if forceRefresh {
+            return signature
+        }
         return signature == lastCompleted ? nil : signature
     }
 

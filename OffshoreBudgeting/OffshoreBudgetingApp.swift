@@ -302,6 +302,7 @@ private struct WindowSceneRootView: View {
     let initialSectionOverride: AppSection?
 
     @StateObject private var commandHub: AppCommandHub = Self.makeCommandHub()
+    @StateObject private var resumeState = ContentViewResumeState()
 
     private static func makeCommandHub() -> AppCommandHub {
         #if targetEnvironment(macCatalyst)
@@ -327,7 +328,8 @@ private struct WindowSceneRootView: View {
     var body: some View {
         let root = AppBootstrapRootView(
             modelContainer: $modelContainer,
-            initialSectionOverride: initialSectionOverride
+            initialSectionOverride: initialSectionOverride,
+            resumeState: resumeState
         )
         .environment(\.appCommandHub, commandHub)
         .environment(postBoardingTipsStore)
