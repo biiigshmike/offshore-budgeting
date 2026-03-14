@@ -97,26 +97,20 @@ struct AppCommandHubPolicyTests {
         )
     }
 
-    @Test func windowSceneCommandHubPolicy_staysEnabledOnPhone() {
+    @Test func accountsPhoneSortTargets_mapToExpectedStorageTargets() {
         #expect(
-            WindowSceneCommandHubPolicyResolver.policy(
-                isMacCatalyst: false,
-                isPhone: true
-            ) == .enabled
+            AccountsPhoneSortTarget.target(for: AppCommandID.Cards.sortZA)
+                == .cards("za")
         )
 
         #expect(
-            WindowSceneCommandHubPolicyResolver.policy(
-                isMacCatalyst: false,
-                isPhone: false
-            ) == .enabled
+            AccountsPhoneSortTarget.target(for: AppCommandID.SharedBalances.sortAmountDesc)
+                == .sharedBalances("amountDesc")
         )
 
         #expect(
-            WindowSceneCommandHubPolicyResolver.policy(
-                isMacCatalyst: true,
-                isPhone: false
-            ) == .enabled
+            AccountsPhoneSortTarget.target(for: AppCommandID.Savings.sortDateAsc)
+                == .savings(SavingsLedgerSortMode.dateAsc.rawValue)
         )
     }
 }

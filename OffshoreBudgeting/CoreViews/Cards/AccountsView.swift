@@ -66,6 +66,10 @@ struct AccountsView: View {
         #endif
     }
 
+    private var shouldSyncCommandSurface: Bool {
+        isPhone == false
+    }
+
     // MARK: - View
 
     var body: some View {
@@ -133,13 +137,15 @@ struct AccountsView: View {
             updateCommandSurface()
         }
         .onDisappear {
-            switch selectedSegment.commandConfiguration.surface {
-            case .cards:
-                commandHub.deactivate(.cards)
-            case .savings:
-                commandHub.deactivate(.savings)
-            default:
-                break
+            if shouldSyncCommandSurface {
+                switch selectedSegment.commandConfiguration.surface {
+                case .cards:
+                    commandHub.deactivate(.cards)
+                case .savings:
+                    commandHub.deactivate(.savings)
+                default:
+                    break
+                }
             }
         }
     }
@@ -147,6 +153,8 @@ struct AccountsView: View {
     // MARK: - Commands
 
     private func updateCommandSurface() {
+        guard shouldSyncCommandSurface else { return }
+
         let configuration = selectedSegment.commandConfiguration
 
         commandHub.activate(configuration.surface)
@@ -299,7 +307,7 @@ struct AccountsView: View {
 
     private func sortMenuButton(title: String, isSelected: Bool, commandID: String) -> some View {
         Button {
-            commandHub.dispatch(commandID)
+            handleSortSelection(commandID)
         } label: {
             HStack {
                 Text(title)
@@ -308,6 +316,26 @@ struct AccountsView: View {
                     Image(systemName: "checkmark")
                 }
             }
+        }
+    }
+
+    private func handleSortSelection(_ commandID: String) {
+        if isPhone, let phoneSortTarget = AccountsPhoneSortTarget.target(for: commandID) {
+            applyPhoneSort(phoneSortTarget)
+            return
+        }
+
+        commandHub.dispatch(commandID)
+    }
+
+    private func applyPhoneSort(_ target: AccountsPhoneSortTarget) {
+        switch target {
+        case .cards(let mode):
+            cardsSortModeRaw = mode
+        case .sharedBalances(let mode):
+            sharedBalancesSortModeRaw = mode
+        case .savings(let mode):
+            savingsSortModeRaw = mode
         }
     }
 
@@ -330,6 +358,43 @@ struct AccountsView: View {
 struct AccountsSegmentCommandConfiguration: Equatable {
     let surface: AppCommandSurface
     let cardsSortContext: AppCardsSortCommandContext?
+}
+
+enum AccountsPhoneSortTarget: Equatable {
+    case cards(String)
+    case sharedBalances(String)
+    case savings(String)
+
+    static func target(for commandID: String) -> AccountsPhoneSortTarget? {
+        switch commandID {
+        case AppCommandID.Cards.sortAZ:
+            return .cards("az")
+        case AppCommandID.Cards.sortZA:
+            return .cards("za")
+        case AppCommandID.SharedBalances.sortAZ:
+            return .sharedBalances("az")
+        case AppCommandID.SharedBalances.sortZA:
+            return .sharedBalances("za")
+        case AppCommandID.SharedBalances.sortAmountAsc:
+            return .sharedBalances("amountAsc")
+        case AppCommandID.SharedBalances.sortAmountDesc:
+            return .sharedBalances("amountDesc")
+        case AppCommandID.Savings.sortAZ:
+            return .savings(SavingsLedgerSortMode.az.rawValue)
+        case AppCommandID.Savings.sortZA:
+            return .savings(SavingsLedgerSortMode.za.rawValue)
+        case AppCommandID.Savings.sortAmountAsc:
+            return .savings(SavingsLedgerSortMode.amountAsc.rawValue)
+        case AppCommandID.Savings.sortAmountDesc:
+            return .savings(SavingsLedgerSortMode.amountDesc.rawValue)
+        case AppCommandID.Savings.sortDateAsc:
+            return .savings(SavingsLedgerSortMode.dateAsc.rawValue)
+        case AppCommandID.Savings.sortDateDesc:
+            return .savings(SavingsLedgerSortMode.dateDesc.rawValue)
+        default:
+            return nil
+        }
+    }
 }
 
 extension AccountsView.Segment {
