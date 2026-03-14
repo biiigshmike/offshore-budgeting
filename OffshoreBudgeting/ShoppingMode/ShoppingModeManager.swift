@@ -337,15 +337,8 @@ enum ShoppingModeMerchantCatalog {
 enum ShoppingModeTuning {
     static let maxMonitoredRegions = 20
     static let localSearchRadiusMeters: Double = 2_500
-    static let refreshDistanceMeters: Double = 250
-    static let minimumRefreshIntervalSeconds: TimeInterval = 120
-    static let poiRetryIntervalSeconds: TimeInterval = 60
-    static let maxPOIRetryAttempts = 3
-    static let startupInsideCollectionWindowSeconds: TimeInterval = 1
     static let startupRouteSelectionMaxCandidates = 5
     static let startupRouteLookupTimeoutSeconds: TimeInterval = 2
     static let startupRouteOutlierCrowMultiplier: Double = 4
     static let startupRouteOutlierExtraMeters: Double = 300
-    static let globalNotificationCooldownSeconds: TimeInterval = 10 * 60
-    static let perMerchantNotificationCooldownSeconds: TimeInterval = 15 * 60
 }

@@ -39,6 +39,9 @@ struct AppCommandHubPolicyTests {
         #expect(hub.activeSectionRaw == AppSection.settings.rawValue)
 
         hub.deactivate(.budgetDetail)
+        #expect(hub.surface == .savings)
+
+        hub.deactivate(.savings)
         #expect(hub.surface == .none)
     }
 

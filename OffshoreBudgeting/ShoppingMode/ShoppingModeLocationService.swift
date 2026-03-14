@@ -25,45 +25,59 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
         case retry
     }
 
-    private struct StartupRouteScore {
-        enum RouteStatus {
-            case valid
-            case unavailable
-            case rejectedOutlier
-        }
+    private enum LocationRequestPurpose: Equatable {
+        case refresh(RefreshTrigger)
+        case startupConfirmation
+        case regionConfirmation(merchantID: String)
+    }
 
+    private struct PersistedMerchantPayload: Codable {
+        let id: String
+        let name: String
+        let latitude: Double
+        let longitude: Double
+        let radiusMeters: Double
+        let categoryHint: String
+    }
+
+    private struct StartupConfirmationState {
+        let startedAt: Date
+        var samplesCollected: Int
+        var topMerchantID: String?
+        var firstTopMerchantAt: Date?
+        var consecutiveMatches: Int
+    }
+
+    private struct StartupRouteScore {
         let merchant: ShoppingModeMerchant
-        let crowDistanceMeters: CLLocationDistance
-        let walkingETASeconds: TimeInterval?
-        let walkingDistanceMeters: CLLocationDistance?
-        let routeStatus: RouteStatus
+        let routeMetrics: ExcursionCandidateScorer.RouteMetrics
     }
 
     private let locationManager = CLLocationManager()
     private let poiResolver = ShoppingModePOIResolver()
-    private var requestedAlwaysUpgrade = false
-    private var pendingLocationRefresh = false
-    private var locationWaitTask: Task<Void, Never>? = nil
-    private var poiRetryTask: Task<Void, Never>? = nil
-    private var cachedAuthorizationStatus: CLAuthorizationStatus = .notDetermined
-    private var monitoredMerchantsByRegionID: [String: ShoppingModeMerchant] = [:]
-    private var pendingPOIRetryAttempts = 0
-    private var startupInsideCandidatesByRegionID: [String: ShoppingModeMerchant] = [:]
-    private var startupInsideCollectionTask: Task<Void, Never>? = nil
-    private var isCollectingStartupInsideStates = false
+    private let detectionPolicy = ExcursionDetectionPolicy()
+    private let candidateScorer = ExcursionCandidateScorer()
     private let defaults = UserDefaults.standard
 
-    private let desiredStartupAccuracyMeters: CLLocationAccuracy = 120
-    private let maxStartupLocationWaitSeconds: UInt64 = 20
-
-    private var lastRefreshLocation: CLLocation? = nil
-    private var lastRefreshDate: Date? = nil
+    private var requestedAlwaysUpgrade = false
+    private var cachedAuthorizationStatus: CLAuthorizationStatus = .notDetermined
+    private var monitoredMerchantsByRegionID: [String: ShoppingModeMerchant] = [:]
+    private var currentInsideRegionIDs: Set<String> = []
+    private var lastRefreshLocation: CLLocation?
+    private var lastRefreshDate: Date?
+    private var lastKnownLocation: CLLocation?
+    private var lastKnownLocationDate: Date?
+    private var pendingPOIRetryAttempts = 0
+    private var poiRetryTask: Task<Void, Never>?
+    private var locationWaitTask: Task<Void, Never>?
+    private var activeLocationRequest: LocationRequestPurpose?
+    private var startupConfirmationState: StartupConfirmationState?
 
     private override init() {
         super.init()
         locationManager.delegate = self
         locationManager.desiredAccuracy = kCLLocationAccuracyHundredMeters
-        locationManager.distanceFilter = 100
+        locationManager.distanceFilter = kCLDistanceFilterNone
         cachedAuthorizationStatus = locationManager.authorizationStatus
         monitoredMerchantsByRegionID = loadPersistedMerchants()
         debugLog("Loaded persisted monitored merchants: \(monitoredMerchantsByRegionID.count)")
@@ -101,6 +115,7 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
         let status = locationManager.authorizationStatus
         cachedAuthorizationStatus = status
         debugLog("Starting monitoring flow with authorization status: \(status.rawValue)")
+
         switch status {
         case .notDetermined:
             requestAuthorizationForExcursionMode()
@@ -116,7 +131,7 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
         case .authorizedAlways:
             requestedAlwaysUpgrade = false
             setBackgroundLocationUpdatesEnabled(true)
-            locationManager.startUpdatingLocation()
+            locationManager.startMonitoringSignificantLocationChanges()
             debugLog("Authorized Always. Refreshing nearby monitored merchants")
             refreshNearbyMonitoredMerchants(trigger: .startup)
         case .restricted, .denied:
@@ -130,24 +145,21 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
 
     func stopMonitoringAllRegions() {
         debugLog("Stopping all monitored regions: \(locationManager.monitoredRegions.count)")
-        for region in locationManager.monitoredRegions {
-            locationManager.stopMonitoring(for: region)
-        }
+        stopMonitoredRegionsOnly()
+        currentInsideRegionIDs = []
         setBackgroundLocationUpdatesEnabled(false)
-        locationManager.stopUpdatingLocation()
+        locationManager.stopMonitoringSignificantLocationChanges()
         locationWaitTask?.cancel()
         locationWaitTask = nil
         poiRetryTask?.cancel()
         poiRetryTask = nil
-        pendingLocationRefresh = false
+        activeLocationRequest = nil
+        startupConfirmationState = nil
         pendingPOIRetryAttempts = 0
         lastRefreshLocation = nil
         lastRefreshDate = nil
-        monitoredMerchantsByRegionID = [:]
-        startupInsideCandidatesByRegionID = [:]
-        startupInsideCollectionTask?.cancel()
-        startupInsideCollectionTask = nil
-        isCollectingStartupInsideStates = false
+        lastKnownLocation = nil
+        lastKnownLocationDate = nil
         persistMerchants([:])
     }
 
@@ -156,57 +168,69 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
         return cachedAuthorizationStatus
     }
 
+    private func stopMonitoredRegionsOnly() {
+        for region in locationManager.monitoredRegions {
+            locationManager.stopMonitoring(for: region)
+        }
+        monitoredMerchantsByRegionID = [:]
+    }
+
     private func refreshNearbyMonitoredMerchants(trigger: RefreshTrigger) {
-        if let location = locationManager.location, hasGoodAccuracy(location) {
-            let currentCoordinate = location.coordinate
-            debugLog("Using current location for \(trigger.rawValue) refresh: \(currentCoordinate.latitude), \(currentCoordinate.longitude)")
-            Task {
-                await monitorNearbyMerchants(around: currentCoordinate, trigger: trigger)
-            }
-            return
+        cancelStartupConfirmationIfNeeded()
+        beginLocationRequest(for: .refresh(trigger))
+    }
+
+    private func beginLocationRequest(for purpose: LocationRequestPurpose) {
+        activeLocationRequest = purpose
+        locationWaitTask?.cancel()
+        let timeoutNanoseconds = UInt64(detectionPolicy.startupLocationWindowSeconds * 1_000_000_000)
+        locationWaitTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: timeoutNanoseconds)
+            await self?.handleLocationWaitTimeout(for: purpose)
         }
 
-        pendingLocationRefresh = true
-        debugLog("Current location unavailable for \(trigger.rawValue). Requesting one-shot location update")
-        scheduleLocationWaitTimeout()
+        debugLog("Requesting location for purpose: \(purpose)")
         locationManager.requestLocation()
     }
 
-    private func monitorNearbyMerchants(around center: CLLocationCoordinate2D, trigger: RefreshTrigger) async {
+    private func monitorNearbyMerchants(
+        around location: CLLocation,
+        trigger: RefreshTrigger
+    ) async {
+        let center = location.coordinate
         let discovered = await poiResolver.discoverNearbyMerchants(
             around: center,
             searchRadiusMeters: ShoppingModeMerchantCatalog.searchRadiusMeters,
             maxResults: ShoppingModeMerchantCatalog.maxMonitoredRegions
         )
-        debugLog("Discovered nearby MapKit POIs: \(discovered.count) [trigger=\(trigger.rawValue)]")
+
+        debugLog(
+            "Discovered nearby MapKit POIs: \(discovered.count) [trigger=\(trigger.rawValue)] accuracy=\(Int(location.horizontalAccuracy))m"
+        )
         for merchant in discovered.prefix(10) {
             debugLog("POI -> \(merchant.name) @ \(merchant.latitude), \(merchant.longitude) radius=\(merchant.radiusMeters)")
         }
 
-        let merchantsToMonitor: [ShoppingModeMerchant]
-        if discovered.isEmpty {
+        guard discovered.isEmpty == false else {
             debugLog("No POIs discovered for \(trigger.rawValue) refresh")
             schedulePOIRetryIfNeeded(reason: "No nearby POIs discovered")
-            lastRefreshLocation = CLLocation(latitude: center.latitude, longitude: center.longitude)
-            lastRefreshDate = .now
+            recordRefreshBaseline(using: location)
             return
-        } else {
-            merchantsToMonitor = Array(discovered.prefix(ShoppingModeMerchantCatalog.maxMonitoredRegions))
-            pendingPOIRetryAttempts = 0
-            poiRetryTask?.cancel()
-            poiRetryTask = nil
         }
 
+        pendingPOIRetryAttempts = 0
+        poiRetryTask?.cancel()
+        poiRetryTask = nil
+
+        let merchantsToMonitor = Array(discovered.prefix(ShoppingModeMerchantCatalog.maxMonitoredRegions))
         applyMonitoredMerchants(merchantsToMonitor, trigger: trigger)
-        lastRefreshLocation = CLLocation(latitude: center.latitude, longitude: center.longitude)
-        lastRefreshDate = .now
+        recordRefreshBaseline(using: location)
     }
 
     private func applyMonitoredMerchants(_ merchants: [ShoppingModeMerchant], trigger: RefreshTrigger) {
-        stopMonitoringAllRegions()
+        stopMonitoredRegionsOnly()
+        currentInsideRegionIDs = []
         debugLog("Applying monitored merchants count: \(merchants.count)")
-
-        startStartupInsideCollectionIfNeeded(trigger: trigger)
 
         var map: [String: ShoppingModeMerchant] = [:]
         for merchant in merchants {
@@ -220,47 +244,37 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
             region.notifyOnExit = false
             locationManager.startMonitoring(for: region)
             locationManager.requestState(for: region)
-            debugLog("Monitoring region -> \(merchant.name) id=\(regionID) radius=\(merchant.radiusMeters)")
+            debugLog("Monitoring region -> \(merchant.name) id=\(regionID) radius=\(Int(merchant.radiusMeters))")
             map[regionID] = merchant
         }
 
         monitoredMerchantsByRegionID = map
         persistMerchants(map)
-        if SpendingSessionStore.isActive() {
-            setBackgroundLocationUpdatesEnabled(true)
-            locationManager.startUpdatingLocation()
+
+        if trigger == .startup {
+            startStartupConfirmation()
         }
     }
 
-    private func regionIdentifier(for merchant: ShoppingModeMerchant) -> String {
-        "shopping_mode.\(merchant.id)"
+    private func startStartupConfirmation() {
+        startupConfirmationState = StartupConfirmationState(
+            startedAt: .now,
+            samplesCollected: 0,
+            topMerchantID: nil,
+            firstTopMerchantAt: nil,
+            consecutiveMatches: 0
+        )
+        debugLog("Starting startup confirmation window")
+        beginLocationRequest(for: .startupConfirmation)
     }
 
-    private func persistMerchants(_ merchants: [String: ShoppingModeMerchant]) {
-        let payload = merchants.reduce(into: [String: String]()) { result, entry in
-            result[entry.key] = "\(entry.value.id)||\(entry.value.name)"
+    private func cancelStartupConfirmationIfNeeded() {
+        startupConfirmationState = nil
+        if activeLocationRequest == .startupConfirmation {
+            activeLocationRequest = nil
+            locationWaitTask?.cancel()
+            locationWaitTask = nil
         }
-        defaults.set(payload, forKey: Key.monitoredMerchantPayloads)
-    }
-
-    private func loadPersistedMerchants() -> [String: ShoppingModeMerchant] {
-        let payload = (defaults.dictionary(forKey: Key.monitoredMerchantPayloads) as? [String: String]) ?? [:]
-        var restored: [String: ShoppingModeMerchant] = [:]
-
-        for (regionID, raw) in payload {
-            let parts = raw.components(separatedBy: "||")
-            guard parts.count == 2 else { continue }
-            restored[regionID] = ShoppingModeMerchant(
-                id: parts[0],
-                name: parts[1],
-                latitude: 0,
-                longitude: 0,
-                radiusMeters: 120,
-                categoryHint: "Shopping"
-            )
-        }
-
-        return restored
     }
 
     private func maybeRefreshMonitoredMerchantsForMovement(_ location: CLLocation, now: Date = .now) {
@@ -275,22 +289,272 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
             return
         }
 
+        let threshold = detectionPolicy.movementRefreshThreshold(for: max(0, location.speed))
         let elapsed = now.timeIntervalSince(lastRefreshDate)
-        if elapsed < ShoppingModeTuning.minimumRefreshIntervalSeconds {
-            debugLog("Movement refresh skipped: interval \(Int(elapsed))s < \(Int(ShoppingModeTuning.minimumRefreshIntervalSeconds))s")
-            return
-        }
-
         let movedMeters = location.distance(from: previousLocation)
-        if movedMeters < ShoppingModeTuning.refreshDistanceMeters {
-            debugLog("Movement refresh skipped: moved \(Int(movedMeters))m < \(Int(ShoppingModeTuning.refreshDistanceMeters))m")
+
+        guard detectionPolicy.shouldRefreshMovement(
+            previousLocation: previousLocation,
+            previousDate: lastRefreshDate,
+            newLocation: location,
+            now: now
+        ) else {
+            debugLog(
+                "Movement refresh skipped: moved \(Int(movedMeters))m in \(Int(elapsed))s; threshold=\(Int(threshold.distanceMeters))m/\(Int(threshold.minimumElapsedSeconds))s"
+            )
             return
         }
 
-        debugLog("Movement refresh triggered: moved \(Int(movedMeters))m in \(Int(elapsed))s")
+        debugLog(
+            "Movement refresh triggered: moved \(Int(movedMeters))m in \(Int(elapsed))s at speed=\(Int(max(0, location.speed)))m/s"
+        )
         Task {
-            await monitorNearbyMerchants(around: location.coordinate, trigger: .distance)
+            await monitorNearbyMerchants(around: location, trigger: .distance)
         }
+    }
+
+    private func recordRefreshBaseline(using location: CLLocation, now: Date = .now) {
+        lastRefreshLocation = location
+        lastRefreshDate = now
+    }
+
+    private func regionIdentifier(for merchant: ShoppingModeMerchant) -> String {
+        candidateScorer.regionIdentifier(for: merchant)
+    }
+
+    private func persistMerchants(_ merchants: [String: ShoppingModeMerchant]) {
+        let payload = merchants.reduce(into: [String: PersistedMerchantPayload]()) { result, entry in
+            result[entry.key] = PersistedMerchantPayload(
+                id: entry.value.id,
+                name: entry.value.name,
+                latitude: entry.value.latitude,
+                longitude: entry.value.longitude,
+                radiusMeters: entry.value.radiusMeters,
+                categoryHint: entry.value.categoryHint
+            )
+        }
+
+        if let encoded = try? JSONEncoder().encode(payload) {
+            defaults.set(encoded, forKey: Key.monitoredMerchantPayloads)
+        }
+    }
+
+    private func loadPersistedMerchants() -> [String: ShoppingModeMerchant] {
+        guard let encoded = defaults.data(forKey: Key.monitoredMerchantPayloads),
+              let payload = try? JSONDecoder().decode([String: PersistedMerchantPayload].self, from: encoded) else {
+            return [:]
+        }
+
+        return payload.reduce(into: [String: ShoppingModeMerchant]()) { result, entry in
+            result[entry.key] = ShoppingModeMerchant(
+                id: entry.value.id,
+                name: entry.value.name,
+                latitude: entry.value.latitude,
+                longitude: entry.value.longitude,
+                radiusMeters: entry.value.radiusMeters,
+                categoryHint: entry.value.categoryHint
+            )
+        }
+    }
+
+    private func handleLocationWaitTimeout(for purpose: LocationRequestPurpose) async {
+        guard activeLocationRequest == purpose else { return }
+        locationWaitTask = nil
+
+        switch purpose {
+        case .refresh(let trigger):
+            activeLocationRequest = nil
+            if let lastKnownLocation {
+                debugLog(
+                    "Location wait timeout reached. Proceeding with best available fix for \(trigger.rawValue): accuracy=\(Int(lastKnownLocation.horizontalAccuracy))m"
+                )
+                await monitorNearbyMerchants(around: lastKnownLocation, trigger: trigger)
+            } else {
+                debugLog("Location wait timeout reached with no fix for \(trigger.rawValue)")
+                schedulePOIRetryIfNeeded(reason: "Location wait timeout")
+            }
+        case .startupConfirmation:
+            activeLocationRequest = nil
+            debugLog("Startup confirmation timed out before a qualifying fix arrived")
+            startupConfirmationState = nil
+        case .regionConfirmation(let merchantID):
+            activeLocationRequest = nil
+            debugLog("Region confirmation timed out for merchant id=\(merchantID)")
+        }
+    }
+
+    private func schedulePOIRetryIfNeeded(reason: String) {
+        guard SpendingSessionStore.isActive() else { return }
+        let nextAttempt = pendingPOIRetryAttempts + 1
+        guard let delay = detectionPolicy.retryDelay(forAttempt: nextAttempt) else {
+            debugLog("POI retry skipped: no more attempts [reason=\(reason)]")
+            return
+        }
+
+        pendingPOIRetryAttempts = nextAttempt
+        poiRetryTask?.cancel()
+        debugLog("Scheduling POI retry attempt \(nextAttempt) in \(Int(delay))s [reason=\(reason)]")
+
+        poiRetryTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            await self?.performPOIRetry(attempt: nextAttempt)
+        }
+    }
+
+    private func performPOIRetry(attempt: Int) async {
+        guard SpendingSessionStore.isActive() else { return }
+        guard attempt == pendingPOIRetryAttempts else { return }
+        debugLog("Executing POI retry attempt \(attempt)")
+        refreshNearbyMonitoredMerchants(trigger: .retry)
+    }
+
+    private func isRecentHighConfidenceFix(_ location: CLLocation, now: Date = .now) -> Bool {
+        detectionPolicy.hasRecentHighConfidenceFix(
+            timestamp: lastKnownLocationDate,
+            accuracyMeters: location.horizontalAccuracy,
+            now: now
+        )
+    }
+
+    private func isTopRankedCandidate(_ merchant: ShoppingModeMerchant, for location: CLLocation) -> Bool {
+        let topCandidate = candidateScorer.topCandidate(
+            merchants: Array(monitoredMerchantsByRegionID.values),
+            referenceLocation: location,
+            insideRegionIDs: currentInsideRegionIDs
+        )
+        let isTop = topCandidate?.merchant.id == merchant.id
+        if let topCandidate {
+            debugLog(
+                "Top candidate at fix -> \(topCandidate.merchant.name) inside=\(topCandidate.isInsideRegion) distance=\(Int(topCandidate.distanceMeters))m"
+            )
+        }
+        return isTop
+    }
+
+    private func processStartupConfirmationSample(_ location: CLLocation) async {
+        guard var state = startupConfirmationState else { return }
+
+        state.samplesCollected += 1
+        let rankedCandidates = await rankedStartupCandidates(for: location)
+        guard let topCandidate = rankedCandidates.first else {
+            debugLog("Startup confirmation sample had no ranked candidates")
+            startupConfirmationState = state
+            await requestAdditionalStartupSampleIfNeeded(state: state)
+            return
+        }
+
+        let now = Date.now
+        if state.topMerchantID == topCandidate.merchant.id {
+            state.consecutiveMatches += 1
+        } else {
+            state.topMerchantID = topCandidate.merchant.id
+            state.firstTopMerchantAt = now
+            state.consecutiveMatches = 1
+        }
+
+        let stableDuration = now.timeIntervalSince(state.firstTopMerchantAt ?? now)
+        startupConfirmationState = state
+
+        debugLog(
+            "Startup candidate -> \(topCandidate.merchant.name) inside=\(topCandidate.isInsideRegion) distance=\(Int(topCandidate.distanceMeters))m accuracy=\(Int(location.horizontalAccuracy))m stable=\(Int(stableDuration))s consecutive=\(state.consecutiveMatches)"
+        )
+
+        if detectionPolicy.acceptsStartupCandidate(
+            accuracyMeters: location.horizontalAccuracy,
+            stableDuration: stableDuration,
+            consecutiveMatches: state.consecutiveMatches
+        ) {
+            let didSend = ShoppingModeSuggestionService.shared.sendStartupNudge(
+                merchant: topCandidate.merchant,
+                sessionID: SpendingSessionStore.sessionID(),
+                currentLocation: location
+            )
+
+            if didSend {
+                debugLog("Startup confirmation accepted for merchant: \(topCandidate.merchant.name)")
+            } else {
+                debugLog("Startup confirmation passed but notification was blocked by cooldown/session guards")
+            }
+            startupConfirmationState = nil
+            return
+        }
+
+        if location.horizontalAccuracy <= detectionPolicy.startupDesiredAccuracyMeters {
+            debugLog("Startup candidate rejected: waiting for more stability")
+        } else {
+            debugLog("Startup candidate rejected: accuracy \(Int(location.horizontalAccuracy))m exceeds \(Int(detectionPolicy.startupDesiredAccuracyMeters))m")
+        }
+
+        await requestAdditionalStartupSampleIfNeeded(state: state)
+    }
+
+    private func requestAdditionalStartupSampleIfNeeded(state: StartupConfirmationState) async {
+        guard detectionPolicy.shouldContinueStartupSampling(
+            startedAt: state.startedAt,
+            samplesCollected: state.samplesCollected
+        ) else {
+            debugLog("Startup confirmation ended without a qualifying candidate")
+            startupConfirmationState = nil
+            return
+        }
+
+        beginLocationRequest(for: .startupConfirmation)
+    }
+
+    private func rankedStartupCandidates(for location: CLLocation) async -> [ExcursionCandidateScorer.ScoredCandidate] {
+        let merchants = Array(monitoredMerchantsByRegionID.values)
+        guard merchants.isEmpty == false else { return [] }
+
+        let shortlist = merchants.sorted {
+            let lhs = CLLocation(latitude: $0.latitude, longitude: $0.longitude)
+            let rhs = CLLocation(latitude: $1.latitude, longitude: $1.longitude)
+            return location.distance(from: lhs) < location.distance(from: rhs)
+        }
+        .prefix(ShoppingModeTuning.startupRouteSelectionMaxCandidates)
+
+        let routeMetrics = await startupRouteMetrics(
+            merchants: Array(shortlist),
+            from: location.coordinate
+        )
+
+        let ranked = candidateScorer.rankedCandidates(
+            merchants: merchants,
+            referenceLocation: location,
+            insideRegionIDs: currentInsideRegionIDs,
+            routeMetrics: routeMetrics
+        )
+
+        for candidate in ranked.prefix(5) {
+            debugLog(
+                "Startup rank -> \(candidate.merchant.name) inside=\(candidate.isInsideRegion) distance=\(Int(candidate.distanceMeters))m route=\(Int(candidate.routeDistanceMeters ?? -1))"
+            )
+        }
+
+        return ranked
+    }
+
+    private func processRegionConfirmationSample(location: CLLocation, merchantID: String) {
+        guard let merchant = monitoredMerchantsByRegionID.values.first(where: { $0.id == merchantID })
+            ?? loadPersistedMerchants().values.first(where: { $0.id == merchantID }) else {
+            debugLog("Region confirmation dropped: merchant not found id=\(merchantID)")
+            return
+        }
+
+        guard location.horizontalAccuracy > 0,
+              location.horizontalAccuracy <= detectionPolicy.recentFixDesiredAccuracyMeters else {
+            debugLog("Region confirmation rejected for \(merchant.name): poor accuracy \(Int(location.horizontalAccuracy))m")
+            return
+        }
+
+        guard isTopRankedCandidate(merchant, for: location) else {
+            debugLog("Region confirmation rejected for \(merchant.name): candidate is no longer top-ranked")
+            return
+        }
+
+        ShoppingModeSuggestionService.shared.handleRegionEntry(
+            merchant: merchant,
+            currentLocation: location
+        )
     }
 
     // MARK: - CLLocationManagerDelegate
@@ -324,47 +588,90 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
             return
         }
 
-        debugLog("Received location update: \(latest.coordinate.latitude), \(latest.coordinate.longitude) accuracy=\(latest.horizontalAccuracy)")
+        lastKnownLocation = latest
+        lastKnownLocationDate = .now
+        debugLog(
+            "Received location update: \(latest.coordinate.latitude), \(latest.coordinate.longitude) accuracy=\(Int(latest.horizontalAccuracy))m speed=\(Int(max(0, latest.speed)))m/s"
+        )
 
-        if pendingLocationRefresh {
-            pendingLocationRefresh = false
-            locationWaitTask?.cancel()
-            locationWaitTask = nil
-
-            Task {
-                await monitorNearbyMerchants(around: latest.coordinate, trigger: .startup)
-            }
+        guard let requestPurpose = activeLocationRequest else {
+            maybeRefreshMonitoredMerchantsForMovement(latest)
             return
         }
 
-        maybeRefreshMonitoredMerchantsForMovement(latest)
+        activeLocationRequest = nil
+        locationWaitTask?.cancel()
+        locationWaitTask = nil
+
+        switch requestPurpose {
+        case .refresh(let trigger):
+            Task {
+                await monitorNearbyMerchants(around: latest, trigger: trigger)
+            }
+        case .startupConfirmation:
+            Task {
+                await processStartupConfirmationSample(latest)
+            }
+        case .regionConfirmation(let merchantID):
+            processRegionConfirmationSample(location: latest, merchantID: merchantID)
+        }
     }
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        guard pendingLocationRefresh else { return }
-        pendingLocationRefresh = false
+        guard let purpose = activeLocationRequest else { return }
+        activeLocationRequest = nil
         locationWaitTask?.cancel()
         locationWaitTask = nil
-        debugLog("Location update failed: \(error.localizedDescription)")
-        schedulePOIRetryIfNeeded(reason: "Location update failed")
+        debugLog("Location update failed for \(purpose): \(error.localizedDescription)")
+
+        switch purpose {
+        case .refresh:
+            schedulePOIRetryIfNeeded(reason: "Location update failed")
+        case .startupConfirmation:
+            startupConfirmationState = nil
+        case .regionConfirmation:
+            break
+        }
     }
 
     func locationManager(_ manager: CLLocationManager, didEnterRegion region: CLRegion) {
         guard SpendingSessionStore.isActive() else { return }
+        currentInsideRegionIDs.insert(region.identifier)
+
         guard let merchant = monitoredMerchantsByRegionID[region.identifier] ?? loadPersistedMerchants()[region.identifier] else { return }
         debugLog("Entered monitored region: \(region.identifier) merchant=\(merchant.name)")
 
-        ShoppingModeSuggestionService.shared.handleRegionEntry(merchant: merchant)
+        if let lastKnownLocation,
+           isRecentHighConfidenceFix(lastKnownLocation),
+           isTopRankedCandidate(merchant, for: lastKnownLocation) {
+            debugLog("Region entry notified immediately for \(merchant.name) using recent high-confidence fix")
+            ShoppingModeSuggestionService.shared.handleRegionEntry(
+                merchant: merchant,
+                currentLocation: lastKnownLocation
+            )
+            return
+        }
+
+        debugLog("Region entry requires confirmation fix for \(merchant.name)")
+        beginLocationRequest(for: .regionConfirmation(merchantID: merchant.id))
     }
 
     func locationManager(_ manager: CLLocationManager, didDetermineState state: CLRegionState, for region: CLRegion) {
         guard SpendingSessionStore.isActive() else { return }
-        guard state == .inside else { return }
-        guard let merchant = monitoredMerchantsByRegionID[region.identifier] ?? loadPersistedMerchants()[region.identifier] else { return }
 
-        guard isCollectingStartupInsideStates else { return }
-        startupInsideCandidatesByRegionID[region.identifier] = merchant
-        debugLog("Startup inside candidate captured: \(merchant.name) [region=\(region.identifier)]")
+        switch state {
+        case .inside:
+            currentInsideRegionIDs.insert(region.identifier)
+        case .outside:
+            currentInsideRegionIDs.remove(region.identifier)
+        case .unknown:
+            break
+        }
+
+        if state == .inside,
+           let merchant = monitoredMerchantsByRegionID[region.identifier] ?? loadPersistedMerchants()[region.identifier] {
+            debugLog("Region state inside: \(merchant.name) [region=\(region.identifier)]")
+        }
     }
 
     private func debugLog(_ message: String) {
@@ -379,274 +686,73 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
         #endif
     }
 
-    private func hasGoodAccuracy(_ location: CLLocation) -> Bool {
-        location.horizontalAccuracy > 0 && location.horizontalAccuracy <= desiredStartupAccuracyMeters
-    }
-
-    private func scheduleLocationWaitTimeout() {
-        locationWaitTask?.cancel()
-        let waitNanoseconds = maxStartupLocationWaitSeconds * 1_000_000_000
-        locationWaitTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: waitNanoseconds)
-            await self?.handleLocationWaitTimeout()
-        }
-    }
-
-    private func handleLocationWaitTimeout() async {
-        guard pendingLocationRefresh else { return }
-        pendingLocationRefresh = false
-        locationWaitTask = nil
-
-        if let location = locationManager.location {
-            debugLog("Location wait timeout reached. Proceeding with best available fix: \(location.coordinate.latitude), \(location.coordinate.longitude) accuracy=\(location.horizontalAccuracy)")
-            await monitorNearbyMerchants(around: location.coordinate, trigger: .startup)
-            return
-        }
-
-        debugLog("Location wait timeout reached with no fix")
-        schedulePOIRetryIfNeeded(reason: "Location wait timeout")
-    }
-
-    private func schedulePOIRetryIfNeeded(reason: String) {
-        guard SpendingSessionStore.isActive() else { return }
-        guard pendingPOIRetryAttempts < ShoppingModeTuning.maxPOIRetryAttempts else {
-            debugLog("POI retry skipped: max attempts reached (\(pendingPOIRetryAttempts)) [reason=\(reason)]")
-            return
-        }
-
-        pendingPOIRetryAttempts += 1
-        poiRetryTask?.cancel()
-        let attempt = pendingPOIRetryAttempts
-        let waitNanoseconds = UInt64(ShoppingModeTuning.poiRetryIntervalSeconds * 1_000_000_000)
-        debugLog("Scheduling POI retry attempt \(attempt) in \(Int(ShoppingModeTuning.poiRetryIntervalSeconds))s [reason=\(reason)]")
-
-        poiRetryTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: waitNanoseconds)
-            await self?.performPOIRetry(attempt: attempt)
-        }
-    }
-
-    private func performPOIRetry(attempt: Int) async {
-        guard SpendingSessionStore.isActive() else { return }
-        guard attempt == pendingPOIRetryAttempts else { return }
-
-        debugLog("Executing POI retry attempt \(attempt)")
-        refreshNearbyMonitoredMerchants(trigger: .retry)
-    }
-
-    private func startStartupInsideCollectionIfNeeded(trigger: RefreshTrigger) {
-        startupInsideCollectionTask?.cancel()
-        startupInsideCollectionTask = nil
-        startupInsideCandidatesByRegionID = [:]
-        isCollectingStartupInsideStates = false
-
-        guard trigger == .startup else { return }
-        isCollectingStartupInsideStates = true
-        let waitNanoseconds = UInt64(ShoppingModeTuning.startupInsideCollectionWindowSeconds * 1_000_000_000)
-        startupInsideCollectionTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: waitNanoseconds)
-            await self?.finalizeStartupInsideSelection()
-        }
-    }
-
-    private func finalizeStartupInsideSelection() async {
-        guard isCollectingStartupInsideStates else { return }
-        isCollectingStartupInsideStates = false
-        startupInsideCollectionTask = nil
-
-        let candidates = Array(startupInsideCandidatesByRegionID.values)
-        startupInsideCandidatesByRegionID = [:]
-        guard candidates.isEmpty == false else {
-            debugLog("No startup inside candidates returned by region state callbacks")
-            return
-        }
-
-        let referenceLocation = locationManager.location ?? lastRefreshLocation
-        let selected = await selectStartupMerchant(from: candidates, referenceLocation: referenceLocation)
-        guard let selected else { return }
-
-        let didSend = ShoppingModeSuggestionService.shared.sendStartupNudge(
-            merchant: selected,
-            sessionID: SpendingSessionStore.sessionID()
-        )
-
-        if didSend {
-            debugLog("Startup nearest-inside nudge sent for merchant: \(selected.name)")
-        } else {
-            debugLog("Startup nearest-inside nudge skipped due to cooldown/session guards")
-        }
-    }
-
-    private func selectStartupMerchant(
-        from merchants: [ShoppingModeMerchant],
-        referenceLocation: CLLocation?
-    ) async -> ShoppingModeMerchant? {
-        guard merchants.isEmpty == false else { return nil }
-
-        guard let referenceLocation else {
-            return merchants.sorted(by: { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }).first
-        }
-
-        let crowSorted = merchants.sorted { lhs, rhs in
-            let lhsDistance = distanceMeters(from: referenceLocation.coordinate, to: lhs)
-            let rhsDistance = distanceMeters(from: referenceLocation.coordinate, to: rhs)
-            if lhsDistance != rhsDistance {
-                return lhsDistance < rhsDistance
-            }
-            return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
-        }
-
-        let shortlist = Array(crowSorted.prefix(ShoppingModeTuning.startupRouteSelectionMaxCandidates))
-
-        #if canImport(MapKit)
-        let scoredCandidates = await scoreStartupCandidates(shortlist: shortlist, from: referenceLocation.coordinate)
-        let sortedCandidates = scoredCandidates.sorted(by: startupRouteSort)
-
-        for score in sortedCandidates {
-            switch score.routeStatus {
-            case .valid:
-                debugLog(
-                    "Startup route score -> \(score.merchant.name) status=valid walkDistance=\(Int(score.walkingDistanceMeters ?? 0))m eta=\(Int(score.walkingETASeconds ?? 0))s crow=\(Int(score.crowDistanceMeters))m"
-                )
-            case .unavailable:
-                debugLog(
-                    "Startup route score -> \(score.merchant.name) status=unavailable crow=\(Int(score.crowDistanceMeters))m"
-                )
-            case .rejectedOutlier:
-                debugLog(
-                    "Startup route score -> \(score.merchant.name) status=rejected_outlier crow=\(Int(score.crowDistanceMeters))m"
-                )
-            }
-        }
-
-        if let selected = sortedCandidates.first {
-            let selectionReason: String
-            switch selected.routeStatus {
-            case .valid:
-                selectionReason = "distance-first route"
-            case .unavailable, .rejectedOutlier:
-                selectionReason = "crow fallback"
-            }
-            debugLog(
-                "Startup inside candidates=\(merchants.count); selected=\(selected.merchant.name) via \(selectionReason)"
-            )
-            return selected.merchant
-        }
-        #endif
-
-        guard let fallback = crowSorted.first else { return nil }
-        let fallbackDistance = distanceMeters(from: referenceLocation.coordinate, to: fallback)
-        debugLog("Startup inside candidates=\(merchants.count); selected=\(fallback.name) via crow distance=\(Int(fallbackDistance))m")
-        return fallback
-    }
-
-    private func distanceMeters(from center: CLLocationCoordinate2D, to merchant: ShoppingModeMerchant) -> CLLocationDistance {
-        let centerLocation = CLLocation(latitude: center.latitude, longitude: center.longitude)
-        let merchantLocation = CLLocation(latitude: merchant.latitude, longitude: merchant.longitude)
-        return centerLocation.distance(from: merchantLocation)
-    }
-
     #if canImport(MapKit)
-    private func startupRouteSort(_ lhs: StartupRouteScore, _ rhs: StartupRouteScore) -> Bool {
-        let lhsPriority = routeStatusPriority(lhs.routeStatus)
-        let rhsPriority = routeStatusPriority(rhs.routeStatus)
-        if lhsPriority != rhsPriority {
-            return lhsPriority < rhsPriority
-        }
-
-        if lhs.routeStatus == .valid && rhs.routeStatus == .valid {
-            let lhsWalkDistance = lhs.walkingDistanceMeters ?? .greatestFiniteMagnitude
-            let rhsWalkDistance = rhs.walkingDistanceMeters ?? .greatestFiniteMagnitude
-            if lhsWalkDistance != rhsWalkDistance {
-                return lhsWalkDistance < rhsWalkDistance
-            }
-        }
-
-        if lhs.crowDistanceMeters != rhs.crowDistanceMeters {
-            return lhs.crowDistanceMeters < rhs.crowDistanceMeters
-        }
-
-        let lhsETA = lhs.walkingETASeconds ?? .greatestFiniteMagnitude
-        let rhsETA = rhs.walkingETASeconds ?? .greatestFiniteMagnitude
-        if lhsETA != rhsETA {
-            return lhsETA < rhsETA
-        }
-
-        return lhs.merchant.name.localizedCaseInsensitiveCompare(rhs.merchant.name) == .orderedAscending
-    }
-
-    private func routeStatusPriority(_ status: StartupRouteScore.RouteStatus) -> Int {
-        switch status {
-        case .valid:
-            return 0
-        case .unavailable:
-            return 1
-        case .rejectedOutlier:
-            return 2
-        }
-    }
-
-    private func scoreStartupCandidates(
-        shortlist: [ShoppingModeMerchant],
+    private func startupRouteMetrics(
+        merchants: [ShoppingModeMerchant],
         from origin: CLLocationCoordinate2D
-    ) async -> [StartupRouteScore] {
-        guard shortlist.isEmpty == false else { return [] }
-
-        let timeoutSeconds = ShoppingModeTuning.startupRouteLookupTimeoutSeconds
+    ) async -> [String: ExcursionCandidateScorer.RouteMetrics] {
+        guard merchants.isEmpty == false else { return [:] }
+        let routeLookupTimeoutSeconds = ShoppingModeTuning.startupRouteLookupTimeoutSeconds
         let outlierCrowMultiplier = ShoppingModeTuning.startupRouteOutlierCrowMultiplier
         let outlierExtraMeters = ShoppingModeTuning.startupRouteOutlierExtraMeters
-        return await withTaskGroup(of: StartupRouteScore.self, returning: [StartupRouteScore].self) { group in
-            for merchant in shortlist {
+
+        return await withTaskGroup(
+            of: StartupRouteScore.self,
+            returning: [String: ExcursionCandidateScorer.RouteMetrics].self
+        ) { group in
+            for merchant in merchants {
                 group.addTask {
                     let destination = CLLocationCoordinate2D(latitude: merchant.latitude, longitude: merchant.longitude)
                     let crowDistance = Self.distanceMeters(from: origin, to: destination)
                     let route = await Self.resolveWalkingRoute(
                         from: origin,
                         to: destination,
-                        timeoutSeconds: timeoutSeconds
+                        timeoutSeconds: routeLookupTimeoutSeconds
                     )
 
                     if let route {
-                        let routeDistance = route.distance
                         if Self.isOutlierRoute(
-                            routeDistance: routeDistance,
+                            routeDistance: route.distance,
                             crowDistance: crowDistance,
                             outlierCrowMultiplier: outlierCrowMultiplier,
                             outlierExtraMeters: outlierExtraMeters
                         ) {
                             return StartupRouteScore(
                                 merchant: merchant,
-                                crowDistanceMeters: crowDistance,
-                                walkingETASeconds: nil,
-                                walkingDistanceMeters: nil,
-                                routeStatus: .rejectedOutlier
+                                routeMetrics: ExcursionCandidateScorer.RouteMetrics(
+                                    distanceMeters: nil,
+                                    expectedTravelTime: nil,
+                                    status: .rejectedOutlier
+                                )
                             )
                         }
 
                         return StartupRouteScore(
                             merchant: merchant,
-                            crowDistanceMeters: crowDistance,
-                            walkingETASeconds: route.expectedTravelTime,
-                            walkingDistanceMeters: routeDistance,
-                            routeStatus: .valid
+                            routeMetrics: ExcursionCandidateScorer.RouteMetrics(
+                                distanceMeters: route.distance,
+                                expectedTravelTime: route.expectedTravelTime,
+                                status: .valid
+                            )
                         )
                     }
 
                     return StartupRouteScore(
                         merchant: merchant,
-                        crowDistanceMeters: crowDistance,
-                        walkingETASeconds: nil,
-                        walkingDistanceMeters: nil,
-                        routeStatus: .unavailable
+                        routeMetrics: ExcursionCandidateScorer.RouteMetrics(
+                            distanceMeters: nil,
+                            expectedTravelTime: nil,
+                            status: .unavailable
+                        )
                     )
                 }
             }
 
-            var scores: [StartupRouteScore] = []
+            var result: [String: ExcursionCandidateScorer.RouteMetrics] = [:]
             for await score in group {
-                scores.append(score)
+                result[score.merchant.id] = score.routeMetrics
             }
-            return scores
+            return result
         }
     }
 
@@ -671,6 +777,20 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
         }
     }
 
+    nonisolated private static func calculateWalkingRoute(
+        from origin: CLLocationCoordinate2D,
+        to destination: CLLocationCoordinate2D
+    ) async -> MKRoute? {
+        let request = MKDirections.Request()
+        request.source = MKMapItem(placemark: MKPlacemark(coordinate: origin))
+        request.destination = MKMapItem(placemark: MKPlacemark(coordinate: destination))
+        request.transportType = .walking
+
+        let directions = MKDirections(request: request)
+        guard let response = try? await directions.calculate() else { return nil }
+        return response.routes.first
+    }
+
     nonisolated private static func distanceMeters(
         from origin: CLLocationCoordinate2D,
         to destination: CLLocationCoordinate2D
@@ -689,22 +809,7 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
         guard crowDistance > 0 else { return false }
         let multiplier = routeDistance / crowDistance
         let extraMeters = routeDistance - crowDistance
-        return multiplier >= outlierCrowMultiplier &&
-            extraMeters >= outlierExtraMeters
-    }
-
-    nonisolated private static func calculateWalkingRoute(
-        from origin: CLLocationCoordinate2D,
-        to destination: CLLocationCoordinate2D
-    ) async -> MKRoute? {
-        let request = MKDirections.Request()
-        request.source = MKMapItem(placemark: MKPlacemark(coordinate: origin))
-        request.destination = MKMapItem(placemark: MKPlacemark(coordinate: destination))
-        request.transportType = .walking
-
-        let directions = MKDirections(request: request)
-        guard let response = try? await directions.calculate() else { return nil }
-        return response.routes.first
+        return multiplier >= outlierCrowMultiplier && extraMeters >= outlierExtraMeters
     }
     #endif
 }

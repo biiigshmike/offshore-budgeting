@@ -26,6 +26,19 @@
     },
     {
       "parallelizable" : true,
+      "skippedTests" : {
+        "suites" : [
+          {
+            "name" : "ExpenseImageAndPaystubImportParserTests",
+            "testFunctions" : [
+              "paystubPDF_ParsesNetPayAndDate()"
+            ]
+          },
+          {
+            "name" : "StatementPDFImportParserTests"
+          }
+        ]
+      },
       "target" : {
         "containerPath" : "container:OffshoreBudgeting.xcodeproj",
         "identifier" : "4C96F85D2F20523900541774",

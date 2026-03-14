@@ -1,6 +1,7 @@
 import XCTest
-@testable import OffshoreBudgeting
+@testable import Offshore
 
+@MainActor
 final class ICloudBootstrapTests: XCTestCase {
 
     func testWorkspaceDiscoveryPhase_localEmptyIsLoadedEmpty() {
