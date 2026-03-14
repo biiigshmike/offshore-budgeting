@@ -51,16 +51,16 @@ struct HomeView: View {
     @AppStorage("general_excludeFutureVariableExpensesFromCalculations")
     private var excludeFutureVariableExpensesFromCalculationsDefault: Bool = false
 
-    @State private var draftStartDate: Date = Date()
-    @State private var draftEndDate: Date = Date()
-    @State private var hideFuturePlannedExpensesInView: Bool = false
-    @State private var excludeFuturePlannedExpensesFromCalculationsInView: Bool = false
-    @State private var hideFutureVariableExpensesInView: Bool = false
-    @State private var excludeFutureVariableExpensesFromCalculationsInView: Bool = false
+    @State private var draftStartDate: Date
+    @State private var draftEndDate: Date
+    @State private var hideFuturePlannedExpensesInView: Bool
+    @State private var excludeFuturePlannedExpensesFromCalculationsInView: Bool
+    @State private var hideFutureVariableExpensesInView: Bool
+    @State private var excludeFutureVariableExpensesFromCalculationsInView: Bool
 
     @State private var isEditingWidgets: Bool = false
 
-    @State private var pinnedItems: [HomePinnedItem] = []
+    @State private var pinnedItems: [HomePinnedItem]
     @State private var masonryMeasuredHeights: [String: CGFloat] = [:]
     @State private var lastMeasuredUsableWidth: CGFloat = 0
 
@@ -134,13 +134,47 @@ struct HomeView: View {
     init(workspace: Workspace) {
         self.workspace = workspace
         let workspaceID = workspace.id
+        let defaults = UserDefaults.standard
+        let defaultBudgetingPeriodRaw = defaults.string(forKey: "general_defaultBudgetingPeriod")
+            ?? BudgetingPeriod.monthly.rawValue
+        let initialPinnedItems = HomeViewBootstrap.initialPinnedItems(
+            workspaceID: workspaceID,
+            fallbackCardIDs: (workspace.cards ?? []).map(\.id),
+            defaults: defaults
+        )
+        let appliedRangeSeed = HomeViewBootstrap.initialAppliedRangeSeed(
+            workspaceID: workspaceID,
+            defaultBudgetingPeriodRaw: defaultBudgetingPeriodRaw,
+            defaults: defaults
+        )
 
-        _appliedStartTimestamp = AppStorage(wrappedValue: 0, Self.appliedStartKey(workspaceID: workspaceID))
-        _appliedEndTimestamp = AppStorage(wrappedValue: 0, Self.appliedEndKey(workspaceID: workspaceID))
+        _appliedStartTimestamp = AppStorage(
+            wrappedValue: appliedRangeSeed.start.timeIntervalSince1970,
+            Self.appliedStartKey(workspaceID: workspaceID)
+        )
+        _appliedEndTimestamp = AppStorage(
+            wrappedValue: appliedRangeSeed.end.timeIntervalSince1970,
+            Self.appliedEndKey(workspaceID: workspaceID)
+        )
         _lastSyncedDefaultBudgetingPeriodRaw = AppStorage(
-            wrappedValue: "",
+            wrappedValue: appliedRangeSeed.lastSyncedDefaultBudgetingPeriodRaw,
             Self.lastSyncedDefaultBudgetingPeriodKey(workspaceID: workspaceID)
         )
+        _draftStartDate = State(initialValue: appliedRangeSeed.start)
+        _draftEndDate = State(initialValue: appliedRangeSeed.end)
+        _hideFuturePlannedExpensesInView = State(
+            initialValue: defaults.bool(forKey: "general_hideFuturePlannedExpenses")
+        )
+        _excludeFuturePlannedExpensesFromCalculationsInView = State(
+            initialValue: defaults.bool(forKey: "general_excludeFuturePlannedExpensesFromCalculations")
+        )
+        _hideFutureVariableExpensesInView = State(
+            initialValue: defaults.bool(forKey: "general_hideFutureVariableExpenses")
+        )
+        _excludeFutureVariableExpensesFromCalculationsInView = State(
+            initialValue: defaults.bool(forKey: "general_excludeFutureVariableExpensesFromCalculations")
+        )
+        _pinnedItems = State(initialValue: initialPinnedItems)
 
         _budgets = Query(
             filter: #Predicate<Budget> { $0.workspace?.id == workspaceID },
@@ -307,13 +341,9 @@ struct HomeView: View {
             }
             bootstrapAppliedDatesIfNeeded()
             applyDefaultBudgetingPeriodIfSettingsChanged()
-            syncDraftToApplied()
-            loadPinnedItemsIfNeeded()
+            syncDraftToAppliedIfNeeded()
+            persistPinnedItemsMigrationIfNeeded()
             prunePinnedCardsIfNeeded()
-            hideFuturePlannedExpensesInView = hideFuturePlannedExpensesDefault
-            excludeFuturePlannedExpensesFromCalculationsInView = excludeFuturePlannedExpensesFromCalculationsDefault
-            hideFutureVariableExpensesInView = hideFutureVariableExpensesDefault
-            excludeFutureVariableExpensesFromCalculationsInView = excludeFutureVariableExpensesFromCalculationsDefault
         }
         .onDisappear {
             dismissAssistantPanel()
@@ -334,7 +364,23 @@ struct HomeView: View {
         .onChange(of: defaultBudgetingPeriodRaw) { _, _ in
             applyDefaultBudgetingPeriodToApplied()
             lastSyncedDefaultBudgetingPeriodRaw = defaultBudgetingPeriodRaw
-            syncDraftToApplied()
+            syncDraftToAppliedIfNeeded()
+        }
+        .onChange(of: hideFuturePlannedExpensesDefault) { _, newValue in
+            guard hideFuturePlannedExpensesInView != newValue else { return }
+            hideFuturePlannedExpensesInView = newValue
+        }
+        .onChange(of: excludeFuturePlannedExpensesFromCalculationsDefault) { _, newValue in
+            guard excludeFuturePlannedExpensesFromCalculationsInView != newValue else { return }
+            excludeFuturePlannedExpensesFromCalculationsInView = newValue
+        }
+        .onChange(of: hideFutureVariableExpensesDefault) { _, newValue in
+            guard hideFutureVariableExpensesInView != newValue else { return }
+            hideFutureVariableExpensesInView = newValue
+        }
+        .onChange(of: excludeFutureVariableExpensesFromCalculationsDefault) { _, newValue in
+            guard excludeFutureVariableExpensesFromCalculationsInView != newValue else { return }
+            excludeFutureVariableExpensesFromCalculationsInView = newValue
         }
     }
 
@@ -992,7 +1038,8 @@ struct HomeView: View {
         "\(formattedDate(appliedStartDate)) - \(formattedDate(appliedEndDate))"
     }
 
-    private func syncDraftToApplied() {
+    private func syncDraftToAppliedIfNeeded() {
+        guard draftStartDate != appliedStartDate || draftEndDate != appliedEndDate else { return }
         draftStartDate = appliedStartDate
         draftEndDate = appliedEndDate
     }
@@ -1066,35 +1113,15 @@ struct HomeView: View {
 
     // MARK: - Persistence: Unified pins + Migration
 
-    private func loadPinnedItemsIfNeeded() {
-        if pinnedItems.isEmpty {
-            let itemsStore = HomePinnedItemsStore(workspaceID: workspace.id)
-            let loaded = itemsStore.load()
-
-            if !loaded.isEmpty {
-                pinnedItems = loaded
-                return
-            }
-
-            let widgetsStore = HomePinnedWidgetsStore(workspaceID: workspace.id)
-            let cardsStore = HomePinnedCardsStore(workspaceID: workspace.id)
-
-            let migratedWidgets = widgetsStore.load().map { HomePinnedItem.widget($0, .small) }
-
-            var migratedCardIDs = cardsStore.load()
-            if migratedCardIDs.isEmpty {
-                migratedCardIDs = cards.map { $0.id }
-            }
-            let migratedCards = migratedCardIDs.map { HomePinnedItem.card($0, .small) }
-
-            let migrated = migratedWidgets + migratedCards
-            pinnedItems = migrated
-            itemsStore.save(migrated)
-        }
-    }
-
     private func persistPinnedItems() {
         let store = HomePinnedItemsStore(workspaceID: workspace.id)
+        store.save(pinnedItems)
+    }
+
+    private func persistPinnedItemsMigrationIfNeeded() {
+        let store = HomePinnedItemsStore(workspaceID: workspace.id)
+        guard store.load().isEmpty else { return }
+        guard pinnedItems.isEmpty == false else { return }
         store.save(pinnedItems)
     }
 

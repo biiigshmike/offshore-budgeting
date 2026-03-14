@@ -104,13 +104,15 @@ enum HomePinnedItem: Identifiable, Codable, Equatable {
 struct HomePinnedItemsStore {
 
     private let storageKey: String
+    private let defaults: UserDefaults
 
-    init(workspaceID: UUID) {
+    init(workspaceID: UUID, defaults: UserDefaults = .standard) {
         self.storageKey = "home_pinnedItems_\(workspaceID.uuidString)"
+        self.defaults = defaults
     }
 
     func load() -> [HomePinnedItem] {
-        guard let data = UserDefaults.standard.data(forKey: storageKey) else { return [] }
+        guard let data = defaults.data(forKey: storageKey) else { return [] }
         guard let decoded = try? JSONDecoder().decode([HomePinnedItem].self, from: data) else { return [] }
         return normalize(decoded)
     }
@@ -118,7 +120,7 @@ struct HomePinnedItemsStore {
     func save(_ items: [HomePinnedItem]) {
         let normalized = normalize(items)
         let data = (try? JSONEncoder().encode(normalized)) ?? Data()
-        UserDefaults.standard.set(data, forKey: storageKey)
+        defaults.set(data, forKey: storageKey)
     }
 
     // MARK: - Helpers

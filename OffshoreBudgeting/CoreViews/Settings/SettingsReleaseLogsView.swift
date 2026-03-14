@@ -70,6 +70,17 @@ struct SettingsReleaseLogsView: View {
 
     static let releaseSections: [ReleaseSection] = [
         ReleaseSection(
+            version: "2.2.1",
+            build: "8",
+            items: [
+                ReleaseItem(
+                    systemImage: "ladybug.slash",
+                    title: "Swept for Bugs",
+                    description: "Cleaned around the vault and managed to squash a few bugs and improve some UI glitches in the process."
+                )
+            ]
+        ),
+        ReleaseSection(
             version: "2.3.2",
             build: "16",
             items: [

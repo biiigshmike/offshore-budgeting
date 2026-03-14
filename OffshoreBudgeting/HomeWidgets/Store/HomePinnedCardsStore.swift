@@ -11,19 +11,21 @@ import SwiftUI
 struct HomePinnedCardsStore {
 
     private let storageKey: String
+    private let defaults: UserDefaults
 
-    init(workspaceID: UUID) {
+    init(workspaceID: UUID, defaults: UserDefaults = .standard) {
         self.storageKey = "home_pinnedCardIDs_\(workspaceID.uuidString)"
+        self.defaults = defaults
     }
 
     func load() -> [UUID] {
-        guard let data = UserDefaults.standard.data(forKey: storageKey) else { return [] }
+        guard let data = defaults.data(forKey: storageKey) else { return [] }
         return (try? JSONDecoder().decode([UUID].self, from: data)) ?? []
     }
 
     func save(_ ids: [UUID]) {
         let data = (try? JSONEncoder().encode(ids)) ?? Data()
-        UserDefaults.standard.set(data, forKey: storageKey)
+        defaults.set(data, forKey: storageKey)
     }
 }
 

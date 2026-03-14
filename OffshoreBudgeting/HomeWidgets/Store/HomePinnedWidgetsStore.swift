@@ -43,13 +43,15 @@ struct HomePinnedWidgetsStore {
     // MARK: - Storage
 
     private let storageKey: String
+    private let defaults: UserDefaults
 
-    init(workspaceID: UUID) {
+    init(workspaceID: UUID, defaults: UserDefaults = .standard) {
         self.storageKey = "home_pinnedWidgets_\(workspaceID.uuidString)"
+        self.defaults = defaults
     }
 
     func load() -> [HomeWidgetID] {
-        guard let data = UserDefaults.standard.data(forKey: storageKey) else {
+        guard let data = defaults.data(forKey: storageKey) else {
             // Default order
             return [
                 .income,
@@ -79,7 +81,7 @@ struct HomePinnedWidgetsStore {
     func save(_ widgets: [HomeWidgetID]) {
         let normalized = normalize(widgets)
         let data = (try? JSONEncoder().encode(normalized)) ?? Data()
-        UserDefaults.standard.set(data, forKey: storageKey)
+        defaults.set(data, forKey: storageKey)
     }
 
     // MARK: - Helpers

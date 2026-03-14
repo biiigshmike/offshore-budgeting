@@ -68,6 +68,8 @@ struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var notificationService = LocalNotificationService()
+    @State private var resumeCoordinator = ContentViewResumeCoordinator()
+    @State private var deferredResumeTask: Task<Void, Never>? = nil
 
     // MARK: - Body
 
@@ -122,76 +124,62 @@ struct ContentView: View {
                 }
             }
             .onAppear {
-                // Ensure the widget extension can see the active workspace immediately
-                IncomeWidgetSnapshotStore.setSelectedWorkspaceID(selectedWorkspaceID)
-                CardWidgetSnapshotStore.setSelectedWorkspaceID(selectedWorkspaceID)
-                NextPlannedExpenseWidgetSnapshotStore.setSelectedWorkspaceID(selectedWorkspaceID)
-                SpendTrendsWidgetSnapshotStore.setSelectedWorkspaceID(selectedWorkspaceID)
-                syncGeneralSettingsToWidgets()
-
-                refreshIncomeWidgetSnapshotsIfPossible()
-                refreshCardWidgetSnapshotsIfPossible()
-                refreshNextPlannedExpenseWidgetSnapshotsIfPossible()
-                refreshSpendTrendsWidgetSnapshotsIfPossible()
-                runSavingsAutoCaptureIfPossible()
-
-                Task { await syncNotificationSchedulesIfPossible() }
+                performImmediateResumeWiring()
+                scheduleDeferredResumeRefresh(
+                    includesWidgets: true,
+                    includesSavings: true,
+                    includesNotifications: true
+                )
             }
             .onChange(of: selectedWorkspaceID) { _, newValue in
-                IncomeWidgetSnapshotStore.setSelectedWorkspaceID(newValue)
-                CardWidgetSnapshotStore.setSelectedWorkspaceID(newValue)
-                NextPlannedExpenseWidgetSnapshotStore.setSelectedWorkspaceID(newValue)
-                SpendTrendsWidgetSnapshotStore.setSelectedWorkspaceID(newValue)
-
-                refreshIncomeWidgetSnapshotsIfPossible()
-                refreshCardWidgetSnapshotsIfPossible()
-                refreshNextPlannedExpenseWidgetSnapshotsIfPossible()
-                refreshSpendTrendsWidgetSnapshotsIfPossible()
-                runSavingsAutoCaptureIfPossible()
-
-                Task { await syncNotificationSchedulesIfPossible() }
+                syncSelectedWorkspaceToWidgetStores(newValue)
+                scheduleDeferredResumeRefresh(
+                    includesWidgets: true,
+                    includesSavings: true,
+                    includesNotifications: true
+                )
             }
             .onChange(of: defaultBudgetingPeriodRaw) { _, _ in
                 syncGeneralSettingsToWidgets()
-                refreshIncomeWidgetSnapshotsIfPossible()
-                refreshCardWidgetSnapshotsIfPossible()
-                refreshNextPlannedExpenseWidgetSnapshotsIfPossible()
-                refreshSpendTrendsWidgetSnapshotsIfPossible()
-                runSavingsAutoCaptureIfPossible()
+                scheduleDeferredResumeRefresh(
+                    includesWidgets: true,
+                    includesSavings: true,
+                    includesNotifications: false
+                )
             }
             .onChange(of: hideFuturePlannedExpenses) { _, _ in
                 syncGeneralSettingsToWidgets()
             }
             .onChange(of: excludeFuturePlannedExpensesFromCalculations) { _, _ in
                 syncGeneralSettingsToWidgets()
-                refreshCardWidgetSnapshotsIfPossible()
-                refreshSpendTrendsWidgetSnapshotsIfPossible()
+                scheduleDeferredResumeRefresh(
+                    includesWidgets: true,
+                    includesSavings: false,
+                    includesNotifications: false
+                )
             }
             .onChange(of: hideFutureVariableExpenses) { _, _ in
                 syncGeneralSettingsToWidgets()
             }
             .onChange(of: excludeFutureVariableExpensesFromCalculations) { _, _ in
                 syncGeneralSettingsToWidgets()
-                refreshCardWidgetSnapshotsIfPossible()
-                refreshSpendTrendsWidgetSnapshotsIfPossible()
+                scheduleDeferredResumeRefresh(
+                    includesWidgets: true,
+                    includesSavings: false,
+                    includesNotifications: false
+                )
             }
             .onChange(of: scenePhase) { _, newPhase in
-                // fter SwiftData/iCloud finishes loading, the app often
-                // becomes active with fresh data. Rebuild snapshots so the widget has options.
-                guard newPhase == .active else { return }
-
-                IncomeWidgetSnapshotStore.setSelectedWorkspaceID(selectedWorkspaceID)
-                CardWidgetSnapshotStore.setSelectedWorkspaceID(selectedWorkspaceID)
-                NextPlannedExpenseWidgetSnapshotStore.setSelectedWorkspaceID(selectedWorkspaceID)
-                SpendTrendsWidgetSnapshotStore.setSelectedWorkspaceID(selectedWorkspaceID)
-
-                refreshIncomeWidgetSnapshotsIfPossible()
-                refreshCardWidgetSnapshotsIfPossible()
-                refreshNextPlannedExpenseWidgetSnapshotsIfPossible()
-                refreshSpendTrendsWidgetSnapshotsIfPossible()
-                runSavingsAutoCaptureIfPossible()
-
-                Task { await syncNotificationSchedulesIfPossible() }
+                if newPhase == .active {
+                    performImmediateResumeWiring()
+                    scheduleDeferredResumeRefresh(
+                        includesWidgets: true,
+                        includesSavings: true,
+                        includesNotifications: true
+                    )
+                } else {
+                    cancelDeferredResumeRefresh()
+                }
             }
             .onChange(of: workspaces.count) { _, newCount in
                 if activeUseICloud, newCount > 0 {
@@ -206,19 +194,12 @@ struct ContentView: View {
                     selectedWorkspaceID = workspaces.first?.id.uuidString ?? ""
                 }
 
-                // when the store populates (especially iCloud), rebuild widget caches.
-                IncomeWidgetSnapshotStore.setSelectedWorkspaceID(selectedWorkspaceID)
-                CardWidgetSnapshotStore.setSelectedWorkspaceID(selectedWorkspaceID)
-                NextPlannedExpenseWidgetSnapshotStore.setSelectedWorkspaceID(selectedWorkspaceID)
-                SpendTrendsWidgetSnapshotStore.setSelectedWorkspaceID(selectedWorkspaceID)
-
-                refreshIncomeWidgetSnapshotsIfPossible()
-                refreshCardWidgetSnapshotsIfPossible()
-                refreshNextPlannedExpenseWidgetSnapshotsIfPossible()
-                refreshSpendTrendsWidgetSnapshotsIfPossible()
-                runSavingsAutoCaptureIfPossible()
-
-                Task { await syncNotificationSchedulesIfPossible() }
+                performImmediateResumeWiring()
+                scheduleDeferredResumeRefresh(
+                    includesWidgets: true,
+                    includesSavings: true,
+                    includesNotifications: true
+                )
             }
             .alert("You must keep at least one workspace.", isPresented: $showingCannotDeleteLastWorkspaceAlert) {
                 Button("OK", role: .cancel) { }
@@ -239,6 +220,124 @@ struct ContentView: View {
 
     // MARK: - Widget Refresh
 
+    private enum ResumeScheduling {
+        static let initialDelayNanos: UInt64 = 250_000_000
+        static let savingsDelayNanos: UInt64 = 700_000_000
+    }
+
+    @MainActor
+    private func performImmediateResumeWiring() {
+        syncSelectedWorkspaceToWidgetStores(selectedWorkspaceID)
+        syncGeneralSettingsToWidgets()
+    }
+
+    @MainActor
+    private func syncSelectedWorkspaceToWidgetStores(_ workspaceID: String) {
+        IncomeWidgetSnapshotStore.setSelectedWorkspaceID(workspaceID)
+        CardWidgetSnapshotStore.setSelectedWorkspaceID(workspaceID)
+        NextPlannedExpenseWidgetSnapshotStore.setSelectedWorkspaceID(workspaceID)
+        SpendTrendsWidgetSnapshotStore.setSelectedWorkspaceID(workspaceID)
+    }
+
+    @MainActor
+    private func scheduleDeferredResumeRefresh(
+        includesWidgets: Bool,
+        includesSavings: Bool,
+        includesNotifications: Bool
+    ) {
+        let request = resumeCoordinator.schedule(
+            widgetSignature: includesWidgets ? widgetRefreshSignature : nil,
+            savingsSignature: includesSavings ? savingsRefreshSignature : nil,
+            notificationSignature: includesNotifications ? notificationRefreshSignature : nil
+        )
+
+        guard let request else { return }
+
+        deferredResumeTask?.cancel()
+        deferredResumeTask = Task {
+            try? await Task.sleep(nanoseconds: ResumeScheduling.initialDelayNanos)
+            guard Task.isCancelled == false else { return }
+
+            let shouldContinue = await MainActor.run { resumeCoordinator.isCurrent(request) }
+            guard shouldContinue else { return }
+
+            if request.widgetSignature != nil {
+                await MainActor.run {
+                    refreshAllWidgetSnapshotsIfPossible()
+                    resumeCoordinator.markWidgetRefreshCompleted(request)
+                }
+            }
+
+            if request.notificationSignature != nil {
+                await syncNotificationSchedulesIfPossible()
+                await MainActor.run {
+                    resumeCoordinator.markNotificationRefreshCompleted(request)
+                }
+            }
+
+            guard request.savingsSignature != nil else { return }
+
+            try? await Task.sleep(nanoseconds: ResumeScheduling.savingsDelayNanos)
+            guard Task.isCancelled == false else { return }
+
+            let shouldRunSavings = await MainActor.run { resumeCoordinator.isCurrent(request) }
+            guard shouldRunSavings else { return }
+
+            await MainActor.run {
+                runSavingsAutoCaptureIfPossible()
+                resumeCoordinator.markSavingsRefreshCompleted(request)
+            }
+        }
+    }
+
+    @MainActor
+    private func cancelDeferredResumeRefresh() {
+        deferredResumeTask?.cancel()
+        deferredResumeTask = nil
+        resumeCoordinator.cancelPending()
+    }
+
+    private var widgetRefreshSignature: ContentViewWidgetRefreshSignature? {
+        guard let workspaceID = UUID(uuidString: selectedWorkspaceID) else { return nil }
+        return ContentViewWidgetRefreshSignature(
+            workspaceID: workspaceID,
+            defaultBudgetingPeriodRaw: defaultBudgetingPeriodRaw,
+            excludeFuturePlannedExpensesFromCalculations: excludeFuturePlannedExpensesFromCalculations,
+            excludeFutureVariableExpensesFromCalculations: excludeFutureVariableExpensesFromCalculations
+        )
+    }
+
+    private var savingsRefreshSignature: ContentViewSavingsRefreshSignature? {
+        guard let workspaceID = UUID(uuidString: selectedWorkspaceID) else { return nil }
+        return ContentViewSavingsRefreshSignature(
+            workspaceID: workspaceID,
+            defaultBudgetingPeriodRaw: defaultBudgetingPeriodRaw
+        )
+    }
+
+    private var notificationRefreshSignature: ContentViewNotificationRefreshSignature? {
+        guard didCompleteOnboarding else { return nil }
+        guard let workspaceID = UUID(uuidString: selectedWorkspaceID) else { return nil }
+        return ContentViewNotificationRefreshSignature(
+            workspaceID: workspaceID,
+            notificationsEnabled: notificationsEnabled,
+            dailyExpenseReminderEnabled: dailyExpenseReminderEnabled,
+            plannedIncomeReminderEnabled: plannedIncomeReminderEnabled,
+            presetDueReminderEnabled: presetDueReminderEnabled,
+            reminderHour: reminderHour,
+            reminderMinute: reminderMinute
+        )
+    }
+
+    @MainActor
+    private func refreshAllWidgetSnapshotsIfPossible() {
+        refreshIncomeWidgetSnapshotsIfPossible()
+        refreshCardWidgetSnapshotsIfPossible()
+        refreshNextPlannedExpenseWidgetSnapshotsIfPossible()
+        refreshSpendTrendsWidgetSnapshotsIfPossible()
+    }
+
+    @MainActor
     private func refreshIncomeWidgetSnapshotsIfPossible() {
         guard let id = UUID(uuidString: selectedWorkspaceID) else { return }
         IncomeWidgetSnapshotBuilder.buildAndSaveAllPeriods(
@@ -247,6 +346,7 @@ struct ContentView: View {
         )
     }
 
+    @MainActor
     private func refreshCardWidgetSnapshotsIfPossible() {
         guard let id = UUID(uuidString: selectedWorkspaceID) else { return }
         CardWidgetSnapshotBuilder.buildAndSaveAllPeriods(
@@ -255,6 +355,7 @@ struct ContentView: View {
         )
     }
 
+    @MainActor
     private func refreshNextPlannedExpenseWidgetSnapshotsIfPossible() {
         guard let id = UUID(uuidString: selectedWorkspaceID) else { return }
         NextPlannedExpenseWidgetSnapshotBuilder.buildAndSaveAllPeriods(
@@ -263,6 +364,7 @@ struct ContentView: View {
         )
     }
 
+    @MainActor
     private func refreshSpendTrendsWidgetSnapshotsIfPossible() {
         guard let id = UUID(uuidString: selectedWorkspaceID) else { return }
         SpendTrendsWidgetSnapshotBuilder.buildAndSaveAllPeriods(
@@ -271,6 +373,7 @@ struct ContentView: View {
         )
     }
 
+    @MainActor
     private func syncGeneralSettingsToWidgets() {
         guard let defaults = UserDefaults(suiteName: IncomeWidgetSnapshotStore.appGroupID) else { return }
         defaults.set(defaultBudgetingPeriodRaw, forKey: "general_defaultBudgetingPeriod")
@@ -286,6 +389,7 @@ struct ContentView: View {
         )
     }
 
+    @MainActor
     private func runSavingsAutoCaptureIfPossible() {
         if DebugScreenshotFormDefaults.isEnabled {
             return
@@ -321,6 +425,7 @@ struct ContentView: View {
 
     // MARK: - Notification Sync
 
+    @MainActor
     private func syncNotificationSchedulesIfPossible() async {
         guard didCompleteOnboarding else { return }
         guard let workspaceID = UUID(uuidString: selectedWorkspaceID) else { return }
