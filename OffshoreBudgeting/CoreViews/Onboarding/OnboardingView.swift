@@ -89,7 +89,20 @@ struct OnboardingView: View {
     }
     
     private var isICloudBootstrapping: Bool {
-        ICloudBootstrap.isBootstrapping(useICloud: activeUseICloud, startedAt: iCloudBootstrapStartedAt)
+        switch workspaceDiscoveryPhase {
+        case .loading, .loadingSlow:
+            return true
+        case .loaded:
+            return false
+        }
+    }
+
+    private var workspaceDiscoveryPhase: ICloudBootstrap.WorkspaceDiscoveryPhase {
+        ICloudBootstrap.workspaceDiscoveryPhase(
+            useICloud: activeUseICloud,
+            startedAt: iCloudBootstrapStartedAt,
+            workspaceCount: workspaces.count
+        )
     }
 
     private var finalStepValue: Int {
@@ -129,11 +142,12 @@ struct OnboardingView: View {
         .onAppear {
             Task { await maybeOfferSkipIfCloudAlreadyHasData() }
         }
-        .task(id: iCloudBootstrapStartedAt) {
-            await enforceICloudBootstrapTimeoutIfNeeded()
-        }
         .onChange(of: workspaces.count) { _, newCount in
             if activeUseICloud, newCount > 0 {
+                ICloudBootstrap.logFirstWorkspaceAppearance(
+                    startedAt: iCloudBootstrapStartedAt,
+                    workspaceCount: newCount
+                )
                 iCloudBootstrapStartedAt = 0
             }
         }
@@ -294,7 +308,7 @@ struct OnboardingView: View {
             workspaces: workspaces,
             selectedWorkspaceID: $selectedWorkspaceID,
             usesICloud: activeUseICloud,
-            isICloudBootstrapping: isICloudBootstrapping,
+            discoveryPhase: workspaceDiscoveryPhase,
             onCreate: createWorkspace(name:hexColor:)
         )
     }
@@ -768,32 +782,6 @@ struct OnboardingView: View {
         }
     }
 
-    @MainActor
-    private func enforceICloudBootstrapTimeoutIfNeeded() async {
-        guard onboardingStep == 1 else { return }
-        guard activeUseICloud, iCloudBootstrapStartedAt > 0 else { return }
-        guard workspaces.isEmpty else { return }
-
-        let startedAtSnapshot = iCloudBootstrapStartedAt
-        let nanoseconds = UInt64(ICloudBootstrap.maxWaitSeconds * 1_000_000_000)
-
-        do {
-            try await Task.sleep(nanoseconds: nanoseconds)
-        } catch {
-            return
-        }
-
-        guard onboardingStep == 1 else { return }
-        guard activeUseICloud else { return }
-        guard workspaces.isEmpty else { return }
-        guard iCloudBootstrapStartedAt == startedAtSnapshot else { return }
-
-        #if DEBUG
-        print("[iCloudBootstrap] Timed out on onboarding workspace step after \(ICloudBootstrap.maxWaitSeconds)s with 0 workspaces.")
-        #endif
-
-        iCloudBootstrapStartedAt = 0
-    }
 }
 
 // MARK: - Step: Workspace Setup
@@ -803,7 +791,7 @@ private struct OnboardingWorkspaceStep: View {
     let workspaces: [Workspace]
     @Binding var selectedWorkspaceID: String
     let usesICloud: Bool
-    let isICloudBootstrapping: Bool
+    let discoveryPhase: ICloudBootstrap.WorkspaceDiscoveryPhase
     let onCreate: (String, String) -> Void
 
     @Environment(\.modelContext) private var modelContext
@@ -845,7 +833,7 @@ private struct OnboardingWorkspaceStep: View {
                         workspaces: workspaces,
                         selectedWorkspaceID: selectedWorkspaceID,
                         usesICloud: usesICloud,
-                        isICloudBootstrapping: isICloudBootstrapping,
+                        discoveryPhase: discoveryPhase,
                         showsSelectionHint: false,
                         onSelect: { workspace in
                             selectedWorkspaceID = workspace.id.uuidString

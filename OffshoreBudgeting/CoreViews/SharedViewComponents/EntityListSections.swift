@@ -14,7 +14,7 @@ struct WorkspaceListRows: View {
     let workspaces: [Workspace]
     let selectedWorkspaceID: String
     let usesICloud: Bool
-    let isICloudBootstrapping: Bool
+    let discoveryPhase: ICloudBootstrap.WorkspaceDiscoveryPhase
     let showsSelectionHint: Bool
     let onSelect: (Workspace) -> Void
     let onEdit: (Workspace) -> Void
@@ -22,24 +22,28 @@ struct WorkspaceListRows: View {
 
     var body: some View {
         if workspaces.isEmpty {
-            if isICloudBootstrapping {
-                VStack(spacing: 12) {
-                    ContentUnavailableView(
-                        "Setting Up iCloud Sync",
-                        systemImage: "icloud.and.arrow.down",
-                        description: Text("Looking for existing workspaces on this Apple ID.")
-                    )
+            switch discoveryPhase {
+            case .loading:
+                iCloudLoadingState(
+                    title: "Setting Up iCloud Sync",
+                    description: "Looking for existing workspaces on this Apple ID."
+                )
 
-                    ProgressView()
-                        .padding(.bottom, 6)
-                }
-                .padding(.vertical, 10)
-            } else {
+            case .loadingSlow:
+                iCloudLoadingState(
+                    title: "Still Checking iCloud",
+                    description: "This can take a moment..."
+                )
+
+            case .loaded(hasWorkspaces: false):
                 ContentUnavailableView(
                     usesICloud ? "No iCloud Workspaces Found" : "No Workspaces Yet",
                     systemImage: usesICloud ? "icloud.slash" : "person.fill",
                     description: Text(usesICloud ? "Nothing was found in iCloud. Create a workspace to begin." : "Create a workspace to begin.")
                 )
+
+            case .loaded(hasWorkspaces: true):
+                EmptyView()
             }
         } else {
             ForEach(workspaces) { workspace in
@@ -73,6 +77,20 @@ struct WorkspaceListRows: View {
                     .foregroundStyle(.secondary)
             }
         }
+    }
+
+    private func iCloudLoadingState(title: String, description: String) -> some View {
+        VStack(spacing: 12) {
+            ContentUnavailableView(
+                title,
+                systemImage: "icloud.and.arrow.down",
+                description: Text(description)
+            )
+
+            ProgressView()
+                .padding(.bottom, 6)
+        }
+        .padding(.vertical, 10)
     }
 
     @ViewBuilder

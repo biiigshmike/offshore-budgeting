@@ -60,8 +60,8 @@ final class OffshoreBudgetingUITests: XCTestCase {
         app.buttons["Get Started"].tap()
         app.buttons["iCloud"].tap()
 
-        let emptyStateTitle = app.staticTexts["No iCloud Workspaces Found"].firstMatch
-        XCTAssertTrue(emptyStateTitle.waitForExistence(timeout: 10))
+        let slowLoadingTitle = app.staticTexts["Still Checking iCloud"].firstMatch
+        XCTAssertTrue(slowLoadingTitle.waitForExistence(timeout: 10))
 
         app.buttons["Add Workspace"].tap()
 
@@ -79,6 +79,30 @@ final class OffshoreBudgetingUITests: XCTestCase {
 
         let nextStepTitle = app.staticTexts["Privacy, iCloud, and Notifications"].firstMatch
         XCTAssertTrue(nextStepTitle.waitForExistence(timeout: 5))
+    }
+
+    @MainActor
+    func testOnboarding_iCloudDelayedWorkspace_keepsLoadingUntilWorkspaceArrives() throws {
+        let app = makeAppForUITesting(
+            scenario: "-uiTestScenarioICloudDelayedWorkspace"
+        )
+        app.launch()
+
+        app.buttons["Get Started"].tap()
+        app.buttons["iCloud"].tap()
+
+        let loadingTitle = app.staticTexts["Setting Up iCloud Sync"].firstMatch
+        XCTAssertTrue(loadingTitle.waitForExistence(timeout: 3))
+
+        let slowLoadingTitle = app.staticTexts["Still Checking iCloud"].firstMatch
+        XCTAssertTrue(slowLoadingTitle.waitForExistence(timeout: 10))
+
+        let emptyStateTitle = app.staticTexts["No iCloud Workspaces Found"].firstMatch
+        XCTAssertFalse(emptyStateTitle.exists)
+
+        let delayedWorkspace = app.buttons["Delayed iCloud Workspace"].firstMatch
+        XCTAssertTrue(delayedWorkspace.waitForExistence(timeout: 5))
+        XCTAssertFalse(emptyStateTitle.exists)
     }
 
     // MARK: - Helpers

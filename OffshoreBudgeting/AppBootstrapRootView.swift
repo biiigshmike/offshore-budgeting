@@ -24,6 +24,10 @@ struct AppBootstrapRootView: View {
                 activeUseICloud = useICloud
                 iCloudBootstrapStartedAt = useICloud ? Date().timeIntervalSince1970 : 0
 
+                if useICloud {
+                    ICloudBootstrap.logICloudSelection(startedAt: iCloudBootstrapStartedAt)
+                }
+
                 modelContainer = OffshoreBudgetingApp.makeModelContainer(useICloud: useICloud)
 
                 #if DEBUG

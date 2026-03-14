@@ -25,12 +25,14 @@ enum UITestSupport {
     enum Scenario {
         case iCloudHasExistingWorkspace
         case iCloudEmpty
+        case iCloudDelayedWorkspace
     }
 
     static var scenario: Scenario? {
         let args = ProcessInfo.processInfo.arguments
         if args.contains("-uiTestScenarioICloudHasExistingWorkspace") { return .iCloudHasExistingWorkspace }
         if args.contains("-uiTestScenarioICloudEmpty") { return .iCloudEmpty }
+        if args.contains("-uiTestScenarioICloudDelayedWorkspace") { return .iCloudDelayedWorkspace }
         return nil
     }
 
@@ -74,6 +76,9 @@ enum UITestSupport {
 
         case .iCloudEmpty:
             break
+
+        case .iCloudDelayedWorkspace:
+            scheduleDelayedWorkspaceInsert(using: container)
         }
 
         do {
@@ -112,6 +117,22 @@ enum UITestSupport {
             }
         } catch {
             // Swallow in DEBUG
+        }
+    }
+
+    private static func scheduleDelayedWorkspaceInsert(using container: ModelContainer) {
+        let delaySeconds: TimeInterval = ICloudBootstrap.maxWaitSeconds + 1.5
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + delaySeconds) {
+            let context = ModelContext(container)
+            let workspace = Workspace(name: "Delayed iCloud Workspace", hexColor: "#14B8A6")
+            context.insert(workspace)
+
+            do {
+                try context.save()
+            } catch {
+                assertionFailure("UITestSupport failed to save delayed workspace seed data: \(error)")
+            }
         }
     }
 }

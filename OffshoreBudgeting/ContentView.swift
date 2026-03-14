@@ -95,10 +95,12 @@ struct ContentView: View {
                 }
             }
             .task {
-                let isBootstrapping = ICloudBootstrap.isBootstrapping(
+                let discoveryPhase = ICloudBootstrap.workspaceDiscoveryPhase(
                     useICloud: activeUseICloud,
-                    startedAt: iCloudBootstrapStartedAt
+                    startedAt: iCloudBootstrapStartedAt,
+                    workspaceCount: workspaces.count
                 )
+                let isBootstrapping = discoveryPhase == .loading || discoveryPhase == .loadingSlow
 
                 if didCompleteOnboarding {
                     if !isBootstrapping {
@@ -193,6 +195,10 @@ struct ContentView: View {
             }
             .onChange(of: workspaces.count) { _, newCount in
                 if activeUseICloud, newCount > 0 {
+                    ICloudBootstrap.logFirstWorkspaceAppearance(
+                        startedAt: iCloudBootstrapStartedAt,
+                        workspaceCount: newCount
+                    )
                     iCloudBootstrapStartedAt = 0
                 }
 
