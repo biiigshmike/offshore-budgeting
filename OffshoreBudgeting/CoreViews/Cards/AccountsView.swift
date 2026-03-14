@@ -66,10 +66,6 @@ struct AccountsView: View {
         #endif
     }
 
-    private var shouldSyncCommandSurface: Bool {
-        isPhone == false
-    }
-
     // MARK: - View
 
     var body: some View {
@@ -137,13 +133,13 @@ struct AccountsView: View {
             updateCommandSurface()
         }
         .onDisappear {
-            if shouldSyncCommandSurface {
-                switch selectedSegment {
-                case .cards, .sharedBalances:
-                    commandHub.deactivate(.cards)
-                case .savings:
-                    commandHub.deactivate(.savings)
-                }
+            switch selectedSegment.commandConfiguration.surface {
+            case .cards:
+                commandHub.deactivate(.cards)
+            case .savings:
+                commandHub.deactivate(.savings)
+            default:
+                break
             }
         }
     }
@@ -151,17 +147,12 @@ struct AccountsView: View {
     // MARK: - Commands
 
     private func updateCommandSurface() {
-        guard shouldSyncCommandSurface else { return }
+        let configuration = selectedSegment.commandConfiguration
 
-        switch selectedSegment {
-        case .cards:
-            commandHub.activate(.cards)
-            commandHub.setCardsSortContext(.cards)
-        case .sharedBalances:
-            commandHub.activate(.cards)
-            commandHub.setCardsSortContext(.sharedBalances)
-        case .savings:
-            commandHub.activate(.savings)
+        commandHub.activate(configuration.surface)
+
+        if let cardsSortContext = configuration.cardsSortContext {
+            commandHub.setCardsSortContext(cardsSortContext)
         }
     }
 
@@ -336,7 +327,32 @@ struct AccountsView: View {
     }
 }
 
-private extension AccountsView.Segment {
+struct AccountsSegmentCommandConfiguration: Equatable {
+    let surface: AppCommandSurface
+    let cardsSortContext: AppCardsSortCommandContext?
+}
+
+extension AccountsView.Segment {
+    var commandConfiguration: AccountsSegmentCommandConfiguration {
+        switch self {
+        case .cards:
+            return AccountsSegmentCommandConfiguration(
+                surface: .cards,
+                cardsSortContext: .cards
+            )
+        case .sharedBalances:
+            return AccountsSegmentCommandConfiguration(
+                surface: .cards,
+                cardsSortContext: .sharedBalances
+            )
+        case .savings:
+            return AccountsSegmentCommandConfiguration(
+                surface: .savings,
+                cardsSortContext: nil
+            )
+        }
+    }
+
     init?(pendingSegmentRaw: String) {
         switch pendingSegmentRaw {
         case AppShortcutNavigationStore.PendingAccountsSegment.cards.rawValue:

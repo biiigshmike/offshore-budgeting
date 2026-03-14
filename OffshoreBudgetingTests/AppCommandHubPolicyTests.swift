@@ -70,4 +70,53 @@ struct AppCommandHubPolicyTests {
         #expect(hub.sequence == initialSequence + 1)
         #expect(hub.latestCommandID == AppCommandID.Help.openHelp)
     }
+
+    @Test func accountsSegments_mapToExpectedCommandRouting() {
+        #expect(
+            AccountsView.Segment.cards.commandConfiguration
+                == AccountsSegmentCommandConfiguration(
+                    surface: .cards,
+                    cardsSortContext: .cards
+                )
+        )
+
+        #expect(
+            AccountsView.Segment.sharedBalances.commandConfiguration
+                == AccountsSegmentCommandConfiguration(
+                    surface: .cards,
+                    cardsSortContext: .sharedBalances
+                )
+        )
+
+        #expect(
+            AccountsView.Segment.savings.commandConfiguration
+                == AccountsSegmentCommandConfiguration(
+                    surface: .savings,
+                    cardsSortContext: nil
+                )
+        )
+    }
+
+    @Test func windowSceneCommandHubPolicy_staysEnabledOnPhone() {
+        #expect(
+            WindowSceneCommandHubPolicyResolver.policy(
+                isMacCatalyst: false,
+                isPhone: true
+            ) == .enabled
+        )
+
+        #expect(
+            WindowSceneCommandHubPolicyResolver.policy(
+                isMacCatalyst: false,
+                isPhone: false
+            ) == .enabled
+        )
+
+        #expect(
+            WindowSceneCommandHubPolicyResolver.policy(
+                isMacCatalyst: true,
+                isPhone: false
+            ) == .enabled
+        )
+    }
 }

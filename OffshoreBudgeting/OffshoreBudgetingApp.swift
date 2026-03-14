@@ -296,6 +296,16 @@ struct OffshoreBudgetingApp: App {
     #endif
 }
 
+enum WindowSceneCommandHubPolicyResolver {
+    static func policy(isMacCatalyst: Bool, isPhone: Bool) -> AppCommandHubPolicy {
+        if isMacCatalyst {
+            return .enabled
+        }
+
+        return .enabled
+    }
+}
+
 private struct WindowSceneRootView: View {
     @Binding var modelContainer: ModelContainer
     let postBoardingTipsStore: PostBoardingTipsStore
@@ -305,12 +315,26 @@ private struct WindowSceneRootView: View {
 
     private static func makeCommandHub() -> AppCommandHub {
         #if targetEnvironment(macCatalyst)
-        return AppCommandHub(policy: .enabled)
+        return AppCommandHub(
+            policy: WindowSceneCommandHubPolicyResolver.policy(
+                isMacCatalyst: true,
+                isPhone: false
+            )
+        )
         #elseif canImport(UIKit)
-        let policy: AppCommandHubPolicy = UIDevice.current.userInterfaceIdiom == .phone ? .disabled : .enabled
-        return AppCommandHub(policy: policy)
+        return AppCommandHub(
+            policy: WindowSceneCommandHubPolicyResolver.policy(
+                isMacCatalyst: false,
+                isPhone: UIDevice.current.userInterfaceIdiom == .phone
+            )
+        )
         #else
-        return AppCommandHub(policy: .enabled)
+        return AppCommandHub(
+            policy: WindowSceneCommandHubPolicyResolver.policy(
+                isMacCatalyst: false,
+                isPhone: false
+            )
+        )
         #endif
     }
 
