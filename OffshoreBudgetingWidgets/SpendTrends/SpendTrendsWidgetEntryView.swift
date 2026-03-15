@@ -74,8 +74,21 @@ private struct SpendTrendsEmptyStateMedium: View {
     let rangeText: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            WidgetHeaderView(title: "Spend Trends", periodToken: periodToken, rangeText: rangeText, style: .stacked)
+        VStack(alignment: .leading, spacing: 4) {
+            ViewThatFits(in: .vertical) {
+                WidgetHeaderView(
+                    title: "Spend Trends",
+                    periodToken: periodToken,
+                    rangeText: rangeText,
+                    style: .singleLine
+                )
+                WidgetHeaderView(
+                    title: "Spend Trends",
+                    periodToken: periodToken,
+                    rangeText: rangeText,
+                    style: .stacked
+                )
+            }
 
             Spacer(minLength: 0)
 
@@ -85,7 +98,7 @@ private struct SpendTrendsEmptyStateMedium: View {
 
             Spacer(minLength: 0)
         }
-        .padding(14)
+        .padding(12)
     }
 }
 

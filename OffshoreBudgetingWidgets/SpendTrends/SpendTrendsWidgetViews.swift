@@ -296,15 +296,25 @@ struct SpendTrendsWidgetMediumView: View {
     let snapshot: SpendTrendsWidgetSnapshot
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            WidgetHeaderView(
-                title: snapshot.title,
-                periodToken: snapshot.periodToken,
-                rangeText: snapshot.rangeText,
-                style: .stacked,
-                compactRangeText: snapshot.compactRangeText,
-                rangeDisplayMode: .compact
-            )
+        VStack(alignment: .leading, spacing: 4) {
+            ViewThatFits(in: .vertical) {
+                WidgetHeaderView(
+                    title: snapshot.title,
+                    periodToken: snapshot.periodToken,
+                    rangeText: snapshot.rangeText,
+                    style: .singleLine,
+                    compactRangeText: snapshot.compactRangeText,
+                    rangeDisplayMode: .compact
+                )
+                WidgetHeaderView(
+                    title: snapshot.title,
+                    periodToken: snapshot.periodToken,
+                    rangeText: snapshot.rangeText,
+                    style: .stacked,
+                    compactRangeText: snapshot.compactRangeText,
+                    rangeDisplayMode: .compact
+                )
+            }
 
             GeometryReader { geo in
                 let chartWidth = max(112, min(140, geo.size.width * 0.44))
@@ -313,7 +323,7 @@ struct SpendTrendsWidgetMediumView: View {
                     SpendTrendsBarChartView(
                         buckets: snapshot.buckets,
                         showsLabels: true,
-                        chartHeight: 72,
+                        chartHeight: 64,
                         compactRangeLabels: true,
                         labelMinimumScaleFactor: 0.72,
                         labelFontSize: 8,
@@ -375,11 +385,12 @@ struct SpendTrendsWidgetMediumView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
+                .frame(width: geo.size.width, height: geo.size.height, alignment: .topLeading)
             }
             .frame(maxHeight: .infinity, alignment: .top)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .padding(14)
+        .padding(12)
     }
 }
 
