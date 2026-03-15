@@ -14,34 +14,23 @@ private func cardWidgetLocalized(_ key: String) -> String {
     NSLocalizedString(key, comment: "")
 }
 
-private func cardWidgetRangeText(_ periodToken: String, start: Date, end: Date) -> String {
-    String(
-        format: NSLocalizedString("%@ • %@", comment: ""),
-        locale: Locale.current,
-        periodToken,
-        formattedRange(start, end)
-    )
-}
-
 struct CardWidgetSmallView: View {
     let snapshot: CardWidgetSnapshot
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(snapshot.title)
-                .font(.headline.weight(.semibold))
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-                .truncationMode(.tail)
-                .minimumScaleFactor(0.78)
-                .allowsTightening(true)
+        VStack(alignment: .leading, spacing: 6) {
+            WidgetHeaderView(
+                title: snapshot.title,
+                periodToken: snapshot.periodToken,
+                rangeText: formattedRange(snapshot.rangeStart, snapshot.rangeEnd),
+                style: .stacked,
+                compactRangeText: widgetCompactDateRangeText(start: snapshot.rangeStart, end: snapshot.rangeEnd),
+                rangeDisplayMode: .compact,
+                secondaryBehavior: .flexible(maxLines: 2)
+            )
 
-            Text(cardWidgetRangeText(snapshot.periodToken, start: snapshot.rangeStart, end: snapshot.rangeEnd))
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.9)
             Spacer()
+
             VStack(alignment: .leading, spacing: 4) {
                 Text(cardWidgetLocalized("Expenses"))
                     .font(.caption.weight(.semibold))
@@ -70,22 +59,17 @@ struct CardWidgetMediumView: View {
         ZStack(alignment: .bottomTrailing) {
 
             // Leading content
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 6) {
+                WidgetHeaderView(
+                    title: snapshot.title,
+                    periodToken: snapshot.periodToken,
+                    rangeText: formattedRange(snapshot.rangeStart, snapshot.rangeEnd),
+                    style: .stacked,
+                    compactRangeText: widgetCompactDateRangeText(start: snapshot.rangeStart, end: snapshot.rangeEnd),
+                    rangeDisplayMode: .compact,
+                    secondaryBehavior: .flexible(maxLines: 2)
+                )
 
-                Text(snapshot.title)
-                    .font(.headline.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                    .minimumScaleFactor(0.78)
-                    .allowsTightening(true)
-
-                Text(cardWidgetRangeText(snapshot.periodToken, start: snapshot.rangeStart, end: snapshot.rangeEnd))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.9)
-                
                 Spacer()
 
                 VStack(alignment: .leading, spacing: 4) {

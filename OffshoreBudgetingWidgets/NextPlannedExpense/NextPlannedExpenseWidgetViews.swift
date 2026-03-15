@@ -203,17 +203,17 @@ struct NextPlannedExpenseWidgetSmallView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(snapshot.smallTitle)
-                .font(.caption2.weight(.semibold))
+                .font(.caption.weight(.semibold))
                 .foregroundStyle(.primary)
                 .lineLimit(2)
-                .minimumScaleFactor(0.76)
+                .minimumScaleFactor(0.8)
                 .fixedSize(horizontal: false, vertical: true)
 
             Text(snapshot.compactPeriodRangeText)
-                .font(.caption2.weight(.semibold))
+                .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
-                .minimumScaleFactor(0.76)
+                .minimumScaleFactor(0.78)
                 .allowsTightening(true)
 
             if let item {

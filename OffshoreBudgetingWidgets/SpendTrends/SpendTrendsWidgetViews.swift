@@ -249,12 +249,13 @@ struct SpendTrendsWidgetSmallView: View {
     let snapshot: SpendTrendsWidgetSnapshot
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
+        VStack(alignment: .leading, spacing: 4) {
             Text(snapshot.title)
-                .font(.caption.weight(.semibold))
+                .font(.headline.weight(.semibold))
                 .foregroundStyle(.primary)
-                .lineLimit(2)
-                .minimumScaleFactor(0.78)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+                .allowsTightening(true)
 
             ViewThatFits(in: .horizontal) {
                 smallHeaderCandidate(snapshot.compactPeriodRangeText)
@@ -266,7 +267,7 @@ struct SpendTrendsWidgetSmallView: View {
             SpendTrendsBarChartView(
                 buckets: snapshot.buckets,
                 showsLabels: true,
-                chartHeight: 72,
+                chartHeight: 68,
                 compactRangeLabels: true,
                 labelMinimumScaleFactor: 0.72,
                 labelFontSize: 8,
@@ -281,9 +282,10 @@ struct SpendTrendsWidgetSmallView: View {
 
     private func smallHeaderCandidate(_ text: String) -> some View {
         Text(text)
-            .font(.caption2.weight(.semibold))
+            .font(.caption.weight(.semibold))
             .foregroundStyle(.secondary)
             .lineLimit(1)
+            .minimumScaleFactor(0.78)
             .fixedSize(horizontal: true, vertical: false)
     }
 }
@@ -301,8 +303,7 @@ struct SpendTrendsWidgetMediumView: View {
                 rangeText: snapshot.rangeText,
                 style: .stacked,
                 compactRangeText: snapshot.compactRangeText,
-                rangeDisplayMode: .compact,
-                secondaryBehavior: .flexible(maxLines: 2)
+                rangeDisplayMode: .compact
             )
 
             GeometryReader { geo in
