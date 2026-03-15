@@ -34,7 +34,7 @@ private extension NextPlannedExpenseWidgetSnapshot {
     }
 
     var smallTitle: String {
-        nextPlannedLocalized("Next Expense")
+        nextPlannedLocalized("Next Planned Expense")
     }
 
     var compactPeriodRangeText: String {
@@ -205,8 +205,9 @@ struct NextPlannedExpenseWidgetSmallView: View {
             Text(snapshot.smallTitle)
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(.primary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.82)
+                .lineLimit(2)
+                .minimumScaleFactor(0.76)
+                .fixedSize(horizontal: false, vertical: true)
 
             Text(snapshot.compactPeriodRangeText)
                 .font(.caption2.weight(.semibold))
@@ -393,18 +394,35 @@ struct NextPlannedExpenseWidgetExtraLargeView: View {
     }
 }
 
-#Preview("Next Planned Expense Small Long Content") {
-    NextPlannedExpenseWidgetSmallView(snapshot: .truncationPreview)
-        .containerBackground(.background, for: .widget)
+#Preview("Next Planned Expense Small Long Content", as: .systemSmall) {
+    NextPlannedExpenseWidget()
+} timeline: {
+    NextPlannedExpenseWidgetEntry(
+        date: .now,
+        periodToken: NextPlannedExpenseWidgetSnapshot.truncationPreview.periodToken,
+        cardID: nil,
+        snapshot: .truncationPreview
+    )
 }
 
-#Preview("Next Planned Expense Medium Long Content") {
-    NextPlannedExpenseWidgetMediumView(snapshot: .truncationPreview)
-        .containerBackground(.background, for: .widget)
-        .environment(\.locale, Locale(identifier: "de"))
+#Preview("Next Planned Expense Medium Long Content", as: .systemMedium) {
+    NextPlannedExpenseWidget()
+} timeline: {
+    NextPlannedExpenseWidgetEntry(
+        date: .now,
+        periodToken: NextPlannedExpenseWidgetSnapshot.truncationPreview.periodToken,
+        cardID: nil,
+        snapshot: .truncationPreview
+    )
 }
 
-#Preview("Next Planned Expense Large Long Content") {
-    NextPlannedExpenseWidgetLargeView(snapshot: .truncationPreview)
-        .containerBackground(.background, for: .widget)
+#Preview("Next Planned Expense Large Long Content", as: .systemLarge) {
+    NextPlannedExpenseWidget()
+} timeline: {
+    NextPlannedExpenseWidgetEntry(
+        date: .now,
+        periodToken: NextPlannedExpenseWidgetSnapshot.truncationPreview.periodToken,
+        cardID: nil,
+        snapshot: .truncationPreview
+    )
 }

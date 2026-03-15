@@ -658,6 +658,16 @@
         }
       }
     },
+    "Ended" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Ended"
+          }
+        }
+      }
+    },
     "Ends %@" : {
       "localizations" : {
         "ar" : {
@@ -979,6 +989,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "收入小组件"
+          }
+        }
+      }
+    },
+    "Left" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Left"
           }
         }
       }
@@ -1503,6 +1523,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "打开 Offshore 以生成此期间的小组件数据。"
+          }
+        }
+      }
+    },
+    "Over" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Over"
           }
         }
       }
@@ -2499,46 +2529,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "跟踪选定时期内的支出趋势和热门类别。"
-          }
-        }
-      }
-    },
-    "Ended" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Ended"
-          }
-        }
-      }
-    },
-    "Left" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Left"
-          }
-        }
-      }
-    },
-    "Next Expense" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Next Expense"
-          }
-        }
-      }
-    },
-    "Over" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Over"
           }
         }
       }
