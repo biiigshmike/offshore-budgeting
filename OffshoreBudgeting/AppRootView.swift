@@ -79,6 +79,24 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
     }
 }
 
+enum AppRootLaunchSectionResolver {
+    static func resolve(
+        initialSectionOverride: AppSection?,
+        pendingShortcutSectionRaw: String
+    ) -> AppSection {
+        if let initialSectionOverride {
+            return initialSectionOverride
+        }
+
+        let pending = pendingShortcutSectionRaw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let pendingSection = AppSection.fromStorageRaw(pending) {
+            return pendingSection
+        }
+
+        return .home
+    }
+}
+
 struct AppRootView: View {
 
     let workspace: Workspace
@@ -95,7 +113,6 @@ struct AppRootView: View {
         self.initialSectionOverride = initialSectionOverride
     }
 
-    @AppStorage("general_rememberTabSelection") private var rememberTabSelection: Bool = false
     @AppStorage(AppShortcutNavigationStore.pendingSectionKey) private var pendingShortcutSectionRaw: String = ""
 
     @SceneStorage("AppRootView.selectedSection")
@@ -161,22 +178,15 @@ struct AppRootView: View {
         .onAppear {
             guard didApplyInitialSection == false else { return }
             didApplyInitialSection = true
-            if let initialSectionOverride {
-                selectedSectionRaw = initialSectionOverride.rawValue
-            } else {
-                consumePendingShortcutSectionIfNeeded()
-
-                guard rememberTabSelection == false else { return }
-                selectedSectionRaw = AppSection.home.rawValue
-            }
+            selectedSectionRaw = AppRootLaunchSectionResolver.resolve(
+                initialSectionOverride: initialSectionOverride,
+                pendingShortcutSectionRaw: pendingShortcutSectionRaw
+            ).rawValue
+            clearPendingShortcutSection()
 
             if shouldSyncActiveSectionToCommandHub {
                 commandHub.setActiveSectionRaw(selectedSectionRaw)
             }
-        }
-        .onChange(of: rememberTabSelection) { _, newValue in
-            guard newValue == false else { return }
-            selectedSectionRaw = AppSection.home.rawValue
         }
         .onChange(of: pendingShortcutSectionRaw) { _, _ in
             consumePendingShortcutSectionIfNeeded()
@@ -310,6 +320,10 @@ struct AppRootView: View {
             selectedSectionRaw = section.rawValue
         }
 
+        clearPendingShortcutSection()
+    }
+
+    private func clearPendingShortcutSection() {
         pendingShortcutSectionRaw = ""
     }
 

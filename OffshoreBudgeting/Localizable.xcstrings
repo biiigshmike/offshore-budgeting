@@ -41226,46 +41226,6 @@
         }
       }
     },
-    "Remember Tab Selection": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "تذكر اختيار علامة التبويب"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Denken Sie an die Tab-Auswahl"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Recordar pestana seleccionada"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mémoriser l’onglet sélectionné"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Lembre-se da seleção de guias"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "记住选项卡选择"
-          }
-        }
-      }
-    },
     "Reminder Time": {
       "localizations": {
         "ar": {
@@ -57463,46 +57423,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "启用后，今天之后安排的计划费用将从费用列表中隐藏。"
-          }
-        }
-      }
-    },
-    "When enabled, the app will always launch with the last view you were on instead of defaulting to Home.": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "عند التمكين، سيتم تشغيل التطبيق دائمًا مع آخر عرض كنت عليه بدلاً من تعيينه افتراضيًا على الصفحة الرئيسية."
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Wenn diese Option aktiviert ist, wird die App immer mit der letzten Ansicht gestartet, in der Sie sich befanden, und nicht standardmäßig auf der Startseite."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cuando está activado, la app siempre abrirá con la última vista usada en lugar de ir al panel."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "When enabled, the app will always launch with the last view you were on instead de defaulting to Accueil."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Quando ativado, o aplicativo sempre será iniciado com a última visualização em que você esteve, em vez de usar o padrão Home."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "启用后，应用程序将始终以您上次使用的视图启动，而不是默认为主页。"
           }
         }
       }
