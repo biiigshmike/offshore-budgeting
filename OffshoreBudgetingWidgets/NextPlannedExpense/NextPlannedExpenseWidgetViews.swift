@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import WidgetKit
 
 func nextPlannedLocalized(_ key: String) -> String {
     NSLocalizedString(key, comment: "")
@@ -20,6 +21,24 @@ private extension NextPlannedExpenseWidgetSnapshot {
         let start = rangeStart.formatted(.dateTime.month(.abbreviated).day())
         let end = rangeEnd.formatted(.dateTime.month(.abbreviated).day())
         return nextPlannedLocalizedFormat("%@ - %@", start, end)
+    }
+
+    var compactRangeText: String {
+        widgetCompactDateRangeText(start: rangeStart, end: rangeEnd)
+    }
+
+    var displayRangeText: String {
+        let start = rangeStart.formatted(.dateTime.month(.abbreviated).day())
+        let end = rangeEnd.formatted(.dateTime.month(.abbreviated).day())
+        return "\(start) - \(end)"
+    }
+
+    var smallTitle: String {
+        nextPlannedLocalized("Next Expense")
+    }
+
+    var compactPeriodRangeText: String {
+        widgetJoinedPeriodRangeText(periodToken: periodToken, rangeText: compactRangeText)
     }
 }
 
@@ -44,11 +63,13 @@ private struct NextPlannedExpenseAmountsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.7)
 
                 Text(nextPlannedLocalizedFormat("Actual: %@", actualAmount.formatted(nextPlannedExpenseCurrencyFormatStyle())))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
         } else {
             VStack(alignment: .leading, spacing: 4) {
@@ -56,22 +77,28 @@ private struct NextPlannedExpenseAmountsView: View {
                     Text(nextPlannedLocalized("Planned"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
                     Spacer(minLength: 0)
                     Text(plannedAmount, format: nextPlannedExpenseCurrencyFormatStyle())
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                 }
 
                 HStack(spacing: 8) {
                     Text(nextPlannedLocalized("Actual"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
                     Spacer(minLength: 0)
                     Text(actualAmount, format: nextPlannedExpenseCurrencyFormatStyle())
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                 }
             }
         }
@@ -80,6 +107,8 @@ private struct NextPlannedExpenseAmountsView: View {
 
 private struct NextPlannedExpensePrimaryRowView: View {
     let item: NextPlannedExpenseWidgetSnapshot.Item
+    var cardWidth: CGFloat = 132
+    var titleLineLimit: Int = 1
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
@@ -93,7 +122,7 @@ private struct NextPlannedExpensePrimaryRowView: View {
                 titleOpacity: 0.86,
                 titleLineLimit: 2
             )
-            .frame(width: 132)
+            .frame(width: cardWidth)
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .accessibilityHidden(true)
 
@@ -101,12 +130,15 @@ private struct NextPlannedExpensePrimaryRowView: View {
                 Text(item.expenseTitle)
                     .font(.headline.weight(.semibold))
                     .foregroundStyle(.primary)
-                    .lineLimit(1)
+                    .lineLimit(titleLineLimit)
+                    .minimumScaleFactor(0.82)
+                    .fixedSize(horizontal: false, vertical: true)
 
                 Text(nextPlannedExpenseDateText(item.expenseDate))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.8)
 
                 NextPlannedExpenseAmountsView(
                     plannedAmount: item.plannedAmount,
@@ -169,43 +201,77 @@ struct NextPlannedExpenseWidgetSmallView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(nextPlannedLocalized("Next Planned Expense"))
+        VStack(alignment: .leading, spacing: 4) {
+            Text(snapshot.smallTitle)
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(.primary)
-                .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
-                .minimumScaleFactor(0.85)
+                .lineLimit(1)
+                .minimumScaleFactor(0.82)
 
-            Text(nextPlannedLocalizedFormat("%@ • %@", snapshot.periodToken, snapshot.rangeText))
+            Text(snapshot.compactPeriodRangeText)
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
-                .minimumScaleFactor(0.75)
+                .minimumScaleFactor(0.76)
+                .allowsTightening(true)
 
             if let item {
                 Text(item.expenseTitle)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                    .minimumScaleFactor(0.74)
 
-                Text(nextPlannedLocalizedFormat("Planned %@", item.plannedAmount.formatted(nextPlannedExpenseCurrencyFormatStyle())))
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
+                ViewThatFits(in: .vertical) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        amountRow(title: nextPlannedLocalized("Planned"), amount: item.plannedAmount)
+                        amountRow(title: nextPlannedLocalized("Actual"), amount: item.actualAmount)
+                    }
 
-                Text(nextPlannedLocalizedFormat("Actual %@", item.actualAmount.formatted(nextPlannedExpenseCurrencyFormatStyle())))
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
+                    VStack(alignment: .leading, spacing: 3) {
+                        compactAmountRow(title: nextPlannedLocalized("Planned"), amount: item.plannedAmount)
+                        compactAmountRow(title: nextPlannedLocalized("Actual"), amount: item.actualAmount)
+                    }
+                }
             }
 
             Spacer(minLength: 0)
         }
         .padding(12)
+    }
+
+    private func amountRow(title: String, amount: Double) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Text(title)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+
+            Text(amount, format: nextPlannedExpenseCurrencyFormatStyle())
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.66)
+        }
+    }
+
+    private func compactAmountRow(title: String, amount: Double) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 4) {
+            Text(title)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
+
+            Spacer(minLength: 0)
+
+            Text(amount, format: nextPlannedExpenseCurrencyFormatStyle())
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+        }
     }
 }
 
@@ -220,11 +286,14 @@ struct NextPlannedExpenseWidgetMediumView: View {
                 title: nextPlannedLocalized("Next Planned Expense"),
                 periodToken: snapshot.periodToken,
                 rangeText: snapshot.rangeText,
-                style: .stacked
+                style: .stacked,
+                compactRangeText: snapshot.compactRangeText,
+                rangeDisplayMode: .compact,
+                secondaryBehavior: .flexible(maxLines: 2)
             )
 
             if let item = snapshot.items.first {
-                NextPlannedExpensePrimaryRowView(item: item)
+                NextPlannedExpensePrimaryRowView(item: item, cardWidth: 118)
             }
 
             Spacer(minLength: 0)
@@ -248,16 +317,19 @@ struct NextPlannedExpenseWidgetLargeView: View {
                 title: nextPlannedLocalized("Next Planned Expense"),
                 periodToken: snapshot.periodToken,
                 rangeText: snapshot.rangeText,
-                style: .stacked
+                style: .stacked,
+                compactRangeText: snapshot.compactRangeText,
+                rangeDisplayMode: .compact,
+                secondaryBehavior: .flexible(maxLines: 2)
             )
 
             if items.count == 1, let first = items.first {
-                NextPlannedExpensePrimaryRowView(item: first)
+                NextPlannedExpensePrimaryRowView(item: first, cardWidth: 124, titleLineLimit: 2)
                     .frame(maxHeight: .infinity, alignment: .center)
             } else {
                 VStack(alignment: .leading, spacing: 12) {
                     ForEach(items, id: \.expenseID) { item in
-                        NextPlannedExpensePrimaryRowView(item: item)
+                        NextPlannedExpensePrimaryRowView(item: item, cardWidth: 120, titleLineLimit: 2)
                     }
                 }
                 .frame(maxHeight: .infinity, alignment: .top)
@@ -282,7 +354,10 @@ struct NextPlannedExpenseWidgetExtraLargeView: View {
                 title: nextPlannedLocalized("Next Planned Expense"),
                 periodToken: snapshot.periodToken,
                 rangeText: snapshot.rangeText,
-                style: .singleLine
+                style: .singleLine,
+                compactRangeText: snapshot.compactRangeText,
+                rangeDisplayMode: .compact,
+                secondaryBehavior: .flexible(maxLines: 2)
             )
 
             content
@@ -316,4 +391,20 @@ struct NextPlannedExpenseWidgetExtraLargeView: View {
             }
         }
     }
+}
+
+#Preview("Next Planned Expense Small Long Content") {
+    NextPlannedExpenseWidgetSmallView(snapshot: .truncationPreview)
+        .containerBackground(.background, for: .widget)
+}
+
+#Preview("Next Planned Expense Medium Long Content") {
+    NextPlannedExpenseWidgetMediumView(snapshot: .truncationPreview)
+        .containerBackground(.background, for: .widget)
+        .environment(\.locale, Locale(identifier: "de"))
+}
+
+#Preview("Next Planned Expense Large Long Content") {
+    NextPlannedExpenseWidgetLargeView(snapshot: .truncationPreview)
+        .containerBackground(.background, for: .widget)
 }

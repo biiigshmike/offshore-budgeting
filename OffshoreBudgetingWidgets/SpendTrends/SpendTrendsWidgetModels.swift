@@ -118,4 +118,62 @@ extension SpendTrendsWidgetSnapshot {
             ]
         )
     }
+
+    static var truncationPreview: SpendTrendsWidgetSnapshot {
+        SpendTrendsWidgetSnapshot(
+            title: "Spend Trends",
+            periodToken: "P",
+            rangeStart: Calendar.current.date(from: DateComponents(year: 2026, month: 3, day: 1)) ?? .now,
+            rangeEnd: Calendar.current.date(from: DateComponents(year: 2026, month: 3, day: 31)) ?? .now,
+            totalSpent: 4934.50,
+            buckets: [
+                .init(
+                    id: "b1",
+                    label: "01-04",
+                    total: 1429.67,
+                    slices: [
+                        .init(id: "bills", name: "Bills & Utilities", hexColor: "#2A4EAD", amount: 1025.43),
+                        .init(id: "food", name: "Food & Drink", hexColor: "#F5B13A", amount: 221.12),
+                        .init(id: "subs", name: "Subscriptions", hexColor: "#D44A7E", amount: 183.12)
+                    ]
+                ),
+                .init(
+                    id: "b2",
+                    label: "05-11",
+                    total: 2168.48,
+                    slices: [
+                        .init(id: "shopping", name: "Shopping", hexColor: "#FFF176", amount: 1927.57),
+                        .init(id: "food2", name: "Food & Drink", hexColor: "#F5B13A", amount: 240.91)
+                    ]
+                ),
+                .init(
+                    id: "b3",
+                    label: "12-18",
+                    total: 634.27,
+                    slices: [
+                        .init(id: "cannabis", name: "Cannabis", hexColor: "#9CCC65", amount: 300.00),
+                        .init(id: "groceries", name: "Groceries", hexColor: "#F28B82", amount: 286.66),
+                        .init(id: "subs2", name: "Subscriptions", hexColor: "#D44A7E", amount: 47.61)
+                    ]
+                ),
+                .init(id: "b4", label: "19-25", total: 0, slices: []),
+                .init(id: "b5", label: "26-31", total: 0, slices: [])
+            ],
+            highestBucket: .init(
+                label: "05-11",
+                amount: 2512.09,
+                topCategoryName: "Shopping",
+                topCategoryAmount: 1927.57,
+                topCategoryPercentOfBucket: 0.77
+            ),
+            topCategories: [
+                .init(id: "shopping", name: "Shopping", hexColor: "#FFF176", amount: 2168.48, percentOfTotal: 0.43),
+                .init(id: "bills", name: "Bills & Utilities", hexColor: "#2A4EAD", amount: 1429.67, percentOfTotal: 0.28),
+                .init(id: "food", name: "Food & Drink", hexColor: "#F5B13A", amount: 634.27, percentOfTotal: 0.12),
+                .init(id: "cannabis", name: "Cannabis", hexColor: "#9CCC65", amount: 300.00, percentOfTotal: 0.06),
+                .init(id: "groceries", name: "Groceries", hexColor: "#F28B82", amount: 286.66, percentOfTotal: 0.06),
+                .init(id: "subs", name: "Subscriptions", hexColor: "#D44A7E", amount: 115.42, percentOfTotal: 0.02)
+            ]
+        )
+    }
 }

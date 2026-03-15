@@ -85,4 +85,45 @@ extension NextPlannedExpenseWidgetSnapshot {
             ]
         )
     }
+
+    static var truncationPreview: NextPlannedExpenseWidgetSnapshot {
+        NextPlannedExpenseWidgetSnapshot(
+            title: "Next Planned Expense",
+            periodToken: "P",
+            rangeStart: Calendar.current.date(from: DateComponents(year: 2026, month: 3, day: 1)) ?? .now,
+            rangeEnd: Calendar.current.date(from: DateComponents(year: 2026, month: 3, day: 31)) ?? .now,
+            items: [
+                .init(
+                    expenseID: UUID().uuidString,
+                    expenseTitle: "Progressive Workspace Insurance Premium",
+                    cardName: "Debit Card",
+                    cardThemeToken: "sunset",
+                    cardEffectToken: "plastic",
+                    expenseDate: Calendar.current.date(from: DateComponents(year: 2026, month: 3, day: 14)) ?? .now,
+                    plannedAmount: 210.16,
+                    actualAmount: 210.16
+                ),
+                .init(
+                    expenseID: UUID().uuidString,
+                    expenseTitle: "QuickQuack Car Wash Family Membership",
+                    cardName: "Apple Card",
+                    cardThemeToken: "graphite",
+                    cardEffectToken: "plastic",
+                    expenseDate: Calendar.current.date(from: DateComponents(year: 2026, month: 3, day: 14)) ?? .now,
+                    plannedAmount: 37.99,
+                    actualAmount: 37.99
+                ),
+                .init(
+                    expenseID: UUID().uuidString,
+                    expenseTitle: "Cloud Backup Subscription Renewal",
+                    cardName: "Bills Card",
+                    cardThemeToken: "ocean",
+                    cardEffectToken: "plastic",
+                    expenseDate: Calendar.current.date(from: DateComponents(year: 2026, month: 3, day: 18)) ?? .now,
+                    plannedAmount: 128.45,
+                    actualAmount: 0
+                )
+            ]
+        )
+    }
 }

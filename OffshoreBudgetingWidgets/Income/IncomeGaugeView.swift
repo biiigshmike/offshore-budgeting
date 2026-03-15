@@ -25,6 +25,7 @@ struct IncomeGaugeView: View {
     var showsPercentEnds: Bool = false
     var footer: FooterStyle = .none
     var footerAlignment: FooterAlignment = .leading
+    var footerLineLimit: Int = 2
 
     var body: some View {
         let progress = progressFraction(planned: planned, actual: actual)
@@ -70,8 +71,9 @@ struct IncomeGaugeView: View {
                 }
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.9)
+                .lineLimit(footerLineLimit)
+                .minimumScaleFactor(footerLineLimit > 1 ? 0.72 : 0.62)
+                .fixedSize(horizontal: false, vertical: footerLineLimit > 1)
 
             case .legend(let planned, let actual):
                 HStack(spacing: 6) {

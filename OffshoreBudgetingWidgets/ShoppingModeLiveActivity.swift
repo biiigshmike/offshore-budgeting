@@ -9,6 +9,58 @@ private func liveActivityLocalizedFormat(_ key: String, _ arguments: CVarArg...)
     String(format: NSLocalizedString(key, comment: ""), locale: Locale.current, arguments)
 }
 
+private struct ExcursionStatusTextView: View {
+    let endDate: Date
+    let isExpired: Bool
+    let font: Font
+    let foregroundStyle: Color
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            primaryText
+            secondaryText
+            compactText
+            timeOnlyText
+        }
+    }
+
+    private var formattedTime: String {
+        endDate.formatted(.dateTime.hour().minute())
+    }
+
+    private var primaryText: some View {
+        Text(isExpired ? liveActivityLocalized("Session ended") : liveActivityLocalizedFormat("Active until %@", formattedTime))
+            .font(font)
+            .foregroundStyle(foregroundStyle)
+            .lineLimit(1)
+            .allowsTightening(true)
+    }
+
+    private var secondaryText: some View {
+        Text(isExpired ? liveActivityLocalized("Session ended") : liveActivityLocalizedFormat("Ends %@", formattedTime))
+            .font(font)
+            .foregroundStyle(foregroundStyle)
+            .lineLimit(1)
+            .allowsTightening(true)
+    }
+
+    private var compactText: some View {
+        Text(isExpired ? liveActivityLocalized("Ended") : liveActivityLocalizedFormat("Until %@", formattedTime))
+            .font(font)
+            .foregroundStyle(foregroundStyle)
+            .lineLimit(1)
+            .allowsTightening(true)
+    }
+
+    private var timeOnlyText: some View {
+        Text(isExpired ? liveActivityLocalized("Done") : formattedTime)
+            .font(font)
+            .foregroundStyle(foregroundStyle)
+            .lineLimit(1)
+            .allowsTightening(true)
+    }
+}
+
 #if canImport(ActivityKit) && !targetEnvironment(macCatalyst)
 import ActivityKit
 
@@ -66,56 +118,63 @@ private struct ShoppingModeLockScreenLiveActivityView: View {
         let isExpired = ExcursionLiveActivityPhase.isExpired(endDate: context.state.endDate, now: now)
 
         return VStack(alignment: .leading, spacing: 10) {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 4) {
-                    Image(systemName: "sailboat.fill")
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(ShoppingModeLiveActivityPalette.brandAccent)
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "sailboat.fill")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(ShoppingModeLiveActivityPalette.brandAccent)
 
-                    Text(liveActivityLocalized("Offshore"))
-                        .font(.headline.weight(.semibold))
-                        .foregroundStyle(ShoppingModeLiveActivityPalette.primaryText)
-                }
+                        Text(liveActivityLocalized("Offshore"))
+                            .font(.headline.weight(.semibold))
+                            .foregroundStyle(ShoppingModeLiveActivityPalette.primaryText)
+                    }
 
-                ViewThatFits(in: .horizontal) {
-                    Text(liveActivityLocalized("Excursion Mode"))
-                        .font(.system(size: 34, weight: .bold, design: .rounded))
-                        .foregroundStyle(ShoppingModeLiveActivityPalette.primaryText)
-                        .lineLimit(1)
-
-                    Text(liveActivityLocalized("Excursion Mode"))
-                        .font(.system(size: 30, weight: .bold, design: .rounded))
-                        .foregroundStyle(ShoppingModeLiveActivityPalette.primaryText)
-                        .lineLimit(1)
-
-                    Text(liveActivityLocalized("Excursion Mode"))
-                        .font(.system(size: 26, weight: .bold, design: .rounded))
-                        .foregroundStyle(ShoppingModeLiveActivityPalette.primaryText)
-                        .lineLimit(1)
-                }
-
-                ViewThatFits(in: .horizontal) {
-                    if isExpired {
-                        Text(liveActivityLocalized("Session ended"))
-                            .font(.footnote.weight(.medium))
-                            .foregroundStyle(ShoppingModeLiveActivityPalette.secondaryText)
-                            .lineLimit(1)
-                    } else {
-                        Text(liveActivityLocalizedFormat("Active until %@", context.state.endDate.formatted(.dateTime.hour().minute())))
-                            .font(.footnote.weight(.medium))
-                            .foregroundStyle(ShoppingModeLiveActivityPalette.secondaryText)
+                    ViewThatFits(in: .horizontal) {
+                        Text(liveActivityLocalized("Excursion Mode"))
+                            .font(.system(size: 34, weight: .bold, design: .rounded))
+                            .foregroundStyle(ShoppingModeLiveActivityPalette.primaryText)
                             .lineLimit(1)
 
-                        Text(liveActivityLocalizedFormat("Ends %@", context.state.endDate.formatted(.dateTime.hour().minute())))
-                            .font(.footnote.weight(.medium))
-                            .foregroundStyle(ShoppingModeLiveActivityPalette.secondaryText)
+                        Text(liveActivityLocalized("Excursion Mode"))
+                            .font(.system(size: 30, weight: .bold, design: .rounded))
+                            .foregroundStyle(ShoppingModeLiveActivityPalette.primaryText)
+                            .lineLimit(1)
+
+                        Text(liveActivityLocalized("Excursion Mode"))
+                            .font(.system(size: 26, weight: .bold, design: .rounded))
+                            .foregroundStyle(ShoppingModeLiveActivityPalette.primaryText)
                             .lineLimit(1)
                     }
 
-                    EmptyView()
+                    ExcursionStatusTextView(
+                        endDate: context.state.endDate,
+                        isExpired: isExpired,
+                        font: .footnote.weight(.medium),
+                        foregroundStyle: ShoppingModeLiveActivityPalette.secondaryText
+                    )
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Group {
+                    if isExpired {
+                        FinishedTimerBadge()
+                    } else {
+                        ZStack {
+                            CountdownRing(
+                                startDate: context.attributes.startDate,
+                                endDate: context.state.endDate,
+                                lineWidth: 4.0,
+                                trackColor: ShoppingModeLiveActivityPalette.ringTrack,
+                                progressColor: ShoppingModeLiveActivityPalette.ringProgress
+                            )
+
+                            LockScreenRingTimerText(endDate: context.state.endDate)
+                        }
+                    }
+                }
+                .frame(width: 66, height: 66)
             }
-            .padding(.trailing, 90)
 
             if isExpired == false {
                 HStack(spacing: 8) {
@@ -149,29 +208,6 @@ private struct ShoppingModeLockScreenLiveActivityView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
-        .overlay(alignment: .topTrailing) {
-            if isExpired {
-                FinishedTimerBadge()
-                    .frame(width: 66, height: 66)
-                    .padding(.top, 10)
-                    .padding(.trailing, 12)
-            } else {
-                ZStack {
-                    CountdownRing(
-                        startDate: context.attributes.startDate,
-                        endDate: context.state.endDate,
-                        lineWidth: 4.0,
-                        trackColor: ShoppingModeLiveActivityPalette.ringTrack,
-                        progressColor: ShoppingModeLiveActivityPalette.ringProgress
-                    )
-
-                    LockScreenRingTimerText(endDate: context.state.endDate)
-                }
-                .frame(width: 66, height: 66)
-                .padding(.top, 10)
-                .padding(.trailing, 12)
-            }
-        }
     }
 }
 
@@ -289,27 +325,12 @@ private struct ShoppingModeExpandedIslandLeadingContentView: View {
                     .minimumScaleFactor(0.72)
                     .allowsTightening(true)
 
-                // I intentionally degrade subtitle before timer text to preserve title hierarchy.
-                ViewThatFits(in: .horizontal) {
-                    if isExpired {
-                        Text(liveActivityLocalized("Session ended"))
-                            .font(.system(size: metrics.subtitleSize, weight: .medium, design: .rounded))
-                            .foregroundStyle(ShoppingModeLiveActivityPalette.secondaryText)
-                            .lineLimit(1)
-                    } else {
-                        Text(liveActivityLocalizedFormat("Active until %@", context.state.endDate.formatted(.dateTime.hour().minute())))
-                            .font(.system(size: metrics.subtitleSize, weight: .medium, design: .rounded))
-                            .foregroundStyle(ShoppingModeLiveActivityPalette.secondaryText)
-                            .lineLimit(1)
-
-                        Text(liveActivityLocalizedFormat("Ends %@", context.state.endDate.formatted(.dateTime.hour().minute())))
-                            .font(.system(size: metrics.subtitleSize, weight: .medium, design: .rounded))
-                            .foregroundStyle(ShoppingModeLiveActivityPalette.secondaryText)
-                            .lineLimit(1)
-                    }
-
-                    EmptyView()
-                }
+                ExcursionStatusTextView(
+                    endDate: context.state.endDate,
+                    isExpired: isExpired,
+                    font: .system(size: metrics.subtitleSize, weight: .medium, design: .rounded),
+                    foregroundStyle: ShoppingModeLiveActivityPalette.secondaryText
+                )
             }
             .dynamicIsland(verticalPlacement: .belowIfTooWide)
         }

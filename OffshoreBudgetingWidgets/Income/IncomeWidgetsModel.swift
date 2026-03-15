@@ -50,4 +50,21 @@ extension IncomeWidgetSnapshot {
             ]
         )
     }
+
+    static var truncationPreview: IncomeWidgetSnapshot {
+        IncomeWidgetSnapshot(
+            title: "Income",
+            periodToken: "P",
+            rangeStart: Calendar.current.date(from: DateComponents(year: 2026, month: 3, day: 1)) ?? .now,
+            rangeEnd: Calendar.current.date(from: DateComponents(year: 2026, month: 3, day: 31)) ?? .now,
+            plannedTotal: 5235.30,
+            actualTotal: 2559.32,
+            recentItems: [
+                .init(source: "International Payroll Deposit", amount: 2494.80, date: Calendar.current.date(byAdding: .day, value: -3, to: .now) ?? .now, isPlanned: false),
+                .init(source: "Tax Adjustment Refund", amount: 53.29, date: Calendar.current.date(byAdding: .day, value: -6, to: .now) ?? .now, isPlanned: false),
+                .init(source: "Performance Paycheck", amount: 2740.50, date: Calendar.current.date(byAdding: .day, value: -11, to: .now) ?? .now, isPlanned: true),
+                .init(source: "Workspace Expense Reimbursement", amount: 10.87, date: Calendar.current.date(byAdding: .day, value: -14, to: .now) ?? .now, isPlanned: false)
+            ]
+        )
+    }
 }

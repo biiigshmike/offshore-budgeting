@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import WidgetKit
 
 // MARK: - Helpers
 
@@ -15,6 +16,12 @@ private func incomeWidgetLocalized(_ key: String) -> String {
 
 private func incomeWidgetLocalizedFormat(_ key: String, _ arguments: CVarArg...) -> String {
     String(format: NSLocalizedString(key, comment: ""), locale: Locale.current, arguments)
+}
+
+private enum IncomeDeltaCopyStyle {
+    case full
+    case compact
+    case amountOnly
 }
 
 private extension IncomeWidgetSnapshot {
@@ -78,6 +85,52 @@ private extension IncomeWidgetSnapshot {
     /// Small header uses no spaces around the separator to keep it short.
     var periodAndRangeSmall: String { "\(periodToken) • \(rangeTextSmall)" }
 
+    var compactRangeText: String {
+        widgetCompactDateRangeText(start: rangeStart, end: rangeEnd)
+    }
+
+    var compactProgressText: String {
+        guard let pct = percent else { return incomeWidgetLocalized("Progress —") }
+        return pct.formatted(.percent.precision(.fractionLength(0)))
+    }
+
+    var gaugeFooterTextMedium: String {
+        compactProgressText
+    }
+
+    func deltaText(style: IncomeDeltaCopyStyle) -> String {
+        let amount = delta.formatted(incomeWidgetCurrencyFormatStyle()).replacingOccurrences(of: "-", with: "")
+
+        switch style {
+        case .full:
+            if delta < 0 { return incomeWidgetLocalizedFormat("Left %@", amount) }
+            if delta > 0 { return incomeWidgetLocalizedFormat("Over %@", amount) }
+            return incomeWidgetLocalized("On target")
+
+        case .compact:
+            if delta < 0 { return incomeWidgetLocalizedFormat("%@ %@", incomeWidgetLocalized("Left"), amount) }
+            if delta > 0 { return incomeWidgetLocalizedFormat("%@ %@", incomeWidgetLocalized("Over"), amount) }
+            return incomeWidgetLocalized("On target")
+
+        case .amountOnly:
+            if delta == 0 { return incomeWidgetLocalized("On target") }
+            return amount
+        }
+    }
+
+}
+
+private struct IncomeLargeFooterView: View {
+    let snapshot: IncomeWidgetSnapshot
+
+    var body: some View {
+        Text(snapshot.compactProgressText)
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
 }
 
 private struct MetricValueView: View {
@@ -178,17 +231,20 @@ struct IncomeWidgetMediumView: View {
                     title: snapshot.title,
                     periodToken: snapshot.periodToken,
                     rangeText: snapshot.rangeText,
-                    style: .stacked
+                    style: .stacked,
+                    compactRangeText: snapshot.compactRangeText,
+                    rangeDisplayMode: .compact,
+                    secondaryBehavior: .flexible(maxLines: 2)
                 )
 
                 IncomeGaugeView(
                     planned: snapshot.plannedTotal,
                     actual: snapshot.actualTotal,
                     showsPercentEnds: true,
-                    footer: .progressOnly(snapshot.progressText),
+                    footer: .progressOnly(snapshot.gaugeFooterTextMedium),
                     footerAlignment: .leading
                 )
-                .frame(height: 44)
+                .frame(height: 52)
             }
 
             VStack(alignment: .leading, spacing: 10) {
@@ -219,18 +275,22 @@ struct IncomeWidgetLargeView: View {
                 title: snapshot.title,
                 periodToken: snapshot.periodToken,
                 rangeText: snapshot.rangeText,
-                style: .singleLine
+                style: .singleLine,
+                compactRangeText: snapshot.compactRangeText,
+                rangeDisplayMode: .compact,
+                secondaryBehavior: .flexible(maxLines: 2)
             )
 
             IncomeGaugeView(
                 planned: snapshot.plannedTotal,
                 actual: snapshot.actualTotal,
                 showsPercentEnds: false,
-                footer: .progressOnly("\(snapshot.progressText) • \(snapshot.deltaText)"),
-                footerAlignment: .centered
+                footer: .none
             )
             .frame(maxWidth: .infinity)
-            .frame(height: 54)
+            .frame(height: 22)
+
+            IncomeLargeFooterView(snapshot: snapshot)
 
             HStack(spacing: 12) {
                 MetricValueView(title: incomeWidgetLocalized("Planned"), value: snapshot.plannedTotal)
@@ -279,18 +339,22 @@ struct IncomeWidgetExtraLargeView: View {
                 title: snapshot.title,
                 periodToken: snapshot.periodToken,
                 rangeText: snapshot.rangeText,
-                style: .singleLine
+                style: .singleLine,
+                compactRangeText: snapshot.compactRangeText,
+                rangeDisplayMode: .compact,
+                secondaryBehavior: .flexible(maxLines: 2)
             )
 
             IncomeGaugeView(
                 planned: snapshot.plannedTotal,
                 actual: snapshot.actualTotal,
                 showsPercentEnds: false,
-                footer: .progressOnly("\(snapshot.progressText) • \(snapshot.deltaText)"),
-                footerAlignment: .centered
+                footer: .progressOnly("\(snapshot.compactProgressText) • \(snapshot.deltaText(style: .full))"),
+                footerAlignment: .centered,
+                footerLineLimit: 1
             )
             .frame(maxWidth: .infinity)
-            .frame(height: 58)
+            .frame(height: 52)
 
             // Planned leading, Actual trailing
             HStack(alignment: .top) {
@@ -342,4 +406,20 @@ struct IncomeWidgetExtraLargeView: View {
 private func incomeWidgetCurrencyFormatStyle() -> FloatingPointFormatStyle<Double>.Currency {
     let code = Locale.current.currency?.identifier ?? "USD"
     return .currency(code: code)
+}
+
+#Preview("Income Small Long Content") {
+    IncomeWidgetSmallView(snapshot: .truncationPreview)
+        .containerBackground(.background, for: .widget)
+}
+
+#Preview("Income Medium Long Content") {
+    IncomeWidgetMediumView(snapshot: .truncationPreview)
+        .containerBackground(.background, for: .widget)
+        .environment(\.locale, Locale(identifier: "de"))
+}
+
+#Preview("Income Large Long Content") {
+    IncomeWidgetLargeView(snapshot: .truncationPreview)
+        .containerBackground(.background, for: .widget)
 }
