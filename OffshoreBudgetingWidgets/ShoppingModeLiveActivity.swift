@@ -5,10 +5,6 @@ private func liveActivityLocalized(_ key: String) -> String {
     NSLocalizedString(key, comment: "")
 }
 
-private func liveActivityLocalizedFormat(_ key: String, _ arguments: CVarArg...) -> String {
-    String(format: NSLocalizedString(key, comment: ""), locale: Locale.current, arguments)
-}
-
 private struct ExcursionStatusTextView: View {
     let endDate: Date
     let isExpired: Bool
@@ -24,40 +20,29 @@ private struct ExcursionStatusTextView: View {
         }
     }
 
-    private var formattedTime: String {
-        endDate.formatted(.dateTime.hour().minute())
-    }
-
     private var primaryText: some View {
-        Text(isExpired ? liveActivityLocalized("Session ended") : liveActivityLocalizedFormat("Active until %@", formattedTime))
-            .font(font)
-            .foregroundStyle(foregroundStyle)
-            .lineLimit(1)
-            .allowsTightening(true)
+        statusText(isExpired ? Text(liveActivityLocalized("Session ended")) : Text("Active until \(endDate, format: .dateTime.hour().minute())"))
     }
 
     private var secondaryText: some View {
-        Text(isExpired ? liveActivityLocalized("Session ended") : liveActivityLocalizedFormat("Ends %@", formattedTime))
-            .font(font)
-            .foregroundStyle(foregroundStyle)
-            .lineLimit(1)
-            .allowsTightening(true)
+        statusText(isExpired ? Text(liveActivityLocalized("Session ended")) : Text("Ends \(endDate, format: .dateTime.hour().minute())"))
     }
 
     private var compactText: some View {
-        Text(isExpired ? liveActivityLocalized("Ended") : liveActivityLocalizedFormat("Until %@", formattedTime))
-            .font(font)
-            .foregroundStyle(foregroundStyle)
-            .lineLimit(1)
-            .allowsTightening(true)
+        statusText(isExpired ? Text(liveActivityLocalized("Ended")) : Text("Until \(endDate, format: .dateTime.hour().minute())"))
     }
 
     private var timeOnlyText: some View {
-        Text(isExpired ? liveActivityLocalized("Done") : formattedTime)
+        statusText(isExpired ? Text(liveActivityLocalized("Done")) : Text(endDate, format: .dateTime.hour().minute()))
+    }
+
+    private func statusText(_ text: Text) -> some View {
+        text
             .font(font)
             .foregroundStyle(foregroundStyle)
             .lineLimit(1)
             .allowsTightening(true)
+            .fixedSize(horizontal: true, vertical: false)
     }
 }
 
