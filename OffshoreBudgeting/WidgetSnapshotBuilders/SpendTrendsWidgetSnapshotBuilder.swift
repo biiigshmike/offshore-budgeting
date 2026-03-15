@@ -17,9 +17,10 @@ enum SpendTrendsWidgetSnapshotBuilder {
         case monthRanges
     }
 
-    static func buildAndSaveAllPeriods(
+    nonisolated static func buildAndSaveAllPeriods(
         modelContext: ModelContext,
-        workspaceID: UUID
+        workspaceID: UUID,
+        shouldReloadTimelines: Bool = true
     ) {
         let workspaceIDString = workspaceID.uuidString
         let now = Date()
@@ -74,10 +75,12 @@ enum SpendTrendsWidgetSnapshotBuilder {
             }
         }
 
-        SpendTrendsWidgetSnapshotStore.reloadTimelines()
+        if shouldReloadTimelines {
+            SpendTrendsWidgetSnapshotStore.reloadTimelines()
+        }
     }
 
-    private static func buildSnapshot(
+    nonisolated private static func buildSnapshot(
         modelContext: ModelContext,
         workspaceID: UUID,
         period: SpendTrendsWidgetPeriod,
@@ -255,7 +258,7 @@ enum SpendTrendsWidgetSnapshotBuilder {
 
     // MARK: - Range resolution
 
-    private static func resolvedRange(
+    nonisolated private static func resolvedRange(
         period: SpendTrendsWidgetPeriod,
         now: Date
     ) -> (start: Date, end: Date, granularity: Granularity) {
@@ -308,7 +311,7 @@ enum SpendTrendsWidgetSnapshotBuilder {
 
     // MARK: - Category totals
 
-    private static func categoryTotals(
+    nonisolated private static func categoryTotals(
         plannedExpenses: [PlannedExpense],
         variableExpenses: [VariableExpense]
     ) -> [UUID?: Double] {
@@ -326,7 +329,7 @@ enum SpendTrendsWidgetSnapshotBuilder {
         return totals
     }
 
-    private static func buildCategoryLookup(
+    nonisolated private static func buildCategoryLookup(
         plannedExpenses: [PlannedExpense],
         variableExpenses: [VariableExpense]
     ) -> [UUID?: (name: String, hexColor: String?)] {
@@ -349,7 +352,7 @@ enum SpendTrendsWidgetSnapshotBuilder {
         return lookup
     }
 
-    private static func buildBucketSlices(
+    nonisolated private static func buildBucketSlices(
         totals: [UUID?: Double],
         categoryLookup: [UUID?: (name: String, hexColor: String?)],
         topCategoryKeys: [UUID?]
@@ -426,7 +429,7 @@ enum SpendTrendsWidgetSnapshotBuilder {
 
     // MARK: - Buckets
 
-    private static func makeBuckets(start: Date, end: Date, granularity: Granularity) -> [(start: Date, end: Date)] {
+    nonisolated private static func makeBuckets(start: Date, end: Date, granularity: Granularity) -> [(start: Date, end: Date)] {
         switch granularity {
         case .day:
             return makeDayBuckets(start: start, end: end)
@@ -439,7 +442,7 @@ enum SpendTrendsWidgetSnapshotBuilder {
         }
     }
 
-    private static func makeDayBuckets(start: Date, end: Date) -> [(start: Date, end: Date)] {
+    nonisolated private static func makeDayBuckets(start: Date, end: Date) -> [(start: Date, end: Date)] {
         let cal = Calendar.current
         var buckets: [(start: Date, end: Date)] = []
 
@@ -454,7 +457,7 @@ enum SpendTrendsWidgetSnapshotBuilder {
         return buckets
     }
 
-    private static func makeMonthBuckets(start: Date, end: Date) -> [(start: Date, end: Date)] {
+    nonisolated private static func makeMonthBuckets(start: Date, end: Date) -> [(start: Date, end: Date)] {
         let cal = Calendar.current
         var buckets: [(start: Date, end: Date)] = []
 
@@ -470,7 +473,7 @@ enum SpendTrendsWidgetSnapshotBuilder {
         return buckets
     }
 
-    private static func makeQuarterBuckets(start: Date, end: Date) -> [(start: Date, end: Date)] {
+    nonisolated private static func makeQuarterBuckets(start: Date, end: Date) -> [(start: Date, end: Date)] {
         let cal = Calendar.current
         var buckets: [(start: Date, end: Date)] = []
 
@@ -486,7 +489,7 @@ enum SpendTrendsWidgetSnapshotBuilder {
         return buckets
     }
 
-    private static func makeMonthRangeBuckets(start: Date, end: Date) -> [(start: Date, end: Date)] {
+    nonisolated private static func makeMonthRangeBuckets(start: Date, end: Date) -> [(start: Date, end: Date)] {
         let cal = Calendar.current
         var results: [(start: Date, end: Date)] = []
 
@@ -528,7 +531,7 @@ enum SpendTrendsWidgetSnapshotBuilder {
 
     // MARK: - Labels
 
-    private static func bucketLabel(
+    nonisolated private static func bucketLabel(
         start: Date,
         end: Date,
         granularity: Granularity,
@@ -560,22 +563,22 @@ enum SpendTrendsWidgetSnapshotBuilder {
 
     // MARK: - Date helpers
 
-    private static func startOfDay(_ date: Date) -> Date {
+    nonisolated private static func startOfDay(_ date: Date) -> Date {
         Calendar.current.startOfDay(for: date)
     }
 
-    private static func endOfDay(_ date: Date) -> Date {
+    nonisolated private static func endOfDay(_ date: Date) -> Date {
         let cal = Calendar.current
         let start = cal.startOfDay(for: date)
         return cal.date(byAdding: DateComponents(day: 1, second: -1), to: start) ?? date
     }
 
-    private static func startOfMonth(containing date: Date) -> Date {
+    nonisolated private static func startOfMonth(containing date: Date) -> Date {
         let cal = Calendar.current
         return cal.date(from: cal.dateComponents([.year, .month], from: date)) ?? date
     }
 
-    private static func startOfQuarter(containing date: Date) -> Date {
+    nonisolated private static func startOfQuarter(containing date: Date) -> Date {
         let cal = Calendar.current
         let year = cal.component(.year, from: date)
         let month = cal.component(.month, from: date)
@@ -583,18 +586,18 @@ enum SpendTrendsWidgetSnapshotBuilder {
         return cal.date(from: DateComponents(year: year, month: quarterStartMonth, day: 1)) ?? date
     }
 
-    private static func defaultBudgetingPeriodFromSharedDefaults() -> BudgetingPeriod {
+    nonisolated private static func defaultBudgetingPeriodFromSharedDefaults() -> BudgetingPeriod {
         let defaults = UserDefaults(suiteName: SpendTrendsWidgetSnapshotStore.appGroupID)
         let raw = defaults?.string(forKey: "general_defaultBudgetingPeriod") ?? BudgetingPeriod.monthly.rawValue
         return BudgetingPeriod(rawValue: raw) ?? .monthly
     }
 
-    private static func defaultExcludeFuturePlannedExpensesFromSharedDefaults() -> Bool {
+    nonisolated private static func defaultExcludeFuturePlannedExpensesFromSharedDefaults() -> Bool {
         let defaults = UserDefaults(suiteName: SpendTrendsWidgetSnapshotStore.appGroupID)
         return defaults?.bool(forKey: "general_excludeFuturePlannedExpensesFromCalculations") ?? false
     }
 
-    private static func defaultExcludeFutureVariableExpensesFromSharedDefaults() -> Bool {
+    nonisolated private static func defaultExcludeFutureVariableExpensesFromSharedDefaults() -> Bool {
         let defaults = UserDefaults(suiteName: SpendTrendsWidgetSnapshotStore.appGroupID)
         return defaults?.bool(forKey: "general_excludeFutureVariableExpensesFromCalculations") ?? false
     }

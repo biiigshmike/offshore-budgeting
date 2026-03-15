@@ -11,7 +11,7 @@ enum VariableExpenseFuturePolicy {
 
     // MARK: - Date Classification
 
-    static func isFutureVariableExpense(
+    nonisolated static func isFutureVariableExpense(
         _ expense: VariableExpense,
         now: Date = .now,
         calendar: Calendar = .current
@@ -19,7 +19,7 @@ enum VariableExpenseFuturePolicy {
         isFutureDate(expense.transactionDate, now: now, calendar: calendar)
     }
 
-    static func isFutureDate(
+    nonisolated static func isFutureDate(
         _ date: Date,
         now: Date = .now,
         calendar: Calendar = .current
@@ -31,7 +31,7 @@ enum VariableExpenseFuturePolicy {
 
     // MARK: - Filters
 
-    static func filteredForVisibility(
+    nonisolated static func filteredForVisibility(
         _ expenses: [VariableExpense],
         hideFuture: Bool,
         now: Date = .now,
@@ -41,7 +41,7 @@ enum VariableExpenseFuturePolicy {
         return expenses.filter { !isFutureVariableExpense($0, now: now, calendar: calendar) }
     }
 
-    static func filteredForCalculations(
+    nonisolated static func filteredForCalculations(
         _ expenses: [VariableExpense],
         excludeFuture: Bool,
         now: Date = .now,

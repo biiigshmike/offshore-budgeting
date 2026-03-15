@@ -8,7 +8,7 @@
 import Foundation
 import WidgetKit
 
-struct CardWidgetSnapshot: Codable, Hashable {
+nonisolated struct CardWidgetSnapshot: Codable, Hashable {
     let title: String                 // Card name
     let cardID: String
     let themeToken: String
@@ -21,7 +21,7 @@ struct CardWidgetSnapshot: Codable, Hashable {
     let unifiedExpensesTotal: Double
     let recentItems: [CardWidgetRecentItem]?
 
-    struct CardWidgetRecentItem: Codable, Hashable {
+    nonisolated struct CardWidgetRecentItem: Codable, Hashable {
         let name: String
         let amount: Double
         let date: Date
@@ -29,7 +29,7 @@ struct CardWidgetSnapshot: Codable, Hashable {
     }
 }
 
-struct CardWidgetEntry: TimelineEntry {
+nonisolated struct CardWidgetEntry: TimelineEntry {
     let date: Date
     let periodToken: String
     let cardID: String?

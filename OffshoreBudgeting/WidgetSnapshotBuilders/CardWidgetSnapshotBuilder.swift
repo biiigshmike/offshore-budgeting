@@ -10,9 +10,10 @@ import SwiftData
 
 enum CardWidgetSnapshotBuilder {
 
-    static func buildAndSaveAllPeriods(
+    nonisolated static func buildAndSaveAllPeriods(
         modelContext: ModelContext,
-        workspaceID: UUID
+        workspaceID: UUID,
+        shouldReloadTimelines: Bool = true
     ) {
         let workspaceIDString = workspaceID.uuidString
         let now = Date()
@@ -65,10 +66,12 @@ enum CardWidgetSnapshotBuilder {
             }
         }
 
-        CardWidgetSnapshotStore.reloadCardWidgetTimelines()
+        if shouldReloadTimelines {
+            CardWidgetSnapshotStore.reloadCardWidgetTimelines()
+        }
     }
 
-    static func buildSnapshot(
+    nonisolated static func buildSnapshot(
         modelContext: ModelContext,
         workspaceID: UUID,
         card: Card,
@@ -180,7 +183,7 @@ enum CardWidgetSnapshotBuilder {
 
     // MARK: - Range Resolution (mirrors Income widget rules)
 
-    private static func resolvedRange(
+    nonisolated private static func resolvedRange(
         period: CardWidgetPeriod,
         now: Date
     ) -> (start: Date, end: Date) {
@@ -219,23 +222,23 @@ enum CardWidgetSnapshotBuilder {
         }
     }
 
-    private static func defaultBudgetingPeriodFromSharedDefaults() -> BudgetingPeriod {
+    nonisolated private static func defaultBudgetingPeriodFromSharedDefaults() -> BudgetingPeriod {
         let defaults = UserDefaults(suiteName: CardWidgetSnapshotStore.appGroupID)
         let raw = defaults?.string(forKey: "general_defaultBudgetingPeriod") ?? BudgetingPeriod.monthly.rawValue
         return BudgetingPeriod(rawValue: raw) ?? .monthly
     }
 
-    private static func defaultExcludeFuturePlannedExpensesFromSharedDefaults() -> Bool {
+    nonisolated private static func defaultExcludeFuturePlannedExpensesFromSharedDefaults() -> Bool {
         let defaults = UserDefaults(suiteName: CardWidgetSnapshotStore.appGroupID)
         return defaults?.bool(forKey: "general_excludeFuturePlannedExpensesFromCalculations") ?? false
     }
 
-    private static func defaultExcludeFutureVariableExpensesFromSharedDefaults() -> Bool {
+    nonisolated private static func defaultExcludeFutureVariableExpensesFromSharedDefaults() -> Bool {
         let defaults = UserDefaults(suiteName: CardWidgetSnapshotStore.appGroupID)
         return defaults?.bool(forKey: "general_excludeFutureVariableExpensesFromCalculations") ?? false
     }
 
-    private static func endOfDay(_ date: Date, calendar: Calendar) -> Date {
+    nonisolated private static func endOfDay(_ date: Date, calendar: Calendar) -> Date {
         let start = calendar.startOfDay(for: date)
         return calendar.date(byAdding: DateComponents(day: 1, second: -1), to: start) ?? date
     }

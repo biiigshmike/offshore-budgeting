@@ -11,13 +11,16 @@ import SwiftData
 struct ContentView: View {
     let initialSectionOverride: AppSection?
     let resumeState: ContentViewResumeState
+    private let widgetRefreshExecutor: ContentViewWidgetRefreshExecutor
 
     init(
         initialSectionOverride: AppSection? = nil,
-        resumeState: ContentViewResumeState
+        resumeState: ContentViewResumeState,
+        modelContainer: ModelContainer
     ) {
         self.initialSectionOverride = initialSectionOverride
         self.resumeState = resumeState
+        self.widgetRefreshExecutor = ContentViewWidgetRefreshExecutor(modelContainer: modelContainer)
     }
 
     // MARK: - Selection
@@ -127,6 +130,7 @@ struct ContentView: View {
                 }
             }
             .onAppear {
+                traceResume("contentView onAppear")
                 performImmediateResumeWiring()
                 scheduleDeferredResumeRefresh(
                     trigger: .initialAppear,
@@ -178,6 +182,7 @@ struct ContentView: View {
                 )
             }
             .onChange(of: scenePhase) { _, newPhase in
+                traceResume("scenePhase changed=\(debugScenePhase(newPhase))")
                 if newPhase == .active {
                     performImmediateResumeWiring()
                     scheduleDeferredResumeRefresh(
@@ -285,11 +290,22 @@ struct ContentView: View {
             let shouldContinue = await MainActor.run { resumeState.coordinator.isCurrent(request) }
             guard shouldContinue else { return }
 
-            if request.widgetSignature != nil {
+            if let widgetSignature = request.widgetSignature {
                 await MainActor.run {
-                    refreshAllWidgetSnapshotsIfPossible()
+                    traceResume(
+                        "starting widgets trigger=\(trigger.rawValue) workspaceID=\(widgetSignature.workspaceID.uuidString)"
+                    )
+                }
+
+                let widgetReport = await widgetRefreshExecutor.refreshAll(
+                    workspaceID: widgetSignature.workspaceID
+                )
+
+                await MainActor.run {
                     resumeState.markWidgetRefreshCompleted(request)
-                    traceResume("completed widgets trigger=\(trigger.rawValue)")
+                    traceResume(
+                        "completed widgets trigger=\(trigger.rawValue) \(widgetReport.traceSummary)"
+                    )
                 }
             }
 
@@ -319,6 +335,7 @@ struct ContentView: View {
 
     @MainActor
     private func cancelDeferredResumeRefresh() {
+        traceResume("cancel deferred refresh")
         resumeState.cancelPending()
     }
 
@@ -379,48 +396,17 @@ struct ContentView: View {
         #endif
     }
 
-    @MainActor
-    private func refreshAllWidgetSnapshotsIfPossible() {
-        refreshIncomeWidgetSnapshotsIfPossible()
-        refreshCardWidgetSnapshotsIfPossible()
-        refreshNextPlannedExpenseWidgetSnapshotsIfPossible()
-        refreshSpendTrendsWidgetSnapshotsIfPossible()
-    }
-
-    @MainActor
-    private func refreshIncomeWidgetSnapshotsIfPossible() {
-        guard let id = UUID(uuidString: selectedWorkspaceID) else { return }
-        IncomeWidgetSnapshotBuilder.buildAndSaveAllPeriods(
-            modelContext: modelContext,
-            workspaceID: id
-        )
-    }
-
-    @MainActor
-    private func refreshCardWidgetSnapshotsIfPossible() {
-        guard let id = UUID(uuidString: selectedWorkspaceID) else { return }
-        CardWidgetSnapshotBuilder.buildAndSaveAllPeriods(
-            modelContext: modelContext,
-            workspaceID: id
-        )
-    }
-
-    @MainActor
-    private func refreshNextPlannedExpenseWidgetSnapshotsIfPossible() {
-        guard let id = UUID(uuidString: selectedWorkspaceID) else { return }
-        NextPlannedExpenseWidgetSnapshotBuilder.buildAndSaveAllPeriods(
-            modelContext: modelContext,
-            workspaceID: id
-        )
-    }
-
-    @MainActor
-    private func refreshSpendTrendsWidgetSnapshotsIfPossible() {
-        guard let id = UUID(uuidString: selectedWorkspaceID) else { return }
-        SpendTrendsWidgetSnapshotBuilder.buildAndSaveAllPeriods(
-            modelContext: modelContext,
-            workspaceID: id
-        )
+    private func debugScenePhase(_ phase: ScenePhase) -> String {
+        switch phase {
+        case .active:
+            return "active"
+        case .inactive:
+            return "inactive"
+        case .background:
+            return "background"
+        @unknown default:
+            return "unknown"
+        }
     }
 
     @MainActor

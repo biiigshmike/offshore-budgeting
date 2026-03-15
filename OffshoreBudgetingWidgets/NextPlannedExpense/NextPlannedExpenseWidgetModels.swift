@@ -8,14 +8,14 @@
 import Foundation
 import WidgetKit
 
-struct NextPlannedExpenseWidgetSnapshot: Codable, Hashable {
+nonisolated struct NextPlannedExpenseWidgetSnapshot: Codable, Hashable {
     let title: String
     let periodToken: String
     let rangeStart: Date
     let rangeEnd: Date
     let items: [Item]
 
-    struct Item: Codable, Hashable {
+    nonisolated struct Item: Codable, Hashable {
         let expenseID: String
         let expenseTitle: String
         let cardName: String
@@ -27,7 +27,7 @@ struct NextPlannedExpenseWidgetSnapshot: Codable, Hashable {
     }
 }
 
-struct NextPlannedExpenseWidgetEntry: TimelineEntry {
+nonisolated struct NextPlannedExpenseWidgetEntry: TimelineEntry {
     let date: Date
     let periodToken: String
     let cardID: String?

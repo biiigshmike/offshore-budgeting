@@ -41,7 +41,8 @@ struct AppBootstrapRootView: View {
         } else {
             ContentView(
                 initialSectionOverride: initialSectionOverride,
-                resumeState: resumeState
+                resumeState: resumeState,
+                modelContainer: modelContainer
             )
         }
     }

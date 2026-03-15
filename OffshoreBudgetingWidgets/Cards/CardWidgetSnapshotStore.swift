@@ -9,35 +9,35 @@ import Foundation
 import WidgetKit
 
 enum CardWidgetSnapshotStore {
-    static let appGroupID = "group.com.mb.offshore-budgeting"
+    nonisolated static let appGroupID = "group.com.mb.offshore-budgeting"
 
-    private static var defaults: UserDefaults? {
+    nonisolated private static var defaults: UserDefaults? {
         UserDefaults(suiteName: appGroupID)
     }
 
-    static let selectedWorkspaceKey = "selectedWorkspaceID"
+    nonisolated static let selectedWorkspaceKey = "selectedWorkspaceID"
 
-    private static func snapshotKey(workspaceID: String, cardID: String, periodToken: String) -> String {
+    nonisolated private static func snapshotKey(workspaceID: String, cardID: String, periodToken: String) -> String {
         "cardWidget.snapshot.\(workspaceID).\(cardID).\(periodToken)"
     }
 
-    private static func cardListKey(workspaceID: String) -> String {
+    nonisolated private static func cardListKey(workspaceID: String) -> String {
         "cardWidget.cards.\(workspaceID)"
     }
 
     // MARK: - Workspace
 
-    static func selectedWorkspaceID() -> String? {
+    nonisolated static func selectedWorkspaceID() -> String? {
         defaults?.string(forKey: selectedWorkspaceKey)
     }
 
-    static func setSelectedWorkspaceID(_ id: String) {
+    nonisolated static func setSelectedWorkspaceID(_ id: String) {
         defaults?.set(id, forKey: selectedWorkspaceKey)
     }
 
     // MARK: - Snapshots
 
-    static func save(snapshot: CardWidgetSnapshot, workspaceID: String, cardID: String, periodToken: String) {
+    nonisolated static func save(snapshot: CardWidgetSnapshot, workspaceID: String, cardID: String, periodToken: String) {
         guard let defaults else { return }
         do {
             let data = try JSONEncoder().encode(snapshot)
@@ -47,7 +47,7 @@ enum CardWidgetSnapshotStore {
         }
     }
 
-    static func load(workspaceID: String, cardID: String, periodToken: String) -> CardWidgetSnapshot? {
+    nonisolated static func load(workspaceID: String, cardID: String, periodToken: String) -> CardWidgetSnapshot? {
         guard
             let defaults,
             let data = defaults.data(forKey: snapshotKey(workspaceID: workspaceID, cardID: cardID, periodToken: periodToken))
@@ -65,7 +65,7 @@ enum CardWidgetSnapshotStore {
         let effectToken: String
     }
 
-    static func saveCardOptions(_ options: [CardOption], workspaceID: String) {
+    nonisolated static func saveCardOptions(_ options: [CardOption], workspaceID: String) {
         guard let defaults else { return }
         do {
             let data = try JSONEncoder().encode(options)
@@ -75,7 +75,7 @@ enum CardWidgetSnapshotStore {
         }
     }
 
-    static func loadCardOptions(workspaceID: String) -> [CardOption] {
+    nonisolated static func loadCardOptions(workspaceID: String) -> [CardOption] {
         guard
             let defaults,
             let data = defaults.data(forKey: cardListKey(workspaceID: workspaceID)),
@@ -87,7 +87,7 @@ enum CardWidgetSnapshotStore {
 
     // MARK: - Timeline reload
 
-    static func reloadCardWidgetTimelines() {
+    nonisolated static func reloadCardWidgetTimelines() {
         WidgetCenter.shared.reloadTimelines(ofKind: "CardWidget")
     }
 }

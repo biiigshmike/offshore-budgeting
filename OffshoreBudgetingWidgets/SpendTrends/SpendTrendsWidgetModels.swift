@@ -8,7 +8,7 @@
 import Foundation
 import WidgetKit
 
-struct SpendTrendsWidgetSnapshot: Codable, Hashable {
+nonisolated struct SpendTrendsWidgetSnapshot: Codable, Hashable {
     let title: String
     let periodToken: String
     let rangeStart: Date
@@ -18,21 +18,21 @@ struct SpendTrendsWidgetSnapshot: Codable, Hashable {
     let highestBucket: HighestBucket?
     let topCategories: [TopCategory]
 
-    struct Bucket: Codable, Hashable, Identifiable {
+    nonisolated struct Bucket: Codable, Hashable, Identifiable {
         let id: String
         let label: String
         let total: Double
         let slices: [Slice]
     }
 
-    struct Slice: Codable, Hashable, Identifiable {
+    nonisolated struct Slice: Codable, Hashable, Identifiable {
         let id: String
         let name: String
         let hexColor: String?
         let amount: Double
     }
 
-    struct HighestBucket: Codable, Hashable {
+    nonisolated struct HighestBucket: Codable, Hashable {
         let label: String
         let amount: Double
         let topCategoryName: String
@@ -40,7 +40,7 @@ struct SpendTrendsWidgetSnapshot: Codable, Hashable {
         let topCategoryPercentOfBucket: Double
     }
 
-    struct TopCategory: Codable, Hashable, Identifiable {
+    nonisolated struct TopCategory: Codable, Hashable, Identifiable {
         let id: String
         let name: String
         let hexColor: String?
@@ -49,7 +49,7 @@ struct SpendTrendsWidgetSnapshot: Codable, Hashable {
     }
 }
 
-struct SpendTrendsWidgetEntry: TimelineEntry {
+nonisolated struct SpendTrendsWidgetEntry: TimelineEntry {
     let date: Date
     let periodToken: String
     let cardID: String?

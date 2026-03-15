@@ -8,7 +8,7 @@
 import Foundation
 import WidgetKit
 
-struct IncomeWidgetSnapshot: Codable, Hashable {
+nonisolated struct IncomeWidgetSnapshot: Codable, Hashable {
     let title: String
     let periodToken: String
     let rangeStart: Date
@@ -19,7 +19,7 @@ struct IncomeWidgetSnapshot: Codable, Hashable {
 
     let recentItems: [IncomeWidgetRecentItem]?
 
-    struct IncomeWidgetRecentItem: Codable, Hashable {
+    nonisolated struct IncomeWidgetRecentItem: Codable, Hashable {
         let source: String
         let amount: Double
         let date: Date
@@ -27,7 +27,7 @@ struct IncomeWidgetSnapshot: Codable, Hashable {
     }
 }
 
-struct IncomeWidgetEntry: TimelineEntry {
+nonisolated struct IncomeWidgetEntry: TimelineEntry {
     let date: Date
     let periodToken: String
     let snapshot: IncomeWidgetSnapshot?

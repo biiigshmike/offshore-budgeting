@@ -186,6 +186,7 @@ struct AppRootView: View {
         }
         .onChange(of: selectedSectionRaw) { _, newValue in
             postBoardingTipActivationCycle &+= 1
+            traceTabSelection(newValue)
             if shouldSyncActiveSectionToCommandHub {
                 commandHub.setActiveSectionRaw(newValue)
             }
@@ -342,6 +343,13 @@ struct AppRootView: View {
 
     private var homeRootView: some View {
         HomeView(workspace: workspace)
+    }
+
+    private func traceTabSelection(_ rawValue: String) {
+        #if DEBUG
+        guard UserDefaults.standard.bool(forKey: "debug_resumeTraceEnabled") else { return }
+        print("[ResumeTrace] tabSelection changed=\(rawValue)")
+        #endif
     }
 
 }

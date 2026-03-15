@@ -10,9 +10,10 @@ import SwiftData
 
 enum NextPlannedExpenseWidgetSnapshotBuilder {
 
-    static func buildAndSaveAllPeriods(
+    nonisolated static func buildAndSaveAllPeriods(
         modelContext: ModelContext,
-        workspaceID: UUID
+        workspaceID: UUID,
+        shouldReloadTimelines: Bool = true
     ) {
         let workspaceIDString = workspaceID.uuidString
         let now = Date()
@@ -75,10 +76,12 @@ enum NextPlannedExpenseWidgetSnapshotBuilder {
             }
         }
 
-        NextPlannedExpenseWidgetSnapshotStore.reloadTimelines()
+        if shouldReloadTimelines {
+            NextPlannedExpenseWidgetSnapshotStore.reloadTimelines()
+        }
     }
 
-    static func buildSnapshot(
+    nonisolated static func buildSnapshot(
         modelContext: ModelContext,
         workspaceID: UUID,
         period: NextPlannedExpenseWidgetPeriod,
@@ -154,7 +157,7 @@ enum NextPlannedExpenseWidgetSnapshotBuilder {
 
     // MARK: - Range Resolution
 
-    private static func resolvedRange(
+    nonisolated private static func resolvedRange(
         period: NextPlannedExpenseWidgetPeriod,
         now: Date
     ) -> (start: Date, end: Date) {
@@ -193,13 +196,13 @@ enum NextPlannedExpenseWidgetSnapshotBuilder {
         }
     }
 
-    private static func defaultBudgetingPeriodFromSharedDefaults() -> BudgetingPeriod {
+    nonisolated private static func defaultBudgetingPeriodFromSharedDefaults() -> BudgetingPeriod {
         let defaults = UserDefaults(suiteName: NextPlannedExpenseWidgetSnapshotStore.appGroupID)
         let raw = defaults?.string(forKey: "general_defaultBudgetingPeriod") ?? BudgetingPeriod.monthly.rawValue
         return BudgetingPeriod(rawValue: raw) ?? .monthly
     }
 
-    private static func endOfDay(_ date: Date, calendar: Calendar) -> Date {
+    nonisolated private static func endOfDay(_ date: Date, calendar: Calendar) -> Date {
         let start = calendar.startOfDay(for: date)
         return calendar.date(byAdding: DateComponents(day: 1, second: -1), to: start) ?? date
     }

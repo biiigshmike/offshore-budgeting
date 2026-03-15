@@ -39,7 +39,7 @@ enum BudgetingPeriod: String, CaseIterable, Identifiable {
         displayTitle
     }
 
-    func defaultRange(containing date: Date, calendar: Calendar = .current) -> (start: Date, end: Date) {
+    nonisolated func defaultRange(containing date: Date, calendar: Calendar = .current) -> (start: Date, end: Date) {
         let day = calendar.startOfDay(for: date)
 
         switch self {
@@ -70,7 +70,7 @@ enum BudgetingPeriod: String, CaseIterable, Identifiable {
 
     // MARK: - Period boundaries
 
-    private func startOfWeek(containing date: Date, calendar: Calendar) -> Date {
+    nonisolated private func startOfWeek(containing date: Date, calendar: Calendar) -> Date {
         if let interval = calendar.dateInterval(of: .weekOfYear, for: date) {
             return calendar.startOfDay(for: interval.start)
         }
@@ -82,11 +82,11 @@ enum BudgetingPeriod: String, CaseIterable, Identifiable {
         return calendar.startOfDay(for: start)
     }
 
-    private func startOfMonth(containing date: Date, calendar: Calendar) -> Date {
+    nonisolated private func startOfMonth(containing date: Date, calendar: Calendar) -> Date {
         calendar.date(from: calendar.dateComponents([.year, .month], from: date)) ?? calendar.startOfDay(for: date)
     }
 
-    private func startOfQuarter(containing date: Date, calendar: Calendar) -> Date {
+    nonisolated private func startOfQuarter(containing date: Date, calendar: Calendar) -> Date {
         let comps = calendar.dateComponents([.year, .month], from: date)
         let year = comps.year ?? calendar.component(.year, from: date)
         let month = comps.month ?? calendar.component(.month, from: date)
@@ -102,7 +102,7 @@ enum BudgetingPeriod: String, CaseIterable, Identifiable {
         return calendar.date(from: DateComponents(year: year, month: quarterStartMonth, day: 1)) ?? calendar.startOfDay(for: date)
     }
 
-    private func startOfYear(containing date: Date, calendar: Calendar) -> Date {
+    nonisolated private func startOfYear(containing date: Date, calendar: Calendar) -> Date {
         let year = calendar.component(.year, from: date)
         return calendar.date(from: DateComponents(year: year, month: 1, day: 1)) ?? calendar.startOfDay(for: date)
     }

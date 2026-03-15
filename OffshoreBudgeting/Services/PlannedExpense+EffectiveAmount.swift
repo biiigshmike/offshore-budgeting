@@ -14,7 +14,7 @@ extension PlannedExpense {
     /// Returns the amount Offshore should use for calculations:
     /// - If `actualAmount > 0`, we treat that as the real amount and use it.
     /// - Otherwise, we fall back to `plannedAmount`.
-    func effectiveAmount() -> Double {
+    nonisolated func effectiveAmount() -> Double {
         if actualAmount > 0 {
             return actualAmount
         } else {
@@ -22,4 +22,3 @@ extension PlannedExpense {
         }
     }
 }
-

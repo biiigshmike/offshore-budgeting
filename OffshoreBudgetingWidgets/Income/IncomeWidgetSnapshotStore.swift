@@ -11,20 +11,20 @@ import WidgetKit
 
 enum IncomeWidgetSnapshotStore {
     
-    static let appGroupID = "group.com.mb.offshore-budgeting"
+    nonisolated static let appGroupID = "group.com.mb.offshore-budgeting"
 
-    private static var defaults: UserDefaults? {
+    nonisolated private static var defaults: UserDefaults? {
         UserDefaults(suiteName: appGroupID)
     }
 
     // Keep the selected workspace ID in the same suite so the widget knows what to read.
-    static let selectedWorkspaceKey = "selectedWorkspaceID"
+    nonisolated static let selectedWorkspaceKey = "selectedWorkspaceID"
 
-    private static func key(workspaceID: String, periodToken: String) -> String {
+    nonisolated private static func key(workspaceID: String, periodToken: String) -> String {
         "incomeWidget.snapshot.\(workspaceID).\(periodToken)"
     }
 
-    static func save(snapshot: IncomeWidgetSnapshot, workspaceID: String, periodToken: String) {
+    nonisolated static func save(snapshot: IncomeWidgetSnapshot, workspaceID: String, periodToken: String) {
         guard let defaults else { return }
         do {
             let data = try JSONEncoder().encode(snapshot)
@@ -34,7 +34,7 @@ enum IncomeWidgetSnapshotStore {
         }
     }
 
-    static func load(workspaceID: String, periodToken: String) -> IncomeWidgetSnapshot? {
+    nonisolated static func load(workspaceID: String, periodToken: String) -> IncomeWidgetSnapshot? {
         guard
             let defaults,
             let data = defaults.data(forKey: key(workspaceID: workspaceID, periodToken: periodToken))
@@ -43,15 +43,15 @@ enum IncomeWidgetSnapshotStore {
         return try? JSONDecoder().decode(IncomeWidgetSnapshot.self, from: data)
     }
 
-    static func selectedWorkspaceID() -> String? {
+    nonisolated static func selectedWorkspaceID() -> String? {
         defaults?.string(forKey: selectedWorkspaceKey)
     }
 
-    static func setSelectedWorkspaceID(_ id: String) {
+    nonisolated static func setSelectedWorkspaceID(_ id: String) {
         defaults?.set(id, forKey: selectedWorkspaceKey)
     }
 
-    static func reloadIncomeWidgetTimelines() {
+    nonisolated static func reloadIncomeWidgetTimelines() {
         WidgetCenter.shared.reloadTimelines(ofKind: "IncomeWidget")
     }
 }

@@ -79,10 +79,7 @@ struct OffshoreBudgetingApp: App {
             )
                 .id(rootResetToken)
                 .onAppear {
-                    ShoppingModeManager.shared.refreshIfExpired()
-                    if ShoppingModeManager.shared.status.isActive {
-                        ShoppingModeLocationService.shared.startMonitoringIfPossible()
-                    }
+                    refreshShoppingModeForForeground(reason: "sceneOnAppear")
                 }
                 .task {
                     #if DEBUG
@@ -96,10 +93,7 @@ struct OffshoreBudgetingApp: App {
                 }
                 .onChange(of: scenePhase) { _, newValue in
                     guard newValue == .active else { return }
-                    ShoppingModeManager.shared.refreshIfExpired()
-                    if ShoppingModeManager.shared.status.isActive {
-                        ShoppingModeLocationService.shared.startMonitoringIfPossible()
-                    }
+                    refreshShoppingModeForForeground(reason: "sceneBecameActive")
                 }
                 .onOpenURL { url in
                     _ = ShoppingModeManager.shared.handleDeepLink(url)
@@ -142,6 +136,33 @@ struct OffshoreBudgetingApp: App {
         let tabBar = UITabBar.appearance()
         tabBar.standardAppearance = appearance
         tabBar.scrollEdgeAppearance = appearance
+        #endif
+    }
+
+    @MainActor
+    private func refreshShoppingModeForForeground(reason: String) {
+        let start = DispatchTime.now().uptimeNanoseconds
+        traceShoppingModeForeground("starting reason=\(reason)")
+
+        ShoppingModeManager.shared.refreshIfExpired()
+        let isActive = ShoppingModeManager.shared.status.isActive
+        traceShoppingModeForeground("refreshed reason=\(reason) isActive=\(isActive)")
+
+        if isActive {
+            ShoppingModeLocationService.shared.startMonitoringIfPossible()
+            traceShoppingModeForeground("monitoring restarted reason=\(reason)")
+        }
+
+        let elapsedMillis = Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000
+        traceShoppingModeForeground(
+            "completed reason=\(reason) elapsedMs=\(String(format: "%.1f", elapsedMillis))"
+        )
+    }
+
+    private func traceShoppingModeForeground(_ message: String) {
+        #if DEBUG
+        guard UserDefaults.standard.bool(forKey: "debug_shoppingModeForegroundTraceEnabled") else { return }
+        print("[ShoppingModeForeground] \(message)")
         #endif
     }
 
