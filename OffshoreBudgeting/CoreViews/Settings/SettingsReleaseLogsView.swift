@@ -70,13 +70,28 @@ struct SettingsReleaseLogsView: View {
 
     static let releaseSections: [ReleaseSection] = [
         ReleaseSection(
-            version: "2.2.1",
-            build: "8",
+            version: "2.3.3",
+            build: "17",
             items: [
                 ReleaseItem(
-                    systemImage: "ladybug.slash",
-                    title: "Swept for Bugs",
-                    description: "Cleaned around the vault and managed to squash a few bugs and improve some UI glitches in the process."
+                    systemImage: "globe",
+                    title: "Language Support",
+                    description: "Offshore now supports the following languages:\n\nEnglish\nSpanish\nFrench\nGerman\nPortugese\nArabic\nChinese (Simplified)\n\nMore languages will be added in the future based on community demand."
+                ),
+                ReleaseItem(
+                    systemImage: "calendar.badge.clock",
+                    title: "Next Planned Expense",
+                    description: "This update fixes an issue where toggling Hide Future Planned Expenses in Settings would render the Next Planned Expense widget empty on the Home tab."
+                ),
+                ReleaseItem(
+                    systemImage: "sailboat.fill",
+                    title: "Excursion Mode",
+                    description: "Resolved an issue where the Dynamic Island widget would not clear itself once time expired. This update also corrects a bug where Location Services did not consistently prompt for permission as expected."
+                ),
+                ReleaseItem(
+                    systemImage: "wand.and.sparkles.inverse",
+                    title: "Sparkle and Polish",
+                    description: "Other quality of life improvements introduced with this update for a smoother, Offshore experience."
                 )
             ]
         ),
