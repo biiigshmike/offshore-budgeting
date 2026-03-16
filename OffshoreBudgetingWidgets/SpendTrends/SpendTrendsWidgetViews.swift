@@ -9,7 +9,7 @@ import SwiftUI
 import WidgetKit
 
 private func spendTrendsLocalizedFormat(_ key: String, _ arguments: CVarArg...) -> String {
-    String(format: NSLocalizedString(key, comment: ""), locale: Locale.current, arguments)
+    String(format: widgetLocalized(key), locale: Locale.current, arguments)
 }
 
 private extension SpendTrendsWidgetSnapshot {
@@ -335,7 +335,7 @@ struct SpendTrendsWidgetMediumView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         if let highest = snapshot.highestBucket {
                             HStack(spacing: 8) {
-                                Text("High")
+                                Text(widgetLocalized("High"))
                                     .font(.caption.weight(.semibold))
                                     .foregroundStyle(.secondary)
                                     .lineLimit(1)
@@ -356,7 +356,7 @@ struct SpendTrendsWidgetMediumView: View {
                                 .minimumScaleFactor(0.85)
 
                             HStack(spacing: 8) {
-                                Text("Top")
+                                Text(widgetLocalized("Top"))
                                     .font(.caption.weight(.semibold))
                                     .foregroundStyle(.secondary)
                                     .lineLimit(1)

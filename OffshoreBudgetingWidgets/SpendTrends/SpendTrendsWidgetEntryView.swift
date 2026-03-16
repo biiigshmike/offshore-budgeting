@@ -45,9 +45,9 @@ struct SpendTrendsWidgetEntryView: View {
         case .systemSmall:
             SpendTrendsEmptyStateSmall(periodToken: periodToken)
         case .systemMedium:
-            SpendTrendsEmptyStateMedium(periodToken: periodToken, rangeText: "No range")
+            SpendTrendsEmptyStateMedium(periodToken: periodToken, rangeText: widgetLocalized("No range"))
         default:
-            SpendTrendsEmptyStateLarge(periodToken: periodToken, rangeText: "No range")
+            SpendTrendsEmptyStateLarge(periodToken: periodToken, rangeText: widgetLocalized("No range"))
         }
     }
 }
@@ -57,9 +57,9 @@ private struct SpendTrendsEmptyStateSmall: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            WidgetHeaderView(title: "Spend Trends", periodToken: periodToken, rangeText: "No range", style: .stacked)
+            WidgetHeaderView(title: widgetLocalized("Spend Trends"), periodToken: periodToken, rangeText: widgetLocalized("No range"), style: .stacked)
 
-            Text("No spending data found for this period.")
+            Text(widgetLocalized("No spending data found for this period."))
                 .font(.headline.weight(.semibold))
                 .lineLimit(4)
 
@@ -77,13 +77,13 @@ private struct SpendTrendsEmptyStateMedium: View {
         VStack(alignment: .leading, spacing: 4) {
             ViewThatFits(in: .vertical) {
                 WidgetHeaderView(
-                    title: "Spend Trends",
+                    title: widgetLocalized("Spend Trends"),
                     periodToken: periodToken,
                     rangeText: rangeText,
                     style: .singleLine
                 )
                 WidgetHeaderView(
-                    title: "Spend Trends",
+                    title: widgetLocalized("Spend Trends"),
                     periodToken: periodToken,
                     rangeText: rangeText,
                     style: .stacked
@@ -92,7 +92,7 @@ private struct SpendTrendsEmptyStateMedium: View {
 
             Spacer(minLength: 0)
 
-            Text("No spending data found for this period.")
+            Text(widgetLocalized("No spending data found for this period."))
                 .font(.headline.weight(.semibold))
                 .lineLimit(3)
 
@@ -108,11 +108,11 @@ private struct SpendTrendsEmptyStateLarge: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            WidgetHeaderView(title: "Spend Trends", periodToken: periodToken, rangeText: rangeText, style: .singleLine)
+            WidgetHeaderView(title: widgetLocalized("Spend Trends"), periodToken: periodToken, rangeText: rangeText, style: .singleLine)
 
             Spacer(minLength: 0)
 
-            Text("No spending data found for this period.")
+            Text(widgetLocalized("No spending data found for this period."))
                 .font(.headline.weight(.semibold))
                 .lineLimit(3)
 

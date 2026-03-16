@@ -37,7 +37,7 @@ nonisolated struct IncomeWidgetEntry: TimelineEntry {
 extension IncomeWidgetSnapshot {
     static var placeholder: IncomeWidgetSnapshot {
         IncomeWidgetSnapshot(
-            title: "Income",
+            title: NSLocalizedString("Income", comment: "Income widget preview title."),
             periodToken: "1M",
             rangeStart: Calendar.current.date(byAdding: .day, value: -29, to: .now) ?? .now,
             rangeEnd: .now,
@@ -53,7 +53,7 @@ extension IncomeWidgetSnapshot {
 
     static var truncationPreview: IncomeWidgetSnapshot {
         IncomeWidgetSnapshot(
-            title: "Income",
+            title: NSLocalizedString("Income", comment: "Income widget preview title."),
             periodToken: "P",
             rangeStart: Calendar.current.date(from: DateComponents(year: 2026, month: 3, day: 1)) ?? .now,
             rangeEnd: Calendar.current.date(from: DateComponents(year: 2026, month: 3, day: 31)) ?? .now,

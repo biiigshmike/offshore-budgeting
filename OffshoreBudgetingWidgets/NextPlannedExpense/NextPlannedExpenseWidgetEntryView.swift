@@ -49,11 +49,11 @@ struct NextPlannedExpenseWidgetEntryView: View {
         case .systemSmall:
             NextPlannedExpenseEmptyStateSmall()
         case .systemMedium:
-            NextPlannedExpenseEmptyStateMedium(periodToken: periodToken, rangeText: "No range")
+            NextPlannedExpenseEmptyStateMedium(periodToken: periodToken, rangeText: widgetLocalized("No range"))
         case .systemExtraLarge:
-            NextPlannedExpenseEmptyStateExtraLarge(periodToken: periodToken, rangeText: "No range")
+            NextPlannedExpenseEmptyStateExtraLarge(periodToken: periodToken, rangeText: widgetLocalized("No range"))
         default:
-            NextPlannedExpenseEmptyStateLarge(periodToken: periodToken, rangeText: "No range")
+            NextPlannedExpenseEmptyStateLarge(periodToken: periodToken, rangeText: widgetLocalized("No range"))
         }
     }
 }
@@ -65,7 +65,7 @@ private struct NextPlannedExpenseEmptyStateSmall: View {
         VStack(alignment: .leading, spacing: 8) {
             WidgetHeaderView(title: nextPlannedLocalized("Next Planned Expense"), periodToken: "", rangeText: "")
 
-            Text("No upcoming planned expenses found for this period.")
+            Text(widgetLocalized("No upcoming planned expenses found for this period."))
                 .font(.headline.weight(.semibold))
                 .lineLimit(4)
 
@@ -90,7 +90,7 @@ private struct NextPlannedExpenseEmptyStateMedium: View {
 
             Spacer(minLength: 0)
 
-            Text("No upcoming planned expenses found for this period.")
+            Text(widgetLocalized("No upcoming planned expenses found for this period."))
                 .font(.headline.weight(.semibold))
                 .lineLimit(3)
                 .minimumScaleFactor(0.9)
@@ -116,7 +116,7 @@ private struct NextPlannedExpenseEmptyStateLarge: View {
 
             Spacer(minLength: 0)
 
-            Text("No upcoming planned expenses found for this period.")
+            Text(widgetLocalized("No upcoming planned expenses found for this period."))
                 .font(.headline.weight(.semibold))
                 .lineLimit(3)
 
@@ -141,7 +141,7 @@ private struct NextPlannedExpenseEmptyStateExtraLarge: View {
 
             Spacer(minLength: 0)
 
-            Text("No upcoming planned expenses found for this period.")
+            Text(widgetLocalized("No upcoming planned expenses found for this period."))
                 .font(.headline.weight(.semibold))
                 .lineLimit(3)
                 .multilineTextAlignment(.center)

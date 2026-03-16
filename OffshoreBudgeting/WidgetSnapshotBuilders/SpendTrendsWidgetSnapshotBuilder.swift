@@ -245,7 +245,7 @@ enum SpendTrendsWidgetSnapshotBuilder {
             }
 
         return SpendTrendsWidgetSnapshot(
-            title: "Spend Trends",
+            title: NSLocalizedString("Spend Trends", comment: "Spend trends widget title."),
             periodToken: period.rawValue,
             rangeStart: start,
             rangeEnd: end,

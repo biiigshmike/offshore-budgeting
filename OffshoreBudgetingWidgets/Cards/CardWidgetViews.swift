@@ -10,9 +10,7 @@ import WidgetKit
 
 // MARK: - Small
 
-private func cardWidgetLocalized(_ key: String) -> String {
-    NSLocalizedString(key, comment: "")
-}
+private func cardWidgetLocalized(_ key: String) -> String { widgetLocalized(key) }
 
 struct CardWidgetSmallView: View {
     let snapshot: CardWidgetSnapshot

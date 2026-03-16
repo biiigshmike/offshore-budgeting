@@ -45,9 +45,9 @@ struct CardWidgetEntryView: View {
         case .systemSmall:
             CardEmptyStateSmall()
         case .systemMedium:
-            CardEmptyStateMedium(periodToken: periodToken, rangeText: "No range")
+            CardEmptyStateMedium(periodToken: periodToken, rangeText: widgetLocalized("No range"))
         default:
-            CardEmptyStateLarge(periodToken: periodToken, rangeText: "No range")
+            CardEmptyStateLarge(periodToken: periodToken, rangeText: widgetLocalized("No range"))
         }
     }
 }
@@ -57,8 +57,8 @@ struct CardWidgetEntryView: View {
 private struct CardEmptyStateSmall: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            WidgetHeaderView(title: "Card", periodToken: "", rangeText: "")
-            Text("No card data found.")
+            WidgetHeaderView(title: widgetLocalized("Card"), periodToken: "", rangeText: "")
+            Text(widgetLocalized("No card data found."))
                 .font(.headline.weight(.semibold))
                 .lineLimit(2)
             Spacer(minLength: 0)
@@ -73,9 +73,9 @@ private struct CardEmptyStateMedium: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            WidgetHeaderView(title: "Card", periodToken: periodToken, rangeText: rangeText, style: .stacked)
+            WidgetHeaderView(title: widgetLocalized("Card"), periodToken: periodToken, rangeText: rangeText, style: .stacked)
             Spacer(minLength: 0)
-            Text("No card data found in this range.")
+            Text(widgetLocalized("No card data found in this range."))
                 .font(.headline.weight(.semibold))
                 .lineLimit(2)
                 .minimumScaleFactor(0.9)
@@ -91,12 +91,12 @@ private struct CardEmptyStateLarge: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            WidgetHeaderView(title: "Card", periodToken: periodToken, rangeText: rangeText, style: .singleLine)
+            WidgetHeaderView(title: widgetLocalized("Card"), periodToken: periodToken, rangeText: rangeText, style: .singleLine)
             Spacer(minLength: 0)
             VStack(alignment: .leading, spacing: 6) {
-                Text("No card data found in this range.")
+                Text(widgetLocalized("No card data found in this range."))
                     .font(.headline.weight(.semibold))
-                Text("Open Offshore to generate widget data for this period.")
+                Text(widgetLocalized("Open Offshore to generate widget data for this period."))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }

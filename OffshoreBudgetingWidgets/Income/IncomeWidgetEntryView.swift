@@ -56,13 +56,13 @@ struct IncomeWidgetEntryView: View {
         case .systemMedium:
             IncomeEmptyStateMedium(
                 periodToken: periodToken,
-                rangeText: "No range"
+                rangeText: widgetLocalized("No range")
             )
 
         default:
             IncomeEmptyStateLarge(
                 periodToken: periodToken,
-                rangeText: "No range",
+                rangeText: widgetLocalized("No range"),
                 headerStyle: .singleLine
             )
         }
@@ -77,12 +77,12 @@ private struct IncomeEmptyStateSmall: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             WidgetHeaderView(
-                title: "Income",
+                title: widgetLocalized("Income"),
                 periodToken: "",
                 rangeText: ""
             )
 
-            Text("No income data found.")
+            Text(widgetLocalized("No income data found."))
                 .font(.headline.weight(.semibold))
                 .lineLimit(2)
 
@@ -101,7 +101,7 @@ private struct IncomeEmptyStateMedium: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             WidgetHeaderView(
-                title: "Income",
+                title: widgetLocalized("Income"),
                 periodToken: periodToken,
                 rangeText: rangeText,
                 style: .stacked
@@ -109,7 +109,7 @@ private struct IncomeEmptyStateMedium: View {
 
             Spacer(minLength: 0)
 
-            Text("No income data found in this range.")
+            Text(widgetLocalized("No income data found in this range."))
                 .font(.headline.weight(.semibold))
                 .lineLimit(2)
                 .minimumScaleFactor(0.9)
@@ -131,7 +131,7 @@ private struct IncomeEmptyStateLarge: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             WidgetHeaderView(
-                title: "Income",
+                title: widgetLocalized("Income"),
                 periodToken: periodToken,
                 rangeText: rangeText,
                 style: headerStyle
@@ -140,10 +140,10 @@ private struct IncomeEmptyStateLarge: View {
             Spacer(minLength: 0)
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("No income data found in this range.")
+                Text(widgetLocalized("No income data found in this range."))
                     .font(.headline.weight(.semibold))
 
-                Text("Open Offshore to generate widget data for this period.")
+                Text(widgetLocalized("Open Offshore to generate widget data for this period."))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }

@@ -10,12 +10,10 @@ import WidgetKit
 
 // MARK: - Helpers
 
-private func incomeWidgetLocalized(_ key: String) -> String {
-    NSLocalizedString(key, comment: "")
-}
+private func incomeWidgetLocalized(_ key: String) -> String { widgetLocalized(key) }
 
 private func incomeWidgetLocalizedFormat(_ key: String, _ arguments: CVarArg...) -> String {
-    String(format: NSLocalizedString(key, comment: ""), locale: Locale.current, arguments)
+    String(format: widgetLocalized(key), locale: Locale.current, arguments)
 }
 
 private enum IncomeDeltaCopyStyle {
@@ -108,8 +106,8 @@ private extension IncomeWidgetSnapshot {
             return incomeWidgetLocalized("On target")
 
         case .compact:
-            if delta < 0 { return incomeWidgetLocalizedFormat("%@ %@", incomeWidgetLocalized("Left"), amount) }
-            if delta > 0 { return incomeWidgetLocalizedFormat("%@ %@", incomeWidgetLocalized("Over"), amount) }
+            if delta < 0 { return incomeWidgetLocalizedFormat("Left %@", amount) }
+            if delta > 0 { return incomeWidgetLocalizedFormat("Over %@", amount) }
             return incomeWidgetLocalized("On target")
 
         case .amountOnly:

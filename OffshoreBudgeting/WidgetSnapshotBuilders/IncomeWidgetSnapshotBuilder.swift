@@ -96,7 +96,7 @@ enum IncomeWidgetSnapshotBuilder {
             }
 
         return IncomeWidgetSnapshot(
-            title: "Income",
+            title: NSLocalizedString("Income", comment: "Income widget title."),
             periodToken: period.rawValue,
             rangeStart: start,
             rangeEnd: end,

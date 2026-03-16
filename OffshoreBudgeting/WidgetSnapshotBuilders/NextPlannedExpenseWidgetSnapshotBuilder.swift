@@ -132,13 +132,13 @@ enum NextPlannedExpenseWidgetSnapshotBuilder {
             .prefix(maxItems)
 
         let items: [NextPlannedExpenseWidgetSnapshot.Item] = upcoming.map {
-            .init(
-                expenseID: $0.id.uuidString,
-                expenseTitle: $0.title,
-                cardName: $0.card?.name ?? "Card",
-                cardThemeToken: $0.card?.theme ?? "graphite",
-                cardEffectToken: $0.card?.effect ?? "plastic",
-                expenseDate: $0.expenseDate,
+                .init(
+                    expenseID: $0.id.uuidString,
+                    expenseTitle: $0.title,
+                    cardName: $0.card?.name ?? NSLocalizedString("Card", comment: "Fallback card title in widget snapshots."),
+                    cardThemeToken: $0.card?.theme ?? "graphite",
+                    cardEffectToken: $0.card?.effect ?? "plastic",
+                    expenseDate: $0.expenseDate,
                 plannedAmount: $0.plannedAmount,
                 actualAmount: $0.effectiveAmount()
             )
@@ -147,7 +147,7 @@ enum NextPlannedExpenseWidgetSnapshotBuilder {
         guard !items.isEmpty else { return nil }
 
         return NextPlannedExpenseWidgetSnapshot(
-            title: "Next Planned Expense",
+            title: NSLocalizedString("Next Planned Expense", comment: "Next planned expense widget title."),
             periodToken: period.rawValue,
             rangeStart: start,
             rangeEnd: end,

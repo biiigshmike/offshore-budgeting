@@ -427,6 +427,36 @@ def extract_about_strings(source_path: Path) -> list[str]:
     return list(seen.keys())
 
 
+def extract_widget_source_strings(source_roots: list[Path]) -> list[tuple[Path, str]]:
+    patterns = [
+        re.compile(r'(?:widgetLocalized|widgetLocalizedFormat|cardWidgetLocalized|incomeWidgetLocalized|incomeWidgetLocalizedFormat|nextPlannedLocalized|nextPlannedLocalizedFormat|liveActivityLocalized|spendTrendsLocalizedFormat)\("((?:[^"\\]|\\.)*)"'),
+        re.compile(r'NSLocalizedString\("((?:[^"\\]|\\.)*)",\s*comment:'),
+        re.compile(r'static var title:\s*LocalizedStringResource\s*=\s*"((?:[^"\\]|\\.)*)"'),
+        re.compile(r'IntentDescription\("((?:[^"\\]|\\.)*)"\)'),
+        re.compile(r'@Parameter\(title:\s*"((?:[^"\\]|\\.)*)"'),
+        re.compile(r'TypeDisplayRepresentation\s*\{\s*"((?:[^"\\]|\\.)*)"\s*\}'),
+        re.compile(r'\.\w+:\s*"((?:[^"\\]|\\.)*)"'),
+    ]
+    seen: dict[tuple[str, str], None] = {}
+
+    for root in source_roots:
+        if root.is_file():
+            candidate_paths = [root]
+        elif root.exists():
+            candidate_paths = sorted(root.rglob("*.swift"))
+        else:
+            candidate_paths = []
+
+        for source_path in candidate_paths:
+            content = source_path.read_text(encoding="utf-8")
+            for pattern in patterns:
+                for match in pattern.finditer(content):
+                    value = json.loads(f'"{match.group(1)}"')
+                    seen.setdefault((str(source_path), value), None)
+
+    return [(Path(path), value) for path, value in seen.keys()]
+
+
 def parse_strings_file(source_path: Path) -> dict[str, str]:
     if not source_path.exists():
         return {}
@@ -507,12 +537,23 @@ for left, right in variant_pairs:
 if widget_catalog_path.exists():
     widget_data = json.loads(widget_catalog_path.read_text(encoding="utf-8"))
     widget_strings = widget_data.get("strings", {})
-    for key in required_widget_keys:
-        entry = widget_strings.get(key, {})
+    for key, entry in widget_strings.items():
         target_value = entry.get("localizations", {}).get(target_locale, {}).get("stringUnit", {}).get("value")
         if not isinstance(target_value, str) or not target_value.strip():
             widget_coverage_issues += 1
             widget_issue_items.append(key)
+
+    widget_source_roots = [
+        Path("OffshoreBudgetingWidgets"),
+        Path("OffshoreBudgeting/WidgetSnapshotBuilders"),
+    ]
+    for source_path, source_text in extract_widget_source_strings(widget_source_roots):
+        entry = widget_strings.get(source_text)
+        if entry is None:
+            source_coverage_issues += 1
+            source_issue_items.append(
+                f"{source_path} missing widget catalog key for {source_text!r}"
+            )
 else:
     widget_coverage_issues += 1
     widget_issue_items.append("missing OffshoreBudgetingWidgets/Localizable.xcstrings")

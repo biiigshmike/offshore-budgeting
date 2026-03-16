@@ -3,7 +3,7 @@ import WidgetKit
 import AppIntents
 
 private func liveActivityLocalized(_ key: String) -> String {
-    NSLocalizedString(key, comment: "")
+    widgetLocalized(key)
 }
 
 private struct ExcursionStatusTextView: View {
@@ -22,15 +22,15 @@ private struct ExcursionStatusTextView: View {
     }
 
     private var primaryText: some View {
-        statusText(isExpired ? Text(liveActivityLocalized("Session ended")) : Text("Active until \(endDate, format: .dateTime.hour().minute())"))
+        statusText(Text(primaryStatusText))
     }
 
     private var secondaryText: some View {
-        statusText(isExpired ? Text(liveActivityLocalized("Session ended")) : Text("Ends \(endDate, format: .dateTime.hour().minute())"))
+        statusText(Text(secondaryStatusText))
     }
 
     private var compactText: some View {
-        statusText(isExpired ? Text(liveActivityLocalized("Ended")) : Text("Until \(endDate, format: .dateTime.hour().minute())"))
+        statusText(Text(compactStatusText))
     }
 
     private var timeOnlyText: some View {
@@ -44,6 +44,22 @@ private struct ExcursionStatusTextView: View {
             .lineLimit(1)
             .allowsTightening(true)
             .fixedSize(horizontal: true, vertical: false)
+    }
+
+    private var timeText: String {
+        endDate.formatted(.dateTime.hour().minute())
+    }
+
+    private var primaryStatusText: String {
+        isExpired ? liveActivityLocalized("Session ended") : widgetLocalizedFormat("Active until %@", timeText)
+    }
+
+    private var secondaryStatusText: String {
+        isExpired ? liveActivityLocalized("Session ended") : widgetLocalizedFormat("Ends %@", timeText)
+    }
+
+    private var compactStatusText: String {
+        isExpired ? liveActivityLocalized("Ended") : widgetLocalizedFormat("Until %@", timeText)
     }
 }
 

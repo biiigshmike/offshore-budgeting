@@ -59,7 +59,7 @@ nonisolated struct SpendTrendsWidgetEntry: TimelineEntry {
 extension SpendTrendsWidgetSnapshot {
     static var placeholder: SpendTrendsWidgetSnapshot {
         SpendTrendsWidgetSnapshot(
-            title: "Spend Trends",
+            title: NSLocalizedString("Spend Trends", comment: "Spend trends widget preview title."),
             periodToken: "1M",
             rangeStart: Calendar.current.date(byAdding: .day, value: -29, to: .now) ?? .now,
             rangeEnd: .now,
@@ -121,7 +121,7 @@ extension SpendTrendsWidgetSnapshot {
 
     static var truncationPreview: SpendTrendsWidgetSnapshot {
         SpendTrendsWidgetSnapshot(
-            title: "Spend Trends",
+            title: NSLocalizedString("Spend Trends", comment: "Spend trends widget preview title."),
             periodToken: "P",
             rangeStart: Calendar.current.date(from: DateComponents(year: 2026, month: 3, day: 1)) ?? .now,
             rangeEnd: Calendar.current.date(from: DateComponents(year: 2026, month: 3, day: 31)) ?? .now,

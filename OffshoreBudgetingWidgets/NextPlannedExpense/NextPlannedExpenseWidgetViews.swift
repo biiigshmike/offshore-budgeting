@@ -9,11 +9,11 @@ import SwiftUI
 import WidgetKit
 
 func nextPlannedLocalized(_ key: String) -> String {
-    NSLocalizedString(key, comment: "")
+    widgetLocalized(key)
 }
 
 func nextPlannedLocalizedFormat(_ key: String, _ arguments: CVarArg...) -> String {
-    String(format: NSLocalizedString(key, comment: ""), locale: Locale.current, arguments)
+    String(format: widgetLocalized(key), locale: Locale.current, arguments)
 }
 
 private extension NextPlannedExpenseWidgetSnapshot {

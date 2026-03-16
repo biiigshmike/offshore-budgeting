@@ -77,14 +77,14 @@ struct IncomeGaugeView: View {
 
             case .legend(let planned, let actual):
                 HStack(spacing: 6) {
-                    Text("Planned")
+                    Text(widgetLocalized("Planned"))
                         .foregroundStyle(.secondary)
                     Text(planned, format: incomeGaugeCurrencyFormatStyle())
                         .foregroundStyle(.primary)
 
                     Spacer(minLength: 0)
 
-                    Text("Actual")
+                    Text(widgetLocalized("Actual"))
                         .foregroundStyle(.secondary)
                     Text(actual, format: incomeGaugeCurrencyFormatStyle())
                         .foregroundStyle(.primary)

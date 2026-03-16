@@ -15,6 +15,12 @@
             "value" : "%@"
           }
         },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@"
+          }
+        },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
@@ -50,6 +56,12 @@
           }
         },
         "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ - %2$@"
+          }
+        },
+        "es" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$@ - %2$@"
@@ -95,6 +107,12 @@
             "value" : "%1$@ • %2$@"
           }
         },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ • %2$@"
+          }
+        },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
@@ -127,6 +145,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "1 Monat"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 mes"
           }
         },
         "fr" : {
@@ -163,6 +187,12 @@
             "value" : "1 Woche"
           }
         },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 semana"
+          }
+        },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
@@ -195,6 +225,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "1 Jahr"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 año"
           }
         },
         "fr" : {
@@ -240,7 +276,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "30 min"
+            "value" : "30 min."
           }
         },
         "fr" : {
@@ -283,6 +319,12 @@
             "value" : "Active until %@"
           }
         },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activo hasta %@"
+          }
+        },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
@@ -321,6 +363,12 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "Actual"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Real"
           }
         },
         "fr" : {
@@ -364,6 +412,12 @@
             "value" : "Actual %@"
           }
         },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Real %@"
+          }
+        },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
@@ -402,6 +456,12 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "Actual: %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Real: %@"
           }
         },
         "fr" : {
@@ -598,6 +658,12 @@
             "value" : "Standardzeitraum"
           }
         },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Período predeterminado"
+          }
+        },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
@@ -638,6 +704,12 @@
             "value" : "Done"
           }
         },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Listo"
+          }
+        },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
@@ -660,10 +732,46 @@
     },
     "Ended" : {
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "انتهى"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beendet"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "Ended"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Finalizado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Terminé"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encerrado"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已结束"
           }
         }
       }
@@ -686,6 +794,12 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "Ends %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Termina %@"
           }
         },
         "fr" : {
@@ -728,6 +842,12 @@
             "value" : "Excursion Mode"
           }
         },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modo excursion"
+          }
+        },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
@@ -768,6 +888,12 @@
             "value" : "Expenses"
           }
         },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gastos"
+          }
+        },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
@@ -790,7 +916,45 @@
     },
     "Extend Excursion Mode" : {
       "comment" : "Title of the \"Extend Excursion Mode\" app intent.",
-      "isCommentAutoGenerated" : true
+      "isCommentAutoGenerated" : true,
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تمديد وضع الرحلة"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exkursionsmodus verlängern"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Extender modo excursion"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prolonger le mode Excursion"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estender modo de excursão"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "延长游览模式"
+          }
+        }
+      }
     },
     "Favorite Emoji" : {
       "localizations" : {
@@ -834,7 +998,45 @@
     },
     "High" : {
       "comment" : "A title for the highest spending bucket.",
-      "isCommentAutoGenerated" : true
+      "isCommentAutoGenerated" : true,
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الأعلى"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hoch"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alto"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pic"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alta"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "峰值"
+          }
+        }
+      }
     },
     "Highest %@" : {
       "extractionState" : "stale",
@@ -884,6 +1086,7 @@
       }
     },
     "Income" : {
+      "comment" : "Income widget preview title.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -935,6 +1138,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Einkommensfortschritt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Progreso de ingresos"
           }
         },
         "fr" : {
@@ -998,16 +1207,94 @@
       }
     },
     "Left" : {
+      "extractionState" : "stale",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "متبقٍ"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Übrig"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "Left"
           }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restante"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reste"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restante"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "剩余"
+          }
+        }
+      }
+    },
+    "Left %@" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "المتبقي %@"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Übrig %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restante %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reste %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restante %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "剩余 %@"
+          }
         }
       }
     },
     "Next Planned Expense" : {
+      "comment" : "Next planned expense widget preview title.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -1101,6 +1388,12 @@
             "value" : "In diesem Bereich wurden keine Kartendaten gefunden."
           }
         },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se encontraron datos de tarjeta en este rango."
+          }
+        },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1133,6 +1426,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Keine Kartendaten gefunden."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se encontraron datos de tarjeta."
           }
         },
         "fr" : {
@@ -1169,6 +1468,12 @@
             "value" : "In diesem Bereich wurden keine Einkommensdaten gefunden."
           }
         },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se encontraron datos de ingresos en este rango."
+          }
+        },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1203,6 +1508,12 @@
             "value" : "Keine Einkommensdaten gefunden."
           }
         },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se encontraron datos de ingresos."
+          }
+        },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1219,6 +1530,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未找到收入数据。"
+          }
+        }
+      }
+    },
+    "No range" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "بلا نطاق"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kein Bereich"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sin rango"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune plage"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sem intervalo"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无范围"
           }
         }
       }
@@ -1241,6 +1592,12 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "No recent entries."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se encontraron entradas recientes."
           }
         },
         "fr" : {
@@ -1283,6 +1640,12 @@
             "value" : "No recent expenses."
           }
         },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se encontraron gastos recientes."
+          }
+        },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1323,6 +1686,12 @@
             "value" : "No recent income entries."
           }
         },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se encontraron entradas de ingresos recientes."
+          }
+        },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1357,6 +1726,12 @@
             "value" : "Für diesen Zeitraum wurden keine Ausgabendaten gefunden."
           }
         },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se encontraron datos de gastos para este período."
+          }
+        },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1389,6 +1764,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Für diesen Zeitraum wurden keine bevorstehenden geplanten Ausgaben gefunden."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se encontraron gastos planificados próximos para este período."
           }
         },
         "fr" : {
@@ -1428,6 +1809,12 @@
         "en" : {
           "stringUnit" : {
             "state" : "new",
+            "value" : "Offshore"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
             "value" : "Offshore"
           }
         },
@@ -1511,6 +1898,12 @@
             "value" : "Öffnen Sie Offshore, um Widget-Daten für diesen Zeitraum zu generieren."
           }
         },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abre Offshore para generar los datos del widget para este período."
+          }
+        },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1532,11 +1925,48 @@
       }
     },
     "Over" : {
+      "extractionState" : "stale",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "زيادة"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Über"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "Over"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Superado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Au-dessus"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sobre"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "超过"
           }
         }
       }
@@ -1647,6 +2077,12 @@
             "value" : "Planned"
           }
         },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Planificado"
+          }
+        },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1688,6 +2124,12 @@
             "value" : "Planned %@"
           }
         },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Planificado %@"
+          }
+        },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1726,6 +2168,12 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "Planned: %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Planificado: %@"
           }
         },
         "fr" : {
@@ -1854,6 +2302,12 @@
             "value" : "F"
           }
         },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "T"
+          }
+        },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1894,6 +2348,12 @@
             "value" : "Recent"
           }
         },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reciente"
+          }
+        },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1932,6 +2392,12 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "Recent Income"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ingresos recientes"
           }
         },
         "fr" : {
@@ -2018,6 +2484,12 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "Session ended"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sesión finalizada"
           }
         },
         "fr" : {
@@ -2241,6 +2713,7 @@
       }
     },
     "Spend Trends" : {
+      "comment" : "Spend trends widget preview title.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -2368,7 +2841,45 @@
     },
     "Stop Excursion Mode" : {
       "comment" : "Title of the intent to stop the excursion mode.",
-      "isCommentAutoGenerated" : true
+      "isCommentAutoGenerated" : true,
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إيقاف وضع الرحلة"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stoppen Sie den Exkursionsmodus"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Detener modo excursion"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stop mode Excursion"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parar o modo de excursão"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停止游览模式"
+          }
+        }
+      }
     },
     "This is an example widget." : {
       "localizations" : {
@@ -2412,7 +2923,45 @@
     },
     "Top" : {
       "comment" : "A label displayed under the amount of the top category within a bucket.",
-      "isCommentAutoGenerated" : true
+      "isCommentAutoGenerated" : true,
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الأبرز"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spitze"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Principal"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premier"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Principal"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最高"
+          }
+        }
+      }
     },
     "Top %@" : {
       "extractionState" : "stale",
@@ -2543,10 +3092,46 @@
     },
     "Until %@" : {
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "حتى %@"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bis %@"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "Until %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hasta %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jusqu’à %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Até %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直到 %@"
           }
         }
       }
