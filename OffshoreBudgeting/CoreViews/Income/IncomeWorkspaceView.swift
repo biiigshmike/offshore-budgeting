@@ -6,7 +6,7 @@ struct IncomeWorkspaceView: View {
 
     var body: some View {
         IncomeView(workspace: workspace)
-        .navigationTitle("Income")
-        .navigationBarTitleDisplayMode(.automatic)
+            .navigationTitle("Income")
+            .navigationBarTitleDisplayMode(.automatic)
     }
 }

@@ -88,7 +88,8 @@ struct ContentView: View {
                     AppRootView(
                         workspace: selected,
                         selectedWorkspaceID: $selectedWorkspaceID,
-                        initialSectionOverride: initialSectionOverride
+                        initialSectionOverride: initialSectionOverride,
+                        onTabInteraction: handleTabInteraction
                     )
                 } else {
                     NavigationStack {
@@ -131,6 +132,15 @@ struct ContentView: View {
             }
             .onAppear {
                 traceResume("contentView onAppear")
+                TabFlickerDiagnostics.beginWatch(
+                    reason: "coldLaunch",
+                    metadata: ["selectedWorkspaceID": selectedWorkspaceID],
+                    duration: 2.5
+                )
+                TabFlickerDiagnostics.markEvent(
+                    "contentViewOnAppear",
+                    metadata: ["selectedWorkspaceID": selectedWorkspaceID]
+                )
                 performImmediateResumeWiring()
                 scheduleDeferredResumeRefresh(
                     trigger: .initialAppear,
@@ -141,6 +151,10 @@ struct ContentView: View {
             }
             .onChange(of: selectedWorkspaceID) { _, newValue in
                 syncSelectedWorkspaceToWidgetStores(newValue)
+                TabFlickerDiagnostics.markEvent(
+                    "selectedWorkspaceChanged",
+                    metadata: ["selectedWorkspaceID": newValue]
+                )
                 scheduleDeferredResumeRefresh(
                     trigger: .workspaceSelectionChanged,
                     includesWidgets: true,
@@ -183,7 +197,19 @@ struct ContentView: View {
             }
             .onChange(of: scenePhase) { _, newPhase in
                 traceResume("scenePhase changed=\(debugScenePhase(newPhase))")
+                TabFlickerDiagnostics.markEvent(
+                    "scenePhaseChanged",
+                    metadata: ["phase": debugScenePhase(newPhase)]
+                )
                 if newPhase == .active {
+                    TabFlickerDiagnostics.beginWatch(
+                        reason: "sceneResume",
+                        metadata: [
+                            "phase": "active",
+                            "selectedWorkspaceID": selectedWorkspaceID
+                        ],
+                        duration: 2.0
+                    )
                     performImmediateResumeWiring()
                     scheduleDeferredResumeRefresh(
                         trigger: .sceneBecameActive,
@@ -236,14 +262,22 @@ struct ContentView: View {
     // MARK: - Widget Refresh
 
     private enum ResumeScheduling {
-        static let initialDelayNanos: UInt64 = 250_000_000
-        static let savingsDelayNanos: UInt64 = 700_000_000
+        static let coldLaunchDelayNanos: UInt64 = 1_200_000_000
+        static let standardDelayNanos: UInt64 = 450_000_000
+        static let savingsDelayNanos: UInt64 = 1_500_000_000
     }
 
     @MainActor
     private func performImmediateResumeWiring() {
+        let start = DispatchTime.now().uptimeNanoseconds
+        TabFlickerDiagnostics.markEvent("resumeImmediatePhaseStarted")
         syncSelectedWorkspaceToWidgetStores(selectedWorkspaceID)
         syncGeneralSettingsToWidgets()
+        let elapsedMillis = Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000
+        TabFlickerDiagnostics.markEvent(
+            "resumeImmediatePhaseFinished",
+            metadata: ["elapsedMs": String(format: "%.1f", elapsedMillis)]
+        )
     }
 
     @MainActor
@@ -279,21 +313,47 @@ struct ContentView: View {
             "savings=\(plan.savingsSignature != nil) forceSavings=\(plan.forceSavingsRefresh) " +
             "notifications=\(plan.notificationSignature != nil)"
         )
+        TabFlickerDiagnostics.markEvent(
+            "resumeRefreshScheduled",
+            metadata: [
+                "trigger": trigger.rawValue,
+                "widgets": plan.widgetSignature != nil ? "true" : "false",
+                "forceWidgets": plan.forceWidgetRefresh ? "true" : "false",
+                "savings": plan.savingsSignature != nil ? "true" : "false",
+                "forceSavings": plan.forceSavingsRefresh ? "true" : "false",
+                "notifications": plan.notificationSignature != nil ? "true" : "false"
+            ]
+        )
 
         let request = resumeState.schedule(plan: plan)
         guard let request else { return }
+        let initialDelayNanos = initialDelayNanos(for: trigger)
 
         resumeState.replaceDeferredResumeTask(Task {
-            try? await Task.sleep(nanoseconds: ResumeScheduling.initialDelayNanos)
+            try? await Task.sleep(nanoseconds: initialDelayNanos)
             guard Task.isCancelled == false else { return }
 
             let shouldContinue = await MainActor.run { resumeState.coordinator.isCurrent(request) }
             guard shouldContinue else { return }
 
             if let widgetSignature = request.widgetSignature {
+                let shouldRunWidgets = await waitForNavigationQuietPeriod(
+                    trigger: trigger,
+                    request: request,
+                    stage: "widgets"
+                )
+                guard shouldRunWidgets else { return }
+
                 await MainActor.run {
                     traceResume(
                         "starting widgets trigger=\(trigger.rawValue) workspaceID=\(widgetSignature.workspaceID.uuidString)"
+                    )
+                    TabFlickerDiagnostics.markEvent(
+                        "widgetsRefreshStarted",
+                        metadata: [
+                            "trigger": trigger.rawValue,
+                            "workspaceID": widgetSignature.workspaceID.uuidString
+                        ]
                     )
                 }
 
@@ -306,14 +366,32 @@ struct ContentView: View {
                     traceResume(
                         "completed widgets trigger=\(trigger.rawValue) \(widgetReport.traceSummary)"
                     )
+                    TabFlickerDiagnostics.markEvent(
+                        "widgetsRefreshCompleted",
+                        metadata: [
+                            "trigger": trigger.rawValue,
+                            "summary": widgetReport.traceSummary
+                        ]
+                    )
                 }
             }
 
             if request.notificationSignature != nil {
+                let shouldRunNotifications = await waitForNavigationQuietPeriod(
+                    trigger: trigger,
+                    request: request,
+                    stage: "notifications"
+                )
+                guard shouldRunNotifications else { return }
+
                 await syncNotificationSchedulesIfPossible()
                 await MainActor.run {
                     resumeState.markNotificationRefreshCompleted(request)
                     traceResume("completed notifications trigger=\(trigger.rawValue)")
+                    TabFlickerDiagnostics.markEvent(
+                        "notificationsRefreshCompleted",
+                        metadata: ["trigger": trigger.rawValue]
+                    )
                 }
             }
 
@@ -325,10 +403,21 @@ struct ContentView: View {
             let shouldRunSavings = await MainActor.run { resumeState.coordinator.isCurrent(request) }
             guard shouldRunSavings else { return }
 
+            let shouldContinueSavings = await waitForNavigationQuietPeriod(
+                trigger: trigger,
+                request: request,
+                stage: "savings"
+            )
+            guard shouldContinueSavings else { return }
+
             await MainActor.run {
                 runSavingsAutoCaptureIfPossible()
                 resumeState.markSavingsRefreshCompleted(request)
                 traceResume("completed savings trigger=\(trigger.rawValue)")
+                TabFlickerDiagnostics.markEvent(
+                    "savingsRefreshCompleted",
+                    metadata: ["trigger": trigger.rawValue]
+                )
             }
         })
     }
@@ -336,6 +425,9 @@ struct ContentView: View {
     @MainActor
     private func cancelDeferredResumeRefresh() {
         traceResume("cancel deferred refresh")
+        TabFlickerDiagnostics.markEvent("resumeRefreshCancelled")
+        TabFlickerDiagnostics.endWatch(reason: "coldLaunch")
+        TabFlickerDiagnostics.endWatch(reason: "sceneResume")
         resumeState.cancelPending()
     }
 
@@ -355,6 +447,58 @@ struct ContentView: View {
             modelContext: modelContext,
             now: now
         )
+    }
+
+    private func initialDelayNanos(for trigger: ContentViewResumeTrigger) -> UInt64 {
+        switch trigger {
+        case .initialAppear, .workspaceCountChanged:
+            return ResumeScheduling.coldLaunchDelayNanos
+        case .sceneBecameActive, .workspaceSelectionChanged, .settingsChanged:
+            return ResumeScheduling.standardDelayNanos
+        }
+    }
+
+    private func navigationQuietPeriodNanos(for trigger: ContentViewResumeTrigger) -> UInt64 {
+        switch trigger {
+        case .initialAppear, .sceneBecameActive:
+            return 900_000_000
+        case .workspaceSelectionChanged, .workspaceCountChanged, .settingsChanged:
+            return 0
+        }
+    }
+
+    private func waitForNavigationQuietPeriod(
+        trigger: ContentViewResumeTrigger,
+        request: ContentViewDeferredRefreshRequest,
+        stage: String
+    ) async -> Bool {
+        let quietPeriodNanos = navigationQuietPeriodNanos(for: trigger)
+        guard quietPeriodNanos > 0 else { return true }
+
+        while true {
+            let shouldContinue = await MainActor.run { resumeState.coordinator.isCurrent(request) }
+            guard shouldContinue else { return false }
+
+            let hasRecentInteraction = await MainActor.run {
+                resumeState.hasRecentUserInteraction(within: quietPeriodNanos)
+            }
+            guard hasRecentInteraction == false else {
+                await MainActor.run {
+                    TabFlickerDiagnostics.markEvent(
+                        "resumeRefreshPostponedForInteraction",
+                        metadata: [
+                            "trigger": trigger.rawValue,
+                            "stage": stage
+                        ]
+                    )
+                }
+                try? await Task.sleep(nanoseconds: 350_000_000)
+                guard Task.isCancelled == false else { return false }
+                continue
+            }
+
+            return true
+        }
     }
 
     private var widgetRefreshSignature: ContentViewWidgetRefreshSignature? {
@@ -426,12 +570,26 @@ struct ContentView: View {
     }
 
     @MainActor
+    private func handleTabInteraction(_ section: AppSection) {
+        resumeState.recordUserInteraction()
+        TabFlickerDiagnostics.markEvent(
+            "tabInteractionObserved",
+            metadata: ["tab": section.rawValue]
+        )
+    }
+
+    @MainActor
     private func runSavingsAutoCaptureIfPossible() {
         if DebugScreenshotFormDefaults.isEnabled {
             return
         }
 
         guard let workspace = selectedWorkspace else { return }
+        let start = DispatchTime.now().uptimeNanoseconds
+        TabFlickerDiagnostics.markEvent(
+            "savingsAutoCaptureStarted",
+            metadata: ["workspaceID": workspace.id.uuidString]
+        )
         let workspaceID = workspace.id
         _ = SavingsAccountService.normalizeSavingsData(for: workspace, modelContext: modelContext)
 
@@ -457,6 +615,15 @@ struct ContentView: View {
             variableExpenses: variableExpenses,
             modelContext: modelContext
         )
+
+        let elapsedMillis = Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000
+        TabFlickerDiagnostics.markEvent(
+            "savingsAutoCaptureFinished",
+            metadata: [
+                "workspaceID": workspaceID.uuidString,
+                "elapsedMs": String(format: "%.1f", elapsedMillis)
+            ]
+        )
     }
 
     // MARK: - Notification Sync
@@ -466,8 +633,22 @@ struct ContentView: View {
         guard didCompleteOnboarding else { return }
         guard let workspaceID = UUID(uuidString: selectedWorkspaceID) else { return }
 
+        let start = DispatchTime.now().uptimeNanoseconds
+        TabFlickerDiagnostics.markEvent(
+            "notificationsRefreshStarted",
+            metadata: ["workspaceID": workspaceID.uuidString]
+        )
         await notificationService.refreshAuthorizationStatus()
-        guard notificationService.isAuthorized else { return }
+        guard notificationService.isAuthorized else {
+            TabFlickerDiagnostics.markEvent(
+                "notificationsRefreshSkipped",
+                metadata: [
+                    "workspaceID": workspaceID.uuidString,
+                    "reason": "notAuthorized"
+                ]
+            )
+            return
+        }
 
         do {
             try await notificationService.syncReminders(
@@ -483,6 +664,15 @@ struct ContentView: View {
         } catch {
             // intentionally ignoring errors here so notifications never block app startup.
         }
+
+        let elapsedMillis = Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000
+        TabFlickerDiagnostics.markEvent(
+            "notificationsRefreshFinished",
+            metadata: [
+                "workspaceID": workspaceID.uuidString,
+                "elapsedMs": String(format: "%.1f", elapsedMillis)
+            ]
+        )
     }
 
     // MARK: - Derived

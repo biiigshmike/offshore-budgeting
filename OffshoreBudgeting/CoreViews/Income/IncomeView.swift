@@ -19,6 +19,8 @@ struct IncomeView: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.appCommandHub) private var commandHub
+    @Environment(\.appTabActivationContext) private var tabActivationContext
+    @Environment(DetailViewSnapshotCache.self) private var detailSnapshotCache
 
     @State private var displayedMonth: Date
     @State private var selectedDate: Date
@@ -27,6 +29,11 @@ struct IncomeView: View {
     @State private var pendingIncomeDelete: (() -> Void)? = nil
     
     @State private var viewWidth: CGFloat = 0
+    @State private var rootSnapshot: IncomeRootSnapshot = .empty
+    @State private var hasLoadedRootSnapshot: Bool = false
+    @State private var needsRootSnapshotRefresh: Bool = false
+    @State private var rootSnapshotRefreshTask: Task<Void, Never>? = nil
+    @State private var activationEnrichmentTask: Task<Void, Never>? = nil
 
     // MARK: - Calendar width tracking
 
@@ -137,13 +144,21 @@ struct IncomeView: View {
     // MARK: - Filters
 
     private var incomesForSelectedDay: [Income] {
-        incomes.filter { income in
+        if hasLoadedRootSnapshot {
+            return rootSnapshot.incomesForSelectedDay
+        }
+
+        return incomes.filter { income in
             income.date >= selectedDayStart && income.date < selectedDayEnd
         }
         .sorted { $0.date > $1.date }
     }
 
     private var incomesSearchedAll: [Income] {
+        if hasLoadedRootSnapshot {
+            return rootSnapshot.incomesSearchedAll
+        }
+
         let query = SearchQueryParser.parse(searchText)
         guard !query.isEmpty else { return incomes }
 
@@ -161,16 +176,34 @@ struct IncomeView: View {
         !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    private var snapshotSearchText: String {
+        hasLoadedRootSnapshot ? rootSnapshot.searchText : searchText
+    }
+
+    private var isIncomeSearchActive: Bool {
+        !snapshotSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var shouldUseSnapshotDrivenPresentation: Bool {
+        hasLoadedRootSnapshot && tabActivationContext.phase != .active
+    }
+
     private var selectedDayTitle: String {
         CalendarGridHelper.selectedDayTitleFormatter.string(from: selectedDayStart)
     }
 
     private var actualIncomesForSelectedDay: [Income] {
-        incomesForSelectedDay.filter { !$0.isPlanned }
+        if hasLoadedRootSnapshot {
+            return rootSnapshot.actualIncomesForSelectedDay
+        }
+        return incomesForSelectedDay.filter { !$0.isPlanned }
     }
 
     private var plannedIncomesForSelectedDay: [Income] {
-        incomesForSelectedDay.filter { $0.isPlanned }
+        if hasLoadedRootSnapshot {
+            return rootSnapshot.plannedIncomesForSelectedDay
+        }
+        return incomesForSelectedDay.filter { $0.isPlanned }
     }
 
     // MARK: - Month indicators (planned vs actual per day)
@@ -178,6 +211,39 @@ struct IncomeView: View {
     struct DayIncomePresence {
         var hasPlanned: Bool = false
         var hasActual: Bool = false
+    }
+
+    private struct IncomeRootSnapshot {
+        let searchText: String
+        let monthPresence: [Date: DayIncomePresence]
+        let incomesForSelectedDay: [Income]
+        let incomesSearchedAll: [Income]
+        let actualIncomesForSelectedDay: [Income]
+        let plannedIncomesForSelectedDay: [Income]
+        let weekPlannedTotal: Double
+        let weekActualTotal: Double
+
+        static let empty = IncomeRootSnapshot(
+            searchText: "",
+            monthPresence: [:],
+            incomesForSelectedDay: [],
+            incomesSearchedAll: [],
+            actualIncomesForSelectedDay: [],
+            plannedIncomesForSelectedDay: [],
+            weekPlannedTotal: 0,
+            weekActualTotal: 0
+        )
+    }
+
+    private struct IncomeRootSnapshotInputs: Equatable {
+        let selectedDayStart: Date
+        let selectedDayEnd: Date
+        let selectedWeekStart: Date
+        let selectedWeekEndExclusive: Date
+        let displayedMonth: Date
+        let monthCount: Int
+        let searchText: String
+        let incomesSignature: Int
     }
 
     private func incomePresenceByDay(for startMonth: Date, monthCount: Int) -> [Date: DayIncomePresence] {
@@ -226,186 +292,77 @@ struct IncomeView: View {
     }
 
     private var weekPlannedTotal: Double {
-        incomes
+        if hasLoadedRootSnapshot {
+            return rootSnapshot.weekPlannedTotal
+        }
+
+        return incomes
             .filter { $0.date >= selectedWeekStart && $0.date < selectedWeekEndExclusive }
             .filter { $0.isPlanned == true }
             .reduce(0) { $0 + $1.amount }
     }
 
     private var weekActualTotal: Double {
-        incomes
+        if hasLoadedRootSnapshot {
+            return rootSnapshot.weekActualTotal
+        }
+
+        return incomes
             .filter { $0.date >= selectedWeekStart && $0.date < selectedWeekEndExclusive }
             .filter { $0.isPlanned == false }
             .reduce(0) { $0 + $1.amount }
     }
 
+    private var rootSnapshotInputs: IncomeRootSnapshotInputs {
+        IncomeRootSnapshotInputs(
+            selectedDayStart: selectedDayStart,
+            selectedDayEnd: selectedDayEnd,
+            selectedWeekStart: selectedWeekStart,
+            selectedWeekEndExclusive: selectedWeekEndExclusive,
+            displayedMonth: displayedMonth,
+            monthCount: calendarMonthCount,
+            searchText: searchText,
+            incomesSignature: SnapshotContentSignature.incomes(incomes)
+        )
+    }
+
+    private var rootSnapshotCacheKey: String {
+        [
+            "income-root",
+            workspace.id.uuidString,
+            String(Int64(selectedDayStart.timeIntervalSinceReferenceDate)),
+            String(Int64(displayedMonth.timeIntervalSinceReferenceDate)),
+            String(calendarMonthCount),
+            searchText,
+            String(SnapshotContentSignature.incomes(incomes))
+        ].joined(separator: "|")
+    }
+
+    private var monthPresence: [Date: DayIncomePresence] {
+        if shouldUseSnapshotDrivenPresentation {
+            return rootSnapshot.monthPresence
+        }
+        return incomePresenceByDay(for: displayedMonth, monthCount: calendarMonthCount)
+    }
+
     var body: some View {
-        let monthPresence = incomePresenceByDay(for: displayedMonth, monthCount: calendarMonthCount)
-
         GeometryReader { proxy in
-            List {
+            contentView(proxy: proxy)
+        }
+    }
 
+    private var incomeTipItems: [PostBoardingTipItem] {
+        [
+            PostBoardingTipItem(systemImage: "calendar", title: "Income Calendar", detail: "View income in a calendar to visualize earnings, almost like a timesheet."),
+            PostBoardingTipItem(systemImage: "calendar.badge.plus", title: "Planned Income", detail: "Add income you expect to earn but haven’t received yet."),
+            PostBoardingTipItem(systemImage: "calendar.badge.checkmark", title: "Actual Income", detail: "Log income you’ve actually received."),
+            PostBoardingTipItem(systemImage: "calendar.badge.clock", title: "Recurring Income", detail: "Planned and actual income can be setup to be a recurring series."),
+            PostBoardingTipItem(systemImage: "magnifyingglass", title: "Search Income", detail: "Search by source, card, date, or amount using the search bar.")
+        ]
+    }
 
-                // MARK: - Calendar
-
-                Section {
-                    MultiMonthCalendarView(
-                        startMonth: displayedMonth,
-                        monthCount: calendarMonthCount,
-                        selectedDate: selectedDate,
-                        incomePresenceByDay: monthPresence,
-                        onStepDay: { deltaDays in
-                            let cal = CalendarGridHelper.displayCalendar
-                            let newDate = cal.date(byAdding: .day, value: deltaDays, to: selectedDate) ?? selectedDate
-                            let normalized = cal.startOfDay(for: newDate)
-                            selectedDate = normalized
-                            displayedMonth = CalendarGridHelper.startOfMonth(for: normalized)
-                        },
-                        onJumpToMonthStart: { deltaMonths in
-                            let cal = CalendarGridHelper.displayCalendar
-                            let targetMonth = CalendarGridHelper.addingMonths(deltaMonths, to: displayedMonth)
-                            let monthStart = CalendarGridHelper.startOfMonth(for: targetMonth)
-                            selectedDate = cal.startOfDay(for: monthStart)
-                            displayedMonth = monthStart
-                        },
-                        onJumpToToday: {
-                            let cal = CalendarGridHelper.displayCalendar
-                            let today = cal.startOfDay(for: Date())
-                            selectedDate = today
-                            displayedMonth = CalendarGridHelper.startOfMonth(for: today)
-                        },
-                        onSelectDate: { tapped in
-                            let cal = CalendarGridHelper.displayCalendar
-                            selectedDate = cal.startOfDay(for: tapped)
-                            displayedMonth = CalendarGridHelper.startOfMonth(for: tapped)
-                        }
-                    )
-                    .padding(.vertical, 8)
-                }
-
-                // MARK: - Row 1: Selected day list (swipe edit/delete)
-
-                Section(
-                    header: VStack(alignment: .leading, spacing: 4) {
-                        Text(isSearching ? "Search Results" : "Income")
-                            .font(.headline)
-
-                        Text(isSearching ? "All income entries" : selectedDayTitle)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                ) {
-                    let rows = isSearching ? incomesSearchedAll : incomesForSelectedDay
-
-                    if rows.isEmpty {
-                        Text(isSearching ? "No matching income." : "No income for \(CalendarGridHelper.shortDateFormatter.string(from: selectedDayStart)).")
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(rows) { income in
-                            Button {
-                                editingIncome = income
-                                showingEditIncome = true
-                            } label: {
-                                IncomeRowView(income: income)
-                            }
-                            .buttonStyle(.plain)
-                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                Button(role: .destructive) {
-                                    requestDeleteIncome(income)
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
-                                }
-                                .tint(Color("OffshoreDepth"))
-                            }
-                            .swipeActions(edge: .leading) {
-                                Button {
-                                    editingIncome = income
-                                    showingEditIncome = true
-                                } label: {
-                                    Label("Edit", systemImage: "pencil")
-                                }
-                                .tint(Color("AccentColor"))
-                            }
-                        }
-                    }
-                }
-
-                // MARK: - Row 2: Week totals
-
-                Section(header: Text("Week Total Income")) {
-                    WeeklyIncomeTotalsRow(
-                        plannedTotal: weekPlannedTotal,
-                        actualTotal: weekActualTotal,
-                        rangeText: selectedWeekRangeText
-                    )
-                }
-            }
-            .onAppear { viewWidth = proxy.size.width }
-            .onChange(of: proxy.size.width) { _, newValue in
-                viewWidth = newValue
-            }
-
-            .postBoardingTip(
-                key: "tip.income.v1",
-                title: "Income",
-                items: [
-                    PostBoardingTipItem(systemImage: "calendar", title: "Income Calendar", detail: "View income in a calendar to visualize earnings, almost like a timesheet."),
-                    PostBoardingTipItem(systemImage: "calendar.badge.plus", title: "Planned Income", detail: "Add income you expect to earn but haven’t received yet."),
-                    PostBoardingTipItem(systemImage: "calendar.badge.checkmark", title: "Actual Income", detail: "Log income you’ve actually received."),
-                    PostBoardingTipItem(systemImage: "calendar.badge.clock", title: "Recurring Income", detail: "Planned and actual income can be setup to be a recurring series."),
-                    PostBoardingTipItem(systemImage: "magnifyingglass", title: "Search Income", detail: "Search by source, card, date, or amount using the search bar.")
-                ]
-            )
-            .navigationTitle("Income")
-            .searchable(
-                text: $searchText,
-                placement: .navigationBarDrawer(displayMode: .always),
-                prompt: "Search"
-            )
-            .searchFocused($searchFocused)
-            .toolbar {
-                Menu {
-                    Button {
-                        addIncomeSheet = AddIncomeSheet(initialDate: selectedDayStart, initialIsPlanned: false)
-                    } label: {
-                        Label("Add Income", systemImage: "plus")
-                    }
-
-                    Button {
-                        showingImportIncomeSheet = true
-                    } label: {
-                        Label("Import Income", systemImage: "tray.and.arrow.down")
-                    }
-                } label: {
-                    Image(systemName: "plus")
-                }
-            }
-            .alert("Delete?", isPresented: $showingIncomeDeleteConfirm) {
-                Button("Delete", role: .destructive) {
-                    pendingIncomeDelete?()
-                    pendingIncomeDelete = nil
-                }
-                Button("Cancel", role: .cancel) {
-                    pendingIncomeDelete = nil
-                }
-            }
-            .confirmationDialog(
-                shortcutDeletePickerTitle,
-                isPresented: $showingShortcutDeletePicker,
-                titleVisibility: .visible
-            ) {
-                ForEach(shortcutDeleteCandidates) { income in
-                    Button(shortcutDeleteCandidateLabel(for: income), role: .destructive) {
-                        clearShortcutDeletePicker()
-                        requestDeleteIncome(income)
-                    }
-                }
-                Button("Cancel", role: .cancel) {
-                    clearShortcutDeletePicker()
-                }
-            } message: {
-                Text(shortcutDeletePickerMessage)
-            }
+    private func contentView(proxy: GeometryProxy) -> some View {
+        configuredIncomeView(proxy: proxy)
             .sheet(item: $addIncomeSheet) { sheet in
                 NavigationStack {
                     AddIncomeView(
@@ -432,19 +389,8 @@ struct IncomeView: View {
                     }
                 }
             }
-            .onAppear {
-                consumePendingShortcutActionIfNeeded()
-                if shouldSyncCommandSurface {
-                    commandHub.activate(.income)
-                    updateIncomeCommandAvailability()
-                }
-            }
-            .onDisappear {
-                if shouldSyncCommandSurface {
-                    commandHub.deactivate(.income)
-                    commandHub.setIncomeDeletionAvailability(canDeleteActual: false, canDeletePlanned: false)
-                }
-            }
+            .onAppear(perform: handleContentAppear)
+            .onDisappear(perform: handleContentDisappear)
             .onChange(of: pendingShortcutActionRaw) { _, _ in
                 consumePendingShortcutActionIfNeeded()
             }
@@ -463,11 +409,386 @@ struct IncomeView: View {
                     updateIncomeCommandAvailability()
                 }
             }
+            .onChange(of: rootSnapshotInputs) { _, _ in
+                if tabActivationContext.phase == .active {
+                    scheduleRootSnapshotRefresh(reason: "inputsChanged")
+                } else {
+                    needsRootSnapshotRefresh = true
+                }
+            }
+            .onChange(of: tabActivationContext) { _, newValue in
+                guard newValue.sectionRawValue == AppSection.income.rawValue else { return }
+                if newValue.phase == .active, needsRootSnapshotRefresh {
+                    scheduleRootSnapshotRefresh(reason: "tabActivationSettled")
+                    scheduleActivationEnrichment(reason: "tabActivationSettled")
+                } else if newValue.phase != .active {
+                    cancelRootSnapshotRefresh(reason: "tabPhaseChanged")
+                    cancelActivationEnrichment()
+                }
+            }
             .onReceive(commandHub.$sequence) { _ in
                 guard commandHub.surface == .income else { return }
                 handleCommand(commandHub.latestCommandID)
             }
+    }
+
+    private func configuredIncomeView(proxy: GeometryProxy) -> some View {
+        baseIncomeView(proxy: proxy)
+            .onAppear { viewWidth = proxy.size.width }
+            .onChange(of: proxy.size.width) { _, newValue in
+                viewWidth = newValue
+            }
+            .postBoardingTip(
+                key: "tip.income.v1",
+                title: "Income",
+                items: incomeTipItems
+            )
+            .navigationTitle("Income")
+            .searchable(
+                text: $searchText,
+                placement: .navigationBarDrawer(displayMode: .always),
+                prompt: "Search"
+            )
+            .searchFocused($searchFocused)
+            .toolbar { incomeToolbar }
+            .alert("Delete?", isPresented: $showingIncomeDeleteConfirm) {
+                Button("Delete", role: .destructive) {
+                    pendingIncomeDelete?()
+                    pendingIncomeDelete = nil
+                }
+                Button("Cancel", role: .cancel) {
+                    pendingIncomeDelete = nil
+                }
+            }
+            .confirmationDialog(
+                shortcutDeletePickerTitle,
+                isPresented: $showingShortcutDeletePicker,
+                titleVisibility: .visible
+            ) {
+                ForEach(shortcutDeleteCandidates) { income in
+                    Button(shortcutDeleteCandidateLabel(for: income), role: .destructive) {
+                        clearShortcutDeletePicker()
+                        requestDeleteIncome(income)
+                    }
+                }
+                Button("Cancel", role: .cancel) {
+                    clearShortcutDeletePicker()
+                }
+            } message: {
+                Text(shortcutDeletePickerMessage)
+            }
+    }
+
+    private func baseIncomeView(proxy: GeometryProxy) -> some View {
+        incomeListView
+    }
+
+    private var incomeListView: some View {
+        List {
+            calendarSection
+            incomeRowsSection
+            weekTotalsSection
         }
+    }
+
+    @ToolbarContentBuilder
+    private var incomeToolbar: some ToolbarContent {
+        ToolbarItem(placement: .topBarTrailing) {
+            Menu {
+                Button {
+                    addIncomeSheet = AddIncomeSheet(initialDate: selectedDayStart, initialIsPlanned: false)
+                } label: {
+                    Label("Add Income", systemImage: "plus")
+                }
+
+                Button {
+                    showingImportIncomeSheet = true
+                } label: {
+                    Label("Import Income", systemImage: "tray.and.arrow.down")
+                }
+            } label: {
+                Image(systemName: "plus")
+            }
+        }
+    }
+
+    private func handleContentAppear() {
+        hydrateRootSnapshotIfAvailable()
+        if hasLoadedRootSnapshot == false {
+            rebuildRootSnapshot(reason: "onAppearInitial")
+        } else if needsRootSnapshotRefresh {
+            scheduleRootSnapshotRefresh(reason: "onAppearRefresh")
+        }
+        consumePendingShortcutActionIfNeeded()
+        scheduleActivationEnrichment(reason: "onAppear")
+    }
+
+    private func handleContentDisappear() {
+        cancelRootSnapshotRefresh(reason: "onDisappear")
+        cancelActivationEnrichment()
+        if shouldSyncCommandSurface {
+            commandHub.deactivate(.income)
+            commandHub.setIncomeDeletionAvailability(canDeleteActual: false, canDeletePlanned: false)
+        }
+    }
+
+    private var incomeRows: [Income] {
+        if shouldUseSnapshotDrivenPresentation {
+            return isIncomeSearchActive ? rootSnapshot.incomesSearchedAll : rootSnapshot.incomesForSelectedDay
+        }
+        return isSearching ? incomesSearchedAll : incomesForSelectedDay
+    }
+
+    @ViewBuilder
+    private var calendarSection: some View {
+        Section {
+            MultiMonthCalendarView(
+                startMonth: displayedMonth,
+                monthCount: calendarMonthCount,
+                selectedDate: selectedDate,
+                incomePresenceByDay: monthPresence,
+                onStepDay: { deltaDays in
+                    let cal = CalendarGridHelper.displayCalendar
+                    let newDate = cal.date(byAdding: .day, value: deltaDays, to: selectedDate) ?? selectedDate
+                    let normalized = cal.startOfDay(for: newDate)
+                    selectedDate = normalized
+                    displayedMonth = CalendarGridHelper.startOfMonth(for: normalized)
+                },
+                onJumpToMonthStart: { deltaMonths in
+                    let cal = CalendarGridHelper.displayCalendar
+                    let targetMonth = CalendarGridHelper.addingMonths(deltaMonths, to: displayedMonth)
+                    let monthStart = CalendarGridHelper.startOfMonth(for: targetMonth)
+                    selectedDate = cal.startOfDay(for: monthStart)
+                    displayedMonth = monthStart
+                },
+                onJumpToToday: {
+                    let cal = CalendarGridHelper.displayCalendar
+                    let today = cal.startOfDay(for: Date())
+                    selectedDate = today
+                    displayedMonth = CalendarGridHelper.startOfMonth(for: today)
+                },
+                onSelectDate: { tapped in
+                    let cal = CalendarGridHelper.displayCalendar
+                    selectedDate = cal.startOfDay(for: tapped)
+                    displayedMonth = CalendarGridHelper.startOfMonth(for: tapped)
+                }
+            )
+            .padding(.vertical, 8)
+        }
+    }
+
+    @ViewBuilder
+    private var incomeRowsSection: some View {
+        Section(header: incomeSectionHeader) {
+            if incomeRows.isEmpty {
+                Text(isIncomeSearchActive ? "No matching income." : "No income for \(CalendarGridHelper.shortDateFormatter.string(from: selectedDayStart)).")
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(incomeRows) { income in
+                    incomeRowButton(for: income)
+                }
+            }
+        }
+    }
+
+    private var incomeSectionHeader: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(isIncomeSearchActive ? "Search Results" : "Income")
+                .font(.headline)
+
+            Text(isIncomeSearchActive ? "All income entries" : selectedDayTitle)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var weekTotalsSection: some View {
+        Section(header: Text("Week Total Income")) {
+            WeeklyIncomeTotalsRow(
+                plannedTotal: weekPlannedTotal,
+                actualTotal: weekActualTotal,
+                rangeText: selectedWeekRangeText
+            )
+        }
+    }
+
+    private func incomeRowButton(for income: Income) -> some View {
+        Button {
+            editingIncome = income
+            showingEditIncome = true
+        } label: {
+            IncomeRowView(income: income)
+        }
+        .buttonStyle(.plain)
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            Button(role: .destructive) {
+                requestDeleteIncome(income)
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+            .tint(Color("OffshoreDepth"))
+        }
+        .swipeActions(edge: .leading) {
+            Button {
+                editingIncome = income
+                showingEditIncome = true
+            } label: {
+                Label("Edit", systemImage: "pencil")
+            }
+            .tint(Color("AccentColor"))
+        }
+    }
+
+    private func buildRootSnapshot() -> IncomeRootSnapshot {
+        let incomesForSelectedDay = incomes.filter { income in
+            income.date >= selectedDayStart && income.date < selectedDayEnd
+        }
+        .sorted { $0.date > $1.date }
+
+        let query = SearchQueryParser.parse(searchText)
+        let searchedIncomes: [Income]
+        if query.isEmpty {
+            searchedIncomes = incomes
+        } else {
+            searchedIncomes = incomes
+                .filter { income in
+                    if !SearchMatch.matchesDateRange(query, date: income.date) { return false }
+                    if !SearchMatch.matchesTextTerms(query, in: [income.source, income.card?.name]) { return false }
+                    if !SearchMatch.matchesAmountDigitTerms(query, amounts: [income.amount]) { return false }
+                    return true
+                }
+                .sorted { $0.date > $1.date }
+        }
+
+        return IncomeRootSnapshot(
+            searchText: searchText,
+            monthPresence: incomePresenceByDay(for: displayedMonth, monthCount: calendarMonthCount),
+            incomesForSelectedDay: incomesForSelectedDay,
+            incomesSearchedAll: searchedIncomes,
+            actualIncomesForSelectedDay: incomesForSelectedDay.filter { !$0.isPlanned },
+            plannedIncomesForSelectedDay: incomesForSelectedDay.filter { $0.isPlanned },
+            weekPlannedTotal: incomes
+                .filter { $0.date >= selectedWeekStart && $0.date < selectedWeekEndExclusive && $0.isPlanned }
+                .reduce(0) { $0 + $1.amount },
+            weekActualTotal: incomes
+                .filter { $0.date >= selectedWeekStart && $0.date < selectedWeekEndExclusive && !$0.isPlanned }
+                .reduce(0) { $0 + $1.amount }
+        )
+    }
+
+    private func rebuildRootSnapshot(reason: String) {
+        let start = DispatchTime.now().uptimeNanoseconds
+        rootSnapshot = buildRootSnapshot()
+        detailSnapshotCache.store(rootSnapshot, for: rootSnapshotCacheKey)
+        hasLoadedRootSnapshot = true
+        needsRootSnapshotRefresh = false
+        let elapsedMs = Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000
+        TabFlickerDiagnostics.markEvent(
+            "incomeRootSnapshotFinished",
+            metadata: [
+                "reason": reason,
+                "elapsedMs": String(format: "%.1f", elapsedMs)
+            ]
+        )
+    }
+
+    private func hydrateRootSnapshotIfAvailable() {
+        guard let cached: IncomeRootSnapshot = detailSnapshotCache.snapshot(for: rootSnapshotCacheKey) else {
+            return
+        }
+
+        rootSnapshot = cached
+        hasLoadedRootSnapshot = true
+        TabFlickerDiagnostics.markEvent("incomeRootSnapshotHydrated")
+    }
+
+    private func scheduleRootSnapshotRefresh(reason: String) {
+        cancelRootSnapshotRefresh(reason: "reschedule")
+        let activationToken = tabActivationContext.token
+        let activationPhase = tabActivationContext.phase
+        TabFlickerDiagnostics.markEvent(
+            "incomeRootSnapshotScheduled",
+            metadata: [
+                "reason": reason,
+                "phase": activationPhase.rawValue,
+                "token": String(activationToken)
+            ]
+        )
+
+        if activationPhase == .active {
+            rebuildRootSnapshot(reason: reason)
+            return
+        }
+
+        needsRootSnapshotRefresh = true
+        rootSnapshotRefreshTask = Task {
+            try? await Task.sleep(nanoseconds: 220_000_000)
+            guard Task.isCancelled == false else { return }
+
+            await MainActor.run {
+                guard tabActivationContext.sectionRawValue == AppSection.income.rawValue,
+                      tabActivationContext.phase == .active,
+                      tabActivationContext.token == activationToken else {
+                    TabFlickerDiagnostics.markEvent(
+                        "incomeRootSnapshotCancelled",
+                        metadata: [
+                            "reason": reason,
+                            "cancel": "activationChanged"
+                        ]
+                    )
+                    return
+                }
+
+                rebuildRootSnapshot(reason: reason)
+            }
+        }
+    }
+
+    private func cancelRootSnapshotRefresh(reason: String) {
+        guard rootSnapshotRefreshTask != nil else { return }
+        rootSnapshotRefreshTask?.cancel()
+        rootSnapshotRefreshTask = nil
+        TabFlickerDiagnostics.markEvent(
+            "incomeRootSnapshotCancelled",
+            metadata: ["reason": reason]
+        )
+    }
+
+    private func scheduleActivationEnrichment(reason: String) {
+        cancelActivationEnrichment()
+        let activationToken = tabActivationContext.token
+
+        activationEnrichmentTask = Task {
+            try? await Task.sleep(nanoseconds: 160_000_000)
+            guard Task.isCancelled == false else { return }
+
+            await MainActor.run {
+                guard tabActivationContext.sectionRawValue == AppSection.income.rawValue,
+                      tabActivationContext.phase == .active,
+                      tabActivationContext.token == activationToken else {
+                    return
+                }
+
+                if shouldSyncCommandSurface {
+                    commandHub.activate(.income)
+                    updateIncomeCommandAvailability()
+                }
+
+                if needsRootSnapshotRefresh {
+                    scheduleRootSnapshotRefresh(reason: "postSettleEnrichment")
+                }
+
+                TabFlickerDiagnostics.markEvent(
+                    "incomeActivationEnrichmentFinished",
+                    metadata: ["reason": reason]
+                )
+            }
+        }
+    }
+
+    private func cancelActivationEnrichment() {
+        activationEnrichmentTask?.cancel()
+        activationEnrichmentTask = nil
     }
 
     // MARK: - Actions

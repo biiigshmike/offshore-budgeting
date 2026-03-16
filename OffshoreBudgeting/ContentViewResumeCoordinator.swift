@@ -112,6 +112,7 @@ final class ContentViewResumeState: ObservableObject {
     var coordinator = ContentViewResumeCoordinator()
     var deferredResumeTask: Task<Void, Never>? = nil
     var lastWidgetRefreshDayStart: Date? = nil
+    private(set) var lastUserInteractionUptimeNs: UInt64? = nil
 
     func schedule(
         plan: ContentViewDeferredRefreshPlan
@@ -129,6 +130,18 @@ final class ContentViewResumeState: ObservableObject {
     func replaceDeferredResumeTask(_ task: Task<Void, Never>) {
         deferredResumeTask?.cancel()
         deferredResumeTask = task
+    }
+
+    func recordUserInteraction(nowUptimeNs: UInt64 = DispatchTime.now().uptimeNanoseconds) {
+        lastUserInteractionUptimeNs = nowUptimeNs
+    }
+
+    func hasRecentUserInteraction(
+        within nanoseconds: UInt64,
+        nowUptimeNs: UInt64 = DispatchTime.now().uptimeNanoseconds
+    ) -> Bool {
+        guard let lastUserInteractionUptimeNs else { return false }
+        return nowUptimeNs - lastUserInteractionUptimeNs < nanoseconds
     }
 
     func cancelPending() {

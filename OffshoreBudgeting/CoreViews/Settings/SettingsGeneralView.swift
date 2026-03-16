@@ -280,6 +280,11 @@ private struct SettingsMaintenanceView: View {
     let onRepeatOnboarding: () -> Void
     let onEraseContent: () -> Void
     @State private var activeMaintenanceAlert: MaintenanceAlert? = nil
+    #if DEBUG
+    @AppStorage("debug_tabFlickerDiagnosticsEnabled") private var tabFlickerDiagnosticsEnabled: Bool = false
+    @AppStorage("debug_tabFlickerVerboseEventsEnabled") private var tabFlickerVerboseEventsEnabled: Bool = false
+    @AppStorage("debug_resumeTraceEnabled") private var resumeTraceEnabled: Bool = false
+    #endif
 
     var body: some View {
         List {
@@ -305,6 +310,23 @@ private struct SettingsMaintenanceView: View {
                 )
                 .listRowSeparator(.hidden)
             }
+
+            #if DEBUG
+            Section {
+                Toggle("Tab Flicker Diagnostics", isOn: $tabFlickerDiagnosticsEnabled)
+                    .tint(Color("AccentColor"))
+
+                Toggle("Verbose Flicker Events", isOn: $tabFlickerVerboseEventsEnabled)
+                    .tint(Color("AccentColor"))
+
+                Toggle("Resume Trace", isOn: $resumeTraceEnabled)
+                    .tint(Color("AccentColor"))
+            } header: {
+                Text("Debug Diagnostics")
+            } footer: {
+                Text("Enable these before reproducing a flicker to print transition and hitch details to the console.")
+            }
+            #endif
         }
         .listStyle(.insetGrouped)
         .navigationTitle("Maintenance")

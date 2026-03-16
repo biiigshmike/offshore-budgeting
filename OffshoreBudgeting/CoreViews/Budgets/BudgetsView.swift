@@ -13,7 +13,9 @@ struct BudgetsView: View {
     let workspace: Workspace
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.appTabActivationContext) private var tabActivationContext
     @Environment(\.appCommandHub) private var commandHub
+    @Environment(DetailViewSnapshotCache.self) private var detailSnapshotCache
 
     @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
     @AppStorage("sort.budgets.mode") private var sortModeRaw: String = BudgetsListSortMode.dateDesc.rawValue
@@ -46,6 +48,30 @@ struct BudgetsView: View {
     @State private var sheetRoute: SheetRoute? = nil
     @State private var showingDeleteConfirm: Bool = false
     @State private var pendingDelete: (() -> Void)? = nil
+    @State private var bucketSnapshot: BudgetBucketsSnapshot = .empty
+    @State private var hasLoadedBucketSnapshot: Bool = false
+    @State private var needsBucketSnapshotRefresh: Bool = false
+    @State private var bucketSnapshotRefreshTask: Task<Void, Never>? = nil
+
+    private struct BudgetBucketsSnapshot {
+        let filteredBudgets: [Budget]
+        let upcomingBudgets: [Budget]
+        let activeBudgets: [Budget]
+        let pastBudgets: [Budget]
+
+        static let empty = BudgetBucketsSnapshot(
+            filteredBudgets: [],
+            upcomingBudgets: [],
+            activeBudgets: [],
+            pastBudgets: []
+        )
+    }
+
+    private struct BudgetBucketsSnapshotInputs: Equatable {
+        let searchText: String
+        let sortModeRaw: String
+        let budgetsSignature: Int
+    }
 
     init(workspace: Workspace) {
         self.workspace = workspace
@@ -90,7 +116,7 @@ struct BudgetsView: View {
         return budget.endDate < t
     }
 
-    private var filteredBudgets: [Budget] {
+    private func computeFilteredBudgets() -> [Budget] {
         let query = SearchQueryParser.parse(searchText)
         guard !query.isEmpty else { return budgets }
 
@@ -101,16 +127,32 @@ struct BudgetsView: View {
         }
     }
 
+    private var filteredBudgets: [Budget] {
+        if hasLoadedBucketSnapshot {
+            return bucketSnapshot.filteredBudgets
+        }
+        return computeFilteredBudgets()
+    }
+
     private var upcomingBudgets: [Budget] {
-        sortBudgets(filteredBudgets.filter { isUpcoming($0) })
+        if hasLoadedBucketSnapshot {
+            return bucketSnapshot.upcomingBudgets
+        }
+        return sortBudgets(filteredBudgets.filter { isUpcoming($0) })
     }
 
     private var activeBudgets: [Budget] {
-        sortBudgets(filteredBudgets.filter { isActive($0) })
+        if hasLoadedBucketSnapshot {
+            return bucketSnapshot.activeBudgets
+        }
+        return sortBudgets(filteredBudgets.filter { isActive($0) })
     }
 
     private var pastBudgets: [Budget] {
-        sortBudgets(filteredBudgets.filter { isPast($0) })
+        if hasLoadedBucketSnapshot {
+            return bucketSnapshot.pastBudgets
+        }
+        return sortBudgets(filteredBudgets.filter { isPast($0) })
     }
 
     // MARK: - View
@@ -265,8 +307,19 @@ struct BudgetsView: View {
             if shouldSyncCommandSurface {
                 commandHub.activate(.budgets)
             }
+            if hasLoadedBucketSnapshot == false {
+                hydrateBucketSnapshotIfAvailable()
+                if hasLoadedBucketSnapshot == false {
+                    rebuildBucketSnapshot(reason: "onAppearInitial")
+                    hasLoadedBucketSnapshot = true
+                }
+                needsBucketSnapshotRefresh = false
+            } else if needsBucketSnapshotRefresh {
+                scheduleBucketSnapshotRefresh(reason: "onAppearRefresh")
+            }
         }
         .onDisappear {
+            cancelBucketSnapshotRefresh(reason: "onDisappear")
             if shouldSyncCommandSurface {
                 commandHub.deactivate(.budgets)
             }
@@ -274,6 +327,21 @@ struct BudgetsView: View {
         .onReceive(commandHub.$sequence) { _ in
             guard commandHub.surface == .budgets else { return }
             handleCommand(commandHub.latestCommandID)
+        }
+        .onChange(of: tabActivationContext) { _, newValue in
+            guard newValue.sectionRawValue == AppSection.budgets.rawValue else { return }
+            if newValue.isSettled, needsBucketSnapshotRefresh {
+                scheduleBucketSnapshotRefresh(reason: "tabActivationSettled")
+            } else if newValue.phase != .active {
+                cancelBucketSnapshotRefresh(reason: "tabPhaseChanged")
+            }
+        }
+        .onChange(of: bucketSnapshotInputs) { _, _ in
+            if tabActivationContext.isSettled {
+                scheduleBucketSnapshotRefresh(reason: "inputsChanged")
+            } else {
+                needsBucketSnapshotRefresh = true
+            }
         }
     }
 
@@ -451,6 +519,122 @@ struct BudgetsView: View {
         }
 
         modelContext.delete(budget)
+    }
+
+    private var budgetsSignature: Int {
+        var hasher = Hasher()
+        hasher.combine(budgets.count)
+
+        for budget in budgets {
+            hasher.combine(budget.id)
+            hasher.combine(budget.name)
+            hasher.combine(Int64(budget.startDate.timeIntervalSinceReferenceDate))
+            hasher.combine(Int64(budget.endDate.timeIntervalSinceReferenceDate))
+        }
+
+        return hasher.finalize()
+    }
+
+    private var bucketSnapshotInputs: BudgetBucketsSnapshotInputs {
+        BudgetBucketsSnapshotInputs(
+            searchText: searchText,
+            sortModeRaw: sortModeRaw,
+            budgetsSignature: budgetsSignature
+        )
+    }
+
+    private var bucketSnapshotCacheKey: String {
+        "budgets-root|\(workspace.id.uuidString)|\(bucketSnapshotInputs.searchText)|\(bucketSnapshotInputs.sortModeRaw)|\(bucketSnapshotInputs.budgetsSignature)"
+    }
+
+    private func buildBucketSnapshot(reason: String) -> BudgetBucketsSnapshot {
+        RootActivationDiagnostics.measure(
+            "budgetsRootBuckets",
+            metadata: [
+                "reason": reason,
+                "phase": tabActivationContext.phase.rawValue,
+                "token": String(tabActivationContext.token)
+            ]
+        ) {
+            let filteredBudgets = computeFilteredBudgets()
+            return BudgetBucketsSnapshot(
+                filteredBudgets: filteredBudgets,
+                upcomingBudgets: sortBudgets(filteredBudgets.filter { isUpcoming($0) }),
+                activeBudgets: sortBudgets(filteredBudgets.filter { isActive($0) }),
+                pastBudgets: sortBudgets(filteredBudgets.filter { isPast($0) })
+            )
+        }
+    }
+
+    private func rebuildBucketSnapshot(reason: String) {
+        bucketSnapshot = buildBucketSnapshot(reason: reason)
+        detailSnapshotCache.store(bucketSnapshot, for: bucketSnapshotCacheKey)
+    }
+
+    private func hydrateBucketSnapshotIfAvailable() {
+        guard let cached: BudgetBucketsSnapshot = detailSnapshotCache.snapshot(for: bucketSnapshotCacheKey) else {
+            return
+        }
+
+        bucketSnapshot = cached
+        hasLoadedBucketSnapshot = true
+        TabFlickerDiagnostics.markEvent("budgetsBucketSnapshotHydrated")
+    }
+
+    private func scheduleBucketSnapshotRefresh(reason: String) {
+        cancelBucketSnapshotRefresh(reason: "reschedule")
+        let activationToken = tabActivationContext.token
+        let activationPhase = tabActivationContext.phase
+        TabFlickerDiagnostics.markEvent(
+            "budgetsBucketSnapshotScheduled",
+            metadata: [
+                "reason": reason,
+                "phase": activationPhase.rawValue,
+                "token": String(activationToken)
+            ]
+        )
+
+        if activationPhase == .active {
+            rebuildBucketSnapshot(reason: reason)
+            hasLoadedBucketSnapshot = true
+            needsBucketSnapshotRefresh = false
+            return
+        }
+
+        needsBucketSnapshotRefresh = true
+        bucketSnapshotRefreshTask = Task {
+            try? await Task.sleep(nanoseconds: 220_000_000)
+            guard Task.isCancelled == false else { return }
+
+            await MainActor.run {
+                guard tabActivationContext.sectionRawValue == AppSection.budgets.rawValue,
+                      tabActivationContext.phase == .active,
+                      tabActivationContext.token == activationToken else {
+                    TabFlickerDiagnostics.markEvent(
+                        "budgetsBucketSnapshotCancelled",
+                        metadata: [
+                            "reason": reason,
+                            "cancel": "activationChanged"
+                        ]
+                    )
+                    return
+                }
+
+                rebuildBucketSnapshot(reason: reason)
+                hasLoadedBucketSnapshot = true
+                needsBucketSnapshotRefresh = false
+            }
+        }
+    }
+
+    private func cancelBucketSnapshotRefresh(reason: String) {
+        guard bucketSnapshotRefreshTask != nil else { return }
+        bucketSnapshotRefreshTask?.cancel()
+        bucketSnapshotRefreshTask = nil
+        TabFlickerDiagnostics.markEvent(
+            "budgetsBucketSnapshotCancelled",
+            metadata: ["reason": reason]
+        )
     }
 }
 

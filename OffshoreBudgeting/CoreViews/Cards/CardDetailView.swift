@@ -12,6 +12,11 @@ struct CardDetailView: View {
     let workspace: Workspace
     @Bindable var card: Card
 
+    @Query private var cardPlannedExpenses: [PlannedExpense]
+    @Query private var cardVariableExpenses: [VariableExpense]
+    @Query private var workspaceCategories: [Category]
+    @Query private var workspacePresets: [Preset]
+
     @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
     @AppStorage("general_defaultBudgetingPeriod")
     private var defaultBudgetingPeriodRaw: String = BudgetingPeriod.monthly.rawValue
@@ -27,7 +32,31 @@ struct CardDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appCommandHub) private var commandHub
-    @Environment(DetailViewSnapshotCache.self) private var detailSnapshotCache
+
+    init(workspace: Workspace, card: Card) {
+        self.workspace = workspace
+        self.card = card
+
+        let cardID = card.id
+        let workspaceID = workspace.id
+
+        _cardPlannedExpenses = Query(
+            filter: #Predicate<PlannedExpense> { $0.card?.id == cardID },
+            sort: [SortDescriptor(\PlannedExpense.expenseDate, order: .reverse)]
+        )
+        _cardVariableExpenses = Query(
+            filter: #Predicate<VariableExpense> { $0.card?.id == cardID },
+            sort: [SortDescriptor(\VariableExpense.transactionDate, order: .reverse)]
+        )
+        _workspaceCategories = Query(
+            filter: #Predicate<Category> { $0.workspace?.id == workspaceID },
+            sort: [SortDescriptor(\Category.name, order: .forward)]
+        )
+        _workspacePresets = Query(
+            filter: #Predicate<Preset> { $0.workspace?.id == workspaceID },
+            sort: [SortDescriptor(\Preset.title, order: .forward)]
+        )
+    }
 
     // MARK: - Sheets
 
@@ -40,15 +69,7 @@ struct CardDetailView: View {
     @State private var pendingExpenseDelete: (() -> Void)? = nil
 
     @State private var searchText: String = ""
-    @State private var derivedState: CardDetailDerivedState = .empty
-    @State private var searchRebuildTask: Task<Void, Never>? = nil
     @State private var didApplyDefaultsOnAppear: Bool = false
-    @State private var hasLoadedDerivedState: Bool = false
-    @State private var needsDerivedStateRefresh: Bool = false
-    @State private var isVisible: Bool = false
-#if DEBUG
-    @State private var appearCount: Int = 0
-#endif
     @FocusState private var searchFocused: Bool
 
     // MARK: - Filters / UI State
@@ -103,11 +124,11 @@ struct CardDetailView: View {
     ]
 
     private var variableExpensesBase: [VariableExpense] {
-        card.variableExpenses ?? []
+        cardVariableExpenses
     }
 
     private var plannedExpensesBase: [PlannedExpense] {
-        card.plannedExpenses ?? []
+        cardPlannedExpenses
     }
 
     private var isDateDirty: Bool {
@@ -335,7 +356,7 @@ struct CardDetailView: View {
         guard !sourcePresetIDs.isEmpty else { return [:] }
 
         var presetsByID: [UUID: Preset] = [:]
-        for preset in workspace.presets ?? [] {
+        for preset in workspacePresets {
             if sourcePresetIDs.contains(preset.id) {
                 presetsByID[preset.id] = preset
             }
@@ -462,6 +483,10 @@ struct CardDetailView: View {
             return Text("All Expenses • \(derived.unifiedTotal, format: CurrencyFormatter.currencyStyle())")
         }
     }
+
+    private var derivedState: CardDetailDerivedState {
+        buildDerivedState()
+    }
     
     // MARK: - Body
 
@@ -503,7 +528,7 @@ struct CardDetailView: View {
                     pendingExpenseDelete = nil
                 }
             }
-            .sheet(item: $activeModal, onDismiss: handleModalDismiss) { modal in
+            .sheet(item: $activeModal) { modal in
                 switch modal {
                 case .addExpense:
                     NavigationStack {
@@ -532,7 +557,6 @@ struct CardDetailView: View {
                 }
             }
             .onAppear {
-                isVisible = true
                 commandHub.activate(.cardDetail)
                 initializeDateRangeIfNeeded()
                 if !didApplyDefaultsOnAppear {
@@ -542,28 +566,10 @@ struct CardDetailView: View {
                     excludeFutureVariableExpensesFromCalculationsInView = excludeFutureVariableExpensesFromCalculationsDefault
                     didApplyDefaultsOnAppear = true
                 }
-                if hasLoadedDerivedState == false {
-                    hydrateDerivedStateFromCacheIfAvailable()
-                    rebuildDerivedState(reason: "onAppearInitial")
-                    hasLoadedDerivedState = true
-                    needsDerivedStateRefresh = false
-                } else if needsDerivedStateRefresh {
-                    rebuildDerivedState(reason: "onAppearRefresh")
-                    needsDerivedStateRefresh = false
-                }
-#if DEBUG
-                appearCount += 1
-                debugLog("onAppear count=\(appearCount)")
-#endif
             }
             .onDisappear {
-                isVisible = false
                 searchFocused = false
                 commandHub.deactivate(.cardDetail)
-                searchRebuildTask?.cancel()
-#if DEBUG
-                debugLog("onDisappear")
-#endif
             }
             .onReceive(commandHub.$sequence) { _ in
                 guard commandHub.surface == .cardDetail else { return }
@@ -571,152 +577,17 @@ struct CardDetailView: View {
             }
             .onChange(of: defaultBudgetingPeriodRaw) { _, _ in
                 applyDefaultPeriodRange()
-                if isVisible {
-                    rebuildDerivedState(reason: "defaultBudgetingPeriodRaw")
-                } else {
-                    needsDerivedStateRefresh = true
-                }
-            }
-            .onChange(of: searchText) { _, _ in
-                if isVisible {
-                    scheduleSearchDerivedStateRebuild()
-                } else {
-                    searchRebuildTask?.cancel()
-                    needsDerivedStateRefresh = true
-                }
-            }
-            .onChange(of: derivedRebuildInputs) { _, _ in
-                if isVisible {
-                    rebuildDerivedState(reason: "derivedRebuildInputs")
-                } else {
-                    needsDerivedStateRefresh = true
-                }
             }
     }
 
-    private func rebuildDerivedState(reason: String = "unspecified") {
-        let start = DispatchTime.now().uptimeNanoseconds
-        derivedState = buildDerivedState()
-        detailSnapshotCache.store(derivedState, for: derivedStateCacheKey)
-#if DEBUG
-        let elapsedMS = Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000
-        if elapsedMS >= 8 {
-            debugLog("rebuildDerivedState reason=\(reason) elapsedMS=\(elapsedMS)")
+    private var cardCategories: [Category] {
+        let categories = variableExpensesBase.compactMap(\.category) + plannedExpensesBase.compactMap(\.category)
+        var uniqueByID: [UUID: Category] = [:]
+        for category in categories {
+            uniqueByID[category.id] = category
         }
-#endif
+        return uniqueByID.values.sorted { $0.id.uuidString < $1.id.uuidString }
     }
-
-    private struct DerivedRebuildInputs: Equatable {
-        let selectedCategoryIDs: Set<UUID>
-        let expenseScope: ExpenseScope
-        let sortMode: SortMode
-        let hideFuturePlannedExpensesInView: Bool
-        let excludeFuturePlannedExpensesFromCalculationsInView: Bool
-        let hideFutureVariableExpensesInView: Bool
-        let excludeFutureVariableExpensesFromCalculationsInView: Bool
-        let appliedStartDate: Date
-        let appliedEndDate: Date
-        let variableExpensesCount: Int
-        let plannedExpensesCount: Int
-        let presetsCount: Int
-    }
-
-    private var derivedRebuildInputs: DerivedRebuildInputs {
-        DerivedRebuildInputs(
-            selectedCategoryIDs: selectedCategoryIDs,
-            expenseScope: expenseScope,
-            sortMode: sortMode,
-            hideFuturePlannedExpensesInView: hideFuturePlannedExpensesInView,
-            excludeFuturePlannedExpensesFromCalculationsInView: excludeFuturePlannedExpensesFromCalculationsInView,
-            hideFutureVariableExpensesInView: hideFutureVariableExpensesInView,
-            excludeFutureVariableExpensesFromCalculationsInView: excludeFutureVariableExpensesFromCalculationsInView,
-            appliedStartDate: appliedStartDate,
-            appliedEndDate: appliedEndDate,
-            variableExpensesCount: card.variableExpenses?.count ?? 0,
-            plannedExpensesCount: card.plannedExpenses?.count ?? 0,
-            presetsCount: workspace.presets?.count ?? 0
-        )
-    }
-
-    private func scheduleSearchDerivedStateRebuild() {
-        searchRebuildTask?.cancel()
-        guard isVisible else {
-            needsDerivedStateRefresh = true
-            return
-        }
-        searchRebuildTask = Task {
-            try? await Task.sleep(nanoseconds: 120_000_000)
-            guard !Task.isCancelled, isVisible else { return }
-            rebuildDerivedState(reason: "searchDebounced")
-        }
-    }
-
-    private func handleModalDismiss() {
-        if isVisible {
-            rebuildDerivedState(reason: "modalDismiss")
-        } else {
-            needsDerivedStateRefresh = true
-        }
-    }
-
-    private func hydrateDerivedStateFromCacheIfAvailable() {
-        if let cached: CardDetailDerivedState = detailSnapshotCache.snapshot(for: derivedStateCacheKey) {
-            derivedState = cached
-#if DEBUG
-            debugLog("cache hit key=\(derivedStateCacheKey)")
-#endif
-        } else {
-#if DEBUG
-            debugLog("cache miss key=\(derivedStateCacheKey)")
-#endif
-        }
-    }
-
-    private var derivedStateCacheKey: String {
-        let startStamp = Int64(normalizedStart(appliedStartDate).timeIntervalSinceReferenceDate)
-        let endStamp = Int64(normalizedEnd(appliedEndDate).timeIntervalSinceReferenceDate)
-        let trimmedSearch = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        var parts: [String] = []
-        parts.reserveCapacity(18)
-        parts.append("card-detail")
-        parts.append(workspace.id.uuidString)
-        parts.append(card.id.uuidString)
-        if selectedCategoryIDs.isEmpty {
-            parts.append("none")
-        } else {
-            parts.append(selectedCategoryIDs.map(\.uuidString).sorted().joined(separator: ","))
-        }
-        parts.append(expenseScope.rawValue)
-        parts.append(sortMode.rawValue)
-        parts.append(hideFuturePlannedExpensesInView ? "1" : "0")
-        parts.append(excludeFuturePlannedExpensesFromCalculationsInView ? "1" : "0")
-        parts.append(hideFutureVariableExpensesInView ? "1" : "0")
-        parts.append(excludeFutureVariableExpensesFromCalculationsInView ? "1" : "0")
-        parts.append(String(startStamp))
-        parts.append(String(endStamp))
-        parts.append(String(card.variableExpenses?.count ?? 0))
-        parts.append(String(card.plannedExpenses?.count ?? 0))
-        parts.append(String(workspace.presets?.count ?? 0))
-        parts.append(String(latestVariableExpenseStamp))
-        parts.append(String(latestPlannedExpenseStamp))
-        parts.append(trimmedSearch)
-        return parts.joined(separator: "|")
-    }
-
-    private var latestVariableExpenseStamp: Int64 {
-        Int64((card.variableExpenses ?? []).map(\.transactionDate.timeIntervalSinceReferenceDate).max() ?? 0)
-    }
-
-    private var latestPlannedExpenseStamp: Int64 {
-        Int64((card.plannedExpenses ?? []).map(\.expenseDate.timeIntervalSinceReferenceDate).max() ?? 0)
-    }
-
-#if DEBUG
-    private func debugLog(_ message: String) {
-        print("[CardDetailView:\(card.id.uuidString)] \(message)")
-    }
-#endif
 
     @ViewBuilder
     private func listContent(derived: CardDetailDerivedState) -> some View {
@@ -1138,8 +1009,8 @@ struct CardDetailView: View {
     private func refreshDateRangeIfSafe() {
         guard !isDateDirty else { return }
 
-        let variableDates = (card.variableExpenses ?? []).map(\.transactionDate)
-        let plannedDates = (card.plannedExpenses ?? []).map(\.expenseDate)
+        let variableDates = cardVariableExpenses.map(\.transactionDate)
+        let plannedDates = cardPlannedExpenses.map(\.expenseDate)
         let allDates = variableDates + plannedDates
 
         guard let minDate = allDates.min(), let maxDate = allDates.max() else { return }
@@ -1243,7 +1114,9 @@ struct CardDetailView: View {
 
     private func deleteWithOptionalConfirm(_ deleteAction: @escaping () -> Void) {
         if confirmBeforeDeleting {
-            pendingExpenseDelete = deleteAction
+            pendingExpenseDelete = { [deleteAction] in
+                deleteAction()
+            }
             showingExpenseDeleteConfirm = true
         } else {
             deleteAction()
@@ -1311,16 +1184,12 @@ struct CardDetailView: View {
 
         // I prefer being explicit here even though SwiftData delete rules are set to cascade.
         // This keeps behavior predictable if those rules ever change.
-        if let planned = card.plannedExpenses {
-            for expense in planned {
-                PlannedExpenseDeletionService.delete(expense, modelContext: modelContext)
-            }
+        for expense in cardPlannedExpenses {
+            PlannedExpenseDeletionService.delete(expense, modelContext: modelContext)
         }
 
-        if let variable = card.variableExpenses {
-            for expense in variable {
-                deleteVariableExpense(expense)
-            }
+        for expense in cardVariableExpenses {
+            deleteVariableExpense(expense)
         }
 
         if let incomes = card.incomes {

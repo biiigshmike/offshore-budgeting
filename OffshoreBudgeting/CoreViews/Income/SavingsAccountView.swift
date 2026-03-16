@@ -97,6 +97,8 @@ struct SavingsAccountView: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.appCommandHub) private var commandHub
+    @Environment(\.appTabActivationContext) private var tabActivationContext
+    @Environment(DetailViewSnapshotCache.self) private var detailSnapshotCache
 
     @Query private var savingsAccounts: [SavingsAccount]
     @Query private var savingsEntries: [SavingsLedgerEntry]
@@ -117,6 +119,10 @@ struct SavingsAccountView: View {
     @FocusState private var searchFocused: Bool
     @State private var lastHandledCommandSequence: Int? = nil
     @State private var selectedTrendMode: SavingsTrendMode = .runningTotal
+    @State private var graphSnapshot: SavingsGraphSnapshot? = nil
+    @State private var hasLoadedGraphSnapshot: Bool = false
+    @State private var needsGraphSnapshotRefresh: Bool = false
+    @State private var graphSnapshotRefreshTask: Task<Void, Never>? = nil
 
     init(workspace: Workspace) {
         self.workspace = workspace
@@ -140,6 +146,23 @@ struct SavingsAccountView: View {
     private var accountScopedEntries: [SavingsLedgerEntry] {
         guard let accountID = account?.id else { return [] }
         return savingsEntries.filter { $0.account?.id == accountID }
+    }
+
+    private var graphSignature: SavingsGraphSnapshotSignature {
+        SavingsGraphSnapshotService.signature(
+            for: workspace,
+            rangeStart: normalizedStart(appliedStartDate),
+            rangeEnd: normalizedEnd(appliedEndDate),
+            modelContext: modelContext
+        )
+    }
+
+    private var graphSnapshotCacheKey: String {
+        SavingsGraphSnapshotService.cacheKey(
+            workspaceID: workspace.id,
+            rangeStart: normalizedStart(appliedStartDate),
+            rangeEnd: normalizedEnd(appliedEndDate)
+        )
     }
 
     private var sortMode: SavingsLedgerSortMode {
@@ -179,10 +202,16 @@ struct SavingsAccountView: View {
     }
 
     private var runningTotal: Double {
-        account?.total ?? 0
+        graphSnapshot?.runningTotal ?? account?.total ?? 0
     }
 
     private var currentPeriodChartPoints: [SavingsChartPoint] {
+        if let graphSnapshot {
+            return graphSnapshot.currentPeriodPoints.map { point in
+                SavingsChartPoint(date: point.date, total: point.total)
+            }
+        }
+
         let rangeStart = normalizedStart(appliedStartDate)
         let rangeEnd = normalizedEnd(appliedEndDate)
 
@@ -222,6 +251,12 @@ struct SavingsAccountView: View {
     }
 
     private var runningTotalChartPoints: [SavingsChartPoint] {
+        if let graphSnapshot {
+            return graphSnapshot.runningTotalPoints.map { point in
+                SavingsChartPoint(date: point.date, total: point.total)
+            }
+        }
+
         let entriesAsc = accountScopedEntries.sorted { lhs, rhs in
             if lhs.date == rhs.date {
                 return lhs.createdAt < rhs.createdAt
@@ -330,9 +365,30 @@ struct SavingsAccountView: View {
         .listStyle(.insetGrouped)
         .onAppear {
             initializeDateRangeIfNeeded()
+            hydrateGraphSnapshotIfAvailable()
+            if graphSnapshot == nil {
+                rebuildGraphSnapshot(reason: "onAppearInitial")
+            } else if needsGraphSnapshotRefresh {
+                scheduleGraphSnapshotRefresh(reason: "onAppearRefresh")
+            }
         }
         .onChange(of: defaultBudgetingPeriodRaw) { _, _ in
             applyDefaultPeriodRange()
+        }
+        .onChange(of: graphSignature) { _, _ in
+            if tabActivationContext.phase == .active {
+                scheduleGraphSnapshotRefresh(reason: "inputsChanged")
+            } else {
+                needsGraphSnapshotRefresh = true
+            }
+        }
+        .onChange(of: tabActivationContext) { _, newValue in
+            guard newValue.sectionRawValue == AppSection.cards.rawValue else { return }
+            if newValue.phase == .active, needsGraphSnapshotRefresh {
+                scheduleGraphSnapshotRefresh(reason: "tabActivationSettled")
+            } else if newValue.phase != .active {
+                cancelGraphSnapshotRefresh(reason: "tabPhaseChanged")
+            }
         }
         .onReceive(commandHub.$sequence) { sequence in
             if lastHandledCommandSequence == nil {
@@ -454,6 +510,92 @@ struct SavingsAccountView: View {
     private func applyDraftDates() {
         appliedStartDate = normalizedStart(draftStartDate)
         appliedEndDate = normalizedEnd(draftEndDate)
+    }
+
+    private func hydrateGraphSnapshotIfAvailable() {
+        guard let cached: SavingsGraphSnapshot = detailSnapshotCache.snapshot(for: graphSnapshotCacheKey) else {
+            return
+        }
+
+        graphSnapshot = cached
+        hasLoadedGraphSnapshot = true
+        needsGraphSnapshotRefresh = cached.signature != graphSignature
+        TabFlickerDiagnostics.markEvent("savingsGraphSnapshotHydrated")
+    }
+
+    private func rebuildGraphSnapshot(reason: String) {
+        let start = DispatchTime.now().uptimeNanoseconds
+        graphSnapshot = SavingsGraphSnapshotService.buildSnapshot(
+            for: workspace,
+            rangeStart: normalizedStart(appliedStartDate),
+            rangeEnd: normalizedEnd(appliedEndDate),
+            modelContext: modelContext
+        )
+        if let graphSnapshot {
+            detailSnapshotCache.store(graphSnapshot, for: graphSnapshotCacheKey)
+        }
+        hasLoadedGraphSnapshot = true
+        needsGraphSnapshotRefresh = false
+        let elapsedMs = Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000
+        TabFlickerDiagnostics.markEvent(
+            "savingsGraphSnapshotFinished",
+            metadata: [
+                "reason": reason,
+                "elapsedMs": String(format: "%.1f", elapsedMs)
+            ]
+        )
+    }
+
+    private func scheduleGraphSnapshotRefresh(reason: String) {
+        cancelGraphSnapshotRefresh(reason: "reschedule")
+        let activationToken = tabActivationContext.token
+        let activationPhase = tabActivationContext.phase
+        TabFlickerDiagnostics.markEvent(
+            "savingsGraphSnapshotScheduled",
+            metadata: [
+                "reason": reason,
+                "phase": activationPhase.rawValue,
+                "token": String(activationToken)
+            ]
+        )
+
+        if activationPhase == .active {
+            rebuildGraphSnapshot(reason: reason)
+            return
+        }
+
+        needsGraphSnapshotRefresh = true
+        graphSnapshotRefreshTask = Task {
+            try? await Task.sleep(nanoseconds: 220_000_000)
+            guard Task.isCancelled == false else { return }
+
+            await MainActor.run {
+                guard tabActivationContext.sectionRawValue == AppSection.cards.rawValue,
+                      tabActivationContext.phase == .active,
+                      tabActivationContext.token == activationToken else {
+                    TabFlickerDiagnostics.markEvent(
+                        "savingsGraphSnapshotCancelled",
+                        metadata: [
+                            "reason": reason,
+                            "cancel": "activationChanged"
+                        ]
+                    )
+                    return
+                }
+
+                rebuildGraphSnapshot(reason: reason)
+            }
+        }
+    }
+
+    private func cancelGraphSnapshotRefresh(reason: String) {
+        guard graphSnapshotRefreshTask != nil else { return }
+        graphSnapshotRefreshTask?.cancel()
+        graphSnapshotRefreshTask = nil
+        TabFlickerDiagnostics.markEvent(
+            "savingsGraphSnapshotCancelled",
+            metadata: ["reason": reason]
+        )
     }
 
     private func applyQuickRangePresetDeferred(_ preset: CalendarQuickRangePreset) {
@@ -583,6 +725,12 @@ private struct SavingsChartPoint: Identifiable {
     let id = UUID()
     let date: Date
     let total: Double
+
+    init(date: Date, total: Double) {
+        self.date = date
+        self.total = total
+    }
+
 }
 
 private struct SavingsLedgerRow: View {

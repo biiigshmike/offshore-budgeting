@@ -8,22 +8,13 @@
 import SwiftUI
 
 private struct PostBoardingTipPresenterIsActiveKey: EnvironmentKey {
-    static let defaultValue: Bool = true
-}
-
-private struct PostBoardingTipActivationCycleKey: EnvironmentKey {
-    static let defaultValue: Int = 0
+    static let defaultValue: Bool = false
 }
 
 extension EnvironmentValues {
     var postBoardingTipPresenterIsActive: Bool {
         get { self[PostBoardingTipPresenterIsActiveKey.self] }
         set { self[PostBoardingTipPresenterIsActiveKey.self] = newValue }
-    }
-
-    var postBoardingTipActivationCycle: Int {
-        get { self[PostBoardingTipActivationCycleKey.self] }
-        set { self[PostBoardingTipActivationCycleKey.self] = newValue }
     }
 }
 
@@ -88,7 +79,6 @@ private struct PostBoardingTipModifier: ViewModifier {
     @AppStorage("releaseLogs_seenReleaseIDs") private var seenReleaseIDsCSV: String = ""
 
     @Environment(\.postBoardingTipPresenterIsActive) private var postBoardingTipPresenterIsActive
-    @Environment(\.postBoardingTipActivationCycle) private var postBoardingTipActivationCycle
     @Environment(PostBoardingTipsStore.self) private var postBoardingTipsStore
 
     @State private var showingTip: Bool = false
@@ -97,19 +87,24 @@ private struct PostBoardingTipModifier: ViewModifier {
     func body(content: Content) -> some View {
         let base = content
             .onAppear {
-                refreshPresentationForCurrentEligibility(deferPresentation: true)
+                if postBoardingTipPresenterIsActive {
+                    refreshPresentationForCurrentEligibility(deferPresentation: true)
+                }
             }
             .onChange(of: postBoardingTipsStore.changeSerial) { _, _ in
-                refreshPresentationForCurrentEligibility(deferPresentation: true)
+                if postBoardingTipPresenterIsActive {
+                    refreshPresentationForCurrentEligibility(deferPresentation: true)
+                }
             }
             .onChange(of: didCompleteOnboarding) { _, _ in
-                refreshPresentationForCurrentEligibility(deferPresentation: true)
+                if postBoardingTipPresenterIsActive {
+                    refreshPresentationForCurrentEligibility(deferPresentation: true)
+                }
             }
             .onChange(of: seenReleaseIDsCSV) { _, _ in
-                refreshPresentationForCurrentEligibility(deferPresentation: true)
-            }
-            .onChange(of: postBoardingTipActivationCycle) { _, _ in
-                refreshPresentationForCurrentEligibility(deferPresentation: true)
+                if postBoardingTipPresenterIsActive {
+                    refreshPresentationForCurrentEligibility(deferPresentation: true)
+                }
             }
             .onChange(of: postBoardingTipPresenterIsActive) { _, isActive in
                 if isActive {
@@ -175,6 +170,11 @@ private struct PostBoardingTipModifier: ViewModifier {
 
     private func refreshPresentationForCurrentEligibility(deferPresentation: Bool = false) {
         if deferPresentation {
+            guard postBoardingTipPresenterIsActive else {
+                showingTip = false
+                didAcknowledgeTip = false
+                return
+            }
             DispatchQueue.main.async {
                 refreshPresentationForCurrentEligibility(deferPresentation: false)
             }

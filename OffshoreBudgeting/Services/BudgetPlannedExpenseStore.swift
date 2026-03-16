@@ -18,11 +18,25 @@ enum BudgetPlannedExpenseStore {
     ) -> [PlannedExpense] {
         let budgetID = budget.id
         let linkedCardIDs = linkedCardIDs(for: budget)
-        guard !linkedCardIDs.isEmpty else { return [] }
-
         let range = DateRange(start: budget.startDate, end: budget.endDate, calendar: calendar)
 
-        return (workspace.plannedExpenses ?? [])
+        return plannedExpenses(
+            workspace.plannedExpenses ?? [],
+            budgetID: budgetID,
+            linkedCardIDs: linkedCardIDs,
+            range: range
+        )
+    }
+
+    static func plannedExpenses(
+        _ expenses: [PlannedExpense],
+        budgetID: UUID,
+        linkedCardIDs: Set<UUID>,
+        range: DateRange
+    ) -> [PlannedExpense] {
+        guard !linkedCardIDs.isEmpty else { return [] }
+
+        return expenses
             .filter { $0.sourceBudgetID == budgetID }
             .filter { expense in
                 guard let cardID = expense.card?.id else { return false }
@@ -38,4 +52,3 @@ enum BudgetPlannedExpenseStore {
         Set((budget.cardLinks ?? []).compactMap { $0.card?.id })
     }
 }
-

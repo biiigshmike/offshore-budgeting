@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 struct AccountsView: View {
 
@@ -46,6 +47,8 @@ struct AccountsView: View {
     let workspace: Workspace
 
     @State private var selectedSegment: Segment = .cards
+    @State private var mountedSegments: Set<Segment> = []
+    @State private var stagingSegments: Set<Segment> = []
     @State private var isSegmentControlExpanded: Bool = false
     @State private var showingAddCardFromAccounts: Bool = false
     @State private var showingAddAllocationAccountFromAccounts: Bool = false
@@ -56,7 +59,12 @@ struct AccountsView: View {
     @AppStorage("sort.savings.mode") private var savingsSortModeRaw: String = SavingsLedgerSortMode.dateDesc.rawValue
     @AppStorage(AppShortcutNavigationStore.pendingAccountsSegmentKey) private var pendingAccountsSegmentRaw: String = ""
 
+    @Environment(\.appTabActivationContext) private var tabActivationContext
     @Environment(\.appCommandHub) private var commandHub
+    @Environment(\.modelContext) private var modelContext
+    @Environment(DetailViewSnapshotCache.self) private var detailSnapshotCache
+
+    @State private var savingsGraphWarmTask: Task<Void, Never>? = nil
 
     private var isPhone: Bool {
         #if canImport(UIKit)
@@ -74,14 +82,7 @@ struct AccountsView: View {
 
     var body: some View {
         Group {
-            switch selectedSegment {
-            case .cards:
-                CardsView(workspace: workspace)
-            case .sharedBalances:
-                AllocationAccountView(workspace: workspace)
-            case .savings:
-                SavingsAccountView(workspace: workspace)
-            }
+            stagedSegmentContent
         }
         .navigationTitle(navigationTitleText)
         .toolbar {
@@ -125,6 +126,8 @@ struct AccountsView: View {
         }
         .onAppear {
             consumePendingAccountsSegmentIfNeeded()
+            requestPrepareSelectedSegment(reason: "onAppear")
+            scheduleSavingsGraphWarmIfNeeded(reason: "onAppear")
             updateCommandSurface()
         }
         .onChange(of: pendingAccountsSegmentRaw) { _, _ in
@@ -134,9 +137,21 @@ struct AccountsView: View {
             if isSegmentControlExpanded {
                 isSegmentControlExpanded = false
             }
+            requestPrepareSelectedSegment(reason: "segmentChanged")
+            scheduleSavingsGraphWarmIfNeeded(reason: "segmentChanged")
             updateCommandSurface()
         }
+        .onChange(of: tabActivationContext) { _, newValue in
+            guard newValue.sectionRawValue == AppSection.cards.rawValue else { return }
+            if newValue.isVisible {
+                requestPrepareSelectedSegment(reason: "tabPhaseChanged")
+                scheduleSavingsGraphWarmIfNeeded(reason: "tabPhaseChanged")
+            } else {
+                cancelSavingsGraphWarm(reason: "tabPhaseChanged")
+            }
+        }
         .onDisappear {
+            cancelSavingsGraphWarm(reason: "onDisappear")
             if shouldSyncCommandSurface {
                 switch selectedSegment.commandConfiguration.surface {
                 case .cards:
@@ -151,6 +166,23 @@ struct AccountsView: View {
     }
 
     // MARK: - Commands
+
+    @ViewBuilder
+    private var stagedSegmentContent: some View {
+        if mountedSegments.contains(selectedSegment) {
+            switch selectedSegment {
+            case .cards:
+                CardsView(workspace: workspace)
+            case .sharedBalances:
+                AllocationAccountView(workspace: workspace)
+            case .savings:
+                SavingsAccountView(workspace: workspace)
+            }
+        } else {
+            Color.clear
+                .accessibilityHidden(true)
+        }
+    }
 
     private func updateCommandSurface() {
         guard shouldSyncCommandSurface else { return }
@@ -173,6 +205,135 @@ struct AccountsView: View {
         }
 
         pendingAccountsSegmentRaw = ""
+    }
+
+    private func requestPrepareSelectedSegment(reason: String) {
+        requestPrepareSegment(selectedSegment, reason: reason)
+    }
+
+    private func requestPrepareSegment(_ segment: Segment, reason: String) {
+        guard segment == selectedSegment else {
+            TabFlickerDiagnostics.markEvent(
+                "accountsSegmentWarmPrevented",
+                metadata: [
+                    "segment": segment.rawValue,
+                    "reason": "nonSelected:\(reason)"
+                ]
+            )
+            return
+        }
+
+        if tabActivationContext.sectionRawValue == AppSection.cards.rawValue,
+           tabActivationContext.phase == .inactive {
+            TabFlickerDiagnostics.markEvent(
+                "accountsSegmentWarmPrevented",
+                metadata: [
+                    "segment": segment.rawValue,
+                    "reason": "inactiveTab:\(reason)"
+                ]
+            )
+            return
+        }
+
+        prepareSegment(segment)
+    }
+
+    private func prepareSegment(_ segment: Segment) {
+        guard mountedSegments.contains(segment) == false else { return }
+        guard stagingSegments.contains(segment) == false else { return }
+
+        stagingSegments.insert(segment)
+        TabFlickerDiagnostics.markEvent(
+            "accountsSegmentMountScheduled",
+            metadata: ["segment": segment.rawValue]
+        )
+        DispatchQueue.main.async {
+            mountedSegments.insert(segment)
+            stagingSegments.remove(segment)
+            TabFlickerDiagnostics.markEvent(
+                "accountsSegmentMountActivated",
+                metadata: ["segment": segment.rawValue]
+            )
+        }
+    }
+
+    private func scheduleSavingsGraphWarmIfNeeded(reason: String) {
+        guard tabActivationContext.sectionRawValue == AppSection.cards.rawValue else { return }
+        guard tabActivationContext.phase == .active else { return }
+        guard selectedSegment != .savings else {
+            cancelSavingsGraphWarm(reason: "savingsVisible")
+            return
+        }
+
+        cancelSavingsGraphWarm(reason: "reschedule")
+        let activationToken = tabActivationContext.token
+        let defaultRange = SavingsGraphSnapshotService.defaultRange(
+            defaultBudgetingPeriodRaw: UserDefaults.standard.string(forKey: "general_defaultBudgetingPeriod")
+                ?? BudgetingPeriod.monthly.rawValue
+        )
+
+        TabFlickerDiagnostics.markEvent(
+            "savingsGraphWarmScheduled",
+            metadata: [
+                "reason": reason,
+                "token": String(activationToken)
+            ]
+        )
+
+        savingsGraphWarmTask = Task {
+            try? await Task.sleep(nanoseconds: 320_000_000)
+            guard Task.isCancelled == false else { return }
+
+            await MainActor.run {
+                guard tabActivationContext.sectionRawValue == AppSection.cards.rawValue,
+                      tabActivationContext.phase == .active,
+                      tabActivationContext.token == activationToken,
+                      selectedSegment != .savings else {
+                    TabFlickerDiagnostics.markEvent(
+                        "savingsGraphWarmCancelled",
+                        metadata: [
+                            "reason": reason,
+                            "cancel": "activationChanged"
+                        ]
+                    )
+                    return
+                }
+
+                let cacheKey = SavingsGraphSnapshotService.cacheKey(
+                    workspaceID: workspace.id,
+                    rangeStart: defaultRange.start,
+                    rangeEnd: defaultRange.end
+                )
+                let existing: SavingsGraphSnapshot? = detailSnapshotCache.snapshot(for: cacheKey)
+                let signature = SavingsGraphSnapshotService.signature(
+                    for: workspace,
+                    rangeStart: defaultRange.start,
+                    rangeEnd: defaultRange.end,
+                    modelContext: modelContext
+                )
+
+                guard existing?.signature != signature else { return }
+
+                let snapshot = SavingsGraphSnapshotService.buildSnapshot(
+                    for: workspace,
+                    rangeStart: defaultRange.start,
+                    rangeEnd: defaultRange.end,
+                    modelContext: modelContext
+                )
+                detailSnapshotCache.store(snapshot, for: cacheKey)
+                TabFlickerDiagnostics.markEvent("savingsGraphWarmFinished")
+            }
+        }
+    }
+
+    private func cancelSavingsGraphWarm(reason: String) {
+        guard savingsGraphWarmTask != nil else { return }
+        savingsGraphWarmTask?.cancel()
+        savingsGraphWarmTask = nil
+        TabFlickerDiagnostics.markEvent(
+            "savingsGraphWarmCancelled",
+            metadata: ["reason": reason]
+        )
     }
 
     @ViewBuilder

@@ -108,4 +108,61 @@ struct BudgetPlannedExpenseStoreTests {
         #expect(aResults.first?.sourceBudgetID == budgetA.id)
         #expect(bResults.first?.sourceBudgetID == budgetB.id)
     }
+
+    @Test func plannedExpenses_CollectionOverloadFiltersByBudgetCardAndRange() {
+        let workspace = Workspace(name: "WS", hexColor: "#3B82F6")
+        let includedCard = Card(name: "Included", workspace: workspace)
+        let excludedCard = Card(name: "Excluded", workspace: workspace)
+
+        let cal = Calendar(identifier: .gregorian)
+        let start = cal.date(from: DateComponents(year: 2026, month: 1, day: 1))!
+        let end = cal.date(from: DateComponents(year: 2026, month: 1, day: 31))!
+        let budgetID = UUID(uuidString: "00000000-0000-0000-0000-000000000111")!
+
+        let inRangeIncluded = PlannedExpense(
+            title: "Included",
+            plannedAmount: 100,
+            actualAmount: 0,
+            expenseDate: cal.date(from: DateComponents(year: 2026, month: 1, day: 15))!,
+            workspace: workspace,
+            card: includedCard,
+            sourceBudgetID: budgetID
+        )
+        let wrongBudget = PlannedExpense(
+            title: "Wrong Budget",
+            plannedAmount: 50,
+            actualAmount: 0,
+            expenseDate: cal.date(from: DateComponents(year: 2026, month: 1, day: 16))!,
+            workspace: workspace,
+            card: includedCard,
+            sourceBudgetID: UUID()
+        )
+        let wrongCard = PlannedExpense(
+            title: "Wrong Card",
+            plannedAmount: 75,
+            actualAmount: 0,
+            expenseDate: cal.date(from: DateComponents(year: 2026, month: 1, day: 17))!,
+            workspace: workspace,
+            card: excludedCard,
+            sourceBudgetID: budgetID
+        )
+        let outOfRange = PlannedExpense(
+            title: "Out of Range",
+            plannedAmount: 80,
+            actualAmount: 0,
+            expenseDate: cal.date(from: DateComponents(year: 2026, month: 2, day: 1))!,
+            workspace: workspace,
+            card: includedCard,
+            sourceBudgetID: budgetID
+        )
+
+        let results = BudgetPlannedExpenseStore.plannedExpenses(
+            [wrongBudget, outOfRange, inRangeIncluded, wrongCard],
+            budgetID: budgetID,
+            linkedCardIDs: [includedCard.id],
+            range: DateRange(start: start, end: end, calendar: cal)
+        )
+
+        #expect(results.map(\.title) == ["Included"])
+    }
 }

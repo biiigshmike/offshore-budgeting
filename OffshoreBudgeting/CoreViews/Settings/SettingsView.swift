@@ -17,7 +17,42 @@ struct SettingsView: View {
     private var workspaces: [Workspace]
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.appTabActivationContext) private var tabActivationContext
     @State private var showingWorkspaceManager: Bool = false
+    @State private var sectionModels: [SettingsSectionModel] = []
+    @State private var workspaceMenuItems: [WorkspaceMenuItemModel] = []
+    @State private var activationEnrichmentTask: Task<Void, Never>? = nil
+
+    private enum SettingsDestination: Hashable {
+        case about
+        case help
+        case general
+        case privacy
+        case notifications
+        case iCloud
+        case quickActions
+        case manageCategories
+        case managePresets
+    }
+
+    private struct SettingsRowModel: Identifiable {
+        let id: SettingsDestination
+        let title: String
+        let systemImage: String
+        let tint: Color
+    }
+
+    private struct SettingsSectionModel: Identifiable {
+        let id: String
+        let rows: [SettingsRowModel]
+    }
+
+    private struct WorkspaceMenuItemModel: Identifiable {
+        let id: UUID
+        let name: String
+        let hexColor: String
+        let isSelected: Bool
+    }
 
     // MARK: - Derived
 
@@ -35,11 +70,17 @@ struct SettingsView: View {
 
     var body: some View {
         List {
-            aboutSection
-            systemSection
-            quickActionsSection
-            managementCategoriesSection
-            managementPresetsSection
+            ForEach(displayedSectionModels) { section in
+                Section {
+                    ForEach(section.rows) { row in
+                        settingsRow(for: row)
+                    }
+                } header: {
+                    EmptyView()
+                } footer: {
+                    EmptyView()
+                }
+            }
         }
         .navigationTitle(String(localized: "app.section.settings", defaultValue: "Settings", comment: "Main tab title for the Settings section."))
         .toolbar {
@@ -50,32 +91,34 @@ struct SettingsView: View {
         .sheet(isPresented: $showingWorkspaceManager) {
             workspaceManagerSheet
         }
+        .onAppear {
+            rebuildDisplayModels()
+            scheduleActivationEnrichment(reason: "onAppear")
+        }
+        .onDisappear {
+            cancelActivationEnrichment()
+        }
+        .onChange(of: workspace.id) { _, _ in
+            rebuildDisplayModels()
+        }
+        .onChange(of: selectedWorkspaceID) { _, _ in
+            rebuildWorkspaceMenuItems()
+        }
+        .onChange(of: workspaces.count) { _, _ in
+            rebuildDisplayModels()
+        }
+        .onChange(of: tabActivationContext) { _, newValue in
+            guard newValue.sectionRawValue == AppSection.settings.rawValue else { return }
+            if newValue.phase == .active {
+                scheduleActivationEnrichment(reason: "tabActivationSettled")
+            } else {
+                cancelActivationEnrichment()
+            }
+        }
     }
 
-    // MARK: - Sections
-
-    private var aboutSection: some View {
-        Section {
-            NavigationLink {
-                SettingsAboutView()
-            } label: {
-                aboutRow
-            }
-
-            NavigationLink {
-                SettingsHelpView()
-            } label: {
-                SettingsRow(
-                    title: String(localized: "help.title", defaultValue: "Help", comment: "Title for help screen."),
-                    systemImage: "questionmark.circle",
-                    tint: Color(.systemGray)
-                )
-            }
-        } header: {
-            EmptyView()
-        } footer: {
-            EmptyView()
-        }
+    private var displayedSectionModels: [SettingsSectionModel] {
+        sectionModels.isEmpty ? buildSectionModels() : sectionModels
     }
 
     private var aboutRow: some View {
@@ -99,108 +142,6 @@ struct SettingsView: View {
             Spacer(minLength: 8)
         }
         .contentShape(Rectangle())
-    }
-
-    private var systemSection: some View {
-        Section {
-            NavigationLink {
-                SettingsGeneralView()
-            } label: {
-                SettingsRow(
-                    title: String(localized: "settings.general", defaultValue: "General", comment: "Title for general settings."),
-                    systemImage: "gear",
-                    tint: Color(.systemGray)
-                )
-            }
-
-            NavigationLink {
-                SettingsPrivacyView()
-            } label: {
-                SettingsRow(
-                    title: String(localized: "settings.privacy", defaultValue: "Privacy", comment: "Title for privacy settings."),
-                    systemImage: "faceid",
-                    tint: Color(.systemBlue)
-                )
-            }
-
-            NavigationLink {
-                SettingsNotificationsView(workspaceID: workspace.id)
-            } label: {
-                SettingsRow(
-                    title: String(localized: "settings.notifications", defaultValue: "Notifications", comment: "Title for notifications settings."),
-                    systemImage: "bell.badge",
-                    tint: Color(.systemRed)
-                )
-            }
-
-            NavigationLink {
-                SettingsiCloudView()
-            } label: {
-                SettingsRow(
-                    title: String(localized: "settings.icloud", defaultValue: "iCloud", comment: "Title for iCloud settings."),
-                    systemImage: "icloud",
-                    tint: Color(.systemBlue)
-                )
-            }
-        } header: {
-            EmptyView()
-        } footer: {
-            EmptyView()
-        }
-    }
-
-    private var quickActionsSection: some View {
-        Section {
-            NavigationLink {
-                QuickActionsInstallView()
-            } label: {
-                SettingsRow(
-                    title: String(localized: "settings.quickActions", defaultValue: "Quick Actions", comment: "Title for quick actions settings."),
-                    systemImage: "bolt.circle",
-                    tint: .green
-                )
-            }
-        } header: {
-            EmptyView()
-        } footer: {
-            EmptyView()
-        }
-    }
-
-    private var managementCategoriesSection: some View {
-        Section {
-            NavigationLink {
-                ManageCategoriesView(workspace: workspace)
-            } label: {
-                SettingsRow(
-                    title: String(localized: "settings.manageCategories", defaultValue: "Manage Categories", comment: "Title for manage categories row."),
-                    systemImage: "tag",
-                    tint: .purple
-                )
-            }
-        } header: {
-            EmptyView()
-        } footer: {
-            EmptyView()
-        }
-    }
-
-    private var managementPresetsSection: some View {
-        Section {
-            NavigationLink {
-                ManagePresetsView(workspace: workspace)
-            } label: {
-                SettingsRow(
-                    title: String(localized: "settings.managePresets", defaultValue: "Manage Presets", comment: "Title for manage presets row."),
-                    systemImage: "list.bullet.rectangle",
-                    tint: .orange
-                )
-            }
-        } header: {
-            EmptyView()
-        } footer: {
-            EmptyView()
-        }
     }
 
     // MARK: - Toolbar Workspace Item (Single Source of Truth)
@@ -235,9 +176,9 @@ struct SettingsView: View {
 
     @ViewBuilder
     private var workspaceSwitcherMenuContent: some View {
-        if !workspaces.isEmpty {
+        if !displayedWorkspaceMenuItems.isEmpty {
             Section(String(localized: "settings.switchWorkspace", defaultValue: "Switch Workspace", comment: "Section title for switching workspace.")) {
-                ForEach(workspaces) { ws in
+                ForEach(displayedWorkspaceMenuItems) { ws in
                     Button {
                         selectedWorkspaceID = ws.id.uuidString
                     } label: {
@@ -250,7 +191,11 @@ struct SettingsView: View {
         }
     }
 
-    private func workspaceMenuRow(for ws: Workspace) -> some View {
+    private var displayedWorkspaceMenuItems: [WorkspaceMenuItemModel] {
+        workspaceMenuItems.isEmpty ? buildWorkspaceMenuItems() : workspaceMenuItems
+    }
+
+    private func workspaceMenuRow(for ws: WorkspaceMenuItemModel) -> some View {
         HStack(spacing: 10) {
             Circle()
                 .fill(Color(hex: ws.hexColor) ?? .secondary)
@@ -260,11 +205,145 @@ struct SettingsView: View {
 
             Spacer()
 
-            if selectedWorkspaceID == ws.id.uuidString {
+            if ws.isSelected {
                 Image(systemName: "checkmark")
                     .foregroundStyle(.tint)
             }
         }
+    }
+
+    @ViewBuilder
+    private func settingsRow(for row: SettingsRowModel) -> some View {
+        NavigationLink {
+            settingsDestination(for: row.id)
+        } label: {
+            if row.id == .about {
+                aboutRow
+            } else {
+                SettingsRow(
+                    title: row.title,
+                    systemImage: row.systemImage,
+                    tint: row.tint
+                )
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func settingsDestination(for destination: SettingsDestination) -> some View {
+        switch destination {
+        case .about:
+            SettingsAboutView()
+        case .help:
+            SettingsHelpView()
+        case .general:
+            SettingsGeneralView()
+        case .privacy:
+            SettingsPrivacyView()
+        case .notifications:
+            SettingsNotificationsView(workspaceID: workspace.id)
+        case .iCloud:
+            SettingsiCloudView()
+        case .quickActions:
+            QuickActionsInstallView()
+        case .manageCategories:
+            ManageCategoriesView(workspace: workspace)
+        case .managePresets:
+            ManagePresetsView(workspace: workspace)
+        }
+    }
+
+    private func rebuildDisplayModels() {
+        sectionModels = buildSectionModels()
+        workspaceMenuItems = buildWorkspaceMenuItems()
+    }
+
+    private func rebuildWorkspaceMenuItems() {
+        workspaceMenuItems = buildWorkspaceMenuItems()
+    }
+
+    private func buildSectionModels() -> [SettingsSectionModel] {
+        [
+            SettingsSectionModel(
+                id: "about",
+                rows: [
+                    SettingsRowModel(id: .about, title: appDisplayName, systemImage: "", tint: .clear),
+                    SettingsRowModel(
+                        id: .help,
+                        title: String(localized: "help.title", defaultValue: "Help", comment: "Title for help screen."),
+                        systemImage: "questionmark.circle",
+                        tint: Color(.systemGray)
+                    )
+                ]
+            ),
+            SettingsSectionModel(
+                id: "system",
+                rows: [
+                    SettingsRowModel(id: .general, title: String(localized: "settings.general", defaultValue: "General", comment: "Title for general settings."), systemImage: "gear", tint: Color(.systemGray)),
+                    SettingsRowModel(id: .privacy, title: String(localized: "settings.privacy", defaultValue: "Privacy", comment: "Title for privacy settings."), systemImage: "faceid", tint: Color(.systemBlue)),
+                    SettingsRowModel(id: .notifications, title: String(localized: "settings.notifications", defaultValue: "Notifications", comment: "Title for notifications settings."), systemImage: "bell.badge", tint: Color(.systemRed)),
+                    SettingsRowModel(id: .iCloud, title: String(localized: "settings.icloud", defaultValue: "iCloud", comment: "Title for iCloud settings."), systemImage: "icloud", tint: Color(.systemBlue))
+                ]
+            ),
+            SettingsSectionModel(
+                id: "quick-actions",
+                rows: [
+                    SettingsRowModel(id: .quickActions, title: String(localized: "settings.quickActions", defaultValue: "Quick Actions", comment: "Title for quick actions settings."), systemImage: "bolt.circle", tint: .green)
+                ]
+            ),
+            SettingsSectionModel(
+                id: "categories",
+                rows: [
+                    SettingsRowModel(id: .manageCategories, title: String(localized: "settings.manageCategories", defaultValue: "Manage Categories", comment: "Title for manage categories row."), systemImage: "tag", tint: .purple)
+                ]
+            ),
+            SettingsSectionModel(
+                id: "presets",
+                rows: [
+                    SettingsRowModel(id: .managePresets, title: String(localized: "settings.managePresets", defaultValue: "Manage Presets", comment: "Title for manage presets row."), systemImage: "list.bullet.rectangle", tint: .orange)
+                ]
+            )
+        ]
+    }
+
+    private func buildWorkspaceMenuItems() -> [WorkspaceMenuItemModel] {
+        workspaces.map { ws in
+            WorkspaceMenuItemModel(
+                id: ws.id,
+                name: ws.name,
+                hexColor: ws.hexColor,
+                isSelected: selectedWorkspaceID == ws.id.uuidString
+            )
+        }
+    }
+
+    private func scheduleActivationEnrichment(reason: String) {
+        cancelActivationEnrichment()
+        let activationToken = tabActivationContext.token
+
+        activationEnrichmentTask = Task {
+            try? await Task.sleep(nanoseconds: 140_000_000)
+            guard Task.isCancelled == false else { return }
+
+            await MainActor.run {
+                guard tabActivationContext.sectionRawValue == AppSection.settings.rawValue,
+                      tabActivationContext.phase == .active,
+                      tabActivationContext.token == activationToken else {
+                    return
+                }
+
+                rebuildDisplayModels()
+                TabFlickerDiagnostics.markEvent(
+                    "settingsActivationEnrichmentFinished",
+                    metadata: ["reason": reason]
+                )
+            }
+        }
+    }
+
+    private func cancelActivationEnrichment() {
+        activationEnrichmentTask?.cancel()
+        activationEnrichmentTask = nil
     }
 
     private var workspaceManagerSheet: some View {
@@ -311,6 +390,7 @@ struct SettingsView: View {
             selectedWorkspaceID = ""
         }
     }
+
 }
 
 // MARK: - Workspace Toolbar Menu Label
