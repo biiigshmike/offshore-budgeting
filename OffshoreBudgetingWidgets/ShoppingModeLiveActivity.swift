@@ -1,5 +1,6 @@
 import SwiftUI
 import WidgetKit
+import AppIntents
 
 private func liveActivityLocalized(_ key: String) -> String {
     NSLocalizedString(key, comment: "")
@@ -163,30 +164,24 @@ private struct ShoppingModeLockScreenLiveActivityView: View {
 
             if isExpired == false {
                 HStack(spacing: 8) {
-                    if let stopURL = ExcursionDeepLink.stopURL {
-                        Link(destination: stopURL) {
-                            Label(liveActivityLocalized("Stop"), systemImage: "stop.fill")
-                                .font(.headline.weight(.semibold))
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.9)
-                                .frame(maxWidth: .infinity, minHeight: 32)
-                                .background(ShoppingModeLiveActivityPalette.controlFill, in: Capsule())
-                                .foregroundStyle(ShoppingModeLiveActivityPalette.primaryText)
-                                .contentShape(Rectangle())
-                        }
+                    Button(intent: StopExcursionIntent()) {
+                        Label(liveActivityLocalized("Stop"), systemImage: "stop.fill")
+                            .font(.headline.weight(.semibold))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.9)
+                            .frame(maxWidth: .infinity, minHeight: 32)
+                            .foregroundStyle(ShoppingModeLiveActivityPalette.primaryText)
+                            .contentShape(Rectangle())
                     }
 
-                    if let extendURL = ExcursionDeepLink.extendThirtyURL {
-                        Link(destination: extendURL) {
-                            Label(liveActivityLocalized("30 min"), systemImage: "plus")
-                                .font(.headline.weight(.semibold))
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.9)
-                                .frame(maxWidth: .infinity, minHeight: 32)
-                                .background(ShoppingModeLiveActivityPalette.controlFill, in: Capsule())
-                                .foregroundStyle(ShoppingModeLiveActivityPalette.primaryText)
-                                .contentShape(Rectangle())
-                        }
+                    Button(intent: ExtendExcursionIntent()) {
+                        Label(liveActivityLocalized("30 min"), systemImage: "plus")
+                            .font(.headline.weight(.semibold))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.9)
+                            .frame(maxWidth: .infinity, minHeight: 32)
+                            .foregroundStyle(ShoppingModeLiveActivityPalette.primaryText)
+                            .contentShape(Rectangle())
                     }
                 }
             }
@@ -388,30 +383,24 @@ private struct ShoppingModeExpandedIslandActionsView: View {
 
     private func actionRow(metrics: ExpandedIslandMetrics) -> some View {
         HStack(spacing: metrics.actionsSpacing) {
-            if let stopURL = ExcursionDeepLink.stopURL {
-                Link(destination: stopURL) {
-                    Label(liveActivityLocalized("Stop"), systemImage: "stop.fill")
-                        .font(.system(size: metrics.actionLabelSize, weight: .semibold, design: .rounded))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.9)
-                        .frame(maxWidth: .infinity, minHeight: metrics.actionHeight)
-                        .background(ShoppingModeLiveActivityPalette.controlFill, in: Capsule())
-                        .foregroundStyle(ShoppingModeLiveActivityPalette.primaryText)
-                        .contentShape(Rectangle())
-                }
+            Button(intent: StopExcursionIntent()) {
+                Label(liveActivityLocalized("Stop"), systemImage: "stop.fill")
+                    .font(.system(size: metrics.actionLabelSize, weight: .semibold, design: .rounded))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.9)
+                    .frame(maxWidth: .infinity, minHeight: metrics.actionHeight)
+                    .foregroundStyle(ShoppingModeLiveActivityPalette.primaryText)
+                    .contentShape(Rectangle())
             }
 
-            if let extendURL = ExcursionDeepLink.extendThirtyURL {
-                Link(destination: extendURL) {
-                    Label(liveActivityLocalized("30 min"), systemImage: "plus")
-                        .font(.system(size: metrics.actionLabelSize, weight: .semibold, design: .rounded))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.9)
-                        .frame(maxWidth: .infinity, minHeight: metrics.actionHeight)
-                        .background(ShoppingModeLiveActivityPalette.controlFill, in: Capsule())
-                        .foregroundStyle(ShoppingModeLiveActivityPalette.primaryText)
-                        .contentShape(Rectangle())
-                }
+            Button(intent: ExtendExcursionIntent()) {
+                Label(liveActivityLocalized("30 min"), systemImage: "plus")
+                    .font(.system(size: metrics.actionLabelSize, weight: .semibold, design: .rounded))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.9)
+                    .frame(maxWidth: .infinity, minHeight: metrics.actionHeight)
+                    .foregroundStyle(ShoppingModeLiveActivityPalette.primaryText)
+                    .contentShape(Rectangle())
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -425,10 +414,6 @@ private enum ExcursionDeepLink {
 
     static var stopURL: URL? {
         URL(string: "\(scheme)://action/excursion/stop")
-    }
-
-    static var extendThirtyURL: URL? {
-        URL(string: "\(scheme)://action/excursion/extend30")
     }
 }
 

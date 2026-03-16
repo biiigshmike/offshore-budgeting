@@ -19,22 +19,11 @@ enum SpendingSessionStore {
         return defaults
     }
 
-    static func activate(hours: Int, now: Date = .now) {
-        let clampedHours = min(max(1, hours), 12)
-        activate(duration: TimeInterval(clampedHours * 3600), now: now)
-    }
-
-    static func activate(minutes: Int, now: Date = .now) {
-        let clampedMinutes = min(max(1, minutes), 240)
-        activate(duration: TimeInterval(clampedMinutes * 60), now: now)
-    }
-
-    private static func activate(duration: TimeInterval, now: Date) {
-        let expiresAt = now.addingTimeInterval(duration)
+    static func end() {
         let defaults = sharedDefaults
-        defaults.set(now.timeIntervalSince1970, forKey: Key.startedAt)
-        defaults.set(expiresAt.timeIntervalSince1970, forKey: Key.expiresAt)
-        defaults.set(UUID().uuidString, forKey: Key.sessionID)
+        defaults.removeObject(forKey: Key.expiresAt)
+        defaults.removeObject(forKey: Key.startedAt)
+        defaults.removeObject(forKey: Key.sessionID)
     }
 
     @discardableResult
@@ -46,14 +35,12 @@ enum SpendingSessionStore {
         return newExpiry
     }
 
-    static func end() {
-        let defaults = sharedDefaults
-        defaults.removeObject(forKey: Key.expiresAt)
-        defaults.removeObject(forKey: Key.startedAt)
-        defaults.removeObject(forKey: Key.sessionID)
+    static func sessionID(now: Date = .now) -> String? {
+        guard expirationDate(now: now) != nil else { return nil }
+        return sharedDefaults.string(forKey: Key.sessionID)
     }
 
-    static func expirationDate(now: Date = .now) -> Date? {
+    private static func expirationDate(now: Date = .now) -> Date? {
         let defaults = sharedDefaults
         let raw = defaults.double(forKey: Key.expiresAt)
         guard raw > 0 else { return nil }
@@ -65,23 +52,6 @@ enum SpendingSessionStore {
         }
 
         return date
-    }
-
-    static func isActive(now: Date = .now) -> Bool {
-        expirationDate(now: now) != nil
-    }
-
-    static func startDate(now: Date = .now) -> Date? {
-        guard expirationDate(now: now) != nil else { return nil }
-
-        let raw = sharedDefaults.double(forKey: Key.startedAt)
-        guard raw > 0 else { return nil }
-        return Date(timeIntervalSince1970: raw)
-    }
-
-    static func sessionID(now: Date = .now) -> String? {
-        guard expirationDate(now: now) != nil else { return nil }
-        return sharedDefaults.string(forKey: Key.sessionID)
     }
 
     private static func migrateLegacyValuesIfNeeded(to defaults: UserDefaults) {

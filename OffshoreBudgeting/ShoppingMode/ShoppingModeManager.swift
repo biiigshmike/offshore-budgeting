@@ -72,6 +72,14 @@ final class ShoppingModeManager: ObservableObject {
         }
     }
 
+    #if DEBUG
+    func start(minutes: Int) async -> ShoppingModeStartResult {
+        await startSession(durationLabel: "\(minutes) minute") {
+            SpendingSessionStore.activate(minutes: minutes)
+        }
+    }
+    #endif
+
     private func startSession(
         durationLabel: String,
         activate: () -> Void
@@ -179,7 +187,7 @@ final class ShoppingModeManager: ObservableObject {
                 await existing.update(
                     ActivityContent(
                         state: state,
-                        staleDate: nil,
+                        staleDate: expiresAt,
                         relevanceScore: Self.liveActivityRelevanceScore
                     )
                 )
@@ -192,7 +200,7 @@ final class ShoppingModeManager: ObservableObject {
                         attributes: attributes,
                         content: ActivityContent(
                             state: state,
-                            staleDate: nil,
+                            staleDate: expiresAt,
                             relevanceScore: Self.liveActivityRelevanceScore
                         )
                     )
