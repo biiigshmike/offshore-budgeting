@@ -18,6 +18,7 @@ struct HomeWhatIfTile: View {
     let incomes: [Income]
     let plannedExpenses: [PlannedExpense]
     let variableExpenses: [VariableExpense]
+    let savingsEntries: [SavingsLedgerEntry]
     let startDate: Date
     let endDate: Date
     let onOpenPlanner: (_ initialScenarioID: UUID?) -> Void
@@ -61,7 +62,13 @@ struct HomeWhatIfTile: View {
     }
 
     private var actualSavings: Double {
-        actualIncomeTotal - (plannedExpensesEffectiveTotal + variableExpensesTotal)
+        actualIncomeTotal
+            - (plannedExpensesEffectiveTotal + variableExpensesTotal)
+            + SavingsMathService.actualSavingsAdjustmentTotal(
+                from: savingsEntries,
+                startDate: startDate,
+                endDate: endDate
+            )
     }
 
     private var displayValue: Double {

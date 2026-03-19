@@ -110,6 +110,7 @@ struct HomeAssistantPanelView: View {
     @Query private var assistantAliasRules: [AssistantAliasRule]
     @Query private var plannedExpenses: [PlannedExpense]
     @Query private var variableExpenses: [VariableExpense]
+    @Query private var savingsEntries: [SavingsLedgerEntry]
     
     @State private var answers: [HomeAnswer] = []
     @State private var promptText = ""
@@ -206,6 +207,11 @@ struct HomeAssistantPanelView: View {
         _variableExpenses = Query(
             filter: #Predicate<VariableExpense> { $0.workspace?.id == workspaceID },
             sort: [SortDescriptor(\VariableExpense.transactionDate, order: .forward)]
+        )
+        
+        _savingsEntries = Query(
+            filter: #Predicate<SavingsLedgerEntry> { $0.workspace?.id == workspaceID },
+            sort: [SortDescriptor(\SavingsLedgerEntry.date, order: .forward)]
         )
         
         _cards = Query(
@@ -878,7 +884,8 @@ struct HomeAssistantPanelView: View {
             presets: presets,
             plannedExpenses: plannedExpenses,
             variableExpenses: variableExpenses,
-            incomes: incomes
+            incomes: incomes,
+            savingsEntries: savingsEntries
         )
         
         let rawAnswer = applyConfidenceTone(to: baseAnswer, confidenceBand: confidenceBand)
@@ -4221,6 +4228,7 @@ struct HomeAssistantPanelView: View {
                 plannedExpenses: plannedExpenses,
                 variableExpenses: variableExpenses,
                 incomes: incomes,
+                savingsEntries: savingsEntries,
                 now: now
             ),
             confidenceBand: basePlan.confidenceBand
@@ -4233,6 +4241,7 @@ struct HomeAssistantPanelView: View {
                 plannedExpenses: plannedExpenses,
                 variableExpenses: variableExpenses,
                 incomes: incomes,
+                savingsEntries: savingsEntries,
                 now: now
             ),
             confidenceBand: basePlan.confidenceBand
@@ -4245,6 +4254,7 @@ struct HomeAssistantPanelView: View {
                 plannedExpenses: plannedExpenses,
                 variableExpenses: variableExpenses,
                 incomes: incomes,
+                savingsEntries: savingsEntries,
                 now: now
             ),
             confidenceBand: basePlan.confidenceBand
@@ -4257,6 +4267,7 @@ struct HomeAssistantPanelView: View {
                 plannedExpenses: plannedExpenses,
                 variableExpenses: variableExpenses,
                 incomes: incomes,
+                savingsEntries: savingsEntries,
                 now: now
             ),
             confidenceBand: basePlan.confidenceBand

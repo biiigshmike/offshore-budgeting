@@ -435,6 +435,7 @@ final class ExpenseCSVImportViewModel: ObservableObject {
                    allocationAmount > 0 {
                     let allocation = ExpenseAllocation(
                         allocatedAmount: allocationAmount,
+                        preservesGrossAmount: true,
                         createdAt: .now,
                         updatedAt: .now,
                         workspace: workspace,

@@ -13,6 +13,7 @@ struct HomeSavingsOutlookTile: View {
     let incomes: [Income]
     let plannedExpenses: [PlannedExpense]
     let variableExpenses: [VariableExpense]
+    let savingsEntries: [SavingsLedgerEntry]
     let startDate: Date
     let endDate: Date
 
@@ -33,7 +34,7 @@ struct HomeSavingsOutlookTile: View {
     private var plannedExpensesPlannedTotal: Double {
         plannedExpenses
             .filter { isInRange($0.expenseDate) }
-            .reduce(0) { $0 + $1.plannedAmount }
+            .reduce(0) { $0 + SavingsMathService.plannedProjectedBudgetImpactAmount(for: $1) }
     }
 
     private var plannedExpensesEffectiveActualTotal: Double {
@@ -53,7 +54,13 @@ struct HomeSavingsOutlookTile: View {
     }
 
     private var actualSavings: Double {
-        actualIncomeTotal - (plannedExpensesEffectiveActualTotal + variableExpensesTotal)
+        actualIncomeTotal
+            - (plannedExpensesEffectiveActualTotal + variableExpensesTotal)
+            + SavingsMathService.actualSavingsAdjustmentTotal(
+                from: savingsEntries,
+                startDate: startDate,
+                endDate: endDate
+            )
     }
 
     // MARK: - Styling
@@ -112,6 +119,7 @@ struct HomeSavingsOutlookTile: View {
                 incomes: incomes,
                 plannedExpenses: plannedExpenses,
                 variableExpenses: variableExpenses,
+                savingsEntries: savingsEntries,
                 startDate: startDate,
                 endDate: endDate,
                 initialPeriod: .period
@@ -266,6 +274,7 @@ private struct HomeSavingsGaugeBar: View {
                 incomes: ws.incomes ?? [],
                 plannedExpenses: ws.plannedExpenses ?? [],
                 variableExpenses: ws.variableExpenses ?? [],
+                savingsEntries: (ws.savingsAccounts ?? []).flatMap { $0.entries ?? [] },
                 startDate: Calendar.current.date(from: DateComponents(year: 2026, month: 1, day: 1)) ?? .now,
                 endDate: Calendar.current.date(from: DateComponents(year: 2026, month: 1, day: 31)) ?? .now
             )

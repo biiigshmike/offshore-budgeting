@@ -19,6 +19,7 @@ struct HomeView: View {
     @Query private var incomes: [Income]
     @Query private var categories: [Category]
     @Query private var variableExpenses: [VariableExpense]
+    @Query private var savingsEntries: [SavingsLedgerEntry]
 
     // MARK: - Date Range Storage (per workspace)
 
@@ -241,6 +242,11 @@ struct HomeView: View {
             filter: #Predicate<VariableExpense> { $0.workspace?.id == workspaceID },
             sort: [SortDescriptor(\VariableExpense.transactionDate, order: .forward)]
         )
+
+        _savingsEntries = Query(
+            filter: #Predicate<SavingsLedgerEntry> { $0.workspace?.id == workspaceID },
+            sort: [SortDescriptor(\SavingsLedgerEntry.date, order: .forward)]
+        )
     }
 
     var body: some View {
@@ -301,6 +307,7 @@ struct HomeView: View {
                 incomes: incomes,
                 plannedExpenses: calculationPlannedExpensesForHome,
                 variableExpenses: calculationVariableExpensesForHome,
+                savingsEntries: savingsEntries,
                 startDate: appliedStartDate,
                 endDate: appliedEndDate,
                 initialScenarioID: whatIfInitialScenarioID
@@ -694,6 +701,7 @@ struct HomeView: View {
             incomes: incomes,
             plannedExpenses: calculationPlannedExpensesForHome,
             variableExpenses: calculationVariableExpensesForHome,
+            savingsEntries: savingsEntries,
             startDate: appliedStartDate,
             endDate: appliedEndDate
         )
@@ -707,6 +715,7 @@ struct HomeView: View {
             incomes: incomes,
             plannedExpenses: calculationPlannedExpensesForHome,
             variableExpenses: calculationVariableExpensesForHome,
+            savingsEntries: savingsEntries,
             startDate: appliedStartDate,
             endDate: appliedEndDate,
             onOpenPlanner: openWhatIfPlanner

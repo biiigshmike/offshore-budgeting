@@ -18265,6 +18265,7 @@
       }
     },
     "Deleting this split charge will remove the split and restore the original gross expense amount." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -18303,6 +18304,9 @@
           }
         }
       }
+    },
+    "Deleting this split charge will remove the split without changing the original expense amount." : {
+
     },
     "Description" : {
       "localizations" : {

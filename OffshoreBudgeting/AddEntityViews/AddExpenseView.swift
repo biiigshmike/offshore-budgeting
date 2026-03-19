@@ -292,9 +292,11 @@ struct AddExpenseView: View {
             allocationAmount = 0
         }
 
+        let amountToStore = allocationAmount > 0 ? amt : netAmount
+
         let expense = VariableExpense(
             descriptionText: trimmedDesc,
-            amount: netAmount,
+            amount: amountToStore,
             transactionDate: transactionDate,
             workspace: workspace,
             card: selectedCard,
@@ -305,7 +307,8 @@ struct AddExpenseView: View {
 
         if let selectedAllocationAccount, allocationAmount > 0 {
             let allocation = ExpenseAllocation(
-                allocatedAmount: AllocationLedgerService.cappedAllocationAmount(allocationAmount, expenseAmount: netAmount),
+                allocatedAmount: AllocationLedgerService.cappedAllocationAmount(allocationAmount, expenseAmount: amt),
+                preservesGrossAmount: true,
                 createdAt: .now,
                 updatedAt: .now,
                 workspace: workspace,

@@ -1168,6 +1168,7 @@ enum DebugSeeder {
 
         let dinnerAllocation = ExpenseAllocation(
             allocatedAmount: 42.00,
+            preservesGrossAmount: true,
             createdAt: twelveDaysAgo,
             updatedAt: twelveDaysAgo,
             workspace: workspace,
@@ -1199,6 +1200,7 @@ enum DebugSeeder {
 
         let groceriesAllocation = ExpenseAllocation(
             allocatedAmount: 48.00,
+            preservesGrossAmount: true,
             createdAt: fourteenDaysAgo,
             updatedAt: fourteenDaysAgo,
             workspace: workspace,
@@ -1220,6 +1222,7 @@ enum DebugSeeder {
 
         let concertAllocation = ExpenseAllocation(
             allocatedAmount: 60.00,
+            preservesGrossAmount: true,
             createdAt: sevenDaysAgo,
             updatedAt: sevenDaysAgo,
             workspace: workspace,
@@ -1262,6 +1265,7 @@ enum DebugSeeder {
 
         let tripAllocation = ExpenseAllocation(
             allocatedAmount: 35.00,
+            preservesGrossAmount: true,
             createdAt: nineDaysAgo,
             updatedAt: nineDaysAgo,
             workspace: workspace,

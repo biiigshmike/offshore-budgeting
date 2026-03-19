@@ -160,7 +160,8 @@ struct SavingsAccountServiceTests {
 
         let accounts = try fetchAll(SavingsAccount.self, in: context)
         #expect(accounts.count == 1)
-        #expect(accounts[0].total == 5600)
+        let account = try #require(accounts.first)
+        #expect(account.total == 5600)
     }
 
     @Test func deletingPeriodCloseEntry_staysDeleted_andFuturePeriodsStillAutoCapture() throws {
@@ -511,10 +512,11 @@ struct SavingsAccountServiceTests {
             sortBy: [SortDescriptor(\SavingsAccount.createdAt, order: .forward)]
         )
         #expect(accounts.count == 1)
-        #expect(accounts[0].id == primary.id)
-        #expect(accounts[0].didBackfillHistory)
-        #expect(accounts[0].autoCaptureThroughDate == makeDate(2026, 1, 31))
-        #expect(accounts[0].total == 125)
+        let account = try #require(accounts.first)
+        #expect(account.id == primary.id)
+        #expect(account.didBackfillHistory)
+        #expect(account.autoCaptureThroughDate == makeDate(2026, 1, 31))
+        #expect(account.total == 125)
 
         let entries = try fetchAll(SavingsLedgerEntry.self, in: context)
         #expect(entries.count == 3)
@@ -524,7 +526,52 @@ struct SavingsAccountServiceTests {
         #expect(report.reassignedEntriesCount == 2)
         #expect(report.dedupedPeriodCloseCount == 0)
         #expect(report.dedupedManualAdjustmentCount == 0)
+        #expect(report.mirroredReconciliationSettlementCount == 0)
         #expect(report.recalculatedTotal == 125)
+    }
+
+    @Test func normalizeSavingsData_backfillsStandaloneReconciliationSettlements() throws {
+        let context = try makeContext()
+
+        let ws = Workspace(name: "WS", hexColor: "#3B82F6")
+        let account = AllocationAccount(name: "Partner", workspace: ws)
+        context.insert(ws)
+        context.insert(account)
+
+        let settlementIn = AllocationSettlement(
+            date: makeDate(2026, 2, 10),
+            note: "They paid me back",
+            amount: 40,
+            workspace: ws,
+            account: account
+        )
+        let settlementOut = AllocationSettlement(
+            date: makeDate(2026, 2, 11),
+            note: "I paid them back",
+            amount: -15,
+            workspace: ws,
+            account: account
+        )
+        context.insert(settlementIn)
+        context.insert(settlementOut)
+        _ = SavingsAccountService.ensureSavingsAccount(for: ws, modelContext: context)
+        try context.save()
+
+        let report = SavingsAccountService.normalizeSavingsData(for: ws, modelContext: context)
+
+        let savingsAccounts = try fetchAll(SavingsAccount.self, in: context)
+        let entries = try fetchAll(SavingsLedgerEntry.self, in: context)
+            .filter { $0.kind == .reconciliationSettlement }
+            .sorted { $0.date < $1.date }
+
+        #expect(savingsAccounts.count == 1)
+        let savingsAccount = try #require(savingsAccounts.first)
+        #expect(savingsAccount.total == 25)
+        #expect(entries.count == 2)
+        #expect(entries.map(\.amount) == [40, -15])
+        #expect(entries.map(\.linkedAllocationSettlementID) == [settlementIn.id, settlementOut.id])
+        #expect(report.mirroredReconciliationSettlementCount == 2)
+        #expect(report.recalculatedTotal == 25)
     }
 
     @Test func ensureSavingsAccount_keepsExistingDuplicateAccountsUntilRepairRuns() throws {
@@ -565,7 +612,8 @@ struct SavingsAccountServiceTests {
 
         let entries = try fetchAll(SavingsLedgerEntry.self, in: context)
         #expect(entries.count == 1)
-        #expect(entries[0].account?.id == second.id)
+        let entry = try #require(entries.first)
+        #expect(entry.account?.id == second.id)
     }
 
     @Test func rebuildRunningTotal_recomputesFromLedgerEntries() throws {
@@ -610,7 +658,8 @@ struct SavingsAccountServiceTests {
 
         let accounts = try fetchAll(SavingsAccount.self, in: context)
         #expect(accounts.count == 1)
-        #expect(accounts[0].total == 400)
+        let rebuiltAccount = try #require(accounts.first)
+        #expect(rebuiltAccount.total == 400)
     }
 
     // MARK: - Positive Offset
@@ -688,6 +737,443 @@ struct SavingsAccountServiceTests {
 
         SavingsAccountService.recalculateAccountTotal(account)
         #expect(account.total == 300)
+    }
+
+    @Test func splitAllocations_reduceSavingsImpact_toOwnedShare() throws {
+        let context = try makeContext()
+
+        let ws = Workspace(name: "WS", hexColor: "#3B82F6")
+        let card = Card(name: "Visa", workspace: ws)
+        let cat = Category(name: "General", hexColor: "#22AA66", workspace: ws)
+        let allocationAccount = AllocationAccount(name: "Shared", workspace: ws)
+
+        context.insert(ws)
+        context.insert(card)
+        context.insert(cat)
+        context.insert(allocationAccount)
+
+        let variable = VariableExpense(
+            descriptionText: "Dinner",
+            amount: 300,
+            transactionDate: makeDate(2026, 6, 4),
+            workspace: ws,
+            card: card,
+            category: cat
+        )
+        let variableAllocation = ExpenseAllocation(
+            allocatedAmount: 150,
+            preservesGrossAmount: true,
+            workspace: ws,
+            account: allocationAccount,
+            expense: variable
+        )
+        variable.allocation = variableAllocation
+
+        let planned = PlannedExpense(
+            title: "Hotel",
+            plannedAmount: 300,
+            actualAmount: 280,
+            expenseDate: makeDate(2026, 6, 5),
+            workspace: ws,
+            card: card,
+            category: cat
+        )
+        let plannedAllocation = ExpenseAllocation(
+            allocatedAmount: 150,
+            preservesGrossAmount: true,
+            workspace: ws,
+            account: allocationAccount,
+            plannedExpense: planned
+        )
+        planned.allocation = plannedAllocation
+
+        context.insert(variable)
+        context.insert(variableAllocation)
+        context.insert(planned)
+        context.insert(plannedAllocation)
+        try context.save()
+
+        #expect(SavingsMathService.ownedAmount(for: variable) == 150)
+        #expect(SavingsMathService.variableBudgetImpactAmount(for: variable) == 150)
+        #expect(SavingsMathService.ownedPlannedAmount(for: planned) == 150)
+        #expect(SavingsMathService.plannedProjectedBudgetImpactAmount(for: planned) == 150)
+        #expect(SavingsMathService.ownedEffectiveAmount(for: planned) == 130)
+        #expect(SavingsMathService.plannedBudgetImpactAmount(for: planned) == 130)
+    }
+
+    @Test func splitAllocations_andOffsets_clampSavingsImpactAtOwnedShare() throws {
+        let context = try makeContext()
+
+        let ws = Workspace(name: "WS", hexColor: "#3B82F6")
+        let card = Card(name: "Visa", workspace: ws)
+        let cat = Category(name: "General", hexColor: "#22AA66", workspace: ws)
+        let allocationAccount = AllocationAccount(name: "Shared", workspace: ws)
+
+        context.insert(ws)
+        context.insert(card)
+        context.insert(cat)
+        context.insert(allocationAccount)
+
+        let savingsAccount = SavingsAccountService.ensureSavingsAccount(for: ws, modelContext: context)
+        SavingsAccountService.addManualAdjustment(
+            workspace: ws,
+            account: savingsAccount,
+            date: makeDate(2026, 6, 1),
+            amount: 500,
+            note: "Seed",
+            modelContext: context
+        )
+
+        let variable = VariableExpense(
+            descriptionText: "Tickets",
+            amount: 300,
+            transactionDate: makeDate(2026, 6, 4),
+            workspace: ws,
+            card: card,
+            category: cat
+        )
+        let variableAllocation = ExpenseAllocation(
+            allocatedAmount: 150,
+            preservesGrossAmount: true,
+            workspace: ws,
+            account: allocationAccount,
+            expense: variable
+        )
+        variable.allocation = variableAllocation
+
+        let planned = PlannedExpense(
+            title: "Cabin",
+            plannedAmount: 300,
+            actualAmount: 280,
+            expenseDate: makeDate(2026, 6, 5),
+            workspace: ws,
+            card: card,
+            category: cat
+        )
+        let plannedAllocation = ExpenseAllocation(
+            allocatedAmount: 150,
+            preservesGrossAmount: true,
+            workspace: ws,
+            account: allocationAccount,
+            plannedExpense: planned
+        )
+        planned.allocation = plannedAllocation
+
+        context.insert(variable)
+        context.insert(variableAllocation)
+        context.insert(planned)
+        context.insert(plannedAllocation)
+        try context.save()
+
+        let variableRejected = SavingsAccountService.upsertSavingsOffset(
+            workspace: ws,
+            variableExpense: variable,
+            offsetAmount: 151,
+            note: "Too high",
+            date: variable.transactionDate,
+            modelContext: context
+        )
+        let plannedRejected = SavingsAccountService.upsertSavingsOffset(
+            workspace: ws,
+            plannedExpense: planned,
+            offsetAmount: 131,
+            note: "Too high",
+            date: planned.expenseDate,
+            modelContext: context
+        )
+
+        let variableApplied = SavingsAccountService.upsertSavingsOffset(
+            workspace: ws,
+            variableExpense: variable,
+            offsetAmount: 140,
+            note: "Partial offset",
+            date: variable.transactionDate,
+            modelContext: context
+        )
+        let plannedApplied = SavingsAccountService.upsertSavingsOffset(
+            workspace: ws,
+            plannedExpense: planned,
+            offsetAmount: 130,
+            note: "Full offset",
+            date: planned.expenseDate,
+            modelContext: context
+        )
+
+        #expect(!variableRejected)
+        #expect(!plannedRejected)
+        #expect(variableApplied)
+        #expect(plannedApplied)
+        #expect(SavingsMathService.variableBudgetImpactAmount(for: variable) == 10)
+        #expect(SavingsMathService.plannedBudgetImpactAmount(for: planned) == 0)
+    }
+
+    @Test func autoCapture_usesOwnedShare_forSplitExpenses() throws {
+        let context = try makeContext()
+
+        let ws = Workspace(name: "WS", hexColor: "#3B82F6")
+        let card = Card(name: "Visa", workspace: ws)
+        let cat = Category(name: "General", hexColor: "#22AA66", workspace: ws)
+        let allocationAccount = AllocationAccount(name: "Shared", workspace: ws)
+
+        context.insert(ws)
+        context.insert(card)
+        context.insert(cat)
+        context.insert(allocationAccount)
+
+        let income = Income(
+            source: "Pay",
+            amount: 1000,
+            date: makeDate(2026, 1, 5),
+            isPlanned: false,
+            workspace: ws,
+            card: card
+        )
+        let variable = VariableExpense(
+            descriptionText: "Shared dinner",
+            amount: 300,
+            transactionDate: makeDate(2026, 1, 10),
+            workspace: ws,
+            card: card,
+            category: cat
+        )
+        let allocation = ExpenseAllocation(
+            allocatedAmount: 150,
+            preservesGrossAmount: true,
+            workspace: ws,
+            account: allocationAccount,
+            expense: variable
+        )
+        variable.allocation = allocation
+
+        context.insert(income)
+        context.insert(variable)
+        context.insert(allocation)
+        try context.save()
+
+        SavingsAccountService.runAutoCaptureIfNeeded(
+            for: ws,
+            defaultBudgetingPeriodRaw: BudgetingPeriod.monthly.rawValue,
+            incomes: [income],
+            plannedExpenses: [],
+            variableExpenses: [variable],
+            modelContext: context,
+            now: makeDate(2026, 2, 15)
+        )
+
+        let entries = try fetchAll(
+            SavingsLedgerEntry.self,
+            in: context,
+            sortBy: [SortDescriptor(\SavingsLedgerEntry.date, order: .forward)]
+        )
+        let periodCloseEntries = entries.filter { $0.kind == .periodClose }
+
+        #expect(periodCloseEntries.count == 1)
+        #expect(periodCloseEntries.first?.amount == 850)
+    }
+
+    @Test func standaloneReconciliationSettlement_mirrorsToSavings_andUpdatesOnEdit() throws {
+        let context = try makeContext()
+
+        let ws = Workspace(name: "WS", hexColor: "#3B82F6")
+        let reconciliation = AllocationAccount(name: "Partner", workspace: ws)
+        context.insert(ws)
+        context.insert(reconciliation)
+
+        let settlement = AllocationSettlement(
+            date: makeDate(2026, 6, 4),
+            note: "Initial",
+            amount: -30,
+            workspace: ws,
+            account: reconciliation
+        )
+        context.insert(settlement)
+
+        SavingsAccountService.upsertStandaloneReconciliationSettlement(
+            workspace: ws,
+            settlement: settlement,
+            modelContext: context
+        )
+
+        var savingsEntries = try fetchAll(SavingsLedgerEntry.self, in: context)
+            .filter { $0.kind == .reconciliationSettlement }
+        #expect(savingsEntries.count == 1)
+        let initialEntry = try #require(savingsEntries.first)
+        #expect(initialEntry.amount == -30)
+        #expect(initialEntry.note == "Initial")
+
+        settlement.amount = 55
+        settlement.note = "Updated"
+        settlement.date = makeDate(2026, 6, 6)
+
+        SavingsAccountService.upsertStandaloneReconciliationSettlement(
+            workspace: ws,
+            settlement: settlement,
+            modelContext: context
+        )
+
+        savingsEntries = try fetchAll(SavingsLedgerEntry.self, in: context)
+            .filter { $0.kind == .reconciliationSettlement }
+        #expect(savingsEntries.count == 1)
+        let updatedEntry = try #require(savingsEntries.first)
+        #expect(updatedEntry.amount == 55)
+        #expect(updatedEntry.note == "Updated")
+        #expect(updatedEntry.date == makeDate(2026, 6, 6))
+
+        let savingsAccount = try #require(fetchAll(SavingsAccount.self, in: context).first)
+        #expect(savingsAccount.total == 55)
+    }
+
+    @Test func removingStandaloneReconciliationSettlement_removesMirroredSavingsEntry() throws {
+        let context = try makeContext()
+
+        let ws = Workspace(name: "WS", hexColor: "#3B82F6")
+        let reconciliation = AllocationAccount(name: "Partner", workspace: ws)
+        context.insert(ws)
+        context.insert(reconciliation)
+
+        let settlement = AllocationSettlement(
+            date: makeDate(2026, 6, 4),
+            note: "Paid back",
+            amount: 70,
+            workspace: ws,
+            account: reconciliation
+        )
+        context.insert(settlement)
+
+        SavingsAccountService.upsertStandaloneReconciliationSettlement(
+            workspace: ws,
+            settlement: settlement,
+            modelContext: context
+        )
+        SavingsAccountService.removeStandaloneReconciliationSettlement(
+            for: settlement,
+            workspace: ws,
+            modelContext: context
+        )
+
+        let savingsEntries = try fetchAll(SavingsLedgerEntry.self, in: context)
+            .filter { $0.kind == .reconciliationSettlement }
+        let savingsAccount = try #require(fetchAll(SavingsAccount.self, in: context).first)
+
+        #expect(savingsEntries.isEmpty)
+        #expect(savingsAccount.total == 0)
+    }
+
+    @Test func actualSavingsAdjustments_includeStandaloneSettlements_andManualEntries_only() throws {
+        let context = try makeContext()
+
+        let ws = Workspace(name: "WS", hexColor: "#3B82F6")
+        let account = SavingsAccount(workspace: ws)
+        context.insert(ws)
+        context.insert(account)
+
+        let includedManual = SavingsLedgerEntry(
+            date: makeDate(2026, 6, 2),
+            amount: 40,
+            note: "Manual in",
+            kindRaw: SavingsLedgerEntryKind.manualAdjustment.rawValue,
+            workspace: ws,
+            account: account
+        )
+        let includedSettlement = SavingsLedgerEntry(
+            date: makeDate(2026, 6, 3),
+            amount: -25,
+            note: "I owe them",
+            kindRaw: SavingsLedgerEntryKind.reconciliationSettlement.rawValue,
+            workspace: ws,
+            account: account
+        )
+        let excludedPeriodClose = SavingsLedgerEntry(
+            date: makeDate(2026, 6, 4),
+            amount: 200,
+            note: "Period close",
+            kindRaw: SavingsLedgerEntryKind.periodClose.rawValue,
+            workspace: ws,
+            account: account
+        )
+        let excludedOffset = SavingsLedgerEntry(
+            date: makeDate(2026, 6, 5),
+            amount: -10,
+            note: "Offset",
+            kindRaw: SavingsLedgerEntryKind.expenseOffset.rawValue,
+            workspace: ws,
+            account: account
+        )
+
+        context.insert(includedManual)
+        context.insert(includedSettlement)
+        context.insert(excludedPeriodClose)
+        context.insert(excludedOffset)
+        try context.save()
+
+        let entries = try fetchAll(SavingsLedgerEntry.self, in: context)
+        let total = SavingsMathService.actualSavingsAdjustmentTotal(
+            from: entries,
+            startDate: makeDate(2026, 6, 1),
+            endDate: makeDate(2026, 6, 30)
+        )
+
+        #expect(total == 15)
+    }
+
+    @Test func normalizeSavingsData_leavesLegacySplitAllocations_unchanged() throws {
+        let context = try makeContext()
+
+        let ws = Workspace(name: "WS", hexColor: "#3B82F6")
+        let card = Card(name: "Visa", workspace: ws)
+        let cat = Category(name: "General", hexColor: "#22AA66", workspace: ws)
+        let account = AllocationAccount(name: "Partner", workspace: ws)
+        context.insert(ws)
+        context.insert(card)
+        context.insert(cat)
+        context.insert(account)
+
+        let variable = VariableExpense(
+            descriptionText: "Dinner",
+            amount: 150,
+            transactionDate: makeDate(2026, 7, 1),
+            workspace: ws,
+            card: card,
+            category: cat
+        )
+        let variableAllocation = ExpenseAllocation(
+            allocatedAmount: 150,
+            workspace: ws,
+            account: account,
+            expense: variable
+        )
+        variable.allocation = variableAllocation
+
+        let planned = PlannedExpense(
+            title: "Trip",
+            plannedAmount: 500,
+            actualAmount: 350,
+            expenseDate: makeDate(2026, 7, 2),
+            workspace: ws,
+            card: card,
+            category: cat
+        )
+        let plannedAllocation = ExpenseAllocation(
+            allocatedAmount: 150,
+            workspace: ws,
+            account: account,
+            plannedExpense: planned
+        )
+        planned.allocation = plannedAllocation
+
+        context.insert(variable)
+        context.insert(variableAllocation)
+        context.insert(planned)
+        context.insert(plannedAllocation)
+        try context.save()
+
+        let report = SavingsAccountService.normalizeSavingsData(for: ws, modelContext: context)
+
+        #expect(variable.amount == 150)
+        #expect(planned.actualAmount == 350)
+        #expect(variableAllocation.preservesGrossAmount == false)
+        #expect(plannedAllocation.preservesGrossAmount == false)
+        #expect(report.mirroredReconciliationSettlementCount == 0)
     }
 
     // MARK: - Currency Boundary

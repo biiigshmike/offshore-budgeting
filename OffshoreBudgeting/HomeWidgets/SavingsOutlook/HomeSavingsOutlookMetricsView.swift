@@ -38,6 +38,7 @@ struct HomeSavingsOutlookMetricsView: View {
     let incomes: [Income]
     let plannedExpenses: [PlannedExpense]
     let variableExpenses: [VariableExpense]
+    let savingsEntries: [SavingsLedgerEntry]
     let startDate: Date
     let endDate: Date
     let initialPeriod: Period
@@ -49,6 +50,7 @@ struct HomeSavingsOutlookMetricsView: View {
         incomes: [Income],
         plannedExpenses: [PlannedExpense],
         variableExpenses: [VariableExpense],
+        savingsEntries: [SavingsLedgerEntry],
         startDate: Date,
         endDate: Date,
         initialPeriod: Period = .period
@@ -57,6 +59,7 @@ struct HomeSavingsOutlookMetricsView: View {
         self.incomes = incomes
         self.plannedExpenses = plannedExpenses
         self.variableExpenses = variableExpenses
+        self.savingsEntries = savingsEntries
         self.startDate = startDate
         self.endDate = endDate
         self.initialPeriod = initialPeriod
@@ -403,7 +406,12 @@ struct HomeSavingsOutlookMetricsView: View {
         let actualIncome = sumActualIncome(from: start, to: end)
         let plannedEffective = sumPlannedExpensesEffectiveActual(from: start, to: end)
         let variableTotal = sumVariableExpenses(from: start, to: end)
-        return actualIncome - (plannedEffective + variableTotal)
+        let adjustmentTotal = SavingsMathService.actualSavingsAdjustmentTotal(
+            from: savingsEntries,
+            startDate: start,
+            endDate: end
+        )
+        return actualIncome - (plannedEffective + variableTotal) + adjustmentTotal
     }
 
     // MARK: - Summation
@@ -425,7 +433,7 @@ struct HomeSavingsOutlookMetricsView: View {
     private func sumPlannedExpensesPlanned(from start: Date, to end: Date) -> Double {
         plannedExpenses
             .filter { $0.expenseDate >= start && $0.expenseDate <= end }
-            .reduce(0) { $0 + $1.plannedAmount }
+            .reduce(0) { $0 + SavingsMathService.plannedProjectedBudgetImpactAmount(for: $1) }
     }
 
     private func sumPlannedExpensesEffectiveActual(from start: Date, to end: Date) -> Double {
@@ -518,6 +526,7 @@ struct HomeSavingsOutlookMetricsView: View {
                 incomes: ws.incomes ?? [],
                 plannedExpenses: ws.plannedExpenses ?? [],
                 variableExpenses: ws.variableExpenses ?? [],
+                savingsEntries: (ws.savingsAccounts ?? []).flatMap { $0.entries ?? [] },
                 startDate: Calendar.current.date(from: DateComponents(year: 2026, month: 1, day: 1)) ?? .now,
                 endDate: Calendar.current.date(from: DateComponents(year: 2026, month: 1, day: 31)) ?? .now,
                 initialPeriod: .period

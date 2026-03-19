@@ -383,7 +383,7 @@ struct SwiftDataCRUDTests {
 
         let expense = VariableExpense(
             descriptionText: "Groceries",
-            amount: 80,
+            amount: 100,
             transactionDate: date,
             workspace: ws,
             card: card,
@@ -392,6 +392,7 @@ struct SwiftDataCRUDTests {
 
         let allocation = ExpenseAllocation(
             allocatedAmount: 20,
+            preservesGrossAmount: true,
             createdAt: .now,
             updatedAt: .now,
             workspace: ws,
@@ -408,9 +409,6 @@ struct SwiftDataCRUDTests {
         context.insert(allocation)
         try context.save()
 
-        let oldSplit = max(0, allocation.allocatedAmount)
-        let gross = max(0, expense.amount + oldSplit)
-        expense.amount = gross
         expense.allocation = nil
         context.delete(allocation)
         try context.save()
@@ -444,6 +442,7 @@ struct SwiftDataCRUDTests {
 
         let allocation = ExpenseAllocation(
             allocatedAmount: 300,
+            preservesGrossAmount: true,
             createdAt: .now,
             updatedAt: .now,
             workspace: ws,
@@ -463,14 +462,14 @@ struct SwiftDataCRUDTests {
 
         let newSplit = AllocationLedgerService.cappedAllocationAmount(450, expenseAmount: plannedExpense.plannedAmount)
         allocation.allocatedAmount = newSplit
-        plannedExpense.actualAmount = max(0, plannedExpense.plannedAmount - newSplit)
+        plannedExpense.actualAmount = 900
         try context.save()
 
         let fetchedPlanned = try fetchAll(PlannedExpense.self, in: context).first
         let fetchedAllocation = try fetchAll(ExpenseAllocation.self, in: context).first
 
         #expect(fetchedAllocation?.allocatedAmount == 450)
-        #expect(fetchedPlanned?.actualAmount == 750)
+        #expect(fetchedPlanned?.actualAmount == 900)
         #expect(fetchedPlanned?.allocation?.id == fetchedAllocation?.id)
     }
 
@@ -495,6 +494,7 @@ struct SwiftDataCRUDTests {
 
         let allocation = ExpenseAllocation(
             allocatedAmount: 300,
+            preservesGrossAmount: true,
             createdAt: .now,
             updatedAt: .now,
             workspace: ws,
@@ -512,7 +512,6 @@ struct SwiftDataCRUDTests {
         context.insert(allocation)
         try context.save()
 
-        plannedExpense.actualAmount = 0
         plannedExpense.allocation = nil
         context.delete(allocation)
         try context.save()
@@ -521,7 +520,7 @@ struct SwiftDataCRUDTests {
         let allocations = try fetchAll(ExpenseAllocation.self, in: context)
 
         #expect(allocations.isEmpty)
-        #expect(fetchedPlanned?.actualAmount == 0)
+        #expect(fetchedPlanned?.actualAmount == 900)
         #expect(fetchedPlanned?.allocation == nil)
     }
 }

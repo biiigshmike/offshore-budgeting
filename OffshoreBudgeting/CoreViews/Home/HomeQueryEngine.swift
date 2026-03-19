@@ -36,6 +36,7 @@ struct HomeQueryEngine {
         plannedExpenses: [PlannedExpense],
         variableExpenses: [VariableExpense],
         incomes: [Income] = [],
+        savingsEntries: [SavingsLedgerEntry] = [],
         now: Date = Date()
     ) -> HomeAnswer {
         switch query.intent {
@@ -107,6 +108,7 @@ struct HomeQueryEngine {
                 incomes: incomes,
                 plannedExpenses: plannedExpenses,
                 variableExpenses: variableExpenses,
+                savingsEntries: savingsEntries,
                 now: now
             )
         case .savingsAverageRecentPeriods:
@@ -115,6 +117,7 @@ struct HomeQueryEngine {
                 incomes: incomes,
                 plannedExpenses: plannedExpenses,
                 variableExpenses: variableExpenses,
+                savingsEntries: savingsEntries,
                 now: now
             )
         case .incomeSourceShare:
@@ -684,6 +687,7 @@ struct HomeQueryEngine {
         incomes: [Income],
         plannedExpenses: [PlannedExpense],
         variableExpenses: [VariableExpense],
+        savingsEntries: [SavingsLedgerEntry],
         now: Date
     ) -> HomeAnswer {
         let range = query.dateRange ?? monthRange(containing: now)
@@ -691,7 +695,8 @@ struct HomeQueryEngine {
             in: range,
             incomes: incomes,
             plannedExpenses: plannedExpenses,
-            variableExpenses: variableExpenses
+            variableExpenses: variableExpenses,
+            savingsEntries: savingsEntries
         )
 
         if totals.hasActivity == false {
@@ -724,6 +729,7 @@ struct HomeQueryEngine {
         incomes: [Income],
         plannedExpenses: [PlannedExpense],
         variableExpenses: [VariableExpense],
+        savingsEntries: [SavingsLedgerEntry],
         now: Date
     ) -> HomeAnswer {
         let periods = min(max(query.resultLimit, 1), 12)
@@ -738,7 +744,8 @@ struct HomeQueryEngine {
                 in: range,
                 incomes: incomes,
                 plannedExpenses: plannedExpenses,
-                variableExpenses: variableExpenses
+                variableExpenses: variableExpenses,
+                savingsEntries: savingsEntries
             )
             periodRows.append((periodStart: range.startDate, actualSavings: totals.actualSavings))
         }
@@ -1653,7 +1660,8 @@ struct HomeQueryEngine {
         in range: HomeQueryDateRange,
         incomes: [Income],
         plannedExpenses: [PlannedExpense],
-        variableExpenses: [VariableExpense]
+        variableExpenses: [VariableExpense],
+        savingsEntries: [SavingsLedgerEntry]
     ) -> (
         projectedSavings: Double,
         actualSavings: Double,
@@ -1669,7 +1677,7 @@ struct HomeQueryEngine {
 
         let plannedExpensesPlannedTotal = plannedExpenses
             .filter { $0.expenseDate >= range.startDate && $0.expenseDate <= range.endDate }
-            .reduce(0.0) { $0 + $1.plannedAmount }
+            .reduce(0.0) { $0 + SavingsMathService.plannedProjectedBudgetImpactAmount(for: $1) }
 
         let plannedExpensesEffectiveActualTotal = plannedExpenses
             .filter { $0.expenseDate >= range.startDate && $0.expenseDate <= range.endDate }
@@ -1678,14 +1686,20 @@ struct HomeQueryEngine {
         let variableExpensesTotal = variableExpenses
             .filter { $0.transactionDate >= range.startDate && $0.transactionDate <= range.endDate }
             .reduce(0.0) { $0 + SavingsMathService.variableBudgetImpactAmount(for: $1) }
+        let actualSavingsAdjustments = SavingsMathService.actualSavingsAdjustmentTotal(
+            from: savingsEntries,
+            startDate: range.startDate,
+            endDate: range.endDate
+        )
 
         let projectedSavings = plannedIncomeTotal - plannedExpensesPlannedTotal
-        let actualSavings = actualIncomeTotal - (plannedExpensesEffectiveActualTotal + variableExpensesTotal)
+        let actualSavings = actualIncomeTotal - (plannedExpensesEffectiveActualTotal + variableExpensesTotal) + actualSavingsAdjustments
         let hasActivity = plannedIncomeTotal != 0
             || actualIncomeTotal != 0
             || plannedExpensesPlannedTotal != 0
             || plannedExpensesEffectiveActualTotal != 0
             || variableExpensesTotal != 0
+            || actualSavingsAdjustments != 0
 
         return (projectedSavings, actualSavings, hasActivity)
     }

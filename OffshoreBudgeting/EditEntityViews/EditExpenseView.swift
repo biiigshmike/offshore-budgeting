@@ -160,7 +160,7 @@ struct EditExpenseView: View {
             // Seed fields once.
             descriptionText = expense.descriptionText
             let existingOffset = max(0, -(expense.offsetSettlement?.amount ?? 0))
-            amountText = CurrencyFormatter.editingString(from: expense.amount + existingOffset)
+            amountText = CurrencyFormatter.editingString(from: SavingsMathService.variableGrossAmount(for: expense) + existingOffset)
             transactionDate = expense.transactionDate
             selectedCardID = expense.card?.id
             selectedCategoryID = expense.category?.id
@@ -310,9 +310,11 @@ struct EditExpenseView: View {
             allocationAmount = 0
         }
 
+        let amountToSave = allocationAmount > 0 ? amt : netAmount
+
         // SwiftData models are reference types, so updating properties is enough.
         expense.descriptionText = trimmedDesc
-        expense.amount = netAmount
+        expense.amount = amountToSave
         expense.transactionDate = transactionDate
         expense.workspace = workspace
         expense.card = selectedCard
@@ -320,13 +322,15 @@ struct EditExpenseView: View {
 
         if let selectedAllocationAccount = resolvedAllocationAccount, allocationAmount > 0 {
             if let existing = expense.allocation {
-                existing.allocatedAmount = AllocationLedgerService.cappedAllocationAmount(allocationAmount, expenseAmount: netAmount)
+                existing.allocatedAmount = AllocationLedgerService.cappedAllocationAmount(allocationAmount, expenseAmount: amt)
+                existing.preservesGrossAmount = true
                 existing.updatedAt = .now
                 existing.account = selectedAllocationAccount
                 existing.workspace = workspace
             } else {
                 let allocation = ExpenseAllocation(
-                    allocatedAmount: AllocationLedgerService.cappedAllocationAmount(allocationAmount, expenseAmount: netAmount),
+                    allocatedAmount: AllocationLedgerService.cappedAllocationAmount(allocationAmount, expenseAmount: amt),
+                    preservesGrossAmount: true,
                     createdAt: .now,
                     updatedAt: .now,
                     workspace: workspace,

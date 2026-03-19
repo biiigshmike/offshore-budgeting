@@ -281,7 +281,8 @@ struct EditPlannedExpenseView: View {
         .onAppear {
             title = plannedExpense.title
             plannedAmountText = CurrencyFormatter.editingString(from: plannedExpense.plannedAmount)
-            actualAmountText = plannedExpense.actualAmount > 0 ? CurrencyFormatter.editingString(from: plannedExpense.actualAmount) : ""
+            let grossRecordedActual = SavingsMathService.grossRecordedActualAmount(for: plannedExpense)
+            actualAmountText = grossRecordedActual > 0 ? CurrencyFormatter.editingString(from: grossRecordedActual) : ""
             expenseDate = plannedExpense.expenseDate
             selectedCardID = plannedExpense.card?.id
             selectedCategoryID = plannedExpense.category?.id
@@ -748,9 +749,7 @@ struct EditPlannedExpenseView: View {
         let hasOffset = resolvedOffsetAccount != nil && offsetAmount > 0
 
         let actualToSave: Double
-        if hasSplit {
-            actualToSave = max(0, planned - allocationAmount)
-        } else if hasOffset {
+        if hasOffset {
             actualToSave = max(0, planned - offsetAmount)
         } else {
             actualToSave = parsedActual
@@ -772,6 +771,7 @@ struct EditPlannedExpenseView: View {
 
             if let existingAllocation = plannedExpense.allocation {
                 existingAllocation.allocatedAmount = AllocationLedgerService.cappedAllocationAmount(allocationAmount, expenseAmount: planned)
+                existingAllocation.preservesGrossAmount = true
                 existingAllocation.updatedAt = .now
                 existingAllocation.workspace = workspace
                 existingAllocation.account = account
@@ -779,6 +779,7 @@ struct EditPlannedExpenseView: View {
             } else {
                 let allocation = ExpenseAllocation(
                     allocatedAmount: AllocationLedgerService.cappedAllocationAmount(allocationAmount, expenseAmount: planned),
+                    preservesGrossAmount: true,
                     createdAt: .now,
                     updatedAt: .now,
                     workspace: workspace,

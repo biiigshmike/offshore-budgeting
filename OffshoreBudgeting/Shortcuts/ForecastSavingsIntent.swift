@@ -34,7 +34,8 @@ struct ForecastSavingsIntent: AppIntent {
                 endDate: monthEnd,
                 incomes: workspace.incomes ?? [],
                 plannedExpenses: workspace.plannedExpenses ?? [],
-                variableExpenses: workspace.variableExpenses ?? []
+                variableExpenses: workspace.variableExpenses ?? [],
+                savingsEntries: (workspace.savingsAccounts ?? []).flatMap { $0.entries ?? [] }
             )
         }
 
@@ -64,7 +65,8 @@ struct ForecastSavingsIntent: AppIntent {
         endDate: Date,
         incomes: [Income],
         plannedExpenses: [PlannedExpense],
-        variableExpenses: [VariableExpense]
+        variableExpenses: [VariableExpense],
+        savingsEntries: [SavingsLedgerEntry]
     ) -> (projectedSavings: Double, actualSavings: Double) {
         let plannedIncomeTotal = incomes
             .filter { $0.isPlanned && $0.date >= startDate && $0.date <= endDate }
@@ -76,7 +78,7 @@ struct ForecastSavingsIntent: AppIntent {
 
         let plannedExpensesPlannedTotal = plannedExpenses
             .filter { $0.expenseDate >= startDate && $0.expenseDate <= endDate }
-            .reduce(0.0) { $0 + $1.plannedAmount }
+            .reduce(0.0) { $0 + SavingsMathService.plannedProjectedBudgetImpactAmount(for: $1) }
 
         let plannedExpensesEffectiveActualTotal = plannedExpenses
             .filter { $0.expenseDate >= startDate && $0.expenseDate <= endDate }
@@ -85,9 +87,14 @@ struct ForecastSavingsIntent: AppIntent {
         let variableExpensesTotal = variableExpenses
             .filter { $0.transactionDate >= startDate && $0.transactionDate <= endDate }
             .reduce(0.0) { $0 + SavingsMathService.variableBudgetImpactAmount(for: $1) }
+        let actualSavingsAdjustments = SavingsMathService.actualSavingsAdjustmentTotal(
+            from: savingsEntries,
+            startDate: startDate,
+            endDate: endDate
+        )
 
         let projectedSavings = plannedIncomeTotal - plannedExpensesPlannedTotal
-        let actualSavings = actualIncomeTotal - (plannedExpensesEffectiveActualTotal + variableExpensesTotal)
+        let actualSavings = actualIncomeTotal - (plannedExpensesEffectiveActualTotal + variableExpensesTotal) + actualSavingsAdjustments
         return (projectedSavings, actualSavings)
     }
 }

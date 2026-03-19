@@ -767,6 +767,7 @@ final class ExpenseAllocation {
 
     var id: UUID = UUID()
     var allocatedAmount: Double = 0
+    var preservesGrossAmount: Bool = false
     var createdAt: Date = Date.now
     var updatedAt: Date = Date.now
 
@@ -785,6 +786,7 @@ final class ExpenseAllocation {
     init(
         id: UUID = UUID(),
         allocatedAmount: Double,
+        preservesGrossAmount: Bool = false,
         createdAt: Date = .now,
         updatedAt: Date = .now,
         workspace: Workspace? = nil,
@@ -794,6 +796,7 @@ final class ExpenseAllocation {
     ) {
         self.id = id
         self.allocatedAmount = allocatedAmount
+        self.preservesGrossAmount = preservesGrossAmount
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.workspace = workspace
@@ -915,6 +918,7 @@ enum SavingsLedgerEntryKind: String, CaseIterable, Identifiable {
     case periodClose
     case manualAdjustment
     case expenseOffset
+    case reconciliationSettlement
 
     var id: String { rawValue }
 }
@@ -965,6 +969,7 @@ final class SavingsLedgerEntry {
     var amount: Double = 0
     var note: String = ""
     var kindRaw: String = SavingsLedgerEntryKind.manualAdjustment.rawValue
+    var linkedAllocationSettlementID: UUID? = nil
     var periodStartDate: Date? = nil
     var periodEndDate: Date? = nil
     var createdAt: Date = Date.now
@@ -988,6 +993,7 @@ final class SavingsLedgerEntry {
         amount: Double,
         note: String,
         kindRaw: String,
+        linkedAllocationSettlementID: UUID? = nil,
         periodStartDate: Date? = nil,
         periodEndDate: Date? = nil,
         createdAt: Date = .now,
@@ -1002,6 +1008,7 @@ final class SavingsLedgerEntry {
         self.amount = amount
         self.note = note
         self.kindRaw = kindRaw
+        self.linkedAllocationSettlementID = linkedAllocationSettlementID
         self.periodStartDate = periodStartDate
         self.periodEndDate = periodEndDate
         self.createdAt = createdAt

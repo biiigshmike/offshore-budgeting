@@ -65,6 +65,7 @@ final class TransactionEntryService {
            allocationAmount > 0 {
             let allocation = ExpenseAllocation(
                 allocatedAmount: AllocationLedgerService.cappedAllocationAmount(allocationAmount, expenseAmount: amount),
+                preservesGrossAmount: true,
                 createdAt: .now,
                 updatedAt: .now,
                 workspace: workspace,

@@ -20,6 +20,7 @@ struct BudgetDetailView: View {
     @Query private var workspaceIncomes: [Income]
     @Query private var workspacePlannedExpenses: [PlannedExpense]
     @Query private var workspaceVariableExpenses: [VariableExpense]
+    @Query private var workspaceSavingsEntries: [SavingsLedgerEntry]
     @Query private var workspaceCategories: [Category]
     @Query private var workspacePresets: [Preset]
     
@@ -68,6 +69,10 @@ struct BudgetDetailView: View {
         _workspaceVariableExpenses = Query(
             filter: #Predicate<VariableExpense> { $0.workspace?.id == workspaceID },
             sort: [SortDescriptor(\VariableExpense.transactionDate, order: .reverse)]
+        )
+        _workspaceSavingsEntries = Query(
+            filter: #Predicate<SavingsLedgerEntry> { $0.workspace?.id == workspaceID },
+            sort: [SortDescriptor(\SavingsLedgerEntry.date, order: .reverse)]
         )
         _workspaceCategories = Query(
             filter: #Predicate<Category> { $0.workspace?.id == workspaceID },
@@ -415,7 +420,9 @@ struct BudgetDetailView: View {
             variableExpensesFiltered.map { BudgetUnifiedExpenseItem.variable($0) }
         )
 
-        let plannedExpensesPlannedTotal = plannedExpensesForCalculations.reduce(0) { $0 + $1.plannedAmount }
+        let plannedExpensesPlannedTotal = plannedExpensesForCalculations.reduce(0) {
+            $0 + SavingsMathService.plannedProjectedBudgetImpactAmount(for: $1)
+        }
         let plannedExpensesActualTotal = plannedExpensesForCalculations.reduce(0) { $0 + max(0, $1.actualAmount) }
         let plannedExpensesEffectiveTotal = plannedExpensesForCalculations.reduce(0) {
             $0 + SavingsMathService.plannedBudgetImpactAmount(for: $1)
@@ -423,10 +430,15 @@ struct BudgetDetailView: View {
         let variableExpensesTotal = variableExpensesForCalculations.reduce(0) {
             $0 + SavingsMathService.variableBudgetImpactAmount(for: $1)
         }
+        let actualSavingsAdjustments = SavingsMathService.actualSavingsAdjustmentTotal(
+            from: workspaceSavingsEntries,
+            startDate: budget.startDate,
+            endDate: budget.endDate
+        )
 
         let maxSavings = plannedIncomeTotal - plannedExpensesEffectiveTotal
         let projectedSavings = plannedIncomeTotal - plannedExpensesPlannedTotal
-        let actualSavings = actualIncomeTotal - plannedExpensesEffectiveTotal - variableExpensesTotal
+        let actualSavings = actualIncomeTotal - plannedExpensesEffectiveTotal - variableExpensesTotal + actualSavingsAdjustments
 
         return BudgetDetailDerivedState(
             plannedExpensesInBudget: plannedExpensesInBudget,
