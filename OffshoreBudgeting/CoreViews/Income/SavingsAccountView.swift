@@ -302,7 +302,7 @@ struct SavingsAccountView: View {
             }
 
             Section("Date Range") {
-                DateRangeFilterRow(
+                SavingsDateFilterRow(
                     draftStartDate: $draftStartDate,
                     draftEndDate: $draftEndDate,
                     isGoEnabled: isDateDirty && !isApplyingQuickRange,
@@ -334,29 +334,33 @@ struct SavingsAccountView: View {
                     .foregroundStyle(.secondary)
                 } else {
                     ForEach(displayRows) { entry in
-                        Button {
-                            editingEntry = entry
-                            showingEntrySheet = true
-                        } label: {
-                            SavingsLedgerRow(entry: entry)
-                        }
-                        .buttonStyle(.plain)
-                        .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                        if entry.kind == .manualAdjustment {
                             Button {
                                 editingEntry = entry
                                 showingEntrySheet = true
                             } label: {
-                                Label("Edit", systemImage: "pencil")
+                                SavingsLedgerRow(entry: entry)
                             }
-                            .tint(Color("AccentColor"))
-                        }
-                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                            Button(role: .destructive) {
-                                requestDelete(entry)
-                            } label: {
-                                Label("Delete", systemImage: "trash")
+                            .buttonStyle(.plain)
+                            .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                                Button {
+                                    editingEntry = entry
+                                    showingEntrySheet = true
+                                } label: {
+                                    Label("Edit", systemImage: "pencil")
+                                }
+                                .tint(Color("AccentColor"))
                             }
-                            .tint(Color("OffshoreDepth"))
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button(role: .destructive) {
+                                    requestDelete(entry)
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                                .tint(Color("OffshoreDepth"))
+                            }
+                        } else {
+                            SavingsLedgerRow(entry: entry)
                         }
                     }
                 }
@@ -713,6 +717,8 @@ extension SavingsLedgerEntry {
             return "Manual Adjustment"
         case .expenseOffset:
             return "Expense Offset"
+        case .reconciliationSettlement:
+            return "Reconciliation Settlement"
         }
     }
 
@@ -731,6 +737,59 @@ private struct SavingsChartPoint: Identifiable {
         self.total = total
     }
 
+}
+
+private struct SavingsDateFilterRow: View {
+    @Binding var draftStartDate: Date
+    @Binding var draftEndDate: Date
+
+    let isGoEnabled: Bool
+    let onTapGo: () -> Void
+    let onSelectQuickRange: (CalendarQuickRangePreset) -> Void
+
+    var body: some View {
+        HStack(spacing: 0) {
+            Spacer(minLength: 0)
+
+            HStack(spacing: 10) {
+                PillDatePickerField(title: "Start Date", date: $draftStartDate)
+                    .layoutPriority(1)
+
+                PillDatePickerField(title: "End Date", date: $draftEndDate)
+                    .layoutPriority(1)
+
+                Button(action: onTapGo) {
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 14, weight: .semibold))
+                        .frame(width: 44, height: 44)
+                        .background(
+                            Circle()
+                                .fill(isGoEnabled
+                                      ? Color.accentColor.opacity(0.85)
+                                      : Color.secondary.opacity(0.1))
+                        )
+                }
+                .buttonStyle(.plain)
+                .disabled(!isGoEnabled)
+                .accessibilityLabel("Apply Date Range")
+
+                Menu {
+                    CalendarQuickRangeMenuItems { preset in
+                        onSelectQuickRange(preset)
+                    }
+                } label: {
+                    Image(systemName: "calendar")
+                        .font(.system(size: 14, weight: .semibold))
+                        .frame(width: 44, height: 44)
+                        .background(Circle().fill(Color.secondary.opacity(0.1)))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Quick Date Ranges")
+            }
+
+            Spacer(minLength: 0)
+        }
+    }
 }
 
 private struct SavingsLedgerRow: View {
@@ -783,7 +842,9 @@ private struct SavingsLedgerEntryFormView: View {
 
     private var isEditingSystemManagedEntry: Bool {
         guard let entry else { return false }
-        return entry.kind == .periodClose || entry.kind == .expenseOffset
+        return entry.kind == .periodClose
+            || entry.kind == .expenseOffset
+            || entry.kind == .reconciliationSettlement
     }
 
     private var displayedTypeLabel: String {
@@ -795,6 +856,8 @@ private struct SavingsLedgerEntryFormView: View {
             return "Manual"
         case .expenseOffset:
             return "Expense Offset"
+        case .reconciliationSettlement:
+            return "Reconciliation Settlement"
         }
     }
 
