@@ -79,6 +79,32 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
     }
 }
 
+struct AppRootLaunchSectionResolver {
+    static func resolve(
+        initialSectionOverride: AppSection?,
+        pendingShortcutSectionRaw: String,
+        persistedSelectedSectionRaw: String? = nil,
+        isPhone: Bool = true
+    ) -> AppSection {
+        if let initialSectionOverride {
+            return initialSectionOverride
+        }
+
+        let pending = pendingShortcutSectionRaw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let pendingSection = AppSection.fromStorageRaw(pending) {
+            return pendingSection
+        }
+
+        if isPhone == false,
+           let persistedSelectedSectionRaw,
+           let persistedSection = AppSection.fromStorageRaw(persistedSelectedSectionRaw) {
+            return persistedSection
+        }
+
+        return .home
+    }
+}
+
 enum AppTabActivationPhase: String, Equatable {
     case inactive
     case activating
@@ -571,21 +597,12 @@ struct AppRootView: View {
     }
 
     private func resolveInitialSection() -> AppSection {
-        if let initialSectionOverride {
-            return initialSectionOverride
-        }
-
-        let pending = pendingShortcutSectionRaw.trimmingCharacters(in: .whitespacesAndNewlines)
-        if let pendingSection = AppSection.fromStorageRaw(pending) {
-            return pendingSection
-        }
-
-        if isPhone == false,
-           let persistedSection = AppSection.fromStorageRaw(persistedSelectedSectionRaw) {
-            return persistedSection
-        }
-
-        return .home
+        AppRootLaunchSectionResolver.resolve(
+            initialSectionOverride: initialSectionOverride,
+            pendingShortcutSectionRaw: pendingShortcutSectionRaw,
+            persistedSelectedSectionRaw: persistedSelectedSectionRaw,
+            isPhone: isPhone
+        )
     }
 
     private func consumePendingShortcutSectionIfNeeded() {
