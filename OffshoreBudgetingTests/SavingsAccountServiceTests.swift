@@ -1052,10 +1052,10 @@ struct SavingsAccountServiceTests {
 
         let savingsEntries = try fetchAll(SavingsLedgerEntry.self, in: context)
             .filter { $0.kind == .reconciliationSettlement }
-        let savingsAccount = try #require(fetchAll(SavingsAccount.self, in: context).first)
+        let fetchedSavingsAccount = try #require(fetchAll(SavingsAccount.self, in: context).first)
 
         #expect(savingsEntries.isEmpty)
-        #expect(savingsAccount.total == 0)
+        #expect(fetchedSavingsAccount.total == 0)
     }
 
     @Test func actualSavingsAdjustments_includeManualEntries_only() throws {
