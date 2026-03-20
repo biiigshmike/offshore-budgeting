@@ -20,6 +20,14 @@ enum ExpenseCSVImportKind: String, Hashable {
     case income
 }
 
+enum ExpenseCSVImportReconciliationAction: String, CaseIterable, Hashable, Identifiable {
+    case none
+    case split
+    case offset
+
+    var id: String { rawValue }
+}
+
 struct ExpenseCSVImportRow: Identifiable {
     let id: UUID = UUID()
 
@@ -48,8 +56,11 @@ struct ExpenseCSVImportRow: Identifiable {
 
     // Category selection (expenses only)
     var selectedCategory: Category?
-    var selectedAllocationAccount: AllocationAccount? = nil
-    var allocationAmountText: String = ""
+    var reconciliationAction: ExpenseCSVImportReconciliationAction = .none
+    var selectedSplitAccount: AllocationAccount? = nil
+    var splitAmountText: String = ""
+    var selectedOffsetAccount: AllocationAccount? = nil
+    var offsetAmountText: String = ""
 
     // Learning
     var rememberMapping: Bool = false
@@ -73,11 +84,44 @@ struct ExpenseCSVImportRow: Identifiable {
         return false
     }
 
-    func parsedAllocationAmount(cappedTo total: Double) -> Double? {
-        let trimmed = allocationAmountText.trimmingCharacters(in: .whitespacesAndNewlines)
+    func parsedSplitAmount(cappedTo total: Double) -> Double? {
+        let trimmed = splitAmountText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
         guard let parsed = CurrencyFormatter.parseAmount(trimmed), parsed > 0 else { return nil }
         return AllocationLedgerService.cappedAllocationAmount(parsed, expenseAmount: total)
+    }
+
+    func parsedOffsetAmount(cappedTo total: Double) -> Double? {
+        let trimmed = offsetAmountText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        guard let parsed = CurrencyFormatter.parseAmount(trimmed), parsed > 0 else { return nil }
+        return min(total, parsed)
+    }
+
+    mutating func setReconciliationAction(_ action: ExpenseCSVImportReconciliationAction) {
+        if reconciliationAction == action { return }
+
+        switch action {
+        case .none:
+            selectedSplitAccount = nil
+            splitAmountText = ""
+            selectedOffsetAccount = nil
+            offsetAmountText = ""
+        case .split:
+            if selectedSplitAccount == nil {
+                selectedSplitAccount = selectedOffsetAccount
+            }
+            selectedOffsetAccount = nil
+            offsetAmountText = ""
+        case .offset:
+            if selectedOffsetAccount == nil {
+                selectedOffsetAccount = selectedSplitAccount
+            }
+            selectedSplitAccount = nil
+            splitAmountText = ""
+        }
+
+        reconciliationAction = action
     }
 
     mutating func recomputeBucket() {

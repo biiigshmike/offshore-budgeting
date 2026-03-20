@@ -6,10 +6,36 @@
 //
 
 import Foundation
+import SwiftData
 import Testing
 @testable import Offshore
 
 struct OffshoreBudgetingTests {
+
+    private func makeContext() throws -> ModelContext {
+        let schema = Schema([
+            Workspace.self,
+            Budget.self,
+            Card.self,
+            BudgetCardLink.self,
+            Category.self,
+            Preset.self,
+            BudgetPresetLink.self,
+            BudgetCategoryLimit.self,
+            PlannedExpense.self,
+            VariableExpense.self,
+            AllocationAccount.self,
+            ExpenseAllocation.self,
+            AllocationSettlement.self,
+            IncomeSeries.self,
+            ImportMerchantRule.self,
+            Income.self
+        ])
+
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: schema, configurations: config)
+        return ModelContext(container)
+    }
 
     @Test func import_PositiveUnsignedAmountDefaultsToExpense() {
         let categories = [
@@ -270,5 +296,143 @@ struct OffshoreBudgetingTests {
         #expect(adjusted[0].kind == .expense)
         #expect(adjusted[0].isBlocked == false)
         #expect(adjusted[0].blockedReason == nil)
+    }
+
+    @MainActor
+    @Test func importRow_ReconciliationActionSwitchingClearsInactiveState() throws {
+        let context = try makeContext()
+        let workspace = Workspace(name: "WS", hexColor: "#3B82F6")
+        let card = Card(name: "Visa", workspace: workspace)
+        let category = Category(name: "Groceries", hexColor: "#00AA00", workspace: workspace)
+        let splitAccount = AllocationAccount(name: "Split Account", workspace: workspace)
+        let offsetAccount = AllocationAccount(name: "Offset Account", workspace: workspace)
+
+        context.insert(workspace)
+        context.insert(card)
+        context.insert(category)
+        context.insert(splitAccount)
+        context.insert(offsetAccount)
+        try context.save()
+
+        let vm = ExpenseCSVImportViewModel(mode: .cardTransactions)
+        vm.prepare(workspace: workspace, modelContext: context)
+        vm.loadClipboard(
+            text: "Date,Description,Amount,Category\n02/10/2026,Safeway,50.00,Groceries",
+            workspace: workspace,
+            card: card,
+            modelContext: context
+        )
+
+        let rowID = try #require(vm.rows.first?.id)
+
+        vm.setReconciliationAction(rowID: rowID, action: .split)
+        vm.setSplitAccount(rowID: rowID, account: splitAccount)
+        vm.setSplitAmount(rowID: rowID, amountText: "20")
+
+        vm.setReconciliationAction(rowID: rowID, action: .offset)
+
+        let offsetRow = try #require(vm.rows.first)
+        #expect(offsetRow.reconciliationAction == .offset)
+        #expect(offsetRow.selectedSplitAccount == nil)
+        #expect(offsetRow.splitAmountText.isEmpty)
+        #expect(offsetRow.selectedOffsetAccount?.id == splitAccount.id)
+
+        vm.setOffsetAccount(rowID: rowID, account: offsetAccount)
+        vm.setOffsetAmount(rowID: rowID, amountText: "15")
+        vm.setReconciliationAction(rowID: rowID, action: .none)
+
+        let clearedRow = try #require(vm.rows.first)
+        #expect(clearedRow.reconciliationAction == .none)
+        #expect(clearedRow.selectedSplitAccount == nil)
+        #expect(clearedRow.splitAmountText.isEmpty)
+        #expect(clearedRow.selectedOffsetAccount == nil)
+        #expect(clearedRow.offsetAmountText.isEmpty)
+    }
+
+    @MainActor
+    @Test func importCommit_SplitCreatesAllocation() throws {
+        let context = try makeContext()
+        let workspace = Workspace(name: "WS", hexColor: "#3B82F6")
+        let card = Card(name: "Visa", workspace: workspace)
+        let category = Category(name: "Groceries", hexColor: "#00AA00", workspace: workspace)
+        let account = AllocationAccount(name: "Partner", workspace: workspace)
+
+        context.insert(workspace)
+        context.insert(card)
+        context.insert(category)
+        context.insert(account)
+        try context.save()
+
+        let vm = ExpenseCSVImportViewModel(mode: .cardTransactions)
+        vm.prepare(workspace: workspace, modelContext: context)
+        vm.loadClipboard(
+            text: "Date,Description,Amount,Category\n02/10/2026,Safeway,50.00,Groceries",
+            workspace: workspace,
+            card: card,
+            modelContext: context
+        )
+
+        let rowID = try #require(vm.rows.first?.id)
+        vm.setReconciliationAction(rowID: rowID, action: .split)
+        vm.setSplitAccount(rowID: rowID, account: account)
+        vm.setSplitAmount(rowID: rowID, amountText: "20")
+
+        vm.commitImport(workspace: workspace, card: card, modelContext: context)
+
+        let expense = try #require(try context.fetch(FetchDescriptor<VariableExpense>()).first)
+        let allocation = try #require(try context.fetch(FetchDescriptor<ExpenseAllocation>()).first)
+
+        #expect(expense.amount == 50)
+        #expect(expense.allocation?.id == allocation.id)
+        #expect(allocation.allocatedAmount == 20)
+        #expect(allocation.account?.id == account.id)
+    }
+
+    @MainActor
+    @Test func importCommit_OffsetCreatesSettlementAndReducesExpenseAmount() throws {
+        let context = try makeContext()
+        let workspace = Workspace(name: "WS", hexColor: "#3B82F6")
+        let card = Card(name: "Visa", workspace: workspace)
+        let category = Category(name: "Groceries", hexColor: "#00AA00", workspace: workspace)
+        let account = AllocationAccount(name: "Partner", workspace: workspace)
+        let seedSettlement = AllocationSettlement(
+            date: Date(),
+            note: "Seed",
+            amount: 30,
+            workspace: workspace,
+            account: account
+        )
+
+        context.insert(workspace)
+        context.insert(card)
+        context.insert(category)
+        context.insert(account)
+        context.insert(seedSettlement)
+        try context.save()
+
+        let vm = ExpenseCSVImportViewModel(mode: .cardTransactions)
+        vm.prepare(workspace: workspace, modelContext: context)
+        vm.loadClipboard(
+            text: "Date,Description,Amount,Category\n02/10/2026,Safeway,50.00,Groceries",
+            workspace: workspace,
+            card: card,
+            modelContext: context
+        )
+
+        let rowID = try #require(vm.rows.first?.id)
+        vm.setReconciliationAction(rowID: rowID, action: .offset)
+        vm.setOffsetAccount(rowID: rowID, account: account)
+        vm.setOffsetAmount(rowID: rowID, amountText: "20")
+
+        vm.commitImport(workspace: workspace, card: card, modelContext: context)
+
+        let expense = try #require(try context.fetch(FetchDescriptor<VariableExpense>()).first)
+        let settlements = try context.fetch(FetchDescriptor<AllocationSettlement>())
+        let offsetSettlement = try #require(settlements.first { $0.expense?.id == expense.id })
+
+        #expect(expense.amount == 30)
+        #expect(expense.offsetSettlement?.id == offsetSettlement.id)
+        #expect(offsetSettlement.amount == -20)
+        #expect(offsetSettlement.account?.id == account.id)
     }
 }

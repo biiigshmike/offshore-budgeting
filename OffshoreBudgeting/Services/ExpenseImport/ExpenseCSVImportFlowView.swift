@@ -293,8 +293,11 @@ struct ExpenseCSVImportFlowView: View {
             onSetAmount: { text in vm.setAmount(rowID: row.id, amountText: text) },
             onSetCategory: { category in vm.setCategory(rowID: row.id, category: category) },
             onSetKind: { kind in vm.setKind(rowID: row.id, kind: kind) },
-            onSetAllocationAccount: { account in vm.setAllocationAccount(rowID: row.id, account: account) },
-            onSetAllocationAmount: { text in vm.setAllocationAmount(rowID: row.id, amountText: text) },
+            onSetReconciliationAction: { action in vm.setReconciliationAction(rowID: row.id, action: action) },
+            onSetSplitAccount: { account in vm.setSplitAccount(rowID: row.id, account: account) },
+            onSetSplitAmount: { text in vm.setSplitAmount(rowID: row.id, amountText: text) },
+            onSetOffsetAccount: { account in vm.setOffsetAccount(rowID: row.id, account: account) },
+            onSetOffsetAmount: { text in vm.setOffsetAmount(rowID: row.id, amountText: text) },
             onToggleRemember: { vm.toggleRemember(rowID: row.id) }
         )
     }

@@ -18,11 +18,17 @@ struct ExpenseCSVImportRowView: View {
     let onSetAmount: (String) -> Void
     let onSetCategory: (Category?) -> Void
     let onSetKind: (ExpenseCSVImportKind) -> Void
-    let onSetAllocationAccount: (AllocationAccount?) -> Void
-    let onSetAllocationAmount: (String) -> Void
+    let onSetReconciliationAction: (ExpenseCSVImportReconciliationAction) -> Void
+    let onSetSplitAccount: (AllocationAccount?) -> Void
+    let onSetSplitAmount: (String) -> Void
+    let onSetOffsetAccount: (AllocationAccount?) -> Void
+    let onSetOffsetAmount: (String) -> Void
     let onToggleRemember: () -> Void
 
     @State private var amountDraft: String
+    @State private var splitPercentage: Double = 0.5
+    @State private var shouldApplyInitialSplitDefault: Bool = false
+    @State private var hasAppliedInitialSplitDefault: Bool = false
     @FocusState private var isAmountFieldFocused: Bool
 
     init(
@@ -36,8 +42,11 @@ struct ExpenseCSVImportRowView: View {
         onSetAmount: @escaping (String) -> Void,
         onSetCategory: @escaping (Category?) -> Void,
         onSetKind: @escaping (ExpenseCSVImportKind) -> Void,
-        onSetAllocationAccount: @escaping (AllocationAccount?) -> Void,
-        onSetAllocationAmount: @escaping (String) -> Void,
+        onSetReconciliationAction: @escaping (ExpenseCSVImportReconciliationAction) -> Void,
+        onSetSplitAccount: @escaping (AllocationAccount?) -> Void,
+        onSetSplitAmount: @escaping (String) -> Void,
+        onSetOffsetAccount: @escaping (AllocationAccount?) -> Void,
+        onSetOffsetAmount: @escaping (String) -> Void,
         onToggleRemember: @escaping () -> Void
     ) {
         self.row = row
@@ -50,8 +59,11 @@ struct ExpenseCSVImportRowView: View {
         self.onSetAmount = onSetAmount
         self.onSetCategory = onSetCategory
         self.onSetKind = onSetKind
-        self.onSetAllocationAccount = onSetAllocationAccount
-        self.onSetAllocationAmount = onSetAllocationAmount
+        self.onSetReconciliationAction = onSetReconciliationAction
+        self.onSetSplitAccount = onSetSplitAccount
+        self.onSetSplitAmount = onSetSplitAmount
+        self.onSetOffsetAccount = onSetOffsetAccount
+        self.onSetOffsetAmount = onSetOffsetAmount
         self.onToggleRemember = onToggleRemember
         _amountDraft = State(initialValue: CurrencyFormatter.editingString(from: row.finalAmount))
     }
@@ -84,12 +96,34 @@ struct ExpenseCSVImportRowView: View {
             }
         }
         .padding(.vertical, 4)
+        .onAppear {
+            syncSplitPercentageFromRow()
+            if row.reconciliationAction == .split {
+                applyInitialSplitDefaultIfNeeded()
+            }
+        }
         .onChange(of: row.id) { _, _ in
             amountDraft = CurrencyFormatter.editingString(from: row.finalAmount)
+            splitPercentage = 0.5
+            shouldApplyInitialSplitDefault = false
+            hasAppliedInitialSplitDefault = false
+            syncSplitPercentageFromRow()
         }
         .onChange(of: row.finalAmount) { _, newValue in
             if !isAmountFieldFocused {
                 amountDraft = CurrencyFormatter.editingString(from: newValue)
+            }
+            handleExpenseAmountChangedForSplit()
+        }
+        .onChange(of: row.splitAmountText) { _, _ in
+            handleSplitAmountTextChanged()
+        }
+        .onChange(of: row.reconciliationAction) { _, newValue in
+            if newValue == .split {
+                shouldApplyInitialSplitDefault = !hasAppliedInitialSplitDefault
+                applyInitialSplitDefaultIfNeeded()
+            } else {
+                shouldApplyInitialSplitDefault = false
             }
         }
     }
@@ -204,37 +238,92 @@ struct ExpenseCSVImportRowView: View {
     }
 
     private var row4SharedBalance: some View {
-        HStack(spacing: 10) {
-            Text("Reconciliation")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                Text("Reconciliation")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 0)
+            }
 
-            Picker("Reconciliation", selection: Binding(
-                get: { row.selectedAllocationAccount?.id },
-                set: { newID in
-                    let match = allAllocationAccounts.first(where: { $0.id == newID })
-                    onSetAllocationAccount(match)
-                }
+            Picker("Action", selection: Binding(
+                get: { row.reconciliationAction },
+                set: { onSetReconciliationAction($0) }
             )) {
-                Text("None").tag(UUID?.none)
-                ForEach(allAllocationAccounts, id: \.id) { account in
-                    Text(account.name).tag(Optional(account.id))
+                Text("None").tag(ExpenseCSVImportReconciliationAction.none)
+                Text("Split").tag(ExpenseCSVImportReconciliationAction.split)
+                Text("Offset").tag(ExpenseCSVImportReconciliationAction.offset)
+            }
+            .pickerStyle(.segmented)
+
+            if row.reconciliationAction == .split {
+                Picker("Reconciliation", selection: Binding(
+                    get: { row.selectedSplitAccount?.id },
+                    set: { newID in
+                        let match = allAllocationAccounts.first(where: { $0.id == newID })
+                        onSetSplitAccount(match)
+                    }
+                )) {
+                    Text("None").tag(UUID?.none)
+                    ForEach(allAllocationAccounts, id: \.id) { account in
+                        Text(account.name).tag(Optional(account.id))
+                    }
+                }
+
+                TextField(
+                    "Amount",
+                    text: Binding(
+                        get: { row.splitAmountText },
+                        set: { onSetSplitAmount($0) }
+                    )
+                )
+                .keyboardType(.decimalPad)
+
+                splitPercentageControl
+            }
+
+            if row.reconciliationAction == .offset {
+                Picker("Reconciliation", selection: Binding(
+                    get: { row.selectedOffsetAccount?.id },
+                    set: { newID in
+                        let match = allAllocationAccounts.first(where: { $0.id == newID })
+                        onSetOffsetAccount(match)
+                    }
+                )) {
+                    Text("None").tag(UUID?.none)
+                    ForEach(allAllocationAccounts, id: \.id) { account in
+                        Text(account.name).tag(Optional(account.id))
+                    }
+                }
+
+                TextField(
+                    "Amount",
+                    text: Binding(
+                        get: { row.offsetAmountText },
+                        set: { onSetOffsetAmount($0) }
+                    )
+                )
+                .keyboardType(.decimalPad)
+
+                if let account = row.selectedOffsetAccount {
+                    HStack {
+                        Text("Available Balance")
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text(
+                            CurrencyFormatter.normalizedCurrencyDisplayValue(AllocationLedgerService.balance(for: account)),
+                            format: CurrencyFormatter.currencyStyle()
+                        )
+                        .fontWeight(.semibold)
+                    }
                 }
             }
-            .pickerStyle(.menu)
-            .labelsHidden()
 
-            TextField(
-                "Split",
-                text: Binding(
-                    get: { row.allocationAmountText },
-                    set: { onSetAllocationAmount($0) }
-                )
-            )
-            .keyboardType(.decimalPad)
-            .multilineTextAlignment(.trailing)
-            .disabled(row.selectedAllocationAccount == nil)
-            .frame(maxWidth: 110)
+            if let validationMessage = reconciliationValidationMessage {
+                Text(validationMessage)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
@@ -283,10 +372,174 @@ struct ExpenseCSVImportRowView: View {
         return nil
     }
 
+    private var reconciliationValidationMessage: String? {
+        switch row.reconciliationAction {
+        case .none:
+            return nil
+        case .split:
+            guard row.finalAmount > 0 else {
+                return "Enter an expense amount first."
+            }
+            guard row.selectedSplitAccount != nil else {
+                return "Choose a Reconciliation."
+            }
+            let trimmed = row.splitAmountText.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty { return nil }
+            guard let parsed = CurrencyFormatter.parseAmount(trimmed) else {
+                return "Enter a valid amount."
+            }
+            guard parsed > 0 else {
+                return "Amount must be greater than 0."
+            }
+            guard parsed <= row.finalAmount else {
+                return "Amount can't exceed the expense amount."
+            }
+            return nil
+        case .offset:
+            guard row.finalAmount > 0 else {
+                return "Enter an expense amount first."
+            }
+            guard let account = row.selectedOffsetAccount else {
+                return "Choose a Reconciliation."
+            }
+            let trimmed = row.offsetAmountText.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty { return nil }
+            guard let parsed = CurrencyFormatter.parseAmount(trimmed) else {
+                return "Enter a valid amount."
+            }
+            guard parsed > 0 else {
+                return "Amount must be greater than 0."
+            }
+            guard parsed <= row.finalAmount else {
+                return "Amount can't exceed the expense amount."
+            }
+            let available = max(0, AllocationLedgerService.balance(for: account))
+            guard CurrencyFormatter.isLessThanOrEqualCurrency(parsed, available) else {
+                return "Amount can't exceed available balance."
+            }
+            return nil
+        }
+    }
+
     private var importSummary: String {
         if let csvCategory = row.originalCategoryText, !csvCategory.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return "Imported: \(row.originalDescriptionText) • \(row.originalAmountText) • \(csvCategory)"
         }
         return "Imported: \(row.originalDescriptionText) • \(row.originalAmountText)"
+    }
+
+    private var splitPercentageControl: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Split Percentage")
+                Spacer()
+                Text(splitPercentage.formatted(.percent.precision(.fractionLength(0))))
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+
+            Slider(
+                value: Binding(
+                    get: { splitPercentage },
+                    set: { newValue in
+                        splitPercentage = roundedSplitPercentage(newValue)
+                        shouldApplyInitialSplitDefault = false
+                        applySplitAmountFromPercentage()
+                    }
+                ),
+                in: 0...1,
+                step: 0.01
+            ) {
+                Text("Split Percentage")
+            } minimumValueLabel: {
+                Text("0%")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            } maximumValueLabel: {
+                Text("100%")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            .disabled(row.finalAmount <= 0)
+            .accessibilityValue(splitPercentage.formatted(.percent.precision(.fractionLength(0))))
+        }
+    }
+
+    private func handleExpenseAmountChangedForSplit() {
+        guard row.reconciliationAction == .split else { return }
+
+        if shouldApplyInitialSplitDefault {
+            applyInitialSplitDefaultIfNeeded()
+            return
+        }
+
+        guard row.finalAmount > 0 else { return }
+
+        let trimmed = row.splitAmountText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
+        applySplitAmountFromPercentage()
+    }
+
+    private func handleSplitAmountTextChanged() {
+        guard row.reconciliationAction == .split else { return }
+
+        let trimmed = row.splitAmountText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
+        hasAppliedInitialSplitDefault = true
+        shouldApplyInitialSplitDefault = false
+        syncSplitPercentageFromRow()
+    }
+
+    private func applyInitialSplitDefaultIfNeeded() {
+        guard row.reconciliationAction == .split else { return }
+        guard shouldApplyInitialSplitDefault else { return }
+        guard row.finalAmount > 0 else { return }
+
+        let trimmed = row.splitAmountText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.isEmpty else {
+            hasAppliedInitialSplitDefault = true
+            shouldApplyInitialSplitDefault = false
+            syncSplitPercentageFromRow()
+            return
+        }
+
+        splitPercentage = 0.5
+        hasAppliedInitialSplitDefault = true
+        shouldApplyInitialSplitDefault = false
+        applySplitAmountFromPercentage()
+    }
+
+    private func applySplitAmountFromPercentage() {
+        guard row.reconciliationAction == .split else { return }
+        guard row.finalAmount > 0 else { return }
+
+        let splitAmount = normalizedSplitAmount(baseAmount: row.finalAmount, percentage: splitPercentage)
+        onSetSplitAmount(CurrencyFormatter.editingString(from: splitAmount))
+    }
+
+    private func syncSplitPercentageFromRow() {
+        guard row.reconciliationAction == .split else { return }
+        guard row.finalAmount > 0 else { return }
+
+        let trimmed = row.splitAmountText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let splitAmount = CurrencyFormatter.parseAmount(trimmed) else { return }
+
+        hasAppliedInitialSplitDefault = true
+        splitPercentage = roundedSplitPercentage(splitAmount / row.finalAmount)
+    }
+
+    private func normalizedSplitAmount(baseAmount: Double, percentage: Double) -> Double {
+        let safeBaseAmount = max(0, baseAmount)
+        let clampedPercentage = min(max(percentage, 0), 1)
+        let rawSplitAmount = safeBaseAmount * clampedPercentage
+        let cappedSplitAmount = min(safeBaseAmount, max(0, rawSplitAmount))
+        return CurrencyFormatter.roundedToCurrency(cappedSplitAmount)
+    }
+
+    private func roundedSplitPercentage(_ value: Double) -> Double {
+        let clamped = min(max(value, 0), 1)
+        return (clamped * 100).rounded() / 100
     }
 }

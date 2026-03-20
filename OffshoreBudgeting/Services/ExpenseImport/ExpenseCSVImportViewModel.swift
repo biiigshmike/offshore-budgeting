@@ -83,11 +83,11 @@ final class ExpenseCSVImportViewModel: ObservableObject {
     var needsMoreDataRows: [ExpenseCSVImportRow] { rows.filter { !$0.isBlocked && $0.bucket == .needsMoreData }.sorted { $0.sourceLine < $1.sourceLine } }
 
     var canCommit: Bool {
-        rows.contains { !$0.isBlocked && $0.includeInImport && !$0.isMissingRequiredData }
+        rows.contains { !$0.isBlocked && $0.includeInImport && !$0.isMissingRequiredData && hasValidReconciliationConfiguration($0) }
     }
 
     var commitSummaryText: String {
-        let included = rows.filter { $0.includeInImport }
+        let included = rows.filter { $0.includeInImport && hasValidReconciliationConfiguration($0) }
         let expCount = included.filter { $0.kind == .expense && !$0.isMissingRequiredData }.count
         let incCount = included.filter { $0.kind == .income && !$0.isMissingRequiredData }.count
         let blockedCount = blockedRows.count
@@ -255,6 +255,10 @@ final class ExpenseCSVImportViewModel: ObservableObject {
             rows[idx].includeInImport = false
             return
         }
+        if !hasValidReconciliationConfiguration(rows[idx]) {
+            rows[idx].includeInImport = false
+            return
+        }
 
         rows[idx].includeInImport.toggle()
     }
@@ -363,8 +367,7 @@ final class ExpenseCSVImportViewModel: ObservableObject {
 
         if kind == .income {
             rows[idx].selectedCategory = nil
-            rows[idx].selectedAllocationAccount = nil
-            rows[idx].allocationAmountText = ""
+            rows[idx].setReconciliationAction(.none)
             rows[idx].bucket = .payment
         } else {
             if rows[idx].selectedCategory == nil {
@@ -399,30 +402,53 @@ final class ExpenseCSVImportViewModel: ObservableObject {
         rows[idx].rememberMapping.toggle()
     }
 
-    func setAllocationAccount(rowID: UUID, account: AllocationAccount?) {
+    func setReconciliationAction(rowID: UUID, action: ExpenseCSVImportReconciliationAction) {
         guard let idx = rows.firstIndex(where: { $0.id == rowID }) else { return }
-        rows[idx].selectedAllocationAccount = account
+        guard rows[idx].kind == .expense else { return }
+        rows[idx].setReconciliationAction(action)
+    }
+
+    func setSplitAccount(rowID: UUID, account: AllocationAccount?) {
+        guard let idx = rows.firstIndex(where: { $0.id == rowID }) else { return }
+        rows[idx].selectedSplitAccount = account
         if account == nil {
-            rows[idx].allocationAmountText = ""
+            rows[idx].splitAmountText = ""
         }
     }
 
-    func setAllocationAmount(rowID: UUID, amountText: String) {
+    func setSplitAmount(rowID: UUID, amountText: String) {
         guard let idx = rows.firstIndex(where: { $0.id == rowID }) else { return }
-        rows[idx].allocationAmountText = amountText
+        rows[idx].splitAmountText = amountText
+    }
+
+    func setOffsetAccount(rowID: UUID, account: AllocationAccount?) {
+        guard let idx = rows.firstIndex(where: { $0.id == rowID }) else { return }
+        rows[idx].selectedOffsetAccount = account
+        if account == nil {
+            rows[idx].offsetAmountText = ""
+        }
+    }
+
+    func setOffsetAmount(rowID: UUID, amountText: String) {
+        guard let idx = rows.firstIndex(where: { $0.id == rowID }) else { return }
+        rows[idx].offsetAmountText = amountText
     }
 
     func commitImport(workspace: Workspace, card: Card?, modelContext: ModelContext) {
-        let importable = rows.filter { !$0.isBlocked && $0.includeInImport && !$0.isMissingRequiredData }
+        let importable = rows.filter { !$0.isBlocked && $0.includeInImport && !$0.isMissingRequiredData && hasValidReconciliationConfiguration($0) }
 
         for row in importable {
             switch row.kind {
             case .expense:
                 guard let card else { continue }
                 let category = row.selectedCategory
+                let offsetAmount = row.parsedOffsetAmount(cappedTo: row.finalAmount) ?? 0
+                let amountToSave = row.reconciliationAction == .offset
+                    ? max(0, row.finalAmount - offsetAmount)
+                    : row.finalAmount
                 let exp = VariableExpense(
                     descriptionText: row.finalMerchant,
-                    amount: row.finalAmount,
+                    amount: amountToSave,
                     transactionDate: row.finalDate,
                     workspace: workspace,
                     card: card,
@@ -430,8 +456,9 @@ final class ExpenseCSVImportViewModel: ObservableObject {
                 )
                 modelContext.insert(exp)
 
-                if let account = row.selectedAllocationAccount,
-                   let allocationAmount = row.parsedAllocationAmount(cappedTo: row.finalAmount),
+                if row.reconciliationAction == .split,
+                   let account = row.selectedSplitAccount,
+                   let allocationAmount = row.parsedSplitAmount(cappedTo: row.finalAmount),
                    allocationAmount > 0 {
                     let allocation = ExpenseAllocation(
                         allocatedAmount: allocationAmount,
@@ -444,6 +471,21 @@ final class ExpenseCSVImportViewModel: ObservableObject {
                     )
                     modelContext.insert(allocation)
                     exp.allocation = allocation
+                }
+
+                if row.reconciliationAction == .offset,
+                   let account = row.selectedOffsetAccount,
+                   offsetAmount > 0 {
+                    let settlement = AllocationSettlement(
+                        date: row.finalDate,
+                        note: offsetNote(for: row.finalMerchant),
+                        amount: -offsetAmount,
+                        workspace: workspace,
+                        account: account,
+                        expense: exp
+                    )
+                    modelContext.insert(settlement)
+                    exp.offsetSettlement = settlement
                 }
 
                 if row.rememberMapping {
@@ -516,7 +558,31 @@ final class ExpenseCSVImportViewModel: ObservableObject {
         try? modelContext.save()
     }
 
+    private func offsetNote(for description: String) -> String {
+        "Offset applied to \(description)"
+    }
+
     // MARK: - Duplicate hints
+
+    private func hasValidReconciliationConfiguration(_ row: ExpenseCSVImportRow) -> Bool {
+        guard row.kind == .expense else { return true }
+
+        switch row.reconciliationAction {
+        case .none:
+            return true
+        case .split:
+            guard row.selectedSplitAccount != nil else { return false }
+            guard let amount = row.parsedSplitAmount(cappedTo: row.finalAmount) else { return false }
+            return amount > 0 && amount <= row.finalAmount
+        case .offset:
+            guard let account = row.selectedOffsetAccount else { return false }
+            guard let amount = row.parsedOffsetAmount(cappedTo: row.finalAmount) else { return false }
+            let available = max(0, AllocationLedgerService.balance(for: account))
+            return amount > 0
+                && amount <= row.finalAmount
+                && CurrencyFormatter.isLessThanOrEqualCurrency(amount, available)
+        }
+    }
 
     nonisolated static func applyImportModeRules(_ rows: [ExpenseCSVImportRow], mode: ImportMode) -> [ExpenseCSVImportRow] {
         switch mode {
