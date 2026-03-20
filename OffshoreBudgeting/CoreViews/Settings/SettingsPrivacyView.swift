@@ -28,6 +28,10 @@ import ActivityKit
 
 @MainActor
 struct SettingsPrivacyView: View {
+    private enum SystemPermissionKind {
+        case location
+        case photos
+    }
 
     @AppStorage("privacy_requireBiometrics") private var requireBiometrics: Bool = false
     @AppStorage("privacy_hideBalances") private var hideBalances: Bool = false
@@ -51,6 +55,14 @@ struct SettingsPrivacyView: View {
 
     @State private var showingEnableError: Bool = false
     @State private var enableErrorMessage: String = ""
+
+    private var isMacCatalyst: Bool {
+        #if targetEnvironment(macCatalyst)
+        true
+        #else
+        false
+        #endif
+    }
 
     private var biometricAvailability: LocalAuthenticationService.BiometricAvailability {
         LocalAuthenticationService.biometricAvailability()
@@ -117,14 +129,18 @@ struct SettingsPrivacyView: View {
                 )
 
                 Button {
-                    openSystemSettings()
+                    openAppOrSystemSettings()
                 } label: {
-                    Label("Open App Settings", systemImage: "gearshape")
+                    Label(isMacCatalyst ? "Open System Settings" : "Open App Settings", systemImage: "gearshape")
                 }
             } header: {
                 Text("System Permissions")
             } footer: {
-                Text("Offshore reflects Apple’s on-device permission system status. You can change any permission at any time in App Settings.")
+                Text(
+                    isMacCatalyst
+                    ? "Offshore reflects Apple’s on-device permission system status. On Mac, some permission changes may require navigating within System Settings manually."
+                    : "Offshore reflects Apple’s on-device permission system status. You can change any permission at any time in App Settings."
+                )
             }
         }
         .listStyle(.insetGrouped)
@@ -135,6 +151,9 @@ struct SettingsPrivacyView: View {
         }
         .onChange(of: scenePhase) { _, newValue in
             guard newValue == .active else { return }
+            refreshPermissionStates()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: ShoppingModeLocationService.authorizationDidChangeNotification)) { _ in
             refreshPermissionStates()
         }
         .onChange(of: requireBiometrics) { _, newValue in
@@ -180,17 +199,26 @@ struct SettingsPrivacyView: View {
                     ShoppingModeLocationService.shared.requestAuthorizationForExcursionMode()
                 }
             case .authorizedWhenInUse:
-                Button("Upgrade in App Settings") {
-                    openSystemSettings()
+                if !isMacCatalyst {
+                    Button("Upgrade in App Settings") {
+                        openAppOrSystemSettings()
+                    }
                 }
             case .denied, .restricted:
-                Button("Manage in App Settings") {
-                    openSystemSettings()
+                Button(isMacCatalyst ? "Open System Settings" : "Manage in App Settings") {
+                    openSystemSettings(for: .location)
                 }
             case .authorizedAlways:
                 EmptyView()
             @unknown default:
                 EmptyView()
+            }
+
+            if isMacCatalyst,
+               let instructions = systemSettingsInstructions(for: .location) {
+                Text(instructions)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
         }
         #else
@@ -214,32 +242,54 @@ struct SettingsPrivacyView: View {
 
             switch photosPermissionState {
             case .notDetermined:
-                Button("Allow Full Photo Access") {
-                    Task {
-                        _ = await PhotoLibraryAccessManager.shared.requestReadWriteAuthorization()
-                        refreshPermissionStates()
+                if !isMacCatalyst {
+                    Button("Allow Full Photo Access") {
+                        Task {
+                            _ = await PhotoLibraryAccessManager.shared.requestReadWriteAuthorization()
+                            refreshPermissionStates()
+                        }
                     }
                 }
             case .limited:
                 if PhotoLibraryAccessManager.shared.canManageLimitedLibrarySelection {
                     Button("Manage Selected Photos") {
                         if PhotoLibraryAccessManager.shared.presentLimitedLibraryPicker() == false {
-                            openSystemSettings()
+                            openSystemSettings(for: .photos)
                         }
                     }
                 }
 
-                Button("Open App Settings") {
-                    openSystemSettings()
+                if !isMacCatalyst {
+                    Button("Open App Settings") {
+                        openAppOrSystemSettings()
+                    }
                 }
             case .denied, .restricted:
-                Button("Manage in App Settings") {
-                    openSystemSettings()
+                if isMacCatalyst {
+                    Button("Open System Settings") {
+                        openSystemSettings(for: .photos)
+                    }
+                } else {
+                    Button("Manage in App Settings") {
+                        openSystemSettings(for: .photos)
+                    }
                 }
             case .authorized:
                 EmptyView()
             @unknown default:
                 EmptyView()
+            }
+
+            if isMacCatalyst {
+                Text("On Mac, Offshore imports screenshots through the system photo picker, so you can choose images without granting full photo library access.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
+                if let instructions = systemSettingsInstructions(for: .photos) {
+                    Text(instructions)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         #else
@@ -288,11 +338,52 @@ struct SettingsPrivacyView: View {
 
     // MARK: - System Settings
 
-    private func openSystemSettings() {
+    private func openAppOrSystemSettings() {
+        openSystemSettings(for: nil)
+    }
+
+    private func openSystemSettings(for permission: SystemPermissionKind?) {
         #if canImport(UIKit)
+        if isMacCatalyst,
+           let url = macSystemSettingsURL(for: permission) {
+            UIApplication.shared.open(url) { success in
+                guard success == false,
+                      let fallbackURL = URL(string: UIApplication.openSettingsURLString) else { return }
+                UIApplication.shared.open(fallbackURL)
+            }
+            return
+        }
+
         guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
         UIApplication.shared.open(url)
         #endif
+    }
+
+    private func macSystemSettingsURL(for permission: SystemPermissionKind?) -> URL? {
+        guard isMacCatalyst else { return nil }
+
+        let urlString: String
+        switch permission {
+        case .location:
+            urlString = "x-apple.systempreferences:com.apple.preference.security?Privacy_LocationServices"
+        case .photos:
+            urlString = "x-apple.systempreferences:com.apple.preference.security?Privacy_Photos"
+        case nil:
+            urlString = "x-apple.systempreferences:com.apple.preference.security"
+        }
+
+        return URL(string: urlString)
+    }
+
+    private func systemSettingsInstructions(for permission: SystemPermissionKind) -> String? {
+        guard isMacCatalyst else { return nil }
+
+        switch permission {
+        case .location:
+            return "System Settings > Privacy & Security > Location Services"
+        case .photos:
+            return "System Settings > Privacy & Security > Photos"
+        }
     }
 
     // MARK: - Permission Status
@@ -309,6 +400,21 @@ struct SettingsPrivacyView: View {
 
     private var locationPermissionStatusText: String {
         #if canImport(CoreLocation)
+        if isMacCatalyst {
+            switch locationPermissionState {
+            case .authorizedAlways, .authorizedWhenInUse:
+                return String(localized: "privacy.permissionStatus.allowed", defaultValue: "Allowed", comment: "Permission status when a capability is allowed.")
+            case .denied:
+                return String(localized: "privacy.permissionStatus.denied", defaultValue: "Denied", comment: "Permission status when access has been denied.")
+            case .restricted:
+                return String(localized: "privacy.permissionStatus.restricted", defaultValue: "Restricted", comment: "Permission status when access is restricted by the system.")
+            case .notDetermined:
+                return String(localized: "privacy.permissionStatus.notRequestedYet", defaultValue: "Not Requested Yet", comment: "Permission status when access has not been requested yet.")
+            @unknown default:
+                return String(localized: "privacy.permissionStatus.unknown", defaultValue: "Unknown", comment: "Fallback permission status when the system returns an unknown value.")
+            }
+        }
+
         switch locationPermissionState {
         case .authorizedAlways:
             return String(localized: "privacy.permissionStatus.alwaysAllow", defaultValue: "Always Allow", comment: "Permission status when location access is always allowed.")
@@ -330,6 +436,23 @@ struct SettingsPrivacyView: View {
 
     private var photosPermissionStatusText: String {
         #if canImport(Photos)
+        if isMacCatalyst {
+            switch photosPermissionState {
+            case .authorized:
+                return String(localized: "privacy.permissionStatus.fullAccess", defaultValue: "Full Access", comment: "Permission status when photo library access is fully allowed.")
+            case .limited:
+                return String(localized: "privacy.permissionStatus.limited", defaultValue: "Limited", comment: "Permission status when photo library access is limited.")
+            case .denied:
+                return String(localized: "privacy.permissionStatus.denied", defaultValue: "Denied", comment: "Permission status when access has been denied.")
+            case .restricted:
+                return String(localized: "privacy.permissionStatus.restricted", defaultValue: "Restricted", comment: "Permission status when access is restricted by the system.")
+            case .notDetermined:
+                return String(localized: "privacy.permissionStatus.pickerOnly", defaultValue: "Picker Only", comment: "Permission status when photo import uses the system picker without broader library access.")
+            @unknown default:
+                return String(localized: "privacy.permissionStatus.unknown", defaultValue: "Unknown", comment: "Fallback permission status when the system returns an unknown value.")
+            }
+        }
+
         switch photosPermissionState {
         case .authorized:
             return String(localized: "privacy.permissionStatus.fullAccess", defaultValue: "Full Access", comment: "Permission status when photo library access is fully allowed.")

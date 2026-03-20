@@ -14,6 +14,7 @@ import MapKit
 @MainActor
 final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
     static let shared = ShoppingModeLocationService()
+    static let authorizationDidChangeNotification = Notification.Name("ShoppingModeLocationService.authorizationDidChange")
 
     private enum Key {
         static let monitoredMerchantPayloads = "shoppingMode_monitoredMerchantPayloads"
@@ -89,13 +90,18 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
 
         switch status {
         case .notDetermined:
-            requestedAlwaysUpgrade = true
+            requestedAlwaysUpgrade = false
             debugLog("Requesting initial When In Use authorization for Excursion Mode")
             locationManager.requestWhenInUseAuthorization()
         case .authorizedWhenInUse:
+            #if targetEnvironment(macCatalyst)
+            requestedAlwaysUpgrade = false
+            debugLog("Location already authorized for Excursion Mode on Mac Catalyst")
+            #else
             requestedAlwaysUpgrade = true
             debugLog("Requesting Always authorization upgrade for Excursion Mode")
             locationManager.requestAlwaysAuthorization()
+            #endif
         case .authorizedAlways, .restricted, .denied:
             break
         @unknown default:
@@ -120,6 +126,13 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
         case .notDetermined:
             requestAuthorizationForExcursionMode()
         case .authorizedWhenInUse:
+            #if targetEnvironment(macCatalyst)
+            requestedAlwaysUpgrade = false
+            setBackgroundLocationUpdatesEnabled(true)
+            locationManager.startMonitoringSignificantLocationChanges()
+            debugLog("Authorized for Location on Mac Catalyst. Refreshing nearby monitored merchants")
+            refreshNearbyMonitoredMerchants(trigger: .startup)
+            #else
             if requestedAlwaysUpgrade {
                 requestedAlwaysUpgrade = false
                 debugLog("Requesting Always authorization upgrade")
@@ -128,6 +141,7 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
                 debugLog("Authorized When In Use only. Waiting for App Settings upgrade to Always")
                 stopMonitoringAllRegions()
             }
+            #endif
         case .authorizedAlways:
             requestedAlwaysUpgrade = false
             setBackgroundLocationUpdatesEnabled(true)
@@ -563,17 +577,32 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
         let status = manager.authorizationStatus
         cachedAuthorizationStatus = status
         debugLog("Authorization changed: \(status.rawValue)")
+        NotificationCenter.default.post(
+            name: Self.authorizationDidChangeNotification,
+            object: self,
+            userInfo: ["status": status.rawValue]
+        )
 
+        #if !targetEnvironment(macCatalyst)
         if status == .authorizedWhenInUse && requestedAlwaysUpgrade {
             requestedAlwaysUpgrade = false
             manager.requestAlwaysAuthorization()
             return
         }
+        #endif
 
+        #if targetEnvironment(macCatalyst)
+        if status == .authorizedWhenInUse || status == .authorizedAlways {
+            requestedAlwaysUpgrade = false
+            startMonitoringIfPossible()
+            return
+        }
+        #else
         if status == .authorizedAlways {
             startMonitoringIfPossible()
             return
         }
+        #endif
 
         if status == .denied || status == .restricted {
             requestedAlwaysUpgrade = false
