@@ -348,27 +348,14 @@ struct AllocationAccountDetailView: View {
 
     private func deleteSettlement(id: UUID) {
         guard let settlement = settlement(for: id) else { return }
-        let isStandaloneSettlement = settlement.expense == nil && settlement.plannedExpense == nil
-
         if let expense = settlement.expense {
-            let oldOffset = abs(settlement.amount)
-            expense.amount = max(0, expense.amount + oldOffset)
             if expense.offsetSettlement?.id == settlement.id {
                 expense.offsetSettlement = nil
             }
         } else if let plannedExpense = settlement.plannedExpense {
-            plannedExpense.actualAmount = 0
             if plannedExpense.offsetSettlement?.id == settlement.id {
                 plannedExpense.offsetSettlement = nil
             }
-        }
-
-        if isStandaloneSettlement {
-            SavingsAccountService.removeStandaloneReconciliationSettlement(
-                for: settlement,
-                workspace: workspace,
-                modelContext: modelContext
-            )
         }
 
         modelContext.delete(settlement)
@@ -899,7 +886,7 @@ private struct EditSharedBalanceEntryView: View {
                 expense.offsetSettlement = settlement
             }
 
-            expense.amount = max(0, gross - amount)
+            expense.amount = gross
         }
 
         expense.transactionDate = date
@@ -921,7 +908,6 @@ private struct EditSharedBalanceEntryView: View {
             } else if let settlement = plannedExpense.offsetSettlement {
                 plannedExpense.offsetSettlement = nil
                 modelContext.delete(settlement)
-                plannedExpense.actualAmount = 0
             }
         case .split:
             if let settlement = plannedExpense.offsetSettlement {
@@ -986,7 +972,9 @@ private struct EditSharedBalanceEntryView: View {
                 plannedExpense.offsetSettlement = settlement
             }
 
-            plannedExpense.actualAmount = max(0, plannedAmount - amount)
+            if grossRecordedActual > 0 {
+                plannedExpense.actualAmount = grossRecordedActual
+            }
         }
 
         plannedExpense.expenseDate = date
@@ -1004,11 +992,6 @@ private struct EditSharedBalanceEntryView: View {
         settlement.amount = Double(direction) * amount
         settlement.account = account
         settlement.workspace = workspace
-        SavingsAccountService.upsertStandaloneReconciliationSettlement(
-            workspace: workspace,
-            settlement: settlement,
-            modelContext: modelContext
-        )
     }
 
     private func variableGrossAmount(for expense: VariableExpense) -> Double {
@@ -1163,11 +1146,6 @@ private struct AddAllocationSettlementView: View {
         )
 
         modelContext.insert(settlement)
-        SavingsAccountService.upsertStandaloneReconciliationSettlement(
-            workspace: workspace,
-            settlement: settlement,
-            modelContext: modelContext
-        )
         try? modelContext.save()
         dismiss()
     }

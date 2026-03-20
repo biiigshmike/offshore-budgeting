@@ -145,7 +145,9 @@ struct SavingsAccountView: View {
 
     private var accountScopedEntries: [SavingsLedgerEntry] {
         guard let accountID = account?.id else { return [] }
-        return savingsEntries.filter { $0.account?.id == accountID }
+        return savingsEntries.filter {
+            $0.account?.id == accountID && $0.kind != .reconciliationSettlement
+        }
     }
 
     private var graphSignature: SavingsGraphSnapshotSignature {

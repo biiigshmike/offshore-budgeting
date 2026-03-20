@@ -71,7 +71,7 @@ struct SettingsReleaseLogsView: View {
     static let releaseSections: [ReleaseSection] = [
         ReleaseSection(
             version: "2.3.3",
-            build: "17",
+            build: "18",
             items: [
                 ReleaseItem(
                     systemImage: "globe",
@@ -82,6 +82,11 @@ struct SettingsReleaseLogsView: View {
                     systemImage: "calendar.badge.clock",
                     title: "Next Planned Expense",
                     description: "This update fixes an issue where toggling Hide Future Planned Expenses in Settings would render the Next Planned Expense widget empty on the Home tab."
+                ),
+                ReleaseItem(
+                    systemImage: "person.2.fill",
+                    title: "Improved Reconciliations and Savings",
+                    description: "This update addresses an issue where split transactions would be counted towards a budget period's savings goal."
                 ),
                 ReleaseItem(
                     systemImage: "sailboat.fill",

@@ -526,35 +526,38 @@ struct SavingsAccountServiceTests {
         #expect(report.reassignedEntriesCount == 2)
         #expect(report.dedupedPeriodCloseCount == 0)
         #expect(report.dedupedManualAdjustmentCount == 0)
-        #expect(report.mirroredReconciliationSettlementCount == 0)
+        #expect(report.removedReconciliationSettlementCount == 0)
         #expect(report.recalculatedTotal == 125)
     }
 
-    @Test func normalizeSavingsData_backfillsStandaloneReconciliationSettlements() throws {
+    @Test func normalizeSavingsData_removesMirroredStandaloneReconciliationSettlements() throws {
         let context = try makeContext()
 
         let ws = Workspace(name: "WS", hexColor: "#3B82F6")
-        let account = AllocationAccount(name: "Partner", workspace: ws)
+        let savingsAccount = SavingsAccount(workspace: ws)
         context.insert(ws)
-        context.insert(account)
+        context.insert(savingsAccount)
 
-        let settlementIn = AllocationSettlement(
+        let mirroredIn = SavingsLedgerEntry(
             date: makeDate(2026, 2, 10),
-            note: "They paid me back",
             amount: 40,
+            note: "They paid me back",
+            kindRaw: SavingsLedgerEntryKind.reconciliationSettlement.rawValue,
+            linkedAllocationSettlementID: UUID(),
             workspace: ws,
-            account: account
+            account: savingsAccount
         )
-        let settlementOut = AllocationSettlement(
+        let mirroredOut = SavingsLedgerEntry(
             date: makeDate(2026, 2, 11),
-            note: "I paid them back",
             amount: -15,
+            note: "I paid them back",
+            kindRaw: SavingsLedgerEntryKind.reconciliationSettlement.rawValue,
+            linkedAllocationSettlementID: UUID(),
             workspace: ws,
-            account: account
+            account: savingsAccount
         )
-        context.insert(settlementIn)
-        context.insert(settlementOut)
-        _ = SavingsAccountService.ensureSavingsAccount(for: ws, modelContext: context)
+        context.insert(mirroredIn)
+        context.insert(mirroredOut)
         try context.save()
 
         let report = SavingsAccountService.normalizeSavingsData(for: ws, modelContext: context)
@@ -562,16 +565,13 @@ struct SavingsAccountServiceTests {
         let savingsAccounts = try fetchAll(SavingsAccount.self, in: context)
         let entries = try fetchAll(SavingsLedgerEntry.self, in: context)
             .filter { $0.kind == .reconciliationSettlement }
-            .sorted { $0.date < $1.date }
 
         #expect(savingsAccounts.count == 1)
-        let savingsAccount = try #require(savingsAccounts.first)
-        #expect(savingsAccount.total == 25)
-        #expect(entries.count == 2)
-        #expect(entries.map(\.amount) == [40, -15])
-        #expect(entries.map(\.linkedAllocationSettlementID) == [settlementIn.id, settlementOut.id])
-        #expect(report.mirroredReconciliationSettlementCount == 2)
-        #expect(report.recalculatedTotal == 25)
+        let normalizedAccount = try #require(savingsAccounts.first)
+        #expect(normalizedAccount.total == 0)
+        #expect(entries.isEmpty)
+        #expect(report.removedReconciliationSettlementCount == 2)
+        #expect(report.recalculatedTotal == 0)
     }
 
     @Test func ensureSavingsAccount_keepsExistingDuplicateAccountsUntilRepairRuns() throws {
@@ -971,7 +971,7 @@ struct SavingsAccountServiceTests {
         #expect(periodCloseEntries.first?.amount == 850)
     }
 
-    @Test func standaloneReconciliationSettlement_mirrorsToSavings_andUpdatesOnEdit() throws {
+    @Test func standaloneReconciliationSettlement_doesNotMirrorToSavings() throws {
         let context = try makeContext()
 
         let ws = Workspace(name: "WS", hexColor: "#3B82F6")
@@ -996,10 +996,7 @@ struct SavingsAccountServiceTests {
 
         var savingsEntries = try fetchAll(SavingsLedgerEntry.self, in: context)
             .filter { $0.kind == .reconciliationSettlement }
-        #expect(savingsEntries.count == 1)
-        let initialEntry = try #require(savingsEntries.first)
-        #expect(initialEntry.amount == -30)
-        #expect(initialEntry.note == "Initial")
+        #expect(savingsEntries.isEmpty)
 
         settlement.amount = 55
         settlement.note = "Updated"
@@ -1013,23 +1010,19 @@ struct SavingsAccountServiceTests {
 
         savingsEntries = try fetchAll(SavingsLedgerEntry.self, in: context)
             .filter { $0.kind == .reconciliationSettlement }
-        #expect(savingsEntries.count == 1)
-        let updatedEntry = try #require(savingsEntries.first)
-        #expect(updatedEntry.amount == 55)
-        #expect(updatedEntry.note == "Updated")
-        #expect(updatedEntry.date == makeDate(2026, 6, 6))
-
-        let savingsAccount = try #require(fetchAll(SavingsAccount.self, in: context).first)
-        #expect(savingsAccount.total == 55)
+        #expect(savingsEntries.isEmpty)
+        #expect(try fetchAll(SavingsAccount.self, in: context).isEmpty)
     }
 
-    @Test func removingStandaloneReconciliationSettlement_removesMirroredSavingsEntry() throws {
+    @Test func removingStandaloneReconciliationSettlement_cleansUpAnyExistingMirroredSavingsEntry() throws {
         let context = try makeContext()
 
         let ws = Workspace(name: "WS", hexColor: "#3B82F6")
         let reconciliation = AllocationAccount(name: "Partner", workspace: ws)
+        let savingsAccount = SavingsAccount(workspace: ws)
         context.insert(ws)
         context.insert(reconciliation)
+        context.insert(savingsAccount)
 
         let settlement = AllocationSettlement(
             date: makeDate(2026, 6, 4),
@@ -1040,10 +1033,16 @@ struct SavingsAccountServiceTests {
         )
         context.insert(settlement)
 
-        SavingsAccountService.upsertStandaloneReconciliationSettlement(
-            workspace: ws,
-            settlement: settlement,
-            modelContext: context
+        context.insert(
+            SavingsLedgerEntry(
+                date: makeDate(2026, 6, 4),
+                amount: 70,
+                note: "Paid back",
+                kindRaw: SavingsLedgerEntryKind.reconciliationSettlement.rawValue,
+                linkedAllocationSettlementID: settlement.id,
+                workspace: ws,
+                account: savingsAccount
+            )
         )
         SavingsAccountService.removeStandaloneReconciliationSettlement(
             for: settlement,
@@ -1059,7 +1058,7 @@ struct SavingsAccountServiceTests {
         #expect(savingsAccount.total == 0)
     }
 
-    @Test func actualSavingsAdjustments_includeStandaloneSettlements_andManualEntries_only() throws {
+    @Test func actualSavingsAdjustments_includeManualEntries_only() throws {
         let context = try makeContext()
 
         let ws = Workspace(name: "WS", hexColor: "#3B82F6")
@@ -1113,7 +1112,7 @@ struct SavingsAccountServiceTests {
             endDate: makeDate(2026, 6, 30)
         )
 
-        #expect(total == 15)
+        #expect(total == 40)
     }
 
     @Test func normalizeSavingsData_leavesLegacySplitAllocations_unchanged() throws {
@@ -1173,7 +1172,7 @@ struct SavingsAccountServiceTests {
         #expect(planned.actualAmount == 350)
         #expect(variableAllocation.preservesGrossAmount == false)
         #expect(plannedAllocation.preservesGrossAmount == false)
-        #expect(report.mirroredReconciliationSettlementCount == 0)
+        #expect(report.removedReconciliationSettlementCount == 0)
     }
 
     // MARK: - Currency Boundary

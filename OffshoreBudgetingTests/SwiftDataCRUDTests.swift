@@ -260,7 +260,7 @@ struct SwiftDataCRUDTests {
 
     // MARK: - Linked settlement integrity
 
-    @Test func deletingLinkedSettlement_restoresExpenseAmountAndUnlinks() throws {
+    @Test func deletingLinkedSettlement_keepsGrossExpenseAmountAndUnlinks() throws {
         let context = try makeContext()
 
         let ws = Workspace(name: "WS", hexColor: "#3B82F6")
@@ -296,8 +296,6 @@ struct SwiftDataCRUDTests {
         context.insert(settlement)
         try context.save()
 
-        let oldOffset = max(0, -settlement.amount)
-        expense.amount = max(0, expense.amount + oldOffset)
         expense.offsetSettlement = nil
         context.delete(settlement)
         try context.save()
@@ -306,11 +304,11 @@ struct SwiftDataCRUDTests {
         let settlements = try fetchAll(AllocationSettlement.self, in: context)
 
         #expect(settlements.isEmpty)
-        #expect(fetchedExpense?.amount == 80)
+        #expect(fetchedExpense?.amount == 60)
         #expect(fetchedExpense?.offsetSettlement == nil)
     }
 
-    @Test func editingLinkedSettlement_updatesExpenseAmountAndDate() throws {
+    @Test func editingLinkedSettlement_keepsGrossExpenseAmountAndUpdatesDate() throws {
         let context = try makeContext()
 
         let ws = Workspace(name: "WS", hexColor: "#3B82F6")
@@ -348,15 +346,12 @@ struct SwiftDataCRUDTests {
         context.insert(settlement)
         try context.save()
 
-        let oldOffset = max(0, -settlement.amount)
-        let gross = max(0, expense.amount + oldOffset)
         let newOffset = 10.0
 
         settlement.amount = -newOffset
         settlement.date = updatedDate
         settlement.note = "Updated offset"
 
-        expense.amount = max(0, gross - newOffset)
         expense.transactionDate = updatedDate
 
         try context.save()
@@ -364,7 +359,7 @@ struct SwiftDataCRUDTests {
         let fetchedExpense = try fetchAll(VariableExpense.self, in: context).first
         let fetchedSettlement = try fetchAll(AllocationSettlement.self, in: context).first
 
-        #expect(fetchedExpense?.amount == 70)
+        #expect(fetchedExpense?.amount == 60)
         #expect(fetchedExpense?.transactionDate == updatedDate)
         #expect(fetchedSettlement?.amount == -10)
         #expect(fetchedSettlement?.date == updatedDate)

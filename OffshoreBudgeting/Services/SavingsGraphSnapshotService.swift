@@ -60,6 +60,7 @@ enum SavingsGraphSnapshotService {
     ) -> SavingsGraphSnapshotSignature {
         let account = workspaceSavingsAccounts(for: workspace, modelContext: modelContext).first
         let entries = accountScopedEntries(for: workspace, accountID: account?.id, modelContext: modelContext)
+        let filteredTotal = entries.reduce(0.0) { $0 + $1.amount }
 
         return SavingsGraphSnapshotSignature(
             workspaceID: workspace.id,
@@ -69,7 +70,7 @@ enum SavingsGraphSnapshotService {
             entriesCount: entries.count,
             latestDateStamp: Int64(entries.map(\.date.timeIntervalSinceReferenceDate).max() ?? 0),
             latestCreatedAtStamp: Int64(entries.map(\.createdAt.timeIntervalSinceReferenceDate).max() ?? 0),
-            totalCents: Int64((account?.total ?? 0) * 100)
+            totalCents: Int64(filteredTotal * 100)
         )
     }
 
@@ -81,6 +82,7 @@ enum SavingsGraphSnapshotService {
     ) -> SavingsGraphSnapshot {
         let account = workspaceSavingsAccounts(for: workspace, modelContext: modelContext).first
         let entries = accountScopedEntries(for: workspace, accountID: account?.id, modelContext: modelContext)
+        let filteredTotal = entries.reduce(0.0) { $0 + $1.amount }
         let signature = signature(
             for: workspace,
             rangeStart: rangeStart,
@@ -89,7 +91,7 @@ enum SavingsGraphSnapshotService {
         )
 
         return SavingsGraphSnapshot(
-            runningTotal: account?.total ?? 0,
+            runningTotal: filteredTotal,
             runningTotalPoints: runningTotalPoints(from: entries),
             currentPeriodPoints: currentPeriodPoints(
                 from: entries,
@@ -133,7 +135,9 @@ enum SavingsGraphSnapshotService {
             ]
         )
         return ((try? modelContext.fetch(descriptor)) ?? []).filter { entry in
-            entry.workspace?.id == workspaceID && entry.account?.id == accountID
+            entry.workspace?.id == workspaceID
+                && entry.account?.id == accountID
+                && entry.kind != .reconciliationSettlement
         }
     }
 

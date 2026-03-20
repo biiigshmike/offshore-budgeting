@@ -20,13 +20,12 @@ struct SavingsMathService {
 
     static func variableGrossAmount(for expense: VariableExpense) -> Double {
         let splitAmount = max(0, expense.allocation?.allocatedAmount ?? 0)
-        let offsetAmount = max(0, -(expense.offsetSettlement?.amount ?? 0))
 
         if let allocation = expense.allocation, allocation.preservesGrossAmount == false {
             return max(0, expense.amount + splitAmount)
         }
 
-        return max(0, expense.amount + offsetAmount)
+        return max(0, expense.amount)
     }
 
     static func grossRecordedActualAmount(for expense: PlannedExpense) -> Double {
@@ -84,9 +83,9 @@ struct SavingsMathService {
 
     static func actualSavingsAdjustmentAmount(for entry: SavingsLedgerEntry) -> Double {
         switch entry.kind {
-        case .manualAdjustment, .reconciliationSettlement:
+        case .manualAdjustment:
             return entry.amount
-        case .periodClose, .expenseOffset:
+        case .periodClose, .expenseOffset, .reconciliationSettlement:
             return 0
         }
     }

@@ -11,7 +11,7 @@ enum SavingsAccountService {
         let reassignedEntriesCount: Int
         let dedupedPeriodCloseCount: Int
         let dedupedManualAdjustmentCount: Int
-        let mirroredReconciliationSettlementCount: Int
+        let removedReconciliationSettlementCount: Int
         let recalculatedTotal: Double
     }
 
@@ -58,7 +58,7 @@ enum SavingsAccountService {
                 reassignedEntriesCount: 0,
                 dedupedPeriodCloseCount: 0,
                 dedupedManualAdjustmentCount: 0,
-                mirroredReconciliationSettlementCount: 0,
+                removedReconciliationSettlementCount: 0,
                 recalculatedTotal: 0
             )
         }
@@ -91,12 +91,12 @@ enum SavingsAccountService {
             didMutate = true
         }
 
-        let mirroredSettlementCount = syncStandaloneReconciliationSettlements(
+        let removedSettlementCount = removeMirroredReconciliationSettlements(
             for: workspace,
             preferredAccount: primaryAccount,
             modelContext: modelContext
         )
-        if mirroredSettlementCount > 0 {
+        if removedSettlementCount > 0 {
             didMutate = true
         }
 
@@ -114,7 +114,7 @@ enum SavingsAccountService {
             "reassignedEntries=\(reassignedEntriesCount) " +
             "dedupedPeriodClose=\(dedupeReport.periodCloseDeletedCount) " +
             "dedupedManual=\(dedupeReport.manualDeletedCount) " +
-            "mirroredSettlements=\(mirroredSettlementCount) total=\(primaryAccount.total)"
+            "removedMirroredSettlements=\(removedSettlementCount) total=\(primaryAccount.total)"
         )
 
         return SavingsNormalizationReport(
@@ -122,7 +122,7 @@ enum SavingsAccountService {
             reassignedEntriesCount: reassignedEntriesCount,
             dedupedPeriodCloseCount: dedupeReport.periodCloseDeletedCount,
             dedupedManualAdjustmentCount: dedupeReport.manualDeletedCount,
-            mirroredReconciliationSettlementCount: mirroredSettlementCount,
+            removedReconciliationSettlementCount: removedSettlementCount,
             recalculatedTotal: primaryAccount.total
         )
     }
@@ -133,7 +133,7 @@ enum SavingsAccountService {
         modelContext: ModelContext
     ) -> Double {
         let account = ensureSavingsAccount(for: workspace, modelContext: modelContext)
-        _ = syncStandaloneReconciliationSettlements(
+        _ = removeMirroredReconciliationSettlements(
             for: workspace,
             preferredAccount: account,
             modelContext: modelContext
@@ -344,39 +344,11 @@ enum SavingsAccountService {
         modelContext: ModelContext
     ) {
         guard settlement.expense == nil, settlement.plannedExpense == nil else { return }
-
-        let account = ensureSavingsAccount(for: workspace, modelContext: modelContext)
-        let existing = standaloneReconciliationEntry(
-            linkedTo: settlement.id,
+        removeStandaloneReconciliationSettlement(
+            for: settlement,
             workspace: workspace,
             modelContext: modelContext
         )
-
-        if let existing {
-            existing.date = settlement.date
-            existing.amount = settlement.amount
-            existing.note = settlement.note
-            existing.kind = .reconciliationSettlement
-            existing.linkedAllocationSettlementID = settlement.id
-            existing.workspace = workspace
-            existing.account = account
-            existing.variableExpense = nil
-            existing.plannedExpense = nil
-            existing.updatedAt = .now
-        } else {
-            let entry = SavingsLedgerEntry(
-                date: settlement.date,
-                amount: settlement.amount,
-                note: settlement.note,
-                kindRaw: SavingsLedgerEntryKind.reconciliationSettlement.rawValue,
-                linkedAllocationSettlementID: settlement.id,
-                workspace: workspace,
-                account: account
-            )
-            modelContext.insert(entry)
-        }
-
-        recalculateAccountTotal(account)
     }
 
     static func removeStandaloneReconciliationSettlement(
@@ -786,21 +758,12 @@ enum SavingsAccountService {
     }
 
     @discardableResult
-    private static func syncStandaloneReconciliationSettlements(
+    private static func removeMirroredReconciliationSettlements(
         for workspace: Workspace,
         preferredAccount: SavingsAccount,
         modelContext: ModelContext
     ) -> Int {
         let workspaceID = workspace.id
-        let settlementDescriptor = FetchDescriptor<AllocationSettlement>(
-            predicate: #Predicate<AllocationSettlement> { settlement in
-                settlement.workspace?.id == workspaceID
-            }
-        )
-        let settlements = ((try? modelContext.fetch(settlementDescriptor)) ?? []).filter {
-            $0.expense == nil && $0.plannedExpense == nil
-        }
-
         let entryDescriptor = FetchDescriptor<SavingsLedgerEntry>(
             predicate: #Predicate<SavingsLedgerEntry> { entry in
                 entry.workspace?.id == workspaceID
@@ -810,78 +773,14 @@ enum SavingsAccountService {
             $0.kind == .reconciliationSettlement
         }
 
-        let settlementsByID = Dictionary(uniqueKeysWithValues: settlements.map { ($0.id, $0) })
-        var entriesBySettlementID: [UUID: SavingsLedgerEntry] = [:]
+        guard mirroredEntries.isEmpty == false else { return 0 }
+
         for entry in mirroredEntries {
-            guard let settlementID = entry.linkedAllocationSettlementID else { continue }
-            if entriesBySettlementID[settlementID] == nil {
-                entriesBySettlementID[settlementID] = entry
-            }
+            modelContext.delete(entry)
         }
 
-        var mirroredCount = 0
-        var didMutate = false
-
-        for settlement in settlements {
-            if let entry = entriesBySettlementID[settlement.id] {
-                let noteChanged = entry.note != settlement.note
-                let amountChanged = entry.amount != settlement.amount
-                let dateChanged = entry.date != settlement.date
-                let accountChanged = entry.account?.id != preferredAccount.id
-                let kindChanged = entry.kind != .reconciliationSettlement
-                if noteChanged || amountChanged || dateChanged || accountChanged || kindChanged {
-                    entry.date = settlement.date
-                    entry.amount = settlement.amount
-                    entry.note = settlement.note
-                    entry.kind = .reconciliationSettlement
-                    entry.linkedAllocationSettlementID = settlement.id
-                    entry.workspace = workspace
-                    entry.account = preferredAccount
-                    entry.variableExpense = nil
-                    entry.plannedExpense = nil
-                    entry.updatedAt = .now
-                    didMutate = true
-                }
-            } else {
-                let entry = SavingsLedgerEntry(
-                    date: settlement.date,
-                    amount: settlement.amount,
-                    note: settlement.note,
-                    kindRaw: SavingsLedgerEntryKind.reconciliationSettlement.rawValue,
-                    linkedAllocationSettlementID: settlement.id,
-                    workspace: workspace,
-                    account: preferredAccount
-                )
-                modelContext.insert(entry)
-                mirroredCount += 1
-                didMutate = true
-            }
-        }
-
-        var seenSettlementIDs: Set<UUID> = []
-        for entry in mirroredEntries {
-            guard let settlementID = entry.linkedAllocationSettlementID else {
-                modelContext.delete(entry)
-                didMutate = true
-                continue
-            }
-            if seenSettlementIDs.contains(settlementID) {
-                modelContext.delete(entry)
-                didMutate = true
-                continue
-            }
-            seenSettlementIDs.insert(settlementID)
-            if settlementsByID[settlementID] == nil {
-                modelContext.delete(entry)
-                didMutate = true
-            }
-        }
-
-        if didMutate {
-            recalculateAccountTotal(accountID: preferredAccount.id, modelContext: modelContext)
-        }
-
-        return mirroredCount
+        recalculateAccountTotal(accountID: preferredAccount.id, modelContext: modelContext)
+        return mirroredEntries.count
     }
 
     private static func standaloneReconciliationEntry(

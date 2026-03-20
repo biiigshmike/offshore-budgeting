@@ -1608,7 +1608,7 @@ private struct BudgetPlannedExpenseRow: View {
     }
 
     private var amountToShow: Double {
-        expense.effectiveAmount()
+        SavingsMathService.grossEffectiveAmount(for: expense)
     }
 
     private var offsetAmount: Double {
@@ -1720,7 +1720,7 @@ private struct BudgetVariableExpenseRow: View {
     }
 
     private var originalChargeAmount: Double {
-        max(0, expense.amount + offsetAmount)
+        max(0, expense.amount)
     }
 
     private var presentation: SharedBalancePresentation {
@@ -1758,9 +1758,8 @@ private struct BudgetVariableExpenseRow: View {
         case .split:
             return "Split \(CurrencyFormatter.string(from: splitAmount))"
         case .offset:
-            let net = CurrencyFormatter.string(from: expense.amount)
             let offset = CurrencyFormatter.string(from: offsetAmount)
-            return "Net \(net) • Offset \(offset)"
+            return "Offset \(offset)"
         }
     }
 
