@@ -138,7 +138,7 @@ struct SettingsPrivacyView: View {
             } footer: {
                 Text(
                     isMacCatalyst
-                    ? "Offshore reflects Apple’s on-device permission system status. On Mac, some permission changes may require navigating within System Settings manually."
+                    ? "Offshore reflects Apple’s on-device permission system status. On Mac, the button opens the relevant area in System Settings, and you can enable Offshore there if needed."
                     : "Offshore reflects Apple’s on-device permission system status. You can change any permission at any time in App Settings."
                 )
             }
@@ -195,7 +195,7 @@ struct SettingsPrivacyView: View {
 
             switch locationPermissionState {
             case .notDetermined:
-                Button("Enable for Excursion Mode") {
+                Button(isMacCatalyst ? "Allow Location Access" : "Enable for Excursion Mode") {
                     ShoppingModeLocationService.shared.requestAuthorizationForExcursionMode()
                 }
             case .authorizedWhenInUse:
@@ -205,7 +205,7 @@ struct SettingsPrivacyView: View {
                     }
                 }
             case .denied, .restricted:
-                Button(isMacCatalyst ? "Open System Settings" : "Manage in App Settings") {
+                Button(isMacCatalyst ? "Open Location Settings" : "Manage in App Settings") {
                     openSystemSettings(for: .location)
                 }
             case .authorizedAlways:
@@ -216,7 +216,7 @@ struct SettingsPrivacyView: View {
 
             if isMacCatalyst,
                let instructions = systemSettingsInstructions(for: .location) {
-                Text(instructions)
+                Text("If Offshore is turned off, enable it in \(instructions).")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -266,7 +266,7 @@ struct SettingsPrivacyView: View {
                 }
             case .denied, .restricted:
                 if isMacCatalyst {
-                    Button("Open System Settings") {
+                    Button("Open Photos Settings") {
                         openSystemSettings(for: .photos)
                     }
                 } else {
@@ -286,7 +286,7 @@ struct SettingsPrivacyView: View {
                     .foregroundStyle(.secondary)
 
                 if let instructions = systemSettingsInstructions(for: .photos) {
-                    Text(instructions)
+                    Text("If you want to review Photos access, open \(instructions).")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
