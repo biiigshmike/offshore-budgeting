@@ -18,6 +18,7 @@ enum ExpenseCSVImportBucket: String, Hashable {
 enum ExpenseCSVImportKind: String, Hashable {
     case expense
     case income
+    case credit
 }
 
 enum ExpenseCSVImportReconciliationAction: String, CaseIterable, Hashable, Identifiable {

@@ -1409,7 +1409,7 @@ private enum BudgetUnifiedExpenseItem: Identifiable {
     var amount: Double {
         switch self {
         case .planned(let e): return e.effectiveAmount()
-        case .variable(let e): return e.amount
+        case .variable(let e): return e.ledgerSignedAmount()
         }
     }
 
@@ -1737,7 +1737,7 @@ private struct BudgetVariableExpenseRow: View {
     }
 
     private var originalChargeAmount: Double {
-        max(0, expense.amount)
+        expense.ledgerDisplayAmount()
     }
 
     private var presentation: SharedBalancePresentation {
@@ -1813,6 +1813,9 @@ private struct BudgetVariableExpenseRow: View {
                 HStack(spacing: 8) {
                     Text(AppDateFormat.abbreviatedDate(expense.transactionDate))
 
+                    Text("•")
+                    Text(expense.kind.displayTitle)
+
                     if showsCardName, let cardName = expense.card?.name {
                         Text("•")
                         Text(cardName)
@@ -1828,7 +1831,7 @@ private struct BudgetVariableExpenseRow: View {
             VStack(alignment: .trailing, spacing: 2) {
                 Text(originalChargeAmount, format: CurrencyFormatter.currencyStyle())
                     .font(.headline.weight(.semibold))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(expense.kind == .credit ? .green : .primary)
                     .multilineTextAlignment(.trailing)
 
                 if let secondaryAmountSummary {

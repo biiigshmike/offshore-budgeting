@@ -241,7 +241,7 @@ struct HomeWhatIfTile: View {
 
         for expense in variableExpenses {
             guard isInRange(expense.transactionDate), let category = expense.category else { continue }
-            variableByCategoryID[category.id, default: 0] += expense.amount
+            variableByCategoryID[category.id, default: 0] += expense.ledgerSignedAmount()
         }
 
         var result: [UUID: Double] = [:]

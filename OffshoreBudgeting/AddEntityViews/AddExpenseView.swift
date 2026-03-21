@@ -37,6 +37,7 @@ struct AddExpenseView: View {
     @State private var descriptionText: String = ""
     @State private var amountText: String = ""
     @State private var transactionDate: Date
+    @State private var transactionKind: VariableExpenseKind = .debit
     @State private var selectedCardID: UUID? = nil
     @State private var selectedCategoryID: UUID? = nil
     @State private var selectedAllocationAccountID: UUID? = nil
@@ -121,6 +122,7 @@ struct AddExpenseView: View {
             descriptionText: $descriptionText,
             amountText: $amountText,
             transactionDate: $transactionDate,
+            transactionKind: $transactionKind,
             selectedCardID: $selectedCardID,
             selectedCategoryID: $selectedCategoryID,
             selectedAllocationAccountID: $selectedAllocationAccountID,
@@ -288,6 +290,7 @@ struct AddExpenseView: View {
         let expense = VariableExpense(
             descriptionText: trimmedDesc,
             amount: amountToStore,
+            kindRaw: transactionKind.rawValue,
             transactionDate: transactionDate,
             workspace: workspace,
             card: selectedCard,

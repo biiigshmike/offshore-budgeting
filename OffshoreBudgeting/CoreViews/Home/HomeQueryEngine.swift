@@ -458,7 +458,7 @@ struct HomeQueryEngine {
 
         for expense in variableExpenses {
             guard expense.transactionDate >= range.startDate, expense.transactionDate <= range.endDate else { continue }
-            entries.append((title: expense.descriptionText, amount: expense.amount))
+            entries.append((title: expense.descriptionText, amount: expense.ledgerSignedAmount()))
         }
 
         let rows = entries
@@ -509,7 +509,7 @@ struct HomeQueryEngine {
         }
 
         let plannedTotal = plannedFiltered.reduce(0.0) { $0 + $1.effectiveAmount() }
-        let variableTotal = variableFiltered.reduce(0.0) { $0 + $1.amount }
+        let variableTotal = variableFiltered.reduce(0.0) { $0 + $1.ledgerSignedAmount() }
         let total = plannedTotal + variableTotal
 
         if total == 0 {
@@ -569,9 +569,9 @@ struct HomeQueryEngine {
         for expense in filtered {
             let card = expense.card?.name.trimmingCharacters(in: .whitespacesAndNewlines)
             let cardName = (card?.isEmpty == false) ? card! : "Unassigned Card"
-            totalsByCard[cardName, default: 0] += expense.amount
+            totalsByCard[cardName, default: 0] += expense.ledgerSignedAmount()
             countsByCard[cardName, default: 0] += 1
-            largestTransactionByCard[cardName] = max(largestTransactionByCard[cardName] ?? 0, expense.amount)
+            largestTransactionByCard[cardName] = max(largestTransactionByCard[cardName] ?? 0, expense.ledgerDisplayAmount())
         }
 
         if let targetName = query.targetName {
@@ -1617,7 +1617,7 @@ struct HomeQueryEngine {
     ) -> Double {
         variableExpenses.reduce(0.0) { partial, expense in
             guard expense.transactionDate >= range.startDate, expense.transactionDate <= range.endDate else { return partial }
-            return partial + expense.amount
+            return partial + expense.ledgerSignedAmount()
         }
     }
 
@@ -1636,7 +1636,7 @@ struct HomeQueryEngine {
 
         for expense in variableExpenses {
             guard expense.transactionDate >= range.startDate, expense.transactionDate <= range.endDate else { continue }
-            entries.append((title: expense.descriptionText, amount: expense.amount))
+            entries.append((title: expense.descriptionText, amount: expense.ledgerSignedAmount()))
         }
 
         return entries.max { left, right in

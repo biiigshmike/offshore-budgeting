@@ -309,7 +309,7 @@ struct CardDetailView: View {
         )
         let plannedExpensesForCalculations = sortPlannedExpenses(plannedIncluded, by: sortMode)
 
-        let variableTotal = variableExpensesForCalculations.reduce(0) { $0 + $1.amount }
+        let variableTotal = variableExpensesForCalculations.reduce(0) { $0 + $1.ledgerSignedAmount() }
         let plannedTotal = plannedExpensesForCalculations.reduce(0) { $0 + plannedEffectiveAmount($1) }
         let unifiedTotal = variableTotal + plannedTotal
 
@@ -392,14 +392,14 @@ struct CardDetailView: View {
             }
         case .variable:
             for expense in variableExpensesForCalculations {
-                add(category: expense.category, amount: expense.amount)
+                add(category: expense.category, amount: expense.ledgerSignedAmount())
             }
         case .unified:
             for expense in plannedExpensesForCalculations {
                 add(category: expense.category, amount: plannedEffectiveAmount(expense))
             }
             for expense in variableExpensesForCalculations {
-                add(category: expense.category, amount: expense.amount)
+                add(category: expense.category, amount: expense.ledgerSignedAmount())
             }
         }
 
@@ -1248,7 +1248,7 @@ private enum UnifiedExpenseItem: Identifiable {
     var amount: Double {
         switch self {
         case .planned(let e): return e.effectiveAmount()
-        case .variable(let e): return e.amount
+        case .variable(let e): return e.ledgerSignedAmount()
         }
     }
 
@@ -1269,7 +1269,7 @@ private enum UnifiedExpenseItem: Identifiable {
     var kindLabel: String {
         switch self {
         case .planned: return "Planned"
-        case .variable: return "Variable"
+        case .variable(let e): return e.kind == .credit ? "Credit" : "Variable"
         }
     }
 }

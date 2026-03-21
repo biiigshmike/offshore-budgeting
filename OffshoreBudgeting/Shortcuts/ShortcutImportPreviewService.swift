@@ -154,7 +154,7 @@ final class ShortcutImportPreviewService {
         lines.append("Possible duplicates: \(possibleDuplicateRows.formatted())")
         lines.append("Needs more data: \(needsMoreDataRows.formatted())")
         if paymentRows > 0 {
-            lines.append("Payments/income rows: \(paymentRows.formatted())")
+            lines.append("Credit/income rows: \(paymentRows.formatted())")
         }
         lines.append("Immediately importable: \(includedRows.formatted())")
         lines.append("Nothing is saved yet. Offshore saves only after you confirm Import.")

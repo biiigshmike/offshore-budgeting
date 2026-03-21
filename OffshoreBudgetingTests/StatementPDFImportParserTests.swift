@@ -11,12 +11,20 @@ import Testing
 
 struct StatementPDFImportParserTests {
 
-    // MARK: - PDF Extraction
+    // MARK: - Parser Extraction
 
-    @Test func statementOpt1_ExtractsExpectedTransactions() throws {
-        let rows = try parsedRows(fromFixture: "StatementOpt1.pdf")
+    @Test func parser_extractsTransactionsFromInlineStatementLines() throws {
+        let rows = try parsedRows(
+            fromLines: [
+                "For the period 12/01/2025 to 01/31/2026",
+                "12/24/2025 Direct Deposit $2,817.83",
+                "01/06/2026 OPENAI *CHATGPT 40.00",
+                "01/07/2026 ATM Transaction Fee 3.00",
+                "Transaction Summary 999.99"
+            ]
+        )
 
-        #expect(rows.count >= 12)
+        #expect(rows.count == 3)
         #expect(
             rows.contains {
                 $0.date == "12/24/2025"
@@ -43,10 +51,18 @@ struct StatementPDFImportParserTests {
         #expect(rows.allSatisfy { !$0.description.lowercased().contains("transaction summary") })
     }
 
-    @Test func statementOpt2_ExtractsExpectedTransactionsAndSkipsSummary() throws {
-        let rows = try parsedRows(fromFixture: "StatementOpt2.pdf")
+    @Test func parser_usesReferencePeriodToResolveMonthDayDatesAndSkipsSummaryNoise() throws {
+        let rows = try parsedRows(
+            fromLines: [
+                "For the period 12/15/2025 to 01/14/2026",
+                "01/04 ACH Deposit -703.51",
+                "01/05 STARBUCKS STORE 12345 25.00",
+                "01/06 APPLE.COM/BILL 51.97",
+                "Total payments for this period 703.51"
+            ]
+        )
 
-        #expect(rows.count >= 30)
+        #expect(rows.count == 3)
         #expect(
             rows.contains {
                 $0.date == "01/04/2026"
@@ -73,11 +89,17 @@ struct StatementPDFImportParserTests {
         #expect(rows.allSatisfy { !$0.description.lowercased().contains("total payments for this period") })
     }
 
-    @Test func statementOpt3_ExtractsExpectedTransactionsAndIgnoresPointsNoise() throws {
-        let rows = try parsedRows(fromFixture: "StatementOpt3.pdf")
+    @Test func parser_ignoresPointsLikeNoiseAndPreservesActualAmounts() throws {
+        let rows = try parsedRows(
+            fromLines: [
+                "Opening/Closing Date 12/01/2025 - 01/31/2026",
+                "01/02 Automatic Payment -277.64",
+                "12/10 AMAZON MARKETPLACE 11.92",
+                "Points earned this period 1192.00"
+            ]
+        )
 
-        #expect(rows.count >= 5)
-        #expect(rows.count <= 8)
+        #expect(rows.count == 2)
         #expect(
             rows.contains {
                 $0.date == "01/02/2026"
@@ -97,10 +119,17 @@ struct StatementPDFImportParserTests {
         #expect(rows.allSatisfy { $0.amount != "1192.00" })
     }
 
-    @Test func statementOpt4_ExtractsPaymentRowAndSkipsAprRows() throws {
-        let rows = try parsedRows(fromFixture: "StatementOpt4.pdf")
+    @Test func parser_extractsPaymentRowAndSkipsAprRows() throws {
+        let rows = try parsedRows(
+            fromLines: [
+                "Closing Date 11/30/2025",
+                "11/15/2025 Mobile Payment -45.44",
+                "Purchase APR 25.74%",
+                "APR for cash advances 29.99%"
+            ]
+        )
 
-        #expect(rows.count >= 1)
+        #expect(rows.count == 1)
         #expect(
             rows.contains {
                 $0.date == "11/15/2025"
@@ -115,7 +144,12 @@ struct StatementPDFImportParserTests {
     // MARK: - Mapper Behavior
 
     @Test func pdfRows_FirstPassWithoutLearning_StayNeedsMoreData() throws {
-        let parsed = try StatementPDFImportParser.parse(url: fixtureURL(named: "StatementOpt2.pdf"))
+        let parsed = try StatementPDFImportParser.parse(
+            lines: [
+                "For the period 12/15/2025 to 01/14/2026",
+                "01/05 STARBUCKS STORE 12345 25.00"
+            ]
+        )
         let starbucksSource = try #require(parsed.rows.first { row in
             row.count >= 2 && row[1].uppercased().contains("STARBUCKS")
         })
@@ -139,7 +173,12 @@ struct StatementPDFImportParserTests {
     }
 
     @Test func pdfRows_AfterLearning_MoveToReady() throws {
-        let parsed = try StatementPDFImportParser.parse(url: fixtureURL(named: "StatementOpt2.pdf"))
+        let parsed = try StatementPDFImportParser.parse(
+            lines: [
+                "For the period 12/15/2025 to 01/14/2026",
+                "01/05 STARBUCKS STORE 12345 25.00"
+            ]
+        )
         let starbucksSource = try #require(parsed.rows.first { row in
             row.count >= 2 && row[1].uppercased().contains("STARBUCKS")
         })
@@ -181,13 +220,18 @@ struct StatementPDFImportParserTests {
         #expect(secondPass[0].selectedCategory?.id == localCategory.id)
     }
 
-    @Test func pdfRows_RespectExplicitIncomeTypeInMapper() throws {
-        let parsed = try StatementPDFImportParser.parse(url: fixtureURL(named: "StatementOpt1.pdf"))
-        let depositSource = try #require(parsed.rows.first { row in
-            row.count >= 2 && row[1].lowercased().contains("direct deposit")
+    @Test func pdfRows_PaymentRowsMapToCreditInMapper() throws {
+        let parsed = try StatementPDFImportParser.parse(
+            lines: [
+                "Statement Period: 12/01/2025 - 01/31/2026",
+                "01/12 Payment - Thank You -45.44"
+            ]
+        )
+        let paymentSource = try #require(parsed.rows.first { row in
+            row.count >= 2 && row[1].lowercased().contains("payment")
         })
 
-        let csv = ParsedCSV(headers: parsed.headers, rows: [depositSource])
+        let csv = ParsedCSV(headers: parsed.headers, rows: [paymentSource])
         let mapped = ExpenseCSVImportMapper.map(
             csv: csv,
             categories: [],
@@ -198,7 +242,7 @@ struct StatementPDFImportParserTests {
         )
 
         #expect(mapped.count == 1)
-        #expect(mapped[0].kind == .income)
+        #expect(mapped[0].kind == .credit)
         #expect(mapped[0].bucket == .payment)
         #expect(mapped[0].includeInImport == true)
     }
@@ -222,19 +266,11 @@ struct StatementPDFImportParserTests {
         }
     }
 
-    private func parsedRows(fromFixture fileName: String) throws -> [ParsedRow] {
-        let parsed = try StatementPDFImportParser.parse(url: fixtureURL(named: fileName))
+    private func parsedRows(fromLines lines: [String]) throws -> [ParsedRow] {
+        let parsed = try StatementPDFImportParser.parse(lines: lines)
         #expect(parsed.headers == ["Date", "Description", "Amount", "Category", "Type"])
         let rows = parsed.rows.compactMap { ParsedRow(fields: $0) }
         #expect(rows.count == parsed.rows.count)
         return rows
-    }
-
-    private func fixtureURL(named fileName: String) -> URL {
-        let testsFolderURL = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-        let repoURL = testsFolderURL.deletingLastPathComponent()
-        let url = repoURL.appendingPathComponent(fileName)
-        #expect(FileManager.default.fileExists(atPath: url.path))
-        return url
     }
 }

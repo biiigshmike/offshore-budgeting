@@ -613,8 +613,15 @@ struct ExpenseImageAndPaystubImportParserTests {
     // MARK: - Paystub PDF
 
     @Test func paystubPDF_ParsesNetPayAndDate() throws {
-        let url = fixtureURL(named: "paystub.pdf")
-        let parsed = try PaystubPDFImportParser.parse(url: url)
+        let parsed = try PaystubPDFImportParser.parse(
+            text: """
+            Payroll Summary
+            Pay Period: Dec 11, 2025 - Dec 24, 2025
+            Pay Day: Dec 24, 2025
+            Gross Pay $4,284.00
+            Net Pay $2,817.83
+            """
+        )
         let rows = parsed.rows.compactMap { ParsedRow(fields: $0) }
 
         #expect(parsed.headers == ["Date", "Description", "Amount", "Category", "Type"])
@@ -652,11 +659,4 @@ struct ExpenseImageAndPaystubImportParserTests {
         }
     }
 
-    private func fixtureURL(named fileName: String) -> URL {
-        let testsFolderURL = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-        let repoURL = testsFolderURL.deletingLastPathComponent()
-        let url = repoURL.appendingPathComponent(fileName)
-        #expect(FileManager.default.fileExists(atPath: url.path))
-        return url
-    }
 }

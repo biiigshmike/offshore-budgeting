@@ -205,7 +205,7 @@ struct HomeCategoryLimitsAggregator {
                 participatingIDs.contains(category.id)
             else { continue }
 
-            variableByCategoryID[category.id, default: 0] += expense.amount
+            variableByCategoryID[category.id, default: 0] += expense.ledgerSignedAmount()
         }
 
         // 5) Build metrics in category name order (we’ll sort after status)

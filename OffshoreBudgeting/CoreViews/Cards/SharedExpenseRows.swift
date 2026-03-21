@@ -120,7 +120,7 @@ struct SharedVariableExpenseRow: View {
     }
 
     private var originalChargeAmount: Double {
-        max(0, expense.amount)
+        expense.ledgerDisplayAmount()
     }
 
     private var presentation: SharedBalancePresentation {
@@ -189,6 +189,8 @@ struct SharedVariableExpenseRow: View {
                             time: .omitted
                         )
                     )
+
+                    Text(expense.kind.displayTitle)
                 }
                 .font(.footnote)
                 .foregroundStyle(.secondary)
@@ -199,7 +201,7 @@ struct SharedVariableExpenseRow: View {
             VStack(alignment: .trailing, spacing: 2) {
                 Text(originalChargeAmount, format: CurrencyFormatter.currencyStyle())
                     .font(.headline.weight(.semibold))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(expense.kind == .credit ? .green : .primary)
                     .multilineTextAlignment(.trailing)
 
                 if let secondaryAmountSummary {

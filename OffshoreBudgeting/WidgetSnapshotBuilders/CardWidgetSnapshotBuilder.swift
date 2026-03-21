@@ -127,7 +127,7 @@ enum CardWidgetSnapshotBuilder {
         let plannedTotal = plannedIncluded.reduce(0) { partial, exp in
             partial + exp.effectiveAmount()
         }
-        let variableTotal = variableIncluded.reduce(0) { $0 + $1.amount }
+        let variableTotal = variableIncluded.reduce(0) { $0 + $1.ledgerSignedAmount() }
         let unifiedTotal = plannedTotal + variableTotal
 
         // Recent (merge planned + variable, then pick newest)
@@ -150,7 +150,7 @@ enum CardWidgetSnapshotBuilder {
             + variableIncluded.map {
                 RecentMergeItem(
                     name: $0.descriptionText,
-                    amount: $0.amount,
+                    amount: $0.ledgerSignedAmount(),
                     date: $0.transactionDate,
                     categoryHex: $0.category?.hexColor
                 )

@@ -16526,6 +16526,9 @@
         }
       }
     },
+    "Credit" : {
+      "comment" : "Variable expense kind label for credit card ledger entries."
+    },
     "Currencies" : {
       "localizations" : {
         "ar" : {
@@ -17458,6 +17461,9 @@
           }
         }
       }
+    },
+    "Debit" : {
+      "comment" : "Variable expense kind label for debit card ledger entries."
     },
     "Debug Diagnostics" : {
       "comment" : "The header text for the \"Debug Diagnostics\" section in the settings maintenance view.",

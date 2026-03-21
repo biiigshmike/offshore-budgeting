@@ -198,6 +198,7 @@ struct ExpenseCSVImportRowView: View {
                     set: { onSetKind($0) }
                 )) {
                     Text("Expense").tag(ExpenseCSVImportKind.expense)
+                    Text("Credit").tag(ExpenseCSVImportKind.credit)
                     Text("Income").tag(ExpenseCSVImportKind.income)
                 }
                 .pickerStyle(.menu)
@@ -205,10 +206,21 @@ struct ExpenseCSVImportRowView: View {
                 .fixedSize(horizontal: true, vertical: false)
                 .layoutPriority(1)
             } else {
-                Text(row.kind == .income ? "Income" : "Expense")
+                Text(kindTitle(row.kind))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
+        }
+    }
+
+    private func kindTitle(_ kind: ExpenseCSVImportKind) -> String {
+        switch kind {
+        case .expense:
+            return "Expense"
+        case .credit:
+            return "Credit"
+        case .income:
+            return "Income"
         }
     }
 

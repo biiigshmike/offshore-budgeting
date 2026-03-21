@@ -35,6 +35,7 @@ final class TransactionEntryService {
         workspace: Workspace,
         card: Card,
         category: Category?,
+        kind: VariableExpenseKind = .debit,
         allocationAccount: AllocationAccount? = nil,
         allocationAmount: Double? = nil,
         modelContext: ModelContext
@@ -51,7 +52,8 @@ final class TransactionEntryService {
 
         let expense = VariableExpense(
             descriptionText: trimmedNotes,
-            amount: amount,
+            amount: abs(amount),
+            kindRaw: kind.rawValue,
             transactionDate: date,
             workspace: workspace,
             card: card,

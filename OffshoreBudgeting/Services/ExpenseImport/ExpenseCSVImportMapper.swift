@@ -109,15 +109,16 @@ struct ExpenseCSVImportMapper {
             )
 
             var isDup = false
-            if kind == .expense {
+            if kind == .expense || kind == .credit {
                 isDup = looksLikeDuplicateExpense(
                     date: date,
                     amount: finalAmount,
                     merchant: finalMerchant,
                     category: suggestion.category,
+                    kind: kind == .credit ? .credit : .debit,
                     existing: existingExpenses
                 )
-                if !isDup {
+                if !isDup, kind == .expense {
                     isDup = looksLikeDuplicatePlannedExpense(
                         date: date,
                         amount: finalAmount,
@@ -139,7 +140,7 @@ struct ExpenseCSVImportMapper {
                 bucket = .possibleDuplicate
                 includeDefault = false
                 selectedCategory = suggestion.category
-            } else if kind == .income {
+            } else if kind == .income || kind == .credit {
                 bucket = .payment
                 includeDefault = true
                 selectedCategory = nil
@@ -204,13 +205,17 @@ struct ExpenseCSVImportMapper {
         categoryText: String?
     ) -> ExpenseCSVImportKind {
         let t = (typeText ?? "").lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        let desc = descriptionText.lowercased()
+        let cat = (categoryText ?? "").lowercased()
 
         if !t.isEmpty {
             if t.contains("expense") { return .expense }
-            if t.contains("income") { return .income }
+            if t.contains("income") {
+                return resolvePositiveFlowKind(descriptionText: desc, categoryText: cat, fallback: .income) ?? .income
+            }
             if t.contains("purchase") || t.contains("debit") { return .expense }
-            if t.contains("payment") || t.contains("credit") { return .income }
-            if t.contains("refund") || t.contains("reversal") { return .income }
+            if t.contains("payment") || t.contains("credit") { return .credit }
+            if t.contains("refund") || t.contains("reversal") { return .credit }
             if t.contains("fee") || t.contains("interest") { return .expense }
         }
 
@@ -218,21 +223,45 @@ struct ExpenseCSVImportMapper {
         if rawAmount < 0 { return .expense }
 
         // Heuristics for exports that use unsigned amounts.
-        let desc = descriptionText.lowercased()
-        let cat = (categoryText ?? "").lowercased()
-
-        if desc.contains("payment") || desc.contains("autopay") || desc.contains("online payment") { return .income }
-        if desc.contains("deposit") || desc.contains("direct deposit") { return .income }
-        if cat.contains("payment") { return .income }
-        if cat.contains("income") || cat.contains("deposit") { return .income }
-
-        if desc.contains("refund") || desc.contains("reversal") { return .income }
-        if cat.contains("refund") || cat.contains("reversal") { return .income }
+        let positiveKind = resolvePositiveFlowKind(descriptionText: desc, categoryText: cat, fallback: nil)
+        if let positiveKind { return positiveKind }
 
         if desc.contains("fee") || desc.contains("interest") { return .expense }
 
         // Default for this flow: treat unsigned amounts as expenses.
         return .expense
+    }
+
+    private static func resolvePositiveFlowKind(
+        descriptionText: String,
+        categoryText: String,
+        fallback: ExpenseCSVImportKind?
+    ) -> ExpenseCSVImportKind? {
+        if descriptionText.contains("direct deposit")
+            || descriptionText.contains("payroll")
+            || descriptionText.contains("paycheck")
+            || descriptionText.contains("deposit")
+            || categoryText.contains("income")
+            || categoryText.contains("deposit")
+            || categoryText.contains("payroll") {
+            return .income
+        }
+
+        if descriptionText.contains("payment")
+            || descriptionText.contains("autopay")
+            || descriptionText.contains("online payment")
+            || descriptionText.contains("automatic payment")
+            || descriptionText.contains("statement credit")
+            || descriptionText.contains("refund")
+            || descriptionText.contains("reversal")
+            || categoryText.contains("payment")
+            || categoryText.contains("refund")
+            || categoryText.contains("reversal")
+            || categoryText.contains("credit") {
+            return .credit
+        }
+
+        return fallback
     }
 
     // MARK: - Header mapping
@@ -421,6 +450,7 @@ struct ExpenseCSVImportMapper {
         amount: Double,
         merchant: String,
         category: Category?,
+        kind: VariableExpenseKind,
         existing: [VariableExpense]
     ) -> Bool {
         let cal = Calendar.current
@@ -433,6 +463,7 @@ struct ExpenseCSVImportMapper {
 
         for e in existing {
             if abs(e.amount - amount) > 0.0001 { continue }
+            if e.kind != kind { continue }
             let eDay = cal.startOfDay(for: e.transactionDate)
             if !candidateDays.contains(eDay) { continue }
 

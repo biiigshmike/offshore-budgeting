@@ -243,6 +243,22 @@ enum TransactionType: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+enum VariableExpenseKind: String, CaseIterable, Identifiable {
+    case debit
+    case credit
+
+    var id: String { rawValue }
+
+    var displayTitle: String {
+        switch self {
+        case .debit:
+            return String(localized: "Debit", defaultValue: "Debit", comment: "Variable expense kind label for debit card ledger entries.")
+        case .credit:
+            return String(localized: "Credit", defaultValue: "Credit", comment: "Variable expense kind label for credit card ledger entries.")
+        }
+    }
+}
+
 enum ExpenseScope: String, Identifiable {
     case planned
     case variable
@@ -677,6 +693,7 @@ final class VariableExpense {
     var id: UUID = UUID()
     var descriptionText: String = ""
     var amount: Double = 0
+    var kindRaw: String = VariableExpenseKind.debit.rawValue
     var transactionDate: Date = Date.now
 
     @Relationship(inverse: \Workspace.variableExpenses)
@@ -707,6 +724,7 @@ final class VariableExpense {
         id: UUID = UUID(),
         descriptionText: String,
         amount: Double,
+        kindRaw: String = VariableExpenseKind.debit.rawValue,
         transactionDate: Date,
         workspace: Workspace? = nil,
         card: Card? = nil,
@@ -715,10 +733,32 @@ final class VariableExpense {
         self.id = id
         self.descriptionText = descriptionText
         self.amount = amount
+        self.kindRaw = kindRaw
         self.transactionDate = transactionDate
         self.workspace = workspace
         self.card = card
         self.category = category
+    }
+}
+
+extension VariableExpense {
+    var kind: VariableExpenseKind {
+        get { VariableExpenseKind(rawValue: kindRaw) ?? .debit }
+        set { kindRaw = newValue.rawValue }
+    }
+
+    nonisolated func ledgerSignedAmount() -> Double {
+        let normalizedAmount = abs(amount)
+        switch kind {
+        case .debit:
+            return normalizedAmount
+        case .credit:
+            return -normalizedAmount
+        }
+    }
+
+    nonisolated func ledgerDisplayAmount() -> Double {
+        abs(amount)
     }
 }
 

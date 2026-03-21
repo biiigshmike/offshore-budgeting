@@ -2896,7 +2896,7 @@ struct HomeAssistantPanelView: View {
     }
     
     private func expenseDisplayLabel(_ expense: VariableExpense) -> String {
-        "\(CurrencyFormatter.string(from: expense.amount)) • \(expense.descriptionText) • \(shortDate(expense.transactionDate))"
+        "\(CurrencyFormatter.string(from: expense.ledgerSignedAmount())) • \(expense.descriptionText) • \(shortDate(expense.transactionDate))"
     }
     
     private func incomeDisplayLabel(_ income: Income) -> String {
@@ -4978,7 +4978,7 @@ private final class HomeAssistantMutationService {
             title: "Expense updated",
             subtitle: "Your expense entry was updated.",
             rows: [
-                HomeAnswerRow(title: "Amount", value: CurrencyFormatter.string(from: expense.amount)),
+                HomeAnswerRow(title: "Amount", value: CurrencyFormatter.string(from: expense.ledgerSignedAmount())),
                 HomeAnswerRow(title: "Description", value: expense.descriptionText),
                 HomeAnswerRow(title: "Date", value: AppDateFormat.abbreviatedDate(expense.transactionDate))
             ]

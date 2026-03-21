@@ -68,7 +68,10 @@ struct SavingsMathService {
     // MARK: - Budget Impact
 
     static func variableBudgetImpactAmount(for expense: VariableExpense) -> Double {
-        max(0, ownedAmount(for: expense) - offsetAmount(for: expense))
+        if expense.kind == .credit {
+            return expense.ledgerSignedAmount()
+        }
+        return max(0, ownedAmount(for: expense) - offsetAmount(for: expense))
     }
 
     static func plannedProjectedBudgetImpactAmount(for expense: PlannedExpense) -> Double {

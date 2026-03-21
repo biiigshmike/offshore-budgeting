@@ -58,7 +58,7 @@ struct ReviewTodaysSpendingIntent: AppIntent {
                 let variableExpenses = try modelContext.fetch(variableDescriptor)
                 let plannedExpenses = try modelContext.fetch(plannedDescriptor)
 
-                let variableTotal = variableExpenses.reduce(0.0) { $0 + $1.amount }
+                let variableTotal = variableExpenses.reduce(0.0) { $0 + $1.ledgerSignedAmount() }
                 let plannedTotal = plannedExpenses.reduce(0.0) { $0 + $1.effectiveAmount() }
                 let total = variableTotal + plannedTotal
 
@@ -68,7 +68,7 @@ struct ReviewTodaysSpendingIntent: AppIntent {
                 var totalsByCardName: [String: Double] = [:]
                 for expense in variableExpenses {
                     let cardName = expense.card?.name ?? "Unknown Card"
-                    totalsByCardName[cardName, default: 0] += expense.amount
+                    totalsByCardName[cardName, default: 0] += expense.ledgerSignedAmount()
                 }
                 for expense in plannedExpenses {
                     let cardName = expense.card?.name ?? "Unknown Card"

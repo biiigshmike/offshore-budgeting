@@ -64,11 +64,33 @@ struct OffshoreBudgetingTests {
         #expect(rows[0].selectedCategory?.name == "Transportation-Fuel")
     }
 
-    @Test func import_PaymentHeuristicMarksIncomeWhenUnsigned() {
+    @Test func import_PaymentHeuristicMarksCreditWhenUnsigned() {
         let parsed = ParsedCSV(
             headers: ["Date", "Description", "Amount", "Category"],
             rows: [
                 ["11/10/2025", "Payment - Thank You", "45.44", ""]
+            ]
+        )
+
+        let rows = ExpenseCSVImportMapper.map(
+            csv: parsed,
+            categories: [],
+            existingExpenses: [],
+            existingPlannedExpenses: [],
+            existingIncomes: [],
+            learnedRules: [:]
+        )
+
+        #expect(rows.count == 1)
+        #expect(rows[0].kind == .credit)
+        #expect(rows[0].bucket == .payment)
+    }
+
+    @Test func import_DirectDepositStaysIncomeWhenUnsigned() {
+        let parsed = ParsedCSV(
+            headers: ["Date", "Description", "Amount", "Category"],
+            rows: [
+                ["11/10/2025", "Direct Deposit Payroll", "2817.83", ""]
             ]
         )
 
@@ -434,5 +456,39 @@ struct OffshoreBudgetingTests {
         #expect(expense.offsetSettlement?.id == offsetSettlement.id)
         #expect(offsetSettlement.amount == -20)
         #expect(offsetSettlement.account?.id == account.id)
+    }
+
+    @MainActor
+    @Test func importCommit_CreditCreatesCreditLedgerEntryInsteadOfIncome() throws {
+        let context = try makeContext()
+        let workspace = Workspace(name: "WS", hexColor: "#3B82F6")
+        let card = Card(name: "Visa", workspace: workspace)
+
+        context.insert(workspace)
+        context.insert(card)
+        try context.save()
+
+        let vm = ExpenseCSVImportViewModel(mode: .cardTransactions)
+        vm.prepare(workspace: workspace, modelContext: context)
+        vm.loadClipboard(
+            text: "Date,Description,Amount,Category\n02/10/2026,Payment - Thank You,50.00,",
+            workspace: workspace,
+            card: card,
+            modelContext: context
+        )
+
+        let row = try #require(vm.rows.first)
+        #expect(row.kind == .credit)
+
+        vm.commitImport(workspace: workspace, card: card, modelContext: context)
+
+        let expenses = try context.fetch(FetchDescriptor<VariableExpense>())
+        let incomes = try context.fetch(FetchDescriptor<Income>())
+
+        let savedExpense = try #require(expenses.first)
+        #expect(savedExpense.kind == .credit)
+        #expect(savedExpense.amount == 50)
+        #expect(savedExpense.card?.id == card.id)
+        #expect(incomes.isEmpty)
     }
 }

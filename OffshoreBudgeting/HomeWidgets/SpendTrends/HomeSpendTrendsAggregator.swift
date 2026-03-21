@@ -382,7 +382,7 @@ struct HomeSpendTrendsAggregator {
 
         for expense in variableExpenses {
             let id = expense.category?.id
-            totals[id, default: 0] += expense.amount
+            totals[id, default: 0] += expense.ledgerSignedAmount()
         }
 
         for category in categories {

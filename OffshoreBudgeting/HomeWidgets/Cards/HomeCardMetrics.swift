@@ -46,7 +46,7 @@ enum HomeCardMetricsCalculator {
         )
 
         let variable = variableIncluded
-            .reduce(0) { $0 + $1.amount }
+            .reduce(0) { $0 + $1.ledgerSignedAmount() }
 
         return HomeCardMetrics(
             plannedTotal: planned,

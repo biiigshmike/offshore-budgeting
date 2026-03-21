@@ -307,7 +307,7 @@ struct ExpenseCSVImportFlowView: View {
     }
 
     private var paymentSectionTitle: String {
-        mode == .cardTransactions ? "Income / Payments" : "Income"
+        mode == .cardTransactions ? "Credits / Income" : "Income"
     }
 
     private var idlePromptText: String {

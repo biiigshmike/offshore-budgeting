@@ -26,6 +26,7 @@ struct EditExpenseView: View {
     @State private var descriptionText: String = ""
     @State private var amountText: String = ""
     @State private var transactionDate: Date = .now
+    @State private var transactionKind: VariableExpenseKind = .debit
     @State private var selectedCardID: UUID? = nil
     @State private var selectedCategoryID: UUID? = nil
     @State private var selectedAllocationAccountID: UUID? = nil
@@ -96,6 +97,7 @@ struct EditExpenseView: View {
             descriptionText: $descriptionText,
             amountText: $amountText,
             transactionDate: $transactionDate,
+            transactionKind: $transactionKind,
             selectedCardID: $selectedCardID,
             selectedCategoryID: $selectedCategoryID,
             selectedAllocationAccountID: $selectedAllocationAccountID,
@@ -162,6 +164,7 @@ struct EditExpenseView: View {
             let existingOffset = max(0, -(expense.offsetSettlement?.amount ?? 0))
             amountText = CurrencyFormatter.editingString(from: SavingsMathService.variableGrossAmount(for: expense) + existingOffset)
             transactionDate = expense.transactionDate
+            transactionKind = expense.kind
             selectedCardID = expense.card?.id
             selectedCategoryID = expense.category?.id
             selectedAllocationAccountID = expense.allocation?.account?.id
@@ -306,6 +309,7 @@ struct EditExpenseView: View {
         // SwiftData models are reference types, so updating properties is enough.
         expense.descriptionText = trimmedDesc
         expense.amount = amountToSave
+        expense.kind = transactionKind
         expense.transactionDate = transactionDate
         expense.workspace = workspace
         expense.card = selectedCard

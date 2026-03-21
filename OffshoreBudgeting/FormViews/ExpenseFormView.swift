@@ -39,6 +39,7 @@ struct ExpenseFormView: View {
     @Binding var descriptionText: String
     @Binding var amountText: String
     @Binding var transactionDate: Date
+    @Binding var transactionKind: VariableExpenseKind
     @Binding var selectedCardID: UUID?
     @Binding var selectedCategoryID: UUID?
     @Binding var selectedAllocationAccountID: UUID?
@@ -227,6 +228,13 @@ struct ExpenseFormView: View {
 
             TextField("Amount", text: $amountText)
                 .keyboardType(.decimalPad)
+
+            Picker("Type", selection: $transactionKind) {
+                ForEach(VariableExpenseKind.allCases) { kind in
+                    Text(kind.displayTitle).tag(kind)
+                }
+            }
+            .pickerStyle(.segmented)
 
             HStack {
                 Text("Date")

@@ -8,6 +8,12 @@
 import Foundation
 import PDFKit
 
+private func statementPDFNormalizeWhitespace(_ text: String) -> String {
+    text
+        .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+}
+
 enum StatementPDFImportParserError: LocalizedError {
     case unreadableFile
     case emptyDocument
@@ -41,17 +47,24 @@ struct StatementPDFImportParser {
             throw StatementPDFImportParserError.unreadableFile
         }
 
-        let lines = normalizedLines(from: document)
-        guard !lines.isEmpty else {
+        return try parse(lines: normalizedLines(from: document))
+    }
+
+    static func parse(lines: [String]) throws -> ParsedCSV {
+        let normalized = lines
+            .map(statementPDFNormalizeWhitespace)
+            .filter { !$0.isEmpty }
+
+        guard !normalized.isEmpty else {
             throw StatementPDFImportParserError.emptyDocument
         }
 
-        let context = StatementDateContext(lines: lines)
+        let context = StatementDateContext(lines: normalized)
 
         var rows: [[String]] = []
-        rows.reserveCapacity(lines.count / 3)
+        rows.reserveCapacity(normalized.count / 3)
 
-        for line in lines {
+        for line in normalized {
             guard let row = parseTransactionLine(line, context: context) else { continue }
             rows.append([row.date, row.description, row.amount, row.category, row.type])
         }
@@ -89,7 +102,7 @@ struct StatementPDFImportParser {
         for pageIndex in 0..<document.pageCount {
             guard let page = document.page(at: pageIndex), let text = page.string else { continue }
             for raw in text.components(separatedBy: .newlines) {
-                let normalized = normalizeWhitespace(raw)
+                let normalized = statementPDFNormalizeWhitespace(raw)
                 if normalized.isEmpty { continue }
                 lines.append(normalized)
             }
@@ -112,7 +125,7 @@ struct StatementPDFImportParser {
             return nil
         }
 
-        let remainder = normalizeWhitespace(String(line[remainderRange]))
+        let remainder = statementPDFNormalizeWhitespace(String(line[remainderRange]))
         guard !remainder.isEmpty else { return nil }
 
         let amountMatches = matches(remainder, regex: amountRegex)
@@ -124,7 +137,7 @@ struct StatementPDFImportParser {
 
         let nsRemainder = remainder as NSString
         let descriptionRaw = nsRemainder.replacingCharacters(in: selectedAmountMatch.range(at: 0), with: " ")
-        let description = normalizeWhitespace(descriptionRaw)
+        let description = statementPDFNormalizeWhitespace(descriptionRaw)
         guard !description.isEmpty else { return nil }
         guard description.rangeOfCharacter(from: .letters) != nil else { return nil }
         guard !looksLikeSummary(description) else { return nil }
@@ -429,12 +442,6 @@ struct StatementPDFImportParser {
     private static func substring(from text: String, nsRange: NSRange) -> String {
         guard let range = Range(nsRange, in: text) else { return "" }
         return String(text[range])
-    }
-
-    private static func normalizeWhitespace(_ text: String) -> String {
-        text
-            .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     // MARK: - Formatters

@@ -41,16 +41,20 @@ struct PaystubPDFImportParser {
             throw PaystubPDFImportParserError.unreadableFile
         }
 
-        let text = extractedText(from: document)
-        guard !text.isEmpty else {
+        return try parse(text: extractedText(from: document))
+    }
+
+    static func parse(text: String) throws -> ParsedCSV {
+        let normalizedText = normalizeWhitespace(text)
+        guard !normalizedText.isEmpty else {
             throw PaystubPDFImportParserError.noTextFound
         }
 
-        guard let amount = extractNetPayAmount(from: text) else {
+        guard let amount = extractNetPayAmount(from: normalizedText) else {
             throw PaystubPDFImportParserError.netPayNotFound
         }
 
-        let dateText = extractPayDate(from: text) ?? outputDateFormatter.string(from: .now)
+        let dateText = extractPayDate(from: normalizedText) ?? outputDateFormatter.string(from: .now)
 
         return ParsedCSV(
             headers: ["Date", "Description", "Amount", "Category", "Type"],

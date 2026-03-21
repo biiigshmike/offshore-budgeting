@@ -89,12 +89,13 @@ final class ExpenseCSVImportViewModel: ObservableObject {
     var commitSummaryText: String {
         let included = rows.filter { $0.includeInImport && hasValidReconciliationConfiguration($0) }
         let expCount = included.filter { $0.kind == .expense && !$0.isMissingRequiredData }.count
+        let creditCount = included.filter { $0.kind == .credit && !$0.isMissingRequiredData }.count
         let incCount = included.filter { $0.kind == .income && !$0.isMissingRequiredData }.count
         let blockedCount = blockedRows.count
 
         switch mode {
         case .cardTransactions:
-            return "\(localizedInt(expCount)) expenses, \(localizedInt(incCount)) incomes will be imported."
+            return "\(localizedInt(expCount)) expenses, \(localizedInt(creditCount)) credits, \(localizedInt(incCount)) incomes will be imported."
         case .incomeOnly:
             if blockedCount > 0 {
                 return "\(localizedInt(incCount)) incomes will be imported. \(localizedInt(blockedCount)) expense rows were skipped."
@@ -274,12 +275,13 @@ final class ExpenseCSVImportViewModel: ObservableObject {
 
         // Recompute duplicate hint since category can be used as a fallback signal.
         let normalized = MerchantNormalizer.normalizeKey(rows[idx].finalMerchant)
-        if rows[idx].kind == .expense {
+        if rows[idx].kind == .expense || rows[idx].kind == .credit {
             rows[idx].isDuplicateHint = looksLikeDuplicateExpense(
                 date: rows[idx].finalDate,
                 amount: rows[idx].finalAmount,
                 merchantKey: normalized,
-                categoryID: rows[idx].selectedCategory?.id
+                categoryID: rows[idx].selectedCategory?.id,
+                kind: rows[idx].kind == .credit ? .credit : .debit
             )
         } else {
             rows[idx].isDuplicateHint = looksLikeDuplicateIncome(date: rows[idx].finalDate, amount: rows[idx].finalAmount, merchantKey: normalized)
@@ -295,12 +297,13 @@ final class ExpenseCSVImportViewModel: ObservableObject {
 
         // Recompute duplicate hint based on the edited merchant.
         let normalized = MerchantNormalizer.normalizeKey(merchant)
-        if rows[idx].kind == .expense {
+        if rows[idx].kind == .expense || rows[idx].kind == .credit {
             rows[idx].isDuplicateHint = looksLikeDuplicateExpense(
                 date: rows[idx].finalDate,
                 amount: rows[idx].finalAmount,
                 merchantKey: normalized,
-                categoryID: rows[idx].selectedCategory?.id
+                categoryID: rows[idx].selectedCategory?.id,
+                kind: rows[idx].kind == .credit ? .credit : .debit
             )
         } else {
             rows[idx].isDuplicateHint = looksLikeDuplicateIncome(date: rows[idx].finalDate, amount: rows[idx].finalAmount, merchantKey: normalized)
@@ -316,12 +319,13 @@ final class ExpenseCSVImportViewModel: ObservableObject {
         rows[idx].finalAmount = CurrencyFormatter.roundedToCurrency(parsed)
 
         let normalized = MerchantNormalizer.normalizeKey(rows[idx].finalMerchant)
-        if rows[idx].kind == .expense {
+        if rows[idx].kind == .expense || rows[idx].kind == .credit {
             rows[idx].isDuplicateHint = looksLikeDuplicateExpense(
                 date: rows[idx].finalDate,
                 amount: rows[idx].finalAmount,
                 merchantKey: normalized,
-                categoryID: rows[idx].selectedCategory?.id
+                categoryID: rows[idx].selectedCategory?.id,
+                kind: rows[idx].kind == .credit ? .credit : .debit
             )
         } else {
             rows[idx].isDuplicateHint = looksLikeDuplicateIncome(
@@ -339,12 +343,13 @@ final class ExpenseCSVImportViewModel: ObservableObject {
         rows[idx].finalDate = Calendar.current.startOfDay(for: date)
 
         let normalized = MerchantNormalizer.normalizeKey(rows[idx].finalMerchant)
-        if rows[idx].kind == .expense {
+        if rows[idx].kind == .expense || rows[idx].kind == .credit {
             rows[idx].isDuplicateHint = looksLikeDuplicateExpense(
                 date: rows[idx].finalDate,
                 amount: rows[idx].finalAmount,
                 merchantKey: normalized,
-                categoryID: rows[idx].selectedCategory?.id
+                categoryID: rows[idx].selectedCategory?.id,
+                kind: rows[idx].kind == .credit ? .credit : .debit
             )
         } else {
             rows[idx].isDuplicateHint = looksLikeDuplicateIncome(
@@ -365,7 +370,7 @@ final class ExpenseCSVImportViewModel: ObservableObject {
         let wasIncluded = rows[idx].includeInImport
         rows[idx].kind = kind
 
-        if kind == .income {
+        if kind == .income || kind == .credit {
             rows[idx].selectedCategory = nil
             rows[idx].setReconciliationAction(.none)
             rows[idx].bucket = .payment
@@ -376,14 +381,15 @@ final class ExpenseCSVImportViewModel: ObservableObject {
         }
 
         let normalized = MerchantNormalizer.normalizeKey(rows[idx].finalMerchant)
-        if rows[idx].kind == .expense {
+        if rows[idx].kind == .expense || rows[idx].kind == .credit {
             rows[idx].isDuplicateHint = looksLikeDuplicateExpense(
                 date: rows[idx].finalDate,
                 amount: rows[idx].finalAmount,
                 merchantKey: normalized,
-                categoryID: rows[idx].selectedCategory?.id
+                categoryID: rows[idx].selectedCategory?.id,
+                kind: rows[idx].kind == .credit ? .credit : .debit
             )
-            rows[idx].bucket = bucketForExpenseRow(rows[idx])
+            rows[idx].bucket = rows[idx].kind == .expense ? bucketForExpenseRow(rows[idx]) : .payment
         } else {
             rows[idx].isDuplicateHint = looksLikeDuplicateIncome(date: rows[idx].finalDate, amount: rows[idx].finalAmount, merchantKey: normalized)
             rows[idx].bucket = .payment
@@ -449,6 +455,7 @@ final class ExpenseCSVImportViewModel: ObservableObject {
                 let exp = VariableExpense(
                     descriptionText: row.finalMerchant,
                     amount: amountToSave,
+                    kindRaw: VariableExpenseKind.debit.rawValue,
                     transactionDate: row.finalDate,
                     workspace: workspace,
                     card: card,
@@ -513,6 +520,19 @@ final class ExpenseCSVImportViewModel: ObservableObject {
                         )
                     }
                 }
+
+            case .credit:
+                guard let card else { continue }
+                let exp = VariableExpense(
+                    descriptionText: row.finalMerchant,
+                    amount: row.finalAmount,
+                    kindRaw: VariableExpenseKind.credit.rawValue,
+                    transactionDate: row.finalDate,
+                    workspace: workspace,
+                    card: card,
+                    category: nil
+                )
+                modelContext.insert(exp)
 
             case .income:
                 let inc = Income(
@@ -597,8 +617,8 @@ final class ExpenseCSVImportViewModel: ObservableObject {
             return rows.map { row in
                 var updated = row
 
-                if updated.kind == .expense {
-                    updated.blockedReason = "Expense rows are skipped when importing from Income."
+                if updated.kind == .expense || updated.kind == .credit {
+                    updated.blockedReason = "Expense and credit rows are skipped when importing from Income."
                     updated.includeInImport = false
                     updated.rememberMapping = false
                     return updated
@@ -611,6 +631,10 @@ final class ExpenseCSVImportViewModel: ObservableObject {
     }
 
     private func looksLikeDuplicateExpense(date: Date, amount: Double, merchantKey: String, categoryID: UUID?) -> Bool {
+        looksLikeDuplicateExpense(date: date, amount: amount, merchantKey: merchantKey, categoryID: categoryID, kind: .debit)
+    }
+
+    private func looksLikeDuplicateExpense(date: Date, amount: Double, merchantKey: String, categoryID: UUID?, kind: VariableExpenseKind) -> Bool {
         let cal = Calendar.current
         let day = cal.startOfDay(for: date)
         let candidateDays = candidateDaysSet(around: day, calendar: cal, windowDays: duplicateDayWindow)
@@ -620,6 +644,7 @@ final class ExpenseCSVImportViewModel: ObservableObject {
 
         for e in existingExpenses {
             if abs(e.amount - amount) > 0.0001 { continue }
+            if e.kind != kind { continue }
             let eDay = cal.startOfDay(for: e.transactionDate)
             if !candidateDays.contains(eDay) { continue }
 
