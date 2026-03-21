@@ -19,6 +19,7 @@ enum ExpenseCSVImportKind: String, Hashable {
     case expense
     case income
     case credit
+    case adjustment
 }
 
 enum ExpenseCSVImportReconciliationAction: String, CaseIterable, Hashable, Identifiable {

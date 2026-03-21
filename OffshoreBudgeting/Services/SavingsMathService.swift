@@ -71,6 +71,9 @@ struct SavingsMathService {
         if expense.kind == .credit {
             return expense.ledgerSignedAmount()
         }
+        if expense.kind == .adjustment {
+            return 0
+        }
         return max(0, ownedAmount(for: expense) - offsetAmount(for: expense))
     }
 

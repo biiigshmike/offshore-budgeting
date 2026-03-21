@@ -184,13 +184,8 @@ struct SharedVariableExpenseRow: View {
 
                 HStack(spacing: 6) {
                     Text(
-                        expense.transactionDate.formatted(
-                            date: .abbreviated,
-                            time: .omitted
-                        )
+                        "\(expense.transactionDate.formatted(date: .abbreviated, time: .omitted)) • \(expense.kind.displayTitle)"
                     )
-
-                    Text(expense.kind.displayTitle)
                 }
                 .font(.footnote)
                 .foregroundStyle(.secondary)

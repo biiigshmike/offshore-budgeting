@@ -1811,10 +1811,7 @@ private struct BudgetVariableExpenseRow: View {
                     .font(.body)
 
                 HStack(spacing: 8) {
-                    Text(AppDateFormat.abbreviatedDate(expense.transactionDate))
-
-                    Text("•")
-                    Text(expense.kind.displayTitle)
+                    Text("\(AppDateFormat.abbreviatedDate(expense.transactionDate)) • \(expense.kind.displayTitle)")
 
                     if showsCardName, let cardName = expense.card?.name {
                         Text("•")

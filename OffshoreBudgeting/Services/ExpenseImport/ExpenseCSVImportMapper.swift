@@ -109,13 +109,13 @@ struct ExpenseCSVImportMapper {
             )
 
             var isDup = false
-            if kind == .expense || kind == .credit {
+            if kind == .expense || kind == .credit || kind == .adjustment {
                 isDup = looksLikeDuplicateExpense(
                     date: date,
                     amount: finalAmount,
                     merchant: finalMerchant,
                     category: suggestion.category,
-                    kind: kind == .credit ? .credit : .debit,
+                    kind: variableExpenseKind(for: kind),
                     existing: existingExpenses
                 )
                 if !isDup, kind == .expense {
@@ -140,7 +140,7 @@ struct ExpenseCSVImportMapper {
                 bucket = .possibleDuplicate
                 includeDefault = false
                 selectedCategory = suggestion.category
-            } else if kind == .income || kind == .credit {
+            } else if kind == .income || kind == .credit || kind == .adjustment {
                 bucket = .payment
                 includeDefault = true
                 selectedCategory = nil
@@ -213,6 +213,7 @@ struct ExpenseCSVImportMapper {
             if t.contains("income") {
                 return resolvePositiveFlowKind(descriptionText: desc, categoryText: cat, fallback: .income) ?? .income
             }
+            if t.contains("adjustment") { return .adjustment }
             if t.contains("purchase") || t.contains("debit") { return .expense }
             if t.contains("payment") || t.contains("credit") { return .credit }
             if t.contains("refund") || t.contains("reversal") { return .credit }
@@ -247,6 +248,12 @@ struct ExpenseCSVImportMapper {
             return .income
         }
 
+        if descriptionText.contains("daily cash adjustment")
+            || descriptionText.contains("cash adjustment")
+            || categoryText.contains("adjustment") {
+            return .adjustment
+        }
+
         if descriptionText.contains("payment")
             || descriptionText.contains("autopay")
             || descriptionText.contains("online payment")
@@ -262,6 +269,19 @@ struct ExpenseCSVImportMapper {
         }
 
         return fallback
+    }
+
+    private static func variableExpenseKind(for kind: ExpenseCSVImportKind) -> VariableExpenseKind {
+        switch kind {
+        case .expense:
+            return .debit
+        case .credit:
+            return .credit
+        case .adjustment:
+            return .adjustment
+        case .income:
+            return .debit
+        }
     }
 
     // MARK: - Header mapping

@@ -309,7 +309,7 @@ struct CardDetailView: View {
         )
         let plannedExpensesForCalculations = sortPlannedExpenses(plannedIncluded, by: sortMode)
 
-        let variableTotal = variableExpensesForCalculations.reduce(0) { $0 + $1.ledgerSignedAmount() }
+        let variableTotal = variableExpensesForCalculations.reduce(0) { $0 + $1.spendingAmount() }
         let plannedTotal = plannedExpensesForCalculations.reduce(0) { $0 + plannedEffectiveAmount($1) }
         let unifiedTotal = variableTotal + plannedTotal
 
@@ -392,14 +392,14 @@ struct CardDetailView: View {
             }
         case .variable:
             for expense in variableExpensesForCalculations {
-                add(category: expense.category, amount: expense.ledgerSignedAmount())
+                add(category: expense.category, amount: expense.spendingAmount())
             }
         case .unified:
             for expense in plannedExpensesForCalculations {
                 add(category: expense.category, amount: plannedEffectiveAmount(expense))
             }
             for expense in variableExpensesForCalculations {
-                add(category: expense.category, amount: expense.ledgerSignedAmount())
+                add(category: expense.category, amount: expense.spendingAmount())
             }
         }
 
@@ -1034,9 +1034,9 @@ struct CardDetailView: View {
         case .za:
             return expenses.sorted { $0.descriptionText.localizedCaseInsensitiveCompare($1.descriptionText) == .orderedDescending }
         case .amountAsc:
-            return expenses.sorted { $0.amount < $1.amount }
+            return expenses.sorted { $0.ledgerDisplayAmount() < $1.ledgerDisplayAmount() }
         case .amountDesc:
-            return expenses.sorted { $0.amount > $1.amount }
+            return expenses.sorted { $0.ledgerDisplayAmount() > $1.ledgerDisplayAmount() }
         case .dateAsc:
             return expenses.sorted { $0.transactionDate < $1.transactionDate }
         case .dateDesc:
@@ -1072,9 +1072,9 @@ struct CardDetailView: View {
         case .za:
             return items.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedDescending }
         case .amountAsc:
-            return items.sorted { $0.amount < $1.amount }
+            return items.sorted { $0.sortAmount < $1.sortAmount }
         case .amountDesc:
-            return items.sorted { $0.amount > $1.amount }
+            return items.sorted { $0.sortAmount > $1.sortAmount }
         case .dateAsc:
             return items.sorted { $0.date < $1.date }
         case .dateDesc:
@@ -1245,10 +1245,10 @@ private enum UnifiedExpenseItem: Identifiable {
         }
     }
 
-    var amount: Double {
+    var sortAmount: Double {
         switch self {
         case .planned(let e): return e.effectiveAmount()
-        case .variable(let e): return e.ledgerSignedAmount()
+        case .variable(let e): return e.ledgerDisplayAmount()
         }
     }
 
@@ -1269,7 +1269,15 @@ private enum UnifiedExpenseItem: Identifiable {
     var kindLabel: String {
         switch self {
         case .planned: return "Planned"
-        case .variable(let e): return e.kind == .credit ? "Credit" : "Variable"
+        case .variable(let e):
+            switch e.kind {
+            case .credit:
+                return "Credit"
+            case .adjustment:
+                return "Adjustment"
+            case .debit:
+                return "Variable"
+            }
         }
     }
 }

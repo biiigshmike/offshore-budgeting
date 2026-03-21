@@ -246,6 +246,7 @@ enum TransactionType: String, CaseIterable, Identifiable {
 enum VariableExpenseKind: String, CaseIterable, Identifiable {
     case debit
     case credit
+    case adjustment
 
     var id: String { rawValue }
 
@@ -255,6 +256,8 @@ enum VariableExpenseKind: String, CaseIterable, Identifiable {
             return String(localized: "Debit", defaultValue: "Debit", comment: "Variable expense kind label for debit card ledger entries.")
         case .credit:
             return String(localized: "Credit", defaultValue: "Credit", comment: "Variable expense kind label for credit card ledger entries.")
+        case .adjustment:
+            return String(localized: "Adjustment", defaultValue: "Adjustment", comment: "Variable expense kind label for balance-affecting non-spend card ledger entries.")
         }
     }
 }
@@ -747,6 +750,11 @@ extension VariableExpense {
         set { kindRaw = newValue.rawValue }
     }
 
+    nonisolated func spendingAmount() -> Double {
+        guard kind == .debit else { return 0 }
+        return abs(amount)
+    }
+
     nonisolated func ledgerSignedAmount() -> Double {
         let normalizedAmount = abs(amount)
         switch kind {
@@ -754,6 +762,8 @@ extension VariableExpense {
             return normalizedAmount
         case .credit:
             return -normalizedAmount
+        case .adjustment:
+            return normalizedAmount
         }
     }
 

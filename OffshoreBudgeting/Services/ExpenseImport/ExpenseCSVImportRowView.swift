@@ -199,6 +199,7 @@ struct ExpenseCSVImportRowView: View {
                 )) {
                     Text("Expense").tag(ExpenseCSVImportKind.expense)
                     Text("Credit").tag(ExpenseCSVImportKind.credit)
+                    Text("Adjustment").tag(ExpenseCSVImportKind.adjustment)
                     Text("Income").tag(ExpenseCSVImportKind.income)
                 }
                 .pickerStyle(.menu)
@@ -219,6 +220,8 @@ struct ExpenseCSVImportRowView: View {
             return "Expense"
         case .credit:
             return "Credit"
+        case .adjustment:
+            return "Adjustment"
         case .income:
             return "Income"
         }

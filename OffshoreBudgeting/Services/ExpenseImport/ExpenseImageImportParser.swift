@@ -506,6 +506,10 @@ struct ExpenseImageImportParser {
     private static func inferType(description: String, amount: Double) -> String {
         let lower = description.lowercased()
 
+        if adjustmentKeywords.contains(where: { lower.contains($0) }) {
+            return "adjustment"
+        }
+
         if lower.contains("payment") {
             if incomePaymentHints.contains(where: { lower.contains($0) }) {
                 return "income"
@@ -556,7 +560,10 @@ struct ExpenseImageImportParser {
         "refund",
         "reversal",
         "take home pay",
-        "paycheck",
+        "paycheck"
+    ]
+
+    private static let adjustmentKeywords: [String] = [
         "daily cash adjustment",
         "adjustment"
     ]

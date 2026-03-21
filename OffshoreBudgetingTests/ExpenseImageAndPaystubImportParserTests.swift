@@ -427,7 +427,7 @@ struct ExpenseImageAndPaystubImportParserTests {
             $0.description.lowercased().contains("daily cash adjustment")
                 && $0.date == "01/09/2026"
                 && $0.amount == "1.06"
-                && $0.type == "income"
+                && $0.type == "adjustment"
         })
         #expect(rows.contains {
             $0.description.uppercased().contains("HOME CHEF")

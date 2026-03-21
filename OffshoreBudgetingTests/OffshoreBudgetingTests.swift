@@ -108,6 +108,56 @@ struct OffshoreBudgetingTests {
         #expect(rows[0].bucket == .payment)
     }
 
+    @Test func variableExpense_SpendingAmountIgnoresCreditsButLedgerRemainsSigned() {
+        let debit = VariableExpense(
+            descriptionText: "Groceries",
+            amount: 42.13,
+            kindRaw: VariableExpenseKind.debit.rawValue,
+            transactionDate: .now
+        )
+        let credit = VariableExpense(
+            descriptionText: "Refund",
+            amount: 15.27,
+            kindRaw: VariableExpenseKind.credit.rawValue,
+            transactionDate: .now
+        )
+        let adjustment = VariableExpense(
+            descriptionText: "Daily Cash Adjustment",
+            amount: 7.41,
+            kindRaw: VariableExpenseKind.adjustment.rawValue,
+            transactionDate: .now
+        )
+
+        #expect(debit.spendingAmount() == 42.13)
+        #expect(credit.spendingAmount() == 0)
+        #expect(adjustment.spendingAmount() == 0)
+        #expect(debit.ledgerSignedAmount() == 42.13)
+        #expect(credit.ledgerSignedAmount() == -15.27)
+        #expect(adjustment.ledgerSignedAmount() == 7.41)
+    }
+
+    @Test func import_DailyCashAdjustmentDefaultsToAdjustment() {
+        let parsed = ParsedCSV(
+            headers: ["Date", "Description", "Amount", "Category"],
+            rows: [
+                ["11/10/2025", "Daily Cash Adjustment", "1.06", ""]
+            ]
+        )
+
+        let rows = ExpenseCSVImportMapper.map(
+            csv: parsed,
+            categories: [],
+            existingExpenses: [],
+            existingPlannedExpenses: [],
+            existingIncomes: [],
+            learnedRules: [:]
+        )
+
+        #expect(rows.count == 1)
+        #expect(rows[0].kind == .adjustment)
+        #expect(rows[0].bucket == .payment)
+    }
+
     @Test func import_UsesDebitCreditColumnsForSignWhenPresent() {
         let parsed = ParsedCSV(
             headers: ["Date", "Description", "Debit", "Credit"],
@@ -490,5 +540,35 @@ struct OffshoreBudgetingTests {
         #expect(savedExpense.amount == 50)
         #expect(savedExpense.card?.id == card.id)
         #expect(incomes.isEmpty)
+    }
+
+    @MainActor
+    @Test func importCommit_AdjustmentCreatesAdjustmentLedgerEntry() throws {
+        let context = try makeContext()
+        let workspace = Workspace(name: "WS", hexColor: "#3B82F6")
+        let card = Card(name: "Apple Card", workspace: workspace)
+
+        context.insert(workspace)
+        context.insert(card)
+        try context.save()
+
+        let vm = ExpenseCSVImportViewModel(mode: .cardTransactions)
+        vm.prepare(workspace: workspace, modelContext: context)
+        vm.loadClipboard(
+            text: "Date,Description,Amount,Category\n02/10/2026,Daily Cash Adjustment,1.06,",
+            workspace: workspace,
+            card: card,
+            modelContext: context
+        )
+
+        let row = try #require(vm.rows.first)
+        #expect(row.kind == .adjustment)
+
+        vm.commitImport(workspace: workspace, card: card, modelContext: context)
+
+        let expenses = try context.fetch(FetchDescriptor<VariableExpense>())
+        let savedExpense = try #require(expenses.first)
+        #expect(savedExpense.kind == .adjustment)
+        #expect(savedExpense.amount == 1.06)
     }
 }

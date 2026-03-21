@@ -247,6 +247,33 @@ struct StatementPDFImportParserTests {
         #expect(mapped[0].includeInImport == true)
     }
 
+    @Test func pdfRows_DailyCashAdjustmentMapsToAdjustmentInMapper() throws {
+        let parsed = try StatementPDFImportParser.parse(
+            lines: [
+                "Statement Period: 12/01/2025 - 01/31/2026",
+                "01/12 Daily Cash Adjustment 1.06"
+            ]
+        )
+        let adjustmentSource = try #require(parsed.rows.first { row in
+            row.count >= 2 && row[1].lowercased().contains("daily cash adjustment")
+        })
+
+        let csv = ParsedCSV(headers: parsed.headers, rows: [adjustmentSource])
+        let mapped = ExpenseCSVImportMapper.map(
+            csv: csv,
+            categories: [],
+            existingExpenses: [],
+            existingPlannedExpenses: [],
+            existingIncomes: [],
+            learnedRules: [:]
+        )
+
+        #expect(mapped.count == 1)
+        #expect(mapped[0].kind == .adjustment)
+        #expect(mapped[0].bucket == .payment)
+        #expect(mapped[0].includeInImport == true)
+    }
+
     // MARK: - Helpers
 
     private struct ParsedRow {

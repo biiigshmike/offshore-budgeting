@@ -3688,6 +3688,9 @@
         }
       }
     },
+    "Adjustment" : {
+      "comment" : "Variable expense kind label for balance-affecting non-spend card ledger entries."
+    },
     "After creating a budget, load planned items first, then track variable expenses and income inside the same window. Revisit the period frequently so adjustments happen while they can still help.\n\nA budget works best as an active workflow, not a one-time setup task. Short frequent check-ins beat occasional deep corrections." : {
       "localizations" : {
         "ar" : {

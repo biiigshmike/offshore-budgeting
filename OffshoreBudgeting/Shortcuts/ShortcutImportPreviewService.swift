@@ -89,14 +89,15 @@ final class ShortcutImportPreviewService {
                 learnedRules: learnedRules
             )
 
-            let totalRows = rows.count
-            let expenseRows = rows.filter { !$0.isBlocked && $0.kind == .expense }.count
-            let incomeRows = rows.filter { !$0.isBlocked && $0.kind == .income }.count
-            let importableIncomeRows = rows.filter { row in
-                !row.isBlocked &&
-                row.kind == .income &&
-                row.includeInImport &&
-                !row.isMissingRequiredData
+        let totalRows = rows.count
+        let expenseRows = rows.filter { !$0.isBlocked && $0.kind == .expense }.count
+        let incomeRows = rows.filter { !$0.isBlocked && $0.kind == .income }.count
+        let adjustmentRows = rows.filter { !$0.isBlocked && $0.kind == .adjustment }.count
+        let importableIncomeRows = rows.filter { row in
+            !row.isBlocked &&
+            row.kind == .income &&
+            row.includeInImport &&
+            !row.isMissingRequiredData
             }.count
 
             return ShortcutImportPreview(
@@ -104,6 +105,7 @@ final class ShortcutImportPreviewService {
                     from: rows,
                     expenseRows: expenseRows,
                     incomeRows: incomeRows,
+                    adjustmentRows: adjustmentRows,
                     importableIncomeRows: importableIncomeRows
                 ),
                 totalRows: totalRows,
@@ -136,6 +138,7 @@ final class ShortcutImportPreviewService {
         from rows: [ExpenseCSVImportRow],
         expenseRows: Int,
         incomeRows: Int,
+        adjustmentRows: Int,
         importableIncomeRows: Int
     ) -> String {
         let totalRows = rows.count
@@ -148,13 +151,13 @@ final class ShortcutImportPreviewService {
 
         var lines: [String] = []
         lines.append("Parsed \(totalRows.formatted()) rows")
-        lines.append("\(expenseRows.formatted()) expenses, \(incomeRows.formatted()) income")
+        lines.append("\(expenseRows.formatted()) expenses, \(adjustmentRows.formatted()) adjustments, \(incomeRows.formatted()) income")
         lines.append("Ready: \(readyRows.formatted())")
         lines.append("Possible matches: \(possibleMatchRows.formatted())")
         lines.append("Possible duplicates: \(possibleDuplicateRows.formatted())")
         lines.append("Needs more data: \(needsMoreDataRows.formatted())")
         if paymentRows > 0 {
-            lines.append("Credit/income rows: \(paymentRows.formatted())")
+            lines.append("Credit/adjustment/income rows: \(paymentRows.formatted())")
         }
         lines.append("Immediately importable: \(includedRows.formatted())")
         lines.append("Nothing is saved yet. Offshore saves only after you confirm Import.")

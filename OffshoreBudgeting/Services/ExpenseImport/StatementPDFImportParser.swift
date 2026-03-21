@@ -194,6 +194,12 @@ struct StatementPDFImportParser {
     private static func inferType(description: String, amount: Double) -> String {
         let lower = description.lowercased()
 
+        let adjustmentKeywords = [
+            "daily cash adjustment",
+            "cash adjustment",
+            "adjustment"
+        ]
+
         let incomeKeywords = [
             "payment",
             "thank you",
@@ -201,8 +207,7 @@ struct StatementPDFImportParser {
             "direct deposit",
             "refund",
             "reversal",
-            "credit",
-            "daily cash adjustment"
+            "credit"
         ]
 
         let expenseKeywords = [
@@ -212,6 +217,10 @@ struct StatementPDFImportParser {
             "interest",
             "debit card"
         ]
+
+        if adjustmentKeywords.contains(where: { lower.contains($0) }) {
+            return "adjustment"
+        }
 
         if incomeKeywords.contains(where: { lower.contains($0) }) {
             return "income"
