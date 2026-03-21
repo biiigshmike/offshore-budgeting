@@ -154,13 +154,6 @@ struct EditPlannedExpenseView: View {
                     return false
                 }
 
-                if mode == .offset,
-                   let selectedOffsetAccount = allocationAccounts.first(where: { $0.id == selectedAccountID }) {
-                    let available = availableOffsetBalance(for: selectedOffsetAccount)
-                    guard CurrencyFormatter.isLessThanOrEqualCurrency(parsedSharedAmount, available) else {
-                        return false
-                    }
-                }
             }
         }
 
@@ -179,9 +172,6 @@ struct EditPlannedExpenseView: View {
                     return false
                 }
 
-                guard CurrencyFormatter.isLessThanOrEqualCurrency(parsed, availableSavingsBalance) else {
-                    return false
-                }
             }
         }
 
@@ -271,12 +261,12 @@ struct EditPlannedExpenseView: View {
         .alert("Invalid Offset Amount", isPresented: $showingInvalidOffsetAmountAlert) {
             Button("OK", role: .cancel) { }
         } message: {
-            Text("Offset amount must be 0 or greater, cannot exceed the planned amount, and cannot exceed the selected account balance.")
+            Text("Offset amount must be 0 or greater and cannot exceed the planned amount.")
         }
         .alert("Invalid Savings Offset Amount", isPresented: $showingInvalidSavingsOffsetAmountAlert) {
             Button("OK", role: .cancel) { }
         } message: {
-            Text("Savings offset amount must be 0 or greater, cannot exceed planned amount, and cannot exceed available savings.")
+            Text("Savings offset amount must be 0 or greater and cannot exceed the planned amount.")
         }
         .onAppear {
             title = plannedExpense.title
@@ -528,14 +518,6 @@ struct EditPlannedExpenseView: View {
             return "Amount can't exceed the planned amount."
         }
 
-        if mode == .offset,
-           let account = allocationAccounts.first(where: { $0.id == selectedAccountID }) {
-            let available = availableOffsetBalance(for: account)
-            guard CurrencyFormatter.isLessThanOrEqualCurrency(parsedAmount, available) else {
-                return "Amount can't exceed available balance."
-            }
-        }
-
         return nil
     }
 
@@ -705,17 +687,12 @@ struct EditPlannedExpenseView: View {
         }
 
         let offsetAmount: Double
-        if let selectedOffsetAccount = resolvedOffsetAccount {
+        if resolvedOffsetAccount != nil {
             let trimmed = offsetAmountText.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmed.isEmpty {
                 offsetAmount = 0
             } else {
                 guard let parsed = CurrencyFormatter.parseAmount(trimmed), parsed >= 0, parsed <= planned else {
-                    showingInvalidOffsetAmountAlert = true
-                    return
-                }
-                let available = availableOffsetBalance(for: selectedOffsetAccount)
-                guard CurrencyFormatter.isLessThanOrEqualCurrency(parsed, available) else {
                     showingInvalidOffsetAmountAlert = true
                     return
                 }
@@ -732,10 +709,6 @@ struct EditPlannedExpenseView: View {
                 savingsOffsetAmount = 0
             } else {
                 guard let parsed = CurrencyFormatter.parseAmount(trimmed), parsed >= 0, parsed <= planned else {
-                    showingInvalidSavingsOffsetAmountAlert = true
-                    return
-                }
-                guard CurrencyFormatter.isLessThanOrEqualCurrency(parsed, availableSavingsBalance) else {
                     showingInvalidSavingsOffsetAmountAlert = true
                     return
                 }
@@ -842,13 +815,6 @@ struct EditPlannedExpenseView: View {
 
         try? modelContext.save()
         dismiss()
-    }
-
-    private func availableOffsetBalance(for account: AllocationAccount) -> Double {
-        let currentBalance = max(0, AllocationLedgerService.balance(for: account))
-        guard let existing = plannedExpense.offsetSettlement else { return currentBalance }
-        guard existing.account?.id == account.id else { return currentBalance }
-        return max(0, currentBalance + max(0, -existing.amount))
     }
 
     private func offsetNote(for title: String) -> String {

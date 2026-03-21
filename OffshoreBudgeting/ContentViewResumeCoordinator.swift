@@ -69,14 +69,14 @@ enum ContentViewDeferredRefreshPlanner {
     }
 }
 
-struct ContentViewWidgetRefreshSignature: Equatable {
+nonisolated struct ContentViewWidgetRefreshSignature: Equatable {
     let workspaceID: UUID
     let defaultBudgetingPeriodRaw: String
     let excludeFuturePlannedExpensesFromCalculations: Bool
     let excludeFutureVariableExpensesFromCalculations: Bool
 }
 
-struct ContentViewSavingsDataSignature: Equatable {
+nonisolated struct ContentViewSavingsDataSignature: Equatable {
     let incomeCount: Int
     let incomeLatestUpdateStamp: Int64
     let incomeTotalCents: Int64
@@ -88,13 +88,13 @@ struct ContentViewSavingsDataSignature: Equatable {
     let variableExpenseTotalCents: Int64
 }
 
-struct ContentViewSavingsRefreshSignature: Equatable {
+nonisolated struct ContentViewSavingsRefreshSignature: Equatable {
     let workspaceID: UUID
     let defaultBudgetingPeriodRaw: String
     let dataSignature: ContentViewSavingsDataSignature
 }
 
-struct ContentViewNotificationRefreshSignature: Equatable {
+nonisolated struct ContentViewNotificationRefreshSignature: Equatable {
     let workspaceID: UUID
     let notificationsEnabled: Bool
     let dailyExpenseReminderEnabled: Bool
@@ -104,7 +104,7 @@ struct ContentViewNotificationRefreshSignature: Equatable {
     let reminderMinute: Int
 }
 
-struct ContentViewDeferredRefreshRequest: Equatable {
+nonisolated struct ContentViewDeferredRefreshRequest: Equatable {
     let generation: Int
     let widgetSignature: ContentViewWidgetRefreshSignature?
     let savingsSignature: ContentViewSavingsRefreshSignature?

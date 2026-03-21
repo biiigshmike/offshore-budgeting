@@ -582,11 +582,6 @@ private struct EditSharedBalanceEntryView: View {
             guard let amount = amountValue, amount > 0 else { return false }
             guard amount <= maxLinkedAmount else { return false }
 
-            if actionMode == .offset, let selectedAccount {
-                let available = availableOffsetBalance(for: selectedAccount)
-                guard CurrencyFormatter.isLessThanOrEqualCurrency(amount, available) else { return false }
-            }
-
             return true
         }
 
@@ -749,7 +744,7 @@ private struct EditSharedBalanceEntryView: View {
     private func save() {
         if isLinked {
             if actionMode != .none {
-                guard let selectedAccount else {
+                guard selectedAccount != nil else {
                     saveErrorMessage = "Please select a reconciliation account."
                     showingSaveErrorAlert = true
                     return
@@ -765,13 +760,6 @@ private struct EditSharedBalanceEntryView: View {
                     return
                 }
 
-                if actionMode == .offset {
-                    let available = availableOffsetBalance(for: selectedAccount)
-                    guard CurrencyFormatter.isLessThanOrEqualCurrency(rawAmount, available) else {
-                        showingInvalidAmountAlert = true
-                        return
-                    }
-                }
             }
         }
 
@@ -996,23 +984,6 @@ private struct EditSharedBalanceEntryView: View {
 
     private func variableGrossAmount(for expense: VariableExpense) -> Double {
         SavingsMathService.variableGrossAmount(for: expense)
-    }
-
-    private func availableOffsetBalance(for account: AllocationAccount) -> Double {
-        let currentBalance = max(0, AllocationLedgerService.balance(for: account))
-
-        switch linkedSource {
-        case .variable(let expense):
-            guard let existing = expense.offsetSettlement else { return currentBalance }
-            guard existing.account?.id == account.id else { return currentBalance }
-            return max(0, currentBalance + max(0, -existing.amount))
-        case .planned(let plannedExpense):
-            guard let existing = plannedExpense.offsetSettlement else { return currentBalance }
-            guard existing.account?.id == account.id else { return currentBalance }
-            return max(0, currentBalance + max(0, -existing.amount))
-        case .none:
-            return currentBalance
-        }
     }
 
     private func resolvedOffsetNote(for title: String) -> String {

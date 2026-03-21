@@ -172,12 +172,12 @@ struct AddExpenseView: View {
         .alert("Invalid Offset Amount", isPresented: $showingInvalidOffsetAlert) {
             Button("OK", role: .cancel) { }
         } message: {
-            Text("Offset amount must be 0 or greater, cannot exceed the expense amount, and cannot exceed the selected account balance.")
+            Text("Offset amount must be 0 or greater and cannot exceed the expense amount.")
         }
         .alert("Invalid Savings Offset", isPresented: $showingInvalidSavingsOffsetAlert) {
             Button("OK", role: .cancel) { }
         } message: {
-            Text("Savings offset must be 0 or greater, cannot exceed the expense amount, and cannot exceed available savings.")
+            Text("Savings offset must be 0 or greater and cannot exceed the expense amount.")
         }
         .onAppear {
             if descriptionText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -234,17 +234,12 @@ struct AddExpenseView: View {
         let selectedOffsetAccount = allocationAccounts.first(where: { $0.id == selectedOffsetAccountID })
 
         let offsetAmount: Double
-        if let selectedOffsetAccount {
+        if selectedOffsetAccount != nil {
             let trimmed = offsetAmountText.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmed.isEmpty {
                 offsetAmount = 0
             } else {
                 guard let parsed = CurrencyFormatter.parseAmount(trimmed), parsed >= 0, parsed <= amt else {
-                    showingInvalidOffsetAlert = true
-                    return
-                }
-                let available = max(0, AllocationLedgerService.balance(for: selectedOffsetAccount))
-                guard CurrencyFormatter.isLessThanOrEqualCurrency(parsed, available) else {
                     showingInvalidOffsetAlert = true
                     return
                 }
@@ -263,10 +258,6 @@ struct AddExpenseView: View {
                 savingsOffsetAmount = 0
             } else {
                 guard let parsed = CurrencyFormatter.parseAmount(trimmed), parsed >= 0, parsed <= netAmount else {
-                    showingInvalidSavingsOffsetAlert = true
-                    return
-                }
-                guard CurrencyFormatter.isLessThanOrEqualCurrency(parsed, availableSavingsBalance) else {
                     showingInvalidSavingsOffsetAlert = true
                     return
                 }

@@ -399,7 +399,7 @@ struct ExpenseCSVImportRowView: View {
             guard row.finalAmount > 0 else {
                 return "Enter an expense amount first."
             }
-            guard let account = row.selectedOffsetAccount else {
+            guard row.selectedOffsetAccount != nil else {
                 return "Choose a Reconciliation."
             }
             let trimmed = row.offsetAmountText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -412,10 +412,6 @@ struct ExpenseCSVImportRowView: View {
             }
             guard parsed <= row.finalAmount else {
                 return "Amount can't exceed the expense amount."
-            }
-            let available = max(0, AllocationLedgerService.balance(for: account))
-            guard CurrencyFormatter.isLessThanOrEqualCurrency(parsed, available) else {
-                return "Amount can't exceed available balance."
             }
             return nil
         }

@@ -9,6 +9,7 @@ import Foundation
 import Testing
 @testable import Offshore
 
+@MainActor
 struct ContentViewResumeCoordinatorTests {
 
     private let widgetSignature = ContentViewWidgetRefreshSignature(

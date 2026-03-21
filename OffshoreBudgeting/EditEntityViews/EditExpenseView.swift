@@ -149,12 +149,12 @@ struct EditExpenseView: View {
         .alert("Invalid Offset Amount", isPresented: $showingInvalidOffsetAlert) {
             Button("OK", role: .cancel) { }
         } message: {
-            Text("Offset amount must be 0 or greater, cannot exceed the expense amount, and cannot exceed the selected account balance.")
+            Text("Offset amount must be 0 or greater and cannot exceed the expense amount.")
         }
         .alert("Invalid Savings Offset", isPresented: $showingInvalidSavingsOffsetAlert) {
             Button("OK", role: .cancel) { }
         } message: {
-            Text("Savings offset must be 0 or greater, cannot exceed the expense amount, and cannot exceed available savings.")
+            Text("Savings offset must be 0 or greater and cannot exceed the expense amount.")
         }
         .onAppear {
             // Seed fields once.
@@ -252,17 +252,12 @@ struct EditExpenseView: View {
         }
 
         let offsetAmount: Double
-        if let selectedOffsetAccount = resolvedOffsetAccount {
+        if resolvedOffsetAccount != nil {
             let trimmed = offsetAmountText.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmed.isEmpty {
                 offsetAmount = 0
             } else {
                 guard let parsed = CurrencyFormatter.parseAmount(trimmed), parsed >= 0, parsed <= amt else {
-                    showingInvalidOffsetAlert = true
-                    return
-                }
-                let available = availableOffsetBalance(for: selectedOffsetAccount)
-                guard CurrencyFormatter.isLessThanOrEqualCurrency(parsed, available) else {
                     showingInvalidOffsetAlert = true
                     return
                 }
@@ -281,10 +276,6 @@ struct EditExpenseView: View {
                 savingsOffsetAmount = 0
             } else {
                 guard let parsed = CurrencyFormatter.parseAmount(trimmed), parsed >= 0, parsed <= netAmount else {
-                    showingInvalidSavingsOffsetAlert = true
-                    return
-                }
-                guard CurrencyFormatter.isLessThanOrEqualCurrency(parsed, availableSavingsBalance) else {
                     showingInvalidSavingsOffsetAlert = true
                     return
                 }
@@ -387,13 +378,6 @@ struct EditExpenseView: View {
         try? modelContext.save()
 
         dismiss()
-    }
-
-    private func availableOffsetBalance(for account: AllocationAccount) -> Double {
-        let currentBalance = max(0, AllocationLedgerService.balance(for: account))
-        guard let existing = expense.offsetSettlement else { return currentBalance }
-        guard existing.account?.id == account.id else { return currentBalance }
-        return max(0, currentBalance + max(0, -existing.amount))
     }
 
     private func offsetNote(for description: String) -> String {

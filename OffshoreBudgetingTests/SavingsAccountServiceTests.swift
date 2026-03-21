@@ -905,6 +905,75 @@ struct SavingsAccountServiceTests {
         #expect(account.total == 300)
     }
 
+    @Test func savingsOffsets_canExceedAvailableBalance_whenWithinOwnedAmount() throws {
+        let context = try makeContext()
+
+        let ws = Workspace(name: "WS", hexColor: "#3B82F6")
+        let card = Card(name: "Visa", workspace: ws)
+        let cat = Category(name: "General", hexColor: "#22AA66", workspace: ws)
+
+        context.insert(ws)
+        context.insert(card)
+        context.insert(cat)
+
+        let account = SavingsAccountService.ensureSavingsAccount(for: ws, modelContext: context)
+        SavingsAccountService.addManualAdjustment(
+            workspace: ws,
+            account: account,
+            date: makeDate(2026, 6, 1),
+            amount: 40,
+            note: "Seed",
+            modelContext: context
+        )
+
+        let variable = VariableExpense(
+            descriptionText: "AirPods",
+            amount: 120,
+            transactionDate: makeDate(2026, 6, 2),
+            workspace: ws,
+            card: card,
+            category: cat
+        )
+        let planned = PlannedExpense(
+            title: "Desk",
+            plannedAmount: 140,
+            actualAmount: 140,
+            expenseDate: makeDate(2026, 6, 3),
+            workspace: ws,
+            card: card,
+            category: cat
+        )
+
+        context.insert(variable)
+        context.insert(planned)
+        try context.save()
+
+        let variableApplied = SavingsAccountService.upsertSavingsOffset(
+            workspace: ws,
+            variableExpense: variable,
+            offsetAmount: 90,
+            note: "Overdraw variable",
+            date: variable.transactionDate,
+            modelContext: context
+        )
+        let plannedApplied = SavingsAccountService.upsertSavingsOffset(
+            workspace: ws,
+            plannedExpense: planned,
+            offsetAmount: 60,
+            note: "Overdraw planned",
+            date: planned.expenseDate,
+            modelContext: context
+        )
+
+        #expect(variableApplied)
+        #expect(plannedApplied)
+        #expect(CurrencyFormatter.roundedToCurrency(variable.savingsLedgerEntry?.amount ?? 0) == -90)
+        #expect(CurrencyFormatter.roundedToCurrency(planned.savingsLedgerEntry?.amount ?? 0) == -60)
+
+        SavingsAccountService.recalculateAccountTotal(account)
+        #expect(CurrencyFormatter.roundedToCurrency(account.total) == -110)
+    }
+
     @Test func splitAllocations_reduceSavingsImpact_toOwnedShare() throws {
         let context = try makeContext()
 
@@ -1397,7 +1466,7 @@ struct SavingsAccountServiceTests {
         #expect(CurrencyFormatter.roundedToCurrency(variable.savingsLedgerEntry?.amount ?? 0) == -0.1)
     }
 
-    @Test func currencyBoundary_rejectsOffset_whenRequestedExceedsAvailableByOneCent() throws {
+    @Test func currencyBoundary_allowsOffset_whenRequestedExceedsAvailableByOneCent() throws {
         let context = try makeContext()
 
         let ws = Workspace(name: "WS", hexColor: "#3B82F6")
@@ -1446,13 +1515,13 @@ struct SavingsAccountServiceTests {
             modelContext: context
         )
 
-        #expect(!applied)
-        #expect(variable.savingsLedgerEntry == nil)
+        #expect(applied)
+        #expect(CurrencyFormatter.roundedToCurrency(variable.savingsLedgerEntry?.amount ?? 0) == -0.11)
     }
 
-    // MARK: - Negative Guard
+    // MARK: - Negative Balances
 
-    @Test func negativeSavings_rejectsOffsetRequests_forVariableAndPlanned() throws {
+    @Test func negativeSavings_allowsOffsetRequests_forVariableAndPlanned() throws {
         let context = try makeContext()
 
         let ws = Workspace(name: "WS", hexColor: "#3B82F6")
@@ -1499,7 +1568,7 @@ struct SavingsAccountServiceTests {
             workspace: ws,
             variableExpense: variable,
             offsetAmount: 30,
-            note: "Should fail",
+            note: "Allowed while negative",
             date: variable.transactionDate,
             modelContext: context
         )
@@ -1507,20 +1576,21 @@ struct SavingsAccountServiceTests {
             workspace: ws,
             plannedExpense: planned,
             offsetAmount: 30,
-            note: "Should fail",
+            note: "Allowed while negative",
             date: planned.expenseDate,
             modelContext: context
         )
 
-        #expect(!variableApplied)
-        #expect(!plannedApplied)
-        #expect(variable.savingsLedgerEntry == nil)
-        #expect(planned.savingsLedgerEntry == nil)
+        #expect(variableApplied)
+        #expect(plannedApplied)
+        #expect(CurrencyFormatter.roundedToCurrency(variable.savingsLedgerEntry?.amount ?? 0) == -30)
+        #expect(CurrencyFormatter.roundedToCurrency(planned.savingsLedgerEntry?.amount ?? 0) == -30)
 
         let entries = try fetchAll(SavingsLedgerEntry.self, in: context)
-        #expect(entries.count == 1)
-        #expect(entries.first?.kind == .manualAdjustment)
-        #expect(account.total == -100)
+        #expect(entries.count == 3)
+        #expect(entries.filter { $0.kind == .manualAdjustment }.count == 1)
+        #expect(entries.filter { $0.kind == .expenseOffset }.count == 2)
+        #expect(account.total == -160)
     }
 
     // MARK: - Edit/Delete

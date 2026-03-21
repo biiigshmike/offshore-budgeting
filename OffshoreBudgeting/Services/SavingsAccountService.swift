@@ -373,14 +373,10 @@ enum SavingsAccountService {
         }
 
         let account = ensureSavingsAccount(for: workspace, modelContext: modelContext)
-        let existingLinkedOffset = max(0, -(variableExpense.savingsLedgerEntry?.amount ?? 0))
-        let available = availableBalance(for: account, existingLinkedOffset: existingLinkedOffset)
-        let isValid = canApplyOffset(
-            requested: offsetAmount,
-            available: available,
-            expenseAmount: SavingsMathService.ownedAmount(for: variableExpense)
-        )
-        guard isValid else { return false }
+        guard CurrencyFormatter.isLessThanOrEqualCurrency(
+            offsetAmount,
+            SavingsMathService.ownedAmount(for: variableExpense)
+        ) else { return false }
 
         if let existing = variableExpense.savingsLedgerEntry {
             existing.date = date
@@ -426,14 +422,10 @@ enum SavingsAccountService {
         }
 
         let account = ensureSavingsAccount(for: workspace, modelContext: modelContext)
-        let existingLinkedOffset = max(0, -(plannedExpense.savingsLedgerEntry?.amount ?? 0))
-        let available = availableBalance(for: account, existingLinkedOffset: existingLinkedOffset)
-        let isValid = canApplyOffset(
-            requested: offsetAmount,
-            available: available,
-            expenseAmount: SavingsMathService.ownedEffectiveAmount(for: plannedExpense)
-        )
-        guard isValid else { return false }
+        guard CurrencyFormatter.isLessThanOrEqualCurrency(
+            offsetAmount,
+            SavingsMathService.ownedEffectiveAmount(for: plannedExpense)
+        ) else { return false }
 
         if let existing = plannedExpense.savingsLedgerEntry {
             existing.date = date
@@ -897,24 +889,6 @@ enum SavingsAccountService {
 
     private static func isInRange(_ date: Date, start: Date, end: Date) -> Bool {
         date >= start && date <= end
-    }
-
-    private static func availableBalance(
-        for account: SavingsAccount,
-        existingLinkedOffset: Double
-    ) -> Double {
-        max(0, account.total + existingLinkedOffset)
-    }
-
-    private static func canApplyOffset(
-        requested: Double,
-        available: Double,
-        expenseAmount: Double
-    ) -> Bool {
-        guard requested > 0 else { return false }
-        guard available > 0 else { return false }
-        return CurrencyFormatter.isLessThanOrEqualCurrency(requested, available)
-            && CurrencyFormatter.isLessThanOrEqualCurrency(requested, expenseAmount)
     }
 
     private static func recalculateAccountTotal(

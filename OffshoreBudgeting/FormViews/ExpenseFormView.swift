@@ -426,10 +426,6 @@ struct ExpenseFormView: View {
             return "Amount can't exceed the expense amount."
         }
 
-        guard CurrencyFormatter.isLessThanOrEqualCurrency(parsed, availableSavingsBalance) else {
-            return "Amount can't exceed available savings."
-        }
-
         return nil
     }
 
@@ -460,14 +456,6 @@ struct ExpenseFormView: View {
 
         guard parsedAmount <= enteredAmount else {
             return "Amount can't exceed the expense amount."
-        }
-
-        if mode == .offset,
-           let account = allocationAccounts.first(where: { $0.id == selectedAccountID }) {
-            let available = max(0, AllocationLedgerService.balance(for: account))
-            guard CurrencyFormatter.isLessThanOrEqualCurrency(parsedAmount, available) else {
-                return "Amount can't exceed available balance."
-            }
         }
 
         return nil
