@@ -135,50 +135,18 @@ struct AddExpenseView: View {
         .navigationTitle("Add Expense")
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                Button { dismiss() } label: {
-                    Image(systemName: "xmark")
-                }
-                .accessibilityLabel("Cancel")
+                Button("Cancel") { dismiss() }
             }
-            if #available(iOS 26.0, macCatalyst 26.0, *) {
-                ToolbarItemGroup(placement: .primaryAction) {
-                    Button { saveAndAdd() } label: {
-                        Image(systemName: "checkmark.arrow.trianglehead.clockwise")
-                    }
-                    .accessibilityLabel("Save & Add")
-                        .disabled(!canSave)
-                        .tint(.accentColor)
-                        .buttonStyle(.plain)
-                }
-
-                ToolbarSpacer(.flexible, placement: .primaryAction)
-
-                ToolbarItemGroup(placement: .primaryAction) {
-                    Button { save() } label: {
-                        Image(systemName: "checkmark")
-                    }
-                    .accessibilityLabel("Save")
+            if #available(iOS 26.0, *) {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Save") { save() }
                         .disabled(!canSave)
                         .tint(.accentColor)
                         .buttonStyle(.glassProminent)
                 }
             } else {
-                ToolbarItem(placement: .primaryAction) {
-                    Button { saveAndAdd() } label: {
-                        Image(systemName: "checkmark.arrow.trianglehead.clockwise")
-                    }
-                    .accessibilityLabel("Save & Add")
-                        .disabled(!canSave)
-                        .tint(.accentColor)
-                        .controlSize(.large)
-                        .buttonStyle(.plain)
-                }
-
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button { save() } label: {
-                        Image(systemName: "checkmark")
-                    }
-                    .accessibilityLabel("Save")
+                    Button("Save") { save() }
                         .disabled(!canSave)
                         .tint(.accentColor)
                         .controlSize(.large)
@@ -248,28 +216,17 @@ struct AddExpenseView: View {
     }
 
     private func save() {
-        guard persistExpense() else { return }
-        dismiss()
-    }
-
-    private func saveAndAdd() {
-        guard persistExpense() else { return }
-        resetForm()
-    }
-
-    @discardableResult
-    private func persistExpense() -> Bool {
         let trimmedDesc = ExpenseFormView.trimmedDescription(descriptionText)
-        guard !trimmedDesc.isEmpty else { return false }
+        guard !trimmedDesc.isEmpty else { return }
 
         guard let amt = ExpenseFormView.parseAmount(amountText), amt > 0 else {
             showingInvalidAmountAlert = true
-            return false
+            return
         }
 
         guard let selectedCard = visibleCards.first(where: { $0.id == selectedCardID }) else {
             showingMissingCardAlert = true
-            return false
+            return
         }
 
         let selectedCategory = categories.first(where: { $0.id == selectedCategoryID })
@@ -284,12 +241,12 @@ struct AddExpenseView: View {
             } else {
                 guard let parsed = CurrencyFormatter.parseAmount(trimmed), parsed >= 0, parsed <= amt else {
                     showingInvalidOffsetAlert = true
-                    return false
+                    return
                 }
                 let available = max(0, AllocationLedgerService.balance(for: selectedOffsetAccount))
                 guard CurrencyFormatter.isLessThanOrEqualCurrency(parsed, available) else {
                     showingInvalidOffsetAlert = true
-                    return false
+                    return
                 }
                 offsetAmount = parsed
             }
@@ -307,11 +264,11 @@ struct AddExpenseView: View {
             } else {
                 guard let parsed = CurrencyFormatter.parseAmount(trimmed), parsed >= 0, parsed <= netAmount else {
                     showingInvalidSavingsOffsetAlert = true
-                    return false
+                    return
                 }
                 guard CurrencyFormatter.isLessThanOrEqualCurrency(parsed, availableSavingsBalance) else {
                     showingInvalidSavingsOffsetAlert = true
-                    return false
+                    return
                 }
                 savingsOffsetAmount = parsed
             }
@@ -327,7 +284,7 @@ struct AddExpenseView: View {
             } else {
                 guard let parsed = CurrencyFormatter.parseAmount(trimmed), parsed >= 0, parsed <= netAmount else {
                     showingInvalidAllocationAlert = true
-                    return false
+                    return
                 }
                 allocationAmount = parsed
             }
@@ -387,52 +344,8 @@ struct AddExpenseView: View {
         } else {
             SavingsAccountService.removeSavingsOffset(for: expense, modelContext: modelContext)
         }
-        return true
-    }
 
-    private func resetForm() {
-        descriptionText = ""
-        amountText = ""
-        transactionDate = defaultDate
-        selectedCardID = nil
-        selectedCategoryID = nil
-        selectedAllocationAccountID = nil
-        allocationAmountText = ""
-        selectedOffsetAccountID = nil
-        offsetAmountText = ""
-        applySavingsOffset = false
-        savingsOffsetAmountText = ""
-
-        applyInitialSelections()
-    }
-
-    private func applyInitialSelections() {
-        let text = (prefilledDescription ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        if !text.isEmpty {
-            descriptionText = text
-        }
-
-        if DebugScreenshotFormDefaults.isEnabled {
-            if descriptionText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                descriptionText = DebugScreenshotFormDefaults.expenseDescription
-            }
-
-            if amountText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                amountText = DebugScreenshotFormDefaults.expenseAmountText
-            }
-        }
-
-        if let defaultCard {
-            selectedCardID = defaultCard.id
-        } else if visibleCards.count == 1 {
-            selectedCardID = visibleCards.first?.id
-        } else if DebugScreenshotFormDefaults.isEnabled {
-            selectedCardID = DebugScreenshotFormDefaults.preferredCardID(in: visibleCards)
-        }
-
-        if DebugScreenshotFormDefaults.isEnabled {
-            selectedCategoryID = DebugScreenshotFormDefaults.preferredCategoryID(in: categories)
-        }
+        dismiss()
     }
 
     private func offsetNote(for description: String) -> String {

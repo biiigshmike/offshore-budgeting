@@ -92,53 +92,20 @@ struct AddPresetView: View {
         .navigationTitle("Add Preset")
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                Button { dismiss() } label: {
-                    Image(systemName: "xmark")
-                }
-                .accessibilityLabel("Cancel")
+                Button("Cancel") { dismiss() }
             }
-            if #available(iOS 26.0, macCatalyst 26.0, *) {
-                ToolbarItemGroup(placement: .primaryAction) {
-                    Button { saveAndAdd() } label: {
-                        Image(systemName: "checkmark.arrow.trianglehead.clockwise")
-                    }
-                    .accessibilityLabel("Save & Add")
-                        .disabled(!canSave)
-                        .tint(.accentColor)
-                        .buttonStyle(.plain)
-                }
-
-                ToolbarSpacer(.flexible, placement: .primaryAction)
-
-                ToolbarItemGroup(placement: .primaryAction) {
-                    Button { save() } label: {
-                        Image(systemName: "checkmark")
-                    }
-                    .accessibilityLabel("Save")
+            if #available(iOS 26.0, *) {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Save") { save() }
                         .disabled(!canSave)
                         .tint(.accentColor)
                         .buttonStyle(.glassProminent)
                 }
             } else {
-                ToolbarItem(placement: .primaryAction) {
-                    Button { saveAndAdd() } label: {
-                        Image(systemName: "checkmark.arrow.trianglehead.clockwise")
-                    }
-                    .accessibilityLabel("Save & Add")
-                        .disabled(!canSave)
-                        .tint(.accentColor)
-                        .controlSize(.large)
-                        .buttonStyle(.plain)
-                }
-
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button { save() } label: {
-                        Image(systemName: "checkmark")
-                    }
-                    .accessibilityLabel("Save")
+                    Button("Save") { save() }
                         .disabled(!canSave)
                         .tint(.accentColor)
-                        .controlSize(.large)
                         .buttonStyle(.plain)
                 }
             }
@@ -176,26 +143,15 @@ struct AddPresetView: View {
     }
 
     private func save() {
-        guard persistPreset() else { return }
-        dismiss()
-    }
-
-    private func saveAndAdd() {
-        guard persistPreset() else { return }
-        resetForm()
-    }
-
-    @discardableResult
-    private func persistPreset() -> Bool {
-        guard !trimmedTitle.isEmpty else { return false }
+        guard !trimmedTitle.isEmpty else { return }
         guard let amt = parsedPlannedAmount, amt > 0 else {
             showingInvalidAmountAlert = true
-            return false
+            return
         }
 
         guard let selectedCard = cards.first(where: { $0.id == selectedCardID }) else {
             showingMissingCardAlert = true
-            return false
+            return
         }
         let selectedCategory = categories.first(where: { $0.id == selectedCategoryID })
 
@@ -215,27 +171,6 @@ struct AddPresetView: View {
         )
 
         modelContext.insert(preset)
-        return true
-    }
-
-    private func resetForm() {
-        title = ""
-        plannedAmountText = ""
-        frequency = .monthly
-        interval = 1
-        weeklyWeekday = 6
-        monthlyDayOfMonth = 15
-        monthlyIsLastDay = false
-        yearlyMonth = 1
-        yearlyDayOfMonth = 15
-        selectedCardID = nil
-        selectedCategoryID = nil
-
-        guard DebugScreenshotFormDefaults.isEnabled else { return }
-
-        title = DebugScreenshotFormDefaults.presetTitle
-        plannedAmountText = DebugScreenshotFormDefaults.presetAmountText
-        selectedCardID = DebugScreenshotFormDefaults.preferredCardID(in: cards)
-        selectedCategoryID = DebugScreenshotFormDefaults.preferredCategoryID(in: categories)
+        dismiss()
     }
 }

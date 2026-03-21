@@ -28,51 +28,19 @@ struct AddCardView: View {
             .navigationTitle("Add Card")
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark")
-                    }
-                    .accessibilityLabel("Cancel")
+                    Button("Cancel") { dismiss() }
                 }
-
-                if #available(iOS 26.0, macCatalyst 26.0, *) {
-                    ToolbarItemGroup(placement: .primaryAction) {
-                        Button { saveAndAdd() } label: {
-                            Image(systemName: "checkmark.arrow.trianglehead.clockwise")
-                        }
-                        .accessibilityLabel("Save & Add")
-                            .disabled(!canSave)
-                            .tint(.accentColor)
-                            .buttonStyle(.plain)
-                    }
-
-                    ToolbarSpacer(.flexible, placement: .primaryAction)
-
-                    ToolbarItemGroup(placement: .primaryAction) {
-                        Button { save() } label: {
-                            Image(systemName: "checkmark")
-                        }
-                        .accessibilityLabel("Save")
+                
+                if #available(iOS 26.0, *) {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Save") { save() }
                             .disabled(!canSave)
                             .tint(.accentColor)
                             .buttonStyle(.glassProminent)
                     }
                 } else {
-                    ToolbarItem(placement: .primaryAction) {
-                        Button { saveAndAdd() } label: {
-                            Image(systemName: "checkmark.arrow.trianglehead.clockwise")
-                        }
-                        .accessibilityLabel("Save & Add")
-                            .disabled(!canSave)
-                            .tint(.accentColor)
-                            .controlSize(.large)
-                            .buttonStyle(.plain)
-                    }
-
                     ToolbarItem(placement: .topBarTrailing) {
-                        Button { save() } label: {
-                            Image(systemName: "checkmark")
-                        }
-                        .accessibilityLabel("Save")
+                        Button("Save") { save() }
                             .disabled(!canSave)
                             .tint(.accentColor)
                             .controlSize(.large)
@@ -89,19 +57,7 @@ struct AddCardView: View {
     }
 
     private func save() {
-        guard persistCard() else { return }
-        dismiss()
-    }
-
-    private func saveAndAdd() {
-        guard persistCard() else { return }
-        resetForm()
-    }
-
-    @discardableResult
-    private func persistCard() -> Bool {
         let trimmed = CardFormView.trimmedName(name)
-        guard !trimmed.isEmpty else { return false }
 
         let card = Card(
             name: trimmed,
@@ -111,15 +67,6 @@ struct AddCardView: View {
         )
 
         modelContext.insert(card)
-        return true
-    }
-
-    private func resetForm() {
-        name = ""
-        effect = .plastic
-        theme = .ruby
-
-        guard DebugScreenshotFormDefaults.isEnabled else { return }
-        name = DebugScreenshotFormDefaults.cardName
+        dismiss()
     }
 }

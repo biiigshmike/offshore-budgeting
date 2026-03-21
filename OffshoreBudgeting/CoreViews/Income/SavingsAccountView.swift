@@ -909,61 +909,11 @@ private struct SavingsLedgerEntryFormView: View {
         .navigationTitle(saveTitle)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                Button { dismiss() } label: {
-                    Image(systemName: "xmark")
-                }
-                .accessibilityLabel("Cancel")
+                Button("Cancel") { dismiss() }
             }
 
-            if entry == nil, #available(iOS 26.0, macCatalyst 26.0, *) {
-                ToolbarItemGroup(placement: .primaryAction) {
-                    Button { saveAndAdd() } label: {
-                        Image(systemName: "checkmark.arrow.trianglehead.clockwise")
-                    }
-                    .accessibilityLabel("Save & Add")
-                        .disabled(!canSave)
-                        .tint(.accentColor)
-                        .buttonStyle(.plain)
-                }
-
-                ToolbarSpacer(.flexible, placement: .primaryAction)
-
-                ToolbarItemGroup(placement: .primaryAction) {
-                    Button { save() } label: {
-                        Image(systemName: "checkmark")
-                    }
-                    .accessibilityLabel("Save")
-                        .disabled(!canSave)
-                        .tint(.accentColor)
-                        .buttonStyle(.glassProminent)
-                }
-            } else if entry == nil {
-                ToolbarItem(placement: .primaryAction) {
-                    Button { saveAndAdd() } label: {
-                        Image(systemName: "checkmark.arrow.trianglehead.clockwise")
-                    }
-                    .accessibilityLabel("Save & Add")
-                        .disabled(!canSave)
-                        .tint(.accentColor)
-                        .controlSize(.large)
-                        .buttonStyle(.plain)
-                }
-
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { save() } label: {
-                        Image(systemName: "checkmark")
-                    }
-                    .accessibilityLabel("Save")
-                        .disabled(!canSave)
-                }
-            } else {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { save() } label: {
-                        Image(systemName: "checkmark")
-                    }
-                    .accessibilityLabel("Save")
-                        .disabled(!canSave)
-                }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Save") { save() }
             }
         }
         .alert("Invalid Amount", isPresented: $showingInvalidAmount) {
@@ -995,25 +945,10 @@ private struct SavingsLedgerEntryFormView: View {
         }
     }
 
-    private var canSave: Bool {
-        CurrencyFormatter.parseAmount(amountText.trimmingCharacters(in: .whitespacesAndNewlines)) != nil
-    }
-
     private func save() {
-        guard persistEntry() else { return }
-        dismiss()
-    }
-
-    private func saveAndAdd() {
-        guard persistEntry() else { return }
-        resetForm()
-    }
-
-    @discardableResult
-    private func persistEntry() -> Bool {
         guard let amount = CurrencyFormatter.parseAmount(amountText.trimmingCharacters(in: .whitespacesAndNewlines)) else {
             showingInvalidAmount = true
-            return false
+            return
         }
 
         var finalAmount = amount
@@ -1029,19 +964,7 @@ private struct SavingsLedgerEntryFormView: View {
         }
 
         onSave(date, finalAmount, finalNote, finalKind)
-        return true
-    }
-
-    private func resetForm() {
-        date = .now
-        amountText = ""
-        note = ""
-        isTransferToTrueSavings = false
-
-        guard DebugScreenshotFormDefaults.isEnabled else { return }
-
-        amountText = DebugScreenshotFormDefaults.savingsEntryAmountText
-        note = DebugScreenshotFormDefaults.savingsEntryNote
+        dismiss()
     }
 
     private func normalizeAmountTextForTransfer() {

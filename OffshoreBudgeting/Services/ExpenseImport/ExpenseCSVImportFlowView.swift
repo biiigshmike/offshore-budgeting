@@ -147,10 +147,7 @@ struct ExpenseCSVImportFlowView: View {
         .navigationTitle(navigationTitle)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                Button { dismiss() } label: {
-                    Image(systemName: "xmark")
-                }
-                .accessibilityLabel("Cancel")
+                Button("Cancel") { dismiss() }
             }
 
             ToolbarItem(placement: .topBarTrailing) {

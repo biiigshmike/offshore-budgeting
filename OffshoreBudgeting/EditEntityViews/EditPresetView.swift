@@ -111,27 +111,18 @@ struct EditPresetView: View {
         .navigationTitle("Edit Preset")
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                Button { dismiss() } label: {
-                    Image(systemName: "xmark")
-                }
-                .accessibilityLabel("Cancel")
+                Button("Cancel") { dismiss() }
             }
             if #available(iOS 26.0, *) {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button { saveChanges() } label: {
-                        Image(systemName: "checkmark")
-                    }
-                    .accessibilityLabel("Save")
+                    Button("Save") { saveChanges() }
                         .disabled(!canSave)
                         .tint(.accentColor)
                         .buttonStyle(.glassProminent)
                 }
             } else {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button { saveChanges() } label: {
-                        Image(systemName: "checkmark")
-                    }
-                    .accessibilityLabel("Save")
+                    Button("Save") { saveChanges() }
                         .disabled(!canSave)
                         .tint(.accentColor)
                         .controlSize(.large)

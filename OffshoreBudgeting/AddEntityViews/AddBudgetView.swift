@@ -81,51 +81,19 @@ struct AddBudgetView: View {
         )
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                Button { dismiss() } label: {
-                    Image(systemName: "xmark")
-                }
-                .accessibilityLabel("Cancel")
-                .clipShape(.containerRelative)
+                Button("Cancel") { dismiss() }
+                    .clipShape(.containerRelative)
             }
-            if #available(iOS 26.0, macCatalyst 26.0, *) {
-                ToolbarItemGroup(placement: .primaryAction) {
-                    Button { saveAndAdd() } label: {
-                        Image(systemName: "checkmark.arrow.trianglehead.clockwise")
-                    }
-                    .accessibilityLabel("Save & Add")
-                        .disabled(!canCreate)
-                        .tint(.accentColor)
-                        .buttonStyle(.plain)
-                }
-
-                ToolbarSpacer(.flexible, placement: .primaryAction)
-
-                ToolbarItemGroup(placement: .primaryAction) {
-                    Button { save() } label: {
-                        Image(systemName: "checkmark")
-                    }
-                    .accessibilityLabel("Save")
+            if #available(iOS 26.0, *) {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Save") { createBudget() }
                         .disabled(!canCreate)
                         .tint(.accentColor)
                         .buttonStyle(.glassProminent)
                 }
             } else {
-                ToolbarItem(placement: .primaryAction) {
-                    Button { saveAndAdd() } label: {
-                        Image(systemName: "checkmark.arrow.trianglehead.clockwise")
-                    }
-                    .accessibilityLabel("Save & Add")
-                        .disabled(!canCreate)
-                        .tint(.accentColor)
-                        .controlSize(.large)
-                        .buttonStyle(.plain)
-                }
-
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button { save() } label: {
-                        Image(systemName: "checkmark")
-                    }
-                    .accessibilityLabel("Save")
+                    Button("Save") { createBudget() }
                         .disabled(!canCreate)
                         .tint(.accentColor)
                         .controlSize(.large)
@@ -229,21 +197,10 @@ struct AddBudgetView: View {
 
     // MARK: - Create
 
-    private func save() {
-        guard createBudget() else { return }
-        dismiss()
-    }
-
-    private func saveAndAdd() {
-        guard createBudget() else { return }
-        resetForm()
-    }
-
-    @discardableResult
-    private func createBudget() -> Bool {
+    private func createBudget() {
         guard startDate <= endDate else {
             showingInvalidDatesAlert = true
-            return false
+            return
         }
 
         let budget = Budget(
@@ -280,7 +237,7 @@ struct AddBudgetView: View {
         } catch {
             budgetSaveErrorMessage = error.localizedDescription
             showingBudgetSaveError = true
-            return false
+            return
         }
 
         Task {
@@ -290,19 +247,7 @@ struct AddBudgetView: View {
             )
         }
 
-        return true
-    }
-
-    private func resetForm() {
-        name = ""
-        userEditedName = false
-        startDate = Calendar.current.startOfDay(for: Date())
-        endDate = Calendar.current.startOfDay(for: Date())
-        selectedCardIDs.removeAll()
-        selectedPresetIDs.removeAll()
-
-        seedInitialDatesAndName()
-        applyScreenshotPrefillIfNeeded()
+        dismiss()
     }
 
     private func materializePlannedExpenses(

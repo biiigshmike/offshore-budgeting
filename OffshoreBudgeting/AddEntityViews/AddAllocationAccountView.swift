@@ -29,51 +29,19 @@ struct AddAllocationAccountView: View {
         .navigationTitle("New Reconciliation")
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                Button { dismiss() } label: {
-                    Image(systemName: "xmark")
-                }
-                .accessibilityLabel("Cancel")
+                Button("Cancel") { dismiss() }
             }
 
-            if #available(iOS 26.0, macCatalyst 26.0, *) {
-                ToolbarItemGroup(placement: .primaryAction) {
-                    Button { saveAndAdd() } label: {
-                        Image(systemName: "checkmark.arrow.trianglehead.clockwise")
-                    }
-                    .accessibilityLabel("Save & Add")
-                        .disabled(!canSave)
-                        .tint(.accentColor)
-                        .buttonStyle(.plain)
-                }
-
-                ToolbarSpacer(.flexible, placement: .primaryAction)
-
-                ToolbarItemGroup(placement: .primaryAction) {
-                    Button { save() } label: {
-                        Image(systemName: "checkmark")
-                    }
-                    .accessibilityLabel("Save")
+            if #available(iOS 26.0, *) {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Save") { save() }
                         .disabled(!canSave)
                         .tint(.accentColor)
                         .buttonStyle(.glassProminent)
                 }
             } else {
-                ToolbarItem(placement: .primaryAction) {
-                    Button { saveAndAdd() } label: {
-                        Image(systemName: "checkmark.arrow.trianglehead.clockwise")
-                    }
-                    .accessibilityLabel("Save & Add")
-                        .disabled(!canSave)
-                        .tint(.accentColor)
-                        .controlSize(.large)
-                        .buttonStyle(.plain)
-                }
-
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button { save() } label: {
-                        Image(systemName: "checkmark")
-                    }
-                    .accessibilityLabel("Save")
+                    Button("Save") { save() }
                         .disabled(!canSave)
                         .tint(.accentColor)
                         .controlSize(.large)
@@ -90,18 +58,7 @@ struct AddAllocationAccountView: View {
     }
 
     private func save() {
-        guard persistAccount() else { return }
-        dismiss()
-    }
-
-    private func saveAndAdd() {
-        guard persistAccount() else { return }
-        resetForm()
-    }
-
-    @discardableResult
-    private func persistAccount() -> Bool {
-        guard !trimmedName.isEmpty else { return false }
+        guard !trimmedName.isEmpty else { return }
 
         let account = AllocationAccount(
             name: trimmedName,
@@ -110,14 +67,6 @@ struct AddAllocationAccountView: View {
         )
 
         modelContext.insert(account)
-        return true
-    }
-
-    private func resetForm() {
-        name = ""
-        color = .blue
-
-        guard DebugScreenshotFormDefaults.isEnabled else { return }
-        name = DebugScreenshotFormDefaults.accountName
+        dismiss()
     }
 }
