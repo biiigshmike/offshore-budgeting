@@ -86,7 +86,7 @@ struct SettingsReleaseLogsView: View {
                 ReleaseItem(
                     systemImage: "person.2.fill",
                     title: "Improved Reconciliations and Savings",
-                    description: "This update addresses an issue where split transactions would be counted towards a budget period's savings goal."
+                    description: "Fixed an issue where split transactions counted toward savings. Amounts split to a Reconciliation now affect only that balance and no longer impact Savings Outlook."
                 ),
                 ReleaseItem(
                     systemImage: "sailboat.fill",
@@ -358,3 +358,4 @@ private struct ReleaseRow: View {
         SettingsReleaseLogsView()
     }
 }
+
