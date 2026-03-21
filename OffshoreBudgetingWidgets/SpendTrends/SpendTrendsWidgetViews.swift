@@ -375,11 +375,15 @@ struct SpendTrendsWidgetMediumView: View {
                                     .font(.caption.weight(.semibold))
                                     .foregroundStyle(.primary)
                                     .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
+
+                                Spacer(minLength: 0)
 
                                 Text(highest.topCategoryPercentOfBucket, format: .percent.precision(.fractionLength(0)))
                                     .font(.caption.weight(.semibold))
                                     .foregroundStyle(.secondary)
                                     .lineLimit(1)
+                                    .frame(minWidth: 36, alignment: .trailing)
                             }
                         }
                     }
