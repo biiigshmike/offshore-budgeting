@@ -22,15 +22,27 @@ private struct ExcursionStatusTextView: View {
     }
 
     private var primaryText: some View {
-        statusText(Text(primaryStatusText))
+        statusText(
+            isExpired
+            ? Text(liveActivityLocalized("Session ended"))
+            : Text("Active until \(endDate, format: .dateTime.hour().minute())")
+        )
     }
 
     private var secondaryText: some View {
-        statusText(Text(secondaryStatusText))
+        statusText(
+            isExpired
+            ? Text(liveActivityLocalized("Session ended"))
+            : Text("Ends \(endDate, format: .dateTime.hour().minute())")
+        )
     }
 
     private var compactText: some View {
-        statusText(Text(compactStatusText))
+        statusText(
+            isExpired
+            ? Text(liveActivityLocalized("Ended"))
+            : Text("Until \(endDate, format: .dateTime.hour().minute())")
+        )
     }
 
     private var timeOnlyText: some View {
@@ -42,24 +54,8 @@ private struct ExcursionStatusTextView: View {
             .font(font)
             .foregroundStyle(foregroundStyle)
             .lineLimit(1)
+            .minimumScaleFactor(0.9)
             .allowsTightening(true)
-            .fixedSize(horizontal: true, vertical: false)
-    }
-
-    private var timeText: String {
-        endDate.formatted(.dateTime.hour().minute())
-    }
-
-    private var primaryStatusText: String {
-        isExpired ? liveActivityLocalized("Session ended") : widgetLocalizedFormat("Active until %@", timeText)
-    }
-
-    private var secondaryStatusText: String {
-        isExpired ? liveActivityLocalized("Session ended") : widgetLocalizedFormat("Ends %@", timeText)
-    }
-
-    private var compactStatusText: String {
-        isExpired ? liveActivityLocalized("Ended") : widgetLocalizedFormat("Until %@", timeText)
     }
 }
 
