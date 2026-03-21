@@ -72,6 +72,9 @@ struct ContentView: View {
 
     @Query(sort: \Workspace.name, order: .forward)
     private var workspaces: [Workspace]
+    @Query private var allIncomes: [Income]
+    @Query private var allPlannedExpenses: [PlannedExpense]
+    @Query private var allVariableExpenses: [VariableExpense]
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
@@ -192,6 +195,15 @@ struct ContentView: View {
                     trigger: .settingsChanged,
                     includesWidgets: true,
                     includesSavings: false,
+                    includesNotifications: false
+                )
+            }
+            .onChange(of: savingsRefreshSignature) { oldValue, newValue in
+                guard oldValue != newValue else { return }
+                scheduleDeferredResumeRefresh(
+                    trigger: .savingsDataChanged,
+                    includesWidgets: false,
+                    includesSavings: true,
                     includesNotifications: false
                 )
             }
@@ -453,7 +465,7 @@ struct ContentView: View {
         switch trigger {
         case .initialAppear, .workspaceCountChanged:
             return ResumeScheduling.coldLaunchDelayNanos
-        case .sceneBecameActive, .workspaceSelectionChanged, .settingsChanged:
+        case .sceneBecameActive, .workspaceSelectionChanged, .settingsChanged, .savingsDataChanged:
             return ResumeScheduling.standardDelayNanos
         }
     }
@@ -462,7 +474,7 @@ struct ContentView: View {
         switch trigger {
         case .initialAppear, .sceneBecameActive:
             return 900_000_000
-        case .workspaceSelectionChanged, .workspaceCountChanged, .settingsChanged:
+        case .workspaceSelectionChanged, .workspaceCountChanged, .settingsChanged, .savingsDataChanged:
             return 0
         }
     }
@@ -513,10 +525,52 @@ struct ContentView: View {
 
     private var savingsRefreshSignature: ContentViewSavingsRefreshSignature? {
         guard let workspaceID = UUID(uuidString: selectedWorkspaceID) else { return nil }
+        guard let dataSignature = savingsDataSignature(workspaceID: workspaceID) else { return nil }
         return ContentViewSavingsRefreshSignature(
             workspaceID: workspaceID,
-            defaultBudgetingPeriodRaw: defaultBudgetingPeriodRaw
+            defaultBudgetingPeriodRaw: defaultBudgetingPeriodRaw,
+            dataSignature: dataSignature
         )
+    }
+
+    private func savingsDataSignature(workspaceID: UUID) -> ContentViewSavingsDataSignature? {
+        let incomes = allIncomes.filter { $0.workspace?.id == workspaceID }
+        let plannedExpenses = allPlannedExpenses.filter { $0.workspace?.id == workspaceID }
+        let variableExpenses = allVariableExpenses.filter { $0.workspace?.id == workspaceID }
+
+        guard !(incomes.isEmpty && plannedExpenses.isEmpty && variableExpenses.isEmpty) else {
+            return ContentViewSavingsDataSignature(
+                incomeCount: 0,
+                incomeLatestUpdateStamp: 0,
+                incomeTotalCents: 0,
+                plannedExpenseCount: 0,
+                plannedExpenseLatestUpdateStamp: 0,
+                plannedExpenseTotalCents: 0,
+                variableExpenseCount: 0,
+                variableExpenseLatestUpdateStamp: 0,
+                variableExpenseTotalCents: 0
+            )
+        }
+
+        return ContentViewSavingsDataSignature(
+            incomeCount: incomes.count,
+            incomeLatestUpdateStamp: latestDateStamp(for: incomes.map(\.date)),
+            incomeTotalCents: totalCents(for: incomes.map(\.amount)),
+            plannedExpenseCount: plannedExpenses.count,
+            plannedExpenseLatestUpdateStamp: latestDateStamp(for: plannedExpenses.map(\.expenseDate)),
+            plannedExpenseTotalCents: totalCents(for: plannedExpenses.map { $0.plannedAmount + $0.actualAmount }),
+            variableExpenseCount: variableExpenses.count,
+            variableExpenseLatestUpdateStamp: latestDateStamp(for: variableExpenses.map(\.transactionDate)),
+            variableExpenseTotalCents: totalCents(for: variableExpenses.map(\.amount))
+        )
+    }
+
+    private func latestDateStamp(for dates: [Date]) -> Int64 {
+        Int64(dates.map(\.timeIntervalSinceReferenceDate).max() ?? 0)
+    }
+
+    private func totalCents(for amounts: [Double]) -> Int64 {
+        Int64(amounts.reduce(0, +) * 100)
     }
 
     private var notificationRefreshSignature: ContentViewNotificationRefreshSignature? {

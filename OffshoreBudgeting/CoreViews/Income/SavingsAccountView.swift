@@ -175,18 +175,26 @@ struct SavingsAccountView: View {
         sortModeRaw = mode.rawValue
     }
 
-    private var displayRows: [SavingsLedgerEntry] {
-        let dateFiltered = accountScopedEntries
-            .filter { entry in
+    private var ledgerBaseRows: [SavingsLedgerEntry] {
+        switch selectedTrendMode {
+        case .runningTotal:
+            return accountScopedEntries
+        case .currentPeriod:
+            return accountScopedEntries.filter { entry in
                 entry.date >= normalizedStart(appliedStartDate) && entry.date <= normalizedEnd(appliedEndDate)
             }
+        }
+    }
+
+    private var displayRows: [SavingsLedgerEntry] {
+        let scopedRows = ledgerBaseRows
 
         let trimmedSearch = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         let filteredRows: [SavingsLedgerEntry]
         if trimmedSearch.isEmpty {
-            filteredRows = dateFiltered
+            filteredRows = scopedRows
         } else {
-            filteredRows = dateFiltered.filter { entry in
+            filteredRows = scopedRows.filter { entry in
                 entryMatchesSearch(entry, query: trimmedSearch)
             }
         }
@@ -270,19 +278,31 @@ struct SavingsAccountView: View {
 
         var runningTotal: Double = 0
         var totalsByDay: [Date: Double] = [:]
+        let calendar = Calendar.current
 
         for entry in entriesAsc {
             runningTotal += entry.amount
-            let day = Calendar.current.startOfDay(for: entry.date)
+            let day = calendar.startOfDay(for: entry.date)
             totalsByDay[day] = runningTotal
         }
 
-        return totalsByDay
+        var points = totalsByDay
             .keys
             .sorted()
             .map { day in
                 SavingsChartPoint(date: day, total: totalsByDay[day] ?? 0)
             }
+
+        guard let firstEntry = entriesAsc.first, let firstPointDate = points.first?.date else {
+            return points
+        }
+
+        let baselineDate = runningTotalBaselineDate(for: firstEntry, calendar: calendar)
+        if baselineDate < firstPointDate {
+            points.insert(SavingsChartPoint(date: baselineDate, total: 0), at: 0)
+        }
+
+        return points
     }
 
     private var activeChartPoints: [SavingsChartPoint] {
@@ -330,8 +350,13 @@ struct SavingsAccountView: View {
             Section("Ledger") {
                 if displayRows.isEmpty {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("No savings entries for this date range.")
-                        Text("Try expanding the date range. Running Total still reflects your full ledger balance.")
+                        if selectedTrendMode == .runningTotal {
+                            Text("No savings entries yet.")
+                            Text("Add savings activity to start your running total history.")
+                        } else {
+                            Text("No savings entries for this date range.")
+                            Text("Try expanding the date range. Running Total still reflects your full ledger balance.")
+                        }
                     }
                     .foregroundStyle(.secondary)
                 } else {
@@ -475,6 +500,13 @@ struct SavingsAccountView: View {
                         y: .value("Total", point.total)
                     )
                     .foregroundStyle(.green.opacity(0.2))
+
+                    PointMark(
+                        x: .value("Date", point.date),
+                        y: .value("Total", point.total)
+                    )
+                    .foregroundStyle(.green)
+                    .symbolSize(activeChartPoints.count == 1 ? 90 : 45)
                 }
                 .chartYAxis {
                     AxisMarks(position: .leading) {
@@ -707,6 +739,18 @@ struct SavingsAccountView: View {
         default:
             break
         }
+    }
+
+    private func runningTotalBaselineDate(
+        for firstEntry: SavingsLedgerEntry,
+        calendar: Calendar
+    ) -> Date {
+        if firstEntry.kind == .periodClose, let periodStartDate = firstEntry.periodStartDate {
+            return calendar.startOfDay(for: periodStartDate)
+        }
+
+        let firstDay = calendar.startOfDay(for: firstEntry.date)
+        return calendar.date(byAdding: .day, value: -1, to: firstDay) ?? firstDay
     }
 }
 

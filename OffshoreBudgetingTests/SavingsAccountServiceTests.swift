@@ -164,7 +164,172 @@ struct SavingsAccountServiceTests {
         #expect(account.total == 5600)
     }
 
-    @Test func deletingPeriodCloseEntry_staysDeleted_andFuturePeriodsStillAutoCapture() throws {
+    @Test func autoCapture_refreshesExistingClosedMonthWhenBackdatedActivityChanges() throws {
+        let context = try makeContext()
+
+        let ws = Workspace(name: "WS", hexColor: "#3B82F6")
+        let card = Card(name: "Visa", workspace: ws)
+        let cat = Category(name: "General", hexColor: "#22AA66", workspace: ws)
+        context.insert(ws)
+        context.insert(card)
+        context.insert(cat)
+
+        let januaryIncome = Income(
+            source: "Pay",
+            amount: 2500,
+            date: makeDate(2026, 1, 5),
+            isPlanned: false,
+            workspace: ws,
+            card: card
+        )
+        let januaryPlanned = PlannedExpense(
+            title: "Rent",
+            plannedAmount: 1000,
+            actualAmount: 1000,
+            expenseDate: makeDate(2026, 1, 10),
+            workspace: ws,
+            card: card,
+            category: cat
+        )
+        let januaryVariable = VariableExpense(
+            descriptionText: "Groceries",
+            amount: 500,
+            transactionDate: makeDate(2026, 1, 15),
+            workspace: ws,
+            card: card,
+            category: cat
+        )
+
+        let februaryIncome = Income(
+            source: "Pay",
+            amount: 2600,
+            date: makeDate(2026, 2, 5),
+            isPlanned: false,
+            workspace: ws,
+            card: card
+        )
+        let februaryPlanned = PlannedExpense(
+            title: "Rent",
+            plannedAmount: 1000,
+            actualAmount: 1000,
+            expenseDate: makeDate(2026, 2, 10),
+            workspace: ws,
+            card: card,
+            category: cat
+        )
+        let februaryVariable = VariableExpense(
+            descriptionText: "Groceries",
+            amount: 400,
+            transactionDate: makeDate(2026, 2, 15),
+            workspace: ws,
+            card: card,
+            category: cat
+        )
+
+        let incomes = [januaryIncome, februaryIncome]
+        let plannedExpenses = [januaryPlanned, februaryPlanned]
+        let variableExpenses = [januaryVariable, februaryVariable]
+
+        incomes.forEach(context.insert)
+        plannedExpenses.forEach(context.insert)
+        variableExpenses.forEach(context.insert)
+        try context.save()
+
+        SavingsAccountService.runAutoCaptureIfNeeded(
+            for: ws,
+            defaultBudgetingPeriodRaw: BudgetingPeriod.monthly.rawValue,
+            incomes: incomes,
+            plannedExpenses: plannedExpenses,
+            variableExpenses: variableExpenses,
+            modelContext: context,
+            now: makeDate(2026, 3, 15)
+        )
+
+        var entries = try fetchAll(
+            SavingsLedgerEntry.self,
+            in: context,
+            sortBy: [SortDescriptor(\SavingsLedgerEntry.date, order: .forward)]
+        )
+        var periodCloseEntries = entries.filter { $0.kind == .periodClose }
+        #expect(periodCloseEntries.count == 2)
+        #expect(periodCloseEntries.map(\.amount) == [1000, 1200])
+
+        let februaryEntryID = try #require(periodCloseEntries.last?.id)
+
+        let backdatedFebruaryExpense = VariableExpense(
+            descriptionText: "Utilities",
+            amount: 200,
+            transactionDate: makeDate(2026, 2, 20),
+            workspace: ws,
+            card: card,
+            category: cat
+        )
+        context.insert(backdatedFebruaryExpense)
+        try context.save()
+
+        SavingsAccountService.runAutoCaptureIfNeeded(
+            for: ws,
+            defaultBudgetingPeriodRaw: BudgetingPeriod.monthly.rawValue,
+            incomes: incomes,
+            plannedExpenses: plannedExpenses,
+            variableExpenses: variableExpenses + [backdatedFebruaryExpense],
+            modelContext: context,
+            now: makeDate(2026, 3, 21)
+        )
+
+        entries = try fetchAll(
+            SavingsLedgerEntry.self,
+            in: context,
+            sortBy: [SortDescriptor(\SavingsLedgerEntry.date, order: .forward)]
+        )
+        periodCloseEntries = entries.filter { $0.kind == .periodClose }
+
+        #expect(periodCloseEntries.count == 2)
+        #expect(periodCloseEntries.map(\.amount) == [1000, 1000])
+        #expect(periodCloseEntries.last?.id == februaryEntryID)
+
+        let account = try #require(fetchAll(SavingsAccount.self, in: context).first)
+        #expect(account.total == 2000)
+    }
+
+    @Test func runningTotalSnapshot_startsAtFirstClosedPeriodStartDate() throws {
+        let context = try makeContext()
+
+        let ws = Workspace(name: "WS", hexColor: "#3B82F6")
+        let account = SavingsAccount(name: "Savings", total: 3886.55, workspace: ws)
+        let periodClose = SavingsLedgerEntry(
+            date: makeDate(2026, 2, 28),
+            amount: 3886.55,
+            note: "Period close Feb 1, 2026 - Feb 28, 2026",
+            kindRaw: SavingsLedgerEntryKind.periodClose.rawValue,
+            periodStartDate: makeDate(2026, 2, 1),
+            periodEndDate: makeDate(2026, 2, 28),
+            workspace: ws,
+            account: account
+        )
+
+        context.insert(ws)
+        context.insert(account)
+        context.insert(periodClose)
+        try context.save()
+
+        let snapshot = SavingsGraphSnapshotService.buildSnapshot(
+            for: ws,
+            rangeStart: makeDate(2026, 3, 1),
+            rangeEnd: makeDate(2026, 3, 31),
+            modelContext: context
+        )
+        let calendar = Calendar.current
+
+        #expect(snapshot.runningTotal == 3886.55)
+        #expect(snapshot.runningTotalPoints.count == 2)
+        #expect(snapshot.runningTotalPoints.first?.date == calendar.startOfDay(for: makeDate(2026, 2, 1)))
+        #expect(snapshot.runningTotalPoints.first?.total == 0)
+        #expect(snapshot.runningTotalPoints.last?.date == calendar.startOfDay(for: makeDate(2026, 2, 28)))
+        #expect(snapshot.runningTotalPoints.last?.total == 3886.55)
+    }
+
+    @Test func deletingPeriodCloseEntry_recreatesMissingClosedPeriodWhenActivityStillExists() throws {
         let context = try makeContext()
 
         let ws = Workspace(name: "WS", hexColor: "#3B82F6")
@@ -236,7 +401,8 @@ struct SavingsAccountServiceTests {
         )
         let periodCloseEntriesAfterRecapture = entries.filter { $0.kind == .periodClose }
 
-        #expect(periodCloseEntriesAfterRecapture.isEmpty)
+        #expect(periodCloseEntriesAfterRecapture.count == 1)
+        #expect(periodCloseEntriesAfterRecapture.first?.amount == 1000)
 
         let febIncome = Income(
             source: "Pay",
@@ -284,8 +450,8 @@ struct SavingsAccountServiceTests {
             sortBy: [SortDescriptor(\SavingsLedgerEntry.date, order: .forward)]
         )
         let periodCloseEntriesAfterMarchRun = entries.filter { $0.kind == .periodClose }
-        #expect(periodCloseEntriesAfterMarchRun.count == 1)
-        #expect(periodCloseEntriesAfterMarchRun.first?.amount == 1200)
+        #expect(periodCloseEntriesAfterMarchRun.count == 2)
+        #expect(periodCloseEntriesAfterMarchRun.map(\.amount) == [1000, 1200])
     }
 
     @Test func autoCapture_repairsDuplicatePeriodCloseEntries_keepingOldest() throws {

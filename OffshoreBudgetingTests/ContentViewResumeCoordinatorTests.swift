@@ -20,7 +20,18 @@ struct ContentViewResumeCoordinatorTests {
 
     private let savingsSignature = ContentViewSavingsRefreshSignature(
         workspaceID: UUID(uuidString: "11111111-1111-1111-1111-111111111111")!,
-        defaultBudgetingPeriodRaw: BudgetingPeriod.monthly.rawValue
+        defaultBudgetingPeriodRaw: BudgetingPeriod.monthly.rawValue,
+        dataSignature: ContentViewSavingsDataSignature(
+            incomeCount: 1,
+            incomeLatestUpdateStamp: 100,
+            incomeTotalCents: 250_000,
+            plannedExpenseCount: 2,
+            plannedExpenseLatestUpdateStamp: 200,
+            plannedExpenseTotalCents: 175_000,
+            variableExpenseCount: 3,
+            variableExpenseLatestUpdateStamp: 300,
+            variableExpenseTotalCents: 95_000
+        )
     )
 
     private let notificationSignature = ContentViewNotificationRefreshSignature(
@@ -55,6 +66,7 @@ struct ContentViewResumeCoordinatorTests {
     ) {
         #expect(actual?.workspaceID == expected?.workspaceID)
         #expect(actual?.defaultBudgetingPeriodRaw == expected?.defaultBudgetingPeriodRaw)
+        #expect(actual?.dataSignature == expected?.dataSignature)
     }
 
     private func expectNotificationSignature(

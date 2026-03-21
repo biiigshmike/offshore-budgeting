@@ -193,19 +193,43 @@ enum SavingsGraphSnapshotService {
 
         var runningTotal = 0.0
         var totalsByDay: [Date: Double] = [:]
+        let calendar = Calendar.current
 
         for entry in entriesAsc {
             runningTotal += entry.amount
-            let day = Calendar.current.startOfDay(for: entry.date)
+            let day = calendar.startOfDay(for: entry.date)
             totalsByDay[day] = runningTotal
         }
 
-        return totalsByDay
+        var points = totalsByDay
             .keys
             .sorted()
             .map { day in
                 SavingsGraphSnapshot.Point(date: day, total: totalsByDay[day] ?? 0)
             }
+
+        guard let firstEntry = entriesAsc.first, let firstPointDate = points.first?.date else {
+            return points
+        }
+
+        let baselineDate = runningTotalBaselineDate(for: firstEntry, calendar: calendar)
+        if baselineDate < firstPointDate {
+            points.insert(SavingsGraphSnapshot.Point(date: baselineDate, total: 0), at: 0)
+        }
+
+        return points
+    }
+
+    private static func runningTotalBaselineDate(
+        for firstEntry: SavingsLedgerEntry,
+        calendar: Calendar
+    ) -> Date {
+        if firstEntry.kind == .periodClose, let periodStartDate = firstEntry.periodStartDate {
+            return calendar.startOfDay(for: periodStartDate)
+        }
+
+        let firstDay = calendar.startOfDay(for: firstEntry.date)
+        return calendar.date(byAdding: .day, value: -1, to: firstDay) ?? firstDay
     }
 
     private static func normalizedEnd(_ date: Date, calendar: Calendar) -> Date {

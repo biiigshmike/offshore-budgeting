@@ -215,18 +215,21 @@ enum SavingsAccountService {
             account.autoCaptureThroughDate = latestClosedRange.end
         }
 
-        var captureStartRange: (start: Date, end: Date)?
+        var refreshStartRange: (start: Date, end: Date)?
+        var insertStartRange: (start: Date, end: Date)?
         if let autoCaptureThroughDate = account.autoCaptureThroughDate {
             let processedRange = periodRange(containing: autoCaptureThroughDate, period: period)
             let isRangeEnd = Calendar.current.isDate(autoCaptureThroughDate, inSameDayAs: processedRange.end)
-            captureStartRange = isRangeEnd ? nextRange(after: processedRange, period: period) : processedRange
+            refreshStartRange = processedRange
+            insertStartRange = isRangeEnd ? nextRange(after: processedRange, period: period) : processedRange
         } else {
-            captureStartRange = latestClosedRange
+            refreshStartRange = latestClosedRange
+            insertStartRange = latestClosedRange
         }
 
-        if let captureStartRange {
+        if let refreshStartRange {
             trace(
-                "Capture window start=\(AppDateFormat.abbreviatedDate(captureStartRange.start)) " +
+                "Capture window start=\(AppDateFormat.abbreviatedDate(refreshStartRange.start)) " +
                 "latestClosedEnd=\(AppDateFormat.abbreviatedDate(latestClosedRange.end))"
             )
         } else {
@@ -235,41 +238,25 @@ enum SavingsAccountService {
             )
         }
 
-        var cursor = captureStartRange
+        var cursor = refreshStartRange
         while let currentRange = cursor, currentRange.start <= latestClosedRange.start {
-            if !periodCloseExists(
+            refreshOrInsertPeriodClose(
+                workspace: workspace,
                 workspaceID: workspaceID,
-                start: currentRange.start,
-                end: currentRange.end,
-                modelContext: modelContext
-            ) {
-                let delta = periodDelta(
-                    in: currentRange,
+                account: account,
+                range: currentRange,
+                incomes: incomes,
+                plannedExpenses: plannedExpenses,
+                variableExpenses: variableExpenses,
+                modelContext: modelContext,
+                allowInsert: shouldInsertPeriodClose(
+                    currentRange,
+                    insertStartRange: insertStartRange,
                     incomes: incomes,
                     plannedExpenses: plannedExpenses,
                     variableExpenses: variableExpenses
                 )
-                let entry = SavingsLedgerEntry(
-                    date: currentRange.end,
-                    amount: delta,
-                    note: periodCloseNote(start: currentRange.start, end: currentRange.end),
-                    kindRaw: SavingsLedgerEntryKind.periodClose.rawValue,
-                    periodStartDate: currentRange.start,
-                    periodEndDate: currentRange.end,
-                    workspace: workspace,
-                    account: account
-                )
-                modelContext.insert(entry)
-                trace(
-                    "Inserted period-close start=\(AppDateFormat.abbreviatedDate(currentRange.start)) " +
-                    "end=\(AppDateFormat.abbreviatedDate(currentRange.end)) amount=\(delta)"
-                )
-            } else {
-                trace(
-                    "Period-close already exists start=\(AppDateFormat.abbreviatedDate(currentRange.start)) " +
-                    "end=\(AppDateFormat.abbreviatedDate(currentRange.end))"
-                )
-            }
+            )
 
             guard let next = nextRange(after: currentRange, period: period) else { break }
             cursor = next
@@ -590,34 +577,17 @@ enum SavingsAccountService {
         )
 
         while cursor.start <= latest.start {
-            if !periodCloseExists(
+            refreshOrInsertPeriodClose(
+                workspace: workspace,
                 workspaceID: workspace.id,
-                start: cursor.start,
-                end: cursor.end,
-                modelContext: modelContext
-            ) {
-                let delta = periodDelta(
-                    in: cursor,
-                    incomes: incomes,
-                    plannedExpenses: plannedExpenses,
-                    variableExpenses: variableExpenses
-                )
-                let entry = SavingsLedgerEntry(
-                    date: cursor.end,
-                    amount: delta,
-                    note: periodCloseNote(start: cursor.start, end: cursor.end),
-                    kindRaw: SavingsLedgerEntryKind.periodClose.rawValue,
-                    periodStartDate: cursor.start,
-                    periodEndDate: cursor.end,
-                    workspace: workspace,
-                    account: account
-                )
-                modelContext.insert(entry)
-                trace(
-                    "Backfill inserted period-close start=\(AppDateFormat.abbreviatedDate(cursor.start)) " +
-                    "end=\(AppDateFormat.abbreviatedDate(cursor.end)) amount=\(delta)"
-                )
-            }
+                account: account,
+                range: cursor,
+                incomes: incomes,
+                plannedExpenses: plannedExpenses,
+                variableExpenses: variableExpenses,
+                modelContext: modelContext,
+                isBackfill: true
+            )
 
             guard let next = nextRange(after: cursor, period: period) else { break }
             cursor = next
@@ -800,12 +770,12 @@ enum SavingsAccountService {
         }
     }
 
-    private static func periodCloseExists(
+    private static func periodCloseEntry(
         workspaceID: UUID,
         start: Date,
         end: Date,
         modelContext: ModelContext
-    ) -> Bool {
+    ) -> SavingsLedgerEntry? {
         let periodCloseRaw = SavingsLedgerEntryKind.periodClose.rawValue
         let descriptor = FetchDescriptor<SavingsLedgerEntry>(
             predicate: #Predicate<SavingsLedgerEntry> { entry in
@@ -814,10 +784,93 @@ enum SavingsAccountService {
             }
         )
         let entries = (try? modelContext.fetch(descriptor)) ?? []
-        return entries.contains { entry in
+        return entries.first { entry in
             Calendar.current.isDate(entry.periodStartDate ?? .distantPast, inSameDayAs: start)
             && Calendar.current.isDate(entry.periodEndDate ?? .distantPast, inSameDayAs: end)
         }
+    }
+
+    private static func refreshOrInsertPeriodClose(
+        workspace: Workspace,
+        workspaceID: UUID,
+        account: SavingsAccount,
+        range: (start: Date, end: Date),
+        incomes: [Income],
+        plannedExpenses: [PlannedExpense],
+        variableExpenses: [VariableExpense],
+        modelContext: ModelContext,
+        allowInsert: Bool = true,
+        isBackfill: Bool = false
+    ) {
+        let delta = periodDelta(
+            in: range,
+            incomes: incomes,
+            plannedExpenses: plannedExpenses,
+            variableExpenses: variableExpenses
+        )
+        let note = periodCloseNote(start: range.start, end: range.end)
+
+        if let entry = periodCloseEntry(
+            workspaceID: workspaceID,
+            start: range.start,
+            end: range.end,
+            modelContext: modelContext
+        ) {
+            let didChange = entry.date != range.end
+                || entry.amount != delta
+                || entry.note != note
+                || entry.account?.id != account.id
+                || entry.workspace?.id != workspace.id
+                || !Calendar.current.isDate(entry.periodStartDate ?? .distantPast, inSameDayAs: range.start)
+                || !Calendar.current.isDate(entry.periodEndDate ?? .distantPast, inSameDayAs: range.end)
+
+            entry.date = range.end
+            entry.amount = delta
+            entry.note = note
+            entry.kind = .periodClose
+            entry.periodStartDate = range.start
+            entry.periodEndDate = range.end
+            entry.workspace = workspace
+            entry.account = account
+
+            if didChange {
+                entry.updatedAt = .now
+                trace(
+                    "Refreshed period-close start=\(AppDateFormat.abbreviatedDate(range.start)) " +
+                    "end=\(AppDateFormat.abbreviatedDate(range.end)) amount=\(delta)"
+                )
+            } else {
+                trace(
+                    "Period-close unchanged start=\(AppDateFormat.abbreviatedDate(range.start)) " +
+                    "end=\(AppDateFormat.abbreviatedDate(range.end))"
+                )
+            }
+            return
+        }
+
+        guard allowInsert else {
+            trace(
+                "Skipped missing period-close start=\(AppDateFormat.abbreviatedDate(range.start)) " +
+                "end=\(AppDateFormat.abbreviatedDate(range.end))"
+            )
+            return
+        }
+
+        let entry = SavingsLedgerEntry(
+            date: range.end,
+            amount: delta,
+            note: note,
+            kindRaw: SavingsLedgerEntryKind.periodClose.rawValue,
+            periodStartDate: range.start,
+            periodEndDate: range.end,
+            workspace: workspace,
+            account: account
+        )
+        modelContext.insert(entry)
+        trace(
+            "\(isBackfill ? "Backfill inserted" : "Inserted") period-close start=\(AppDateFormat.abbreviatedDate(range.start)) " +
+            "end=\(AppDateFormat.abbreviatedDate(range.end)) amount=\(delta)"
+        )
     }
 
     private static func periodDelta(
@@ -936,5 +989,35 @@ enum SavingsAccountService {
 
         guard let previousDate else { return nil }
         return periodRange(containing: previousDate, period: period)
+    }
+
+    private static func shouldInsertPeriodClose(
+        _ range: (start: Date, end: Date),
+        insertStartRange: (start: Date, end: Date)?,
+        incomes: [Income],
+        plannedExpenses: [PlannedExpense],
+        variableExpenses: [VariableExpense]
+    ) -> Bool {
+        if let insertStartRange, range.start >= insertStartRange.start {
+            return true
+        }
+
+        return periodHasActivity(
+            in: range,
+            incomes: incomes,
+            plannedExpenses: plannedExpenses,
+            variableExpenses: variableExpenses
+        )
+    }
+
+    private static func periodHasActivity(
+        in range: (start: Date, end: Date),
+        incomes: [Income],
+        plannedExpenses: [PlannedExpense],
+        variableExpenses: [VariableExpense]
+    ) -> Bool {
+        incomes.contains { !$0.isPlanned && isInRange($0.date, start: range.start, end: range.end) }
+            || plannedExpenses.contains { isInRange($0.expenseDate, start: range.start, end: range.end) }
+            || variableExpenses.contains { isInRange($0.transactionDate, start: range.start, end: range.end) }
     }
 }
