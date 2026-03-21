@@ -48,6 +48,8 @@ struct BudgetsView: View {
     @State private var sheetRoute: SheetRoute? = nil
     @State private var showingDeleteConfirm: Bool = false
     @State private var pendingDelete: (() -> Void)? = nil
+    @State private var deleteErrorMessage: String = ""
+    @State private var showingDeleteError: Bool = false
     @State private var bucketSnapshot: BudgetBucketsSnapshot = .empty
     @State private var hasLoadedBucketSnapshot: Bool = false
     @State private var needsBucketSnapshotRefresh: Bool = false
@@ -303,6 +305,11 @@ struct BudgetsView: View {
                 pendingDelete = nil
             }
         }
+        .alert("Couldn’t Delete Budget", isPresented: $showingDeleteError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(deleteErrorMessage)
+        }
         .onAppear {
             if shouldSyncCommandSurface {
                 commandHub.activate(.budgets)
@@ -505,20 +512,15 @@ struct BudgetsView: View {
     }
 
     private func deleteBudgetAndGeneratedPlannedExpenses(_ budget: Budget) {
-        let budgetID: UUID? = budget.id
-        let descriptor = FetchDescriptor<PlannedExpense>(
-            predicate: #Predicate { expense in
-                expense.sourceBudgetID == budgetID
-            }
-        )
-
-        if let expenses = try? modelContext.fetch(descriptor) {
-            for expense in expenses {
-                PlannedExpenseDeletionService.delete(expense, modelContext: modelContext)
-            }
+        do {
+            try BudgetDeletionService.deleteBudgetAndGeneratedPlannedExpenses(
+                budget,
+                modelContext: modelContext
+            )
+        } catch {
+            deleteErrorMessage = error.localizedDescription
+            showingDeleteError = true
         }
-
-        modelContext.delete(budget)
     }
 
     private var budgetsSignature: Int {

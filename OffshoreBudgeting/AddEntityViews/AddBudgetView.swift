@@ -35,6 +35,8 @@ struct AddBudgetView: View {
     // MARK: - Alerts
 
     @State private var showingInvalidDatesAlert: Bool = false
+    @State private var budgetSaveErrorMessage: String = ""
+    @State private var showingBudgetSaveError: Bool = false
 
     init(workspace: Workspace) {
         self.workspace = workspace
@@ -143,6 +145,11 @@ struct AddBudgetView: View {
             Button("OK", role: .cancel) { }
         } message: {
             Text("Start date must be on or before the end date.")
+        }
+        .alert("Couldn’t Save Budget", isPresented: $showingBudgetSaveError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(budgetSaveErrorMessage)
         }
     }
 
@@ -267,6 +274,14 @@ struct AddBudgetView: View {
             selectedPresets: selectedPresets,
             selectedCardIDs: selectedCardIDs
         )
+
+        do {
+            try modelContext.save()
+        } catch {
+            budgetSaveErrorMessage = error.localizedDescription
+            showingBudgetSaveError = true
+            return false
+        }
 
         Task {
             await LocalNotificationService.syncFromUserDefaultsIfPossible(

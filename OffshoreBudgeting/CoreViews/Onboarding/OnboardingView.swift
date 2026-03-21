@@ -74,6 +74,9 @@ struct OnboardingView: View {
     @State private var showingRestartRequired: Bool = false
     @State private var didChooseICloudFromGetStarted: Bool = false
     @State private var showingStarterBudgetPrompt: Bool = false
+    @State private var starterBudgetPromptContinuation: (() -> Void)? = nil
+    @State private var starterBudgetErrorMessage: String = ""
+    @State private var showingStarterBudgetError: Bool = false
     
     // Drives the “wake up” background motion on the welcome step.
     @State private var isExitingWelcome: Bool = false
@@ -176,15 +179,23 @@ struct OnboardingView: View {
         .alert("Create a Starter Budget?", isPresented: $showingStarterBudgetPrompt) {
             Button("Create Budget") {
                 if let workspace = currentWorkspace {
-                    _ = createStarterBudgetIfNeeded(in: workspace)
+                    if createStarterBudgetIfNeeded(in: workspace) != nil || hasAtLeastOneBudget(in: workspace) {
+                        continueAfterStarterBudgetPrompt()
+                    }
+                } else {
+                    continueAfterStarterBudgetPrompt()
                 }
-                completeOnboarding()
             }
             Button("Skip", role: .cancel) {
-                completeOnboarding()
+                continueAfterStarterBudgetPrompt()
             }
         } message: {
             Text("You can finish now, or create a starter budget so Home has planning context right away.")
+        }
+        .alert("Couldn’t Save Starter Budget", isPresented: $showingStarterBudgetError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(starterBudgetErrorMessage)
         }
         .sheet(isPresented: $showingRestartRequired) {
             RestartRequiredView(
@@ -543,7 +554,10 @@ struct OnboardingView: View {
                 let hasIncome = hasAtLeastOneIncome(in: ws)
                 let hasBudget = hasAtLeastOneBudget(in: ws)
                 if hasIncome && !hasBudget {
-                    _ = createStarterBudgetIfNeeded(in: ws)
+                    presentStarterBudgetPrompt {
+                        goNext()
+                    }
+                    return
                 }
             }
 
@@ -553,10 +567,11 @@ struct OnboardingView: View {
 
         if onboardingStep >= finalStepValue {
             if let ws = currentWorkspace {
-                let hasIncome = hasAtLeastOneIncome(in: ws)
                 let hasBudget = hasAtLeastOneBudget(in: ws)
-                if !hasIncome && !hasBudget {
-                    showingStarterBudgetPrompt = true
+                if !hasBudget {
+                    presentStarterBudgetPrompt {
+                        completeOnboarding()
+                    }
                     return
                 }
             }
@@ -698,64 +713,37 @@ struct OnboardingView: View {
 
     @discardableResult
     private func createStarterBudgetIfNeeded(in workspace: Workspace) -> Budget? {
-        if hasAtLeastOneBudget(in: workspace) {
+        do {
+            let budget = try StarterBudgetService.createIfNeeded(
+                in: workspace,
+                defaultBudgetingPeriodRaw: defaultBudgetingPeriodRaw,
+                modelContext: modelContext
+            )
+
+            Task {
+                await LocalNotificationService.syncFromUserDefaultsIfPossible(
+                    modelContext: modelContext,
+                    workspaceID: workspace.id
+                )
+            }
+
+            return budget
+        } catch {
+            starterBudgetErrorMessage = error.localizedDescription
+            showingStarterBudgetError = true
             return nil
         }
+    }
 
-        let period = BudgetingPeriod(rawValue: defaultBudgetingPeriodRaw) ?? .monthly
-        let range = period.defaultRange(containing: .now, calendar: .current)
-        let budgetName = BudgetNameSuggestion.suggestedName(
-            start: range.start,
-            end: range.end,
-            calendar: .current
-        )
+    private func presentStarterBudgetPrompt(continuation: @escaping () -> Void) {
+        starterBudgetPromptContinuation = continuation
+        showingStarterBudgetPrompt = true
+    }
 
-        let budget = Budget(
-            name: budgetName,
-            startDate: range.start,
-            endDate: range.end,
-            workspace: workspace
-        )
-        modelContext.insert(budget)
-
-        let workspaceID = workspace.id
-        let cardsDescriptor = FetchDescriptor<Card>(
-            predicate: #Predicate<Card> { $0.workspace?.id == workspaceID },
-            sortBy: [SortDescriptor(\Card.name, order: .forward)]
-        )
-        let presetsDescriptor = FetchDescriptor<Preset>(
-            predicate: #Predicate<Preset> { $0.workspace?.id == workspaceID },
-            sortBy: [SortDescriptor(\Preset.title, order: .forward)]
-        )
-
-        let cards = (try? modelContext.fetch(cardsDescriptor)) ?? []
-        let presets = ((try? modelContext.fetch(presetsDescriptor)) ?? []).filter { !$0.isArchived }
-
-        for card in cards {
-            modelContext.insert(BudgetCardLink(budget: budget, card: card))
-        }
-
-        for preset in presets {
-            modelContext.insert(BudgetPresetLink(budget: budget, preset: preset))
-            let dates = PresetScheduleEngine.occurrences(for: preset, in: budget)
-
-            for date in dates {
-                let plannedExpense = PlannedExpense(
-                    title: preset.title,
-                    plannedAmount: preset.plannedAmount,
-                    actualAmount: 0,
-                    expenseDate: date,
-                    workspace: workspace,
-                    card: preset.defaultCard,
-                    category: preset.defaultCategory,
-                    sourcePresetID: preset.id,
-                    sourceBudgetID: budget.id
-                )
-                modelContext.insert(plannedExpense)
-            }
-        }
-
-        return budget
+    private func continueAfterStarterBudgetPrompt() {
+        let continuation = starterBudgetPromptContinuation
+        starterBudgetPromptContinuation = nil
+        continuation?()
     }
     
     // MARK: - Skip prompt
@@ -2446,6 +2434,8 @@ private struct OnboardingBudgetsStep: View {
     @State private var sheetRoute: SheetRoute? = nil
     @State private var showingDeleteConfirm: Bool = false
     @State private var pendingDelete: (() -> Void)? = nil
+    @State private var deleteErrorMessage: String = ""
+    @State private var showingDeleteError: Bool = false
 
     init(workspace: Workspace) {
         self.workspace = workspace
@@ -2550,6 +2540,11 @@ private struct OnboardingBudgetsStep: View {
                 pendingDelete = nil
             }
         }
+        .alert("Couldn’t Delete Budget", isPresented: $showingDeleteError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(deleteErrorMessage)
+        }
     }
 
     private func deleteBudgetWithOptionalConfirm(_ budget: Budget) {
@@ -2564,20 +2559,15 @@ private struct OnboardingBudgetsStep: View {
     }
 
     private func deleteBudgetAndGeneratedPlannedExpenses(_ budget: Budget) {
-        let budgetID: UUID? = budget.id
-        let descriptor = FetchDescriptor<PlannedExpense>(
-            predicate: #Predicate { expense in
-                expense.sourceBudgetID == budgetID
-            }
-        )
-
-        if let expenses = try? modelContext.fetch(descriptor) {
-            for expense in expenses {
-                PlannedExpenseDeletionService.delete(expense, modelContext: modelContext)
-            }
+        do {
+            try BudgetDeletionService.deleteBudgetAndGeneratedPlannedExpenses(
+                budget,
+                modelContext: modelContext
+            )
+        } catch {
+            deleteErrorMessage = error.localizedDescription
+            showingDeleteError = true
         }
-
-        modelContext.delete(budget)
     }
 
     private func budgetRangeLabel(for budget: Budget) -> String {

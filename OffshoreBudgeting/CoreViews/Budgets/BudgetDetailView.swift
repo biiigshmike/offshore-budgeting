@@ -91,6 +91,8 @@ struct BudgetDetailView: View {
     
     @State private var showingBudgetDeleteOptionsDialog: Bool = false
     @State private var showingNothingToDeleteAlert: Bool = false
+    @State private var budgetMutationErrorMessage: String = ""
+    @State private var showingBudgetMutationError: Bool = false
 
     // MARK: - Sheets
 
@@ -659,6 +661,11 @@ struct BudgetDetailView: View {
         } message: {
             Text(String(localized: "budgetDetail.nothingToDelete.message", defaultValue: "These planned expenses have actual spending recorded.", comment: "Alert message when deletion is blocked due recorded spending."))
         }
+        .alert("Couldn’t Update Budget", isPresented: $showingBudgetMutationError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(budgetMutationErrorMessage)
+        }
 
         .alert("Delete?", isPresented: $showingExpenseDeleteConfirm) {
             Button("Delete", role: .destructive) {
@@ -1142,8 +1149,13 @@ struct BudgetDetailView: View {
     }
 
     private func deleteBudgetOnly() {
-        modelContext.delete(budget)
-        dismiss()
+        do {
+            try BudgetDeletionService.deleteBudgetOnly(budget, modelContext: modelContext)
+            dismiss()
+        } catch {
+            budgetMutationErrorMessage = error.localizedDescription
+            showingBudgetMutationError = true
+        }
     }
 
     /// New flow:
@@ -1166,8 +1178,13 @@ struct BudgetDetailView: View {
             return
         }
 
-        modelContext.delete(budget)
-        dismiss()
+        do {
+            try BudgetDeletionService.deleteBudgetOnly(budget, modelContext: modelContext)
+            dismiss()
+        } catch {
+            budgetMutationErrorMessage = error.localizedDescription
+            showingBudgetMutationError = true
+        }
     }
 
     private func deleteUnspentGeneratedPlannedExpensesForBudget() -> Int {
