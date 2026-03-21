@@ -9,6 +9,8 @@ struct AllocationAccountDetailView: View {
     @Environment(\.dismiss) private var dismiss
 
     @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
+    @AppStorage("general_defaultBudgetingPeriod")
+    private var defaultBudgetingPeriodRaw: String = BudgetingPeriod.monthly.rawValue
 
     @State private var showingAddSettlementSheet: Bool = false
     @State private var showingEditAccountSheet: Bool = false
@@ -25,6 +27,14 @@ struct AllocationAccountDetailView: View {
 
     @State private var showingSettlementActionError: Bool = false
     @State private var settlementActionErrorMessage: String = ""
+    @State private var didInitializeDateRange: Bool = false
+    @State private var draftStartDate: Date = .now
+    @State private var draftEndDate: Date = .now
+    @State private var appliedStartDate: Date = .now
+    @State private var appliedEndDate: Date = .now
+    @State private var isApplyingQuickRange: Bool = false
+    @State private var selectedCategoryIDs: Set<UUID> = []
+    @State private var sortMode: ReconciliationDetailSortMode = .dateDesc
 
     private var balance: Double {
         CurrencyFormatter.normalizedCurrencyDisplayValue(AllocationLedgerService.balance(for: account))
@@ -43,77 +53,39 @@ struct AllocationAccountDetailView: View {
         return settlement.expense != nil || settlement.plannedExpense != nil
     }
 
+    private var isDateDirty: Bool {
+        let cal = Calendar.current
+        let s1 = cal.startOfDay(for: draftStartDate)
+        let s2 = cal.startOfDay(for: appliedStartDate)
+        let e1 = cal.startOfDay(for: draftEndDate)
+        let e2 = cal.startOfDay(for: appliedEndDate)
+        return s1 != s2 || e1 != e2
+    }
+
+    private var derivedState: ReconciliationDetailDerivedState {
+        buildDerivedState()
+    }
+
     var body: some View {
         List {
-            Section {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Balance")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+            balanceSection(derivedState)
+            dateRangeSection
 
-                    Text(balance, format: CurrencyFormatter.currencyStyle())
-                        .font(.title2.weight(.semibold))
-                }
-                .padding(.vertical, 4)
+            if !derivedState.availableCategoriesForChips.isEmpty {
+                categorySection(derivedState)
             }
 
-            if ledgerRows.isEmpty {
-                Section {
-                    Text("No ledger entries yet.")
-                        .foregroundStyle(.secondary)
-                }
-            } else {
-                Section("Ledger") {
-                    ForEach(ledgerRows) { row in
-                        ledgerRowView(row)
-                            .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                                if let settlementID = row.settlementID, !account.isArchived {
-                                    Button {
-                                        guard let settlement = settlement(for: settlementID) else {
-                                            showEntryUnavailableError()
-                                            return
-                                        }
-                                        editingSheetEntry = .settlement(settlement)
-                                    } label: {
-                                        Label("Edit", systemImage: "pencil")
-                                    }
-                                    .tint(Color("AccentColor"))
-                                }
-                                if isEditableChargeRow(row), !account.isArchived {
-                                    Button {
-                                        guard let allocationID = row.allocationID,
-                                              let allocation = allocation(for: allocationID) else {
-                                            showEntryUnavailableError()
-                                            return
-                                        }
-                                        editingSheetEntry = .allocation(allocation)
-                                    } label: {
-                                        Label("Edit", systemImage: "pencil")
-                                    }
-                                    .tint(Color("AccentColor"))
-                                }
-                            }
-                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                if let settlementID = row.settlementID, !account.isArchived {
-                                    Button(role: .destructive) {
-                                        requestDeleteSettlement(id: settlementID)
-                                    } label: {
-                                        Label("Delete", systemImage: "trash")
-                                    }
-                                }
-                                if isEditableChargeRow(row), !account.isArchived, let allocationID = row.allocationID {
-                                    Button(role: .destructive) {
-                                        requestDeleteChargeAllocation(id: allocationID)
-                                    } label: {
-                                        Label("Delete", systemImage: "trash")
-                                    }
-                                }
-                            }
-                    }
-                }
-            }
+            sortSection
+            ledgerSection(derivedState)
         }
+        .listStyle(.insetGrouped)
         .navigationTitle(account.name)
+        .onAppear {
+            initializeDateRangeIfNeeded()
+        }
+        .onChange(of: defaultBudgetingPeriodRaw) { _, _ in
+            applyDefaultPeriodRange()
+        }
         .toolbar {
             if account.isArchived {
                 ToolbarItemGroup(placement: .topBarTrailing) {
@@ -283,6 +255,340 @@ struct AllocationAccountDetailView: View {
         }
     }
 
+    private func buildDerivedState() -> ReconciliationDetailDerivedState {
+        let rows = ledgerRows
+
+        var categoriesByID: [UUID: Category] = [:]
+        for row in rows {
+            if let category = category(for: row) {
+                categoriesByID[category.id] = category
+            }
+        }
+        let availableCategoriesForChips = categoriesByID.values.sorted {
+            $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+        }
+
+        let start = normalizedStart(appliedStartDate)
+        let end = normalizedEnd(appliedEndDate)
+
+        let dateFiltered = rows.filter { row in
+            row.date >= start && row.date <= end
+        }
+
+        let categoryFiltered: [AllocationLedgerService.LedgerRow]
+        if selectedCategoryIDs.isEmpty {
+            categoryFiltered = dateFiltered
+        } else {
+            categoryFiltered = dateFiltered.filter { row in
+                guard let categoryID = category(for: row)?.id else { return false }
+                return selectedCategoryIDs.contains(categoryID)
+            }
+        }
+
+        let sortedRows = sortMode.sorted(categoryFiltered)
+        let slices = categoryHeatSlices(for: categoryFiltered, limit: 10)
+
+        return ReconciliationDetailDerivedState(
+            availableCategoriesForChips: availableCategoriesForChips,
+            filteredLedgerRows: sortedRows,
+            filteredAmountValue: CurrencyFormatter.normalizedCurrencyDisplayValue(
+                categoryFiltered
+                    .filter { $0.type == .charge }
+                    .reduce(0) { partial, row in
+                        partial + max(0, row.amount)
+                    }
+            ),
+            heatMapStops: gradientStops(from: slices)
+        )
+    }
+
+    private func category(for row: AllocationLedgerService.LedgerRow) -> Category? {
+        if let allocationID = row.allocationID {
+            let allocation = allocation(for: allocationID)
+            return allocation?.expense?.category ?? allocation?.plannedExpense?.category
+        }
+
+        if let settlementID = row.settlementID {
+            let settlement = settlement(for: settlementID)
+            return settlement?.expense?.category ?? settlement?.plannedExpense?.category
+        }
+
+        return nil
+    }
+
+    private func categoryHeatSlices(
+        for rows: [AllocationLedgerService.LedgerRow],
+        limit: Int
+    ) -> [ReconciliationCategorySpendSlice] {
+        var totalsByCategoryID: [UUID: (category: Category, total: Double)] = [:]
+
+        for row in rows {
+            guard let category = category(for: row) else { continue }
+            let amount = abs(row.amount)
+            guard amount > 0 else { continue }
+
+            if let existing = totalsByCategoryID[category.id] {
+                totalsByCategoryID[category.id] = (existing.category, existing.total + amount)
+            } else {
+                totalsByCategoryID[category.id] = (category, amount)
+            }
+        }
+
+        var slices = totalsByCategoryID.values
+            .map {
+                ReconciliationCategorySpendSlice(
+                    id: $0.category.id,
+                    hexColor: $0.category.hexColor,
+                    amount: $0.total
+                )
+            }
+            .sorted { $0.amount > $1.amount }
+
+        if slices.count > limit {
+            slices = Array(slices.prefix(limit))
+        }
+
+        let total = slices.reduce(0) { $0 + $1.amount }
+        guard total > 0 else { return [] }
+
+        var cursor: Double = 0
+        slices = slices.map { slice in
+            let width = slice.amount / total
+            let start = cursor
+            let end = min(1.0, cursor + width)
+            cursor = end
+            return ReconciliationCategorySpendSlice(
+                id: slice.id,
+                hexColor: slice.hexColor,
+                amount: slice.amount,
+                start: start,
+                end: end
+            )
+        }
+
+        if var last = slices.last, last.end < 1.0 {
+            last.end = 1.0
+            slices[slices.count - 1] = last
+        }
+
+        return slices
+    }
+
+    private func gradientStops(from slices: [ReconciliationCategorySpendSlice]) -> [Gradient.Stop] {
+        guard !slices.isEmpty else { return [] }
+
+        var stops: [Gradient.Stop] = []
+        stops.reserveCapacity(slices.count * 2)
+
+        for slice in slices {
+            let color = Color(hex: slice.hexColor) ?? Color.secondary.opacity(0.35)
+            stops.append(.init(color: color, location: slice.start))
+            stops.append(.init(color: color, location: slice.end))
+        }
+
+        if stops.first?.location != 0 {
+            let firstColor = stops.first?.color ?? Color.secondary.opacity(0.35)
+            stops.insert(.init(color: firstColor, location: 0), at: 0)
+        }
+
+        if stops.last?.location != 1 {
+            let lastColor = stops.last?.color ?? Color.secondary.opacity(0.35)
+            stops.append(.init(color: lastColor, location: 1))
+        }
+
+        return stops
+    }
+
+    private func initializeDateRangeIfNeeded() {
+        guard !didInitializeDateRange else { return }
+        didInitializeDateRange = true
+        applyDefaultPeriodRange()
+    }
+
+    private func applyDefaultPeriodRange() {
+        let now = Date()
+        let period = BudgetingPeriod(rawValue: defaultBudgetingPeriodRaw) ?? .monthly
+        let range = period.defaultRange(containing: now, calendar: .current)
+
+        draftStartDate = normalizedStart(range.start)
+        draftEndDate = normalizedEnd(range.end)
+        appliedStartDate = draftStartDate
+        appliedEndDate = draftEndDate
+    }
+
+    private func applyDraftDates() {
+        appliedStartDate = normalizedStart(draftStartDate)
+        appliedEndDate = normalizedEnd(draftEndDate)
+    }
+
+    private func applyQuickRangePresetDeferred(_ preset: CalendarQuickRangePreset) {
+        isApplyingQuickRange = true
+        applyQuickRangePreset(preset)
+        DispatchQueue.main.async {
+            applyDraftDates()
+            isApplyingQuickRange = false
+        }
+    }
+
+    private func applyQuickRangePreset(_ preset: CalendarQuickRangePreset) {
+        let range = preset.makeRange(now: Date(), calendar: .current)
+        draftStartDate = normalizedStart(range.start)
+        draftEndDate = normalizedEnd(range.end)
+    }
+
+    private func normalizedStart(_ date: Date) -> Date {
+        Calendar.current.startOfDay(for: date)
+    }
+
+    private func normalizedEnd(_ date: Date) -> Date {
+        let start = Calendar.current.startOfDay(for: date)
+        return Calendar.current.date(byAdding: DateComponents(day: 1, second: -1), to: start) ?? date
+    }
+
+    private func balanceSection(_ derived: ReconciliationDetailDerivedState) -> some View {
+        Section {
+            ReconciliationBalanceStatementRow(
+                total: balance,
+                heatMapStops: derived.heatMapStops
+            )
+            .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+        } header: {
+            Text("Balance")
+        } footer: {
+            Text("Current outstanding reconciliation balance across all history.")
+        }
+    }
+
+    private var dateRangeSection: some View {
+        Section {
+            ReconciliationDateFilterRow(
+                draftStartDate: $draftStartDate,
+                draftEndDate: $draftEndDate,
+                isGoEnabled: isDateDirty && !isApplyingQuickRange,
+                onTapGo: applyDraftDates,
+                onSelectQuickRange: applyQuickRangePresetDeferred
+            )
+        } header: {
+            Text("Date Range")
+        }
+    }
+
+    private func categorySection(_ derived: ReconciliationDetailDerivedState) -> some View {
+        Section {
+            ReconciliationCategoryChipsRow(
+                categories: derived.availableCategoriesForChips,
+                selectedIDs: $selectedCategoryIDs
+            )
+        } header: {
+            HStack {
+                Text("Categories")
+                Spacer()
+                if !selectedCategoryIDs.isEmpty {
+                    Button("Clear") {
+                        selectedCategoryIDs.removeAll()
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        } footer: {
+            Text(
+                selectedCategoryIDs.isEmpty
+                ? "Single-press categories to filter ledger entries."
+                : "Tap selected chips to clear one at a time, or use Clear to reset all."
+            )
+        }
+    }
+
+    private var sortSection: some View {
+        Section {
+            Picker("Sort", selection: $sortMode) {
+                Text("A-Z").tag(ReconciliationDetailSortMode.az)
+                Text("Z-A").tag(ReconciliationDetailSortMode.za)
+                Text("\(CurrencyFormatter.currencySymbol)↑").tag(ReconciliationDetailSortMode.amountAsc)
+                Text("\(CurrencyFormatter.currencySymbol)↓").tag(ReconciliationDetailSortMode.amountDesc)
+                Text(String(localized: "sort.dateShort.asc", defaultValue: "D↑", comment: "Compact ascending date sort label for segmented controls.")).tag(ReconciliationDetailSortMode.dateAsc)
+                Text(String(localized: "sort.dateShort.desc", defaultValue: "D↓", comment: "Compact descending date sort label for segmented controls.")).tag(ReconciliationDetailSortMode.dateDesc)
+            }
+            .pickerStyle(.segmented)
+        } header: {
+            Text("Sort")
+        }
+    }
+
+    private func ledgerSection(_ derived: ReconciliationDetailDerivedState) -> some View {
+        Section {
+            if derived.filteredLedgerRows.isEmpty {
+                Text(emptyLedgerMessage)
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(derived.filteredLedgerRows) { row in
+                    ledgerRowView(row)
+                        .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                            if let settlementID = row.settlementID, !account.isArchived {
+                                Button {
+                                    guard let settlement = settlement(for: settlementID) else {
+                                        showEntryUnavailableError()
+                                        return
+                                    }
+                                    editingSheetEntry = .settlement(settlement)
+                                } label: {
+                                    Label("Edit", systemImage: "pencil")
+                                }
+                                .tint(Color("AccentColor"))
+                            }
+                            if isEditableChargeRow(row), !account.isArchived {
+                                Button {
+                                    guard let allocationID = row.allocationID,
+                                          let allocation = allocation(for: allocationID) else {
+                                        showEntryUnavailableError()
+                                        return
+                                    }
+                                    editingSheetEntry = .allocation(allocation)
+                                } label: {
+                                    Label("Edit", systemImage: "pencil")
+                                }
+                                .tint(Color("AccentColor"))
+                            }
+                        }
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            if let settlementID = row.settlementID, !account.isArchived {
+                                Button(role: .destructive) {
+                                    requestDeleteSettlement(id: settlementID)
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
+                            if isEditableChargeRow(row), !account.isArchived, let allocationID = row.allocationID {
+                                Button(role: .destructive) {
+                                    requestDeleteChargeAllocation(id: allocationID)
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
+                        }
+                }
+            }
+        } header: {
+            Text("Period Activity • \(derived.filteredAmountValue, format: CurrencyFormatter.currencyStyle())")
+        } footer: {
+            Text("Shows filtered charge activity for the selected date range and categories.")
+        }
+    }
+
+    private var emptyLedgerMessage: String {
+        if !selectedCategoryIDs.isEmpty {
+            return selectedCategoryIDs.count == 1
+            ? "No ledger entries match the selected category in this date range."
+            : "No ledger entries match the selected categories in this date range."
+        }
+
+        if hasHistory {
+            return "No ledger entries yet for this date range."
+        }
+
+        return "No ledger entries yet."
+    }
+
     private func ledgerRowView(_ row: AllocationLedgerService.LedgerRow) -> some View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
@@ -432,6 +738,265 @@ struct AllocationAccountDetailView: View {
         modelContext.delete(account)
         try? modelContext.save()
         dismiss()
+    }
+}
+
+private struct ReconciliationDetailDerivedState {
+    let availableCategoriesForChips: [Category]
+    let filteredLedgerRows: [AllocationLedgerService.LedgerRow]
+    let filteredAmountValue: Double
+    let heatMapStops: [Gradient.Stop]
+}
+
+private enum ReconciliationDetailSortMode: String, Identifiable {
+    case az
+    case za
+    case amountAsc
+    case amountDesc
+    case dateAsc
+    case dateDesc
+
+    var id: String { rawValue }
+
+    func sorted(_ rows: [AllocationLedgerService.LedgerRow]) -> [AllocationLedgerService.LedgerRow] {
+        rows.sorted(by: compare)
+    }
+
+    private func compare(_ lhs: AllocationLedgerService.LedgerRow, _ rhs: AllocationLedgerService.LedgerRow) -> Bool {
+        switch self {
+        case .az:
+            let result = lhs.title.localizedCaseInsensitiveCompare(rhs.title)
+            if result != .orderedSame {
+                return result == .orderedAscending
+            }
+            return descendingTieBreak(lhs, rhs)
+        case .za:
+            let result = lhs.title.localizedCaseInsensitiveCompare(rhs.title)
+            if result != .orderedSame {
+                return result == .orderedDescending
+            }
+            return descendingTieBreak(lhs, rhs)
+        case .amountAsc:
+            if lhs.amount != rhs.amount {
+                return lhs.amount < rhs.amount
+            }
+            return descendingTieBreak(lhs, rhs)
+        case .amountDesc:
+            if lhs.amount != rhs.amount {
+                return lhs.amount > rhs.amount
+            }
+            return descendingTieBreak(lhs, rhs)
+        case .dateAsc:
+            if lhs.date != rhs.date {
+                return lhs.date < rhs.date
+            }
+            return lhs.id < rhs.id
+        case .dateDesc:
+            return descendingTieBreak(lhs, rhs)
+        }
+    }
+
+    private func descendingTieBreak(_ lhs: AllocationLedgerService.LedgerRow, _ rhs: AllocationLedgerService.LedgerRow) -> Bool {
+        if lhs.date != rhs.date {
+            return lhs.date > rhs.date
+        }
+        return lhs.id > rhs.id
+    }
+}
+
+private struct ReconciliationCategorySpendSlice: Identifiable {
+    let id: UUID
+    let hexColor: String
+    let amount: Double
+
+    var start: Double = 0
+    var end: Double = 0
+}
+
+private struct ReconciliationHeatMapBar: View {
+    let stops: [Gradient.Stop]
+
+    var body: some View {
+        ZStack {
+            if !stops.isEmpty {
+                LinearGradient(
+                    gradient: Gradient(stops: stops),
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .saturation(1.75)
+                .blur(radius: 36)
+                .overlay(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.16),
+                            Color.white.opacity(0.05),
+                            Color.clear
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+private struct ReconciliationBalanceStatementRow: View {
+    let total: Double
+    let heatMapStops: [Gradient.Stop]
+
+    private let cornerRadius: CGFloat = 14
+
+    var body: some View {
+        ZStack(alignment: .leading) {
+            ReconciliationHeatMapBar(stops: heatMapStops)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(total, format: CurrencyFormatter.currencyStyle())
+                    .font(.title2.weight(.semibold))
+                    .foregroundStyle(.primary)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(minHeight: 72)
+        .contentShape(RoundedRectangle(cornerRadius: cornerRadius))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Balance")
+        .accessibilityValue(Text(total, format: CurrencyFormatter.currencyStyle()))
+    }
+}
+
+private struct ReconciliationDateFilterRow: View {
+    @Binding var draftStartDate: Date
+    @Binding var draftEndDate: Date
+
+    let isGoEnabled: Bool
+    let onTapGo: () -> Void
+    let onSelectQuickRange: (CalendarQuickRangePreset) -> Void
+
+    var body: some View {
+        HStack(spacing: 0) {
+            Spacer(minLength: 0)
+
+            HStack(spacing: 10) {
+                PillDatePickerField(title: "Start Date", date: $draftStartDate)
+                    .layoutPriority(1)
+
+                PillDatePickerField(title: "End Date", date: $draftEndDate)
+                    .layoutPriority(1)
+
+                Button(action: onTapGo) {
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 14, weight: .semibold))
+                        .frame(width: 44, height: 44)
+                        .background(
+                            Circle()
+                                .fill(
+                                    isGoEnabled
+                                    ? Color.accentColor.opacity(0.85)
+                                    : Color.secondary.opacity(0.1)
+                                )
+                        )
+                }
+                .buttonStyle(.plain)
+                .disabled(!isGoEnabled)
+                .accessibilityLabel("Apply Date Range")
+
+                Menu {
+                    CalendarQuickRangeMenuItems { preset in
+                        onSelectQuickRange(preset)
+                    }
+                } label: {
+                    Image(systemName: "calendar")
+                        .font(.system(size: 14, weight: .semibold))
+                        .frame(width: 44, height: 44)
+                        .background(Circle().fill(Color.secondary.opacity(0.1)))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Quick Date Ranges")
+            }
+
+            Spacer(minLength: 0)
+        }
+    }
+}
+
+private struct ReconciliationCategoryChipsRow: View {
+    let categories: [Category]
+    @Binding var selectedIDs: Set<UUID>
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 10) {
+                ForEach(categories, id: \.id) { category in
+                    ReconciliationChip(
+                        title: category.name,
+                        dotHex: category.hexColor,
+                        isSelected: selectedIDs.contains(category.id)
+                    ) {
+                        toggle(category.id)
+                    }
+                }
+            }
+            .padding(.vertical, 2)
+        }
+    }
+
+    private func toggle(_ id: UUID) {
+        if selectedIDs.contains(id) {
+            selectedIDs.remove(id)
+        } else {
+            selectedIDs.insert(id)
+        }
+    }
+}
+
+private struct ReconciliationChip: View {
+    let title: String
+    let dotHex: String
+    let isSelected: Bool
+    let action: () -> Void
+
+    private var baseColor: Color {
+        Color(hex: dotHex) ?? Color.secondary.opacity(0.35)
+    }
+
+    private var backgroundColor: Color {
+        isSelected ? baseColor.opacity(0.20) : Color.secondary.opacity(0.12)
+    }
+
+    private var foregroundColor: Color {
+        isSelected ? baseColor : .primary
+    }
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(baseColor)
+                    .frame(width: 8, height: 8)
+
+                Text(title)
+                    .font(.subheadline.weight(.medium))
+                    .lineLimit(1)
+            }
+            .foregroundStyle(foregroundColor)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(
+                Capsule()
+                    .fill(backgroundColor)
+            )
+        }
+        .buttonStyle(.plain)
     }
 }
 
