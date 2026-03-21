@@ -76,7 +76,7 @@ struct SettingsReleaseLogsView: View {
                 ReleaseItem(
                     systemImage: "creditcard.fill",
                     title: "Card and Expense Improvements",
-                    description: "Previous releases didn’t accurately support assigning debits, credits, income, or adjustments. This update adds historical card ledger entries and enables precise assignment of each type. You’ll see clearer segmentation of your spending—without affecting Savings Outlook or total spent."
+                    description: "Previous releases didn’t accurately support assigning debits, credits, income, or adjustments. This update adds historical card ledger entries and enables precise assignment of each type. You’ll see clearer segmentation of your spending without affecting your actual savings or total spent."
                 ),
                 ReleaseItem(
                     systemImage: "person.2.fill",
