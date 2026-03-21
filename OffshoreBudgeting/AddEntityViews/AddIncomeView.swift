@@ -62,18 +62,50 @@ struct AddIncomeView: View {
         .navigationTitle("Add Income")
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                Button("Cancel") { dismiss() }
+                Button { dismiss() } label: {
+                    Image(systemName: "xmark")
+                }
+                .accessibilityLabel("Cancel")
             }
-            if #available(iOS 26.0, *) {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Save") { save() }
+            if #available(iOS 26.0, macCatalyst 26.0, *) {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    Button { saveAndAdd() } label: {
+                        Image(systemName: "checkmark.arrow.trianglehead.clockwise")
+                    }
+                    .accessibilityLabel("Save & Add")
+                        .disabled(!canSave)
+                        .tint(.accentColor)
+                        .buttonStyle(.plain)
+                }
+
+                ToolbarSpacer(.flexible, placement: .primaryAction)
+
+                ToolbarItemGroup(placement: .primaryAction) {
+                    Button { save() } label: {
+                        Image(systemName: "checkmark")
+                    }
+                    .accessibilityLabel("Save")
                         .disabled(!canSave)
                         .tint(.accentColor)
                         .buttonStyle(.glassProminent)
                 }
             } else {
+                ToolbarItem(placement: .primaryAction) {
+                    Button { saveAndAdd() } label: {
+                        Image(systemName: "checkmark.arrow.trianglehead.clockwise")
+                    }
+                    .accessibilityLabel("Save & Add")
+                        .disabled(!canSave)
+                        .tint(.accentColor)
+                        .controlSize(.large)
+                        .buttonStyle(.plain)
+                }
+
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Save") { save() }
+                    Button { save() } label: {
+                        Image(systemName: "checkmark")
+                    }
+                    .accessibilityLabel("Save")
                         .disabled(!canSave)
                         .tint(.accentColor)
                         .controlSize(.large)
@@ -134,9 +166,20 @@ struct AddIncomeView: View {
     // MARK: - Save
 
     private func save() {
+        guard persistIncome() else { return }
+        dismiss()
+    }
+
+    private func saveAndAdd() {
+        guard persistIncome() else { return }
+        resetForm()
+    }
+
+    @discardableResult
+    private func persistIncome() -> Bool {
         guard let amt = parsedAmount, amt > 0 else {
             showingInvalidAmountAlert = true
-            return
+            return false
         }
 
         // One-off
@@ -151,21 +194,20 @@ struct AddIncomeView: View {
                 series: nil
             )
             modelContext.insert(income)
-            dismiss()
-            return
+            return true
         }
 
         // Series (Option 2 requires end date)
         guard let endDate else {
             showingInvalidRepeatAlert = true
-            return
+            return false
         }
 
         let startDay = Calendar.current.startOfDay(for: date)
         let endDay = Calendar.current.startOfDay(for: endDate)
         guard endDay >= startDay else {
             showingInvalidRepeatAlert = true
-            return
+            return false
         }
 
         let series = IncomeSeries(
@@ -199,7 +241,26 @@ struct AddIncomeView: View {
             )
             modelContext.insert(income)
         }
+        return true
+    }
 
-        dismiss()
+    private func resetForm() {
+        source = ""
+        amountText = ""
+        date = initialDate
+        isPlanned = initialIsPlanned
+        frequencyRaw = RecurrenceFrequency.none.rawValue
+        interval = 1
+        weeklyWeekday = 6
+        monthlyDayOfMonth = 15
+        monthlyIsLastDay = false
+        yearlyMonth = 1
+        yearlyDayOfMonth = 15
+        endDate = nil
+
+        guard DebugScreenshotFormDefaults.isEnabled else { return }
+
+        source = DebugScreenshotFormDefaults.incomeSource
+        amountText = DebugScreenshotFormDefaults.incomeAmountText
     }
 }

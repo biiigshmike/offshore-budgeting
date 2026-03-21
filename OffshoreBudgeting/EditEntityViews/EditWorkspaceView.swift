@@ -36,18 +36,27 @@ struct EditWorkspaceView: View {
             .navigationTitle("Edit Workspace")
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Cancel") { dismiss() }
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark")
+                    }
+                    .accessibilityLabel("Cancel")
                 }
                 if #available(iOS 26.0, *) {
                     ToolbarItem(placement: .topBarTrailing) {
-                        Button("Save") { save() }
+                        Button { save() } label: {
+                            Image(systemName: "checkmark")
+                        }
+                        .accessibilityLabel("Save")
                             .disabled(!canSave)
                             .tint(.accentColor)
                             .buttonStyle(.glassProminent)
                     }
                 } else {
                     ToolbarItem(placement: .topBarTrailing) {
-                        Button("Save") { save() }
+                        Button { save() } label: {
+                            Image(systemName: "checkmark")
+                        }
+                        .accessibilityLabel("Save")
                             .disabled(!canSave)
                             .tint(.accentColor)
                             .controlSize(.large)

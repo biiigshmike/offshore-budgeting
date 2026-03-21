@@ -29,18 +29,50 @@ struct AddWorkspaceView: View {
             .navigationTitle("Add Workspace")
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Cancel") { dismiss() }
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark")
+                    }
+                    .accessibilityLabel("Cancel")
                 }
-                if #available(iOS 26.0, *) {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button("Save") { save() }
+                if #available(iOS 26.0, macCatalyst 26.0, *) {
+                    ToolbarItemGroup(placement: .primaryAction) {
+                        Button { saveAndAdd() } label: {
+                            Image(systemName: "checkmark.arrow.trianglehead.clockwise")
+                        }
+                        .accessibilityLabel("Save & Add")
+                            .disabled(!canSave)
+                            .tint(.accentColor)
+                            .buttonStyle(.plain)
+                    }
+
+                    ToolbarSpacer(.flexible, placement: .primaryAction)
+
+                    ToolbarItemGroup(placement: .primaryAction) {
+                        Button { save() } label: {
+                            Image(systemName: "checkmark")
+                        }
+                        .accessibilityLabel("Save")
                             .disabled(!canSave)
                             .tint(.accentColor)
                             .buttonStyle(.glassProminent)
                     }
                 } else {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button { saveAndAdd() } label: {
+                            Image(systemName: "checkmark.arrow.trianglehead.clockwise")
+                        }
+                        .accessibilityLabel("Save & Add")
+                            .disabled(!canSave)
+                            .tint(.accentColor)
+                            .controlSize(.large)
+                            .buttonStyle(.plain)
+                    }
+
                     ToolbarItem(placement: .topBarTrailing) {
-                        Button("Save") { save() }
+                        Button { save() } label: {
+                            Image(systemName: "checkmark")
+                        }
+                        .accessibilityLabel("Save")
                             .disabled(!canSave)
                             .tint(.accentColor)
                             .controlSize(.large)
@@ -57,8 +89,28 @@ struct AddWorkspaceView: View {
     }
 
     private func save() {
+        guard persistWorkspace() else { return }
+        dismiss()
+    }
+
+    private func saveAndAdd() {
+        guard persistWorkspace() else { return }
+        resetForm()
+    }
+
+    @discardableResult
+    private func persistWorkspace() -> Bool {
+        guard !trimmedName.isEmpty else { return false }
         let hex = WorkspaceFormView.hexString(from: color)
         onCreate(trimmedName, hex)
-        dismiss()
+        return true
+    }
+
+    private func resetForm() {
+        name = ""
+        color = WorkspaceFormView.color(fromHex: "#3B82F6")
+
+        guard DebugScreenshotFormDefaults.isEnabled else { return }
+        name = DebugScreenshotFormDefaults.workspaceName
     }
 }

@@ -84,10 +84,16 @@ struct EditIncomeView: View {
         .navigationTitle("Edit Income")
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                Button("Cancel") { dismiss() }
+                Button { dismiss() } label: {
+                    Image(systemName: "xmark")
+                }
+                .accessibilityLabel("Cancel")
             }
             ToolbarItem(placement: .topBarTrailing) {
-                Button("Update") { onTapUpdate() }
+                Button { onTapUpdate() } label: {
+                    Image(systemName: "checkmark")
+                }
+                .accessibilityLabel("Update")
                     .disabled(!canSave)
             }
         }

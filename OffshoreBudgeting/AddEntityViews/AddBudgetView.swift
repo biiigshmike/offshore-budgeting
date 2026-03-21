@@ -79,19 +79,51 @@ struct AddBudgetView: View {
         )
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                Button("Cancel") { dismiss() }
-                    .clipShape(.containerRelative)
+                Button { dismiss() } label: {
+                    Image(systemName: "xmark")
+                }
+                .accessibilityLabel("Cancel")
+                .clipShape(.containerRelative)
             }
-            if #available(iOS 26.0, *) {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Save") { createBudget() }
+            if #available(iOS 26.0, macCatalyst 26.0, *) {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    Button { saveAndAdd() } label: {
+                        Image(systemName: "checkmark.arrow.trianglehead.clockwise")
+                    }
+                    .accessibilityLabel("Save & Add")
+                        .disabled(!canCreate)
+                        .tint(.accentColor)
+                        .buttonStyle(.plain)
+                }
+
+                ToolbarSpacer(.flexible, placement: .primaryAction)
+
+                ToolbarItemGroup(placement: .primaryAction) {
+                    Button { save() } label: {
+                        Image(systemName: "checkmark")
+                    }
+                    .accessibilityLabel("Save")
                         .disabled(!canCreate)
                         .tint(.accentColor)
                         .buttonStyle(.glassProminent)
                 }
             } else {
+                ToolbarItem(placement: .primaryAction) {
+                    Button { saveAndAdd() } label: {
+                        Image(systemName: "checkmark.arrow.trianglehead.clockwise")
+                    }
+                    .accessibilityLabel("Save & Add")
+                        .disabled(!canCreate)
+                        .tint(.accentColor)
+                        .controlSize(.large)
+                        .buttonStyle(.plain)
+                }
+
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Save") { createBudget() }
+                    Button { save() } label: {
+                        Image(systemName: "checkmark")
+                    }
+                    .accessibilityLabel("Save")
                         .disabled(!canCreate)
                         .tint(.accentColor)
                         .controlSize(.large)
@@ -190,10 +222,21 @@ struct AddBudgetView: View {
 
     // MARK: - Create
 
-    private func createBudget() {
+    private func save() {
+        guard createBudget() else { return }
+        dismiss()
+    }
+
+    private func saveAndAdd() {
+        guard createBudget() else { return }
+        resetForm()
+    }
+
+    @discardableResult
+    private func createBudget() -> Bool {
         guard startDate <= endDate else {
             showingInvalidDatesAlert = true
-            return
+            return false
         }
 
         let budget = Budget(
@@ -218,22 +261,34 @@ struct AddBudgetView: View {
             modelContext.insert(link)
         }
 
-	        // Materialize: presets -> planned expenses (inside this budget window)
-	        materializePlannedExpenses(
-	            for: budget,
-	            selectedPresets: selectedPresets,
-	            selectedCardIDs: selectedCardIDs
-	        )
+        // Materialize: presets -> planned expenses (inside this budget window)
+        materializePlannedExpenses(
+            for: budget,
+            selectedPresets: selectedPresets,
+            selectedCardIDs: selectedCardIDs
+        )
 
-	        Task {
-	            await LocalNotificationService.syncFromUserDefaultsIfPossible(
-	                modelContext: modelContext,
-	                workspaceID: workspace.id
-	            )
-	        }
+        Task {
+            await LocalNotificationService.syncFromUserDefaultsIfPossible(
+                modelContext: modelContext,
+                workspaceID: workspace.id
+            )
+        }
 
-	        dismiss()
-	    }
+        return true
+    }
+
+    private func resetForm() {
+        name = ""
+        userEditedName = false
+        startDate = Calendar.current.startOfDay(for: Date())
+        endDate = Calendar.current.startOfDay(for: Date())
+        selectedCardIDs.removeAll()
+        selectedPresetIDs.removeAll()
+
+        seedInitialDatesAndName()
+        applyScreenshotPrefillIfNeeded()
+    }
 
     private func materializePlannedExpenses(
         for budget: Budget,
