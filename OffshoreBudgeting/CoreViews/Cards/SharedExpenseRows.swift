@@ -78,12 +78,7 @@ struct SharedPlannedExpenseRow: View {
                     .font(.body)
 
                 HStack(spacing: 6) {
-                    Text(
-                        expense.expenseDate.formatted(
-                            date: .abbreviated,
-                            time: .omitted
-                        )
-                    )
+                    Text(expense.displaySubtitle(includeCardName: false))
                 }
                 .font(.footnote)
                 .foregroundStyle(.secondary)

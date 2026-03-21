@@ -1695,12 +1695,7 @@ private struct BudgetPlannedExpenseRow: View {
                     .font(.body)
 
                 HStack(spacing: 8) {
-                    Text(AppDateFormat.abbreviatedDate(expense.expenseDate))
-
-                    if showsCardName, let cardName = expense.card?.name {
-                        Text("•")
-                        Text(cardName)
-                    }
+                    Text(expense.displaySubtitle(includeCardName: showsCardName))
                 }
                 .font(.footnote)
                 .foregroundStyle(.secondary)

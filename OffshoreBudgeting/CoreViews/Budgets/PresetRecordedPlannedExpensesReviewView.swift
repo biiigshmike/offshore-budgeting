@@ -119,11 +119,7 @@ struct PresetRecordedPlannedExpensesReviewView: View {
             }
 
             HStack(spacing: 8) {
-                Text(AppDateFormat.abbreviatedDate(expense.expenseDate))
-                if let cardName = expense.card?.name {
-                    Text("•")
-                    Text(cardName)
-                }
+                Text(expense.displaySubtitle())
             }
             .font(.footnote)
             .foregroundStyle(.secondary)
