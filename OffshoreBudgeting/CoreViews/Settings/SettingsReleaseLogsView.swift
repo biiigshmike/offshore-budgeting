@@ -70,6 +70,27 @@ struct SettingsReleaseLogsView: View {
 
     static let releaseSections: [ReleaseSection] = [
         ReleaseSection(
+            version: "2.3.4",
+            build: "19",
+            items: [
+                ReleaseItem(
+                    systemImage: "creditcard.fill",
+                    title: "Card and Expense Improvements",
+                    description: "Previous releases didn’t accurately support assigning debits, credits, income, or adjustments. This update adds historical card ledger entries and enables precise assignment of each type. You’ll see clearer segmentation of your spending—without affecting Savings Outlook or total spent."
+                ),
+                ReleaseItem(
+                    systemImage: "person.2.fill",
+                    title: "Reconciliation Redesign",
+                    description: "Reconciliations now have an instantly familiar, streamlined design. Use the search bar to find transactions, category chips for quick filters, and the sort bar to surface results faster."
+                ),
+                ReleaseItem(
+                    systemImage: "banknote.fill",
+                    title: "Savings Account Refinement",
+                    description: "Fixes an issue where post‑dated budgets didn’t always update the Savings Account running total.\n\nNote: If the graph or running total doesn’t update right away, edit and save a budget that includes post‑dated entries (for example, adjust an expense), then return and undo the change. This should trigger the update and reflect accurate totals."
+                )
+            ]
+        ),
+        ReleaseSection(
             version: "2.3.3",
             build: "18",
             items: [

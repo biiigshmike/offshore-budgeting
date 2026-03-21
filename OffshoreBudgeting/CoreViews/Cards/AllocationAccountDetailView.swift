@@ -35,6 +35,8 @@ struct AllocationAccountDetailView: View {
     @State private var isApplyingQuickRange: Bool = false
     @State private var selectedCategoryIDs: Set<UUID> = []
     @State private var sortMode: ReconciliationDetailSortMode = .dateDesc
+    @State private var searchText: String = ""
+    @FocusState private var searchFocused: Bool
 
     private var balance: Double {
         CurrencyFormatter.normalizedCurrencyDisplayValue(AllocationLedgerService.balance(for: account))
@@ -66,6 +68,10 @@ struct AllocationAccountDetailView: View {
         buildDerivedState()
     }
 
+    private var isSearching: Bool {
+        !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     var body: some View {
         List {
             balanceSection(derivedState)
@@ -80,8 +86,17 @@ struct AllocationAccountDetailView: View {
         }
         .listStyle(.insetGrouped)
         .navigationTitle(account.name)
+        .searchable(
+            text: $searchText,
+            placement: .navigationBarDrawer(displayMode: .always),
+            prompt: "Search"
+        )
+        .searchFocused($searchFocused)
         .onAppear {
             initializeDateRangeIfNeeded()
+        }
+        .onDisappear {
+            searchFocused = false
         }
         .onChange(of: defaultBudgetingPeriodRaw) { _, _ in
             applyDefaultPeriodRange()
@@ -270,6 +285,7 @@ struct AllocationAccountDetailView: View {
 
         let start = normalizedStart(appliedStartDate)
         let end = normalizedEnd(appliedEndDate)
+        let query = SearchQueryParser.parse(searchText)
 
         let dateFiltered = rows.filter { row in
             row.date >= start && row.date <= end
@@ -285,14 +301,27 @@ struct AllocationAccountDetailView: View {
             }
         }
 
-        let sortedRows = sortMode.sorted(categoryFiltered)
-        let slices = categoryHeatSlices(for: categoryFiltered, limit: 10)
+        let searchedRows: [AllocationLedgerService.LedgerRow]
+        if query.isEmpty {
+            searchedRows = categoryFiltered
+        } else {
+            searchedRows = categoryFiltered.filter { row in
+                ReconciliationDetailSearch.matches(
+                    row: row,
+                    categoryName: category(for: row)?.name,
+                    query: query
+                )
+            }
+        }
+
+        let sortedRows = sortMode.sorted(searchedRows)
+        let slices = categoryHeatSlices(for: searchedRows, limit: 10)
 
         return ReconciliationDetailDerivedState(
             availableCategoriesForChips: availableCategoriesForChips,
             filteredLedgerRows: sortedRows,
             filteredAmountValue: CurrencyFormatter.normalizedCurrencyDisplayValue(
-                categoryFiltered
+                searchedRows
                     .filter { $0.type == .charge }
                     .reduce(0) { partial, row in
                         partial + max(0, row.amount)
@@ -576,17 +605,35 @@ struct AllocationAccountDetailView: View {
     }
 
     private var emptyLedgerMessage: String {
+        if isSearching {
+            return ReconciliationDetailEmptyState.message(
+                hasHistory: hasHistory,
+                isSearching: true,
+                selectedCategoryCount: selectedCategoryIDs.count
+            )
+        }
+
         if !selectedCategoryIDs.isEmpty {
-            return selectedCategoryIDs.count == 1
-            ? "No ledger entries match the selected category in this date range."
-            : "No ledger entries match the selected categories in this date range."
+            return ReconciliationDetailEmptyState.message(
+                hasHistory: hasHistory,
+                isSearching: false,
+                selectedCategoryCount: selectedCategoryIDs.count
+            )
         }
 
         if hasHistory {
-            return "No ledger entries yet for this date range."
+            return ReconciliationDetailEmptyState.message(
+                hasHistory: true,
+                isSearching: false,
+                selectedCategoryCount: 0
+            )
         }
 
-        return "No ledger entries yet."
+        return ReconciliationDetailEmptyState.message(
+            hasHistory: false,
+            isSearching: false,
+            selectedCategoryCount: 0
+        )
     }
 
     private func ledgerRowView(_ row: AllocationLedgerService.LedgerRow) -> some View {
