@@ -180,20 +180,21 @@ struct PillDatePickerField: View {
 
     private var macPopoverContent: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(title)
-                .font(.headline)
+            HStack(alignment: .firstTextBaseline) {
+                Text(title)
+                    .font(.headline)
 
-            picker
-                .frame(height: PillPickerPopoverMetrics.datePickerHeight, alignment: .top)
-                .frame(maxWidth: .infinity, alignment: .topLeading)
-
-            HStack {
                 Spacer()
+
                 Button("Done") {
                     isPresented = false
                 }
                 .keyboardShortcut(.defaultAction)
             }
+
+            picker
+                .frame(height: PillPickerPopoverMetrics.datePickerHeight, alignment: .top)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
         }
         .padding(14)
         .frame(width: PillPickerPopoverMetrics.datePickerWidth, alignment: .topLeading)
