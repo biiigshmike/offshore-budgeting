@@ -2,14 +2,17 @@
 set -euo pipefail
 
 CATALOG_PATH="${1:-OffshoreBudgeting/Localizable.xcstrings}"
-TARGET_LOCALE="${2:-es}"
+TARGET_LOCALE="${2:-}"
+SUPPORTED_LOCALES=("es" "fr" "de" "ar" "pt-BR" "zh-Hans")
 
 if [[ ! -f "$CATALOG_PATH" ]]; then
   echo "error: catalog not found at '$CATALOG_PATH'" >&2
   exit 2
 fi
 
-python3 - "$CATALOG_PATH" "$TARGET_LOCALE" <<'PY'
+run_audit() {
+  local target_locale="$1"
+  python3 - "$CATALOG_PATH" "$target_locale" <<'PY'
 import json
 import re
 import sys
@@ -801,3 +804,17 @@ if (
 ):
     sys.exit(1)
 PY
+}
+
+if [[ -n "$TARGET_LOCALE" ]]; then
+  run_audit "$TARGET_LOCALE"
+  exit $?
+fi
+
+status=0
+for locale in "${SUPPORTED_LOCALES[@]}"; do
+  run_audit "$locale" || status=1
+  echo
+done
+
+exit "$status"
