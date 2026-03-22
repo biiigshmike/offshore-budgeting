@@ -84,6 +84,29 @@ struct OffshoreIntentDataStoreResolutionTests {
         }
     }
 
+    @Test func resolveCard_ByID_WinsOverWalletNameFallback() throws {
+        let context = try makeContext()
+        let dataStore = OffshoreIntentDataStore.shared
+
+        let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
+        let preferredCard = Card(name: "Apple Card", workspace: workspace)
+        let otherCard = Card(name: "Backup Card", workspace: workspace)
+
+        context.insert(workspace)
+        context.insert(preferredCard)
+        context.insert(otherCard)
+        try context.save()
+
+        let resolved = try dataStore.resolveCard(
+            id: preferredCard.id.uuidString,
+            name: "Backup Card",
+            in: workspace,
+            modelContext: context
+        )
+
+        #expect(resolved.id == preferredCard.id)
+    }
+
     // MARK: - Category Resolution
 
     @Test func resolveCategory_MerchantRuleMatchBeatsFallback() throws {

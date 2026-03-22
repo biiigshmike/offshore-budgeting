@@ -15,10 +15,16 @@ struct AddExpenseIntent: AppIntent {
     var amountText: String?
 
     @Parameter(
-        title: "Card",
-        requestValueDialog: IntentDialog("Which card should this expense use?")
+        title: "Offshore Card",
+        requestValueDialog: IntentDialog("Which Offshore card should this expense use?")
     )
     var card: OffshoreCardEntity?
+
+    @Parameter(
+        title: "Wallet Card",
+        requestValueDialog: IntentDialog("What Wallet card or pass name should I use?")
+    )
+    var walletCardName: String?
 
     @Parameter(
         title: "Category",
@@ -41,73 +47,53 @@ struct AddExpenseIntent: AppIntent {
     init() {
         self.amountText = nil
         self.card = nil
+        self.walletCardName = nil
         self.category = nil
         self.merchant = nil
         self.date = nil
     }
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        let parsedAmount = await MainActor.run {
-            CurrencyFormatter.parseAmount((amountText ?? "").trimmingCharacters(in: .whitespacesAndNewlines))
-        }
-        guard let parsedAmount else {
-            throw $amountText.needsValueError("Please provide a valid amount.")
-        }
-
-        if parsedAmount <= 0 {
-            throw $amountText.needsValueError("Amount must be greater than 0.")
-        }
-
-        let trimmedMerchant = (merchant ?? "")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedCardID = (card?.id ?? "")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-
-        if trimmedCardID.isEmpty {
-            throw $card.needsValueError("Please choose a card.")
-        }
-
-        if trimmedMerchant.isEmpty {
-            throw $merchant.needsValueError("Please provide a merchant or description for the expense.")
-        }
-
-        guard let date else {
-            throw $date.needsValueError("Please provide a date.")
-        }
+        let request = AddExpenseShortcutExecutor.Request(
+            amountText: amountText,
+            offshoreCardID: card?.id,
+            walletCardName: walletCardName,
+            categoryID: category?.id,
+            merchant: merchant,
+            date: date
+        )
 
         do {
             let addedSummary = try await MainActor.run {
-                let dataStore = OffshoreIntentDataStore.shared
-                let service = TransactionEntryService()
-
-                return try dataStore.performWrite { modelContext, workspace in
-                    let resolvedCard = try dataStore.resolveCard(id: trimmedCardID, in: workspace, modelContext: modelContext)
-                    let resolvedCategory = try dataStore.resolveCategory(
-                        id: category?.id,
-                        merchant: trimmedMerchant,
-                        in: workspace,
-                        modelContext: modelContext
-                    )
-
-                    _ = try service.addExpense(
-                        notes: trimmedMerchant,
-                        amount: parsedAmount,
-                        date: date,
-                        workspace: workspace,
-                        card: resolvedCard,
-                        category: resolvedCategory,
-                        allocationAccount: nil,
-                        allocationAmount: nil,
-                        modelContext: modelContext
-                    )
-
-                    let amountText = CurrencyFormatter.string(from: parsedAmount)
-                    let categoryName = resolvedCategory?.name ?? "Uncategorized"
-                    return "Logged \(amountText) to \(resolvedCard.name) in \(categoryName)."
-                }
+                try AddExpenseShortcutExecutor.executeInSelectedWorkspace(request: request)
             }
 
             return .result(dialog: IntentDialog(stringLiteral: addedSummary))
+        } catch let requestError as AddExpenseShortcutExecutor.RequestValidationError {
+            switch requestError {
+            case .invalidAmount:
+                throw $amountText.needsValueError(
+                    IntentDialog(stringLiteral: requestError.errorDescription ?? "Please provide a valid amount.")
+                )
+            case .missingCard:
+                throw $walletCardName.needsValueError(
+                    IntentDialog(
+                        stringLiteral: requestError.errorDescription
+                            ?? "Please choose an Offshore card or provide the Wallet card name."
+                    )
+                )
+            case .missingMerchant:
+                throw $merchant.needsValueError(
+                    IntentDialog(
+                        stringLiteral: requestError.errorDescription
+                            ?? "Please provide a merchant or description for the expense."
+                    )
+                )
+            case .missingDate:
+                throw $date.needsValueError(
+                    IntentDialog(stringLiteral: requestError.errorDescription ?? "Please provide a date.")
+                )
+            }
         } catch let validation as TransactionEntryService.ValidationError {
             return .result(dialog: IntentDialog(stringLiteral: validation.errorDescription ?? "Couldn't add expense."))
         } catch let intentError as OffshoreIntentDataStore.IntentDataError {
