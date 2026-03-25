@@ -17,6 +17,8 @@ final class ShoppingModeSuggestionService {
         static let lastDeliveredMerchantID = "shoppingMode_lastDeliveredMerchantID"
         static let lastDeliveredLatitude = "shoppingMode_lastDeliveredLatitude"
         static let lastDeliveredLongitude = "shoppingMode_lastDeliveredLongitude"
+        static let lastDeliveredStopLatitude = "shoppingMode_lastDeliveredStopLatitude"
+        static let lastDeliveredStopLongitude = "shoppingMode_lastDeliveredStopLongitude"
     }
 
     private let defaults = UserDefaults.standard
@@ -35,6 +37,8 @@ final class ShoppingModeSuggestionService {
         defaults.removeObject(forKey: Key.lastDeliveredMerchantID)
         defaults.removeObject(forKey: Key.lastDeliveredLatitude)
         defaults.removeObject(forKey: Key.lastDeliveredLongitude)
+        defaults.removeObject(forKey: Key.lastDeliveredStopLatitude)
+        defaults.removeObject(forKey: Key.lastDeliveredStopLongitude)
     }
 
     func resetAllCooldowns() {
@@ -45,12 +49,15 @@ final class ShoppingModeSuggestionService {
         defaults.removeObject(forKey: Key.lastDeliveredMerchantID)
         defaults.removeObject(forKey: Key.lastDeliveredLatitude)
         defaults.removeObject(forKey: Key.lastDeliveredLongitude)
+        defaults.removeObject(forKey: Key.lastDeliveredStopLatitude)
+        defaults.removeObject(forKey: Key.lastDeliveredStopLongitude)
     }
 
     func handleRegionEntry(
         merchant: ShoppingModeMerchant,
         currentLocation: CLLocation? = nil,
-        now: Date = .now
+        now: Date = .now,
+        onSuccessfulNotification: (@MainActor () -> Void)? = nil
     ) {
         guard SpendingSessionStore.isActive(now: now) else { return }
         let decision = notificationDecision(
@@ -59,9 +66,7 @@ final class ShoppingModeSuggestionService {
             now: now
         )
         guard decision.isAllowed else {
-            if let reason = decision.reason {
-                debugLog("Suggestion suppressed for \(merchant.name): \(reason)")
-            }
+            debugLogSuppressedSuggestion(for: merchant.name, decision: decision)
             return
         }
 
@@ -74,6 +79,7 @@ final class ShoppingModeSuggestionService {
                     currentLocation: currentLocation,
                     now: now
                 )
+                onSuccessfulNotification?()
             } catch {
                 debugLog("Suggestion scheduling failed for \(merchant.name): \(error.localizedDescription)")
             }
@@ -115,6 +121,7 @@ final class ShoppingModeSuggestionService {
             lastMerchantFireAt: lastMerchantFire,
             lastDeliveredMerchantID: defaults.string(forKey: Key.lastDeliveredMerchantID),
             lastDeliveredLocation: lastDeliveredLocation(),
+            lastDeliveredStopLocation: lastDeliveredStopLocation(),
             now: now
         )
     }
@@ -132,6 +139,13 @@ final class ShoppingModeSuggestionService {
         return CLLocation(latitude: latitude, longitude: longitude)
     }
 
+    private func lastDeliveredStopLocation() -> CLLocation? {
+        let latitude = defaults.double(forKey: Key.lastDeliveredStopLatitude)
+        let longitude = defaults.double(forKey: Key.lastDeliveredStopLongitude)
+        guard latitude != 0 || longitude != 0 else { return nil }
+        return CLLocation(latitude: latitude, longitude: longitude)
+    }
+
     private func recordSuccessfulFire(merchantID: String, currentLocation: CLLocation?, now: Date) {
         var map = (defaults.dictionary(forKey: Key.lastFiredByMerchant) as? [String: Double]) ?? [:]
         map[merchantID] = now.timeIntervalSince1970
@@ -141,10 +155,30 @@ final class ShoppingModeSuggestionService {
         if let currentLocation {
             defaults.set(currentLocation.coordinate.latitude, forKey: Key.lastDeliveredLatitude)
             defaults.set(currentLocation.coordinate.longitude, forKey: Key.lastDeliveredLongitude)
+            defaults.set(currentLocation.coordinate.latitude, forKey: Key.lastDeliveredStopLatitude)
+            defaults.set(currentLocation.coordinate.longitude, forKey: Key.lastDeliveredStopLongitude)
         } else {
             defaults.removeObject(forKey: Key.lastDeliveredLatitude)
             defaults.removeObject(forKey: Key.lastDeliveredLongitude)
+            defaults.removeObject(forKey: Key.lastDeliveredStopLatitude)
+            defaults.removeObject(forKey: Key.lastDeliveredStopLongitude)
         }
+    }
+
+    private func debugLogSuppressedSuggestion(
+        for merchantName: String,
+        decision: ExcursionDetectionPolicy.NotificationDecision
+    ) {
+        guard let reason = decision.reason else { return }
+
+        let globalSeconds = decision.secondsSinceLastGlobalFire.map { String(Int($0)) } ?? "n/a"
+        let merchantSeconds = decision.secondsSinceLastMerchantFire.map { String(Int($0)) } ?? "n/a"
+        let movementMeters = decision.distanceFromLastDeliveredLocation.map { String(Int($0)) } ?? "n/a"
+        let stopMeters = decision.distanceFromLastStopLocation.map { String(Int($0)) } ?? "n/a"
+        debugLog(
+            "Suggestion suppressed for \(merchantName): \(reason) " +
+            "[global=\(globalSeconds)s merchant=\(merchantSeconds)s moved=\(movementMeters)m stop=\(stopMeters)m sameStop=\(decision.isSameStopCluster)]"
+        )
     }
 
     private func debugLog(_ message: String) {

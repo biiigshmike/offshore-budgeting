@@ -11,8 +11,10 @@ struct ExcursionDetectionPolicy {
     }
 
     enum NotificationBlockReason: Equatable {
+        case rapidRepeat
         case globalCooldown
         case merchantCooldown
+        case sameStopCooldown
         case insufficientMovement
         case missingLocation
     }
@@ -20,6 +22,11 @@ struct ExcursionDetectionPolicy {
     struct NotificationDecision: Equatable {
         let isAllowed: Bool
         let reason: NotificationBlockReason?
+        let secondsSinceLastGlobalFire: TimeInterval?
+        let secondsSinceLastMerchantFire: TimeInterval?
+        let distanceFromLastDeliveredLocation: CLLocationDistance?
+        let distanceFromLastStopLocation: CLLocationDistance?
+        let isSameStopCluster: Bool
     }
 
     let startupDesiredAccuracyMeters: CLLocationAccuracy = 80
@@ -32,20 +39,22 @@ struct ExcursionDetectionPolicy {
     let recentFixDesiredAccuracyMeters: CLLocationAccuracy = 80
 
     let walkingRefreshThreshold = MovementRefreshThreshold(
-        distanceMeters: 125,
-        minimumElapsedSeconds: 45
+        distanceMeters: 60,
+        minimumElapsedSeconds: 25
     )
     let drivingRefreshThreshold = MovementRefreshThreshold(
-        distanceMeters: 250,
-        minimumElapsedSeconds: 90
+        distanceMeters: 180,
+        minimumElapsedSeconds: 60
     )
     let highSpeedThresholdMetersPerSecond: CLLocationSpeed = 8
 
     let retryIntervalsSeconds: [TimeInterval] = [30, 60]
 
-    let globalNotificationCooldownSeconds: TimeInterval = 4 * 60
-    let perMerchantNotificationCooldownSeconds: TimeInterval = 20 * 60
-    let minimumMovementBetweenNotificationsMeters: CLLocationDistance = 150
+    let rapidRepeatGuardSeconds: TimeInterval = 75
+    let globalNotificationCooldownSeconds: TimeInterval = 2 * 60
+    let perMerchantNotificationCooldownSeconds: TimeInterval = 8 * 60
+    let minimumMovementBetweenNotificationsMeters: CLLocationDistance = 60
+    let sameStopClusterMeters: CLLocationDistance = 40
 
     func movementRefreshThreshold(for speed: CLLocationSpeed) -> MovementRefreshThreshold {
         if speed > highSpeedThresholdMetersPerSecond {
@@ -109,30 +118,109 @@ struct ExcursionDetectionPolicy {
         lastMerchantFireAt: Date?,
         lastDeliveredMerchantID: String?,
         lastDeliveredLocation: CLLocation?,
+        lastDeliveredStopLocation: CLLocation?,
         now: Date = .now
     ) -> NotificationDecision {
-        if let lastGlobalFireAt,
-           now.timeIntervalSince(lastGlobalFireAt) < globalNotificationCooldownSeconds {
-            return NotificationDecision(isAllowed: false, reason: .globalCooldown)
+        let secondsSinceLastGlobalFire = lastGlobalFireAt.map { now.timeIntervalSince($0) }
+        let secondsSinceLastMerchantFire = lastMerchantFireAt.map { now.timeIntervalSince($0) }
+        let distanceFromLastDeliveredLocation = distance(from: currentLocation, to: lastDeliveredLocation)
+        let distanceFromLastStopLocation = distance(from: currentLocation, to: lastDeliveredStopLocation)
+        let isSameStopCluster = distanceFromLastStopLocation.map { $0 < sameStopClusterMeters } ?? false
+
+        if let secondsSinceLastGlobalFire,
+           secondsSinceLastGlobalFire < rapidRepeatGuardSeconds {
+            return NotificationDecision(
+                isAllowed: false,
+                reason: .rapidRepeat,
+                secondsSinceLastGlobalFire: secondsSinceLastGlobalFire,
+                secondsSinceLastMerchantFire: secondsSinceLastMerchantFire,
+                distanceFromLastDeliveredLocation: distanceFromLastDeliveredLocation,
+                distanceFromLastStopLocation: distanceFromLastStopLocation,
+                isSameStopCluster: isSameStopCluster
+            )
         }
 
-        if let lastMerchantFireAt,
-           now.timeIntervalSince(lastMerchantFireAt) < perMerchantNotificationCooldownSeconds {
-            return NotificationDecision(isAllowed: false, reason: .merchantCooldown)
+        if let secondsSinceLastGlobalFire,
+           secondsSinceLastGlobalFire < globalNotificationCooldownSeconds {
+            return NotificationDecision(
+                isAllowed: false,
+                reason: .globalCooldown,
+                secondsSinceLastGlobalFire: secondsSinceLastGlobalFire,
+                secondsSinceLastMerchantFire: secondsSinceLastMerchantFire,
+                distanceFromLastDeliveredLocation: distanceFromLastDeliveredLocation,
+                distanceFromLastStopLocation: distanceFromLastStopLocation,
+                isSameStopCluster: isSameStopCluster
+            )
+        }
+
+        if isSameStopCluster,
+           let secondsSinceLastGlobalFire,
+           secondsSinceLastGlobalFire < perMerchantNotificationCooldownSeconds {
+            return NotificationDecision(
+                isAllowed: false,
+                reason: .sameStopCooldown,
+                secondsSinceLastGlobalFire: secondsSinceLastGlobalFire,
+                secondsSinceLastMerchantFire: secondsSinceLastMerchantFire,
+                distanceFromLastDeliveredLocation: distanceFromLastDeliveredLocation,
+                distanceFromLastStopLocation: distanceFromLastStopLocation,
+                isSameStopCluster: isSameStopCluster
+            )
         }
 
         if let lastDeliveredMerchantID,
-           let lastDeliveredLocation,
            lastDeliveredMerchantID == merchantID {
             guard let currentLocation else {
-                return NotificationDecision(isAllowed: false, reason: .missingLocation)
+                return NotificationDecision(
+                    isAllowed: false,
+                    reason: .missingLocation,
+                    secondsSinceLastGlobalFire: secondsSinceLastGlobalFire,
+                    secondsSinceLastMerchantFire: secondsSinceLastMerchantFire,
+                    distanceFromLastDeliveredLocation: distanceFromLastDeliveredLocation,
+                    distanceFromLastStopLocation: distanceFromLastStopLocation,
+                    isSameStopCluster: isSameStopCluster
+                )
             }
 
-            if currentLocation.distance(from: lastDeliveredLocation) < minimumMovementBetweenNotificationsMeters {
-                return NotificationDecision(isAllowed: false, reason: .insufficientMovement)
+            if let secondsSinceLastMerchantFire,
+               secondsSinceLastMerchantFire < perMerchantNotificationCooldownSeconds {
+                return NotificationDecision(
+                    isAllowed: false,
+                    reason: .merchantCooldown,
+                    secondsSinceLastGlobalFire: secondsSinceLastGlobalFire,
+                    secondsSinceLastMerchantFire: secondsSinceLastMerchantFire,
+                    distanceFromLastDeliveredLocation: distanceFromLastDeliveredLocation,
+                    distanceFromLastStopLocation: distanceFromLastStopLocation,
+                    isSameStopCluster: isSameStopCluster
+                )
+            }
+
+            if let lastDeliveredLocation,
+               currentLocation.distance(from: lastDeliveredLocation) < minimumMovementBetweenNotificationsMeters {
+                return NotificationDecision(
+                    isAllowed: false,
+                    reason: .insufficientMovement,
+                    secondsSinceLastGlobalFire: secondsSinceLastGlobalFire,
+                    secondsSinceLastMerchantFire: secondsSinceLastMerchantFire,
+                    distanceFromLastDeliveredLocation: distanceFromLastDeliveredLocation,
+                    distanceFromLastStopLocation: distanceFromLastStopLocation,
+                    isSameStopCluster: isSameStopCluster
+                )
             }
         }
 
-        return NotificationDecision(isAllowed: true, reason: nil)
+        return NotificationDecision(
+            isAllowed: true,
+            reason: nil,
+            secondsSinceLastGlobalFire: secondsSinceLastGlobalFire,
+            secondsSinceLastMerchantFire: secondsSinceLastMerchantFire,
+            distanceFromLastDeliveredLocation: distanceFromLastDeliveredLocation,
+            distanceFromLastStopLocation: distanceFromLastStopLocation,
+            isSameStopCluster: isSameStopCluster
+        )
+    }
+
+    private func distance(from currentLocation: CLLocation?, to priorLocation: CLLocation?) -> CLLocationDistance? {
+        guard let currentLocation, let priorLocation else { return nil }
+        return currentLocation.distance(from: priorLocation)
     }
 }

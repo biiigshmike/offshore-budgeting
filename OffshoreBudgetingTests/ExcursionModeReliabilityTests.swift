@@ -72,21 +72,39 @@ struct ExcursionModeReliabilityTests {
             lastMerchantFireAt: nil,
             lastDeliveredMerchantID: nil,
             lastDeliveredLocation: nil,
+            lastDeliveredStopLocation: nil,
             now: .now
         )
 
         #expect(decision.isAllowed == false)
-        #expect(decision.reason == .globalCooldown)
+        #expect(decision.reason == .rapidRepeat)
     }
 
-    @Test func notificationGate_BlocksSameMerchantWithoutEnoughMovement() {
+    @Test func notificationGate_BlocksSameMerchantDuringMerchantCooldown() {
         let decision = policy.notificationDecision(
             merchantID: "merchant",
             currentLocation: CLLocation(latitude: 37.0005, longitude: -122.0005),
             lastGlobalFireAt: Date.now.addingTimeInterval(-policy.globalNotificationCooldownSeconds - 1),
+            lastMerchantFireAt: Date.now.addingTimeInterval(-240),
+            lastDeliveredMerchantID: "merchant",
+            lastDeliveredLocation: CLLocation(latitude: 37.0, longitude: -122.0),
+            lastDeliveredStopLocation: CLLocation(latitude: 36.9990, longitude: -122.0),
+            now: .now
+        )
+
+        #expect(decision.isAllowed == false)
+        #expect(decision.reason == .merchantCooldown)
+    }
+
+    @Test func notificationGate_BlocksSameMerchantWithoutEnoughMovementAfterCooldown() {
+        let decision = policy.notificationDecision(
+            merchantID: "merchant",
+            currentLocation: CLLocation(latitude: 37.0003, longitude: -122.0),
+            lastGlobalFireAt: Date.now.addingTimeInterval(-policy.perMerchantNotificationCooldownSeconds - 30),
             lastMerchantFireAt: Date.now.addingTimeInterval(-policy.perMerchantNotificationCooldownSeconds - 1),
             lastDeliveredMerchantID: "merchant",
             lastDeliveredLocation: CLLocation(latitude: 37.0, longitude: -122.0),
+            lastDeliveredStopLocation: CLLocation(latitude: 36.9990, longitude: -122.0),
             now: .now
         )
 
@@ -94,19 +112,68 @@ struct ExcursionModeReliabilityTests {
         #expect(decision.reason == .insufficientMovement)
     }
 
-    @Test func notificationGate_AllowsDifferentMerchantAfterCooldown() {
+    @Test func notificationGate_AllowsDifferentMerchantAfterCooldownWithShortTravel() {
         let decision = policy.notificationDecision(
             merchantID: "merchant-b",
-            currentLocation: CLLocation(latitude: 37.0015, longitude: -122.0015),
+            currentLocation: CLLocation(latitude: 37.0002, longitude: -122.0),
             lastGlobalFireAt: Date.now.addingTimeInterval(-policy.globalNotificationCooldownSeconds - 1),
             lastMerchantFireAt: nil,
             lastDeliveredMerchantID: "merchant-a",
             lastDeliveredLocation: CLLocation(latitude: 37.0, longitude: -122.0),
+            lastDeliveredStopLocation: CLLocation(latitude: 36.9990, longitude: -122.0),
             now: .now
         )
 
         #expect(decision.isAllowed)
         #expect(decision.reason == nil)
+    }
+
+    @Test func notificationGate_BlocksNearbyAliasWithinSameStopCluster() {
+        let decision = policy.notificationDecision(
+            merchantID: "merchant-b",
+            currentLocation: CLLocation(latitude: 37.0001, longitude: -122.0),
+            lastGlobalFireAt: Date.now.addingTimeInterval(-policy.globalNotificationCooldownSeconds - 1),
+            lastMerchantFireAt: nil,
+            lastDeliveredMerchantID: "merchant-a",
+            lastDeliveredLocation: CLLocation(latitude: 37.0, longitude: -122.0),
+            lastDeliveredStopLocation: CLLocation(latitude: 37.0, longitude: -122.0),
+            now: .now
+        )
+
+        #expect(decision.isAllowed == false)
+        #expect(decision.reason == .sameStopCooldown)
+    }
+
+    @Test func notificationGate_AllowsSameMerchantAfterCooldownAndMovement() {
+        let decision = policy.notificationDecision(
+            merchantID: "merchant",
+            currentLocation: CLLocation(latitude: 37.0007, longitude: -122.0),
+            lastGlobalFireAt: Date.now.addingTimeInterval(-policy.perMerchantNotificationCooldownSeconds - 30),
+            lastMerchantFireAt: Date.now.addingTimeInterval(-policy.perMerchantNotificationCooldownSeconds - 1),
+            lastDeliveredMerchantID: "merchant",
+            lastDeliveredLocation: CLLocation(latitude: 37.0, longitude: -122.0),
+            lastDeliveredStopLocation: CLLocation(latitude: 36.9990, longitude: -122.0),
+            now: .now
+        )
+
+        #expect(decision.isAllowed)
+        #expect(decision.reason == nil)
+    }
+
+    @Test func notificationGate_BlocksSameMerchantWithoutLocation() {
+        let decision = policy.notificationDecision(
+            merchantID: "merchant",
+            currentLocation: nil,
+            lastGlobalFireAt: Date.now.addingTimeInterval(-policy.perMerchantNotificationCooldownSeconds - 30),
+            lastMerchantFireAt: Date.now.addingTimeInterval(-policy.perMerchantNotificationCooldownSeconds - 1),
+            lastDeliveredMerchantID: "merchant",
+            lastDeliveredLocation: CLLocation(latitude: 37.0, longitude: -122.0),
+            lastDeliveredStopLocation: CLLocation(latitude: 36.9990, longitude: -122.0),
+            now: .now
+        )
+
+        #expect(decision.isAllowed == false)
+        #expect(decision.reason == .missingLocation)
     }
 
     @Test func movementRefreshPolicy_UsesWalkingThreshold() {

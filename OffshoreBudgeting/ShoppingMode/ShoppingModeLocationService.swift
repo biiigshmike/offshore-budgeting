@@ -23,6 +23,7 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
     private enum RefreshTrigger: String {
         case startup
         case distance
+        case followUp
         case retry
     }
 
@@ -71,6 +72,7 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
     private var pendingPOIRetryAttempts = 0
     private var poiRetryTask: Task<Void, Never>?
     private var locationWaitTask: Task<Void, Never>?
+    private var followUpRefreshTask: Task<Void, Never>?
     private var activeLocationRequest: LocationRequestPurpose?
     private var startupConfirmationState: StartupConfirmationState?
 
@@ -167,6 +169,8 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
         locationWaitTask = nil
         poiRetryTask?.cancel()
         poiRetryTask = nil
+        followUpRefreshTask?.cancel()
+        followUpRefreshTask = nil
         activeLocationRequest = nil
         startupConfirmationState = nil
         pendingPOIRetryAttempts = 0
@@ -330,6 +334,36 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
     private func recordRefreshBaseline(using location: CLLocation, now: Date = .now) {
         lastRefreshLocation = location
         lastRefreshDate = now
+    }
+
+    private func handleSuccessfulRegionEntryNotification(at location: CLLocation?) {
+        guard let location else { return }
+        recordRefreshBaseline(using: location)
+        scheduleFollowUpRefreshIfNeeded(baselineDate: lastRefreshDate ?? .now)
+    }
+
+    private func scheduleFollowUpRefreshIfNeeded(baselineDate: Date) {
+        followUpRefreshTask?.cancel()
+        let delaySeconds: TimeInterval = 90
+        followUpRefreshTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(delaySeconds * 1_000_000_000))
+            await self?.performFollowUpRefreshIfNeeded(expectedBaselineDate: baselineDate)
+        }
+    }
+
+    private func performFollowUpRefreshIfNeeded(expectedBaselineDate: Date) async {
+        guard SpendingSessionStore.isActive() else { return }
+        guard activeLocationRequest == nil else {
+            debugLog("Follow-up refresh skipped: location request already in flight")
+            return
+        }
+        guard let lastRefreshDate, lastRefreshDate == expectedBaselineDate else {
+            debugLog("Follow-up refresh skipped: baseline changed before delayed re-evaluation")
+            return
+        }
+
+        debugLog("Follow-up refresh requesting a delayed re-evaluation of nearby merchants")
+        refreshNearbyMonitoredMerchants(trigger: .followUp)
     }
 
     private func regionIdentifier(for merchant: ShoppingModeMerchant) -> String {
@@ -567,7 +601,10 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
 
         ShoppingModeSuggestionService.shared.handleRegionEntry(
             merchant: merchant,
-            currentLocation: location
+            currentLocation: location,
+            onSuccessfulNotification: { [weak self, location] in
+                self?.handleSuccessfulRegionEntryNotification(at: location)
+            }
         )
     }
 
@@ -676,7 +713,10 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
             debugLog("Region entry notified immediately for \(merchant.name) using recent high-confidence fix")
             ShoppingModeSuggestionService.shared.handleRegionEntry(
                 merchant: merchant,
-                currentLocation: lastKnownLocation
+                currentLocation: lastKnownLocation,
+                onSuccessfulNotification: { [weak self, lastKnownLocation] in
+                    self?.handleSuccessfulRegionEntryNotification(at: lastKnownLocation)
+                }
             )
             return
         }

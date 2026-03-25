@@ -3417,6 +3417,7 @@
       }
     },
     "Add these screenshots to provide a visual walkthrough for new users." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -41578,6 +41579,7 @@
       }
     },
     "Quick Action Pitfalls" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -41670,6 +41672,7 @@
       }
     },
     "Quick Actions are optional Apple Shortcuts that make repeat tasks faster. Offshore works fully without them, so treat automations as a convenience layer.\n\nFor Tap-to-Pay logging, setup is per device. Build and test the automation on each device where you want it to run." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -41716,6 +41719,7 @@
       }
     },
     "Quick Actions is the install hub for Offshore shortcut links. For Tap-to-Pay, use Apple Shortcuts Transaction automation and Offshore Add Expense intent.\n\nSetup is per device." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -50709,6 +50713,7 @@
       }
     },
     "Tap To Pay Automation Steps" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -50755,6 +50760,7 @@
       }
     },
     "Tap To Pay Screenshots" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -50801,6 +50807,7 @@
       }
     },
     "Tap To Pay: Controlled Setup" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
