@@ -19,6 +19,7 @@ enum AllocationLedgerService {
         let title: String
         let subtitle: String?
         let amount: Double
+        let runningBalance: Double
         let settlementID: UUID?
         let allocationID: UUID?
         let linkedExpenseID: UUID?
@@ -42,14 +43,14 @@ enum AllocationLedgerService {
     // MARK: - Ledger
 
     static func rows(for account: AllocationAccount) -> [LedgerRow] {
-        var rows: [LedgerRow] = []
+        var baseRows: [LedgerRow] = []
 
         for allocation in account.expenseAllocations ?? [] {
             if let expense = allocation.expense {
                 let cardName = expense.card?.name ?? "No Card"
                 let categoryName = expense.category?.name ?? "Uncategorized"
 
-                rows.append(
+                baseRows.append(
                     LedgerRow(
                         id: "charge-\(allocation.id.uuidString)",
                         type: .charge,
@@ -57,6 +58,7 @@ enum AllocationLedgerService {
                         title: expense.descriptionText,
                         subtitle: "\(cardName) • \(categoryName)",
                         amount: allocation.allocatedAmount,
+                        runningBalance: 0,
                         settlementID: nil,
                         allocationID: allocation.id,
                         linkedExpenseID: expense.id,
@@ -67,7 +69,7 @@ enum AllocationLedgerService {
                 let cardName = plannedExpense.card?.name ?? "No Card"
                 let categoryName = plannedExpense.category?.name ?? "Uncategorized"
 
-                rows.append(
+                baseRows.append(
                     LedgerRow(
                         id: "charge-\(allocation.id.uuidString)",
                         type: .charge,
@@ -75,6 +77,7 @@ enum AllocationLedgerService {
                         title: plannedExpense.title,
                         subtitle: "\(cardName) • \(categoryName)",
                         amount: allocation.allocatedAmount,
+                        runningBalance: 0,
                         settlementID: nil,
                         allocationID: allocation.id,
                         linkedExpenseID: plannedExpense.id,
@@ -99,7 +102,7 @@ enum AllocationLedgerService {
                 subtitle = nil
             }
 
-            rows.append(
+            baseRows.append(
                 LedgerRow(
                     id: "settlement-\(settlement.id.uuidString)",
                     type: .settlement,
@@ -107,6 +110,7 @@ enum AllocationLedgerService {
                     title: note.isEmpty ? "Settlement" : note,
                     subtitle: subtitle,
                     amount: settlement.amount,
+                    runningBalance: 0,
                     settlementID: settlement.id,
                     allocationID: nil,
                     linkedExpenseID: settlement.expense?.id ?? settlement.plannedExpense?.id,
@@ -115,17 +119,49 @@ enum AllocationLedgerService {
             )
         }
 
-        return rows.sorted { lhs, rhs in
-            if lhs.date == rhs.date {
-                return lhs.id > rhs.id
-            }
-            return lhs.date > rhs.date
+        let chronologicalRows = baseRows.sorted(by: ascendingCompare)
+        var runningBalance = 0.0
+
+        let rowsWithRunningBalance = chronologicalRows.map { row in
+            runningBalance += row.amount
+
+            return LedgerRow(
+                id: row.id,
+                type: row.type,
+                date: row.date,
+                title: row.title,
+                subtitle: row.subtitle,
+                amount: row.amount,
+                runningBalance: runningBalance,
+                settlementID: row.settlementID,
+                allocationID: row.allocationID,
+                linkedExpenseID: row.linkedExpenseID,
+                isLinkedSettlement: row.isLinkedSettlement
+            )
         }
+
+        return rowsWithRunningBalance.sorted(by: descendingCompare)
     }
 
     // MARK: - Entry
 
     static func cappedAllocationAmount(_ value: Double, expenseAmount: Double) -> Double {
         max(0, min(value, max(0, expenseAmount)))
+    }
+
+    private static func ascendingCompare(_ lhs: LedgerRow, _ rhs: LedgerRow) -> Bool {
+        if lhs.date != rhs.date {
+            return lhs.date < rhs.date
+        }
+
+        return lhs.id < rhs.id
+    }
+
+    private static func descendingCompare(_ lhs: LedgerRow, _ rhs: LedgerRow) -> Bool {
+        if lhs.date != rhs.date {
+            return lhs.date > rhs.date
+        }
+
+        return lhs.id > rhs.id
     }
 }

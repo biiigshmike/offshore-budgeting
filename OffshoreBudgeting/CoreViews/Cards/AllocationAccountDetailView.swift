@@ -660,13 +660,34 @@ struct AllocationAccountDetailView: View {
 
             Spacer(minLength: 12)
 
-            Text(
-                CurrencyFormatter.normalizedCurrencyDisplayValue(row.amount),
-                format: CurrencyFormatter.currencyStyle()
-            )
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(
+                    CurrencyFormatter.normalizedCurrencyDisplayValue(row.amount),
+                    format: CurrencyFormatter.currencyStyle()
+                )
                 .font(.body.weight(.semibold))
+
+                Text(
+                    CurrencyFormatter.normalizedCurrencyDisplayValue(row.runningBalance),
+                    format: CurrencyFormatter.currencyStyle()
+                )
+                .font(.caption)
+                .foregroundStyle(runningBalanceColor(for: row.runningBalance))
+            }
         }
         .padding(.vertical, 2)
+    }
+
+    private func runningBalanceColor(for balance: Double) -> Color {
+        if balance > 0 {
+            return .red
+        }
+
+        if balance < 0 {
+            return .green
+        }
+
+        return .secondary
     }
 
     private func requestDeleteSettlement(id: UUID) {
