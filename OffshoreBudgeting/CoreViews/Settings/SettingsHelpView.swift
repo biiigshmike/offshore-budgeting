@@ -693,7 +693,17 @@ private struct HelpSectionThumbnail: View {
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
-    private var thumbnailSize: CGSize {
+    private var image: NativeImage? {
+        platformImage(named: item.assetName)
+    }
+
+    private var isPortraitAsset: Bool {
+        guard let image else { return false }
+        let size = platformImageSize(image)
+        return size.height > size.width
+    }
+
+    private var landscapeThumbnailSize: CGSize {
         #if targetEnvironment(macCatalyst)
         return CGSize(width: 200, height: 140)
         #else
@@ -702,6 +712,21 @@ private struct HelpSectionThumbnail: View {
         }
         return CGSize(width: 176, height: 124)
         #endif
+    }
+
+    private var portraitThumbnailSize: CGSize {
+        #if targetEnvironment(macCatalyst)
+        return CGSize(width: 148, height: 248)
+        #else
+        if horizontalSizeClass == .regular {
+            return CGSize(width: 148, height: 248)
+        }
+        return CGSize(width: 132, height: 220)
+        #endif
+    }
+
+    private var thumbnailSize: CGSize {
+        isPortraitAsset ? portraitThumbnailSize : landscapeThumbnailSize
     }
 
     private var imageSize: CGSize {
@@ -713,14 +738,14 @@ private struct HelpSectionThumbnail: View {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(Color(.secondarySystemGroupedBackground))
 
-            if let image = platformImage(named: item.assetName) {
+            if let image {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .fill(Color(.tertiarySystemGroupedBackground))
                     .frame(width: imageSize.width, height: imageSize.height)
                     .overlay {
                         Image(platformImage: image)
                             .resizable()
-                            .scaledToFit()
+                            .scaledToFill()
                             .frame(width: imageSize.width, height: imageSize.height)
                             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     }
@@ -1053,6 +1078,10 @@ private func platformImage(named name: String) -> NativeImage? {
     UIImage(named: name)
 }
 
+private func platformImageSize(_ image: NativeImage) -> CGSize {
+    image.size
+}
+
 private extension Image {
     init(platformImage: NativeImage) {
         self.init(uiImage: platformImage)
@@ -1064,6 +1093,10 @@ private typealias NativeImage = NSImage
 
 private func platformImage(named name: String) -> NativeImage? {
     NSImage(named: name)
+}
+
+private func platformImageSize(_ image: NativeImage) -> CGSize {
+    image.size
 }
 
 private extension Image {
