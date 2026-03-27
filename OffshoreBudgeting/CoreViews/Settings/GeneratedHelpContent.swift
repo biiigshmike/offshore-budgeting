@@ -62,17 +62,50 @@ struct GeneratedHelpSectionMediaItem: Identifiable, Hashable {
     }
 }
 
+struct GeneratedHelpSectionLinkItem: Identifiable, Hashable {
+    let id: String
+    let title: String
+    let subtitle: String?
+    let systemImageName: String
+    let url: URL
+    let accessoryText: String?
+
+    init(
+        id: String,
+        title: String,
+        subtitle: String? = nil,
+        systemImageName: String,
+        url: URL,
+        accessoryText: String? = nil
+    ) {
+        self.id = id
+        self.title = NSLocalizedString(title, comment: "")
+        self.subtitle = subtitle.map { NSLocalizedString($0, comment: "") }
+        self.systemImageName = systemImageName
+        self.url = url
+        self.accessoryText = accessoryText.map { NSLocalizedString($0, comment: "") }
+    }
+}
+
 struct GeneratedHelpSection: Identifiable, Hashable {
     let id: String
     let header: String?
     let bodyText: String
     let mediaItems: [GeneratedHelpSectionMediaItem]
+    let linkItems: [GeneratedHelpSectionLinkItem]
 
-    init(id: String, header: String?, bodyText: String, mediaItems: [GeneratedHelpSectionMediaItem]) {
+    init(
+        id: String,
+        header: String?,
+        bodyText: String,
+        mediaItems: [GeneratedHelpSectionMediaItem],
+        linkItems: [GeneratedHelpSectionLinkItem] = []
+    ) {
         self.id = id
         self.header = header.map { NSLocalizedString($0, comment: "") }
         self.bodyText = NSLocalizedString(bodyText, comment: "")
         self.mediaItems = mediaItems
+        self.linkItems = linkItems
     }
 }
 
@@ -102,6 +135,9 @@ struct GeneratedHelpLeafTopic: Identifiable, Hashable {
             }
 
             parts.append(section.bodyText)
+            parts.append(contentsOf: section.linkItems.map(\.title))
+            parts.append(contentsOf: section.linkItems.compactMap(\.subtitle))
+            parts.append(contentsOf: section.linkItems.compactMap(\.accessoryText))
             parts.append(contentsOf: section.mediaItems.compactMap(\.displayTitle))
             parts.append(contentsOf: section.mediaItems.map(\.bodyText))
             parts.append(contentsOf: section.mediaItems.compactMap(\.fullscreenCaptionText))
@@ -115,6 +151,10 @@ struct GeneratedHelpLeafTopic: Identifiable, Hashable {
 
     func mediaItems(for section: GeneratedHelpSection) -> [GeneratedHelpSectionMediaItem] {
         section.mediaItems
+    }
+
+    func linkItems(for section: GeneratedHelpSection) -> [GeneratedHelpSectionLinkItem] {
+        section.linkItems
     }
 }
 
@@ -1356,8 +1396,50 @@ private func quickActionsGuideSections(prefix: String, isSettingsVariant: Bool) 
     let incomeSMSBody = "Use this workflow for bank or payment messages that announce incoming funds. The shortcut should extract the credited amount first, then set a short income source name or a safe fallback before calling Offshore Add Income.\n\nPlan for a non-AI baseline first. If you later offer an Apple Intelligence version, keep the non-AI shortcut available for unsupported devices."
     let incomeEmailBody = "Use this workflow for deposit confirmations and payroll-style emails. The shortcut should look for amount phrases near deposit language, then pass the extracted amount, description, date, and income type into Offshore Add Income.\n\nFallback prompting is still helpful here because forwarded emails or changed templates can strip out the expected amount format."
     let expenseEmailBody = "Use this workflow for receipts, order confirmations, and shipped or delivered purchase emails. Match labeled totals first, then pass the amount and a merchant or fallback label into Offshore Add Expense.\n\nIf an email can include multiple final totals, decide whether the shortcut should log each one or only the best single match before you share it widely."
-    let tapToPayBody = "Use this workflow for Apple Wallet transaction automations. Setup is per device. Start with one card, keep the first automation simple, and let Offshore resolve merchant-based category matching when possible.\n\nThis remains the most device-specific Quick Action, so test it on each phone or tablet where you want it to run."
+    let tapToPayBody = "Use this workflow for Apple Wallet transaction automations. Setup is per device. Start with one card, keep the first automation simple, and let Offshore resolve merchant-based category matching when possible.\n\nTap to Pay is configured manually inside Shortcuts and does not require a shortcut download link."
     let reliabilityBody = "Test after each automation is created. If parsing fails, recheck that the intended variables are mapped to the correct Shortcut Input details and that the installed shortcut version matches the instructions you are following.\n\nAvoid creating many near-duplicate automations up front. Start with one, verify it runs from a real message or transaction, then expand only if needed."
+    let shortcutDownloadsHeader = "Download Shortcuts"
+    let shortcutDownloadsBody = "Choose the version you want to install before following the setup guide."
+    let incomeEmailSteps = [
+        "Open the Shortcuts app, make sure you have downloaded the correct shortcut, then go to the Automation tab. Tap the plus button to create a new automation.",
+        "On this screen, choose the Email trigger.",
+        "On the next screen, define when the shortcut should run. Find the email address that sends your direct deposit notifications and paste it into the Sender field. You can also add a Subject Contains trigger if that is more reliable. Set Run Immediately, then tap Next.",
+        "On the next screen, under Get Started, tap Create New Shortcut.",
+        "Search the Actions list for Run Shortcut.",
+        "Tap the blue Shortcut field to open your list of shortcuts. If you downloaded Add Income From An Email, you should see it here. Tap it to select it, then return to the shortcut setup screen.",
+        "Before saving, tap the blue arrow. Change Input from Choose Variable to Shortcut Input. You should see the two fields connect with a line. Once that appears, tap Save."
+    ]
+    let expenseEmailSteps = [
+        "Open the Shortcuts app, make sure you have downloaded the correct shortcut, then go to the Automation tab. Tap the plus button to create a new automation.",
+        "On this screen, choose the Email trigger.",
+        "On the next screen, define when the shortcut should run. Find the email address that sends your receipt or order confirmation emails and paste it into the Sender field. You can also add a Subject Contains trigger if that is more reliable. Set Run Immediately, then tap Next.",
+        "On the next screen, under Get Started, tap Create New Shortcut.",
+        "Search the Actions list for Run Shortcut.",
+        "Tap the blue Shortcut field to open your list of shortcuts. If you downloaded Add Expense From Email, you should see it here. Tap it to select it, then return to the shortcut setup screen.",
+        "Before saving, tap the blue arrow. Change Input from Choose Variable to Shortcut Input. You should see the two fields connect with a line. Once that appears, tap Save."
+    ]
+    let incomeSMSSteps = [
+        "Open the Shortcuts app, make sure you have downloaded the correct shortcut, then go to the Automation tab. Tap the plus button to create a new automation.",
+        "On this screen, choose the Message trigger.",
+        "On the next screen, define when the shortcut should run. Fill in the Sender field or the Message Contains field using the text pattern from the SMS message that confirms a direct deposit. Set Run Immediately, then tap Next.",
+        "On the next screen, under Get Started, tap Create New Shortcut.",
+        "Search the Actions list for Run Shortcut.",
+        "Tap the blue Shortcut field to open your list of shortcuts. If you downloaded Add Income From An SMS Message, you should see it here. Tap it to select it, then return to the shortcut setup screen.",
+        "Before saving, tap the blue arrow. Change Input from Choose Variable to Shortcut Input. You should see the two fields connect with a line. Once that appears, tap Save."
+    ]
+    let tapToPaySteps = [
+        "Open the Shortcuts app and go to the Automation tab. Tap the plus button to create a new automation.",
+        "On this screen, choose the Wallet trigger.",
+        "For the best results, set up one automation per Apple Wallet card. By default, all cards are selected, so deselect every card except the one you want to use for this automation. It is also recommended to leave all categories selected. You can filter merchants if you want, but the safest default is to leave them unchanged. Make sure Run Immediately is selected instead of Run After Confirmation.",
+        "On the next screen, under Get Started, tap Create New Shortcut.",
+        "Search the Actions list for Add Expense. This action is built into Offshore, so nothing needs to be downloaded first.",
+        "The form now needs to be configured so it can receive the transaction details from Apple Wallet.",
+        "Tap the Amount field, choose Select Variable, then choose Shortcut Input. Once Shortcut Input appears in the field, tap it again and change the Type from Transaction to Amount. Then tap Return.",
+        "Choose the Offshore card that should receive these Tap to Pay expenses.",
+        "Repeat the same setup for the Wallet Card field. Tap the field, choose Select Variable, then choose Shortcut Input. Once Shortcut Input appears in the field, tap it again and change the Type from Transaction to Card or Pass. Then tap Return.",
+        "Repeat the same setup for Merchant. Tap the field, choose Select Variable, then choose Shortcut Input. Once Shortcut Input appears in the field, tap it again and change the Type from Transaction to Merchant. Then tap Return.",
+        "Leave Category unchanged if you want these expenses to be added as Uncategorized. Then tap the Date field and scroll until you find Current Date. Turn off Show When Run, then tap Save."
+    ]
 
     return [
         textSection(
@@ -1377,61 +1459,85 @@ private func quickActionsGuideSections(prefix: String, isSettingsVariant: Bool) 
             header: incomeSMSHeader,
             body: incomeSMSBody
         ),
-        quickActionsWorkflowMediaSection(
+        quickActionsWorkflowLinksSection(
             prefix: prefix,
             sectionNumber: 4,
             workflowSlug: "income-sms",
+            header: shortcutDownloadsHeader,
+            body: shortcutDownloadsBody,
+            workflowID: "income-sms"
+        ),
+        quickActionsWorkflowMediaSection(
+            prefix: prefix,
+            sectionNumber: 5,
+            workflowSlug: "income-sms",
             header: incomeSMSGuideHeader,
-            futureAssetPrefix: "income-sms",
-            itemCount: 8
+            assetPrefix: "income-sms",
+            steps: incomeSMSSteps
         ),
         quickActionsWorkflowTextSection(
             prefix: prefix,
-            sectionNumber: 5,
+            sectionNumber: 6,
             workflowSlug: "income-email",
             header: incomeEmailHeader,
             body: incomeEmailBody
         ),
-        quickActionsWorkflowMediaSection(
-            prefix: prefix,
-            sectionNumber: 6,
-            workflowSlug: "income-email",
-            header: incomeEmailGuideHeader,
-            futureAssetPrefix: "income-email",
-            itemCount: 8
-        ),
-        quickActionsWorkflowTextSection(
+        quickActionsWorkflowLinksSection(
             prefix: prefix,
             sectionNumber: 7,
-            workflowSlug: "expense-email",
-            header: expenseEmailHeader,
-            body: expenseEmailBody
+            workflowSlug: "income-email",
+            header: shortcutDownloadsHeader,
+            body: shortcutDownloadsBody,
+            workflowID: "income-email"
         ),
         quickActionsWorkflowMediaSection(
             prefix: prefix,
             sectionNumber: 8,
-            workflowSlug: "expense-email",
-            header: expenseEmailGuideHeader,
-            futureAssetPrefix: "expense-email",
-            itemCount: 8
+            workflowSlug: "income-email",
+            header: incomeEmailGuideHeader,
+            assetPrefix: "income-email",
+            steps: incomeEmailSteps
         ),
         quickActionsWorkflowTextSection(
             prefix: prefix,
             sectionNumber: 9,
+            workflowSlug: "expense-email",
+            header: expenseEmailHeader,
+            body: expenseEmailBody
+        ),
+        quickActionsWorkflowLinksSection(
+            prefix: prefix,
+            sectionNumber: 10,
+            workflowSlug: "expense-email",
+            header: shortcutDownloadsHeader,
+            body: shortcutDownloadsBody,
+            workflowID: "expense-email"
+        ),
+        quickActionsWorkflowMediaSection(
+            prefix: prefix,
+            sectionNumber: 11,
+            workflowSlug: "expense-email",
+            header: expenseEmailGuideHeader,
+            assetPrefix: "expense-email",
+            steps: expenseEmailSteps
+        ),
+        quickActionsWorkflowTextSection(
+            prefix: prefix,
+            sectionNumber: 12,
             workflowSlug: "tap-to-pay",
             header: tapToPayHeader,
             body: tapToPayBody
         ),
         quickActionsWorkflowMediaSection(
             prefix: prefix,
-            sectionNumber: 10,
+            sectionNumber: 13,
             workflowSlug: "tap-to-pay",
             header: tapToPayGuideHeader,
-            futureAssetPrefix: "tap-to-pay",
-            itemCount: 12
+            assetPrefix: "tap-to-pay",
+            steps: tapToPaySteps
         ),
         textSection(
-            id: "\(prefix)-11",
+            id: "\(prefix)-14",
             header: "Reliability Tips",
             body: reliabilityBody
         )
@@ -1457,40 +1563,54 @@ private func quickActionsWorkflowMediaSection(
     sectionNumber: Int,
     workflowSlug: String,
     header: String,
-    futureAssetPrefix: String,
-    itemCount: Int
+    assetPrefix: String,
+    steps: [String]
 ) -> GeneratedHelpSection {
-    let body = "Placeholder guide blocks are shown here until the final screenshots are imported. When you add the real images to the asset catalog, use the future asset names shown in each placeholder caption."
+    let body = "Follow each step in order, then compare it to the matching screenshot in this guide."
     return mediaSection(
         id: "\(prefix)-\(sectionNumber)-\(workflowSlug)",
         header: header,
         body: body,
-        media: quickActionsPlaceholderMediaItems(
+        media: quickActionsMediaItems(
             prefix: "\(prefix)-\(sectionNumber)-\(workflowSlug)",
-            workflowTitle: header,
-            futureAssetPrefix: futureAssetPrefix,
-            itemCount: itemCount
+            assetPrefix: assetPrefix,
+            steps: steps
         )
     )
 }
 
-private func quickActionsPlaceholderMediaItems(
+private func quickActionsWorkflowLinksSection(
     prefix: String,
-    workflowTitle: String,
-    futureAssetPrefix: String,
-    itemCount: Int
+    sectionNumber: Int,
+    workflowSlug: String,
+    header: String,
+    body: String,
+    workflowID: String
+) -> GeneratedHelpSection {
+    let group = ShortcutLinkCatalog.installGroups.first(where: { $0.id == workflowID })
+
+    return linkSection(
+        id: "\(prefix)-\(sectionNumber)-\(workflowSlug)",
+        header: header,
+        body: body,
+        links: group.map(helpLinkItems(for:)) ?? []
+    )
+}
+
+private func quickActionsMediaItems(
+    prefix: String,
+    assetPrefix: String,
+    steps: [String]
 ) -> [GeneratedHelpSectionMediaItem] {
-    (1...itemCount).map { index in
-        let fallbackAssetNumber = min(index, 9)
-        let assetName = "Help/CoreScreens/Settings/Quick Actions/tap-automation-\(fallbackAssetNumber)"
-        let futureAssetName = "\(futureAssetPrefix)-\(index)"
-        let bodyText = "Placeholder step \(index) for \(workflowTitle). Import your future screenshot as \(futureAssetName) when you are ready to replace this block."
-        let caption = "Future asset name: \(futureAssetName)"
+    steps.enumerated().map { index, step in
+        let stepNumber = index + 1
+        let assetName = "Help/CoreScreens/Settings/Quick Actions/\(assetPrefix)-\(stepNumber)"
+        let caption = "Step \(stepNumber): \(step)"
 
         return mediaItem(
-            id: "\(prefix)-image-\(index)",
+            id: "\(prefix)-image-\(stepNumber)",
             assetName: assetName,
-            bodyText: bodyText,
+            bodyText: step,
             fullscreenCaptionText: caption
         )
     }
@@ -1501,7 +1621,8 @@ private func textSection(id: String, header: String?, body: String) -> Generated
         id: id,
         header: header,
         bodyText: body,
-        mediaItems: []
+        mediaItems: [],
+        linkItems: []
     )
 }
 
@@ -1515,7 +1636,23 @@ private func mediaSection(
         id: id,
         header: header,
         bodyText: body,
-        mediaItems: media
+        mediaItems: media,
+        linkItems: []
+    )
+}
+
+private func linkSection(
+    id: String,
+    header: String?,
+    body: String,
+    links: [GeneratedHelpSectionLinkItem]
+) -> GeneratedHelpSection {
+    GeneratedHelpSection(
+        id: id,
+        header: header,
+        bodyText: body,
+        mediaItems: [],
+        linkItems: links
     )
 }
 
@@ -1533,4 +1670,17 @@ private func mediaItem(
         bodyText: bodyText,
         fullscreenCaptionText: fullscreenCaptionText
     )
+}
+
+private func helpLinkItems(for group: ShortcutLinkGroup) -> [GeneratedHelpSectionLinkItem] {
+    group.variants.map { variant in
+        GeneratedHelpSectionLinkItem(
+            id: "\(group.id)-\(variant.id)",
+            title: variant.title,
+            subtitle: variant.subtitle,
+            systemImageName: "square.and.arrow.down",
+            url: variant.url,
+            accessoryText: variant.requirementLabel
+        )
+    }
 }

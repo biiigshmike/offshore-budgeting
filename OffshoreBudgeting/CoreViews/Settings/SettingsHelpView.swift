@@ -415,6 +415,7 @@ struct HelpTopicDetailView: View {
     @State private var currentTopicID: String
     @State private var selectedMediaIDsBySectionID: [String: String] = [:]
     @State private var fullscreenPresentation: HelpFullscreenPresentation?
+    @Environment(\.openURL) private var openURL
 
     private let topAnchorID: String = "help-topic-top-anchor"
 
@@ -492,6 +493,7 @@ struct HelpTopicDetailView: View {
     @ViewBuilder
     private func sectionContent(_ section: GeneratedHelpSection) -> some View {
         let mediaItems = currentTopic.mediaItems(for: section)
+        let linkItems = currentTopic.linkItems(for: section)
         let selectedItem = selectedMediaItem(for: section, from: mediaItems)
         let sectionTitle = selectedItem?.displayTitle ?? section.header
 
@@ -500,7 +502,16 @@ struct HelpTopicDetailView: View {
                 .font(.title3.weight(.semibold))
         }
 
-        if mediaItems.isEmpty {
+        if linkItems.isEmpty == false {
+            HelpSectionLinkGrid(
+                linkItems: linkItems,
+                openURL: openURL
+            )
+
+            if section.bodyText.isEmpty == false {
+                HelpSectionBodyCard(text: section.bodyText)
+            }
+        } else if mediaItems.isEmpty {
             HelpSectionBodyCard(text: section.bodyText)
         } else if let selectedItem {
             HelpSectionMediaStrip(
@@ -778,6 +789,68 @@ private struct HelpSectionThumbnail: View {
         )
         .accessibilityElement(children: .combine)
         .accessibilityLabel(Text(item.assetName))
+    }
+}
+
+private struct HelpSectionLinkGrid: View {
+    let linkItems: [GeneratedHelpSectionLinkItem]
+    let openURL: OpenURLAction
+
+    private var columns: [GridItem] {
+        Array(repeating: GridItem(.flexible(), spacing: 12, alignment: .top), count: max(1, min(2, linkItems.count)))
+    }
+
+    var body: some View {
+        LazyVGrid(columns: columns, alignment: .leading, spacing: 12) {
+            ForEach(linkItems) { item in
+                HelpSectionLinkCard(
+                    item: item,
+                    openURL: openURL
+                )
+            }
+        }
+    }
+}
+
+private struct HelpSectionLinkCard: View {
+    let item: GeneratedHelpSectionLinkItem
+    let openURL: OpenURLAction
+
+    var body: some View {
+        Button {
+            openURL(item.url)
+        } label: {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: item.systemImageName)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Color("AccentColor"))
+                }
+
+                Text(item.title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .multilineTextAlignment(.leading)
+
+                if let subtitle = item.subtitle {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.leading)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .padding(12)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color(.secondarySystemBackground))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
     }
 }
 

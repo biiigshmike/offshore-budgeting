@@ -13,12 +13,16 @@ nonisolated struct ContentViewWidgetRefreshReport: Equatable {
     let cardDurationMillis: Double
     let nextPlannedExpenseDurationMillis: Double
     let spendTrendsDurationMillis: Double
+    let safeSpendTodayDurationMillis: Double
+    let forecastSavingsDurationMillis: Double
 
     var totalDurationMillis: Double {
         incomeDurationMillis
             + cardDurationMillis
             + nextPlannedExpenseDurationMillis
             + spendTrendsDurationMillis
+            + safeSpendTodayDurationMillis
+            + forecastSavingsDurationMillis
     }
 
     var traceSummary: String {
@@ -26,6 +30,8 @@ nonisolated struct ContentViewWidgetRefreshReport: Equatable {
         "cardsMs=\(Self.formatted(cardDurationMillis)) " +
         "nextPlannedMs=\(Self.formatted(nextPlannedExpenseDurationMillis)) " +
         "spendTrendsMs=\(Self.formatted(spendTrendsDurationMillis)) " +
+        "safeSpendMs=\(Self.formatted(safeSpendTodayDurationMillis)) " +
+        "forecastMs=\(Self.formatted(forecastSavingsDurationMillis)) " +
         "totalMs=\(Self.formatted(totalDurationMillis))"
     }
 
@@ -41,10 +47,9 @@ actor ContentViewWidgetRefreshExecutor {
         self.modelContainer = modelContainer
     }
 
-    func refreshAll(workspaceID: UUID) -> ContentViewWidgetRefreshReport {
-        let modelContext = ModelContext(modelContainer)
-
+    func refreshAll(workspaceID: UUID) async -> ContentViewWidgetRefreshReport {
         let incomeDurationMillis = Self.measure {
+            let modelContext = ModelContext(modelContainer)
             IncomeWidgetSnapshotBuilder.buildAndSaveAllPeriods(
                 modelContext: modelContext,
                 workspaceID: workspaceID,
@@ -53,6 +58,7 @@ actor ContentViewWidgetRefreshExecutor {
         }
 
         let cardDurationMillis = Self.measure {
+            let modelContext = ModelContext(modelContainer)
             CardWidgetSnapshotBuilder.buildAndSaveAllPeriods(
                 modelContext: modelContext,
                 workspaceID: workspaceID,
@@ -61,6 +67,7 @@ actor ContentViewWidgetRefreshExecutor {
         }
 
         let nextPlannedExpenseDurationMillis = Self.measure {
+            let modelContext = ModelContext(modelContainer)
             NextPlannedExpenseWidgetSnapshotBuilder.buildAndSaveAllPeriods(
                 modelContext: modelContext,
                 workspaceID: workspaceID,
@@ -69,6 +76,7 @@ actor ContentViewWidgetRefreshExecutor {
         }
 
         let spendTrendsDurationMillis = Self.measure {
+            let modelContext = ModelContext(modelContainer)
             SpendTrendsWidgetSnapshotBuilder.buildAndSaveAllPeriods(
                 modelContext: modelContext,
                 workspaceID: workspaceID,
@@ -76,16 +84,44 @@ actor ContentViewWidgetRefreshExecutor {
             )
         }
 
+        let safeSpendTodayStart = DispatchTime.now().uptimeNanoseconds
+        await MainActor.run {
+            let modelContext = ModelContext(modelContainer)
+            SafeSpendTodayWidgetSnapshotBuilder.buildAndSave(
+                modelContext: modelContext,
+                workspaceID: workspaceID,
+                shouldReloadTimelines: false
+            )
+        }
+        let safeSpendTodayDurationMillis = Double(DispatchTime.now().uptimeNanoseconds - safeSpendTodayStart) / 1_000_000
+
+        let forecastSavingsStart = DispatchTime.now().uptimeNanoseconds
+        await MainActor.run {
+            let modelContext = ModelContext(modelContainer)
+            ForecastSavingsWidgetSnapshotBuilder.buildAndSave(
+                modelContext: modelContext,
+                workspaceID: workspaceID,
+                shouldReloadTimelines: false
+            )
+        }
+        let forecastSavingsDurationMillis = Double(DispatchTime.now().uptimeNanoseconds - forecastSavingsStart) / 1_000_000
+
         IncomeWidgetSnapshotStore.reloadIncomeWidgetTimelines()
         CardWidgetSnapshotStore.reloadCardWidgetTimelines()
         NextPlannedExpenseWidgetSnapshotStore.reloadTimelines()
         SpendTrendsWidgetSnapshotStore.reloadTimelines()
+        await MainActor.run {
+            SafeSpendTodayWidgetSnapshotBuilder.reloadTimelines()
+            ForecastSavingsWidgetSnapshotBuilder.reloadTimelines()
+        }
 
         return ContentViewWidgetRefreshReport(
             incomeDurationMillis: incomeDurationMillis,
             cardDurationMillis: cardDurationMillis,
             nextPlannedExpenseDurationMillis: nextPlannedExpenseDurationMillis,
-            spendTrendsDurationMillis: spendTrendsDurationMillis
+            spendTrendsDurationMillis: spendTrendsDurationMillis,
+            safeSpendTodayDurationMillis: safeSpendTodayDurationMillis,
+            forecastSavingsDurationMillis: forecastSavingsDurationMillis
         )
     }
 

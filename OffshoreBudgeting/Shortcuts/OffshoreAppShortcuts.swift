@@ -34,7 +34,7 @@ struct OffshoreAppShortcuts: AppShortcutsProvider {
                 "Start spending mode in \(.applicationName)"
             ],
             shortTitle: "Excursion Mode",
-            systemImageName: "cart.badge.plus"
+            systemImageName: "sailboat.fill"
         )
         AppShortcut(
             intent: ReviewTodaysSpendingIntent(),

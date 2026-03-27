@@ -15,6 +15,14 @@ struct OffshoreBudgetingWidgetsBundle: WidgetBundle {
         CardWidget()
         NextPlannedExpenseWidget()
         SpendTrendsWidget()
+        SafeSpendTodayWidget()
+        ForecastSavingsWidget()
+        if #available(iOS 18.0, *) {
+            AddExpenseControlWidget()
+            AddIncomeControlWidget()
+            ReviewTodayControlWidget()
+            ExcursionModeControlWidget()
+        }
         #if canImport(ActivityKit) && !targetEnvironment(macCatalyst)
         ShoppingModeLiveActivity()
         #endif

@@ -298,6 +298,8 @@ struct ContentView: View {
         CardWidgetSnapshotStore.setSelectedWorkspaceID(workspaceID)
         NextPlannedExpenseWidgetSnapshotStore.setSelectedWorkspaceID(workspaceID)
         SpendTrendsWidgetSnapshotStore.setSelectedWorkspaceID(workspaceID)
+        SafeSpendTodayWidgetSnapshotBuilder.setSelectedWorkspaceID(workspaceID)
+        ForecastSavingsWidgetSnapshotBuilder.setSelectedWorkspaceID(workspaceID)
     }
 
     @MainActor
