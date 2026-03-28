@@ -81,12 +81,7 @@ private struct AboutAppIdentityRow: View {
 private struct AboutRow: View {
 
     let systemImage: String
-    let title: String
-
-    init(systemImage: String, title: String) {
-        self.systemImage = systemImage
-        self.title = NSLocalizedString(title, comment: "")
-    }
+    let title: LocalizedStringResource
 
     var body: some View {
         HStack(spacing: 12) {

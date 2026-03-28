@@ -17,7 +17,7 @@ struct SettingsReleaseLogsView: View {
         var id: String { "\(version)-\(build)" }
         var headerTitle: String {
             String(
-                format: NSLocalizedString("What’s New • %@ (Build %@)", comment: ""),
+                format: String(localized: "What’s New • %@ (Build %@)", defaultValue: "What’s New • %@ (Build %@)", comment: "Release log section header with app version and build number."),
                 locale: Locale.current,
                 version,
                 localizedBuild
@@ -43,10 +43,16 @@ struct SettingsReleaseLogsView: View {
 
         var id: String { "\(systemImage)|\(title)" }
 
-        init(systemImage: String, title: String, description: String) {
+        init(systemImage: String, title: LocalizedStringResource, description: LocalizedStringResource) {
             self.systemImage = systemImage
-            self.title = NSLocalizedString(title, comment: "")
-            self.description = NSLocalizedString(description, comment: "")
+            self.title = String(localized: title)
+            self.description = String(localized: description)
+        }
+
+        init(systemImage: String, title: LocalizedStringResource, resolvedDescription: String) {
+            self.systemImage = systemImage
+            self.title = String(localized: title)
+            self.description = resolvedDescription
         }
     }
 
@@ -133,7 +139,7 @@ struct SettingsReleaseLogsView: View {
                 ReleaseItem(
                     systemImage: "sailboat.fill",
                     title: "Excursion Mode",
-                    description: "Excursion Mode has been refined to deliver more precise notifications near relevant points of interest, while still processing everything 100% on-device."
+                    resolvedDescription: excursionModeRefinedDescription
                 ),
                 ReleaseItem(
                     systemImage: "questionmark.text.page.fill",
@@ -332,6 +338,19 @@ struct SettingsReleaseLogsView: View {
         )
     ]
 
+    private static var excursionModeRefinedDescription: String {
+        let fullyOnDevice = 1.0.formatted(.percent.precision(.fractionLength(0)))
+        return String(
+            format: String(
+                localized: "Excursion Mode has been refined to deliver more precise notifications near relevant points of interest, while still processing everything %@ on-device.",
+                defaultValue: "Excursion Mode has been refined to deliver more precise notifications near relevant points of interest, while still processing everything %@ on-device.",
+                comment: "Release note describing refined Excursion Mode behavior while emphasizing fully on-device processing."
+            ),
+            locale: Locale.current,
+            fullyOnDevice
+        )
+    }
+
     var body: some View {
         List {
             ForEach(Self.releaseSections) { section in
@@ -379,4 +398,3 @@ private struct ReleaseRow: View {
         SettingsReleaseLogsView()
     }
 }
-

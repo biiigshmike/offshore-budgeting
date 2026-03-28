@@ -50,15 +50,29 @@ struct GeneratedHelpSectionMediaItem: Identifiable, Hashable {
     init(
         id: String,
         assetName: String,
-        displayTitle: String?,
-        bodyText: String,
-        fullscreenCaptionText: String?
+        displayTitle: LocalizedStringResource?,
+        bodyText: LocalizedStringResource,
+        fullscreenCaptionText: LocalizedStringResource?
     ) {
         self.id = id
         self.assetName = assetName
-        self.displayTitle = displayTitle.map { NSLocalizedString($0, comment: "") }
-        self.bodyText = NSLocalizedString(bodyText, comment: "")
-        self.fullscreenCaptionText = fullscreenCaptionText.map { NSLocalizedString($0, comment: "") }
+        self.displayTitle = displayTitle.map(String.init(localized:))
+        self.bodyText = String(localized: bodyText)
+        self.fullscreenCaptionText = fullscreenCaptionText.map(String.init(localized:))
+    }
+
+    init(
+        id: String,
+        assetName: String,
+        resolvedDisplayTitle: String?,
+        resolvedBodyText: String,
+        resolvedFullscreenCaptionText: String?
+    ) {
+        self.id = id
+        self.assetName = assetName
+        self.displayTitle = resolvedDisplayTitle
+        self.bodyText = resolvedBodyText
+        self.fullscreenCaptionText = resolvedFullscreenCaptionText
     }
 }
 
@@ -79,11 +93,11 @@ struct GeneratedHelpSectionLinkItem: Identifiable, Hashable {
         accessoryText: String? = nil
     ) {
         self.id = id
-        self.title = NSLocalizedString(title, comment: "")
-        self.subtitle = subtitle.map { NSLocalizedString($0, comment: "") }
+        self.title = title
+        self.subtitle = subtitle
         self.systemImageName = systemImageName
         self.url = url
-        self.accessoryText = accessoryText.map { NSLocalizedString($0, comment: "") }
+        self.accessoryText = accessoryText
     }
 }
 
@@ -96,14 +110,14 @@ struct GeneratedHelpSection: Identifiable, Hashable {
 
     init(
         id: String,
-        header: String?,
-        bodyText: String,
+        header: LocalizedStringResource?,
+        bodyText: LocalizedStringResource,
         mediaItems: [GeneratedHelpSectionMediaItem],
         linkItems: [GeneratedHelpSectionLinkItem] = []
     ) {
         self.id = id
-        self.header = header.map { NSLocalizedString($0, comment: "") }
-        self.bodyText = NSLocalizedString(bodyText, comment: "")
+        self.header = header.map(String.init(localized:))
+        self.bodyText = String(localized: bodyText)
         self.mediaItems = mediaItems
         self.linkItems = linkItems
     }
@@ -115,10 +129,17 @@ struct GeneratedHelpLeafTopic: Identifiable, Hashable {
     let title: String
     let sections: [GeneratedHelpSection]
 
-    init(id: String, destinationID: String, title: String, sections: [GeneratedHelpSection]) {
+    init(id: String, destinationID: String, title: LocalizedStringResource, sections: [GeneratedHelpSection]) {
         self.id = id
         self.destinationID = destinationID
-        self.title = NSLocalizedString(title, comment: "")
+        self.title = String(localized: title)
+        self.sections = sections
+    }
+
+    init(id: String, destinationID: String, resolvedTitle: String, sections: [GeneratedHelpSection]) {
+        self.id = id
+        self.destinationID = destinationID
+        self.title = resolvedTitle
         self.sections = sections
     }
 
@@ -168,14 +189,14 @@ struct GeneratedHelpDestination: Identifiable, Hashable {
 
     init(
         id: String,
-        title: String,
+        title: LocalizedStringResource,
         group: GeneratedHelpDestinationGroup,
         iconSystemName: String,
         iconStyle: GeneratedHelpIconStyle,
         leafTopicIDs: [String]
     ) {
         self.id = id
-        self.title = NSLocalizedString(title, comment: "")
+        self.title = String(localized: title)
         self.group = group
         self.iconSystemName = iconSystemName
         self.iconStyle = iconStyle
@@ -184,7 +205,7 @@ struct GeneratedHelpDestination: Identifiable, Hashable {
 }
 
 enum GeneratedHelpContent {
-    static let bookTitle: String = NSLocalizedString("Offshore Help", comment: "")
+    static let bookTitle: String = String(localized: "Offshore Help", defaultValue: "Offshore Help", comment: "Title for the in-app help book.")
     static let bookIdentifier: String = "com.mb.offshore.help"
 
     // MARK: - Destinations
@@ -1346,7 +1367,7 @@ enum GeneratedHelpContent {
         return GeneratedHelpLeafTopic(
             id: topic.id,
             destinationID: topic.destinationID,
-            title: topic.title,
+            resolvedTitle: topic.title,
             sections: filteredSections
         )
     }
@@ -1373,34 +1394,34 @@ enum GeneratedHelpContent {
 // MARK: - Builders
 
 private func quickActionsGuideSections(prefix: String, isSettingsVariant: Bool) -> [GeneratedHelpSection] {
-    let introHeader = isSettingsVariant ? "Install and Use Quick Actions" : "What Quick Actions Are"
-    let introBody: String
+    let introHeader: LocalizedStringResource = isSettingsVariant ? "Install and Use Quick Actions" : "What Quick Actions Are"
+    let introBody: LocalizedStringResource
     if isSettingsVariant {
         introBody = "Quick Actions is the install hub for Offshore shortcut links and setup guidance. Use it to configure repeat tasks like income capture from SMS or email, expense capture from email, and Tap to Pay logging.\n\nShortcuts are optional. Offshore works without them, so treat automations as a convenience layer you build gradually."
     } else {
         introBody = "Quick Actions are optional Apple Shortcuts that make repeat tasks faster. Offshore works fully without them, so treat automations as a convenience layer.\n\nSome workflows can use Apple Intelligence for better names or labels, but every flow should still have a non-AI fallback so setup works on more devices."
     }
 
-    let setupPatternBody = isSettingsVariant
+    let setupPatternBody: LocalizedStringResource = isSettingsVariant
         ? "Start with one automation for one trusted source, test it with a real message or transaction, then expand only after it behaves reliably. Keep card mapping, amount parsing, and source naming as simple as possible on the first pass.\n\nIf a workflow offers both Apple Intelligence and non-AI variants, install the non-AI option by default and treat the AI-enhanced version as optional."
         : "Start with one automation for one source, confirm the right variables are being passed into Offshore, then expand only after real-world testing. This keeps troubleshooting small and prevents duplicate or misparsed entries.\n\nFor shared shortcut links, assume people who already installed an older copy may need to reinstall to get later improvements."
 
-    let incomeSMSHeader = "Add Income From An SMS Message"
-    let incomeSMSGuideHeader = "Add Income From An SMS Message Setup Guide"
-    let incomeEmailHeader = "Add Income From An Email"
-    let incomeEmailGuideHeader = "Add Income From An Email Setup Guide"
-    let expenseEmailHeader = "Add Expense From Email"
-    let expenseEmailGuideHeader = "Add Expense From Email Setup Guide"
-    let tapToPayHeader = "Add Expense via Tap to Pay"
-    let tapToPayGuideHeader = "Add Expense via Tap to Pay Setup Guide"
-    let incomeSMSBody = "Use this workflow for bank or payment messages that announce incoming funds. The shortcut should extract the credited amount first, then set a short income source name or a safe fallback before calling Offshore Add Income.\n\nPlan for a non-AI baseline first. If you later offer an Apple Intelligence version, keep the non-AI shortcut available for unsupported devices."
-    let incomeEmailBody = "Use this workflow for deposit confirmations and payroll-style emails. The shortcut should look for amount phrases near deposit language, then pass the extracted amount, description, date, and income type into Offshore Add Income.\n\nFallback prompting is still helpful here because forwarded emails or changed templates can strip out the expected amount format."
-    let expenseEmailBody = "Use this workflow for receipts, order confirmations, and shipped or delivered purchase emails. Match labeled totals first, then pass the amount and a merchant or fallback label into Offshore Add Expense.\n\nIf an email can include multiple final totals, decide whether the shortcut should log each one or only the best single match before you share it widely."
-    let tapToPayBody = "Use this workflow for Apple Wallet transaction automations. Setup is per device. Start with one card, keep the first automation simple, and let Offshore resolve merchant-based category matching when possible.\n\nTap to Pay is configured manually inside Shortcuts and does not require a shortcut download link."
-    let reliabilityBody = "Test after each automation is created. If parsing fails, recheck that the intended variables are mapped to the correct Shortcut Input details and that the installed shortcut version matches the instructions you are following.\n\nAvoid creating many near-duplicate automations up front. Start with one, verify it runs from a real message or transaction, then expand only if needed."
-    let shortcutDownloadsHeader = "Download Shortcuts"
-    let shortcutDownloadsBody = "Choose the version you want to install before following the setup guide."
-    let incomeEmailSteps = [
+    let incomeSMSHeader: LocalizedStringResource = "Add Income From An SMS Message"
+    let incomeSMSGuideHeader: LocalizedStringResource = "Add Income From An SMS Message Setup Guide"
+    let incomeEmailHeader: LocalizedStringResource = "Add Income From An Email"
+    let incomeEmailGuideHeader: LocalizedStringResource = "Add Income From An Email Setup Guide"
+    let expenseEmailHeader: LocalizedStringResource = "Add Expense From Email"
+    let expenseEmailGuideHeader: LocalizedStringResource = "Add Expense From Email Setup Guide"
+    let tapToPayHeader: LocalizedStringResource = "Add Expense via Tap to Pay"
+    let tapToPayGuideHeader: LocalizedStringResource = "Add Expense via Tap to Pay Setup Guide"
+    let incomeSMSBody: LocalizedStringResource = "Use this workflow for bank or payment messages that announce incoming funds. The shortcut should extract the credited amount first, then set a short income source name or a safe fallback before calling Offshore Add Income.\n\nPlan for a non-AI baseline first. If you later offer an Apple Intelligence version, keep the non-AI shortcut available for unsupported devices."
+    let incomeEmailBody: LocalizedStringResource = "Use this workflow for deposit confirmations and payroll-style emails. The shortcut should look for amount phrases near deposit language, then pass the extracted amount, description, date, and income type into Offshore Add Income.\n\nFallback prompting is still helpful here because forwarded emails or changed templates can strip out the expected amount format."
+    let expenseEmailBody: LocalizedStringResource = "Use this workflow for receipts, order confirmations, and shipped or delivered purchase emails. Match labeled totals first, then pass the amount and a merchant or fallback label into Offshore Add Expense.\n\nIf an email can include multiple final totals, decide whether the shortcut should log each one or only the best single match before you share it widely."
+    let tapToPayBody: LocalizedStringResource = "Use this workflow for Apple Wallet transaction automations. Setup is per device. Start with one card, keep the first automation simple, and let Offshore resolve merchant-based category matching when possible.\n\nTap to Pay is configured manually inside Shortcuts and does not require a shortcut download link."
+    let reliabilityBody: LocalizedStringResource = "Test after each automation is created. If parsing fails, recheck that the intended variables are mapped to the correct Shortcut Input details and that the installed shortcut version matches the instructions you are following.\n\nAvoid creating many near-duplicate automations up front. Start with one, verify it runs from a real message or transaction, then expand only if needed."
+    let shortcutDownloadsHeader: LocalizedStringResource = "Download Shortcuts"
+    let shortcutDownloadsBody: LocalizedStringResource = "Choose the version you want to install before following the setup guide."
+    let incomeEmailSteps: [LocalizedStringResource] = [
         "Open the Shortcuts app, make sure you have downloaded the correct shortcut, then go to the Automation tab. Tap the plus button to create a new automation.",
         "On this screen, choose the Email trigger.",
         "On the next screen, define when the shortcut should run. Find the email address that sends your direct deposit notifications and paste it into the Sender field. You can also add a Subject Contains trigger if that is more reliable. Set Run Immediately, then tap Next.",
@@ -1409,7 +1430,7 @@ private func quickActionsGuideSections(prefix: String, isSettingsVariant: Bool) 
         "Tap the blue Shortcut field to open your list of shortcuts. If you downloaded Add Income From An Email, you should see it here. Tap it to select it, then return to the shortcut setup screen.",
         "Before saving, tap the blue arrow. Change Input from Choose Variable to Shortcut Input. You should see the two fields connect with a line. Once that appears, tap Save."
     ]
-    let expenseEmailSteps = [
+    let expenseEmailSteps: [LocalizedStringResource] = [
         "Open the Shortcuts app, make sure you have downloaded the correct shortcut, then go to the Automation tab. Tap the plus button to create a new automation.",
         "On this screen, choose the Email trigger.",
         "On the next screen, define when the shortcut should run. Find the email address that sends your receipt or order confirmation emails and paste it into the Sender field. You can also add a Subject Contains trigger if that is more reliable. Set Run Immediately, then tap Next.",
@@ -1418,7 +1439,7 @@ private func quickActionsGuideSections(prefix: String, isSettingsVariant: Bool) 
         "Tap the blue Shortcut field to open your list of shortcuts. If you downloaded Add Expense From Email, you should see it here. Tap it to select it, then return to the shortcut setup screen.",
         "Before saving, tap the blue arrow. Change Input from Choose Variable to Shortcut Input. You should see the two fields connect with a line. Once that appears, tap Save."
     ]
-    let incomeSMSSteps = [
+    let incomeSMSSteps: [LocalizedStringResource] = [
         "Open the Shortcuts app, make sure you have downloaded the correct shortcut, then go to the Automation tab. Tap the plus button to create a new automation.",
         "On this screen, choose the Message trigger.",
         "On the next screen, define when the shortcut should run. Fill in the Sender field or the Message Contains field using the text pattern from the SMS message that confirms a direct deposit. Set Run Immediately, then tap Next.",
@@ -1427,7 +1448,7 @@ private func quickActionsGuideSections(prefix: String, isSettingsVariant: Bool) 
         "Tap the blue Shortcut field to open your list of shortcuts. If you downloaded Add Income From An SMS Message, you should see it here. Tap it to select it, then return to the shortcut setup screen.",
         "Before saving, tap the blue arrow. Change Input from Choose Variable to Shortcut Input. You should see the two fields connect with a line. Once that appears, tap Save."
     ]
-    let tapToPaySteps = [
+    let tapToPaySteps: [LocalizedStringResource] = [
         "Open the Shortcuts app and go to the Automation tab. Tap the plus button to create a new automation.",
         "On this screen, choose the Wallet trigger.",
         "For the best results, set up one automation per Apple Wallet card. By default, all cards are selected, so deselect every card except the one you want to use for this automation. It is also recommended to leave all categories selected. You can filter merchants if you want, but the safest default is to leave them unchanged. Make sure Run Immediately is selected instead of Run After Confirmation.",
@@ -1548,8 +1569,8 @@ private func quickActionsWorkflowTextSection(
     prefix: String,
     sectionNumber: Int,
     workflowSlug: String,
-    header: String,
-    body: String
+    header: LocalizedStringResource,
+    body: LocalizedStringResource
 ) -> GeneratedHelpSection {
     textSection(
         id: "\(prefix)-\(sectionNumber)-\(workflowSlug)",
@@ -1562,11 +1583,11 @@ private func quickActionsWorkflowMediaSection(
     prefix: String,
     sectionNumber: Int,
     workflowSlug: String,
-    header: String,
+    header: LocalizedStringResource,
     assetPrefix: String,
-    steps: [String]
+    steps: [LocalizedStringResource]
 ) -> GeneratedHelpSection {
-    let body = "Follow each step in order, then compare it to the matching screenshot in this guide."
+    let body: LocalizedStringResource = "Follow each step in order, then compare it to the matching screenshot in this guide."
     return mediaSection(
         id: "\(prefix)-\(sectionNumber)-\(workflowSlug)",
         header: header,
@@ -1583,8 +1604,8 @@ private func quickActionsWorkflowLinksSection(
     prefix: String,
     sectionNumber: Int,
     workflowSlug: String,
-    header: String,
-    body: String,
+    header: LocalizedStringResource,
+    body: LocalizedStringResource,
     workflowID: String
 ) -> GeneratedHelpSection {
     let group = ShortcutLinkCatalog.installGroups.first(where: { $0.id == workflowID })
@@ -1600,23 +1621,29 @@ private func quickActionsWorkflowLinksSection(
 private func quickActionsMediaItems(
     prefix: String,
     assetPrefix: String,
-    steps: [String]
+    steps: [LocalizedStringResource]
 ) -> [GeneratedHelpSectionMediaItem] {
     steps.enumerated().map { index, step in
         let stepNumber = index + 1
         let assetName = "Help/CoreScreens/Settings/Quick Actions/\(assetPrefix)-\(stepNumber)"
-        let caption = "Step \(stepNumber): \(step)"
+        let resolvedStep = String(localized: step)
+        let caption = String(
+            format: String(localized: "Step %@: %@", defaultValue: "Step %@: %@", comment: "Fullscreen caption for quick-actions help screenshots."),
+            locale: Locale.current,
+            stepNumber.formatted(.number),
+            resolvedStep
+        )
 
         return mediaItem(
             id: "\(prefix)-image-\(stepNumber)",
             assetName: assetName,
-            bodyText: step,
-            fullscreenCaptionText: caption
+            resolvedBodyText: resolvedStep,
+            resolvedFullscreenCaptionText: caption
         )
     }
 }
 
-private func textSection(id: String, header: String?, body: String) -> GeneratedHelpSection {
+private func textSection(id: String, header: LocalizedStringResource?, body: LocalizedStringResource) -> GeneratedHelpSection {
     GeneratedHelpSection(
         id: id,
         header: header,
@@ -1628,8 +1655,8 @@ private func textSection(id: String, header: String?, body: String) -> Generated
 
 private func mediaSection(
     id: String,
-    header: String?,
-    body: String,
+    header: LocalizedStringResource?,
+    body: LocalizedStringResource,
     media: [GeneratedHelpSectionMediaItem]
 ) -> GeneratedHelpSection {
     GeneratedHelpSection(
@@ -1643,8 +1670,8 @@ private func mediaSection(
 
 private func linkSection(
     id: String,
-    header: String?,
-    body: String,
+    header: LocalizedStringResource?,
+    body: LocalizedStringResource,
     links: [GeneratedHelpSectionLinkItem]
 ) -> GeneratedHelpSection {
     GeneratedHelpSection(
@@ -1659,9 +1686,9 @@ private func linkSection(
 private func mediaItem(
     id: String,
     assetName: String,
-    displayTitle: String? = nil,
-    bodyText: String,
-    fullscreenCaptionText: String? = nil
+    displayTitle: LocalizedStringResource? = nil,
+    bodyText: LocalizedStringResource,
+    fullscreenCaptionText: LocalizedStringResource? = nil
 ) -> GeneratedHelpSectionMediaItem {
     GeneratedHelpSectionMediaItem(
         id: id,
@@ -1669,6 +1696,22 @@ private func mediaItem(
         displayTitle: displayTitle,
         bodyText: bodyText,
         fullscreenCaptionText: fullscreenCaptionText
+    )
+}
+
+private func mediaItem(
+    id: String,
+    assetName: String,
+    resolvedDisplayTitle: String? = nil,
+    resolvedBodyText: String,
+    resolvedFullscreenCaptionText: String? = nil
+) -> GeneratedHelpSectionMediaItem {
+    GeneratedHelpSectionMediaItem(
+        id: id,
+        assetName: assetName,
+        resolvedDisplayTitle: resolvedDisplayTitle,
+        resolvedBodyText: resolvedBodyText,
+        resolvedFullscreenCaptionText: resolvedFullscreenCaptionText
     )
 }
 

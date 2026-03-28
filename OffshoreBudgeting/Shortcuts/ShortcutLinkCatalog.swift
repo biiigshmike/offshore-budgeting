@@ -13,25 +13,25 @@ struct ShortcutLinkVariant: Identifiable, Hashable {
 
     init(
         id: String,
-        title: String,
-        subtitle: String,
+        title: LocalizedStringResource,
+        subtitle: LocalizedStringResource,
         systemImageName: String,
         url: URL,
-        platformNote: String? = nil,
+        platformNote: LocalizedStringResource? = nil,
         requiresAppleIntelligence: Bool = false
     ) {
         self.id = id
-        self.title = NSLocalizedString(title, comment: "")
-        self.subtitle = NSLocalizedString(subtitle, comment: "")
+        self.title = String(localized: title)
+        self.subtitle = String(localized: subtitle)
         self.systemImageName = systemImageName
         self.url = url
-        self.platformNote = platformNote.map { NSLocalizedString($0, comment: "") }
+        self.platformNote = platformNote.map(String.init(localized:))
         self.requiresAppleIntelligence = requiresAppleIntelligence
     }
 
     var requirementLabel: String? {
         guard requiresAppleIntelligence else { return nil }
-        return NSLocalizedString("Apple Intelligence", comment: "")
+        return String(localized: "Apple Intelligence", defaultValue: "Apple Intelligence", comment: "Requirement label for shortcut variants that need Apple Intelligence.")
     }
 }
 
@@ -45,13 +45,13 @@ struct ShortcutLinkGroup: Identifiable, Hashable {
 
     init(
         id: String,
-        title: String,
-        subtitle: String,
+        title: LocalizedStringResource,
+        subtitle: LocalizedStringResource,
         variants: [ShortcutLinkVariant]
     ) {
         self.id = id
-        self.title = NSLocalizedString(title, comment: "")
-        self.subtitle = NSLocalizedString(subtitle, comment: "")
+        self.title = String(localized: title)
+        self.subtitle = String(localized: subtitle)
         self.variants = variants
     }
 }

@@ -9,6 +9,7 @@ import SwiftUI
 
 #if canImport(CoreLocation)
 import CoreLocation
+import SwiftData
 #endif
 
 struct SettingsNotificationsView: View {

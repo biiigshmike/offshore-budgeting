@@ -215,49 +215,49 @@ extension EnvironmentValues {
 
 private struct AppMenuCommandItem: Identifiable {
     let id: String
-    let title: String
+    let title: LocalizedStringResource
     let shortcut: KeyboardShortcut?
     let isEnabled: Bool
     let role: ButtonRole?
 
     init(
         id: String,
-        title: String,
+        title: LocalizedStringResource,
         shortcut: KeyboardShortcut? = nil,
         isEnabled: Bool = true,
         role: ButtonRole? = nil
     ) {
         self.id = id
-        self.title = NSLocalizedString(title, comment: "")
+        self.title = title
         self.shortcut = shortcut
         self.isEnabled = isEnabled
         self.role = role
     }
 }
 
-private extension String {
-    static var localizedSortAZ: String {
-        String(localized: "Sort A-Z", defaultValue: "Sort A-Z", comment: "App command title for ascending alphabetic sort.")
+private extension LocalizedStringResource {
+    static var localizedSortAZ: LocalizedStringResource {
+        "Sort A-Z"
     }
 
-    static var localizedSortZA: String {
-        String(localized: "Sort Z-A", defaultValue: "Sort Z-A", comment: "App command title for descending alphabetic sort.")
+    static var localizedSortZA: LocalizedStringResource {
+        "Sort Z-A"
     }
 
-    static var localizedSortDateAsc: String {
-        String(localized: "Sort Date ↑", defaultValue: "Sort Date ↑", comment: "App command title for ascending date sort.")
+    static var localizedSortDateAsc: LocalizedStringResource {
+        "Sort Date ↑"
     }
 
-    static var localizedSortDateDesc: String {
-        String(localized: "Sort Date ↓", defaultValue: "Sort Date ↓", comment: "App command title for descending date sort.")
+    static var localizedSortDateDesc: LocalizedStringResource {
+        "Sort Date ↓"
     }
 
-    static var localizedSortAmountAsc: String {
-        String(localized: "Sort $↑", defaultValue: "Sort $↑", comment: "App command title for ascending amount sort.")
+    static var localizedSortAmountAsc: LocalizedStringResource {
+        "Sort $↑"
     }
 
-    static var localizedSortAmountDesc: String {
-        String(localized: "Sort $↓", defaultValue: "Sort $↓", comment: "App command title for descending amount sort.")
+    static var localizedSortAmountDesc: LocalizedStringResource {
+        "Sort $↓"
     }
 }
 
@@ -451,70 +451,70 @@ struct OffshoreAppCommands: Commands {
             return expenseDisplayItems
         case .budgets:
             return [
-                AppMenuCommandItem(
-                    id: AppCommandID.Budgets.sortAZ,
-                    title: .localizedSortAZ,
+                    AppMenuCommandItem(
+                        id: AppCommandID.Budgets.sortAZ,
+                        title: .localizedSortAZ,
                     shortcut: KeyboardShortcut("1", modifiers: [.command, .option])
                 ),
-                AppMenuCommandItem(
-                    id: AppCommandID.Budgets.sortZA,
-                    title: .localizedSortZA,
+                    AppMenuCommandItem(
+                        id: AppCommandID.Budgets.sortZA,
+                        title: .localizedSortZA,
                     shortcut: KeyboardShortcut("2", modifiers: [.command, .option])
                 ),
-                AppMenuCommandItem(
-                    id: AppCommandID.Budgets.sortDateAsc,
-                    title: .localizedSortDateAsc,
+                    AppMenuCommandItem(
+                        id: AppCommandID.Budgets.sortDateAsc,
+                        title: .localizedSortDateAsc,
                     shortcut: KeyboardShortcut("3", modifiers: [.command, .option])
                 ),
-                AppMenuCommandItem(
-                    id: AppCommandID.Budgets.sortDateDesc,
-                    title: .localizedSortDateDesc,
+                    AppMenuCommandItem(
+                        id: AppCommandID.Budgets.sortDateDesc,
+                        title: .localizedSortDateDesc,
                     shortcut: KeyboardShortcut("4", modifiers: [.command, .option])
                 )
             ]
         case .presets:
             return [
-                AppMenuCommandItem(
-                    id: AppCommandID.Presets.sortAZ,
-                    title: .localizedSortAZ,
+                    AppMenuCommandItem(
+                        id: AppCommandID.Presets.sortAZ,
+                        title: .localizedSortAZ,
                     shortcut: KeyboardShortcut("1", modifiers: [.command, .option])
                 ),
-                AppMenuCommandItem(
-                    id: AppCommandID.Presets.sortZA,
-                    title: .localizedSortZA,
+                    AppMenuCommandItem(
+                        id: AppCommandID.Presets.sortZA,
+                        title: .localizedSortZA,
                     shortcut: KeyboardShortcut("2", modifiers: [.command, .option])
                 ),
-                AppMenuCommandItem(
-                    id: AppCommandID.Presets.sortDateAsc,
-                    title: .localizedSortDateAsc,
+                    AppMenuCommandItem(
+                        id: AppCommandID.Presets.sortDateAsc,
+                        title: .localizedSortDateAsc,
                     shortcut: KeyboardShortcut("3", modifiers: [.command, .option])
                 ),
-                AppMenuCommandItem(
-                    id: AppCommandID.Presets.sortDateDesc,
-                    title: .localizedSortDateDesc,
+                    AppMenuCommandItem(
+                        id: AppCommandID.Presets.sortDateDesc,
+                        title: .localizedSortDateDesc,
                     shortcut: KeyboardShortcut("4", modifiers: [.command, .option])
                 ),
-                AppMenuCommandItem(
-                    id: AppCommandID.Presets.sortAmountAsc,
-                    title: .localizedSortAmountAsc,
+                    AppMenuCommandItem(
+                        id: AppCommandID.Presets.sortAmountAsc,
+                        title: .localizedSortAmountAsc,
                     shortcut: KeyboardShortcut("5", modifiers: [.command, .option])
                 ),
-                AppMenuCommandItem(
-                    id: AppCommandID.Presets.sortAmountDesc,
-                    title: .localizedSortAmountDesc,
+                    AppMenuCommandItem(
+                        id: AppCommandID.Presets.sortAmountDesc,
+                        title: .localizedSortAmountDesc,
                     shortcut: KeyboardShortcut("6", modifiers: [.command, .option])
                 )
             ]
         case .categories:
             return [
-                AppMenuCommandItem(
-                    id: AppCommandID.Categories.sortAZ,
-                    title: .localizedSortAZ,
+                    AppMenuCommandItem(
+                        id: AppCommandID.Categories.sortAZ,
+                        title: .localizedSortAZ,
                     shortcut: KeyboardShortcut("1", modifiers: [.command, .option])
                 ),
-                AppMenuCommandItem(
-                    id: AppCommandID.Categories.sortZA,
-                    title: .localizedSortZA,
+                    AppMenuCommandItem(
+                        id: AppCommandID.Categories.sortZA,
+                        title: .localizedSortZA,
                     shortcut: KeyboardShortcut("2", modifiers: [.command, .option])
                 )
             ]
@@ -559,100 +559,100 @@ struct OffshoreAppCommands: Commands {
             }
         case .savings:
             return [
-                AppMenuCommandItem(
-                    id: AppCommandID.Savings.sortAZ,
-                    title: .localizedSortAZ,
+                    AppMenuCommandItem(
+                        id: AppCommandID.Savings.sortAZ,
+                        title: .localizedSortAZ,
                     shortcut: KeyboardShortcut("1", modifiers: [.command, .option])
                 ),
-                AppMenuCommandItem(
-                    id: AppCommandID.Savings.sortZA,
-                    title: .localizedSortZA,
+                    AppMenuCommandItem(
+                        id: AppCommandID.Savings.sortZA,
+                        title: .localizedSortZA,
                     shortcut: KeyboardShortcut("2", modifiers: [.command, .option])
                 ),
-                AppMenuCommandItem(
-                    id: AppCommandID.Savings.sortAmountAsc,
-                    title: .localizedSortAmountAsc,
+                    AppMenuCommandItem(
+                        id: AppCommandID.Savings.sortAmountAsc,
+                        title: .localizedSortAmountAsc,
                     shortcut: KeyboardShortcut("3", modifiers: [.command, .option])
                 ),
-                AppMenuCommandItem(
-                    id: AppCommandID.Savings.sortAmountDesc,
-                    title: .localizedSortAmountDesc,
+                    AppMenuCommandItem(
+                        id: AppCommandID.Savings.sortAmountDesc,
+                        title: .localizedSortAmountDesc,
                     shortcut: KeyboardShortcut("4", modifiers: [.command, .option])
                 ),
-                AppMenuCommandItem(
-                    id: AppCommandID.Savings.sortDateAsc,
-                    title: .localizedSortDateAsc,
+                    AppMenuCommandItem(
+                        id: AppCommandID.Savings.sortDateAsc,
+                        title: .localizedSortDateAsc,
                     shortcut: KeyboardShortcut("5", modifiers: [.command, .option])
                 ),
-                AppMenuCommandItem(
-                    id: AppCommandID.Savings.sortDateDesc,
-                    title: .localizedSortDateDesc,
+                    AppMenuCommandItem(
+                        id: AppCommandID.Savings.sortDateDesc,
+                        title: .localizedSortDateDesc,
                     shortcut: KeyboardShortcut("6", modifiers: [.command, .option])
                 )
             ]
         case .budgetDetail:
             return [
-                AppMenuCommandItem(
-                    id: AppCommandID.BudgetDetail.sortAZ,
-                    title: .localizedSortAZ,
+                    AppMenuCommandItem(
+                        id: AppCommandID.BudgetDetail.sortAZ,
+                        title: .localizedSortAZ,
                     shortcut: KeyboardShortcut("1", modifiers: [.command, .option])
                 ),
-                AppMenuCommandItem(
-                    id: AppCommandID.BudgetDetail.sortZA,
-                    title: .localizedSortZA,
+                    AppMenuCommandItem(
+                        id: AppCommandID.BudgetDetail.sortZA,
+                        title: .localizedSortZA,
                     shortcut: KeyboardShortcut("2", modifiers: [.command, .option])
                 ),
-                AppMenuCommandItem(
-                    id: AppCommandID.BudgetDetail.sortAmountAsc,
-                    title: .localizedSortAmountAsc,
+                    AppMenuCommandItem(
+                        id: AppCommandID.BudgetDetail.sortAmountAsc,
+                        title: .localizedSortAmountAsc,
                     shortcut: KeyboardShortcut("3", modifiers: [.command, .option])
                 ),
-                AppMenuCommandItem(
-                    id: AppCommandID.BudgetDetail.sortAmountDesc,
-                    title: .localizedSortAmountDesc,
+                    AppMenuCommandItem(
+                        id: AppCommandID.BudgetDetail.sortAmountDesc,
+                        title: .localizedSortAmountDesc,
                     shortcut: KeyboardShortcut("4", modifiers: [.command, .option])
                 ),
-                AppMenuCommandItem(
-                    id: AppCommandID.BudgetDetail.sortDateAsc,
-                    title: .localizedSortDateAsc,
+                    AppMenuCommandItem(
+                        id: AppCommandID.BudgetDetail.sortDateAsc,
+                        title: .localizedSortDateAsc,
                     shortcut: KeyboardShortcut("5", modifiers: [.command, .option])
                 ),
-                AppMenuCommandItem(
-                    id: AppCommandID.BudgetDetail.sortDateDesc,
-                    title: .localizedSortDateDesc,
+                    AppMenuCommandItem(
+                        id: AppCommandID.BudgetDetail.sortDateDesc,
+                        title: .localizedSortDateDesc,
                     shortcut: KeyboardShortcut("6", modifiers: [.command, .option])
                 ),
             ] + expenseDisplayItems
         case .cardDetail:
             return [
-                AppMenuCommandItem(
-                    id: AppCommandID.CardDetail.sortAZ,
-                    title: .localizedSortAZ,
+                    AppMenuCommandItem(
+                        id: AppCommandID.CardDetail.sortAZ,
+                        title: .localizedSortAZ,
                     shortcut: KeyboardShortcut("1", modifiers: [.command, .option])
                 ),
-                AppMenuCommandItem(
-                    id: AppCommandID.CardDetail.sortZA,
-                    title: .localizedSortZA,
+                    AppMenuCommandItem(
+                        id: AppCommandID.CardDetail.sortZA,
+                        title: .localizedSortZA,
                     shortcut: KeyboardShortcut("2", modifiers: [.command, .option])
                 ),
-                AppMenuCommandItem(
-                    id: AppCommandID.CardDetail.sortAmountAsc,
-                    title: .localizedSortAmountAsc,
+                    AppMenuCommandItem(
+                        id: AppCommandID.CardDetail.sortAmountAsc,
+                        title: .localizedSortAmountAsc,
                     shortcut: KeyboardShortcut("3", modifiers: [.command, .option])
                 ),
-                AppMenuCommandItem(
-                    id: AppCommandID.CardDetail.sortAmountDesc,
-                    title: .localizedSortAmountDesc,
+                    AppMenuCommandItem(
+                        id: AppCommandID.CardDetail.sortAmountDesc,
+                        title: .localizedSortAmountDesc,
                     shortcut: KeyboardShortcut("4", modifiers: [.command, .option])
                 ),
-                AppMenuCommandItem(
-                    id: AppCommandID.CardDetail.sortDateAsc,
-                    title: .localizedSortDateAsc,
+                    AppMenuCommandItem(
+                        id: AppCommandID.CardDetail.sortDateAsc,
+                        title: .localizedSortDateAsc,
                     shortcut: KeyboardShortcut("5", modifiers: [.command, .option])
                 ),
-                AppMenuCommandItem(
-                    id: AppCommandID.CardDetail.sortDateDesc,
-                    title: .localizedSortDateDesc,
+                    AppMenuCommandItem(
+                        id: AppCommandID.CardDetail.sortDateDesc,
+                        title: .localizedSortDateDesc,
                     shortcut: KeyboardShortcut("6", modifiers: [.command, .option])
                 ),
             ] + expenseDisplayItems
@@ -689,14 +689,18 @@ struct OffshoreAppCommands: Commands {
     @ViewBuilder
     private func commandButton(for item: AppMenuCommandItem) -> some View {
         if let role = item.role {
-            Button(item.title, role: role) {
+            Button(role: role) {
                 dispatch(item.id)
+            } label: {
+                Text(item.title)
             }
             .keyboardShortcut(item.shortcut)
             .disabled(!item.isEnabled)
         } else {
-            Button(item.title) {
+            Button {
                 dispatch(item.id)
+            } label: {
+                Text(item.title)
             }
             .keyboardShortcut(item.shortcut)
             .disabled(!item.isEnabled)

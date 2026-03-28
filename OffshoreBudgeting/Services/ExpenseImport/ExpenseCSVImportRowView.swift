@@ -463,11 +463,11 @@ struct ExpenseCSVImportRowView: View {
             ) {
                 Text("Split Percentage")
             } minimumValueLabel: {
-                Text("0%")
+                Text(0.0.formatted(.percent.precision(.fractionLength(0))))
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             } maximumValueLabel: {
-                Text("100%")
+                Text(1.0.formatted(.percent.precision(.fractionLength(0))))
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
