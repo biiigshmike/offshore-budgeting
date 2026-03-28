@@ -1,7 +1,7 @@
 {
   "images" : [
     {
-      "filename" : "step-3-light.png",
+      "filename" : "IMG_0093.png",
       "idiom" : "iphone",
       "scale" : "1x"
     },
@@ -12,7 +12,7 @@
           "value" : "dark"
         }
       ],
-      "filename" : "step-3-dark.png",
+      "filename" : "IMG_0094.png",
       "idiom" : "iphone",
       "scale" : "1x"
     },

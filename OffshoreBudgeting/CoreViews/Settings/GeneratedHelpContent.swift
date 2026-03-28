@@ -1417,7 +1417,7 @@ private func quickActionsGuideSections(prefix: String, isSettingsVariant: Bool) 
     let incomeSMSBody: LocalizedStringResource = "Use this workflow for bank or payment messages that announce incoming funds. The shortcut should extract the credited amount first, then set a short income source name or a safe fallback before calling Offshore Add Income.\n\nPlan for a non-AI baseline first. If you later offer an Apple Intelligence version, keep the non-AI shortcut available for unsupported devices."
     let incomeEmailBody: LocalizedStringResource = "Use this workflow for deposit confirmations and payroll-style emails. The shortcut should look for amount phrases near deposit language, then pass the extracted amount, description, date, and income type into Offshore Add Income.\n\nFallback prompting is still helpful here because forwarded emails or changed templates can strip out the expected amount format."
     let expenseEmailBody: LocalizedStringResource = "Use this workflow for receipts, order confirmations, and shipped or delivered purchase emails. Match labeled totals first, then pass the amount and a merchant or fallback label into Offshore Add Expense.\n\nIf an email can include multiple final totals, decide whether the shortcut should log each one or only the best single match before you share it widely."
-    let tapToPayBody: LocalizedStringResource = "Use this workflow for Apple Wallet transaction automations. Setup is per device. Start with one card, keep the first automation simple, and let Offshore resolve merchant-based category matching when possible.\n\nTap to Pay is configured manually inside Shortcuts and does not require a shortcut download link."
+    let tapToPayBody: LocalizedStringResource = "Use this workflow for Apple Wallet transaction automations. Setup is per device and works best with one automation per card. Leave categories selected, keep merchant filters broad unless you need them, and let Offshore resolve merchant-based category matching later when possible.\n\nTap to Pay is configured manually in Shortcuts using Offshore’s built-in Add Expense action, so no shortcut download is required."
     let reliabilityBody: LocalizedStringResource = "Test after each automation is created. If parsing fails, recheck that the intended variables are mapped to the correct Shortcut Input details and that the installed shortcut version matches the instructions you are following.\n\nAvoid creating many near-duplicate automations up front. Start with one, verify it runs from a real message or transaction, then expand only if needed."
     let shortcutDownloadsHeader: LocalizedStringResource = "Download Shortcuts"
     let shortcutDownloadsBody: LocalizedStringResource = "Choose the version you want to install before following the setup guide."
@@ -1449,17 +1449,17 @@ private func quickActionsGuideSections(prefix: String, isSettingsVariant: Bool) 
         "Before saving, tap the blue arrow. Change Input from Choose Variable to Shortcut Input. You should see the two fields connect with a line. Once that appears, tap Save."
     ]
     let tapToPaySteps: [LocalizedStringResource] = [
-        "Open the Shortcuts app and go to the Automation tab. Tap the plus button to create a new automation.",
+        "Open the Shortcuts app and go to the Automations tab. Tap the plus button to create a new automation.",
         "On this screen, choose the Wallet trigger.",
-        "For the best results, set up one automation per Apple Wallet card. By default, all cards are selected, so deselect every card except the one you want to use for this automation. It is also recommended to leave all categories selected. You can filter merchants if you want, but the safest default is to leave them unchanged. Make sure Run Immediately is selected instead of Run After Confirmation.",
+        "For best results, set up one automation per Apple Wallet card. By default, all cards are selected, so deselect every card except the one you want to use for this automation. It is also recommended to leave all categories selected. You can filter merchants if you want, but the safest default is to leave them unchanged. Make sure Run Immediately is selected instead of Run After Confirmation.",
         "On the next screen, under Get Started, tap Create New Shortcut.",
-        "Search the Actions list for Add Expense. This action is built into Offshore, so nothing needs to be downloaded first.",
-        "The form now needs to be configured so it can receive the transaction details from Apple Wallet.",
-        "Tap the Amount field, choose Select Variable, then choose Shortcut Input. Once Shortcut Input appears in the field, tap it again and change the Type from Transaction to Amount. Then tap Return.",
-        "Choose the Offshore card that should receive these Tap to Pay expenses.",
-        "Repeat the same setup for the Wallet Card field. Tap the field, choose Select Variable, then choose Shortcut Input. Once Shortcut Input appears in the field, tap it again and change the Type from Transaction to Card or Pass. Then tap Return.",
-        "Repeat the same setup for Merchant. Tap the field, choose Select Variable, then choose Shortcut Input. Once Shortcut Input appears in the field, tap it again and change the Type from Transaction to Merchant. Then tap Return.",
-        "Leave Category unchanged if you want these expenses to be added as Uncategorized. Then tap the Date field and scroll until you find Current Date. Turn off Show When Run, then tap Save."
+        "Search the Actions list for Add Expense. This action is built into Offshore, so there is nothing to download first. To extract the Amount, Wallet Card, Merchant, and Date, you will need to configure the form.",
+        "Tap the Amount field, choose Select Variable, then choose Shortcut Input. Once Shortcut Input appears in the field, tap it so the data is passed into the Amount field. Then change the Type from Transaction to Amount and tap Return.",
+        "Choose the Offshore card these Tap to Pay expenses should be attached to.",
+        "Repeat the same setup for the Wallet Card field. Tap the field, choose Select Variable, then choose Shortcut Input. Once Shortcut Input appears in the field, tap it and change the Type from Transaction to Card or Pass. Then tap Return.",
+        "Repeat the same setup for Merchant. Tap the field, choose Select Variable, then choose Shortcut Input. Once Shortcut Input appears in the field, tap it and change the Type from Transaction to Merchant. Then tap Return.",
+        "To use the current date, tap the Date field and scroll until you find Current Date. For best results, set Date Format to Medium and Time Format to None. Once Current Date looks correct, tap Return.",
+        "Leave Category unchanged if you want these expenses added as Uncategorized. Turn off Show When Run, then tap Save."
     ]
 
     return [

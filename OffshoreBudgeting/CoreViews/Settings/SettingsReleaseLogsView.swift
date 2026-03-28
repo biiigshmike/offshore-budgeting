@@ -9,6 +9,8 @@ import SwiftUI
 
 struct SettingsReleaseLogsView: View {
 
+    @State private var isPastVersionsExpanded: Bool = false
+
     struct ReleaseSection: Identifiable {
         let version: String
         let build: String
@@ -351,18 +353,87 @@ struct SettingsReleaseLogsView: View {
         )
     }
 
+    private var featuredReleaseSection: ReleaseSection? {
+        Self.currentReleaseSection ?? Self.releaseSections.first
+    }
+
+    private var pastReleaseSections: [ReleaseSection] {
+        guard let featuredReleaseSection else { return Self.releaseSections }
+        return Self.releaseSections.filter { $0.id != featuredReleaseSection.id }
+    }
+
     var body: some View {
         List {
-            ForEach(Self.releaseSections) { section in
-                Section(section.headerTitle) {
-                    ForEach(section.items) { item in
-                        ReleaseRow(item: item)
+            if let featuredReleaseSection {
+                Section("Current Version") {
+                    VStack(alignment: .leading, spacing: 14) {
+                        ReleaseSectionHeader(section: featuredReleaseSection)
+
+                        ForEach(featuredReleaseSection.items) { item in
+                            ReleaseRow(item: item)
+                        }
+                    }
+                }
+            }
+
+            if pastReleaseSections.isEmpty == false {
+                Section {
+                    DisclosureGroup(isExpanded: $isPastVersionsExpanded) {
+                        ForEach(pastReleaseSections) { section in
+                            NavigationLink {
+                                ReleaseSectionDetailView(section: section)
+                            } label: {
+                                ReleaseSectionSummaryRow(section: section)
+                            }
+                        }
+                    } label: {
+                        LabeledContent("Past Versions") {
+                            Text(pastReleaseSections.count, format: .number)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
             }
         }
         .listStyle(.insetGrouped)
         .navigationTitle("Release Logs")
+    }
+}
+
+// MARK: - Section Header
+
+private struct ReleaseSectionHeader: View {
+
+    let section: SettingsReleaseLogsView.ReleaseSection
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(section.version)
+                .font(.title3.weight(.semibold))
+
+            Text(buildText)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 4)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var buildText: String {
+        String(
+            format: String(
+                localized: "Build %@",
+                defaultValue: "Build %@",
+                comment: "Build label for a release log summary."
+            ),
+            locale: Locale.current,
+            localizedBuild
+        )
+    }
+
+    private var localizedBuild: String {
+        guard let value = Int(section.build) else { return section.build }
+        return value.formatted(.number)
     }
 }
 
@@ -390,6 +461,68 @@ private struct ReleaseRow: View {
             }
         }
         .padding(.vertical, 6)
+    }
+}
+
+// MARK: - Past Version Row
+
+private struct ReleaseSectionSummaryRow: View {
+
+    let section: SettingsReleaseLogsView.ReleaseSection
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(section.version)
+                .font(.body.weight(.semibold))
+                .foregroundStyle(.primary)
+
+            Text(buildText)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 2)
+    }
+
+    private var buildText: String {
+        let localizedBuild: String
+        if let value = Int(section.build) {
+            localizedBuild = value.formatted(.number)
+        } else {
+            localizedBuild = section.build
+        }
+
+        return String(
+            format: String(
+                localized: "Build %@",
+                defaultValue: "Build %@",
+                comment: "Build label for a release log summary."
+            ),
+            locale: Locale.current,
+            localizedBuild
+        )
+    }
+}
+
+// MARK: - Detail
+
+private struct ReleaseSectionDetailView: View {
+
+    let section: SettingsReleaseLogsView.ReleaseSection
+
+    var body: some View {
+        List {
+            Section {
+                ReleaseSectionHeader(section: section)
+            }
+
+            Section("Release Notes") {
+                ForEach(section.items) { item in
+                    ReleaseRow(item: item)
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+        .navigationTitle(section.version)
     }
 }
 
