@@ -774,10 +774,6 @@ private struct OnboardingWorkspaceStep: View {
                 .tint(.accentColor)
             }
 
-            Text("Tip: Try starting with a workspace called Personal. You can always add more later.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-
             Spacer(minLength: 0)
         }
         .onAppear {
@@ -1290,23 +1286,23 @@ private struct OnboardingCardsStep: View {
 
     private var cardsGrid: some View {
         ScrollView {
-            LazyVGrid(columns: columns, spacing: 14) {
-                if cards.isEmpty {
-                    ContentUnavailableView(
-                        "No Cards Yet",
-                        systemImage: "creditcard",
-                        description: Text("Create at least one card to continue.")
-                    )
-                    .frame(maxWidth: .infinity)
-                } else {
+            if cards.isEmpty {
+                ContentUnavailableView(
+                    "No Cards Yet",
+                    systemImage: "creditcard",
+                    description: Text("Create at least one card to continue.")
+                )
+                .frame(maxWidth: .infinity, minHeight: 220, alignment: .top)
+            } else {
+                LazyVGrid(columns: columns, spacing: 14) {
                     ForEach(cards) { card in
                         cardTile(card)
                     }
                 }
+                .padding(.horizontal, 2)
+                .padding(.top, 4)
+                .padding(.bottom, 10)
             }
-            .padding(.horizontal, 2)
-            .padding(.top, 4)
-            .padding(.bottom, 10)
         }
     }
 
@@ -2518,9 +2514,6 @@ private struct OnboardingBudgetsStep: View {
 
     @Environment(\.modelContext) private var modelContext
     @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
-    @AppStorage("general_defaultBudgetingPeriod")
-    private var defaultBudgetingPeriodRaw: String = BudgetingPeriod.monthly.rawValue
-
     @Query private var budgets: [Budget]
 
     private enum SheetRoute: Identifiable {
@@ -2598,10 +2591,6 @@ private struct OnboardingBudgetsStep: View {
             .scrollContentBackground(.hidden)
             .background(Color(.systemBackground))
             .frame(minHeight: 320)
-
-            Text("Default period: \((BudgetingPeriod(rawValue: defaultBudgetingPeriodRaw) ?? .monthly).displayTitle)")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
 
             if #available(iOS 26.0, *) {
                 Button {

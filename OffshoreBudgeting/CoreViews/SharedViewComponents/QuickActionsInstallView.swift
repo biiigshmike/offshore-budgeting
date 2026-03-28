@@ -39,11 +39,6 @@ struct QuickActionsInstallView: View {
             .background(Color(.systemBackground))
             .frame(minHeight: 300)
 
-            if isOnboarding {
-                Text("This step is optional. You can install these later from Settings.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
         }
 
         if isOnboarding {

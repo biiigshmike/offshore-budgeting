@@ -625,90 +625,6 @@
         }
       }
     },
-    "$ ↑" : {
-      "comment" : "Ascending amount sort label.",
-      "extractionState" : "stale",
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "$ ↑"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "$ ↑"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "$ ↑"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "$ ↑"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "$ ↑"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "$ ↑"
-          }
-        }
-      }
-    },
-    "$ ↓" : {
-      "comment" : "Descending amount sort label.",
-      "extractionState" : "stale",
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "$ ↓"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "$ ↓"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "$ ↓"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "$ ↓"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "$ ↓"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "$ ↓"
-          }
-        }
-      }
-    },
     "$↑" : {
       "comment" : "Ascending amount sort label.",
       "localizations" : {
@@ -17119,46 +17035,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "默认类别"
-          }
-        }
-      }
-    },
-    "Default period: %@" : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "الفترة الافتراضية: %@"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Standardzeitraum: %@"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Período predeterminado: %@"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Période par défaut : %@"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Período padrão: %@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "默认周期：%@"
           }
         }
       }
@@ -48863,46 +48739,6 @@
         }
       }
     },
-    "This step is optional. You can install these later from Settings." : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "هذه الخطوة اختيارية. يمكنك تثبيتها لاحقًا من الإعدادات."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dieser Schritt ist optional."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Este paso es opcional. Puedes instalarlos más tarde desde Ajustes."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This step is optional. You can install these later from Réglages."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Esta etapa é opcional. Você pode instalá-los posteriormente em Configurações."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "此步骤是可选的。您可以稍后从“设置”中安装它们。"
-          }
-        }
-      }
-    },
     "This step opens the add expense flow from Budget Details. Choose the correct expense type first so the entry contributes to calculations in the right way. Planned and variable entries serve different purposes, so classification is important. Starting with the right type prevents avoidable reporting confusion." : {
       "localizations" : {
         "ar" : {
@@ -49507,46 +49343,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "时间"
-          }
-        }
-      }
-    },
-    "Tip: Try starting with a workspace called Personal. You can always add more later." : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "نصيحة: حاول البدء بمساحة عمل تسمى \"شخصي\". يمكنك دائمًا إضافة المزيد لاحقًا."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tipp: Versuchen Sie, mit einem Arbeitsbereich namens „Persönlich“ zu beginnen."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Consejo: empieza con un espacio llamado Personal. Siempre puedes agregar más después."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Astuce : essayez de commencer avec un espace de travail appelé Personnel. Vous pourrez toujours en ajouter d’autres plus tard."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dica: tente começar com um espaço de trabalho chamado Pessoal. Você sempre pode adicionar mais posteriormente."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "提示：尝试从名为“个人”的工作区开始。您以后可以随时添加更多内容。"
           }
         }
       }
