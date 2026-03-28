@@ -28,9 +28,11 @@ struct QuickActionsInstallView: View {
             }
 
             List {
-                builtInActionsSection
                 shortcutsSection
-                helpSection
+                if !isOnboarding {
+                    builtInActionsSection
+                    helpSection
+                }
             }
             .listStyle(.insetGrouped)
             .scrollContentBackground(.hidden)
@@ -83,16 +85,18 @@ struct QuickActionsInstallView: View {
                 .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
                 .listRowBackground(Color.clear)
             }
-
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Tap to Pay is configured directly in the Shortcuts app using Offshore’s built-in Add Expense action.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                Text("There is no Tap to Pay shortcut download. Use the Setup Guide for the manual automation steps.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+            
+            if !isOnboarding {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Tap to Pay is configured directly in the Shortcuts app using Offshore’s built-in Add Expense action.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                    Text("There is no Tap to Pay shortcut download. Use the Setup Guide for the manual automation steps.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 4)
             }
-            .padding(.vertical, 4)
         }
     }
 
@@ -116,7 +120,7 @@ struct QuickActionsInstallView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Quick Actions")
                 .font(.title2.weight(.bold))
-            Text("Install your Offshore shortcuts, then use the Setup Guide links for step-by-step automation instructions.")
+            Text("Download any shortcut links you want to use with Offshore. Everything here is optional, and you can install these later from Settings.")
                 .foregroundStyle(.secondary)
         }
     }

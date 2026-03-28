@@ -46,9 +46,6 @@ struct OnboardingView: View {
     
     @AppStorage("onboarding_didChooseDataSource") private var didChooseDataSource: Bool = false
     @AppStorage("onboarding_didPressGetStarted") private var didPressGetStarted: Bool = false
-    @AppStorage("general_defaultBudgetingPeriod")
-    private var defaultBudgetingPeriodRaw: String = BudgetingPeriod.monthly.rawValue
-    
     // MARK: - SwiftData
     
     @Query(sort: \Workspace.name, order: .forward)
@@ -73,11 +70,6 @@ struct OnboardingView: View {
     @State private var isCheckingICloudForGetStarted: Bool = false
     @State private var showingRestartRequired: Bool = false
     @State private var didChooseICloudFromGetStarted: Bool = false
-    @State private var showingStarterBudgetPrompt: Bool = false
-    @State private var starterBudgetPromptContinuation: (() -> Void)? = nil
-    @State private var starterBudgetErrorMessage: String = ""
-    @State private var showingStarterBudgetError: Bool = false
-    
     // Drives the “wake up” background motion on the welcome step.
     @State private var isExitingWelcome: Bool = false
     
@@ -175,27 +167,6 @@ struct OnboardingView: View {
             Button("Continue Locally", role: .cancel) { startLocalFromGetStarted() }
         } message: {
             Text("This Apple ID can sync existing Offshore data from iCloud. You can always switch later from Manage Workspaces.")
-        }
-        .alert("Create a Starter Budget?", isPresented: $showingStarterBudgetPrompt) {
-            Button("Create Budget") {
-                if let workspace = currentWorkspace {
-                    if createStarterBudgetIfNeeded(in: workspace) != nil || hasAtLeastOneBudget(in: workspace) {
-                        continueAfterStarterBudgetPrompt()
-                    }
-                } else {
-                    continueAfterStarterBudgetPrompt()
-                }
-            }
-            Button("Skip", role: .cancel) {
-                continueAfterStarterBudgetPrompt()
-            }
-        } message: {
-            Text("You can finish now, or create a starter budget so Home has planning context right away.")
-        }
-        .alert("Couldn’t Save Starter Budget", isPresented: $showingStarterBudgetError) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text(starterBudgetErrorMessage)
         }
         .sheet(isPresented: $showingRestartRequired) {
             RestartRequiredView(
@@ -549,32 +520,11 @@ struct OnboardingView: View {
                 }
             }
 
-        case Step.income.rawValue:
-            if let ws = currentWorkspace {
-                let hasIncome = hasAtLeastOneIncome(in: ws)
-                let hasBudget = hasAtLeastOneBudget(in: ws)
-                if hasIncome && !hasBudget {
-                    presentStarterBudgetPrompt {
-                        goNext()
-                    }
-                    return
-                }
-            }
-
         default:
             break
         }
 
         if onboardingStep >= finalStepValue {
-            if let ws = currentWorkspace {
-                let hasBudget = hasAtLeastOneBudget(in: ws)
-                if !hasBudget {
-                    presentStarterBudgetPrompt {
-                        completeOnboarding()
-                    }
-                    return
-                }
-            }
             completeOnboarding()
         } else {
             goNext()
@@ -693,59 +643,6 @@ struct OnboardingView: View {
         return !cards.isEmpty
     }
 
-    private func hasAtLeastOneIncome(in workspace: Workspace) -> Bool {
-        let workspaceID = workspace.id
-        let descriptor = FetchDescriptor<Income>(
-            predicate: #Predicate<Income> { $0.workspace?.id == workspaceID }
-        )
-        let incomes = (try? modelContext.fetch(descriptor)) ?? []
-        return !incomes.isEmpty
-    }
-
-    private func hasAtLeastOneBudget(in workspace: Workspace) -> Bool {
-        let workspaceID = workspace.id
-        let descriptor = FetchDescriptor<Budget>(
-            predicate: #Predicate<Budget> { $0.workspace?.id == workspaceID }
-        )
-        let budgets = (try? modelContext.fetch(descriptor)) ?? []
-        return !budgets.isEmpty
-    }
-
-    @discardableResult
-    private func createStarterBudgetIfNeeded(in workspace: Workspace) -> Budget? {
-        do {
-            let budget = try StarterBudgetService.createIfNeeded(
-                in: workspace,
-                defaultBudgetingPeriodRaw: defaultBudgetingPeriodRaw,
-                modelContext: modelContext
-            )
-
-            Task {
-                await LocalNotificationService.syncFromUserDefaultsIfPossible(
-                    modelContext: modelContext,
-                    workspaceID: workspace.id
-                )
-            }
-
-            return budget
-        } catch {
-            starterBudgetErrorMessage = error.localizedDescription
-            showingStarterBudgetError = true
-            return nil
-        }
-    }
-
-    private func presentStarterBudgetPrompt(continuation: @escaping () -> Void) {
-        starterBudgetPromptContinuation = continuation
-        showingStarterBudgetPrompt = true
-    }
-
-    private func continueAfterStarterBudgetPrompt() {
-        let continuation = starterBudgetPromptContinuation
-        starterBudgetPromptContinuation = nil
-        continuation?()
-    }
-    
     // MARK: - Skip prompt
     
     /// This is a pragmatic check:
@@ -1711,6 +1608,48 @@ private struct OnboardingPresetsStep: View {
 // MARK: - Step: Gestures & Editing
 
 private struct OnboardingGestureTrainingStep: View {
+    private struct DemoBudget {
+        let name: String
+        let startDate: Date
+        let endDate: Date
+    }
+
+    private struct DemoCategory {
+        let name: String
+        let hexColor: String
+    }
+
+    private struct DemoCard {
+        let name: String
+        let theme: String
+        let effect: String
+    }
+
+    private struct DemoReconciliation {
+        let name: String
+        let hexColor: String
+        let balance: Double
+    }
+
+    private struct DemoIncome {
+        let source: String
+        let amount: Double
+        let isPlanned: Bool
+    }
+
+    private struct DemoExpense {
+        let descriptionText: String
+        let amount: Double
+        let transactionDate: Date
+        let kindTitle: String
+        let categoryHexColor: String?
+    }
+
+    private struct DemoPreset {
+        let title: String
+        let plannedAmount: Double
+        let scheduleText: String
+    }
 
     private enum GestureDemoSegment: String, CaseIterable, Identifiable {
         case budget = "Budget"
@@ -1897,78 +1836,118 @@ private struct OnboardingGestureTrainingStep: View {
         }
     }
 
-    private var demoBudget: Budget {
+    private var demoBudget: DemoBudget {
         if let existing = budgets.first {
-            return existing
+            return DemoBudget(
+                name: existing.name,
+                startDate: existing.startDate,
+                endDate: existing.endDate
+            )
         }
 
         let range = BudgetingPeriod.monthly.defaultRange(containing: .now)
-        return Budget(
+        return DemoBudget(
             name: currentMonthYearFallbackBudgetName(),
             startDate: range.start,
-            endDate: range.end,
-            workspace: workspace
+            endDate: range.end
         )
     }
 
-    private var demoCategory: Category {
-        categories.first ?? Category(name: "Groceries", hexColor: "#22C55E", workspace: workspace)
+    private var demoCategory: DemoCategory {
+        if let existing = categories.first {
+            return DemoCategory(name: existing.name, hexColor: existing.hexColor)
+        }
+        return DemoCategory(name: "Groceries", hexColor: "#22C55E")
     }
 
-    private var demoCard: Card {
-        cards.first ?? Card(name: "Apple Card", theme: CardThemeOption.ruby.rawValue, effect: CardEffectOption.plastic.rawValue, workspace: workspace)
+    private var demoCard: DemoCard {
+        if let existing = cards.first {
+            return DemoCard(name: existing.name, theme: existing.theme, effect: existing.effect)
+        }
+        return DemoCard(
+            name: "Apple Card",
+            theme: CardThemeOption.ruby.rawValue,
+            effect: CardEffectOption.plastic.rawValue
+        )
     }
 
-    private var demoReconciliation: AllocationAccount {
-        allocationAccounts.first ?? AllocationAccount(name: "Jim", hexColor: "#3B82F6", workspace: workspace)
+    private var demoReconciliation: DemoReconciliation {
+        if let existing = allocationAccounts.first {
+            return DemoReconciliation(
+                name: existing.name,
+                hexColor: existing.hexColor,
+                balance: AllocationLedgerService.balance(for: existing)
+            )
+        }
+        return DemoReconciliation(name: "Jim", hexColor: "#3B82F6", balance: 0)
     }
 
-    private var demoIncome: Income {
+    private var demoIncome: DemoIncome {
         if let existing = incomes.first {
-            return existing
+            return DemoIncome(
+                source: existing.source,
+                amount: existing.amount,
+                isPlanned: existing.isPlanned
+            )
         }
 
-        return Income(
+        return DemoIncome(
             source: "Paycheck",
             amount: 2200,
-            date: .now,
-            isPlanned: false,
-            isException: false,
-            workspace: workspace,
-            series: nil,
-            card: demoCard
+            isPlanned: false
         )
     }
 
-    private var demoExpense: VariableExpense {
+    private var demoExpense: DemoExpense {
         if let existing = variableExpenses.first {
-            return existing
+            return DemoExpense(
+                descriptionText: existing.descriptionText,
+                amount: existing.ledgerDisplayAmount(),
+                transactionDate: existing.transactionDate,
+                kindTitle: existing.kind.displayTitle,
+                categoryHexColor: existing.category?.hexColor
+            )
         }
 
-        return VariableExpense(
+        return DemoExpense(
             descriptionText: "Trader Joe's",
             amount: 48.90,
             transactionDate: Calendar.current.startOfDay(for: .now),
-            workspace: workspace,
-            card: demoCard,
-            category: demoCategory
+            kindTitle: VariableExpenseKind.debit.displayTitle,
+            categoryHexColor: demoCategory.hexColor
         )
     }
 
-    private var demoPreset: Preset {
-        let now = Date.now
-        let month = Calendar.current.component(.month, from: now)
-        let day = Calendar.current.component(.day, from: now)
+    private var demoPreset: DemoPreset {
+        if let existing = presets.first {
+            return DemoPreset(
+                title: existing.title,
+                plannedAmount: existing.plannedAmount,
+                scheduleText: demoScheduleText(
+                    frequencyRaw: existing.frequencyRaw,
+                    interval: existing.interval,
+                    weeklyWeekday: existing.weeklyWeekday,
+                    monthlyDayOfMonth: existing.monthlyDayOfMonth,
+                    monthlyIsLastDay: existing.monthlyIsLastDay,
+                    yearlyMonth: existing.yearlyMonth,
+                    yearlyDayOfMonth: existing.yearlyDayOfMonth
+                )
+            )
+        }
 
-        return presets.first ?? Preset(
+        let now = Date.now
+        return DemoPreset(
             title: "Rent",
             plannedAmount: 1400,
-            frequencyRaw: RecurrenceFrequency.yearly.rawValue,
-            yearlyMonth: month,
-            yearlyDayOfMonth: day,
-            workspace: workspace,
-            defaultCard: demoCard,
-            defaultCategory: demoCategory
+            scheduleText: demoScheduleText(
+                frequencyRaw: RecurrenceFrequency.yearly.rawValue,
+                interval: 1,
+                weeklyWeekday: 6,
+                monthlyDayOfMonth: 15,
+                monthlyIsLastDay: false,
+                yearlyMonth: Calendar.current.component(.month, from: now),
+                yearlyDayOfMonth: Calendar.current.component(.day, from: now)
+            )
         )
     }
 
@@ -2001,7 +1980,7 @@ private struct OnboardingGestureTrainingStep: View {
 
     private var reconciliationDemoRow: some View {
         ZStack(alignment: .bottomLeading) {
-            Text(AllocationLedgerService.balance(for: demoReconciliation), format: CurrencyFormatter.currencyStyle())
+            Text(demoReconciliation.balance, format: CurrencyFormatter.currencyStyle())
                 .font(.title2.weight(.semibold))
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
 
@@ -2076,10 +2055,32 @@ private struct OnboardingGestureTrainingStep: View {
     }
 
     private var expenseDemoRow: some View {
-        SharedVariableExpenseRow(expense: demoExpense)
-            .contentShape(Rectangle())
-            .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                Button {
+        HStack(alignment: .top, spacing: 12) {
+            Circle()
+                .fill(Color(hex: demoExpense.categoryHexColor ?? "") ?? Color.secondary.opacity(0.35))
+                .frame(width: 12, height: 12)
+                .padding(.top, 6)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(demoExpense.descriptionText)
+                    .font(.body)
+
+                Text("\(demoExpense.transactionDate.formatted(date: .abbreviated, time: .omitted)) • \(demoExpense.kindTitle)")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 0)
+
+            Text(demoExpense.amount, format: CurrencyFormatter.currencyStyle())
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(.primary)
+                .multilineTextAlignment(.trailing)
+        }
+        .padding(.vertical, 4)
+        .contentShape(Rectangle())
+        .swipeActions(edge: .leading, allowsFullSwipe: false) {
+            Button {
                     expenseInstruction = "Leading swipe opened Edit."
                 } label: {
                     Label("Edit", systemImage: "pencil")
@@ -2097,10 +2098,55 @@ private struct OnboardingGestureTrainingStep: View {
     }
 
     private var presetDemoRow: some View {
-        PresetRowView(preset: demoPreset, assignedBudgetsCount: 1)
-            .contentShape(Rectangle())
-            .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                Button {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(demoPreset.title)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+
+                Spacer(minLength: 8)
+
+                HStack(spacing: 10) {
+                    Text("Assigned Budgets")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+
+                    Text("1")
+                        .font(.subheadline.weight(.semibold))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Capsule().fill(Color.secondary.opacity(0.18)))
+                        .accessibilityHidden(true)
+                }
+            }
+
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("PLANNED")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    Text(demoPreset.plannedAmount, format: CurrencyFormatter.currencyStyle())
+                        .font(.body.weight(.semibold))
+                }
+
+                Spacer()
+
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text("SCHEDULE")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    Text(demoPreset.scheduleText)
+                        .font(.body.weight(.semibold))
+                }
+            }
+        }
+        .padding(.vertical, 6)
+        .contentShape(Rectangle())
+        .swipeActions(edge: .leading, allowsFullSwipe: false) {
+            Button {
                     presetInstruction = "Leading swipe opened Edit."
                 } label: {
                     Label("Edit", systemImage: "pencil")
@@ -2156,6 +2202,66 @@ private struct OnboardingGestureTrainingStep: View {
         let start = budget.startDate.formatted(date: .abbreviated, time: .omitted)
         let end = budget.endDate.formatted(date: .abbreviated, time: .omitted)
         return "\(start) - \(end)"
+    }
+
+    private func budgetRangeLabel(for budget: DemoBudget) -> String {
+        let start = budget.startDate.formatted(date: .abbreviated, time: .omitted)
+        let end = budget.endDate.formatted(date: .abbreviated, time: .omitted)
+        return "\(start) - \(end)"
+    }
+
+    private func demoScheduleText(
+        frequencyRaw: String,
+        interval: Int,
+        weeklyWeekday: Int,
+        monthlyDayOfMonth: Int,
+        monthlyIsLastDay: Bool,
+        yearlyMonth: Int,
+        yearlyDayOfMonth: Int
+    ) -> String {
+        let frequency = RecurrenceFrequency(rawValue: frequencyRaw) ?? .monthly
+        let normalizedInterval = max(1, interval)
+
+        switch frequency {
+        case .none:
+            return "None"
+        case .daily:
+            return normalizedInterval == 1 ? "Daily" : "Every \(AppNumberFormat.integer(normalizedInterval)) days"
+        case .weekly:
+            let weekdaySymbols = Calendar.current.weekdaySymbols
+            let weekdayIndex = min(7, max(1, weeklyWeekday)) - 1
+            let weekday = weekdaySymbols.indices.contains(weekdayIndex) ? weekdaySymbols[weekdayIndex] : "Sunday"
+            return normalizedInterval == 1
+                ? "Weekly • \(weekday)"
+                : "Every \(AppNumberFormat.integer(normalizedInterval)) weeks • \(weekday)"
+        case .monthly:
+            let anchor: String
+            if monthlyIsLastDay {
+                anchor = "Last day"
+            } else {
+                let formatter = NumberFormatter()
+                formatter.numberStyle = .ordinal
+                formatter.locale = .current
+                anchor = formatter.string(from: NSNumber(value: min(31, max(1, monthlyDayOfMonth))))
+                    ?? AppNumberFormat.integer(monthlyDayOfMonth)
+            }
+            return normalizedInterval == 1
+                ? "Monthly • \(anchor)"
+                : "Every \(AppNumberFormat.integer(normalizedInterval)) months • \(anchor)"
+        case .yearly:
+            let months = Calendar.current.shortMonthSymbols
+            let monthIndex = min(12, max(1, yearlyMonth)) - 1
+            let month = months.indices.contains(monthIndex) ? months[monthIndex] : "Jan"
+            let formatter = NumberFormatter()
+            formatter.numberStyle = .ordinal
+            formatter.locale = .current
+            let day = formatter.string(from: NSNumber(value: min(31, max(1, yearlyDayOfMonth))))
+                ?? AppNumberFormat.integer(yearlyDayOfMonth)
+            let anchor = "\(month) \(day)"
+            return normalizedInterval == 1
+                ? "Yearly • \(anchor)"
+                : "Every \(AppNumberFormat.integer(normalizedInterval)) years • \(anchor)"
+        }
     }
 
     private func currentMonthYearFallbackBudgetName() -> String {

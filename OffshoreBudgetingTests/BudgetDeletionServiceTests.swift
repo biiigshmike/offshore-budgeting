@@ -4,7 +4,7 @@ import Testing
 @testable import Offshore
 
 @MainActor
-struct StarterBudgetServiceTests {
+struct BudgetDeletionServiceTests {
     private func makeSchema() -> Schema {
         Schema([
             Workspace.self,
@@ -29,66 +29,13 @@ struct StarterBudgetServiceTests {
         ])
     }
 
-    private func makeInMemoryContext() throws -> ModelContext {
-        let config = ModelConfiguration(isStoredInMemoryOnly: true)
-        let container = try ModelContainer(for: makeSchema(), configurations: config)
-        return ModelContext(container)
-    }
-
     private func makeFileBackedContainer(url: URL) throws -> ModelContainer {
         let config = ModelConfiguration(url: url, allowsSave: true, cloudKitDatabase: .none)
         return try ModelContainer(for: makeSchema(), configurations: config)
     }
 
-    @Test func createIfNeeded_createsCurrentMonthlyBudgetForWorkspace() throws {
-        let context = try makeInMemoryContext()
-        let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
-        context.insert(workspace)
-        try context.save()
-
-        let calendar = Calendar(identifier: .gregorian)
-        let now = calendar.date(from: DateComponents(year: 2026, month: 3, day: 20))!
-
-        let created = try StarterBudgetService.createIfNeeded(
-            in: workspace,
-            defaultBudgetingPeriodRaw: BudgetingPeriod.monthly.rawValue,
-            modelContext: context,
-            calendar: calendar,
-            now: now
-        )
-
-        let budgets = try context.fetch(FetchDescriptor<Budget>())
-        #expect(created != nil)
-        #expect(budgets.count == 1)
-        #expect(budgets.first?.name == "March 2026")
-        #expect(budgets.first?.startDate == calendar.date(from: DateComponents(year: 2026, month: 3, day: 1)))
-        #expect(budgets.first?.endDate == calendar.date(from: DateComponents(year: 2026, month: 3, day: 31)))
-    }
-
-    @Test func createIfNeeded_returnsNilWhenWorkspaceAlreadyHasBudget() throws {
-        let context = try makeInMemoryContext()
-        let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
-        let start = Calendar.current.date(from: DateComponents(year: 2026, month: 3, day: 1))!
-        let end = Calendar.current.date(from: DateComponents(year: 2026, month: 3, day: 31))!
-        let existingBudget = Budget(name: "March 2026", startDate: start, endDate: end, workspace: workspace)
-
-        context.insert(workspace)
-        context.insert(existingBudget)
-        try context.save()
-
-        let created = try StarterBudgetService.createIfNeeded(
-            in: workspace,
-            defaultBudgetingPeriodRaw: BudgetingPeriod.monthly.rawValue,
-            modelContext: context
-        )
-
-        let budgets = try context.fetch(FetchDescriptor<Budget>())
-        #expect(created == nil)
-        #expect(budgets.count == 1)
-    }
-
     @Test func deleteBudgetAndGeneratedPlannedExpenses_persistsAcrossContainerReload() throws {
-        let storeURL = FileManager.default.temporaryDirectory.appendingPathComponent("StarterBudgetServiceTests-\(UUID().uuidString).store")
+        let storeURL = FileManager.default.temporaryDirectory.appendingPathComponent("BudgetDeletionServiceTests-\(UUID().uuidString).store")
         defer { try? FileManager.default.removeItem(at: storeURL) }
 
         let initialContainer = try makeFileBackedContainer(url: storeURL)

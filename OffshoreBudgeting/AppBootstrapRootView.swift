@@ -21,6 +21,10 @@ struct AppBootstrapRootView: View {
     var body: some View {
         if didCompleteOnboarding == false, didChooseDataSource == false {
             OnboardingStartGateView { useICloud in
+                if useICloud == false {
+                    resetLocalStoreForFreshStartIfNeeded()
+                }
+
                 desiredUseICloud = useICloud
                 activeUseICloud = useICloud
                 iCloudBootstrapStartedAt = useICloud ? Date().timeIntervalSince1970 : 0
@@ -45,5 +49,10 @@ struct AppBootstrapRootView: View {
                 modelContainer: modelContainer
             )
         }
+    }
+
+    private func resetLocalStoreForFreshStartIfNeeded() {
+        let context = ModelContext(modelContainer)
+        try? AppResetService.eraseAllLocalData(modelContext: context)
     }
 }

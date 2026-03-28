@@ -105,6 +105,67 @@ final class OffshoreBudgetingUITests: XCTestCase {
         XCTAssertFalse(emptyStateTitle.exists)
     }
 
+    @MainActor
+    func testOnboarding_localFlow_doesNotCreateStarterBudget() throws {
+        let app = makeAppForUITesting(
+            scenario: "-uiTestScenarioICloudEmpty"
+        )
+        app.launch()
+
+        app.buttons["Get Started"].tap()
+        app.buttons["Continue Locally"].tap()
+
+        app.buttons["Add Workspace"].tap()
+
+        let workspaceNameField = app.textFields["Name"].firstMatch
+        XCTAssertTrue(workspaceNameField.waitForExistence(timeout: 5))
+        workspaceNameField.tap()
+        workspaceNameField.typeText("Personal")
+        app.buttons["Save"].tap()
+
+        app.buttons["Next"].tap()
+        XCTAssertTrue(app.staticTexts["Privacy, iCloud, and Notifications"].firstMatch.waitForExistence(timeout: 5))
+
+        app.buttons["Next"].tap()
+        XCTAssertTrue(app.staticTexts["Gestures & Editing"].firstMatch.waitForExistence(timeout: 5))
+
+        app.buttons["Next"].tap()
+        XCTAssertTrue(app.staticTexts["Categories"].firstMatch.waitForExistence(timeout: 5))
+
+        app.buttons["Next"].tap()
+        XCTAssertTrue(app.staticTexts["Cards"].firstMatch.waitForExistence(timeout: 5))
+
+        app.buttons["Add Card"].tap()
+
+        let cardNameField = app.textFields["Name"].firstMatch
+        XCTAssertTrue(cardNameField.waitForExistence(timeout: 5))
+        cardNameField.tap()
+        cardNameField.typeText("Checking")
+        app.buttons["Save"].tap()
+
+        app.buttons["Next"].tap()
+        XCTAssertTrue(app.staticTexts["Presets"].firstMatch.waitForExistence(timeout: 5))
+
+        app.buttons["Next"].tap()
+        XCTAssertTrue(app.staticTexts["Income"].firstMatch.waitForExistence(timeout: 5))
+
+        app.buttons["Next"].tap()
+        XCTAssertTrue(app.staticTexts["Budgets"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["No budgets yet."].firstMatch.exists)
+
+        app.buttons["Next"].tap()
+        XCTAssertTrue(app.buttons["Done"].firstMatch.waitForExistence(timeout: 5))
+        app.buttons["Done"].tap()
+
+        let budgetsTab = app.tabBars.buttons["Budgets"].firstMatch
+        XCTAssertTrue(budgetsTab.waitForExistence(timeout: 5))
+        budgetsTab.tap()
+
+        let emptyBudgetsTitle = app.staticTexts["No Budgets Yet"].firstMatch
+        XCTAssertTrue(emptyBudgetsTitle.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["March 2026"].firstMatch.exists)
+    }
+
     // MARK: - Helpers
 
     private func makeAppForUITesting(scenario: String) -> XCUIApplication {
