@@ -195,7 +195,7 @@ struct HelpFAQEngineTests {
         #expect(topic != nil)
 
         let sectionIDs = Set(topic?.sections.map(\.id) ?? [])
-        #expect(sectionIDs.contains("settings-quick-actions-2") == false)
+        #expect(sectionIDs.contains("settings-quick-actions-2"))
         #expect(sectionIDs.contains("settings-quick-actions-3") == false)
         #expect(sectionIDs.contains("settings-quick-actions-nonphone-note"))
     }
@@ -210,7 +210,7 @@ struct HelpFAQEngineTests {
 
         let sectionIDs = Set(topic?.sections.map(\.id) ?? [])
         #expect(sectionIDs.contains("settings-quick-actions-2"))
-        #expect(sectionIDs.contains("settings-quick-actions-3"))
+        #expect(sectionIDs.contains("settings-quick-actions-3-income-sms"))
         #expect(sectionIDs.contains("settings-quick-actions-nonphone-note") == false)
     }
 
@@ -218,9 +218,9 @@ struct HelpFAQEngineTests {
 
     private func makeTopic(
         id: String,
-        title: String,
-        header: String,
-        body: String
+        title: LocalizedStringResource,
+        header: LocalizedStringResource,
+        body: LocalizedStringResource
     ) -> GeneratedHelpLeafTopic {
         GeneratedHelpLeafTopic(
             id: id,
@@ -237,3 +237,4 @@ struct HelpFAQEngineTests {
         )
     }
 }
+

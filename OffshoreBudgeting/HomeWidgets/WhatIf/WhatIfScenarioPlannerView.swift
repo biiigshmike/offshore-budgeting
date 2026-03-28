@@ -50,13 +50,10 @@ struct WhatIfScenarioPlannerView: View {
     // Baseline = seeded min/max values per category for this range
     @State private var baselineBoundsByCategoryID: [UUID: WhatIfScenarioStore.WhatIfCategoryBounds] = [:]
 
-    // Overrides = scenario min/max adjustments (global per workspace)
-    @State private var overridesByCategoryID: [UUID: WhatIfScenarioStore.WhatIfCategoryBounds] = [:]
-
-    // Scenario values rendered in UI (override ?? baseline)
+    // Scenario values rendered and edited in UI.
     @State private var scenarioBoundsByCategoryID: [UUID: WhatIfScenarioStore.WhatIfCategoryBounds] = [:]
-    @State private var scenarioPlannedIncomeTotal: Double = 0
-    @State private var scenarioActualIncomeTotal: Double = 0
+    @State private var scenarioPlannedIncomeTotal: Double? = nil
+    @State private var scenarioActualIncomeTotal: Double? = nil
 
     // Global scenario list + selection
     @State private var scenarios: [WhatIfScenarioStore.GlobalScenarioInfo] = []
@@ -140,21 +137,20 @@ struct WhatIfScenarioPlannerView: View {
 
     private var scenarioSpendTotal: Double {
         categories.reduce(0) { partial, category in
-            let bounds = scenarioBoundsByCategoryID[category.id, default: .init(min: 0, max: 0)]
-            return partial + describedAsCurrencySafe(bounds.resolvedScenarioSpend(fallback: bounds.midpoint))
+            partial + describedAsCurrencySafe(effectiveScenarioSpend(for: category.id))
         }
     }
 
     private var actualIncomeOutcomeRange: ClosedRange<Double> {
-        (scenarioActualIncomeTotal - scenarioMaxSpendTotal)...(scenarioActualIncomeTotal - scenarioMinSpendTotal)
+        (effectiveScenarioActualIncomeTotal - scenarioMaxSpendTotal)...(effectiveScenarioActualIncomeTotal - scenarioMinSpendTotal)
     }
 
     private var plannedIncomeOutcomeRange: ClosedRange<Double> {
-        (scenarioPlannedIncomeTotal - scenarioMaxSpendTotal)...(scenarioPlannedIncomeTotal - scenarioMinSpendTotal)
+        (effectiveScenarioPlannedIncomeTotal - scenarioMaxSpendTotal)...(effectiveScenarioPlannedIncomeTotal - scenarioMinSpendTotal)
     }
 
     private var scenarioOutcomeForDonut: Double {
-        describedAsCurrencySafe(scenarioActualIncomeTotal - scenarioSpendTotal)
+        describedAsCurrencySafe(effectiveScenarioActualIncomeTotal - scenarioSpendTotal)
     }
 
     private var subtitleText: String {
@@ -190,15 +186,15 @@ struct WhatIfScenarioPlannerView: View {
         Actual Savings: \(CurrencyFormatter.string(from: actualSavings))
         Entered Actual Income: \(CurrencyFormatter.string(from: actualIncomeTotal))
         Entered Planned Income: \(CurrencyFormatter.string(from: plannedIncomeTotal))
-        Scenario Actual Income: \(CurrencyFormatter.string(from: scenarioActualIncomeTotal))
-        Scenario Planned Income: \(CurrencyFormatter.string(from: scenarioPlannedIncomeTotal))
+        Scenario Actual Income: \(CurrencyFormatter.string(from: effectiveScenarioActualIncomeTotal))
+        Scenario Planned Income: \(CurrencyFormatter.string(from: effectiveScenarioPlannedIncomeTotal))
 
         """
 
         let lines: [String] = categories.map { c in
             let baseline = baselineBoundsByCategoryID[c.id, default: .init(min: 0, max: 0)]
             let planned = scenarioBoundsByCategoryID[c.id, default: .init(min: 0, max: 0)]
-            let plannedScenario = planned.resolvedScenarioSpend(fallback: planned.midpoint)
+            let plannedScenario = effectiveScenarioSpend(for: c.id)
             let baselineScenario = baseline.resolvedScenarioSpend(fallback: baseline.midpoint)
             return "\(c.name): Min \(CurrencyFormatter.string(from: planned.min)), Max \(CurrencyFormatter.string(from: planned.max)), Scenario \(CurrencyFormatter.string(from: plannedScenario)) (Actual Min \(CurrencyFormatter.string(from: baseline.min)), Actual Max \(CurrencyFormatter.string(from: baseline.max)), Actual Scenario \(CurrencyFormatter.string(from: baselineScenario)))"
         }
@@ -211,7 +207,7 @@ struct WhatIfScenarioPlannerView: View {
 
         for c in categories {
             let bounds = scenarioBoundsByCategoryID[c.id, default: .init(min: 0, max: 0)]
-            let scenarioSpend = bounds.resolvedScenarioSpend(fallback: bounds.midpoint)
+            let scenarioSpend = effectiveScenarioSpend(for: c.id)
             rows.append("\"\(c.name)\",\(CurrencyFormatter.csvNumberString(from: bounds.min)),\(CurrencyFormatter.csvNumberString(from: bounds.max)),\(CurrencyFormatter.csvNumberString(from: scenarioSpend))")
         }
 
@@ -221,8 +217,8 @@ struct WhatIfScenarioPlannerView: View {
         rows.append("\"Outcome Planned Income Max\",\(CurrencyFormatter.csvNumberString(from: plannedIncomeOutcomeRange.upperBound))")
         rows.append("\"Entered Actual Income\",\(CurrencyFormatter.csvNumberString(from: actualIncomeTotal))")
         rows.append("\"Entered Planned Income\",\(CurrencyFormatter.csvNumberString(from: plannedIncomeTotal))")
-        rows.append("\"Scenario Actual Income\",\(CurrencyFormatter.csvNumberString(from: scenarioActualIncomeTotal))")
-        rows.append("\"Scenario Planned Income\",\(CurrencyFormatter.csvNumberString(from: scenarioPlannedIncomeTotal))")
+        rows.append("\"Scenario Actual Income\",\(CurrencyFormatter.csvNumberString(from: effectiveScenarioActualIncomeTotal))")
+        rows.append("\"Scenario Planned Income\",\(CurrencyFormatter.csvNumberString(from: effectiveScenarioPlannedIncomeTotal))")
         return rows.joined(separator: "\n")
     }
 
@@ -236,8 +232,7 @@ struct WhatIfScenarioPlannerView: View {
 
     private var donutSlices: [DonutSlice] {
         var slices: [DonutSlice] = categories.compactMap { category in
-            let bounds = scenarioBoundsByCategoryID[category.id, default: .init(min: 0, max: 0)]
-            let value = describedAsCurrencySafe(bounds.resolvedScenarioSpend(fallback: bounds.midpoint))
+            let value = describedAsCurrencySafe(effectiveScenarioSpend(for: category.id))
             guard value > 0 else { return nil }
             let color = Color(hex: category.hexColor) ?? .secondary
             return DonutSlice(id: category.id, title: category.name, value: value, color: color)
@@ -641,9 +636,12 @@ struct WhatIfScenarioPlannerView: View {
         if scenarios.contains(where: { $0.id == chosen }) {
             loadScenarioIntoUI(id: chosen)
         } else {
-            overridesByCategoryID = [:]
+            scenarioBoundsByCategoryID = WhatIfScenarioPlannerDraft.uiBoundsByCategoryID(
+                overrides: [:],
+                baselineBoundsByCategoryID: baselineBoundsByCategoryID,
+                categories: categories.map(\.id)
+            )
             resetScenarioIncomeToBaseline()
-            rebuildScenarioFromOverrides(animated: false)
         }
 
         didLoad = true
@@ -753,15 +751,15 @@ struct WhatIfScenarioPlannerView: View {
         lines.append("Outcome (Planned Income): \(formatRange(plannedIncomeOutcomeRange))")
         lines.append("Entered Actual Income: \(CurrencyFormatter.string(from: actualIncomeTotal))")
         lines.append("Entered Planned Income: \(CurrencyFormatter.string(from: plannedIncomeTotal))")
-        lines.append("Scenario Actual Income: \(CurrencyFormatter.string(from: scenarioActualIncomeTotal))")
-        lines.append("Scenario Planned Income: \(CurrencyFormatter.string(from: scenarioPlannedIncomeTotal))")
+        lines.append("Scenario Actual Income: \(CurrencyFormatter.string(from: effectiveScenarioActualIncomeTotal))")
+        lines.append("Scenario Planned Income: \(CurrencyFormatter.string(from: effectiveScenarioPlannedIncomeTotal))")
         lines.append("Actual Savings: \(CurrencyFormatter.string(from: actualSavings))")
         lines.append("")
         lines.append("Categories")
 
         for c in categories {
             let bounds = scenarioBoundsByCategoryID[c.id, default: .init(min: 0, max: 0)]
-            let scenarioSpend = bounds.resolvedScenarioSpend(fallback: bounds.midpoint)
+            let scenarioSpend = effectiveScenarioSpend(for: c.id)
             lines.append("• \(c.name): Min \(CurrencyFormatter.string(from: bounds.min)), Max \(CurrencyFormatter.string(from: bounds.max)), Scenario \(CurrencyFormatter.string(from: scenarioSpend))")
         }
 
@@ -772,14 +770,15 @@ struct WhatIfScenarioPlannerView: View {
 
     private func loadScenarioIntoUI(id: UUID) {
         let loadedOverrides = store.loadGlobalScenario(scenarioID: id) ?? .empty
-        overridesByCategoryID = sanitizeOverrides(loadedOverrides.overridesByCategoryID)
-        scenarioPlannedIncomeTotal = loadedOverrides.plannedIncomeOverride ?? plannedIncomeTotal
-        scenarioActualIncomeTotal = loadedOverrides.actualIncomeOverride ?? actualIncomeTotal
+        applyMergedScenarioBounds(
+            overrides: loadedOverrides.overridesByCategoryID,
+            animated: true
+        )
+        scenarioPlannedIncomeTotal = loadedOverrides.plannedIncomeOverride
+        scenarioActualIncomeTotal = loadedOverrides.actualIncomeOverride
 
         store.setSelectedGlobalScenarioID(id)
         scenarios = store.listGlobalScenarios()
-
-        rebuildScenarioFromOverrides(animated: true)
     }
 
     private func selectScenario(_ id: UUID) {
@@ -790,9 +789,12 @@ struct WhatIfScenarioPlannerView: View {
         let created = store.createGlobalScenario(name: newScenarioName, overrides: .empty)
         scenarios = store.listGlobalScenarios()
         selectedScenarioID = created.id
-        overridesByCategoryID = [:]
+        scenarioBoundsByCategoryID = WhatIfScenarioPlannerDraft.uiBoundsByCategoryID(
+            overrides: [:],
+            baselineBoundsByCategoryID: baselineBoundsByCategoryID,
+            categories: categories.map(\.id)
+        )
         resetScenarioIncomeToBaseline()
-        rebuildScenarioFromOverrides(animated: true)
         didLoad = true
     }
 
@@ -828,17 +830,20 @@ struct WhatIfScenarioPlannerView: View {
         if let next {
             loadScenarioIntoUI(id: next)
         } else {
-            overridesByCategoryID = [:]
+            scenarioBoundsByCategoryID = WhatIfScenarioPlannerDraft.uiBoundsByCategoryID(
+                overrides: [:],
+                baselineBoundsByCategoryID: baselineBoundsByCategoryID,
+                categories: categories.map(\.id)
+            )
             resetScenarioIncomeToBaseline()
-            rebuildScenarioFromOverrides(animated: true)
         }
     }
 
     // MARK: - Editing / Overrides
 
     private func resetCategoryToBaseline(_ categoryID: UUID) {
-        overridesByCategoryID.removeValue(forKey: categoryID)
-        rebuildScenarioFromOverrides(animated: true)
+        let baseline = baselineBoundsByCategoryID[categoryID, default: .init(min: 0, max: 0)]
+        scenarioBoundsByCategoryID[categoryID] = .init(min: baseline.min, max: baseline.max, scenarioSpend: nil)
         persistIfReady()
     }
 
@@ -847,38 +852,31 @@ struct WhatIfScenarioPlannerView: View {
         persistIfReady()
     }
 
-    private func setScenarioValues(min newMin: Double, max newMax: Double, scenarioSpend newScenarioSpend: Double, for categoryID: UUID) {
-        let baseline = baselineBoundsByCategoryID[categoryID, default: .init(min: 0, max: 0)]
+    private func setScenarioValues(min newMin: Double, max newMax: Double, scenarioSpend newScenarioSpend: Double?, for categoryID: UUID) {
         var candidate = WhatIfScenarioStore.WhatIfCategoryBounds(
             min: newMin,
             max: newMax,
             scenarioSpend: newScenarioSpend
         )
         candidate.normalize()
-
-        // If it matches baseline, remove override (keeps payload clean)
-        if candidate == baseline {
-            overridesByCategoryID.removeValue(forKey: categoryID)
-        } else {
-            overridesByCategoryID[categoryID] = candidate
-        }
-
-        rebuildScenarioFromOverrides(animated: false)
+        scenarioBoundsByCategoryID[categoryID] = candidate
         persistIfReady()
     }
 
-    private func setScenarioIncome(planned newPlanned: Double, actual newActual: Double) {
-        scenarioPlannedIncomeTotal = max(0, CurrencyFormatter.roundedToCurrency(newPlanned))
-        scenarioActualIncomeTotal = max(0, CurrencyFormatter.roundedToCurrency(newActual))
+    private func setScenarioIncome(planned newPlanned: Double?, actual newActual: Double?) {
+        scenarioPlannedIncomeTotal = newPlanned.map { max(0, CurrencyFormatter.roundedToCurrency($0)) }
+        scenarioActualIncomeTotal = newActual.map { max(0, CurrencyFormatter.roundedToCurrency($0)) }
         persistIfReady()
     }
 
-    private func rebuildScenarioFromOverrides(animated: Bool) {
-        let ids = categories.map { $0.id }
-        let rebuilt = store.applyGlobalScenario(
-            overrides: overridesByCategoryID,
-            baselineByCategoryID: baselineBoundsByCategoryID,
-            categories: ids
+    private func applyMergedScenarioBounds(
+        overrides: [UUID: WhatIfScenarioStore.WhatIfCategoryBounds],
+        animated: Bool
+    ) {
+        let rebuilt = WhatIfScenarioPlannerDraft.uiBoundsByCategoryID(
+            overrides: sanitizeOverrides(overrides),
+            baselineBoundsByCategoryID: baselineBoundsByCategoryID,
+            categories: categories.map(\.id)
         )
 
         if animated {
@@ -920,7 +918,7 @@ struct WhatIfScenarioPlannerView: View {
                 withAnimation(.snappy(duration: 0.20)) {
                     let bounds = scenarioBoundsByCategoryID[id, default: .init(min: 0, max: 0)]
                     let currentMax = scenarioBoundsByCategoryID[id, default: .init(min: 0, max: 0)].max
-                    let currentScenario = bounds.resolvedScenarioSpend(fallback: bounds.midpoint)
+                    let currentScenario = bounds.scenarioSpend
                     setScenarioValues(min: newValue, max: currentMax, scenarioSpend: currentScenario, for: id)
                 }
             }
@@ -934,19 +932,16 @@ struct WhatIfScenarioPlannerView: View {
                 withAnimation(.snappy(duration: 0.20)) {
                     let bounds = scenarioBoundsByCategoryID[id, default: .init(min: 0, max: 0)]
                     let currentMin = bounds.min
-                    let currentScenario = bounds.resolvedScenarioSpend(fallback: bounds.midpoint)
+                    let currentScenario = bounds.scenarioSpend
                     setScenarioValues(min: currentMin, max: newValue, scenarioSpend: currentScenario, for: id)
                 }
             }
         )
     }
 
-    private func scenarioBindingForCategory(_ id: UUID) -> Binding<Double> {
+    private func scenarioBindingForCategory(_ id: UUID) -> Binding<Double?> {
         Binding(
-            get: {
-                let bounds = scenarioBoundsByCategoryID[id, default: .init(min: 0, max: 0)]
-                return bounds.resolvedScenarioSpend(fallback: bounds.midpoint)
-            },
+            get: { scenarioBoundsByCategoryID[id, default: .init(min: 0, max: 0)].scenarioSpend },
             set: { newValue in
                 withAnimation(.snappy(duration: 0.20)) {
                     let bounds = scenarioBoundsByCategoryID[id, default: .init(min: 0, max: 0)]
@@ -956,7 +951,7 @@ struct WhatIfScenarioPlannerView: View {
         )
     }
 
-    private var scenarioPlannedIncomeBinding: Binding<Double> {
+    private var scenarioPlannedIncomeBinding: Binding<Double?> {
         Binding(
             get: { scenarioPlannedIncomeTotal },
             set: { newValue in
@@ -965,7 +960,7 @@ struct WhatIfScenarioPlannerView: View {
         )
     }
 
-    private var scenarioActualIncomeBinding: Binding<Double> {
+    private var scenarioActualIncomeBinding: Binding<Double?> {
         Binding(
             get: { scenarioActualIncomeTotal },
             set: { newValue in
@@ -1058,11 +1053,15 @@ struct WhatIfScenarioPlannerView: View {
     }
 
     private func resetScenarioIncomeToBaseline() {
-        scenarioPlannedIncomeTotal = plannedIncomeTotal
-        scenarioActualIncomeTotal = actualIncomeTotal
+        scenarioPlannedIncomeTotal = nil
+        scenarioActualIncomeTotal = nil
     }
 
     private func currentScenarioOverrides() -> WhatIfScenarioStore.GlobalScenarioOverrides {
+        let categoryOverrides = WhatIfScenarioPlannerDraft.overridesByCategoryID(
+            scenarioBoundsByCategoryID: scenarioBoundsByCategoryID,
+            baselineBoundsByCategoryID: baselineBoundsByCategoryID
+        )
         let plannedOverride = incomeOverrideValue(
             scenarioValue: scenarioPlannedIncomeTotal,
             baselineValue: plannedIncomeTotal
@@ -1073,16 +1072,39 @@ struct WhatIfScenarioPlannerView: View {
         )
 
         return WhatIfScenarioStore.GlobalScenarioOverrides(
-            overridesByCategoryID: overridesByCategoryID,
+            overridesByCategoryID: categoryOverrides,
             plannedIncomeOverride: plannedOverride,
             actualIncomeOverride: actualOverride
         )
     }
 
-    private func incomeOverrideValue(scenarioValue: Double, baselineValue: Double) -> Double? {
-        let roundedScenario = CurrencyFormatter.roundedToCurrency(max(0, scenarioValue))
-        let roundedBaseline = CurrencyFormatter.roundedToCurrency(max(0, baselineValue))
-        return abs(roundedScenario - roundedBaseline) < 0.000_1 ? nil : roundedScenario
+    private func incomeOverrideValue(scenarioValue: Double?, baselineValue: Double) -> Double? {
+        WhatIfScenarioPlannerDraft.incomeOverrideValue(
+            scenarioValue: scenarioValue,
+            baselineValue: baselineValue
+        )
+    }
+
+    private var effectiveScenarioPlannedIncomeTotal: Double {
+        WhatIfScenarioPlannerDraft.effectiveIncomeTotal(
+            scenarioValue: scenarioPlannedIncomeTotal,
+            baselineValue: plannedIncomeTotal
+        )
+    }
+
+    private var effectiveScenarioActualIncomeTotal: Double {
+        WhatIfScenarioPlannerDraft.effectiveIncomeTotal(
+            scenarioValue: scenarioActualIncomeTotal,
+            baselineValue: actualIncomeTotal
+        )
+    }
+
+    private func effectiveScenarioSpend(for categoryID: UUID) -> Double {
+        WhatIfScenarioPlannerDraft.effectiveScenarioSpend(
+            categoryID: categoryID,
+            scenarioBoundsByCategoryID: scenarioBoundsByCategoryID,
+            baselineBoundsByCategoryID: baselineBoundsByCategoryID
+        )
     }
 
     // This keeps behavior stable if any values ever drift negative/NaN.
@@ -1117,6 +1139,89 @@ struct WhatIfScenarioPlannerView: View {
         )
     }
 
+}
+
+struct WhatIfScenarioPlannerDraft {
+    static func uiBoundsByCategoryID(
+        overrides: [UUID: WhatIfScenarioStore.WhatIfCategoryBounds],
+        baselineBoundsByCategoryID: [UUID: WhatIfScenarioStore.WhatIfCategoryBounds],
+        categories: [UUID]
+    ) -> [UUID: WhatIfScenarioStore.WhatIfCategoryBounds] {
+        var result: [UUID: WhatIfScenarioStore.WhatIfCategoryBounds] = [:]
+        result.reserveCapacity(categories.count)
+
+        for id in categories {
+            let baseline = baselineBoundsByCategoryID[id, default: .init(min: 0, max: 0)]
+
+            if let override = overrides[id] {
+                var merged = WhatIfScenarioStore.WhatIfCategoryBounds(
+                    min: override.min,
+                    max: override.max,
+                    scenarioSpend: override.scenarioSpend
+                )
+                merged.normalize()
+                result[id] = merged
+            } else {
+                result[id] = .init(min: baseline.min, max: baseline.max, scenarioSpend: nil)
+            }
+        }
+
+        return result
+    }
+
+    static func overridesByCategoryID(
+        scenarioBoundsByCategoryID: [UUID: WhatIfScenarioStore.WhatIfCategoryBounds],
+        baselineBoundsByCategoryID: [UUID: WhatIfScenarioStore.WhatIfCategoryBounds]
+    ) -> [UUID: WhatIfScenarioStore.WhatIfCategoryBounds] {
+        var result: [UUID: WhatIfScenarioStore.WhatIfCategoryBounds] = [:]
+        result.reserveCapacity(scenarioBoundsByCategoryID.count)
+
+        for (id, scenarioBounds) in scenarioBoundsByCategoryID {
+            let baseline = baselineBoundsByCategoryID[id, default: .init(min: 0, max: 0)]
+            let baselineScenarioSpend = baseline.scenarioSpend
+            let scenarioMatchesBaseline: Bool
+
+            switch (scenarioBounds.scenarioSpend, baselineScenarioSpend) {
+            case (nil, _):
+                scenarioMatchesBaseline = true
+            case let (lhs?, rhs?):
+                scenarioMatchesBaseline = abs(lhs - rhs) < 0.000_1
+            case (.some, nil):
+                scenarioMatchesBaseline = false
+            }
+
+            let minMatchesBaseline = abs(scenarioBounds.min - baseline.min) < 0.000_1
+            let maxMatchesBaseline = abs(scenarioBounds.max - baseline.max) < 0.000_1
+
+            if !(minMatchesBaseline && maxMatchesBaseline && scenarioMatchesBaseline) {
+                result[id] = scenarioBounds
+            }
+        }
+
+        return result
+    }
+
+    static func incomeOverrideValue(scenarioValue: Double?, baselineValue: Double) -> Double? {
+        guard let scenarioValue else { return nil }
+        let roundedScenario = CurrencyFormatter.roundedToCurrency(max(0, scenarioValue))
+        let roundedBaseline = CurrencyFormatter.roundedToCurrency(max(0, baselineValue))
+        return abs(roundedScenario - roundedBaseline) < 0.000_1 ? nil : roundedScenario
+    }
+
+    static func effectiveIncomeTotal(scenarioValue: Double?, baselineValue: Double) -> Double {
+        scenarioValue ?? baselineValue
+    }
+
+    static func effectiveScenarioSpend(
+        categoryID: UUID,
+        scenarioBoundsByCategoryID: [UUID: WhatIfScenarioStore.WhatIfCategoryBounds],
+        baselineBoundsByCategoryID: [UUID: WhatIfScenarioStore.WhatIfCategoryBounds]
+    ) -> Double {
+        let scenarioBounds = scenarioBoundsByCategoryID[categoryID, default: .init(min: 0, max: 0)]
+        let baselineBounds = baselineBoundsByCategoryID[categoryID, default: .init(min: 0, max: 0)]
+        let fallback = baselineBounds.scenarioSpend ?? baselineBounds.midpoint
+        return scenarioBounds.resolvedScenarioSpend(fallback: fallback)
+    }
 }
 
 #if canImport(UIKit)

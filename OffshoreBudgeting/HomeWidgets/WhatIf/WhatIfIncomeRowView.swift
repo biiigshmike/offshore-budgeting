@@ -7,13 +7,14 @@
 
 import SwiftUI
 
+@MainActor
 struct WhatIfIncomeRowView: View {
 
     let baselinePlannedAmount: Double
     let baselineActualAmount: Double
 
-    @Binding var plannedAmount: Double
-    @Binding var actualAmount: Double
+    @Binding var plannedAmount: Double?
+    @Binding var actualAmount: Double?
 
     let currencyCode: String
 
@@ -27,19 +28,22 @@ struct WhatIfIncomeRowView: View {
     }
 
     private var isDirty: Bool {
-        abs(plannedAmount - baselinePlannedAmount) > 0.000_1
-        || abs(actualAmount - baselineActualAmount) > 0.000_1
+        isPlannedEdited
+        || isActualEdited
+    }
+
+    private var isPlannedEdited: Bool {
+        guard let plannedAmount else { return false }
+        return abs(plannedAmount - baselinePlannedAmount) > 0.000_1
+    }
+
+    private var isActualEdited: Bool {
+        guard let actualAmount else { return false }
+        return abs(actualAmount - baselineActualAmount) > 0.000_1
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if isDirty {
-                HStack(alignment: .firstTextBaseline, spacing: 10) {
-                    Spacer(minLength: 0)
-                    editedBadge
-                }
-            }
-
             HStack(spacing: 10) {
                 plannedField
                 actualField
@@ -81,8 +85,8 @@ struct WhatIfIncomeRowView: View {
                     comment: "Accessibility summary for What If income row."
                 ),
                 locale: .current,
-                formatCurrency(plannedAmount),
-                formatCurrency(actualAmount)
+                formatOptionalCurrency(plannedAmount),
+                formatOptionalCurrency(actualAmount)
             )
         )
     }
@@ -92,13 +96,27 @@ struct WhatIfIncomeRowView: View {
             Text(String(localized: "common.planned", defaultValue: "Planned", comment: "Common label for planned values."))
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
-            TextField("", text: $plannedText)
+            TextField(
+                "",
+                text: $plannedText,
+                prompt: Text(
+                    String(
+                        localized: "whatIf.enterAmount",
+                        defaultValue: "Enter amount",
+                        comment: "Placeholder text for What If amount entry fields."
+                    )
+                )
+            )
                 .focused($focusedField, equals: .planned)
                 .keyboardType(.decimalPad)
                 .multilineTextAlignment(.leading)
                 .textFieldStyle(.automatic)
                 .onChange(of: plannedText) { _, newValue in
                     guard focusedField == .planned else { return }
+                    if newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        plannedAmount = nil
+                        return
+                    }
                     if let parsed = CurrencyFormatter.parseAmount(newValue) {
                         plannedAmount = max(0, CurrencyFormatter.roundedToCurrency(parsed))
                     }
@@ -109,16 +127,38 @@ struct WhatIfIncomeRowView: View {
 
     private var actualField: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(String(localized: "common.actual", defaultValue: "Actual", comment: "Common label for actual values."))
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-            TextField("", text: $actualText)
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(String(localized: "common.actual", defaultValue: "Actual", comment: "Common label for actual values."))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+
+                Spacer(minLength: 0)
+
+                if isDirty {
+                    editedBadge
+                }
+            }
+            TextField(
+                "",
+                text: $actualText,
+                prompt: Text(
+                    String(
+                        localized: "whatIf.enterAmount",
+                        defaultValue: "Enter amount",
+                        comment: "Placeholder text for What If amount entry fields."
+                    )
+                )
+            )
                 .focused($focusedField, equals: .actual)
                 .keyboardType(.decimalPad)
                 .multilineTextAlignment(.leading)
                 .textFieldStyle(.automatic)
                 .onChange(of: actualText) { _, newValue in
                     guard focusedField == .actual else { return }
+                    if newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        actualAmount = nil
+                        return
+                    }
                     if let parsed = CurrencyFormatter.parseAmount(newValue) {
                         actualAmount = max(0, CurrencyFormatter.roundedToCurrency(parsed))
                     }
@@ -146,18 +186,18 @@ struct WhatIfIncomeRowView: View {
     // MARK: - Helpers
 
     private func refreshTexts() {
-        plannedText = CurrencyFormatter.editingString(from: plannedAmount)
-        actualText = CurrencyFormatter.editingString(from: actualAmount)
+        plannedText = editingString(from: plannedAmount)
+        actualText = editingString(from: actualAmount)
     }
 
     private func prepareFieldForEditing(_ field: FocusField) {
         switch field {
         case .planned:
-            if CurrencyFormatter.roundedToCurrency(plannedAmount) == 0 {
+            if plannedAmount == nil {
                 plannedText = ""
             }
         case .actual:
-            if CurrencyFormatter.roundedToCurrency(actualAmount) == 0 {
+            if actualAmount == nil {
                 actualText = ""
             }
         }
@@ -166,25 +206,25 @@ struct WhatIfIncomeRowView: View {
     private func commitField(_ field: FocusField) {
         switch field {
         case .planned:
-            plannedAmount = committedAmount(from: plannedText, currentValue: plannedAmount)
-            plannedText = CurrencyFormatter.editingString(from: plannedAmount)
+            plannedAmount = committedOptionalAmount(from: plannedText, currentValue: plannedAmount)
+            plannedText = editingString(from: plannedAmount)
         case .actual:
-            actualAmount = committedAmount(from: actualText, currentValue: actualAmount)
-            actualText = CurrencyFormatter.editingString(from: actualAmount)
+            actualAmount = committedOptionalAmount(from: actualText, currentValue: actualAmount)
+            actualText = editingString(from: actualAmount)
         }
     }
 
-    private func committedAmount(from text: String, currentValue: Double) -> Double {
+    private func committedOptionalAmount(from text: String, currentValue: Double?) -> Double? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty {
-            return 0
+            return nil
         }
 
         if let parsed = CurrencyFormatter.parseAmount(trimmed) {
             return max(0, CurrencyFormatter.roundedToCurrency(parsed))
         }
 
-        return max(0, CurrencyFormatter.roundedToCurrency(currentValue))
+        return currentValue.map { max(0, CurrencyFormatter.roundedToCurrency($0)) }
     }
 
     private func formatCurrency(_ value: Double) -> String {
@@ -192,5 +232,15 @@ struct WhatIfIncomeRowView: View {
             .currency(code: currencyCode)
             .presentation(.narrow)
         )
+    }
+
+    private func formatOptionalCurrency(_ value: Double?) -> String {
+        guard let value else { return "Not set" }
+        return formatCurrency(value)
+    }
+
+    private func editingString(from value: Double?) -> String {
+        guard let value else { return "" }
+        return CurrencyFormatter.editingString(from: value)
     }
 }

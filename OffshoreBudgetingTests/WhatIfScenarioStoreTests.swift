@@ -90,4 +90,102 @@ struct WhatIfScenarioStoreTests {
             #expect(loaded?.overridesByCategoryID[categoryID]?.scenarioSpend == 60)
         }
     }
+
+    @Test func plannerDraft_overrides_keepExplicitScenarioSpendOutsideRange() {
+        let categoryID = UUID()
+        let baseline: [UUID: WhatIfScenarioStore.WhatIfCategoryBounds] = [
+            categoryID: .init(min: 100, max: 300, scenarioSpend: 180)
+        ]
+        let edited: [UUID: WhatIfScenarioStore.WhatIfCategoryBounds] = [
+            categoryID: .init(min: 125, max: 150, scenarioSpend: 260)
+        ]
+
+        let overrides = WhatIfScenarioPlannerDraft.overridesByCategoryID(
+            scenarioBoundsByCategoryID: edited,
+            baselineBoundsByCategoryID: baseline
+        )
+
+        #expect(overrides[categoryID]?.min == 125)
+        #expect(overrides[categoryID]?.max == 150)
+        #expect(overrides[categoryID]?.scenarioSpend == 260)
+    }
+
+    @Test func plannerDraft_uiBounds_leaveScenarioBlankWhenNoOverrideExists() {
+        let categoryID = UUID()
+        let baseline: [UUID: WhatIfScenarioStore.WhatIfCategoryBounds] = [
+            categoryID: .init(min: 100, max: 300, scenarioSpend: 180)
+        ]
+
+        let uiBounds = WhatIfScenarioPlannerDraft.uiBoundsByCategoryID(
+            overrides: [:],
+            baselineBoundsByCategoryID: baseline,
+            categories: [categoryID]
+        )
+
+        #expect(uiBounds[categoryID]?.min == 100)
+        #expect(uiBounds[categoryID]?.max == 300)
+        #expect(uiBounds[categoryID]?.scenarioSpend == nil)
+    }
+
+    @Test func plannerDraft_overrides_dropBaselineMatchedCategory() {
+        let categoryID = UUID()
+        let baselineBounds = WhatIfScenarioStore.WhatIfCategoryBounds(min: 80, max: 120, scenarioSpend: 100)
+        let baseline: [UUID: WhatIfScenarioStore.WhatIfCategoryBounds] = [
+            categoryID: baselineBounds
+        ]
+        let edited: [UUID: WhatIfScenarioStore.WhatIfCategoryBounds] = [
+            categoryID: baselineBounds
+        ]
+
+        let overrides = WhatIfScenarioPlannerDraft.overridesByCategoryID(
+            scenarioBoundsByCategoryID: edited,
+            baselineBoundsByCategoryID: baseline
+        )
+
+        #expect(overrides.isEmpty)
+    }
+
+    @Test func plannerDraft_overrides_keepMinMaxOverrideWhenScenarioIsBlank() {
+        let categoryID = UUID()
+        let baseline: [UUID: WhatIfScenarioStore.WhatIfCategoryBounds] = [
+            categoryID: .init(min: 80, max: 120, scenarioSpend: 100)
+        ]
+        let edited: [UUID: WhatIfScenarioStore.WhatIfCategoryBounds] = [
+            categoryID: .init(min: 90, max: 140, scenarioSpend: nil)
+        ]
+
+        let overrides = WhatIfScenarioPlannerDraft.overridesByCategoryID(
+            scenarioBoundsByCategoryID: edited,
+            baselineBoundsByCategoryID: baseline
+        )
+
+        #expect(overrides[categoryID]?.min == 90)
+        #expect(overrides[categoryID]?.max == 140)
+        #expect(overrides[categoryID]?.scenarioSpend == nil)
+    }
+
+    @Test func plannerDraft_incomeOverride_onlyPersistsWhenDifferentFromBaseline() {
+        #expect(WhatIfScenarioPlannerDraft.incomeOverrideValue(scenarioValue: 4200, baselineValue: 4000) == 4200)
+        #expect(WhatIfScenarioPlannerDraft.incomeOverrideValue(scenarioValue: 4000, baselineValue: 4000) == nil)
+        #expect(WhatIfScenarioPlannerDraft.incomeOverrideValue(scenarioValue: nil, baselineValue: 4000) == nil)
+    }
+
+    @Test func plannerDraft_effectiveFallbacks_useBaselineWhenInputsAreBlank() {
+        let categoryID = UUID()
+        let baseline: [UUID: WhatIfScenarioStore.WhatIfCategoryBounds] = [
+            categoryID: .init(min: 100, max: 300, scenarioSpend: 180)
+        ]
+        let edited: [UUID: WhatIfScenarioStore.WhatIfCategoryBounds] = [
+            categoryID: .init(min: 100, max: 300, scenarioSpend: nil)
+        ]
+
+        #expect(
+            WhatIfScenarioPlannerDraft.effectiveScenarioSpend(
+                categoryID: categoryID,
+                scenarioBoundsByCategoryID: edited,
+                baselineBoundsByCategoryID: baseline
+            ) == 180
+        )
+        #expect(WhatIfScenarioPlannerDraft.effectiveIncomeTotal(scenarioValue: nil, baselineValue: 4000) == 4000)
+    }
 }

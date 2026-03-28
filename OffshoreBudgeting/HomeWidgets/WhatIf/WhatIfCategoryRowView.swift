@@ -7,6 +7,7 @@
 
 import SwiftUI
 
+@MainActor
 struct WhatIfCategoryRowView: View {
 
     let categoryName: String
@@ -17,7 +18,7 @@ struct WhatIfCategoryRowView: View {
 
     @Binding var minAmount: Double
     @Binding var maxAmount: Double
-    @Binding var scenarioSpendAmount: Double
+    @Binding var scenarioSpendAmount: Double?
 
     let currencyCode: String
     let onEditingBegan: () -> Void
@@ -40,7 +41,12 @@ struct WhatIfCategoryRowView: View {
     private var isDirty: Bool {
         abs(minAmount - baselineMinAmount) > 0.000_1
         || abs(maxAmount - baselineMaxAmount) > 0.000_1
-        || abs(scenarioSpendAmount - baselineScenarioSpendAmount) > 0.000_1
+        || isScenarioEdited
+    }
+
+    private var isScenarioEdited: Bool {
+        guard let scenarioSpendAmount else { return false }
+        return abs(scenarioSpendAmount - baselineScenarioSpendAmount) > 0.000_1
     }
 
     var body: some View {
@@ -117,7 +123,7 @@ struct WhatIfCategoryRowView: View {
                 locale: .current,
                 formatCurrency(minAmount),
                 formatCurrency(maxAmount),
-                formatCurrency(scenarioSpendAmount)
+                formatScenarioCurrency(scenarioSpendAmount)
             )
         )
     }
@@ -167,13 +173,27 @@ struct WhatIfCategoryRowView: View {
             Text(String(localized: "whatIf.scenario", defaultValue: "Scenario", comment: "Label for scenario value field in What If category row."))
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
-            TextField("", text: $scenarioText)
+            TextField(
+                "",
+                text: $scenarioText,
+                prompt: Text(
+                    String(
+                        localized: "whatIf.enterAmount",
+                        defaultValue: "Enter amount",
+                        comment: "Placeholder text for What If amount entry fields."
+                    )
+                )
+            )
                 .focused($focusedField, equals: .scenario)
                 .keyboardType(.decimalPad)
                 .multilineTextAlignment(.leading)
                 .textFieldStyle(.automatic)
                 .onChange(of: scenarioText) { _, newValue in
                     guard focusedField == .scenario else { return }
+                    if newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        scenarioSpendAmount = nil
+                        return
+                    }
                     if let parsed = CurrencyFormatter.parseAmount(newValue) {
                         scenarioSpendAmount = max(0, CurrencyFormatter.roundedToCurrency(parsed))
                     }
@@ -228,7 +248,7 @@ struct WhatIfCategoryRowView: View {
     private func refreshTexts() {
         minText = CurrencyFormatter.editingString(from: minAmount)
         maxText = CurrencyFormatter.editingString(from: maxAmount)
-        scenarioText = CurrencyFormatter.editingString(from: scenarioSpendAmount)
+        scenarioText = editingString(from: scenarioSpendAmount)
     }
 
     private func prepareFieldForEditing(_ field: FocusField) {
@@ -242,7 +262,7 @@ struct WhatIfCategoryRowView: View {
                 maxText = ""
             }
         case .scenario:
-            if CurrencyFormatter.roundedToCurrency(scenarioSpendAmount) == 0 {
+            if scenarioSpendAmount == nil {
                 scenarioText = ""
             }
         }
@@ -257,8 +277,8 @@ struct WhatIfCategoryRowView: View {
             maxAmount = committedAmount(from: maxText, currentValue: maxAmount)
             maxText = CurrencyFormatter.editingString(from: maxAmount)
         case .scenario:
-            scenarioSpendAmount = committedAmount(from: scenarioText, currentValue: scenarioSpendAmount)
-            scenarioText = CurrencyFormatter.editingString(from: scenarioSpendAmount)
+            scenarioSpendAmount = committedOptionalAmount(from: scenarioText, currentValue: scenarioSpendAmount)
+            scenarioText = editingString(from: scenarioSpendAmount)
         }
     }
 
@@ -275,10 +295,33 @@ struct WhatIfCategoryRowView: View {
         return max(0, CurrencyFormatter.roundedToCurrency(currentValue))
     }
 
+    private func committedOptionalAmount(from text: String, currentValue: Double?) -> Double? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            return nil
+        }
+
+        if let parsed = CurrencyFormatter.parseAmount(trimmed) {
+            return max(0, CurrencyFormatter.roundedToCurrency(parsed))
+        }
+
+        return currentValue.map { max(0, CurrencyFormatter.roundedToCurrency($0)) }
+    }
+
     private func formatCurrency(_ value: Double) -> String {
         value.formatted(
             .currency(code: currencyCode)
             .presentation(.standard)
         )
+    }
+
+    private func formatScenarioCurrency(_ value: Double?) -> String {
+        guard let value else { return "Not set" }
+        return formatCurrency(value)
+    }
+
+    private func editingString(from value: Double?) -> String {
+        guard let value else { return "" }
+        return CurrencyFormatter.editingString(from: value)
     }
 }
