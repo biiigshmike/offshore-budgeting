@@ -113,7 +113,9 @@ final class OffshoreBudgetingUITests: XCTestCase {
         app.launch()
 
         app.buttons["Get Started"].tap()
-        app.buttons["Continue Locally"].tap()
+        let onDeviceButton = app.buttons["On Device"].firstMatch
+        XCTAssertTrue(onDeviceButton.waitForExistence(timeout: 5))
+        onDeviceButton.tap()
 
         app.buttons["Add Workspace"].tap()
 
@@ -124,7 +126,7 @@ final class OffshoreBudgetingUITests: XCTestCase {
         app.buttons["Save"].tap()
 
         app.buttons["Next"].tap()
-        XCTAssertTrue(app.staticTexts["Privacy, iCloud, and Notifications"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Privacy and Notifications"].firstMatch.waitForExistence(timeout: 5))
 
         app.buttons["Next"].tap()
         XCTAssertTrue(app.staticTexts["Gestures & Editing"].firstMatch.waitForExistence(timeout: 5))

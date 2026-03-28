@@ -133,11 +133,11 @@ struct SettingsGeneralView: View {
             case .repeatOnboardingConfirm:
                 Alert(
                     title: Text("Repeat Onboarding?"),
-                    message: Text("You can restart onboarding at any time."),
+                    message: Text("You can restart onboarding at any time. Your current data source and saved data will stay in place."),
                     primaryButton: .destructive(Text("Go")) {
+                        OnboardingResetService.repeatOnboarding()
                         onboardingStep = 0
                         didPressGetStarted = false
-                        didChooseDataSource = false
                         didCompleteOnboarding = false
                     },
                     secondaryButton: .cancel()
