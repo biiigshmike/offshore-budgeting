@@ -30,7 +30,6 @@ struct QuickActionsInstallView: View {
             List {
                 shortcutsSection
                 if !isOnboarding {
-                    builtInActionsSection
                     helpSection
                 }
             }
@@ -50,25 +49,6 @@ struct QuickActionsInstallView: View {
     }
 
     // MARK: - Sections
-
-    private var builtInActionsSection: some View {
-        Section("Built-In Offshore Actions") {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Add Expense, Add Income, Excursion Mode, Review Today, Safe Spend Today, and Forecast Savings are built into Offshore as native App Shortcuts.")
-                    .font(.footnote)
-                    .foregroundStyle(.primary)
-
-                Text("Users can access them from the Shortcuts app, Siri, Spotlight, and the Action button on supported devices without downloading an iCloud shortcut link.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-
-                Text("Control Center is best for quick actions like Add Expense, Add Income, Review Today, and Excursion Mode. Safe Spend Today and Forecast Savings are better surfaced as widgets.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.vertical, 4)
-        }
-    }
 
     private var shortcutsSection: some View {
         Section("Shortcuts") {
