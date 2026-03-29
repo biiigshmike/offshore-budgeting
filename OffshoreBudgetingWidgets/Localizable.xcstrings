@@ -1,4023 +1,3741 @@
 {
-  "sourceLanguage": "en",
-  "strings": {
-    "%@": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@"
+  "sourceLanguage" : "en",
+  "strings" : {
+    "%@" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@"
           }
         }
       }
     },
-    "%@ - %@": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%1$@ - %2$@"
+    "%@ - %@" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ - %2$@"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%1$@ - %2$@"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ - %2$@"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%1$@ - %2$@"
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ - %2$@"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%1$@ - %2$@"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ - %2$@"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%1$@ - %2$@"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ - %2$@"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%1$@ - %2$@"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ - %2$@"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%1$@ - %2$@"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ - %2$@"
           }
         }
       }
     },
-    "%@ • %@": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%1$@ • %2$@"
+    "%@ • %@" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ • %2$@"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%1$@ • %2$@"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ • %2$@"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "%1$@ • %2$@"
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ • %2$@"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%1$@ • %2$@"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ • %2$@"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%1$@ • %2$@"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ • %2$@"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%1$@ • %2$@"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ • %2$@"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%1$@ • %2$@"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ • %2$@"
           }
         }
       }
     },
-    "%@ today": {
-      "comment": "A label that shows the amount of money that can be spent today. The argument is the string “—”.",
-      "isCommentAutoGenerated": true,
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ اليوم"
+    "%@ today" : {
+      "comment" : "A label that shows the amount of money that can be spent today. The argument is the string “—”.",
+      "isCommentAutoGenerated" : true,
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ اليوم"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ heute"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ heute"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ hoy"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ hoy"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ aujourd’hui"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ aujourd’hui"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ hoje"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ hoje"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "今天 %@"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今天 %@"
           }
         }
       }
     },
-    "1 Month": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1 شهر"
+    "1 Month" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 شهر"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1 Monat"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 Monat"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1 mes"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 mes"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1 Mois"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 Mois"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1 mês"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 mês"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1个月"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1个月"
           }
         }
       }
     },
-    "1 Week": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1 أسبوع"
+    "1 Week" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 أسبوع"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1 Woche"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 Woche"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1 semana"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 semana"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1 semaine"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 semaine"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1 semana"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 semana"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1周"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1周"
           }
         }
       }
     },
-    "1 Year": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1 سنة"
+    "1 Year" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 سنة"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1 Jahr"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 Jahr"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1 año"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 año"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1 Année"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 Année"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1 ano"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 ano"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1年"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1年"
           }
         }
       }
     },
-    "30 min": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "30 دقيقة"
+    "30 min" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "30 دقيقة"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "30 Min"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "30 Min"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "30 min"
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "30 min"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "30 min."
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "30 min."
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "30 min"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "30 min"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "30 minutos"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "30 minutos"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "30 分钟"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "30 分钟"
           }
         }
       }
     },
-    "Active until %@": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "نشط حتى %@"
+    "Active until %@" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "نشط حتى %@"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aktiv bis %@"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aktiv bis %@"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "Active until %@"
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Active until %@"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Activo hasta %@"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activo hasta %@"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Actif jusqu’a %@"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actif jusqu’a %@"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ativo até %@"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ativo até %@"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "有效直至 %@"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有效直至 %@"
           }
         }
       }
     },
-    "Actual": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "فِعلي"
+    "Actual" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "فِعلي"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tatsächlich"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tatsächlich"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "Actual"
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Actual"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Real"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Real"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Reel"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reel"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Real"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Real"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "实际"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "实际"
           }
         }
       }
     },
-    "Actual %@": {
-      "extractionState": "stale",
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "الفعلي %@"
+    "Actual: %@" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الفعلي: %@"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tatsächlich %@"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aktuell: %@"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "Actual %@"
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Actual: %@"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Real %@"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Real: %@"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Reel %@"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reel : %@"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ real"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Real: %@"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "实际%@"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "实际：%@"
           }
         }
       }
     },
-    "Actual: %@": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "الفعلي: %@"
+    "Add Expense" : {
+      "comment" : "A button that opens the app to add an expense.",
+      "isCommentAutoGenerated" : true,
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إضافة مصروف"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aktuell: %@"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ausgabe hinzufügen"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "Actual: %@"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agregar gasto"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Real: %@"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouter une dépense"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Reel : %@"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicionar despesa"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Real: %@"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加支出"
           }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "实际：%@"
-          }
-        }
-      }
-    },
-    "Add Expense": {
-      "comment": "A button that opens the app to add an expense.",
-      "isCommentAutoGenerated": true,
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "إضافة مصروف"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ausgabe hinzufügen"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Agregar gasto"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ajouter une dépense"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Adicionar despesa"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "添加支出"
-          }
         }
       }
     },
-    "Add Income": {
-      "comment": "A button that opens the app to add income.",
-      "isCommentAutoGenerated": true,
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "إضافة دخل"
+    "Add Income" : {
+      "comment" : "A button that opens the app to add income.",
+      "isCommentAutoGenerated" : true,
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إضافة دخل"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Einkommen hinzufügen"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Einkommen hinzufügen"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Agregar ingreso"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agregar ingreso"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ajouter un revenu"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouter un revenu"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Adicionar renda"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicionar renda"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "添加收入"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加收入"
           }
         }
       }
     },
-    "Card": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "بطاقة"
+    "Card" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "بطاقة"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Karte"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Karte"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cuenta"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cuenta"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Carte"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Carte"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cartão"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cartão"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "卡片"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "卡片"
           }
         }
       }
     },
-    "Card Widget": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "القطعة البطاقة"
+    "Card Widget" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "القطعة البطاقة"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Karten-Widget"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Karten-Widget"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Widget de cuenta"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Widget de cuenta"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Widget Carte"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Widget Carte"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Widget de cartão"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Widget de cartão"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "卡片小组件"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "卡片小组件"
           }
         }
       }
     },
-    "Configuration": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "إعدادات"
+    "Configuration" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إعدادات"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Konfiguration"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Konfiguration"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Configuración"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Configuración"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Configuration"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Configuration"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Configuração"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Configuração"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "配置"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "配置"
           }
         }
       }
     },
-    "Configure the period shown in the Income widget.": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "قم بتكوين الفترة الموضحة في أداة الدخل."
+    "Configure the period shown in the Income widget." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "قم بتكوين الفترة الموضحة في أداة الدخل."
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Konfigurieren Sie den im Einkommens-Widget angezeigten Zeitraum."
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Konfigurieren Sie den im Einkommens-Widget angezeigten Zeitraum."
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Configura el período que se muestra en el widget de ingresos."
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Configura el período que se muestra en el widget de ingresos."
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Configure the period shown in the Revenu widget."
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Configure the period shown in the Revenu widget."
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Configure o período mostrado no widget Renda."
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Configure o período mostrado no widget Renda."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "配置收入小部件中显示的期间。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "配置收入小部件中显示的期间。"
           }
         }
       }
     },
-    "Default Period": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "الفترة الافتراضية"
+    "Default Period" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الفترة الافتراضية"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Standardzeitraum"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Standardzeitraum"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Período predeterminado"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Período predeterminado"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Par défaut Période"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Par défaut Période"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Período padrão"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Período padrão"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "默认期间"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "默认期间"
           }
         }
       }
     },
-    "Done": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "منتهي"
+    "Done" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "منتهي"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Fertig"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fertig"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "Done"
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Done"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Listo"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Listo"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Termine"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Termine"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Feito"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Feito"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "完成"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完成"
           }
         }
       }
     },
-    "Ended": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "انتهى"
+    "Ended" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "انتهى"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Beendet"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beendet"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "Ended"
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Ended"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Finalizado"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Finalizado"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Terminé"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Terminé"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Encerrado"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encerrado"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "已结束"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已结束"
           }
         }
       }
     },
-    "Ends %@": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ينتهي %@"
+    "Ends %@" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ينتهي %@"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Endet %@"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Endet %@"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "Ends %@"
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Ends %@"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Termina %@"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Termina %@"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Se termine a %@"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se termine a %@"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Termina %@"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Termina %@"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "结束 %@"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "结束 %@"
           }
         }
       }
     },
-    "Excursion Mode": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "وضع الرحلة"
+    "Excursion Mode" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "وضع الرحلة"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ausflugsmodus"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ausflugsmodus"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "Excursion Mode"
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Excursion Mode"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Modo excursion"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modo excursion"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mode Excursion"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mode Excursion"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Modo Excursão"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modo Excursão"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "游览模式"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "游览模式"
           }
         }
       }
     },
-    "Expenses": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "نفقات"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ausgaben"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "Expenses"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Gastos"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Depenses"
+    "Expenses" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "نفقات"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Despesas"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ausgaben"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "支出"
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Expenses"
           }
-        }
-      }
-    },
-    "Extend Excursion Mode": {
-      "comment": "Title of the \"Extend Excursion Mode\" app intent.",
-      "isCommentAutoGenerated": true,
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "تمديد وضع الرحلة"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Exkursionsmodus verlängern"
-          }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Extender modo excursion"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gastos"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Prolonger le mode Excursion"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Depenses"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Estender modo de excursão"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Despesas"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "延长游览模式"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "支出"
           }
         }
       }
     },
-    "Favorite Emoji": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "الرموز التعبيرية المفضلة"
+    "Extend Excursion Mode" : {
+      "comment" : "Title of the \"Extend Excursion Mode\" app intent.",
+      "isCommentAutoGenerated" : true,
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تمديد وضع الرحلة"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Lieblings-Emoji"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exkursionsmodus verlängern"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Emoji favorito"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Extender modo excursion"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Emoji favori"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prolonger le mode Excursion"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Emoji favorito"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estender modo de excursão"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "最喜欢的表情符号"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "延长游览模式"
           }
         }
       }
     },
-    "Forecast Savings": {
-      "comment": "Intent title for opening the forecast savings view in the Offshore widget.",
-      "isCommentAutoGenerated": true,
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "توقع المدخرات"
+    "Favorite Emoji" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الرموز التعبيرية المفضلة"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sparprognose"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lieblings-Emoji"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pronóstico de ahorros"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Emoji favorito"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Prévision d’épargne"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Emoji favori"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Previsão de economia"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Emoji favorito"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "储蓄预测"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最喜欢的表情符号"
           }
         }
       }
     },
-    "High": {
-      "comment": "A title for the highest spending bucket.",
-      "isCommentAutoGenerated": true,
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "الأعلى"
+    "Forecast Savings" : {
+      "comment" : "Intent title for opening the forecast savings view in the Offshore widget.",
+      "isCommentAutoGenerated" : true,
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "توقع المدخرات"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Hoch"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sparprognose"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Alto"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pronóstico de ahorros"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pic"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prévision d’épargne"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Alta"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Previsão de economia"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "峰值"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "储蓄预测"
           }
         }
       }
     },
-    "Highest %@": {
-      "extractionState": "stale",
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "أعلى %@"
+    "High" : {
+      "comment" : "A title for the highest spending bucket.",
+      "isCommentAutoGenerated" : true,
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الأعلى"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Höchster %@"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hoch"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "Highest %@"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alto"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mayor %@"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pic"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pic %@"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alta"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ mais alto"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "峰值"
           }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "最高%@"
-          }
         }
       }
     },
-    "Income": {
-      "comment": "Income widget preview title.",
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "دخل"
+    "Income" : {
+      "comment" : "Income widget preview title.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "دخل"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Einkommen"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Einkommen"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ingresos"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ingresos"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Revenu"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revenu"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Renda"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renda"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "收入"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "收入"
           }
         }
       }
     },
-    "Income progress": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "تقدم الدخل"
+    "Income progress" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تقدم الدخل"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Einkommensfortschritt"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Einkommensfortschritt"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Progreso de ingresos"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Progreso de ingresos"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Revenu progress"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revenu progress"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Progresso da renda"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Progresso da renda"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "收入进展"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "收入进展"
           }
         }
       }
     },
-    "Income Widget": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "القطعة الدخل"
+    "Income Widget" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "القطعة الدخل"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Einkommens-Widget"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Einkommens-Widget"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Widget de ingresos"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Widget de ingresos"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Widget Revenus"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Widget Revenus"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Widget de renda"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Widget de renda"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "收入小组件"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "收入小组件"
           }
         }
       }
     },
-    "Left": {
-      "extractionState": "stale",
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "متبقٍ"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Übrig"
+    "Left %@" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "المتبقي %@"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "Left"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Übrig %@"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Restante"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restante %@"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Reste"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reste %@"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Restante"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restante %@"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "剩余"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "剩余 %@"
           }
         }
       }
     },
-    "Left %@": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "المتبقي %@"
+    "Monthly" : {
+      "comment" : "A label describing the monthly budgeting period.",
+      "isCommentAutoGenerated" : true,
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "شهريا"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Übrig %@"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Monatlich"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Restante %@"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mensual"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Reste %@"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mensuel"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Restante %@"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mensal"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "剩余 %@"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每月"
           }
         }
       }
     },
-    "Next Planned Expense": {
-      "comment": "Next planned expense widget preview title.",
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "المصروف المخطط التالي"
+    "Next Planned Expense" : {
+      "comment" : "Next planned expense widget preview title.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "المصروف المخطط التالي"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nächste geplante Ausgabe"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nächste geplante Ausgabe"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Siguiente gasto planificado"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siguiente gasto planificado"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Prochaine dépense prévue"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prochaine dépense prévue"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Próxima despesa planejada"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Próxima despesa planejada"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "下一笔计划支出"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下一笔计划支出"
           }
         }
       }
     },
-    "Next Planned Expense Widget": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "أداة المصروف المخطط التالي"
+    "Next Planned Expense Widget" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أداة المصروف المخطط التالي"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Widget „Nächste geplante Ausgabe“."
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Widget „Nächste geplante Ausgabe“."
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Widget de siguiente gasto planificado"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Widget de siguiente gasto planificado"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Widget Prochaine dépense prévue"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Widget Prochaine dépense prévue"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Widget de próxima despesa planejada"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Widget de próxima despesa planejada"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "下一笔计划支出小组件"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下一笔计划支出小组件"
           }
         }
       }
     },
-    "No card data found in this range.": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "لم يتم العثور على بيانات البطاقة في هذا النطاق."
+    "No card data found in this range." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لم يتم العثور على بيانات البطاقة في هذا النطاق."
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "In diesem Bereich wurden keine Kartendaten gefunden."
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In diesem Bereich wurden keine Kartendaten gefunden."
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No se encontraron datos de tarjeta en este rango."
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se encontraron datos de tarjeta en este rango."
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aucune donnée de carte trouvée dans cette plage."
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune donnée de carte trouvée dans cette plage."
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nenhum dado de cartão encontrado neste intervalo."
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhum dado de cartão encontrado neste intervalo."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "在此范围内未找到卡片数据。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在此范围内未找到卡片数据。"
           }
         }
       }
     },
-    "No card data found.": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "لم يتم العثور على بيانات البطاقة."
+    "No card data found." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لم يتم العثور على بيانات البطاقة."
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Keine Kartendaten gefunden."
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine Kartendaten gefunden."
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No se encontraron datos de tarjeta."
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se encontraron datos de tarjeta."
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aucune donnée de carte trouvée."
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune donnée de carte trouvée."
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nenhum dado do cartão encontrado."
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhum dado do cartão encontrado."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "未找到卡片数据。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未找到卡片数据。"
           }
         }
       }
     },
-    "No income data found in this range.": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "لم يتم العثور على بيانات الدخل في هذا النطاق."
+    "No income data found in this range." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لم يتم العثور على بيانات الدخل في هذا النطاق."
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "In diesem Bereich wurden keine Einkommensdaten gefunden."
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In diesem Bereich wurden keine Einkommensdaten gefunden."
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No se encontraron datos de ingresos en este rango."
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se encontraron datos de ingresos en este rango."
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aucune donnée de revenu trouvée dans cette plage."
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune donnée de revenu trouvée dans cette plage."
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nenhum dado de renda encontrado nesta faixa."
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhum dado de renda encontrado nesta faixa."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "在此范围内未找到收入数据。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在此范围内未找到收入数据。"
           }
         }
       }
     },
-    "No income data found.": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "لم يتم العثور على بيانات الدخل."
+    "No income data found." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لم يتم العثور على بيانات الدخل."
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Keine Einkommensdaten gefunden."
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine Einkommensdaten gefunden."
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No se encontraron datos de ingresos."
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se encontraron datos de ingresos."
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aucune donnée de revenu trouvée."
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune donnée de revenu trouvée."
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nenhum dado de renda encontrado."
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhum dado de renda encontrado."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "未找到收入数据。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未找到收入数据。"
           }
         }
       }
     },
-    "No range": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "بلا نطاق"
+    "No range" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "بلا نطاق"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Kein Bereich"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kein Bereich"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sin rango"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sin rango"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aucune plage"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune plage"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sem intervalo"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sem intervalo"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "无范围"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无范围"
           }
         }
       }
     },
-    "No recent entries.": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "لا توجد إدخالات الأخيرة."
+    "No recent entries." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا توجد إدخالات الأخيرة."
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Keine aktuellen Einträge."
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine aktuellen Einträge."
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "No recent entries."
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "No recent entries."
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No se encontraron entradas recientes."
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se encontraron entradas recientes."
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aucune entree recente."
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune entree recente."
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nenhuma entrada recente."
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhuma entrada recente."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "没有最近的条目。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有最近的条目。"
           }
         }
       }
     },
-    "No recent expenses.": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "لا توجد نفقات الأخيرة."
+    "No recent expenses." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا توجد نفقات الأخيرة."
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Keine aktuellen Ausgaben."
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine aktuellen Ausgaben."
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "No recent expenses."
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "No recent expenses."
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No se encontraron gastos recientes."
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se encontraron gastos recientes."
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aucune depense recente."
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune depense recente."
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sem despesas recentes."
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sem despesas recentes."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "没有最近的支出。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有最近的支出。"
           }
         }
       }
     },
-    "No recent income entries.": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "لا توجد إدخالات الدخل الأخيرة."
+    "No recent income entries." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا توجد إدخالات الدخل الأخيرة."
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Keine aktuellen Einkommenseinträge."
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine aktuellen Einkommenseinträge."
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "No recent income entries."
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "No recent income entries."
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No se encontraron entradas de ingresos recientes."
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se encontraron entradas de ingresos recientes."
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aucune entree de revenu recente."
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune entree de revenu recente."
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nenhuma entrada de renda recente."
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhuma entrada de renda recente."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "没有最近的收入条目。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有最近的收入条目。"
           }
         }
       }
     },
-    "No spending data found for this period.": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "لم يتم العثور على بيانات الإنفاق لهذه الفترة."
+    "No spending data found for this period." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لم يتم العثور على بيانات الإنفاق لهذه الفترة."
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Für diesen Zeitraum wurden keine Ausgabendaten gefunden."
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Für diesen Zeitraum wurden keine Ausgabendaten gefunden."
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No se encontraron datos de gastos para este período."
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se encontraron datos de gastos para este período."
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aucune donnée de dépenses trouvée pour cette période."
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune donnée de dépenses trouvée pour cette période."
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Não foram encontrados dados de gastos para este período."
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não foram encontrados dados de gastos para este período."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "未找到此期间的支出数据。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未找到此期间的支出数据。"
           }
         }
       }
     },
-    "No upcoming planned expenses found for this period.": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "لم يتم العثور على أي نفقات مخططة قادمة لهذه الفترة."
+    "No upcoming planned expenses found for this period." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لم يتم العثور على أي نفقات مخططة قادمة لهذه الفترة."
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Für diesen Zeitraum wurden keine bevorstehenden geplanten Ausgaben gefunden."
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Für diesen Zeitraum wurden keine bevorstehenden geplanten Ausgaben gefunden."
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No se encontraron gastos planificados próximos para este período."
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se encontraron gastos planificados próximos para este período."
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aucune dépense prévue à venir trouvée pour cette période."
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune dépense prévue à venir trouvée pour cette période."
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nenhuma despesa planejada futura encontrada para este período."
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhuma despesa planejada futura encontrada para este período."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "未找到此期间即将发生的计划支出。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未找到此期间即将发生的计划支出。"
           }
         }
       }
     },
-    "Offshore": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Offshore"
+    "Offshore" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offshore"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Offshore"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offshore"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "Offshore"
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Offshore"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Offshore"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offshore"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Offshore"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offshore"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Offshore"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offshore"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Offshore"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offshore"
           }
         }
       }
     },
-    "On target": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "على الهدف"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Am Ziel"
+    "On target" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "على الهدف"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "On target"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "En objetivo"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dans la cible"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No alvo"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "达到目标"
-          }
-        }
-      }
-    },
-    "Open Offshore directly to quick add expense.": {
-      "comment": "Description of a control widget that opens the app to add an expense.",
-      "isCommentAutoGenerated": true,
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "افتح Offshore مباشرة للإضافة السريعة لمصروف."
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Am Ziel"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Offshore direkt zum schnellen Hinzufügen einer Ausgabe öffnen."
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "On target"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Abre Offshore directamente para agregar un gasto rápidamente."
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En objetivo"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ouvrez Offshore directement pour ajouter rapidement une dépense."
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dans la cible"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Abra o Offshore diretamente para adicionar uma despesa rapidamente."
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No alvo"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "直接打开 Offshore 以快速添加支出。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "达到目标"
           }
         }
       }
     },
-    "Open Offshore directly to quick add income.": {
-      "comment": "Description of a control widget that opens the app to add income.",
-      "isCommentAutoGenerated": true,
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "افتح Offshore مباشرة للإضافة السريعة لدخل."
+    "Open Offshore directly to quick add expense." : {
+      "comment" : "Description of a control widget that opens the app to add an expense.",
+      "isCommentAutoGenerated" : true,
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "افتح Offshore مباشرة للإضافة السريعة لمصروف."
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Offshore direkt zum schnellen Hinzufügen eines Einkommens öffnen."
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offshore direkt zum schnellen Hinzufügen einer Ausgabe öffnen."
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Abre Offshore directamente para agregar un ingreso rápidamente."
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abre Offshore directamente para agregar un gasto rápidamente."
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ouvrez Offshore directement pour ajouter rapidement un revenu."
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrez Offshore directement pour ajouter rapidement une dépense."
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Abra o Offshore diretamente para adicionar uma renda rapidamente."
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abra o Offshore diretamente para adicionar uma despesa rapidamente."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "直接打开 Offshore 以快速添加收入。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直接打开 Offshore 以快速添加支出。"
           }
         }
       }
     },
-    "Open Offshore for a review of today's spending.": {
-      "comment": "Intent name for the \"Open Offshore for a review of today's spending.\" action.",
-      "isCommentAutoGenerated": true,
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "افتح Offshore لمراجعة إنفاق اليوم."
+    "Open Offshore directly to quick add income." : {
+      "comment" : "Description of a control widget that opens the app to add income.",
+      "isCommentAutoGenerated" : true,
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "افتح Offshore مباشرة للإضافة السريعة لدخل."
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Offshore öffnen, um die heutigen Ausgaben zu prüfen."
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offshore direkt zum schnellen Hinzufügen eines Einkommens öffnen."
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Abre Offshore para revisar el gasto de hoy."
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abre Offshore directamente para agregar un ingreso rápidamente."
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ouvrez Offshore pour revoir les dépenses d’aujourd’hui."
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrez Offshore directement pour ajouter rapidement un revenu."
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Abra o Offshore para revisar os gastos de hoje."
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abra o Offshore diretamente para adicionar uma renda rapidamente."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "打开 Offshore 查看今天的支出。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直接打开 Offshore 以快速添加收入。"
           }
         }
       }
     },
-    "Open Offshore to generate widget data for this period.": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "افتح Offshore لإنشاء بيانات عنصر واجهة المستخدم لهذه الفترة."
+    "Open Offshore for a review of today's spending." : {
+      "comment" : "Intent name for the \"Open Offshore for a review of today's spending.\" action.",
+      "isCommentAutoGenerated" : true,
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "افتح Offshore لمراجعة إنفاق اليوم."
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Öffnen Sie Offshore, um Widget-Daten für diesen Zeitraum zu generieren."
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offshore öffnen, um die heutigen Ausgaben zu prüfen."
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Abre Offshore para generar los datos del widget para este período."
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abre Offshore para revisar el gasto de hoy."
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ouvrez Offshore pour générer les données du widget pour cette période."
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrez Offshore pour revoir les dépenses d’aujourd’hui."
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Abra Offshore para gerar dados de widget para este período."
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abra o Offshore para revisar os gastos de hoje."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "打开 Offshore 以生成此期间的小组件数据。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开 Offshore 查看今天的支出。"
           }
         }
       }
     },
-    "Open Offshore to review safe spending guidance for today.": {
-      "comment": "Intent to open the Offshore widget to review safe spending guidance for today.",
-      "isCommentAutoGenerated": true,
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "افتح Offshore لمراجعة إرشادات الإنفاق الآمن لليوم."
+    "Open Offshore to generate widget data for this period." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "افتح Offshore لإنشاء بيانات عنصر واجهة المستخدم لهذه الفترة."
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Offshore öffnen, um die Hinweise zum sicheren Ausgeben für heute zu prüfen."
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Öffnen Sie Offshore, um Widget-Daten für diesen Zeitraum zu generieren."
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Abre Offshore para revisar la guía de gasto seguro de hoy."
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abre Offshore para generar los datos del widget para este período."
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ouvrez Offshore pour consulter les conseils de dépense sûre pour aujourd’hui."
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrez Offshore pour générer les données du widget pour cette période."
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Abra o Offshore para revisar a orientação de gasto seguro de hoje."
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abra Offshore para gerar dados de widget para este período."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "打开 Offshore 查看今天的安全支出建议。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开 Offshore 以生成此期间的小组件数据。"
           }
         }
       }
     },
-    "Open Offshore to review today's spending.": {
-      "comment": "Description of a control widget that opens the app to review today's spending.",
-      "isCommentAutoGenerated": true,
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "افتح Offshore لمراجعة إنفاق اليوم."
+    "Open Offshore to review safe spending guidance for today." : {
+      "comment" : "Intent to open the Offshore widget to review safe spending guidance for today.",
+      "isCommentAutoGenerated" : true,
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "افتح Offshore لمراجعة إرشادات الإنفاق الآمن لليوم."
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Offshore öffnen, um die heutigen Ausgaben zu prüfen."
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offshore öffnen, um die Hinweise zum sicheren Ausgeben für heute zu prüfen."
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Abre Offshore para revisar el gasto de hoy."
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abre Offshore para revisar la guía de gasto seguro de hoy."
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ouvrez Offshore pour revoir les dépenses d’aujourd’hui."
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrez Offshore pour consulter les conseils de dépense sûre pour aujourd’hui."
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Abra o Offshore para revisar os gastos de hoje."
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abra o Offshore para revisar a orientação de gasto seguro de hoje."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "打开 Offshore 查看今天的支出。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开 Offshore 查看今天的安全支出建议。"
           }
         }
       }
     },
-    "Open Offshore to review your savings outlook.": {
-      "comment": "Intent to open the Offshore widget to review savings.",
-      "isCommentAutoGenerated": true,
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "افتح Offshore لمراجعة توقعات مدخراتك."
+    "Open Offshore to review today's spending." : {
+      "comment" : "Description of a control widget that opens the app to review today's spending.",
+      "isCommentAutoGenerated" : true,
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "افتح Offshore لمراجعة إنفاق اليوم."
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Offshore öffnen, um deinen Sparausblick zu prüfen."
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offshore öffnen, um die heutigen Ausgaben zu prüfen."
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Abre Offshore para revisar tu perspectiva de ahorros."
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abre Offshore para revisar el gasto de hoy."
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ouvrez Offshore pour consulter votre perspective d’épargne."
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrez Offshore pour revoir les dépenses d’aujourd’hui."
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Abra o Offshore para revisar sua perspectiva de economia."
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abra o Offshore para revisar os gastos de hoje."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "打开 Offshore 查看你的储蓄展望。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开 Offshore 查看今天的支出。"
           }
         }
       }
     },
-    "Over": {
-      "extractionState": "stale",
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "زيادة"
+    "Open Offshore to review your savings outlook." : {
+      "comment" : "Intent to open the Offshore widget to review savings.",
+      "isCommentAutoGenerated" : true,
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "افتح Offshore لمراجعة توقعات مدخراتك."
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Über"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offshore öffnen, um deinen Sparausblick zu prüfen."
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "Over"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abre Offshore para revisar tu perspectiva de ahorros."
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Superado"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrez Offshore pour consulter votre perspective d’épargne."
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Au-dessus"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abra o Offshore para revisar sua perspectiva de economia."
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sobre"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开 Offshore 查看你的储蓄展望。"
           }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "超过"
-          }
         }
       }
     },
-    "Over %@": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "أكثر من %@"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Über %@"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "Over %@"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Por encima %@"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Depassement %@"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sobre %@"
+    "Over %@" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أكثر من %@"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "超过%@"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Über %@"
           }
-        }
-      }
-    },
-    "Period": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "فترة"
-          }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Zeitraum"
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Over %@"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Período"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Por encima %@"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Période"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Depassement %@"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Período"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sobre %@"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "期间"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "超过%@"
           }
         }
       }
     },
-    "Planned": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "المخطط لها"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Geplant"
+    "Period" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "فترة"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "Planned"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zeitraum"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Planificado"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Período"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Prevu"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Période"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Planejado"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Período"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "计划"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "期间"
           }
         }
       }
     },
-    "Planned %@": {
-      "extractionState": "stale",
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ المخطط لها"
+    "Planned" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "المخطط لها"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Geplant %@"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geplant"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "Planned %@"
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Planned"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Planificado %@"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Planificado"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Prevu %@"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prevu"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ planejado"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Planejado"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "计划%@"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "计划"
           }
         }
       }
     },
-    "Planned: %@": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "المخطط: %@"
+    "Planned: %@" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "المخطط: %@"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Geplant: %@"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geplant: %@"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "Planned: %@"
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Planned: %@"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Planificado: %@"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Planificado: %@"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Prevu : %@"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prevu : %@"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Planejado: %@"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Planejado: %@"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "计划：%@"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "计划：%@"
           }
         }
       }
     },
-    "Progress —": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "تقدم -"
+    "Progress —" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تقدم -"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Fortschritt –"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fortschritt –"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "Progress —"
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Progress —"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Progreso —"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Progreso —"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Progression —"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Progression —"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Progresso -"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Progresso -"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "进步 -"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "进步 -"
           }
         }
       }
     },
-    "Progress %@": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "التقدم %@"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Fortschritt %@"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "Progress %@"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Progreso %@"
+    "Progress %@" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "التقدم %@"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Progression %@"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fortschritt %@"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Progresso %@"
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Progress %@"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "进度%@"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Progreso %@"
           }
-        }
-      }
-    },
-    "projected": {
-      "comment": "A label that indicates that the value is a projected value.",
-      "isCommentAutoGenerated": true,
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "متوقع"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "prognostiziert"
-          }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "proyectado"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Progression %@"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "prévu"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Progresso %@"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "projetado"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "进度%@"
           }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "预计"
-          }
         }
       }
     },
-    "Monthly": {
-      "comment": "A label describing the monthly budgeting period.",
-      "isCommentAutoGenerated": true,
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "شهريا"
+    "projected" : {
+      "comment" : "A label that indicates that the value is a projected value.",
+      "isCommentAutoGenerated" : true,
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "متوقع"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Monatlich"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "prognostiziert"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mensual"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "proyectado"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mensuel"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "prévu"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mensal"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "projetado"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "每月"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "预计"
           }
         }
       }
     },
-    "Projected": {
-      "comment": "A label describing the projected savings.",
-      "isCommentAutoGenerated": true,
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "المتوقع"
+    "Projected" : {
+      "comment" : "A label describing the projected savings.",
+      "isCommentAutoGenerated" : true,
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "المتوقع"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Prognostiziert"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prognostiziert"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Proyectado"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Proyectado"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Prévu"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prévu"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Projetado"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Projetado"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "预计"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "预计"
           }
         }
       }
     },
-    "Q": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "س"
+    "Q" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "س"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "F"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "F"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "T"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "T"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "T"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "T"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "P"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "P"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "问"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "问"
           }
         }
       }
     },
-    "Recent": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "مؤخرًا"
+    "Recent" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مؤخرًا"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Neu"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neu"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "Recent"
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Recent"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Reciente"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reciente"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Récent"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Récent"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Recente"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recente"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "最近"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最近"
           }
         }
       }
     },
-    "Recent Income": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "الدخل الأخير"
+    "Recent Income" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الدخل الأخير"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aktuelles Einkommen"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aktuelles Einkommen"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "Recent Income"
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Recent Income"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ingresos recientes"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ingresos recientes"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Revenus recents"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revenus recents"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Renda recente"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renda recente"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "最近收入"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最近收入"
           }
         }
       }
     },
-    "Remaining %@": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "المتبقية %@"
+    "Remaining %@" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "المتبقية %@"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Verbleibende %@"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verbleibende %@"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "Remaining %@"
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Remaining %@"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Restante %@"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restante %@"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Reste %@"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reste %@"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Restante %@"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restante %@"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "剩余%@"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "剩余%@"
           }
         }
       }
     },
-    "Review Today": {
-      "comment": "A button that opens a sheet to review today's spending.",
-      "isCommentAutoGenerated": true,
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "مراجعة اليوم"
+    "Review Today" : {
+      "comment" : "A button that opens a sheet to review today's spending.",
+      "isCommentAutoGenerated" : true,
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مراجعة اليوم"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Heute prüfen"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Heute prüfen"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Revisar hoy"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revisar hoy"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Revoir aujourd’hui"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revoir aujourd’hui"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Revisar hoje"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revisar hoje"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "查看今日"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查看今日"
           }
         }
       }
     },
-    "Safe Spend Today": {
-      "comment": "Title of an intent to open the Safe Spend Today view in the Offshore widget.",
-      "isCommentAutoGenerated": true,
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "الإنفاق الآمن اليوم"
+    "Safe Spend Today" : {
+      "comment" : "Title of an intent to open the Safe Spend Today view in the Offshore widget.",
+      "isCommentAutoGenerated" : true,
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الإنفاق الآمن اليوم"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sicher heute ausgeben"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sicher heute ausgeben"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Gasto seguro de hoy"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gasto seguro de hoy"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dépense sûre aujourd’hui"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dépense sûre aujourd’hui"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Gasto seguro de hoje"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gasto seguro de hoje"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "今日安全支出"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今日安全支出"
           }
         }
       }
     },
-    "See a glanceable safe-to-spend amount for today.": {
-      "comment": "Description of the Safe Spend Today widget.",
-      "isCommentAutoGenerated": true,
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "اعرض بسرعة مبلغًا آمنًا للإنفاق اليوم."
+    "See a glanceable safe-to-spend amount for today." : {
+      "comment" : "Description of the Safe Spend Today widget.",
+      "isCommentAutoGenerated" : true,
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اعرض بسرعة مبلغًا آمنًا للإنفاق اليوم."
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sieh auf einen Blick einen sicheren Ausgabebetrag für heute."
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sieh auf einen Blick einen sicheren Ausgabebetrag für heute."
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Consulta de un vistazo un monto seguro para gastar hoy."
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Consulta de un vistazo un monto seguro para gastar hoy."
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Consultez d’un coup d’œil un montant sûr à dépenser aujourd’hui."
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Consultez d’un coup d’œil un montant sûr à dépenser aujourd’hui."
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Veja rapidamente um valor seguro para gastar hoje."
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Veja rapidamente um valor seguro para gastar hoje."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "一眼查看今天可安全支出的金额。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一眼查看今天可安全支出的金额。"
           }
         }
       }
     },
-    "See projected end-of-month savings at a glance.": {
-      "comment": "Description of the Forecast Savings widget.",
-      "isCommentAutoGenerated": true,
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "اعرض بسرعة المدخرات المتوقعة لنهاية الشهر."
+    "See projected end-of-month savings at a glance." : {
+      "comment" : "Description of the Forecast Savings widget.",
+      "isCommentAutoGenerated" : true,
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اعرض بسرعة المدخرات المتوقعة لنهاية الشهر."
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sieh die prognostizierten Monatsend-Ersparnisse auf einen Blick."
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sieh die prognostizierten Monatsend-Ersparnisse auf einen Blick."
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Consulta de un vistazo los ahorros proyectados para fin de mes."
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Consulta de un vistazo los ahorros proyectados para fin de mes."
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Consultez d’un coup d’œil l’épargne prévue en fin de mois."
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Consultez d’un coup d’œil l’épargne prévue en fin de mois."
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Veja rapidamente a economia projetada para o fim do mês."
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Veja rapidamente a economia projetada para o fim do mês."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "一眼查看预计的月末储蓄。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一眼查看预计的月末储蓄。"
           }
         }
       }
     },
-    "Session ended": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "انتهت الجلسة"
+    "Session ended" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "انتهت الجلسة"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sitzung beendet"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sitzung beendet"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "Session ended"
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Session ended"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sesión finalizada"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sesión finalizada"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Session terminee"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Session terminee"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sessão encerrada"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sessão encerrada"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "会议结束"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会议结束"
           }
         }
       }
     },
-    "Show a card and its expenses for a selected period.": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "إبراز البطاقة ومصروفاتها لفترة محددة."
+    "Show a card and its expenses for a selected period." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إبراز البطاقة ومصروفاتها لفترة محددة."
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Zeigen Sie eine Karte und ihre Ausgaben für einen ausgewählten Zeitraum an."
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zeigen Sie eine Karte und ihre Ausgaben für einen ausgewählten Zeitraum an."
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Muestra una cuenta y sus gastos para un período seleccionado."
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Muestra una cuenta y sus gastos para un período seleccionado."
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Afficher a card and its expenses for a selected period."
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher a card and its expenses for a selected period."
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mostre um cartão e suas despesas para um período selecionado."
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostre um cartão e suas despesas para um período selecionado."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "显示某张卡及其在选定期间内的费用。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示某张卡及其在选定期间内的费用。"
           }
         }
       }
     },
-    "Show a card preview with spending for a selected period.": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "إظهار معاينة البطاقة مع الإنفاق لفترة محددة."
+    "Show a card preview with spending for a selected period." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إظهار معاينة البطاقة مع الإنفاق لفترة محددة."
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Zeigen Sie eine Kartenvorschau mit Ausgaben für einen ausgewählten Zeitraum an."
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zeigen Sie eine Kartenvorschau mit Ausgaben für einen ausgewählten Zeitraum an."
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Muestra una vista previa de una cuenta con gasto para un período seleccionado."
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Muestra una vista previa de una cuenta con gasto para un período seleccionado."
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Affiche un aperçu d’une carte avec les dépenses pour une période choisie."
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Affiche un aperçu d’une carte avec les dépenses pour une période choisie."
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mostre uma prévia do cartão com os gastos de um período selecionado."
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostre uma prévia do cartão com os gastos de um período selecionado."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "显示卡片预览以及选定时间段内的支出。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示卡片预览以及选定时间段内的支出。"
           }
         }
       }
     },
-    "Show spend trends for all cards or a selected card.": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "إظهار اتجاهات الإنفاق لجميع البطاقات أو البطاقة المحددة."
+    "Show spend trends for all cards or a selected card." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إظهار اتجاهات الإنفاق لجميع البطاقات أو البطاقة المحددة."
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ausgabentrends für alle Karten oder eine ausgewählte Karte anzeigen."
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ausgabentrends für alle Karten oder eine ausgewählte Karte anzeigen."
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Muestra tendencias de gasto para todas las cuentas o una cuenta seleccionada."
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Muestra tendencias de gasto para todas las cuentas o una cuenta seleccionada."
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Afficher spend trends for all cards or a selected card."
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher spend trends for all cards or a selected card."
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mostre tendências de gastos para todos os cartões ou para um cartão selecionado."
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostre tendências de gastos para todos os cartões ou para um cartão selecionado."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "显示所有卡或选定卡的支出趋势。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示所有卡或选定卡的支出趋势。"
           }
         }
       }
     },
-    "Show the next planned expense for all cards or a selected card.": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "إظهار المصاريف المخططة التالية لجميع البطاقات أو البطاقة المحددة."
+    "Show the next planned expense for all cards or a selected card." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إظهار المصاريف المخططة التالية لجميع البطاقات أو البطاقة المحددة."
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Zeigt die nächste geplante Ausgabe für alle Karten oder eine ausgewählte Karte an."
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zeigt die nächste geplante Ausgabe für alle Karten oder eine ausgewählte Karte an."
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Muestra el siguiente gasto planificado para todas las cuentas o una cuenta seleccionada."
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Muestra el siguiente gasto planificado para todas las cuentas o una cuenta seleccionada."
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Afficher the next planned expense for all cards or a selected card."
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher the next planned expense for all cards or a selected card."
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mostre a próxima despesa planejada para todos os cartões ou para um cartão selecionado."
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostre a próxima despesa planejada para todos os cartões ou para um cartão selecionado."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "显示所有卡或选定卡的下一个计划费用。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示所有卡或选定卡的下一个计划费用。"
           }
         }
       }
     },
-    "Show upcoming planned expenses for all cards or a selected card.": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "إظهار النفقات المخططة القادمة لجميع البطاقات أو البطاقة المحددة."
+    "Show upcoming planned expenses for all cards or a selected card." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إظهار النفقات المخططة القادمة لجميع البطاقات أو البطاقة المحددة."
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Zeigen Sie anstehende geplante Ausgaben für alle Karten oder eine ausgewählte Karte an."
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zeigen Sie anstehende geplante Ausgaben für alle Karten oder eine ausgewählte Karte an."
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Muestra próximos gastos planificados para todas las cuentas o una cuenta seleccionada."
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Muestra próximos gastos planificados para todas las cuentas o una cuenta seleccionada."
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Affiche les dépenses prévues à venir pour toutes les cartes ou pour une carte choisie."
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Affiche les dépenses prévues à venir pour toutes les cartes ou pour une carte choisie."
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mostre as próximas despesas planejadas para todos os cartões ou para um cartão selecionado."
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostre as próximas despesas planejadas para todos os cartões ou para um cartão selecionado."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "显示所有卡或所选卡即将发生的计划费用。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示所有卡或所选卡即将发生的计划费用。"
           }
         }
       }
     },
-    "Spend Trends": {
-      "comment": "Spend trends widget preview title.",
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "اتجاهات الإنفاق"
+    "Spend Trends" : {
+      "comment" : "Spend trends widget preview title.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اتجاهات الإنفاق"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ausgabentrends"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ausgabentrends"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tendencias de gasto"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tendencias de gasto"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tendances des dépenses"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tendances des dépenses"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tendências de gastos"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tendências de gastos"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "支出趋势"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "支出趋势"
           }
         }
       }
     },
-    "Spend Trends Widget": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "أداة اتجاهات الإنفاق"
+    "Spend Trends Widget" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أداة اتجاهات الإنفاق"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Widget „Ausgabentrends“."
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Widget „Ausgabentrends“."
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Widget de tendencias de gasto"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Widget de tendencias de gasto"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Widget Tendances des dépenses"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Widget Tendances des dépenses"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Widget de tendências de gastos"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Widget de tendências de gastos"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "支出趋势小组件"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "支出趋势小组件"
           }
         }
       }
     },
-    "Start a 2-hour Excursion Mode session in Offshore.": {
-      "comment": "Description of an intent to start a 2-hour Excursion Mode session in Offshore.",
-      "isCommentAutoGenerated": true,
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ابدأ جلسة وضع الرحلة لمدة ساعتين في Offshore."
+    "Start a 2-hour Excursion Mode session in Offshore." : {
+      "comment" : "Description of an intent to start a 2-hour Excursion Mode session in Offshore.",
+      "isCommentAutoGenerated" : true,
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ابدأ جلسة وضع الرحلة لمدة ساعتين في Offshore."
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Eine 2-stündige Exkursionsmodus-Sitzung in Offshore starten."
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eine 2-stündige Exkursionsmodus-Sitzung in Offshore starten."
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Inicia una sesión de Modo excursión de 2 horas en Offshore."
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inicia una sesión de Modo excursión de 2 horas en Offshore."
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Démarrez une session de mode excursion de 2 heures dans Offshore."
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Démarrez une session de mode excursion de 2 heures dans Offshore."
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Inicie uma sessão de Modo excursão de 2 horas no Offshore."
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inicie uma sessão de Modo excursão de 2 horas no Offshore."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "在 Offshore 中开始 2 小时的远足模式会话。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 Offshore 中开始 2 小时的远足模式会话。"
           }
         }
       }
     },
-    "Start a 2-hour Excursion Mode session.": {
-      "comment": "Description of a control widget that starts an excursion mode session.",
-      "isCommentAutoGenerated": true,
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ابدأ جلسة وضع الرحلة لمدة ساعتين."
+    "Start a 2-hour Excursion Mode session." : {
+      "comment" : "Description of a control widget that starts an excursion mode session.",
+      "isCommentAutoGenerated" : true,
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ابدأ جلسة وضع الرحلة لمدة ساعتين."
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Eine 2-stündige Exkursionsmodus-Sitzung starten."
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eine 2-stündige Exkursionsmodus-Sitzung starten."
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Inicia una sesión de Modo excursión de 2 horas."
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inicia una sesión de Modo excursión de 2 horas."
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Démarrez une session de mode excursion de 2 heures."
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Démarrez une session de mode excursion de 2 heures."
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Inicie uma sessão de Modo excursão de 2 horas."
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inicie uma sessão de Modo excursão de 2 horas."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "开始 2 小时的远足模式会话。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开始 2 小时的远足模式会话。"
           }
         }
       }
     },
-    "Stop": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "قف"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Stopp"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "Stop"
+    "Stop" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "قف"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Detener"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stopp"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Arreter"
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Stop"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Parar"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Detener"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "停止"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arreter"
           }
-        }
-      }
-    },
-    "Stop Excursion Mode": {
-      "comment": "Title of the intent to stop the excursion mode.",
-      "isCommentAutoGenerated": true,
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "إيقاف وضع الرحلة"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Stoppen Sie den Exkursionsmodus"
-          }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Detener modo excursion"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parar"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Stop mode Excursion"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停止"
           }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Parar o modo de excursão"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "停止游览模式"
-          }
         }
       }
     },
-    "This is an example widget.": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "هذا هو القطعة سبيل المثال."
+    "Stop Excursion Mode" : {
+      "comment" : "Title of the intent to stop the excursion mode.",
+      "isCommentAutoGenerated" : true,
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إيقاف وضع الرحلة"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dies ist ein Beispiel-Widget."
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stoppen Sie den Exkursionsmodus"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Este es un widget de ejemplo."
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Detener modo excursion"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ceci est un widget d’exemple."
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stop mode Excursion"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Este é um widget de exemplo."
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parar o modo de excursão"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "这是一个示例小部件。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停止游览模式"
           }
         }
       }
     },
-    "today": {
-      "comment": "A label that can be used to refer to today.",
-      "isCommentAutoGenerated": true,
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "اليوم"
+    "This is an example widget." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "هذا هو القطعة سبيل المثال."
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "heute"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dies ist ein Beispiel-Widget."
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "hoy"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este es un widget de ejemplo."
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "aujourd’hui"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ceci est un widget d’exemple."
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "hoje"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este é um widget de exemplo."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "今天"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这是一个示例小部件。"
           }
         }
       }
     },
-    "Today": {
-      "comment": "A label displayed below the amount of money the user can spend today.",
-      "isCommentAutoGenerated": true,
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "اليوم"
+    "today" : {
+      "comment" : "A label that can be used to refer to today.",
+      "isCommentAutoGenerated" : true,
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اليوم"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Heute"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "heute"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Hoy"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "hoy"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aujourd’hui"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "aujourd’hui"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Hoje"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "hoje"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "今天"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今天"
           }
         }
       }
     },
-    "Top": {
-      "comment": "A label displayed under the amount of the top category within a bucket.",
-      "isCommentAutoGenerated": true,
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "الأبرز"
+    "Today" : {
+      "comment" : "A label displayed below the amount of money the user can spend today.",
+      "isCommentAutoGenerated" : true,
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اليوم"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Spitze"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Heute"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Principal"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hoy"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Premier"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aujourd’hui"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Principal"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hoje"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "最高"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今天"
           }
         }
       }
     },
-    "Top %@": {
-      "extractionState": "stale",
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "أعلى %@"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Oben %@"
+    "Top" : {
+      "comment" : "A label displayed under the amount of the top category within a bucket.",
+      "isCommentAutoGenerated" : true,
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الأبرز"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "Top %@"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spitze"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Principal %@"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Principal"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Principal %@"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premier"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Topo %@"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Principal"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "顶部 %@"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最高"
           }
         }
       }
     },
-    "Track planned vs actual income for a selected period.": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "تتبع الدخل المخطط مقابل الدخل الفعلي لفترة محددة."
+    "Track planned vs actual income for a selected period." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تتبع الدخل المخطط مقابل الدخل الفعلي لفترة محددة."
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Verfolgen Sie geplante und tatsächliche Einnahmen für einen ausgewählten Zeitraum."
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verfolgen Sie geplante und tatsächliche Einnahmen für einen ausgewählten Zeitraum."
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sigue ingresos planificados frente a reales para un período seleccionado."
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sigue ingresos planificados frente a reales para un período seleccionado."
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Suivez les revenus prévus et réels pour une période choisie."
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suivez les revenus prévus et réels pour une période choisie."
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Acompanhe a receita planejada versus a real para um período selecionado."
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Acompanhe a receita planejada versus a real para um período selecionado."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "跟踪选定期间的计划收入与实际收入。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跟踪选定期间的计划收入与实际收入。"
           }
         }
       }
     },
-    "Track spending trends and top categories for a selected period.": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "تتبع اتجاهات الإنفاق وأهم الفئات لفترة محددة."
+    "Track spending trends and top categories for a selected period." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تتبع اتجاهات الإنفاق وأهم الفئات لفترة محددة."
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Verfolgen Sie Ausgabentrends und Top-Kategorien für einen ausgewählten Zeitraum."
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verfolgen Sie Ausgabentrends und Top-Kategorien für einen ausgewählten Zeitraum."
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sigue tendencias de gasto y categorías principales para un período seleccionado."
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sigue tendencias de gasto y categorías principales para un período seleccionado."
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Suivez les tendances de dépenses et les principales catégories pour une période choisie."
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suivez les tendances de dépenses et les principales catégories pour une période choisie."
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Acompanhe as tendências de gastos e as principais categorias para um período selecionado."
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Acompanhe as tendências de gastos e as principais categorias para um período selecionado."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "跟踪选定时期内的支出趋势和热门类别。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跟踪选定时期内的支出趋势和热门类别。"
           }
         }
       }
     },
-    "Until %@": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "حتى %@"
+    "Until %@" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "حتى %@"
           }
         },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bis %@"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bis %@"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "Until %@"
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Until %@"
           }
         },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Hasta %@"
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hasta %@"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Jusqu’à %@"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jusqu’à %@"
           }
         },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Até %@"
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Até %@"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "直到 %@"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直到 %@"
           }
         }
       }
     }
   },
-  "version": "1.1"
+  "version" : "1.1"
 }
