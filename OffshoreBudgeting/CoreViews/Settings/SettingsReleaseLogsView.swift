@@ -79,7 +79,7 @@ struct SettingsReleaseLogsView: View {
     static let releaseSections: [ReleaseSection] = [
         ReleaseSection(
             version: "2.3.4",
-            build: "19",
+            build: "20",
             items: [
                 ReleaseItem(
                     systemImage: "creditcard.fill",
@@ -95,6 +95,11 @@ struct SettingsReleaseLogsView: View {
                     systemImage: "banknote.fill",
                     title: "Savings Account Refinement",
                     description: "Fixes an issue where post‑dated budgets didn’t always update the Savings Account running total.\n\nNote: If the graph or running total doesn’t update right away, edit and save a budget that includes post‑dated entries (for example, adjust an expense), then return and undo the change. This should trigger the update and reflect accurate totals."
+                ),
+                ReleaseItem(
+                    systemImage: "square.2.layers.3d",
+                    title: "Shortcut and Widget Support",
+                    description: "Offshore is now more accessible across your iOS devices with updated Tap to Pay automation, plus new Lock Screen and Control Center widget support.\n\nPreviously shared iCloud Shortcuts will remain available for now, and the app now includes more precise shortcuts for adding income by SMS or email, adding expenses by email, and Tap to Pay."
                 )
             ]
         ),

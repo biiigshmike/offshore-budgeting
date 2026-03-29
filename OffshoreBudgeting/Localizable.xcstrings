@@ -34031,6 +34031,52 @@
         }
       }
     },
+    "Offshore is now more accessible across your iOS devices with updated Tap to Pay automation, plus new Lock Screen and Control Center widget support.\n\nPreviously shared iCloud Shortcuts will remain available for now, and the app now includes more precise shortcuts for adding income by SMS or email, adding expenses by email, and Tap to Pay." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أصبح Offshore الآن أكثر سهولة عبر أجهزة iOS الخاصة بك بفضل أتمتة Tap to Pay المحدّثة، إلى جانب دعم جديد لعناصر واجهة شاشة القفل ومركز التحكم.\n\nستظل اختصارات iCloud المشتركة سابقًا متاحة في الوقت الحالي، ويتضمن التطبيق الآن اختصارات أكثر دقة لإضافة الدخل عبر الرسائل النصية أو البريد الإلكتروني، وإضافة المصروفات عبر البريد الإلكتروني، وTap to Pay."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offshore ist jetzt auf deinen iOS-Geräten noch zugänglicher, mit aktualisierter Tap-to-Pay-Automation sowie neuer Unterstützung für Widgets auf dem Sperrbildschirm und im Kontrollzentrum.\n\nBereits geteilte iCloud-Kurzbefehle bleiben vorerst verfügbar, und die App enthält jetzt präzisere Kurzbefehle zum Hinzufügen von Einnahmen per SMS oder E-Mail, zum Hinzufügen von Ausgaben per E-Mail sowie für Tap to Pay."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offshore is now more accessible across your iOS devices with updated Tap to Pay automation, plus new Lock Screen and Control Center widget support.\n\nPreviously shared iCloud Shortcuts will remain available for now, and the app now includes more precise shortcuts for adding income by SMS or email, adding expenses by email, and Tap to Pay."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offshore ahora es más accesible en todos tus dispositivos iOS con la automatización actualizada de Tap to Pay, además de nuevo soporte para widgets en la pantalla de bloqueo y el Centro de control.\n\nLos Atajos de iCloud compartidos anteriormente seguirán disponibles por ahora, y la app ahora incluye atajos más precisos para agregar ingresos por SMS o correo electrónico, agregar gastos por correo electrónico y Tap to Pay."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offshore est maintenant plus accessible sur vos appareils iOS grâce à une automatisation Tap to Pay mise à jour, ainsi qu’à la prise en charge de nouveaux widgets pour l’écran verrouillé et le Centre de contrôle.\n\nLes raccourcis iCloud déjà partagés resteront disponibles pour le moment, et l’app inclut désormais des raccourcis plus précis pour ajouter des revenus par SMS ou e-mail, ajouter des dépenses par e-mail et utiliser Tap to Pay."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Offshore agora está mais acessível em todos os seus dispositivos iOS com a automação atualizada do Tap to Pay, além de novo suporte a widgets na Tela Bloqueada e na Central de Controle.\n\nOs Atalhos do iCloud compartilhados anteriormente continuarão disponíveis por enquanto, e o app agora inclui atalhos mais precisos para adicionar receita por SMS ou e-mail, adicionar despesas por e-mail e Tap to Pay."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "借助更新后的 Tap to Pay 自动化，以及对锁定屏幕和控制中心小组件的新支持，Offshore 现在在你的各台 iOS 设备上都变得更加易于使用。\n\n此前共享的 iCloud 快捷指令暂时仍会继续可用，应用现在还提供了更精确的快捷指令，可通过短信或电子邮件添加收入、通过电子邮件添加支出，以及处理 Tap to Pay。"
+          }
+        }
+      }
+    },
     "Offshore is organized into core functions that work together instead of competing for your attention. Accounts includes Cards, Reconciliations, and a dedicated workspace Savings Account. Income is split into planned and actual inflows, while Budgets gives you the lens that compares what you expected against what really happened.\n\nEach area has one clear job so you always know where to go, where money is being spent, what income is expected, what income has landed, and what your savings direction looks like in the current period. Settings supports all of this with defaults and tools like Categories, Presets, and workspace-level behavior. Once these building blocks click, every other screen feels much more natural." : {
       "localizations" : {
         "ar" : {
@@ -43530,6 +43576,52 @@
         }
       }
     },
+    "Shortcut and Widget Support" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "دعم الاختصارات وعناصر الواجهة"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unterstützung für Kurzbefehle und Widgets"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shortcut and Widget Support"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compatibilidad con Atajos y widgets"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prise en charge des raccourcis et des widgets"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suporte a Atalhos e widgets"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "快捷指令与小组件支持"
+          }
+        }
+      }
+    },
     "Shortcuts" : {
       "localizations" : {
         "ar" : {
@@ -46886,46 +46978,6 @@
         }
       }
     },
-    "To use the current date, tap the Date field and scroll until you find Current Date. For best results, set Date Format to Medium and Time Format to None. Once Current Date looks correct, tap Return." : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "لاستخدام التاريخ الحالي، اضغط على حقل التاريخ ومرّر حتى تجد التاريخ الحالي. ولأفضل النتائج، اضبط تنسيق التاريخ على متوسط وتنسيق الوقت على بلا. عندما يبدو التاريخ الحالي صحيحًا، اضغط رجوع."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Um das aktuelle Datum zu verwenden, tippe auf das Datumsfeld und scrolle, bis du Aktuelles Datum findest. Für die besten Ergebnisse stelle Datumsformat auf Mittel und Zeitformat auf Keine. Sobald Aktuelles Datum korrekt aussieht, tippe auf Zurück."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Para usar la fecha actual, toca el campo Fecha y desplázate hasta encontrar Fecha actual. Para obtener mejores resultados, establece Formato de fecha en Medio y Formato de hora en Ninguno. Cuando Fecha actual se vea correcta, toca Retorno."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pour utiliser la date actuelle, touchez le champ Date et faites défiler jusqu’à Date actuelle. Pour de meilleurs résultats, réglez le Format de date sur Moyen et le Format de l’heure sur Aucun. Une fois que Date actuelle s’affiche correctement, touchez Retour."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Para usar a data atual, toque no campo Data e role até encontrar Data atual. Para obter os melhores resultados, defina Formato de data como Médio e Formato de hora como Nenhum. Quando Data atual estiver correta, toque em Retorno."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "若要使用当前日期，请点按“日期”字段并滚动，直到找到“当前日期”。为获得最佳效果，请将“日期格式”设为“中等”，将“时间格式”设为“无”。当“当前日期”显示正确后，点按回车。"
-          }
-        }
-      }
-    },
     "The Home dashboard acts as a starting point for daily review. Read top-level totals first, then look for any widget that suggests a shift in spending, income, or savings direction. When something needs clarification, open the matching core screen and validate the underlying entries. Returning to Home after each adjustment helps you confirm whether the correction improved the period outlook." : {
       "localizations" : {
         "ar" : {
@@ -49774,6 +49826,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "要使用 iCloud 同步，请在“设置”应用中登录 iCloud，然后重试。"
+          }
+        }
+      }
+    },
+    "To use the current date, tap the Date field and scroll until you find Current Date. For best results, set Date Format to Medium and Time Format to None. Once Current Date looks correct, tap Return." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لاستخدام التاريخ الحالي، اضغط على حقل التاريخ ومرّر حتى تجد التاريخ الحالي. ولأفضل النتائج، اضبط تنسيق التاريخ على متوسط وتنسيق الوقت على بلا. عندما يبدو التاريخ الحالي صحيحًا، اضغط رجوع."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Um das aktuelle Datum zu verwenden, tippe auf das Datumsfeld und scrolle, bis du Aktuelles Datum findest. Für die besten Ergebnisse stelle Datumsformat auf Mittel und Zeitformat auf Keine. Sobald Aktuelles Datum korrekt aussieht, tippe auf Zurück."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Para usar la fecha actual, toca el campo Fecha y desplázate hasta encontrar Fecha actual. Para obtener mejores resultados, establece Formato de fecha en Medio y Formato de hora en Ninguno. Cuando Fecha actual se vea correcta, toca Retorno."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pour utiliser la date actuelle, touchez le champ Date et faites défiler jusqu’à Date actuelle. Pour de meilleurs résultats, réglez le Format de date sur Moyen et le Format de l’heure sur Aucun. Une fois que Date actuelle s’affiche correctement, touchez Retour."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Para usar a data atual, toque no campo Data e role até encontrar Data atual. Para obter os melhores resultados, defina Formato de data como Médio e Formato de hora como Nenhum. Quando Data atual estiver correta, toque em Retorno."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "若要使用当前日期，请点按“日期”字段并滚动，直到找到“当前日期”。为获得最佳效果，请将“日期格式”设为“中等”，将“时间格式”设为“无”。当“当前日期”显示正确后，点按回车。"
           }
         }
       }
