@@ -1,4 +1,7 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 // MARK: - QuickActionsInstallView
 
@@ -14,6 +17,16 @@ struct QuickActionsInstallView: View {
 
     init(isOnboarding: Bool = false) {
         self.isOnboarding = isOnboarding
+    }
+
+    private var isPhone: Bool {
+        #if targetEnvironment(macCatalyst)
+        false
+        #elseif canImport(UIKit)
+        UIDevice.current.userInterfaceIdiom == .phone
+        #else
+        false
+        #endif
     }
 
     var body: some View {
@@ -61,7 +74,7 @@ struct QuickActionsInstallView: View {
                 .listRowBackground(Color.clear)
             }
             
-            if !isOnboarding {
+            if !isOnboarding && isPhone {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Tap to Pay is configured directly in the Shortcuts app using Offshore’s built-in Add Expense action.")
                         .font(.footnote)

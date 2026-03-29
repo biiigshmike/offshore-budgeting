@@ -1295,10 +1295,10 @@ enum GeneratedHelpContent {
         return lookup
     }()
     private static let iPhoneOnlyQuickActionsSectionIDs: Set<String> = [
-        "introduction-quick-actions-9-tap-to-pay",
-        "introduction-quick-actions-10",
-        "settings-quick-actions-9-tap-to-pay",
-        "settings-quick-actions-10"
+        "introduction-quick-actions-12-tap-to-pay",
+        "introduction-quick-actions-13-tap-to-pay",
+        "settings-quick-actions-12-tap-to-pay",
+        "settings-quick-actions-13-tap-to-pay"
     ]
     private static let introductionQuickActionsNoteSectionID: String = "introduction-quick-actions-nonphone-note"
     private static let settingsQuickActionsNoteSectionID: String = "settings-quick-actions-nonphone-note"
