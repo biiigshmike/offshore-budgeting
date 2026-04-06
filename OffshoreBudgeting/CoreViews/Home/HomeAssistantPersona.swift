@@ -214,7 +214,8 @@ struct HomeAssistantPersonaFormatter {
         personaID: HomeAssistantPersonaID,
         seedContext: HomeAssistantPersonaSeedContext? = nil,
         footerContext: HomeAssistantPersonaFooterContext? = nil,
-        echoContext: HomeAssistantPersonaEchoContext? = nil
+        echoContext: HomeAssistantPersonaEchoContext? = nil,
+        visibleProvenance: String? = nil
     ) -> HomeAnswer {
         let profile = HomeAssistantPersonaCatalog.profile(for: personaID)
         let isNoDataMessage = rawAnswer.kind == .message && rawAnswer.primaryValue == nil && rawAnswer.rows.isEmpty
@@ -241,7 +242,8 @@ struct HomeAssistantPersonaFormatter {
             footerContext: responseRules.isMarinaEnabled ? footerContext : nil,
             userEchoLine: responseRules.isMarinaEnabled
                 ? userEchoLine(from: userPrompt, seedContext: seedContext, echoContext: echoContext)
-                : nil
+                : nil,
+            visibleProvenance: visibleProvenance
         )
 
         return HomeAnswer(
@@ -514,7 +516,8 @@ struct HomeAssistantPersonaFormatter {
         factualLeadLine: String?,
         rulesFooterLine: String?,
         footerContext: HomeAssistantPersonaFooterContext?,
-        userEchoLine: String?
+        userEchoLine: String?,
+        visibleProvenance: String?
     ) -> String? {
         let expressivePersonaLine = mergedSentencePair(userEchoLine, personaLine)
         let subtitleBody: String?
@@ -522,31 +525,43 @@ struct HomeAssistantPersonaFormatter {
         switch (expressivePersonaLine, factualSubtitle) {
         case let (.some(persona), .some(facts)):
             if let factualLeadLine, factualLeadLine.isEmpty == false {
-                subtitleBody = "\(persona)\n\n\(factualLeadLine)\nSources: \(facts)"
+                subtitleBody = "\(persona)\n\n\(factualLeadLine)\n\(facts)"
             } else {
-                subtitleBody = "\(persona)\n\nSources: \(facts)"
+                subtitleBody = "\(persona)\n\n\(facts)"
             }
         case let (.some(persona), .none):
             subtitleBody = persona
         case let (.none, .some(facts)):
             if let factualLeadLine, factualLeadLine.isEmpty == false {
-                subtitleBody = "\(factualLeadLine)\nSources: \(facts)"
+                subtitleBody = "\(factualLeadLine)\n\(facts)"
             } else {
-                subtitleBody = "Sources: \(facts)"
+                subtitleBody = facts
             }
         case (.none, .none):
             subtitleBody = nil
+        }
+
+        let subtitleWithProvenance: String?
+        let trimmedProvenance = visibleProvenance?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let trimmedProvenance, trimmedProvenance.isEmpty == false {
+            if let subtitleBody, subtitleBody.isEmpty == false {
+                subtitleWithProvenance = "\(subtitleBody)\n\nBased on:\n\(trimmedProvenance)"
+            } else {
+                subtitleWithProvenance = "Based on:\n\(trimmedProvenance)"
+            }
+        } else {
+            subtitleWithProvenance = subtitleBody
         }
 
         guard
             let rulesFooter = rulesFooterText(footerContext: footerContext, rulesFooterLine: rulesFooterLine),
             rulesFooter.isEmpty == false
         else {
-            return subtitleBody
+            return subtitleWithProvenance
         }
 
-        if let subtitleBody {
-            return "\(subtitleBody)\n\n---\n\(rulesFooter)"
+        if let subtitleWithProvenance {
+            return "\(subtitleWithProvenance)\n\n---\n\(rulesFooter)"
         }
 
         return rulesFooter
@@ -653,7 +668,10 @@ struct HomeAssistantPersonaFormatter {
 
         if let seedContext {
             switch seedContext.intentKey {
-            case HomeQueryIntent.cardSpendTotal.rawValue, HomeQueryIntent.cardVariableSpendingHabits.rawValue:
+            case HomeQueryIntent.cardSpendTotal.rawValue,
+                HomeQueryIntent.cardVariableSpendingHabits.rawValue,
+                HomeQueryIntent.cardSnapshotSummary.rawValue,
+                HomeQueryIntent.nextPlannedExpense.rawValue:
                 return randomEchoLine(
                     key: "echo.intent.card.\(echoSeedKey)",
                     lines: [
@@ -673,7 +691,11 @@ struct HomeAssistantPersonaFormatter {
                         "I centered this on income results so it is actionable."
                     ]
                 )
-            case HomeQueryIntent.categorySpendShare.rawValue, HomeQueryIntent.categorySpendShareTrend.rawValue, HomeQueryIntent.categoryPotentialSavings.rawValue, HomeQueryIntent.categoryReallocationGuidance.rawValue:
+            case HomeQueryIntent.categorySpendShare.rawValue,
+                HomeQueryIntent.categorySpendShareTrend.rawValue,
+                HomeQueryIntent.categoryPotentialSavings.rawValue,
+                HomeQueryIntent.categoryReallocationGuidance.rawValue,
+                HomeQueryIntent.spendTrendsSummary.rawValue:
                 return randomEchoLine(
                     key: "echo.intent.category.\(echoSeedKey)",
                     lines: [

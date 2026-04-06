@@ -19,6 +19,30 @@ struct HelpFAQEngineTests {
         #expect(answer?.match.topicID == "home-marina")
     }
 
+    @Test func answer_marinaCapabilityQuestion_returnsMarinaTopic() {
+        let engine = HelpFAQEngine()
+
+        let answer = engine.answer(
+            prompt: "What kinds of questions should I ask Marina?",
+            topics: GeneratedHelpContent.allLeafTopics
+        )
+
+        #expect(answer != nil)
+        #expect(answer?.match.topicID == "home-marina")
+    }
+
+    @Test func answer_marinaComparisonGapQuestion_returnsMarinaTopic() {
+        let engine = HelpFAQEngine()
+
+        let answer = engine.answer(
+            prompt: "Why does Marina get confused by some comparison questions?",
+            topics: GeneratedHelpContent.allLeafTopics
+        )
+
+        #expect(answer != nil)
+        #expect(answer?.match.topicID == "home-marina")
+    }
+
     @Test func answer_sectionHeaderLanguage_resolvesBudgetOverviewTopic() {
         let engine = HelpFAQEngine()
 
@@ -237,4 +261,3 @@ struct HelpFAQEngineTests {
         )
     }
 }
-

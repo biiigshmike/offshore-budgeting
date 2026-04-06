@@ -57,8 +57,15 @@ enum MarinaResponseParser {
             return MarinaSubtitleParts(personaLine: nil, sourcesBlock: nil)
         }
 
-        let marker = "\n\nSources: "
-        guard let range = subtitle.range(of: marker) else {
+        let provenanceMarker = "\n\nBased on:\n"
+        if let range = subtitle.range(of: provenanceMarker) {
+            let persona = String(subtitle[..<range.lowerBound])
+            let facts = String(subtitle[range.upperBound...])
+            return MarinaSubtitleParts(personaLine: persona, sourcesBlock: facts)
+        }
+
+        let legacyMarker = "\n\nSources: "
+        guard let range = subtitle.range(of: legacyMarker) else {
             return MarinaSubtitleParts(personaLine: subtitle, sourcesBlock: nil)
         }
 
@@ -69,7 +76,9 @@ enum MarinaResponseParser {
 
     static func sourcesMarkerCount(in subtitle: String?) -> Int {
         guard let subtitle else { return 0 }
-        return subtitle.components(separatedBy: "Sources:").count - 1
+        let visibleProvenanceCount = subtitle.components(separatedBy: "Based on:").count - 1
+        let legacySourcesCount = subtitle.components(separatedBy: "Sources:").count - 1
+        return visibleProvenanceCount + legacySourcesCount
     }
 }
 

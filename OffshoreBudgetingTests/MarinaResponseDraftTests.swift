@@ -36,11 +36,11 @@ struct MarinaResponseDraftTests {
         let parts = MarinaResponseParser.splitSubtitle(styled.subtitle)
 
         #expect(parts.personaLine?.isEmpty == false)
-        #expect(parts.sourcesBlock?.contains("February 2026") == true)
-        #expect(MarinaResponseAssertions.containsSourcesBlock(styled))
+        #expect(parts.personaLine?.contains("February 2026") == true)
+        #expect(MarinaResponseAssertions.containsSourcesBlock(styled) == false)
     }
 
-    @Test func styledAnswer_noDataMessage_usesNoDataTitleAndSources() throws {
+    @Test func styledAnswer_noDataMessage_usesNoDataTitleAndNoVisibleProvenance() throws {
         let formatter = HomeAssistantPersonaFormatter(variantIndexPicker: { _, _ in 0 })
         let raw = MarinaResponseFixtures.noDataRawAnswer()
 
@@ -51,7 +51,8 @@ struct MarinaResponseDraftTests {
         )
 
         #expect(styled.title == "No activity in this range yet.")
-        #expect(MarinaResponseAssertions.containsSourcesBlock(styled))
+        #expect(styled.subtitle?.contains("Try a different date range") == true)
+        #expect(MarinaResponseAssertions.containsSourcesBlock(styled) == false)
     }
 
     @Test func styledAnswer_preservesIdentityPayloadAndRows() throws {
@@ -143,7 +144,7 @@ struct MarinaResponseDraftTests {
 
         let styled = formatter.styledAnswer(from: raw, userPrompt: "spend this month", personaID: .marina)
 
-        #expect(MarinaResponseAssertions.hasSingleSourcesMarker(styled))
+        #expect(MarinaResponseAssertions.hasSingleSourcesMarker(styled) == false)
     }
 
     // MARK: - Marina Footer
@@ -407,7 +408,7 @@ struct MarinaResponseDraftTests {
         #expect(styled.subtitle?.contains("income from Salary") == true)
     }
 
-    @Test func styledAnswer_whenMarinaRulesEnabled_includesFactsLeadLineBeforeSources() throws {
+    @Test func styledAnswer_whenMarinaRulesEnabled_includesFactsLeadLineBeforeFactualSummary() throws {
         let formatter = makeMarinaFormatter()
         let raw = MarinaResponseFixtures.metricRawAnswer()
 
@@ -417,7 +418,34 @@ struct MarinaResponseDraftTests {
             personaID: .marina
         )
 
-        #expect(styled.subtitle?.contains("Here is the direct read:\nSources:") == true)
+        #expect(styled.subtitle?.contains("Here is the direct read:\nFebruary 2026") == true)
+    }
+
+    @Test func styledAnswer_whenVisibleProvenanceProvided_rendersBasedOnBlock() throws {
+        let formatter = makeMarinaFormatter()
+        let raw = HomeAnswer(
+            queryID: UUID(),
+            kind: .comparison,
+            title: "Period Comparison",
+            subtitle: "Up $25.00",
+            primaryValue: "$125.00",
+            rows: [
+                HomeAnswerRow(title: "February 2026", value: "$125.00"),
+                HomeAnswerRow(title: "March 2026", value: "$100.00")
+            ]
+        )
+
+        let styled = formatter.styledAnswer(
+            from: raw,
+            userPrompt: "compare february to march",
+            personaID: .marina,
+            visibleProvenance: "Compared: February 2026 vs March 2026\nData used: Planned expenses, Variable expenses"
+        )
+        let parts = MarinaResponseParser.splitSubtitle(styled.subtitle)
+
+        #expect(parts.sourcesBlock?.contains("Compared: February 2026 vs March 2026") == true)
+        #expect(parts.sourcesBlock?.contains("Data used: Planned expenses, Variable expenses") == true)
+        #expect(parts.sourcesBlock?.contains("Up $25.00") == false)
     }
 
     @Test func styledAnswer_whenMarinaRulesEnabled_repeatedMonthPromptVariesEchoLine() throws {

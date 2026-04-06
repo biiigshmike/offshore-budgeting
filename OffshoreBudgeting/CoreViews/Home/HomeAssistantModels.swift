@@ -37,6 +37,9 @@ enum HomeQueryIntent: String, CaseIterable, Codable, Equatable {
     case spendThisMonth
     case topCategoriesThisMonth
     case compareThisMonthToPreviousMonth
+    case compareCategoryThisMonthToPreviousMonth
+    case compareCardThisMonthToPreviousMonth
+    case compareIncomeSourceThisMonthToPreviousMonth
     case largestRecentTransactions
     case cardSpendTotal
     case cardVariableSpendingHabits
@@ -53,6 +56,11 @@ enum HomeQueryIntent: String, CaseIterable, Codable, Equatable {
     case presetCategorySpend
     case categoryPotentialSavings
     case categoryReallocationGuidance
+    case safeSpendToday
+    case forecastSavings
+    case nextPlannedExpense
+    case spendTrendsSummary
+    case cardSnapshotSummary
 }
 
 enum HomeQueryMetric: String, Codable, Equatable {
@@ -60,6 +68,9 @@ enum HomeQueryMetric: String, Codable, Equatable {
     case spendTotal
     case topCategories
     case monthComparison
+    case categoryMonthComparison
+    case cardMonthComparison
+    case incomeSourceMonthComparison
     case largestTransactions
     case cardSpendTotal
     case cardVariableSpendingHabits
@@ -76,6 +87,11 @@ enum HomeQueryMetric: String, Codable, Equatable {
     case presetCategorySpend
     case categoryPotentialSavings
     case categoryReallocationGuidance
+    case safeSpendToday
+    case forecastSavings
+    case nextPlannedExpense
+    case spendTrendsSummary
+    case cardSnapshotSummary
 }
 
 enum HomeQueryConfidenceBand: String, Codable, Equatable {
@@ -87,6 +103,7 @@ enum HomeQueryConfidenceBand: String, Codable, Equatable {
 struct HomeQueryPlan: Equatable {
     let metric: HomeQueryMetric
     let dateRange: HomeQueryDateRange?
+    let comparisonDateRange: HomeQueryDateRange?
     let resultLimit: Int?
     let confidenceBand: HomeQueryConfidenceBand
     let targetName: String?
@@ -95,6 +112,7 @@ struct HomeQueryPlan: Equatable {
     init(
         metric: HomeQueryMetric,
         dateRange: HomeQueryDateRange?,
+        comparisonDateRange: HomeQueryDateRange? = nil,
         resultLimit: Int?,
         confidenceBand: HomeQueryConfidenceBand,
         targetName: String? = nil,
@@ -102,6 +120,7 @@ struct HomeQueryPlan: Equatable {
     ) {
         self.metric = metric
         self.dateRange = dateRange
+        self.comparisonDateRange = comparisonDateRange
         self.resultLimit = resultLimit
         self.confidenceBand = confidenceBand
         self.targetName = targetName
@@ -112,6 +131,7 @@ struct HomeQueryPlan: Equatable {
         HomeQuery(
             intent: metric.intent,
             dateRange: dateRange,
+            comparisonDateRange: comparisonDateRange,
             resultLimit: resultLimit,
             targetName: targetName,
             periodUnit: periodUnit
@@ -130,6 +150,12 @@ extension HomeQueryMetric {
             return .topCategoriesThisMonth
         case .monthComparison:
             return .compareThisMonthToPreviousMonth
+        case .categoryMonthComparison:
+            return .compareCategoryThisMonthToPreviousMonth
+        case .cardMonthComparison:
+            return .compareCardThisMonthToPreviousMonth
+        case .incomeSourceMonthComparison:
+            return .compareIncomeSourceThisMonthToPreviousMonth
         case .largestTransactions:
             return .largestRecentTransactions
         case .cardSpendTotal:
@@ -162,6 +188,16 @@ extension HomeQueryMetric {
             return .categoryPotentialSavings
         case .categoryReallocationGuidance:
             return .categoryReallocationGuidance
+        case .safeSpendToday:
+            return .safeSpendToday
+        case .forecastSavings:
+            return .forecastSavings
+        case .nextPlannedExpense:
+            return .nextPlannedExpense
+        case .spendTrendsSummary:
+            return .spendTrendsSummary
+        case .cardSnapshotSummary:
+            return .cardSnapshotSummary
         }
     }
 }
@@ -177,6 +213,12 @@ extension HomeQueryIntent {
             return .topCategories
         case .compareThisMonthToPreviousMonth:
             return .monthComparison
+        case .compareCategoryThisMonthToPreviousMonth:
+            return .categoryMonthComparison
+        case .compareCardThisMonthToPreviousMonth:
+            return .cardMonthComparison
+        case .compareIncomeSourceThisMonthToPreviousMonth:
+            return .incomeSourceMonthComparison
         case .largestRecentTransactions:
             return .largestTransactions
         case .cardSpendTotal:
@@ -209,6 +251,16 @@ extension HomeQueryIntent {
             return .categoryPotentialSavings
         case .categoryReallocationGuidance:
             return .categoryReallocationGuidance
+        case .safeSpendToday:
+            return .safeSpendToday
+        case .forecastSavings:
+            return .forecastSavings
+        case .nextPlannedExpense:
+            return .nextPlannedExpense
+        case .spendTrendsSummary:
+            return .spendTrendsSummary
+        case .cardSnapshotSummary:
+            return .cardSnapshotSummary
         }
     }
 }
@@ -229,6 +281,7 @@ struct HomeQuery: Identifiable, Codable, Equatable {
     let id: UUID
     let intent: HomeQueryIntent
     let dateRange: HomeQueryDateRange?
+    let comparisonDateRange: HomeQueryDateRange?
     let resultLimit: Int
     let targetName: String?
     let periodUnit: HomeQueryPeriodUnit?
@@ -237,6 +290,7 @@ struct HomeQuery: Identifiable, Codable, Equatable {
         id: UUID = UUID(),
         intent: HomeQueryIntent,
         dateRange: HomeQueryDateRange? = nil,
+        comparisonDateRange: HomeQueryDateRange? = nil,
         resultLimit: Int? = nil,
         targetName: String? = nil,
         periodUnit: HomeQueryPeriodUnit? = nil
@@ -244,6 +298,7 @@ struct HomeQuery: Identifiable, Codable, Equatable {
         self.id = id
         self.intent = intent
         self.dateRange = dateRange
+        self.comparisonDateRange = comparisonDateRange
         self.resultLimit = HomeQuery.sanitizedResultLimit(intent: intent, requestedLimit: resultLimit)
         self.targetName = targetName
         self.periodUnit = periodUnit
@@ -268,7 +323,7 @@ struct HomeQuery: Identifiable, Codable, Equatable {
             baseline = 1
         case .categoryPotentialSavings, .categoryReallocationGuidance:
             baseline = 3
-        case .spendThisMonth, .compareThisMonthToPreviousMonth, .cardSpendTotal, .incomeAverageActual, .savingsStatus, .incomeSourceShare, .categorySpendShare:
+        case .spendThisMonth, .compareThisMonthToPreviousMonth, .compareCategoryThisMonthToPreviousMonth, .compareCardThisMonthToPreviousMonth, .compareIncomeSourceThisMonthToPreviousMonth, .cardSpendTotal, .incomeAverageActual, .savingsStatus, .incomeSourceShare, .categorySpendShare, .safeSpendToday, .forecastSavings, .nextPlannedExpense, .spendTrendsSummary, .cardSnapshotSummary:
             baseline = 1
         }
 

@@ -48,6 +48,12 @@ struct HomeAssistantTextParserTests {
         #expect(query?.intent == .compareThisMonthToPreviousMonth)
     }
 
+    @Test func parse_comparePrompt_withThisMonthToLastMonthPhrase_keepsExistingIntent() throws {
+        let query = makeParser().parse("Compare this month to last month")
+
+        #expect(query?.intent == .compareThisMonthToPreviousMonth)
+    }
+
     @Test func parse_largestTransactionsPrompt_withPurchasesKeyword_mapsToLargestIntent() throws {
         let query = makeParser().parse("What are my biggest purchases this month?")
 
@@ -109,6 +115,36 @@ struct HomeAssistantTextParserTests {
         let query = makeParser().parse("How am I doing this month with my savings?")
 
         #expect(query?.intent == .savingsStatus)
+    }
+
+    @Test func parse_safeSpendTodayPrompt_mapsToSafeSpendIntent() throws {
+        let query = makeParser().parse("What is my safe spend today?")
+
+        #expect(query?.intent == .safeSpendToday)
+    }
+
+    @Test func parse_forecastSavingsPrompt_mapsToForecastSavingsIntent() throws {
+        let query = makeParser().parse("What are my projected savings for April?")
+
+        #expect(query?.intent == .forecastSavings)
+    }
+
+    @Test func parse_nextPlannedExpensePrompt_mapsToNextPlannedExpenseIntent() throws {
+        let query = makeParser().parse("What is my next planned expense?")
+
+        #expect(query?.intent == .nextPlannedExpense)
+    }
+
+    @Test func parse_spendTrendsPrompt_mapsToSpendTrendsIntent() throws {
+        let query = makeParser().parse("Show my spending trend this month")
+
+        #expect(query?.intent == .spendTrendsSummary)
+    }
+
+    @Test func parse_cardSnapshotPrompt_mapsToCardSnapshotIntent() throws {
+        let query = makeParser().parse("How is my Apple Card doing this month?")
+
+        #expect(query?.intent == .cardSnapshotSummary)
     }
 
     @Test func parse_savingsAveragePrompt_mapsToSavingsAverageIntent() throws {

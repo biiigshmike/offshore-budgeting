@@ -20,6 +20,7 @@ typealias HomeAssistantClarificationPlan = HomeAssistantClarificationDecision
 
 enum HomeAssistantClarificationReason: String, CaseIterable, Hashable {
     case missingDate
+    case missingComparisonDate
     case missingCategoryTarget
     case missingCardTarget
     case missingIncomeSourceTarget
@@ -30,6 +31,8 @@ enum HomeAssistantClarificationReason: String, CaseIterable, Hashable {
         switch self {
         case .missingDate:
             return "Choose a date window so I can scope the query."
+        case .missingComparisonDate:
+            return "I found one comparison period, but I still need the second one."
         case .missingCategoryTarget:
             return "Choose a category, or run it across all categories."
         case .missingCardTarget:
@@ -80,6 +83,7 @@ struct HomeAssistantClarificationResolver {
             subtitle: subtitle,
             suggestions: suggestions,
             shouldRunBestEffort: plan.confidenceBand == .medium
+                && reasons.contains(.missingComparisonDate) == false
         )
     }
 
@@ -93,6 +97,12 @@ struct HomeAssistantClarificationResolver {
 
         if plan.confidenceBand == .low {
             reasons.append(.lowConfidenceLanguage)
+        }
+
+        if plan.comparisonDateRange == nil
+            && appearsToRequestExplicitComparisonDates(in: normalizedPrompt)
+        {
+            reasons.append(.missingComparisonDate)
         }
 
         if plan.dateRange == nil
@@ -171,6 +181,27 @@ struct HomeAssistantClarificationResolver {
                 HomeAssistantSuggestion(
                     title: "Use last month",
                     query: queryFromPlan(plan, overridingDateRange: previousMonthRange(from: now))
+                )
+            )
+        }
+
+        if reasons.contains(.missingComparisonDate) {
+            suggestions.append(
+                HomeAssistantSuggestion(
+                    title: "Compare this month vs last month",
+                    query: HomeQuery(
+                        intent: plan.metric.intent,
+                        dateRange: monthRange(containing: now),
+                        resultLimit: plan.resultLimit,
+                        targetName: plan.targetName,
+                        periodUnit: plan.periodUnit
+                    )
+                )
+            )
+            suggestions.append(
+                HomeAssistantSuggestion(
+                    title: "Use this month",
+                    query: queryFromPlan(plan, overridingDateRange: monthRange(containing: now))
                 )
             )
         }
@@ -330,6 +361,7 @@ struct HomeAssistantClarificationResolver {
         HomeQuery(
             intent: plan.metric.intent,
             dateRange: overridingDateRange ?? plan.dateRange,
+            comparisonDateRange: plan.comparisonDateRange,
             resultLimit: plan.resultLimit,
             targetName: overridingTargetName ?? plan.targetName,
             periodUnit: plan.periodUnit
@@ -350,7 +382,7 @@ struct HomeAssistantClarificationResolver {
             return false
         case .savingsAverageRecentPeriods, .incomeSourceShareTrend, .categorySpendShareTrend:
             return false
-        case .overview, .spendTotal, .topCategories, .monthComparison, .largestTransactions, .cardSpendTotal, .cardVariableSpendingHabits, .incomeAverageActual, .savingsStatus, .incomeSourceShare, .categorySpendShare, .presetDueSoon, .categoryPotentialSavings, .categoryReallocationGuidance:
+        case .overview, .spendTotal, .topCategories, .monthComparison, .categoryMonthComparison, .cardMonthComparison, .incomeSourceMonthComparison, .largestTransactions, .cardSpendTotal, .cardVariableSpendingHabits, .incomeAverageActual, .savingsStatus, .incomeSourceShare, .categorySpendShare, .presetDueSoon, .categoryPotentialSavings, .categoryReallocationGuidance, .safeSpendToday, .forecastSavings, .nextPlannedExpense, .spendTrendsSummary, .cardSnapshotSummary:
             return true
         }
     }
@@ -373,6 +405,39 @@ struct HomeAssistantClarificationResolver {
         return normalizedPrompt.range(of: "\\b\\d{4}-\\d{1,2}-\\d{1,2}\\b", options: .regularExpression) != nil
     }
 
+    private func appearsToRequestExplicitComparisonDates(in normalizedPrompt: String) -> Bool {
+        let explicitDateTokenPattern = "\\b(jan|january|feb|february|mar|march|apr|april|may|jun|june|jul|july|aug|august|sep|sept|september|oct|october|nov|november|dec|december|q[1-4]|\\d{4}-\\d{1,2}-\\d{1,2}|\\d{4})\\b"
+        let hasExplicitDateToken = normalizedPrompt.range(
+            of: explicitDateTokenPattern,
+            options: .regularExpression
+        ) != nil
+        let explicitDateTokenCount = regexMatchCount(
+            pattern: explicitDateTokenPattern,
+            in: normalizedPrompt
+        )
+        let hasComparisonVerb = normalizedPrompt.contains("compare")
+        let hasComparisonBridge = normalizedPrompt.range(
+            of: "\\b(from .+ to|between .+ and|vs|versus)\\b",
+            options: .regularExpression
+        ) != nil
+        let hasToBridge = hasComparisonVerb
+            && normalizedPrompt.contains(" to ")
+            && explicitDateTokenCount >= 2
+        return hasExplicitDateToken && (hasComparisonBridge || hasToBridge)
+    }
+
+    private func regexMatchCount(
+        pattern: String,
+        in text: String
+    ) -> Int {
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else {
+            return 0
+        }
+
+        let range = NSRange(text.startIndex..., in: text)
+        return regex.numberOfMatches(in: text, options: [], range: range)
+    }
+
     private func isBroadOverviewPrompt(_ normalizedPrompt: String) -> Bool {
         let broadOverviewPhrases = [
             "how am i doing",
@@ -390,7 +455,7 @@ struct HomeAssistantClarificationResolver {
 
     private func requiresCategoryTarget(_ metric: HomeQueryMetric) -> Bool {
         switch metric {
-        case .categorySpendShare, .categorySpendShareTrend, .categoryPotentialSavings, .categoryReallocationGuidance, .presetCategorySpend:
+        case .categorySpendShare, .categorySpendShareTrend, .categoryPotentialSavings, .categoryReallocationGuidance, .presetCategorySpend, .categoryMonthComparison:
             return true
         default:
             return false
@@ -399,7 +464,7 @@ struct HomeAssistantClarificationResolver {
 
     private func requiresCardTarget(_ metric: HomeQueryMetric) -> Bool {
         switch metric {
-        case .cardSpendTotal, .cardVariableSpendingHabits:
+        case .cardSpendTotal, .cardVariableSpendingHabits, .cardMonthComparison:
             return true
         default:
             return false
@@ -408,7 +473,7 @@ struct HomeAssistantClarificationResolver {
 
     private func requiresIncomeTarget(_ metric: HomeQueryMetric) -> Bool {
         switch metric {
-        case .incomeSourceShare, .incomeSourceShareTrend:
+        case .incomeSourceShare, .incomeSourceShareTrend, .incomeSourceMonthComparison:
             return true
         default:
             return false

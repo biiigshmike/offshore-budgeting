@@ -51,7 +51,7 @@ struct HomeAssistantPanelView: View {
     
     private struct AssistantSubtitlePresentation {
         let narrative: String?
-        let sources: String?
+        let provenance: String?
     }
     
     private enum EmptySuggestionGroup: String, CaseIterable, Identifiable {
@@ -169,6 +169,13 @@ struct HomeAssistantPanelView: View {
     private let entityMatcher = HomeAssistantEntityMatcher()
     private let aliasMatcher = HomeAssistantAliasMatcher()
     private let mutationService = HomeAssistantMutationService()
+    private var intentBuilder: HomeAssistantIntentBuilder {
+        HomeAssistantIntentBuilder(
+            categoryNames: categories.map(\.name),
+            cardNames: cards.map(\.name),
+            incomeSourceNames: Array(Set(incomes.map(\.source)))
+        )
+    }
     
     private var personaFormatter: HomeAssistantPersonaFormatter {
         HomeAssistantPersonaFormatter(
@@ -815,10 +822,10 @@ struct HomeAssistantPanelView: View {
                     }
                 }
                 
-                if let sources = subtitlePresentation.sources {
+                if let provenance = subtitlePresentation.provenance {
                     Divider()
                         .padding(.top, 2)
-                    Text("Sources: \(sources)")
+                    Text(provenance)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -840,7 +847,7 @@ struct HomeAssistantPanelView: View {
     
     private func assistantSubtitlePresentation(for subtitle: String?) -> AssistantSubtitlePresentation {
         guard let subtitle else {
-            return AssistantSubtitlePresentation(narrative: nil, sources: nil)
+            return AssistantSubtitlePresentation(narrative: nil, provenance: nil)
         }
         
         let bodyWithoutTechnicalFooter = subtitle
@@ -849,24 +856,36 @@ struct HomeAssistantPanelView: View {
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         
         guard bodyWithoutTechnicalFooter.isEmpty == false else {
-            return AssistantSubtitlePresentation(narrative: nil, sources: nil)
+            return AssistantSubtitlePresentation(narrative: nil, provenance: nil)
         }
-        
-        guard let sourcesRange = bodyWithoutTechnicalFooter.range(of: "Sources:", options: .backwards) else {
+
+        if let provenanceRange = bodyWithoutTechnicalFooter.range(of: "\n\nBased on:\n", options: .backwards) {
+            let narrative = String(bodyWithoutTechnicalFooter[..<provenanceRange.lowerBound])
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let provenance = String(bodyWithoutTechnicalFooter[provenanceRange.upperBound...])
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+
             return AssistantSubtitlePresentation(
-                narrative: bodyWithoutTechnicalFooter,
-                sources: nil
+                narrative: narrative.isEmpty ? nil : narrative,
+                provenance: provenance.isEmpty ? nil : provenance
             )
         }
-        
-        let narrative = String(bodyWithoutTechnicalFooter[..<sourcesRange.lowerBound])
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        let sources = String(bodyWithoutTechnicalFooter[sourcesRange.upperBound...])
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        
+
+        if let legacySourcesRange = bodyWithoutTechnicalFooter.range(of: "Sources:", options: .backwards) {
+            let narrative = String(bodyWithoutTechnicalFooter[..<legacySourcesRange.lowerBound])
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let provenance = String(bodyWithoutTechnicalFooter[legacySourcesRange.upperBound...])
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+
+            return AssistantSubtitlePresentation(
+                narrative: narrative.isEmpty ? nil : narrative,
+                provenance: provenance.isEmpty ? nil : provenance
+            )
+        }
+
         return AssistantSubtitlePresentation(
-            narrative: narrative.isEmpty ? nil : narrative,
-            sources: sources.isEmpty ? nil : sources
+            narrative: bodyWithoutTechnicalFooter,
+            provenance: nil
         )
     }
     
@@ -894,14 +913,16 @@ struct HomeAssistantPanelView: View {
             query: query,
             userPrompt: userPrompt
         )
+        let personaUserPrompt = (confidenceBand == .high || rawAnswer.kind != .comparison) ? userPrompt : nil
         
         let answer = personaFormatter.styledAnswer(
             from: titledAnswer,
-            userPrompt: userPrompt,
+            userPrompt: personaUserPrompt,
             personaID: selectedPersonaID,
             seedContext: personaSeedContext(for: query),
             footerContext: personaFooterContext(for: [query]),
-            echoContext: personaEchoContext(for: query)
+            echoContext: personaEchoContext(for: query),
+            visibleProvenance: visibleProvenance(for: query)
         )
         
         updateSessionContext(after: query)
@@ -2922,7 +2943,10 @@ struct HomeAssistantPanelView: View {
         for prompt: String
     ) -> (plan: HomeQueryPlan, source: HomeAssistantPlanResolutionSource)? {
         if let plan = parser.parsePlan(prompt, defaultPeriodUnit: defaultQueryPeriodUnit) {
-            return (enrichPlanWithEntities(plan, rawPrompt: prompt), .parser)
+            let fallbackPlan = enrichPlanWithEntities(plan, rawPrompt: prompt)
+            let signals = parsedSignals(for: prompt, fallbackPlan: fallbackPlan)
+            let resolvedPlan = intentBuilder.buildPlan(from: signals, fallbackPlan: fallbackPlan)
+            return (resolvedPlan, .parser)
         }
         
         if let contextualPlan = contextualPlan(for: prompt) {
@@ -2952,6 +2976,33 @@ struct HomeAssistantPanelView: View {
     
     private func planExplanationAnswer(for prompt: String) -> HomeAnswer {
         let normalized = normalizedPrompt(prompt)
+        let comparisonDetected = detectComparison(prompt)
+        let explicitComparisonRequested = appearsToRequestExplicitComparisonDates(in: normalized)
+        let signalTarget = extractedSignalTarget(for: prompt)
+        let signalTargetSource = extractedSignalTargetSource(for: prompt)
+        let signalScope: String = {
+            guard let signalTarget else { return "global" }
+            switch signalTargetSource {
+            case .matchedEntity?:
+                if entityMatcher.bestCategoryMatch(in: prompt, categories: categories)?.caseInsensitiveCompare(signalTarget) == .orderedSame
+                    || aliasTarget(in: prompt, entityType: .category)?.caseInsensitiveCompare(signalTarget) == .orderedSame {
+                    return "category"
+                }
+                if entityMatcher.bestCardMatch(in: prompt, cards: cards)?.caseInsensitiveCompare(signalTarget) == .orderedSame
+                    || aliasTarget(in: prompt, entityType: .card)?.caseInsensitiveCompare(signalTarget) == .orderedSame {
+                    return "card"
+                }
+                if entityMatcher.bestIncomeSourceMatch(in: prompt, incomes: incomes)?.caseInsensitiveCompare(signalTarget) == .orderedSame
+                    || aliasTarget(in: prompt, entityType: .incomeSource)?.caseInsensitiveCompare(signalTarget) == .orderedSame {
+                    return "incomeSource"
+                }
+                return "matchedEntity"
+            case .inferredComparisonText?:
+                return "unresolved"
+            case nil:
+                return "global"
+            }
+        }()
         let aliasCard = aliasTarget(in: prompt, entityType: .card)
         let aliasCategory = aliasTarget(in: prompt, entityType: .category)
         let aliasIncome = aliasTarget(in: prompt, entityType: .incomeSource)
@@ -2998,6 +3049,12 @@ struct HomeAssistantPanelView: View {
                 HomeAnswerRow(title: "Confidence", value: plan.confidenceBand.rawValue),
                 HomeAnswerRow(title: "Target", value: plan.targetName ?? "None"),
                 HomeAnswerRow(title: "Date Range", value: debugDateRangeLabel(plan.dateRange)),
+                HomeAnswerRow(title: "Comparison Date Range", value: debugDateRangeLabel(plan.comparisonDateRange)),
+                HomeAnswerRow(title: "Comparison Detected", value: comparisonDetected ? "Yes" : "No"),
+                HomeAnswerRow(title: "Explicit Comparison Dates", value: explicitComparisonRequested ? "Yes" : "No"),
+                HomeAnswerRow(title: "Signal Target", value: signalTarget ?? "None"),
+                HomeAnswerRow(title: "Signal Target Source", value: signalTargetSource.map(debugSignalTargetSource) ?? "None"),
+                HomeAnswerRow(title: "Resolved Comparison Scope", value: signalScope),
                 HomeAnswerRow(title: "Limit", value: plan.resultLimit.map(String.init) ?? "Default"),
                 HomeAnswerRow(title: "Period Unit", value: plan.periodUnit?.rawValue ?? defaultQueryPeriodUnit.rawValue),
                 HomeAnswerRow(title: "Matched Card", value: matchedCard ?? "None"),
@@ -3019,6 +3076,15 @@ struct HomeAssistantPanelView: View {
     private func debugDateRangeLabel(_ range: HomeQueryDateRange?) -> String {
         guard let range else { return "None" }
         return "\(AppDateFormat.shortDate(range.startDate)) - \(AppDateFormat.shortDate(range.endDate))"
+    }
+
+    private func debugSignalTargetSource(_ source: HomeAssistantSignalTargetSource) -> String {
+        switch source {
+        case .matchedEntity:
+            return "matchedEntity"
+        case .inferredComparisonText:
+            return "inferredComparisonText"
+        }
     }
     
     private func aliasTarget(
@@ -3302,6 +3368,7 @@ struct HomeAssistantPanelView: View {
         )
         
         let shouldRunBestEffort = plan.confidenceBand == .medium
+            && reasons.contains(.missingComparisonDate) == false
         
         return HomeAssistantClarificationPlan(
             reasons: reasons,
@@ -3339,6 +3406,12 @@ struct HomeAssistantPanelView: View {
         
         if plan.confidenceBand == .low {
             reasons.append(.lowConfidenceLanguage)
+        }
+
+        if plan.comparisonDateRange == nil
+            && appearsToRequestExplicitComparisonDates(in: normalizedPrompt)
+        {
+            reasons.append(.missingComparisonDate)
         }
         
         if plan.dateRange == nil
@@ -3413,6 +3486,27 @@ struct HomeAssistantPanelView: View {
                 HomeAssistantSuggestion(
                     title: "Use last month",
                     query: queryFromPlan(plan, overridingDateRange: previousMonthRange(from: now))
+                )
+            )
+        }
+
+        if reasons.contains(.missingComparisonDate) {
+            suggestions.append(
+                HomeAssistantSuggestion(
+                    title: "Compare this month vs last month",
+                    query: HomeQuery(
+                        intent: plan.metric.intent,
+                        dateRange: monthRange(containing: now),
+                        resultLimit: plan.resultLimit,
+                        targetName: plan.targetName,
+                        periodUnit: plan.periodUnit
+                    )
+                )
+            )
+            suggestions.append(
+                HomeAssistantSuggestion(
+                    title: "Use this month",
+                    query: queryFromPlan(plan, overridingDateRange: monthRange(containing: now))
                 )
             )
         }
@@ -3562,6 +3656,7 @@ struct HomeAssistantPanelView: View {
         HomeQuery(
             intent: plan.metric.intent,
             dateRange: overridingDateRange ?? plan.dateRange,
+            comparisonDateRange: plan.comparisonDateRange,
             resultLimit: plan.resultLimit,
             targetName: overridingTargetName ?? plan.targetName,
             periodUnit: plan.periodUnit
@@ -3582,7 +3677,7 @@ struct HomeAssistantPanelView: View {
             return false
         case .savingsAverageRecentPeriods, .incomeSourceShareTrend, .categorySpendShareTrend:
             return false
-        case .overview, .spendTotal, .topCategories, .monthComparison, .largestTransactions, .cardSpendTotal, .cardVariableSpendingHabits, .incomeAverageActual, .savingsStatus, .incomeSourceShare, .categorySpendShare, .presetDueSoon, .categoryPotentialSavings, .categoryReallocationGuidance:
+        case .overview, .spendTotal, .topCategories, .monthComparison, .categoryMonthComparison, .cardMonthComparison, .incomeSourceMonthComparison, .largestTransactions, .cardSpendTotal, .cardVariableSpendingHabits, .incomeAverageActual, .savingsStatus, .incomeSourceShare, .categorySpendShare, .presetDueSoon, .categoryPotentialSavings, .categoryReallocationGuidance, .safeSpendToday, .forecastSavings, .nextPlannedExpense, .spendTrendsSummary, .cardSnapshotSummary:
             return true
         }
     }
@@ -3622,7 +3717,7 @@ struct HomeAssistantPanelView: View {
     
     private func requiresCategoryTarget(_ metric: HomeQueryMetric) -> Bool {
         switch metric {
-        case .categorySpendShare, .categorySpendShareTrend, .categoryPotentialSavings, .categoryReallocationGuidance, .presetCategorySpend:
+        case .categorySpendShare, .categorySpendShareTrend, .categoryPotentialSavings, .categoryReallocationGuidance, .presetCategorySpend, .categoryMonthComparison:
             return true
         default:
             return false
@@ -3631,7 +3726,7 @@ struct HomeAssistantPanelView: View {
     
     private func requiresCardTarget(_ metric: HomeQueryMetric) -> Bool {
         switch metric {
-        case .cardSpendTotal, .cardVariableSpendingHabits:
+        case .cardSpendTotal, .cardVariableSpendingHabits, .cardMonthComparison:
             return true
         default:
             return false
@@ -3640,7 +3735,7 @@ struct HomeAssistantPanelView: View {
     
     private func requiresIncomeTarget(_ metric: HomeQueryMetric) -> Bool {
         switch metric {
-        case .incomeSourceShare, .incomeSourceShareTrend:
+        case .incomeSourceShare, .incomeSourceShareTrend, .incomeSourceMonthComparison:
             return true
         default:
             return false
@@ -3744,7 +3839,7 @@ struct HomeAssistantPanelView: View {
             .trimmingCharacters(in: .whitespacesAndNewlines)
         
         switch plan.metric {
-        case .cardSpendTotal, .cardVariableSpendingHabits:
+        case .cardSpendTotal, .cardVariableSpendingHabits, .cardMonthComparison, .nextPlannedExpense, .spendTrendsSummary, .cardSnapshotSummary:
             let isAllCards = normalized.contains("all cards")
             let card = isAllCards
             ? nil
@@ -3755,13 +3850,14 @@ struct HomeAssistantPanelView: View {
             return HomeQueryPlan(
                 metric: plan.metric,
                 dateRange: plan.dateRange,
+                comparisonDateRange: plan.comparisonDateRange,
                 resultLimit: plan.resultLimit,
                 confidenceBand: card == nil ? plan.confidenceBand : .high,
                 targetName: card,
                 periodUnit: plan.periodUnit
             )
             
-        case .incomeAverageActual, .incomeSourceShare, .incomeSourceShareTrend:
+        case .incomeAverageActual, .incomeSourceShare, .incomeSourceShareTrend, .incomeSourceMonthComparison:
             let isAllSources = normalized.contains("all sources") || normalized.contains("all income")
             let source = isAllSources
             ? nil
@@ -3772,13 +3868,14 @@ struct HomeAssistantPanelView: View {
             return HomeQueryPlan(
                 metric: plan.metric,
                 dateRange: plan.dateRange,
+                comparisonDateRange: plan.comparisonDateRange,
                 resultLimit: plan.resultLimit,
                 confidenceBand: source == nil ? plan.confidenceBand : .high,
                 targetName: source,
                 periodUnit: plan.periodUnit
             )
             
-        case .categorySpendShare, .categorySpendShareTrend, .categoryPotentialSavings, .categoryReallocationGuidance:
+        case .categorySpendShare, .categorySpendShareTrend, .categoryPotentialSavings, .categoryReallocationGuidance, .categoryMonthComparison:
             let isAllCategories = normalized.contains("all categories")
             let category = isAllCategories
             ? nil
@@ -3794,6 +3891,7 @@ struct HomeAssistantPanelView: View {
             return HomeQueryPlan(
                 metric: plan.metric,
                 dateRange: plan.dateRange,
+                comparisonDateRange: plan.comparisonDateRange,
                 resultLimit: plan.resultLimit,
                 confidenceBand: category == nil ? plan.confidenceBand : .high,
                 targetName: category,
@@ -3811,15 +3909,277 @@ struct HomeAssistantPanelView: View {
             return HomeQueryPlan(
                 metric: plan.metric,
                 dateRange: plan.dateRange,
+                comparisonDateRange: plan.comparisonDateRange,
                 resultLimit: plan.resultLimit,
                 confidenceBand: category == nil ? plan.confidenceBand : .high,
                 targetName: category,
                 periodUnit: plan.periodUnit
             )
             
-        case .overview, .spendTotal, .topCategories, .monthComparison, .largestTransactions, .savingsStatus, .savingsAverageRecentPeriods, .presetDueSoon, .presetHighestCost, .presetTopCategory:
+        case .overview, .spendTotal, .topCategories, .monthComparison, .largestTransactions, .savingsStatus, .savingsAverageRecentPeriods, .presetDueSoon, .presetHighestCost, .presetTopCategory, .safeSpendToday, .forecastSavings:
             return plan
         }
+    }
+
+    private func parsedSignals(
+        for rawPrompt: String,
+        fallbackPlan _: HomeQueryPlan
+    ) -> HomeAssistantParsedSignals {
+        let comparisonRanges = extractedComparisonDateRanges(for: rawPrompt)
+        let signalTarget = extractedSignalTarget(for: rawPrompt)
+        return HomeAssistantParsedSignals(
+            metric: nil,
+            targetName: signalTarget,
+            targetSource: extractedSignalTargetSource(for: rawPrompt),
+            dateRange: comparisonRanges?.primary ?? extractedSignalDateRange(for: rawPrompt),
+            comparisonDateRange: comparisonRanges?.comparison,
+            comparisonDetected: detectComparison(rawPrompt),
+            rawPrompt: rawPrompt
+        )
+    }
+
+    private func detectComparison(_ text: String) -> Bool {
+        let keywords = ["compare", "vs", "versus", "difference", "changed"]
+        let normalized = text.lowercased()
+        return keywords.contains { normalized.contains($0) }
+    }
+
+    private func extractedSignalTarget(for rawPrompt: String) -> String? {
+        let normalized = normalizedPrompt(rawPrompt)
+        if hasExplicitGlobalComparisonScope(in: normalized)
+            || normalized.contains("all cards")
+            || normalized.contains("all categories")
+            || normalized.contains("all sources")
+            || normalized.contains("all income")
+        {
+            return nil
+        }
+
+        if let category = aliasTarget(in: rawPrompt, entityType: .category)
+            ?? entityMatcher.bestCategoryMatch(in: rawPrompt, categories: categories)
+        {
+            return category
+        }
+
+        if let card = aliasTarget(in: rawPrompt, entityType: .card)
+            ?? entityMatcher.bestCardMatch(in: rawPrompt, cards: cards)
+        {
+            return card
+        }
+
+        if let source = aliasTarget(in: rawPrompt, entityType: .incomeSource)
+            ?? entityMatcher.bestIncomeSourceMatch(in: rawPrompt, incomes: incomes)
+        {
+            return source
+        }
+
+        if detectComparison(rawPrompt),
+           appearsToRequestExplicitComparisonDates(in: normalized) == false,
+           let unmatchedTarget = unmatchedComparisonTarget(in: rawPrompt)
+        {
+            return unmatchedTarget
+        }
+
+        return nil
+    }
+
+    private func extractedSignalTargetSource(for rawPrompt: String) -> HomeAssistantSignalTargetSource? {
+        let normalized = normalizedPrompt(rawPrompt)
+        if hasExplicitGlobalComparisonScope(in: normalized) {
+            return nil
+        }
+
+        if aliasTarget(in: rawPrompt, entityType: .category) != nil
+            || entityMatcher.bestCategoryMatch(in: rawPrompt, categories: categories) != nil
+            || aliasTarget(in: rawPrompt, entityType: .card) != nil
+            || entityMatcher.bestCardMatch(in: rawPrompt, cards: cards) != nil
+            || aliasTarget(in: rawPrompt, entityType: .incomeSource) != nil
+            || entityMatcher.bestIncomeSourceMatch(in: rawPrompt, incomes: incomes) != nil
+        {
+            return .matchedEntity
+        }
+
+        if detectComparison(rawPrompt),
+           appearsToRequestExplicitComparisonDates(in: normalized) == false,
+           unmatchedComparisonTarget(in: rawPrompt) != nil
+        {
+            return .inferredComparisonText
+        }
+
+        return nil
+    }
+
+    private func unmatchedComparisonTarget(in rawPrompt: String) -> String? {
+        let normalized = normalizedPrompt(rawPrompt)
+        guard detectComparison(rawPrompt) else { return nil }
+
+        let candidate: String
+        if let vsRange = normalized.range(of: " vs ") ?? normalized.range(of: " versus ") {
+            candidate = String(normalized[..<vsRange.lowerBound])
+        } else {
+            candidate = normalized
+        }
+
+        let fillerPhrases = [
+            "compare my ", "compare ", "this month", "last month",
+            "spending", "spend", "income", "difference", "changed",
+            "change", "month"
+        ]
+
+        let reduced = fillerPhrases.reduce(candidate) { partial, phrase in
+            partial.replacingOccurrences(of: phrase, with: " ")
+        }
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard reduced.isEmpty == false else { return nil }
+        return reduced
+            .split(separator: " ")
+            .map { $0.capitalized }
+            .joined(separator: " ")
+    }
+
+    private func extractedSignalDateRange(for rawPrompt: String) -> HomeQueryDateRange? {
+        parser.parseDateRange(rawPrompt, defaultPeriodUnit: defaultQueryPeriodUnit)
+    }
+
+    private func extractedComparisonDateRanges(
+        for rawPrompt: String
+    ) -> (primary: HomeQueryDateRange, comparison: HomeQueryDateRange)? {
+        guard detectComparison(rawPrompt) else { return nil }
+        let normalized = normalizedPrompt(rawPrompt)
+
+        let candidatePairs: [(String, String)] = [
+            capturedComparisonSnippets(
+                normalizedPrompt: normalized,
+                pattern: "\\bfrom\\s+(.+?)\\s+to\\s+(.+)$"
+            ),
+            capturedComparisonSnippets(
+                normalizedPrompt: normalized,
+                pattern: "\\bbetween\\s+(.+?)\\s+and\\s+(.+)$"
+            ),
+            capturedComparisonSnippets(
+                normalizedPrompt: normalized,
+                pattern: "\\bcompare\\s+(.+?)\\s+(?:vs|versus)\\s+(.+)$"
+            ),
+            comparisonSnippetsSeparatedByTo(normalizedPrompt: normalized)
+        ].compactMap { $0 }
+
+        for (firstSnippet, secondSnippet) in candidatePairs {
+            guard let firstRange = parser.parseDateRange(firstSnippet, defaultPeriodUnit: defaultQueryPeriodUnit),
+                  let secondRange = parser.parseDateRange(secondSnippet, defaultPeriodUnit: defaultQueryPeriodUnit),
+                  firstRange != secondRange else {
+                continue
+            }
+
+            return (firstRange, secondRange)
+        }
+
+        return nil
+    }
+
+    private func capturedComparisonSnippets(
+        normalizedPrompt: String,
+        pattern: String
+    ) -> (String, String)? {
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else {
+            return nil
+        }
+
+        let fullRange = NSRange(normalizedPrompt.startIndex..., in: normalizedPrompt)
+        guard let match = regex.firstMatch(in: normalizedPrompt, options: [], range: fullRange),
+              match.numberOfRanges == 3,
+              let firstRange = Range(match.range(at: 1), in: normalizedPrompt),
+              let secondRange = Range(match.range(at: 2), in: normalizedPrompt) else {
+            return nil
+        }
+
+        return (
+            String(normalizedPrompt[firstRange]),
+            String(normalizedPrompt[secondRange])
+        )
+    }
+
+    private func appearsToRequestExplicitComparisonDates(in normalizedPrompt: String) -> Bool {
+        let explicitDateTokenPattern = "\\b(jan|january|feb|february|mar|march|apr|april|may|jun|june|jul|july|aug|august|sep|sept|september|oct|october|nov|november|dec|december|q[1-4]|\\d{4}-\\d{1,2}-\\d{1,2}|\\d{4})\\b"
+        let hasExplicitDateToken = normalizedPrompt.range(
+            of: explicitDateTokenPattern,
+            options: .regularExpression
+        ) != nil
+        let explicitDateTokenCount = regexMatchCount(
+            pattern: explicitDateTokenPattern,
+            in: normalizedPrompt
+        )
+        let hasComparisonVerb = normalizedPrompt.contains("compare")
+        let hasComparisonBridge = normalizedPrompt.range(
+            of: "\\b(from .+ to|between .+ and|vs|versus)\\b",
+            options: .regularExpression
+        ) != nil
+        let hasToBridge = hasComparisonVerb
+            && normalizedPrompt.contains(" to ")
+            && explicitDateTokenCount >= 2
+        return hasExplicitDateToken && (hasComparisonBridge || hasToBridge)
+    }
+
+    private func comparisonSnippetsSeparatedByTo(
+        normalizedPrompt: String
+    ) -> (String, String)? {
+        guard normalizedPrompt.contains("compare"),
+              let separatorRange = normalizedPrompt.range(of: " to ") else {
+            return nil
+        }
+
+        let leadingSegment = String(normalizedPrompt[..<separatorRange.lowerBound])
+        let trailingSegment = String(normalizedPrompt[separatorRange.upperBound...])
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trailingSegment.isEmpty == false else { return nil }
+
+        let prefixes = [
+            "compare spending in ",
+            "compare spending ",
+            "compare spend in ",
+            "compare spend ",
+            "compare income in ",
+            "compare income ",
+            "compare expenses in ",
+            "compare expenses ",
+            "compare in ",
+            "compare "
+        ]
+
+        guard let matchedPrefix = prefixes.first(where: { leadingSegment.hasPrefix($0) }) else {
+            return nil
+        }
+
+        let firstSnippet = String(leadingSegment.dropFirst(matchedPrefix.count))
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard firstSnippet.isEmpty == false else { return nil }
+
+        return (firstSnippet, trailingSegment)
+    }
+
+    private func regexMatchCount(
+        pattern: String,
+        in text: String
+    ) -> Int {
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else {
+            return 0
+        }
+
+        let range = NSRange(text.startIndex..., in: text)
+        return regex.numberOfMatches(in: text, options: [], range: range)
+    }
+
+    private func hasExplicitGlobalComparisonScope(in normalizedPrompt: String) -> Bool {
+        let phrases = [
+            "across all categories",
+            "all categories",
+            "overall",
+            "total spending",
+            "total spend",
+            "all spending"
+        ]
+        return phrases.contains { normalizedPrompt.contains($0) }
     }
     
     private func entityAwarePlan(for rawPrompt: String) -> HomeQueryPlan? {
@@ -4324,7 +4684,15 @@ struct HomeAssistantPanelView: View {
                     cardsQuery
                 ]
             ),
-            echoContext: nil
+            echoContext: nil,
+            visibleProvenance: visibleProvenance(
+                for: [
+                    overviewQuery,
+                    savingsQuery,
+                    categoriesQuery,
+                    cardsQuery
+                ]
+            )
         )
         
         updateSessionContext(after: overviewQuery)
@@ -4414,6 +4782,153 @@ struct HomeAssistantPanelView: View {
         let raw = id.uuidString.replacingOccurrences(of: "-", with: "")
         return String(raw.prefix(8)).uppercased()
     }
+
+    private func visibleProvenance(for query: HomeQuery) -> String? {
+        let periodLine = visiblePeriodLine(for: query)
+        let dataLabels = visibleDataSourceLabels(for: query)
+        let dataLine = dataLabels.isEmpty ? nil : "Data used: \(dataLabels.joined(separator: ", "))"
+
+        let lines: [String] = [periodLine, dataLine]
+            .compactMap { value in
+                guard let value else { return nil }
+                let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+                return trimmed.isEmpty ? nil : trimmed
+            }
+        guard lines.isEmpty == false else { return nil }
+        return lines.joined(separator: "\n")
+    }
+
+    private func visibleProvenance(for queries: [HomeQuery]) -> String? {
+        let range = queries.compactMap(\.dateRange).first
+        let periodLine = range.map { "Period: \(visibleRangeLabel(for: $0))" }
+        let dataLabels = Array(Set(queries.flatMap { visibleDataSourceLabels(for: $0) })).sorted()
+        let dataLine = dataLabels.isEmpty ? nil : "Data used: \(dataLabels.joined(separator: ", "))"
+
+        let lines: [String] = [periodLine, dataLine]
+            .compactMap { value in
+                guard let value else { return nil }
+                let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+                return trimmed.isEmpty ? nil : trimmed
+            }
+        guard lines.isEmpty == false else { return nil }
+        return lines.joined(separator: "\n")
+    }
+
+    private func visiblePeriodLine(for query: HomeQuery) -> String? {
+        switch query.intent {
+        case .compareThisMonthToPreviousMonth,
+             .compareCategoryThisMonthToPreviousMonth,
+             .compareCardThisMonthToPreviousMonth,
+             .compareIncomeSourceThisMonthToPreviousMonth:
+            let ranges = visibleComparisonRanges(for: query)
+            let scopePrefix: String
+            switch query.intent {
+            case .compareCategoryThisMonthToPreviousMonth:
+                scopePrefix = query.targetName.map { "Compared: \($0) in " } ?? "Compared: "
+            case .compareCardThisMonthToPreviousMonth:
+                scopePrefix = query.targetName.map { "Compared: \($0) card in " } ?? "Compared: "
+            case .compareIncomeSourceThisMonthToPreviousMonth:
+                scopePrefix = query.targetName.map { "Compared: \($0) income in " } ?? "Compared: "
+            default:
+                scopePrefix = "Compared: "
+            }
+
+            return "\(scopePrefix)\(visibleRangeLabel(for: ranges.current)) vs \(visibleRangeLabel(for: ranges.previous))"
+
+        default:
+            guard let range = query.dateRange else { return nil }
+            return "Period: \(visibleRangeLabel(for: range))"
+        }
+    }
+
+    private func visibleDataSourceLabels(for query: HomeQuery) -> [String] {
+        switch query.intent {
+        case .periodOverview:
+            return ["Planned expenses", "Variable expenses", "Income", "Savings"]
+        case .spendThisMonth,
+             .topCategoriesThisMonth,
+             .compareThisMonthToPreviousMonth,
+             .compareCategoryThisMonthToPreviousMonth,
+             .compareCardThisMonthToPreviousMonth,
+             .largestRecentTransactions,
+             .cardSpendTotal,
+             .cardVariableSpendingHabits,
+             .categorySpendShare,
+             .categorySpendShareTrend,
+             .spendTrendsSummary,
+             .cardSnapshotSummary,
+             .presetCategorySpend,
+             .categoryPotentialSavings,
+             .categoryReallocationGuidance:
+            return ["Planned expenses", "Variable expenses"]
+        case .nextPlannedExpense:
+            return ["Planned expenses"]
+        case .compareIncomeSourceThisMonthToPreviousMonth,
+             .incomeAverageActual,
+             .incomeSourceShare,
+             .incomeSourceShareTrend:
+            return ["Income"]
+        case .savingsStatus,
+             .savingsAverageRecentPeriods,
+             .safeSpendToday,
+             .forecastSavings:
+            return ["Income", "Planned expenses", "Variable expenses", "Savings"]
+        case .presetDueSoon,
+             .presetHighestCost,
+             .presetTopCategory:
+            return ["Presets"]
+        }
+    }
+
+    private func visibleComparisonRanges(for query: HomeQuery) -> (current: HomeQueryDateRange, previous: HomeQueryDateRange) {
+        if let currentRange = query.dateRange, let comparisonRange = query.comparisonDateRange {
+            return (currentRange, comparisonRange)
+        }
+
+        let currentRange = query.dateRange ?? monthRange(containing: Date())
+        let previousRange = query.dateRange == nil
+            ? previousMonthRange(from: currentRange.startDate)
+            : previousEquivalentRange(matching: currentRange)
+        return (currentRange, previousRange)
+    }
+
+    private func previousEquivalentRange(matching range: HomeQueryDateRange) -> HomeQueryDateRange {
+        let calendar = Calendar.current
+        let startOfCurrent = calendar.startOfDay(for: range.startDate)
+        let startOfEnd = calendar.startOfDay(for: range.endDate)
+        let daySpan = (calendar.dateComponents([.day], from: startOfCurrent, to: startOfEnd).day ?? 0) + 1
+        let previousEnd = calendar.date(byAdding: .day, value: -1, to: startOfCurrent) ?? startOfCurrent
+        let previousStart = calendar.date(byAdding: .day, value: -(daySpan - 1), to: previousEnd) ?? previousEnd
+        return HomeQueryDateRange(startDate: previousStart, endDate: previousEnd)
+    }
+
+    private func visibleRangeLabel(for range: HomeQueryDateRange) -> String {
+        if visibleRangeIsFullMonth(range) {
+            return range.startDate.formatted(.dateTime.year().month(.wide))
+        }
+
+        if visibleRangeIsFullYear(range) {
+            return range.startDate.formatted(.dateTime.year())
+        }
+
+        return "\(AppDateFormat.abbreviatedDate(range.startDate)) - \(AppDateFormat.abbreviatedDate(range.endDate))"
+    }
+
+    private func visibleRangeIsFullMonth(_ range: HomeQueryDateRange) -> Bool {
+        let calendar = Calendar.current
+        let monthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: range.startDate)) ?? range.startDate
+        let monthEnd = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: monthStart) ?? monthStart
+        return calendar.isDate(range.startDate, inSameDayAs: monthStart)
+            && calendar.isDate(range.endDate, inSameDayAs: monthEnd)
+    }
+
+    private func visibleRangeIsFullYear(_ range: HomeQueryDateRange) -> Bool {
+        let calendar = Calendar.current
+        let yearStart = calendar.date(from: calendar.dateComponents([.year], from: range.startDate)) ?? range.startDate
+        let yearEnd = calendar.date(byAdding: DateComponents(year: 1, day: -1), to: yearStart) ?? yearStart
+        return calendar.isDate(range.startDate, inSameDayAs: yearStart)
+            && calendar.isDate(range.endDate, inSameDayAs: yearEnd)
+    }
     
     private func personaEchoContext(for query: HomeQuery) -> HomeAssistantPersonaEchoContext? {
         guard let targetName = query.targetName?.trimmingCharacters(in: .whitespacesAndNewlines), targetName.isEmpty == false else {
@@ -4421,19 +4936,19 @@ struct HomeAssistantPanelView: View {
         }
         
         switch query.intent {
-        case .cardSpendTotal, .cardVariableSpendingHabits:
+        case .cardSpendTotal, .cardVariableSpendingHabits, .compareCardThisMonthToPreviousMonth, .nextPlannedExpense, .spendTrendsSummary, .cardSnapshotSummary:
             return HomeAssistantPersonaEchoContext(
                 cardName: targetName,
                 categoryName: nil,
                 incomeSourceName: nil
             )
-        case .categorySpendShare, .categorySpendShareTrend, .categoryPotentialSavings, .categoryReallocationGuidance, .presetCategorySpend:
+        case .categorySpendShare, .categorySpendShareTrend, .categoryPotentialSavings, .categoryReallocationGuidance, .presetCategorySpend, .compareCategoryThisMonthToPreviousMonth:
             return HomeAssistantPersonaEchoContext(
                 cardName: nil,
                 categoryName: targetName,
                 incomeSourceName: nil
             )
-        case .incomeAverageActual, .incomeSourceShare, .incomeSourceShareTrend:
+        case .incomeAverageActual, .incomeSourceShare, .incomeSourceShareTrend, .compareIncomeSourceThisMonthToPreviousMonth:
             return HomeAssistantPersonaEchoContext(
                 cardName: nil,
                 categoryName: nil,

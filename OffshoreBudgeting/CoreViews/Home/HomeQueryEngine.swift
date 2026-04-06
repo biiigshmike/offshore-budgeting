@@ -73,6 +73,26 @@ struct HomeQueryEngine {
                 variableExpenses: variableExpenses,
                 now: now
             )
+        case .compareCategoryThisMonthToPreviousMonth:
+            return categoryMonthComparisonAnswer(
+                query: query,
+                plannedExpenses: plannedExpenses,
+                variableExpenses: variableExpenses,
+                now: now
+            )
+        case .compareCardThisMonthToPreviousMonth:
+            return cardMonthComparisonAnswer(
+                query: query,
+                plannedExpenses: plannedExpenses,
+                variableExpenses: variableExpenses,
+                now: now
+            )
+        case .compareIncomeSourceThisMonthToPreviousMonth:
+            return incomeSourceMonthComparisonAnswer(
+                query: query,
+                incomes: incomes,
+                now: now
+            )
 
         case .largestRecentTransactions:
             return largestRecentTransactionsAnswer(
@@ -186,6 +206,45 @@ struct HomeQueryEngine {
                 variableExpenses: variableExpenses,
                 now: now
             )
+        case .safeSpendToday:
+            return safeSpendTodayAnswer(
+                query: query,
+                incomes: incomes,
+                plannedExpenses: plannedExpenses,
+                variableExpenses: variableExpenses,
+                savingsEntries: savingsEntries,
+                now: now
+            )
+        case .forecastSavings:
+            return forecastSavingsAnswer(
+                query: query,
+                incomes: incomes,
+                plannedExpenses: plannedExpenses,
+                variableExpenses: variableExpenses,
+                savingsEntries: savingsEntries,
+                now: now
+            )
+        case .nextPlannedExpense:
+            return nextPlannedExpenseAnswer(
+                query: query,
+                plannedExpenses: plannedExpenses,
+                now: now
+            )
+        case .spendTrendsSummary:
+            return spendTrendsSummaryAnswer(
+                query: query,
+                categories: categories,
+                plannedExpenses: plannedExpenses,
+                variableExpenses: variableExpenses,
+                now: now
+            )
+        case .cardSnapshotSummary:
+            return cardSnapshotSummaryAnswer(
+                query: query,
+                plannedExpenses: plannedExpenses,
+                variableExpenses: variableExpenses,
+                now: now
+            )
         }
     }
 
@@ -208,6 +267,14 @@ struct HomeQueryEngine {
             HomeAssistantSuggestion(
                 title: "Compare with last month",
                 query: HomeQuery(intent: .compareThisMonthToPreviousMonth)
+            ),
+            HomeAssistantSuggestion(
+                title: "Safe spend today",
+                query: HomeQuery(intent: .safeSpendToday)
+            ),
+            HomeAssistantSuggestion(
+                title: "Next planned expense",
+                query: HomeQuery(intent: .nextPlannedExpense)
             ),
             HomeAssistantSuggestion(
                 title: "Largest recent expenses",
@@ -395,13 +462,9 @@ struct HomeQueryEngine {
         variableExpenses: [VariableExpense],
         now: Date
     ) -> HomeAnswer {
-        let currentRange = query.dateRange ?? monthRange(containing: now)
-        let previousRange: HomeQueryDateRange
-        if query.dateRange == nil {
-            previousRange = previousMonthRange(before: currentRange.startDate)
-        } else {
-            previousRange = previousEquivalentRange(matching: currentRange)
-        }
+        let ranges = comparisonRanges(for: query, now: now)
+        let currentRange = ranges.current
+        let previousRange = ranges.previous
 
         let currentTotal = totalSpend(
             plannedExpenses: plannedExpenses,
@@ -430,13 +493,164 @@ struct HomeQueryEngine {
         return HomeAnswer(
             queryID: query.id,
             kind: .comparison,
-            title: query.dateRange == nil ? "This Month vs Last Month" : "Current Period vs Previous Period",
+            title: query.comparisonDateRange != nil
+                ? "Period Comparison"
+                : (query.dateRange == nil ? "This Month vs Last Month" : "Current Period vs Previous Period"),
             subtitle: deltaLabel,
             primaryValue: currency(currentTotal),
             rows: [
                 HomeAnswerRow(title: currentLabel, value: currency(currentTotal)),
                 HomeAnswerRow(title: previousLabel, value: currency(previousTotal))
             ]
+        )
+    }
+
+    private func categoryMonthComparisonAnswer(
+        query: HomeQuery,
+        plannedExpenses: [PlannedExpense],
+        variableExpenses: [VariableExpense],
+        now: Date
+    ) -> HomeAnswer {
+        guard let targetName = query.targetName?.trimmingCharacters(in: .whitespacesAndNewlines), targetName.isEmpty == false else {
+            return HomeAnswer(
+                queryID: query.id,
+                kind: .message,
+                title: "Category Comparison",
+                subtitle: "Choose a category to compare.",
+                primaryValue: nil,
+                rows: []
+            )
+        }
+
+        let filteredPlanned = filteredPlannedExpenses(plannedExpenses, matchingCategoryName: targetName)
+        let filteredVariable = filteredVariableExpenses(variableExpenses, matchingCategoryName: targetName)
+        let ranges = comparisonRanges(for: query, now: now)
+
+        guard filteredPlanned.isEmpty == false || filteredVariable.isEmpty == false else {
+            return HomeAnswer(
+                queryID: query.id,
+                kind: .message,
+                title: "Category Comparison (\(targetName))",
+                subtitle: "No matching category spending found.",
+                primaryValue: nil,
+                rows: []
+            )
+        }
+
+        return comparisonAnswer(
+            query: query,
+            currentTotal: totalSpend(
+                plannedExpenses: filteredPlanned,
+                variableExpenses: filteredVariable,
+                range: ranges.current
+            ),
+            previousTotal: totalSpend(
+                plannedExpenses: filteredPlanned,
+                variableExpenses: filteredVariable,
+                range: ranges.previous
+            ),
+            currentRange: ranges.current,
+            previousRange: ranges.previous,
+            defaultTitle: "Category Comparison (\(targetName))",
+            periodTitle: "Category Comparison (\(targetName))"
+        )
+    }
+
+    private func cardMonthComparisonAnswer(
+        query: HomeQuery,
+        plannedExpenses: [PlannedExpense],
+        variableExpenses: [VariableExpense],
+        now: Date
+    ) -> HomeAnswer {
+        guard let targetName = query.targetName?.trimmingCharacters(in: .whitespacesAndNewlines), targetName.isEmpty == false else {
+            return HomeAnswer(
+                queryID: query.id,
+                kind: .message,
+                title: "Card Comparison",
+                subtitle: "Choose a card to compare.",
+                primaryValue: nil,
+                rows: []
+            )
+        }
+
+        let filteredPlanned = filteredPlannedExpenses(plannedExpenses, matchingCardName: targetName)
+        let filteredVariable = filteredVariableExpenses(variableExpenses, matchingCardName: targetName)
+        let ranges = comparisonRanges(for: query, now: now)
+
+        guard filteredPlanned.isEmpty == false || filteredVariable.isEmpty == false else {
+            return HomeAnswer(
+                queryID: query.id,
+                kind: .message,
+                title: "Card Comparison (\(targetName))",
+                subtitle: "No matching card spending found.",
+                primaryValue: nil,
+                rows: []
+            )
+        }
+
+        return comparisonAnswer(
+            query: query,
+            currentTotal: totalSpend(
+                plannedExpenses: filteredPlanned,
+                variableExpenses: filteredVariable,
+                range: ranges.current
+            ),
+            previousTotal: totalSpend(
+                plannedExpenses: filteredPlanned,
+                variableExpenses: filteredVariable,
+                range: ranges.previous
+            ),
+            currentRange: ranges.current,
+            previousRange: ranges.previous,
+            defaultTitle: "Card Comparison (\(targetName))",
+            periodTitle: "Card Comparison (\(targetName))"
+        )
+    }
+
+    private func incomeSourceMonthComparisonAnswer(
+        query: HomeQuery,
+        incomes: [Income],
+        now: Date
+    ) -> HomeAnswer {
+        guard let targetName = query.targetName?.trimmingCharacters(in: .whitespacesAndNewlines), targetName.isEmpty == false else {
+            return HomeAnswer(
+                queryID: query.id,
+                kind: .message,
+                title: "Income Source Comparison",
+                subtitle: "Choose an income source to compare.",
+                primaryValue: nil,
+                rows: []
+            )
+        }
+
+        let matchingIncomes = incomes.filter { income in
+            income.isPlanned == false
+                && income.source.caseInsensitiveCompare(targetName) == .orderedSame
+        }
+
+        guard matchingIncomes.isEmpty == false else {
+            return HomeAnswer(
+                queryID: query.id,
+                kind: .message,
+                title: "Income Source Comparison (\(targetName))",
+                subtitle: "No matching income source found.",
+                primaryValue: nil,
+                rows: []
+            )
+        }
+
+        let ranges = comparisonRanges(for: query, now: now)
+        let currentTotal = incomeTotal(forSource: targetName, range: ranges.current, incomes: matchingIncomes)
+        let previousTotal = incomeTotal(forSource: targetName, range: ranges.previous, incomes: matchingIncomes)
+
+        return comparisonAnswer(
+            query: query,
+            currentTotal: currentTotal,
+            previousTotal: previousTotal,
+            currentRange: ranges.current,
+            previousRange: ranges.previous,
+            defaultTitle: "Income Source Comparison (\(targetName))",
+            periodTitle: "Income Source Comparison (\(targetName))"
         )
     }
 
@@ -1591,7 +1805,413 @@ struct HomeQueryEngine {
         )
     }
 
+    private func safeSpendTodayAnswer(
+        query: HomeQuery,
+        incomes: [Income],
+        plannedExpenses: [PlannedExpense],
+        variableExpenses: [VariableExpense],
+        savingsEntries: [SavingsLedgerEntry],
+        now: Date
+    ) -> HomeAnswer {
+        let range = query.dateRange ?? monthRange(containing: now)
+        let todayStart = calendar.startOfDay(for: now)
+        let tomorrowStart = calendar.date(byAdding: .day, value: 1, to: todayStart) ?? now
+        let todayEnd = calendar.date(byAdding: DateComponents(day: 1, second: -1), to: todayStart) ?? now
+        let rangeEndDayStart = calendar.startOfDay(for: range.endDate)
+        let toDateEnd = min(range.endDate, todayEnd)
+
+        let actualIncomeToDate = incomes
+            .filter { !$0.isPlanned && $0.date >= range.startDate && $0.date < tomorrowStart }
+            .reduce(0.0) { $0 + $1.amount }
+        let plannedIncomeRemaining = incomes
+            .filter { $0.isPlanned && $0.date >= todayStart && $0.date <= range.endDate }
+            .reduce(0.0) { $0 + $1.amount }
+        let plannedExpensesAlreadyConsumed = plannedExpenses
+            .filter { $0.expenseDate >= range.startDate && $0.expenseDate < todayStart }
+            .reduce(0.0) { $0 + SavingsMathService.plannedBudgetImpactAmount(for: $1) }
+        let remainingPlannedExpenses = plannedExpenses
+            .filter { $0.expenseDate >= todayStart && $0.expenseDate <= range.endDate }
+            .reduce(0.0) { $0 + SavingsMathService.plannedProjectedBudgetImpactAmount(for: $1) }
+        let actualVariableExpensesToDate = variableExpenses
+            .filter { $0.transactionDate >= range.startDate && $0.transactionDate < tomorrowStart }
+            .reduce(0.0) { $0 + SavingsMathService.variableBudgetImpactAmount(for: $1) }
+        let actualSavingsAdjustmentsToDate = SavingsMathService.actualSavingsAdjustmentTotal(
+            from: savingsEntries,
+            startDate: range.startDate,
+            endDate: toDateEnd
+        )
+
+        let periodRemainingRoom = actualIncomeToDate
+            + plannedIncomeRemaining
+            - plannedExpensesAlreadyConsumed
+            - remainingPlannedExpenses
+            - actualVariableExpensesToDate
+            + actualSavingsAdjustmentsToDate
+        let clampedRoom = max(0, periodRemainingRoom)
+        let daysLeft = max(
+            1,
+            (calendar.dateComponents([.day], from: todayStart, to: rangeEndDayStart).day ?? 0) + 1
+        )
+        let safeToSpendToday = range.startDate == rangeEndDayStart
+            ? clampedRoom
+            : clampedRoom / Double(daysLeft)
+        let hasActivity = actualIncomeToDate != 0
+            || plannedIncomeRemaining != 0
+            || plannedExpensesAlreadyConsumed != 0
+            || remainingPlannedExpenses != 0
+            || actualVariableExpensesToDate != 0
+            || actualSavingsAdjustmentsToDate != 0
+
+        guard hasActivity else {
+            return HomeAnswer(
+                queryID: query.id,
+                kind: .message,
+                title: "Safe Spend Today",
+                subtitle: "Not enough budget activity in this range yet.",
+                primaryValue: nil,
+                rows: [
+                    HomeAnswerRow(title: "Period", value: rangeLabel(for: range))
+                ]
+            )
+        }
+
+        return HomeAnswer(
+            queryID: query.id,
+            kind: .metric,
+            title: "Safe Spend Today",
+            subtitle: rangeLabel(for: range),
+            primaryValue: currency(safeToSpendToday),
+            rows: [
+                HomeAnswerRow(title: "Period remaining room", value: currency(clampedRoom)),
+                HomeAnswerRow(title: "Days left in period", value: "\(daysLeft)"),
+                HomeAnswerRow(title: "Period", value: rangeLabel(for: range))
+            ]
+        )
+    }
+
+    private func forecastSavingsAnswer(
+        query: HomeQuery,
+        incomes: [Income],
+        plannedExpenses: [PlannedExpense],
+        variableExpenses: [VariableExpense],
+        savingsEntries: [SavingsLedgerEntry],
+        now: Date
+    ) -> HomeAnswer {
+        let range = query.dateRange ?? monthRange(containing: now)
+        let totals = savingsTotals(
+            in: range,
+            incomes: incomes,
+            plannedExpenses: plannedExpenses,
+            variableExpenses: variableExpenses,
+            savingsEntries: savingsEntries
+        )
+
+        guard totals.hasActivity else {
+            return HomeAnswer(
+                queryID: query.id,
+                kind: .message,
+                title: "Forecast Savings",
+                subtitle: "No savings activity in this range yet.",
+                primaryValue: nil,
+                rows: []
+            )
+        }
+
+        let gap = totals.actualSavings - totals.projectedSavings
+        let statusLine: String
+        if totals.projectedSavings < 0 {
+            statusLine = "Overspending forecast for this period."
+        } else if totals.actualSavings < 0 {
+            statusLine = "Current actual savings are negative."
+        } else {
+            statusLine = "Forecast is currently on track."
+        }
+
+        return HomeAnswer(
+            queryID: query.id,
+            kind: .metric,
+            title: "Forecast Savings",
+            subtitle: rangeLabel(for: range),
+            primaryValue: currency(totals.projectedSavings),
+            rows: [
+                HomeAnswerRow(title: "Projected savings", value: currency(totals.projectedSavings)),
+                HomeAnswerRow(title: "Actual savings", value: currency(totals.actualSavings)),
+                HomeAnswerRow(title: "Gap to projected", value: deltaSummary(gap)),
+                HomeAnswerRow(title: "Status", value: statusLine)
+            ]
+        )
+    }
+
+    private func nextPlannedExpenseAnswer(
+        query: HomeQuery,
+        plannedExpenses: [PlannedExpense],
+        now: Date
+    ) -> HomeAnswer {
+        let range = query.dateRange ?? monthRange(containing: now)
+        let filteredPlanned = plannedExpenses
+            .filter { expense in
+                guard expense.sourceBudgetID != nil else { return false }
+                guard expense.expenseDate >= range.startDate, expense.expenseDate <= range.endDate else { return false }
+                guard let targetName = query.targetName else { return true }
+                return expense.card?.name.caseInsensitiveCompare(targetName) == .orderedSame
+            }
+
+        guard let expense = HomeNextPlannedExpenseFinder.nextExpense(
+            from: filteredPlanned,
+            in: range.startDate,
+            to: range.endDate,
+            now: now,
+            calendar: calendar
+        ) else {
+            return HomeAnswer(
+                queryID: query.id,
+                kind: .message,
+                title: query.targetName.map { "Next Planned Expense (\($0))" } ?? "Next Planned Expense",
+                subtitle: "No upcoming planned expenses in this range.",
+                primaryValue: nil,
+                rows: []
+            )
+        }
+
+        var rows = [
+            HomeAnswerRow(title: "Date", value: shortDate(expense.expenseDate))
+        ]
+        if let cardName = expense.card?.name, cardName.isEmpty == false {
+            rows.append(HomeAnswerRow(title: "Card", value: cardName))
+        }
+        if let categoryName = expense.category?.name, categoryName.isEmpty == false {
+            rows.append(HomeAnswerRow(title: "Category", value: categoryName))
+        }
+
+        return HomeAnswer(
+            queryID: query.id,
+            kind: .metric,
+            title: query.targetName.map { "Next Planned Expense (\($0))" } ?? "Next Planned Expense",
+            subtitle: rangeLabel(for: range),
+            primaryValue: currency(HomeNextPlannedExpenseFinder.effectiveAmount(for: expense)),
+            rows: [HomeAnswerRow(title: "Expense", value: expense.title)] + rows
+        )
+    }
+
+    private func spendTrendsSummaryAnswer(
+        query: HomeQuery,
+        categories: [Category],
+        plannedExpenses: [PlannedExpense],
+        variableExpenses: [VariableExpense],
+        now: Date
+    ) -> HomeAnswer {
+        let range = query.dateRange ?? monthRange(containing: now)
+        let plannedFiltered = query.targetName.map {
+            filteredPlannedExpenses(plannedExpenses, matchingCardName: $0)
+        } ?? plannedExpenses
+        let variableFiltered = query.targetName.map {
+            filteredVariableExpenses(variableExpenses, matchingCardName: $0)
+        } ?? variableExpenses
+
+        let metricsResult = HomeCategoryMetricsCalculator.calculate(
+            categories: categories,
+            plannedExpenses: plannedFiltered,
+            variableExpenses: variableFiltered,
+            rangeStart: range.startDate,
+            rangeEnd: range.endDate
+        )
+
+        guard metricsResult.totalSpent > 0 else {
+            return HomeAnswer(
+                queryID: query.id,
+                kind: .message,
+                title: query.targetName.map { "Spend Trends (\($0))" } ?? "Spend Trends",
+                subtitle: "No spending activity in this range yet.",
+                primaryValue: nil,
+                rows: []
+            )
+        }
+
+        let topMetrics = Array(metricsResult.metrics.prefix(3))
+        var rows = topMetrics.map { metric in
+            HomeAnswerRow(
+                title: metric.categoryName,
+                value: "\(currency(metric.totalSpent)) (\(percent(metric.percentOfTotal)))"
+            )
+        }
+
+        if let highest = topMetrics.first {
+            rows.insert(
+                HomeAnswerRow(
+                    title: "Top category",
+                    value: "\(highest.categoryName) (\(currency(highest.totalSpent)))"
+                ),
+                at: 0
+            )
+        }
+
+        return HomeAnswer(
+            queryID: query.id,
+            kind: .list,
+            title: query.targetName.map { "Spend Trends (\($0))" } ?? "Spend Trends",
+            subtitle: rangeLabel(for: range),
+            primaryValue: currency(metricsResult.totalSpent),
+            rows: rows
+        )
+    }
+
+    private func cardSnapshotSummaryAnswer(
+        query: HomeQuery,
+        plannedExpenses: [PlannedExpense],
+        variableExpenses: [VariableExpense],
+        now: Date
+    ) -> HomeAnswer {
+        let range = query.dateRange ?? monthRange(containing: now)
+        let plannedFiltered = query.targetName.map {
+            filteredPlannedExpenses(plannedExpenses, matchingCardName: $0)
+        } ?? plannedExpenses
+        let variableFiltered = query.targetName.map {
+            filteredVariableExpenses(variableExpenses, matchingCardName: $0)
+        } ?? variableExpenses
+
+        let plannedInRange = plannedFiltered.filter { $0.expenseDate >= range.startDate && $0.expenseDate <= range.endDate }
+        let variableInRange = variableFiltered.filter { $0.transactionDate >= range.startDate && $0.transactionDate <= range.endDate }
+
+        let unifiedTotal = plannedInRange.reduce(0.0) { $0 + $1.effectiveAmount() }
+            + variableInRange.reduce(0.0) { $0 + $1.spendingAmount() }
+
+        guard unifiedTotal > 0 else {
+            return HomeAnswer(
+                queryID: query.id,
+                kind: .message,
+                title: query.targetName.map { "\($0) Snapshot" } ?? "Card Snapshot",
+                subtitle: "No card activity in this range yet.",
+                primaryValue: nil,
+                rows: []
+            )
+        }
+
+        let recentRows = (
+            plannedInRange.map { (date: $0.expenseDate, title: $0.title, amount: $0.effectiveAmount()) }
+            + variableInRange.map { (date: $0.transactionDate, title: $0.descriptionText, amount: $0.ledgerSignedAmount()) }
+        )
+            .sorted { $0.date > $1.date }
+            .prefix(3)
+            .map { item in
+                HomeAnswerRow(
+                    title: item.title,
+                    value: "\(currency(item.amount)) • \(shortDate(item.date))"
+                )
+            }
+
+        return HomeAnswer(
+            queryID: query.id,
+            kind: .list,
+            title: query.targetName.map { "\($0) Snapshot" } ?? "Card Snapshot",
+            subtitle: rangeLabel(for: range),
+            primaryValue: currency(unifiedTotal),
+            rows: Array(recentRows)
+        )
+    }
+
     // MARK: - Helpers
+
+    private func comparisonRanges(
+        for query: HomeQuery,
+        now: Date
+    ) -> (current: HomeQueryDateRange, previous: HomeQueryDateRange) {
+        if let currentRange = query.dateRange, let comparisonRange = query.comparisonDateRange {
+            return (currentRange, comparisonRange)
+        }
+
+        let currentRange = query.dateRange ?? monthRange(containing: now)
+        let previousRange = query.dateRange == nil
+            ? previousMonthRange(before: currentRange.startDate)
+            : previousEquivalentRange(matching: currentRange)
+        return (currentRange, previousRange)
+    }
+
+    private func comparisonAnswer(
+        query: HomeQuery,
+        currentTotal: Double,
+        previousTotal: Double,
+        currentRange: HomeQueryDateRange,
+        previousRange: HomeQueryDateRange,
+        defaultTitle: String,
+        periodTitle: String
+    ) -> HomeAnswer {
+        let delta = currentTotal - previousTotal
+        let deltaLabel: String
+        if delta > 0 {
+            deltaLabel = "Up \(currency(delta))"
+        } else if delta < 0 {
+            deltaLabel = "Down \(currency(abs(delta)))"
+        } else {
+            deltaLabel = "No change"
+        }
+
+        let currentLabel = query.dateRange == nil ? monthTitle(containing: currentRange.startDate) : rangeLabel(for: currentRange)
+        let previousLabel = query.comparisonDateRange == nil && query.dateRange == nil
+            ? monthTitle(containing: previousRange.startDate)
+            : rangeLabel(for: previousRange)
+        let title = (query.dateRange == nil && query.comparisonDateRange == nil) ? defaultTitle : periodTitle
+
+        return HomeAnswer(
+            queryID: query.id,
+            kind: .comparison,
+            title: title,
+            subtitle: deltaLabel,
+            primaryValue: currency(currentTotal),
+            rows: [
+                HomeAnswerRow(title: currentLabel, value: currency(currentTotal)),
+                HomeAnswerRow(title: previousLabel, value: currency(previousTotal))
+            ]
+        )
+    }
+
+    private func filteredPlannedExpenses(
+        _ plannedExpenses: [PlannedExpense],
+        matchingCategoryName categoryName: String
+    ) -> [PlannedExpense] {
+        plannedExpenses.filter { expense in
+            expense.category?.name.caseInsensitiveCompare(categoryName) == .orderedSame
+        }
+    }
+
+    private func filteredVariableExpenses(
+        _ variableExpenses: [VariableExpense],
+        matchingCategoryName categoryName: String
+    ) -> [VariableExpense] {
+        variableExpenses.filter { expense in
+            expense.category?.name.caseInsensitiveCompare(categoryName) == .orderedSame
+        }
+    }
+
+    private func filteredPlannedExpenses(
+        _ plannedExpenses: [PlannedExpense],
+        matchingCardName cardName: String
+    ) -> [PlannedExpense] {
+        plannedExpenses.filter { expense in
+            expense.card?.name.caseInsensitiveCompare(cardName) == .orderedSame
+        }
+    }
+
+    private func filteredVariableExpenses(
+        _ variableExpenses: [VariableExpense],
+        matchingCardName cardName: String
+    ) -> [VariableExpense] {
+        variableExpenses.filter { expense in
+            expense.card?.name.caseInsensitiveCompare(cardName) == .orderedSame
+        }
+    }
+
+    private func incomeTotal(
+        forSource sourceName: String,
+        range: HomeQueryDateRange,
+        incomes: [Income]
+    ) -> Double {
+        incomes.reduce(0.0) { partial, income in
+            guard income.isPlanned == false else { return partial }
+            guard income.source.caseInsensitiveCompare(sourceName) == .orderedSame else { return partial }
+            guard income.date >= range.startDate, income.date <= range.endDate else { return partial }
+            return partial + income.amount
+        }
+    }
 
     private func totalSpend(
         plannedExpenses: [PlannedExpense],

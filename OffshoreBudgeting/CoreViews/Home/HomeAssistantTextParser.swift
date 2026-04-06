@@ -45,7 +45,7 @@ struct HomeAssistantTextParser {
         let metric = intent.metric
 
         switch intent {
-        case .periodOverview, .spendThisMonth, .compareThisMonthToPreviousMonth, .cardSpendTotal, .incomeAverageActual, .savingsStatus, .incomeSourceShare, .categorySpendShare, .presetCategorySpend:
+        case .periodOverview, .spendThisMonth, .compareThisMonthToPreviousMonth, .compareCategoryThisMonthToPreviousMonth, .compareCardThisMonthToPreviousMonth, .compareIncomeSourceThisMonthToPreviousMonth, .cardSpendTotal, .incomeAverageActual, .savingsStatus, .incomeSourceShare, .categorySpendShare, .presetCategorySpend, .safeSpendToday, .forecastSavings, .nextPlannedExpense, .spendTrendsSummary, .cardSnapshotSummary:
             return HomeQueryPlan(
                 metric: metric,
                 dateRange: dateRange,
@@ -97,6 +97,26 @@ struct HomeAssistantTextParser {
 
         if matchesSavingsAverageIntent(in: text) {
             return .savingsAverageRecentPeriods
+        }
+
+        if matchesSafeSpendTodayIntent(in: text) {
+            return .safeSpendToday
+        }
+
+        if matchesForecastSavingsIntent(in: text) {
+            return .forecastSavings
+        }
+
+        if matchesNextPlannedExpenseIntent(in: text) {
+            return .nextPlannedExpense
+        }
+
+        if matchesSpendTrendsIntent(in: text) {
+            return .spendTrendsSummary
+        }
+
+        if matchesCardSnapshotIntent(in: text) {
+            return .cardSnapshotSummary
         }
 
         if matchesSavingsStatusIntent(in: text) {
@@ -203,6 +223,37 @@ struct HomeAssistantTextParser {
 
         return containsAny(text, keywords: overviewKeywords)
             && containsAny(text, keywords: financeContextKeywords)
+    }
+
+    private func matchesSafeSpendTodayIntent(in text: String) -> Bool {
+        (text.contains("safe spend") || text.contains("safely spend") || text.contains("what can i spend today"))
+            && text.contains("today")
+    }
+
+    private func matchesForecastSavingsIntent(in text: String) -> Bool {
+        text.contains("forecast savings")
+            || text.contains("projected savings")
+            || text.contains("on track for savings")
+    }
+
+    private func matchesNextPlannedExpenseIntent(in text: String) -> Bool {
+        text.contains("next planned expense")
+            || text.contains("upcoming planned expense")
+            || text.contains("planned expenses are coming up")
+            || (text.contains("next") && text.contains("planned") && text.contains("expense"))
+    }
+
+    private func matchesSpendTrendsIntent(in text: String) -> Bool {
+        let trendKeywords = ["trend", "trends", "trending"]
+        let spendKeywords = ["spend", "spent", "spending", "expense", "expenses"]
+        return containsAny(text, keywords: trendKeywords)
+            && containsAny(text, keywords: spendKeywords)
+    }
+
+    private func matchesCardSnapshotIntent(in text: String) -> Bool {
+        let summaryKeywords = ["summary", "snapshot", "recent", "recent expenses", "how is", "how s", "doing"]
+        return containsAny(text, keywords: ["card", "cards"])
+            && containsAny(text, keywords: summaryKeywords)
     }
 
     private func matchesSpendIntent(in text: String) -> Bool {
@@ -444,7 +495,7 @@ struct HomeAssistantTextParser {
         case .periodOverview:
             // Broad overview prompts are inherently less specific than direct metric requests.
             return .medium
-        case .spendThisMonth, .topCategoriesThisMonth, .compareThisMonthToPreviousMonth, .largestRecentTransactions, .cardSpendTotal, .cardVariableSpendingHabits, .incomeAverageActual, .savingsStatus, .savingsAverageRecentPeriods, .incomeSourceShare, .categorySpendShare, .incomeSourceShareTrend, .categorySpendShareTrend, .presetDueSoon, .presetHighestCost, .presetTopCategory, .presetCategorySpend, .categoryPotentialSavings, .categoryReallocationGuidance:
+        case .spendThisMonth, .topCategoriesThisMonth, .compareThisMonthToPreviousMonth, .compareCategoryThisMonthToPreviousMonth, .compareCardThisMonthToPreviousMonth, .compareIncomeSourceThisMonthToPreviousMonth, .largestRecentTransactions, .cardSpendTotal, .cardVariableSpendingHabits, .incomeAverageActual, .savingsStatus, .savingsAverageRecentPeriods, .incomeSourceShare, .categorySpendShare, .incomeSourceShareTrend, .categorySpendShareTrend, .presetDueSoon, .presetHighestCost, .presetTopCategory, .presetCategorySpend, .categoryPotentialSavings, .categoryReallocationGuidance, .safeSpendToday, .forecastSavings, .nextPlannedExpense, .spendTrendsSummary, .cardSnapshotSummary:
             return .high
         }
     }

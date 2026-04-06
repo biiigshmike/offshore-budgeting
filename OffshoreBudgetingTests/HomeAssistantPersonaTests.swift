@@ -94,8 +94,8 @@ struct HomeAssistantPersonaTests {
         let styled = formatter.styledAnswer(from: raw, userPrompt: "largest transactions", personaID: .marina)
 
         #expect(styled.title == "No activity in this range yet.")
-        #expect(styled.subtitle?.contains("Sources:") == true)
         #expect(styled.subtitle?.contains("Try a different date range") == true)
+        #expect(styled.subtitle?.contains("Based on:") == false)
         #expect(styled.primaryValue == nil)
         #expect(styled.rows.isEmpty)
     }

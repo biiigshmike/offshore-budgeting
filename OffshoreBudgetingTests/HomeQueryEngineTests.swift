@@ -676,6 +676,340 @@ struct HomeQueryEngineTests {
         #expect((answer.subtitle ?? "").contains("150"))
     }
 
+    @Test func categoryMonthComparison_filtersToTargetCategory() throws {
+        let engine = makeEngine()
+        let query = HomeQuery(intent: .compareCategoryThisMonthToPreviousMonth, targetName: "Groceries")
+
+        let groceries = Category(name: "Groceries", hexColor: "#00AA00")
+        let travel = Category(name: "Travel", hexColor: "#0000AA")
+
+        let planned: [PlannedExpense] = [
+            PlannedExpense(title: "Current Groceries Planned", plannedAmount: 300, expenseDate: date(2026, 2, 5), category: groceries),
+            PlannedExpense(title: "Previous Groceries Planned", plannedAmount: 200, expenseDate: date(2026, 1, 10), category: groceries),
+            PlannedExpense(title: "Travel Planned", plannedAmount: 900, expenseDate: date(2026, 2, 7), category: travel)
+        ]
+        let variable: [VariableExpense] = [
+            VariableExpense(descriptionText: "Current Groceries Variable", amount: 100, transactionDate: date(2026, 2, 8), category: groceries),
+            VariableExpense(descriptionText: "Previous Groceries Variable", amount: 50, transactionDate: date(2026, 1, 15), category: groceries),
+            VariableExpense(descriptionText: "Travel Variable", amount: 400, transactionDate: date(2026, 2, 9), category: travel)
+        ]
+
+        let answer = engine.execute(
+            query: query,
+            categories: [groceries, travel],
+            plannedExpenses: planned,
+            variableExpenses: variable,
+            now: date(2026, 2, 15)
+        )
+
+        #expect(answer.kind == .comparison)
+        #expect(answer.title.contains("Groceries"))
+        #expect((answer.primaryValue ?? "").contains("400"))
+        #expect(answer.rows[1].value.contains("250"))
+    }
+
+    @Test func compareExplicitPeriods_usesProvidedRangesInsteadOfPreviousEquivalent() throws {
+        let engine = makeEngine()
+        let january = HomeQueryDateRange(
+            startDate: date(2026, 1, 1),
+            endDate: date(2026, 1, 31)
+        )
+        let february = HomeQueryDateRange(
+            startDate: date(2026, 2, 1),
+            endDate: date(2026, 2, 28)
+        )
+        let query = HomeQuery(
+            intent: .compareThisMonthToPreviousMonth,
+            dateRange: january,
+            comparisonDateRange: february
+        )
+
+        let groceries = Category(name: "Groceries", hexColor: "#00AA00")
+        let planned: [PlannedExpense] = [
+            PlannedExpense(title: "January Planned", plannedAmount: 200, expenseDate: date(2026, 1, 10), category: groceries),
+            PlannedExpense(title: "February Planned", plannedAmount: 300, expenseDate: date(2026, 2, 10), category: groceries),
+            PlannedExpense(title: "December Planned", plannedAmount: 999, expenseDate: date(2025, 12, 10), category: groceries)
+        ]
+        let variable: [VariableExpense] = [
+            VariableExpense(descriptionText: "January Variable", amount: 50, transactionDate: date(2026, 1, 15), category: groceries),
+            VariableExpense(descriptionText: "February Variable", amount: 100, transactionDate: date(2026, 2, 15), category: groceries),
+            VariableExpense(descriptionText: "December Variable", amount: 777, transactionDate: date(2025, 12, 15), category: groceries)
+        ]
+
+        let answer = engine.execute(
+            query: query,
+            categories: [groceries],
+            plannedExpenses: planned,
+            variableExpenses: variable,
+            now: date(2026, 2, 15)
+        )
+
+        #expect(answer.kind == .comparison)
+        #expect(answer.title == "Period Comparison")
+        #expect((answer.primaryValue ?? "").contains("250"))
+        #expect(answer.rows[0].value.contains("250"))
+        #expect(answer.rows[1].value.contains("400"))
+        #expect(answer.rows[0].title.contains("Jan") || answer.rows[0].title.contains("1/"))
+        #expect(answer.rows[1].title.contains("Feb") || answer.rows[1].title.contains("2/"))
+        #expect((answer.subtitle ?? "").contains("Down"))
+        #expect((answer.subtitle ?? "").contains("150"))
+    }
+
+    @Test func compareExplicitPeriodsAcrossAllCategories_returnsCombinedSpend() throws {
+        let engine = makeEngine()
+        let february = HomeQueryDateRange(
+            startDate: date(2026, 2, 1),
+            endDate: date(2026, 2, 28)
+        )
+        let march = HomeQueryDateRange(
+            startDate: date(2026, 3, 1),
+            endDate: date(2026, 3, 31)
+        )
+        let query = HomeQuery(
+            intent: .compareThisMonthToPreviousMonth,
+            dateRange: february,
+            comparisonDateRange: march
+        )
+
+        let groceries = Category(name: "Groceries", hexColor: "#00AA00")
+        let travel = Category(name: "Travel", hexColor: "#0000AA")
+        let planned: [PlannedExpense] = [
+            PlannedExpense(title: "Feb Groceries Planned", plannedAmount: 300, expenseDate: date(2026, 2, 10), category: groceries),
+            PlannedExpense(title: "Mar Travel Planned", plannedAmount: 250, expenseDate: date(2026, 3, 10), category: travel)
+        ]
+        let variable: [VariableExpense] = [
+            VariableExpense(descriptionText: "Feb Groceries Variable", amount: 125, transactionDate: date(2026, 2, 15), category: groceries),
+            VariableExpense(descriptionText: "Mar Travel Variable", amount: 175, transactionDate: date(2026, 3, 15), category: travel)
+        ]
+
+        let answer = engine.execute(
+            query: query,
+            categories: [groceries, travel],
+            plannedExpenses: planned,
+            variableExpenses: variable,
+            now: date(2026, 3, 20)
+        )
+
+        #expect(answer.kind == .comparison)
+        #expect(answer.title == "Period Comparison")
+        #expect((answer.primaryValue ?? "").contains("425"))
+        #expect(answer.rows[0].value.contains("425"))
+        #expect(answer.rows[1].value.contains("425"))
+        #expect((answer.subtitle ?? "").contains("No change"))
+    }
+
+    @Test func cardMonthComparison_filtersToTargetCard() throws {
+        let engine = makeEngine()
+        let query = HomeQuery(intent: .compareCardThisMonthToPreviousMonth, targetName: "Apple Card")
+
+        let category = Category(name: "General", hexColor: "#00AA00")
+        let appleCard = Card(name: "Apple Card")
+        let travelCard = Card(name: "Travel Card")
+
+        let planned: [PlannedExpense] = [
+            PlannedExpense(title: "Apple Current Planned", plannedAmount: 300, expenseDate: date(2026, 2, 5), card: appleCard, category: category),
+            PlannedExpense(title: "Apple Previous Planned", plannedAmount: 125, expenseDate: date(2026, 1, 10), card: appleCard, category: category),
+            PlannedExpense(title: "Travel Planned", plannedAmount: 900, expenseDate: date(2026, 2, 6), card: travelCard, category: category)
+        ]
+        let variable: [VariableExpense] = [
+            VariableExpense(descriptionText: "Apple Current Variable", amount: 100, transactionDate: date(2026, 2, 8), card: appleCard, category: category),
+            VariableExpense(descriptionText: "Apple Previous Variable", amount: 50, transactionDate: date(2026, 1, 15), card: appleCard, category: category),
+            VariableExpense(descriptionText: "Travel Variable", amount: 250, transactionDate: date(2026, 2, 9), card: travelCard, category: category)
+        ]
+
+        let answer = engine.execute(
+            query: query,
+            categories: [category],
+            plannedExpenses: planned,
+            variableExpenses: variable,
+            now: date(2026, 2, 15)
+        )
+
+        #expect(answer.kind == .comparison)
+        #expect(answer.title.contains("Apple Card"))
+        #expect((answer.primaryValue ?? "").contains("400"))
+        #expect(answer.rows[1].value.contains("175"))
+    }
+
+    @Test func incomeSourceMonthComparison_filtersToTargetSource() throws {
+        let engine = makeEngine()
+        let query = HomeQuery(intent: .compareIncomeSourceThisMonthToPreviousMonth, targetName: "Salary")
+
+        let incomes: [Income] = [
+            Income(source: "Salary", amount: 3_000, date: date(2026, 2, 3), isPlanned: false),
+            Income(source: "Salary", amount: 2_500, date: date(2026, 1, 3), isPlanned: false),
+            Income(source: "Freelance", amount: 1_200, date: date(2026, 2, 7), isPlanned: false),
+            Income(source: "Salary", amount: 999, date: date(2026, 2, 9), isPlanned: true)
+        ]
+
+        let answer = engine.execute(
+            query: query,
+            categories: [],
+            plannedExpenses: [],
+            variableExpenses: [],
+            incomes: incomes,
+            now: date(2026, 2, 15)
+        )
+
+        #expect(answer.kind == .comparison)
+        #expect(answer.title.contains("Salary"))
+        #expect((answer.primaryValue ?? "").contains("3000"))
+        #expect(answer.rows[1].value.contains("2500"))
+    }
+
+    // MARK: - Widget Parity
+
+    @Test func safeSpendToday_returnsRemainingRoomAndDaysLeft() throws {
+        let engine = makeEngine()
+        let range = HomeQueryDateRange(startDate: date(2026, 4, 1), endDate: date(2026, 4, 30))
+        let query = HomeQuery(intent: .safeSpendToday, dateRange: range)
+
+        let category = Category(name: "General", hexColor: "#00AA00")
+        let incomes = [
+            Income(source: "Paycheck", amount: 3_000, date: date(2026, 4, 1), isPlanned: false),
+            Income(source: "Bonus", amount: 600, date: date(2026, 4, 20), isPlanned: true)
+        ]
+        let plannedExpenses = [
+            PlannedExpense(title: "Rent", plannedAmount: 1_200, expenseDate: date(2026, 4, 3), category: category),
+            PlannedExpense(title: "Utilities", plannedAmount: 300, expenseDate: date(2026, 4, 25), category: category)
+        ]
+        let variableExpenses = [
+            VariableExpense(descriptionText: "Groceries", amount: 200, transactionDate: date(2026, 4, 5), category: category)
+        ]
+
+        let answer = engine.execute(
+            query: query,
+            categories: [category],
+            plannedExpenses: plannedExpenses,
+            variableExpenses: variableExpenses,
+            incomes: incomes,
+            now: date(2026, 4, 10)
+        )
+
+        #expect(answer.kind == .metric)
+        #expect(answer.title == "Safe Spend Today")
+        #expect(answer.rows.contains(where: { $0.title == "Period remaining room" }))
+        #expect(answer.rows.contains(where: { $0.title == "Days left in period" && $0.value == "21" }))
+    }
+
+    @Test func forecastSavings_returnsProjectedActualAndGap() throws {
+        let engine = makeEngine()
+        let range = HomeQueryDateRange(startDate: date(2026, 4, 1), endDate: date(2026, 4, 30))
+        let query = HomeQuery(intent: .forecastSavings, dateRange: range)
+
+        let category = Category(name: "General", hexColor: "#00AA00")
+        let incomes = [
+            Income(source: "Paycheck", amount: 5_000, date: date(2026, 4, 1), isPlanned: true),
+            Income(source: "Paycheck", amount: 4_500, date: date(2026, 4, 2), isPlanned: false)
+        ]
+        let plannedExpenses = [
+            PlannedExpense(title: "Rent", plannedAmount: 2_000, actualAmount: 1_900, expenseDate: date(2026, 4, 3), category: category)
+        ]
+        let variableExpenses = [
+            VariableExpense(descriptionText: "Groceries", amount: 300, transactionDate: date(2026, 4, 4), category: category)
+        ]
+
+        let answer = engine.execute(
+            query: query,
+            categories: [category],
+            plannedExpenses: plannedExpenses,
+            variableExpenses: variableExpenses,
+            incomes: incomes,
+            now: date(2026, 4, 10)
+        )
+
+        #expect(answer.kind == .metric)
+        #expect(answer.title == "Forecast Savings")
+        #expect((answer.primaryValue ?? "").filter(\.isNumber).contains("3000"))
+        #expect(answer.rows.contains(where: { $0.title == "Actual savings" && $0.value.filter(\.isNumber).contains("2300") }))
+        #expect(answer.rows.contains(where: { $0.title == "Gap to projected" && $0.value.contains("Down") }))
+    }
+
+    @Test func nextPlannedExpense_returnsUpcomingBudgetGeneratedExpense() throws {
+        let engine = makeEngine()
+        let range = HomeQueryDateRange(startDate: date(2026, 4, 1), endDate: date(2026, 4, 30))
+        let query = HomeQuery(intent: .nextPlannedExpense, dateRange: range)
+
+        let category = Category(name: "Bills", hexColor: "#00AA00")
+        let budgetID = UUID()
+        let plannedExpenses = [
+            PlannedExpense(title: "Past Rent", plannedAmount: 1_200, expenseDate: date(2026, 4, 3), category: category, sourceBudgetID: budgetID),
+            PlannedExpense(title: "Phone", plannedAmount: 90, expenseDate: date(2026, 4, 12), category: category, sourceBudgetID: budgetID),
+            PlannedExpense(title: "Ignored Manual", plannedAmount: 45, expenseDate: date(2026, 4, 11), category: category)
+        ]
+
+        let answer = engine.execute(
+            query: query,
+            categories: [category],
+            plannedExpenses: plannedExpenses,
+            variableExpenses: [],
+            now: date(2026, 4, 10)
+        )
+
+        #expect(answer.kind == .metric)
+        #expect(answer.title == "Next Planned Expense")
+        #expect((answer.primaryValue ?? "").filter(\.isNumber).contains("90"))
+        #expect(answer.rows.contains(where: { $0.title == "Expense" && $0.value == "Phone" }))
+    }
+
+    @Test func spendTrendsSummary_returnsTotalAndTopCategories() throws {
+        let engine = makeEngine()
+        let range = HomeQueryDateRange(startDate: date(2026, 4, 1), endDate: date(2026, 4, 30))
+        let query = HomeQuery(intent: .spendTrendsSummary, dateRange: range)
+
+        let groceries = Category(name: "Groceries", hexColor: "#00AA00")
+        let travel = Category(name: "Travel", hexColor: "#0000AA")
+        let plannedExpenses = [
+            PlannedExpense(title: "Flight", plannedAmount: 700, expenseDate: date(2026, 4, 2), category: travel),
+            PlannedExpense(title: "Market Plan", plannedAmount: 150, expenseDate: date(2026, 4, 5), category: groceries)
+        ]
+        let variableExpenses = [
+            VariableExpense(descriptionText: "Market", amount: 200, transactionDate: date(2026, 4, 6), category: groceries)
+        ]
+
+        let answer = engine.execute(
+            query: query,
+            categories: [groceries, travel],
+            plannedExpenses: plannedExpenses,
+            variableExpenses: variableExpenses,
+            now: date(2026, 4, 10)
+        )
+
+        #expect(answer.kind == .list)
+        #expect(answer.title == "Spend Trends")
+        #expect((answer.primaryValue ?? "").filter(\.isNumber).contains("1050"))
+        #expect(answer.rows.contains(where: { $0.title == "Top category" && $0.value.contains("Travel") }))
+    }
+
+    @Test func cardSnapshotSummary_returnsTotalAndRecentItems() throws {
+        let engine = makeEngine()
+        let range = HomeQueryDateRange(startDate: date(2026, 4, 1), endDate: date(2026, 4, 30))
+        let query = HomeQuery(intent: .cardSnapshotSummary, dateRange: range, targetName: "Apple Card")
+
+        let category = Category(name: "General", hexColor: "#00AA00")
+        let appleCard = Card(name: "Apple Card")
+        let plannedExpenses = [
+            PlannedExpense(title: "Subscription", plannedAmount: 20, expenseDate: date(2026, 4, 8), card: appleCard, category: category)
+        ]
+        let variableExpenses = [
+            VariableExpense(descriptionText: "Coffee", amount: 5, transactionDate: date(2026, 4, 9), card: appleCard, category: category),
+            VariableExpense(descriptionText: "Dinner", amount: 40, transactionDate: date(2026, 4, 10), card: appleCard, category: category)
+        ]
+
+        let answer = engine.execute(
+            query: query,
+            categories: [category],
+            plannedExpenses: plannedExpenses,
+            variableExpenses: variableExpenses,
+            now: date(2026, 4, 10)
+        )
+
+        #expect(answer.kind == .list)
+        #expect(answer.title == "Apple Card Snapshot")
+        #expect((answer.primaryValue ?? "").filter(\.isNumber).contains("65"))
+        #expect(answer.rows.first?.title == "Dinner")
+    }
+
     // MARK: - Helpers
 
     private func makeEngine() -> HomeQueryEngine {
