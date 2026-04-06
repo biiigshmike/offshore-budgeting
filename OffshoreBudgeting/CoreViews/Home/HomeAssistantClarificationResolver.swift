@@ -24,6 +24,7 @@ enum HomeAssistantClarificationReason: String, CaseIterable, Hashable {
     case missingCategoryTarget
     case missingCardTarget
     case missingIncomeSourceTarget
+    case missingMerchantTarget
     case broadPrompt
     case lowConfidenceLanguage
 
@@ -39,6 +40,8 @@ enum HomeAssistantClarificationReason: String, CaseIterable, Hashable {
             return "Choose a card, or run it across all cards."
         case .missingIncomeSourceTarget:
             return "Choose an income source, or run it across all sources."
+        case .missingMerchantTarget:
+            return "Choose a merchant, or start with top merchants."
         case .broadPrompt:
             return "Your request is broad, so narrowing will improve precision."
         case .lowConfidenceLanguage:
@@ -84,6 +87,7 @@ struct HomeAssistantClarificationResolver {
             suggestions: suggestions,
             shouldRunBestEffort: plan.confidenceBand == .medium
                 && reasons.contains(.missingComparisonDate) == false
+                && reasons.contains(.missingMerchantTarget) == false
         )
     }
 
@@ -129,6 +133,8 @@ struct HomeAssistantClarificationResolver {
                 && normalizedPrompt.contains("all sources") == false
             {
                 reasons.append(.missingIncomeSourceTarget)
+            } else if requiresMerchantTarget(plan.metric) {
+                reasons.append(.missingMerchantTarget)
             }
         }
 
@@ -259,6 +265,29 @@ struct HomeAssistantClarificationResolver {
             )
         }
 
+        if reasons.contains(.missingMerchantTarget) {
+            suggestions.append(
+                HomeAssistantSuggestion(
+                    title: "Top merchants",
+                    query: HomeQuery(
+                        intent: .topMerchantsThisMonth,
+                        dateRange: plan.dateRange ?? monthRange(containing: now),
+                        resultLimit: 3
+                    )
+                )
+            )
+            suggestions.append(
+                HomeAssistantSuggestion(
+                    title: "Largest recent expenses",
+                    query: HomeQuery(
+                        intent: .largestRecentTransactions,
+                        dateRange: plan.dateRange ?? monthRange(containing: now),
+                        resultLimit: 5
+                    )
+                )
+            )
+        }
+
         if reasons.contains(.broadPrompt) {
             suggestions.append(
                 HomeAssistantSuggestion(
@@ -382,7 +411,7 @@ struct HomeAssistantClarificationResolver {
             return false
         case .savingsAverageRecentPeriods, .incomeSourceShareTrend, .categorySpendShareTrend:
             return false
-        case .overview, .spendTotal, .topCategories, .monthComparison, .categoryMonthComparison, .cardMonthComparison, .incomeSourceMonthComparison, .largestTransactions, .cardSpendTotal, .cardVariableSpendingHabits, .incomeAverageActual, .savingsStatus, .incomeSourceShare, .categorySpendShare, .presetDueSoon, .categoryPotentialSavings, .categoryReallocationGuidance, .safeSpendToday, .forecastSavings, .nextPlannedExpense, .spendTrendsSummary, .cardSnapshotSummary:
+        case .overview, .spendTotal, .topCategories, .monthComparison, .categoryMonthComparison, .cardMonthComparison, .incomeSourceMonthComparison, .merchantMonthComparison, .largestTransactions, .cardSpendTotal, .cardVariableSpendingHabits, .incomeAverageActual, .savingsStatus, .incomeSourceShare, .categorySpendShare, .presetDueSoon, .categoryPotentialSavings, .categoryReallocationGuidance, .safeSpendToday, .forecastSavings, .nextPlannedExpense, .spendTrendsSummary, .cardSnapshotSummary, .merchantSpendTotal, .topMerchants, .topCategoryChanges, .topCardChanges:
             return true
         }
     }
@@ -474,6 +503,15 @@ struct HomeAssistantClarificationResolver {
     private func requiresIncomeTarget(_ metric: HomeQueryMetric) -> Bool {
         switch metric {
         case .incomeSourceShare, .incomeSourceShareTrend, .incomeSourceMonthComparison:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func requiresMerchantTarget(_ metric: HomeQueryMetric) -> Bool {
+        switch metric {
+        case .merchantSpendTotal, .merchantMonthComparison:
             return true
         default:
             return false

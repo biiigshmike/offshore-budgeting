@@ -93,6 +93,12 @@ struct HomeQueryEngine {
                 incomes: incomes,
                 now: now
             )
+        case .compareMerchantThisMonthToPreviousMonth:
+            return merchantMonthComparisonAnswer(
+                query: query,
+                variableExpenses: variableExpenses,
+                now: now
+            )
 
         case .largestRecentTransactions:
             return largestRecentTransactionsAnswer(
@@ -245,6 +251,33 @@ struct HomeQueryEngine {
                 variableExpenses: variableExpenses,
                 now: now
             )
+        case .merchantSpendTotal:
+            return merchantSpendTotalAnswer(
+                query: query,
+                variableExpenses: variableExpenses,
+                now: now
+            )
+        case .topMerchantsThisMonth:
+            return topMerchantsThisMonthAnswer(
+                query: query,
+                variableExpenses: variableExpenses,
+                now: now
+            )
+        case .topCategoryChangesThisMonth:
+            return topCategoryChangesThisMonthAnswer(
+                query: query,
+                categories: categories,
+                plannedExpenses: plannedExpenses,
+                variableExpenses: variableExpenses,
+                now: now
+            )
+        case .topCardChangesThisMonth:
+            return topCardChangesThisMonthAnswer(
+                query: query,
+                plannedExpenses: plannedExpenses,
+                variableExpenses: variableExpenses,
+                now: now
+            )
         }
     }
 
@@ -275,6 +308,10 @@ struct HomeQueryEngine {
             HomeAssistantSuggestion(
                 title: "Next planned expense",
                 query: HomeQuery(intent: .nextPlannedExpense)
+            ),
+            HomeAssistantSuggestion(
+                title: "Top merchants this month",
+                query: HomeQuery(intent: .topMerchantsThisMonth)
             ),
             HomeAssistantSuggestion(
                 title: "Largest recent expenses",
@@ -2109,6 +2146,247 @@ struct HomeQueryEngine {
         )
     }
 
+    private func merchantSpendTotalAnswer(
+        query: HomeQuery,
+        variableExpenses: [VariableExpense],
+        now: Date
+    ) -> HomeAnswer {
+        let range = query.dateRange ?? monthRange(containing: now)
+        let merchantName = query.targetName?.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard let merchantName, merchantName.isEmpty == false else {
+            return HomeAnswer(
+                queryID: query.id,
+                kind: .message,
+                title: "Merchant Spend",
+                subtitle: "Choose a merchant to review.",
+                primaryValue: nil,
+                rows: []
+            )
+        }
+
+        let merchantKey = MerchantNormalizer.normalizeKey(merchantName)
+        let filtered = variableExpenses.filter { expense in
+            expense.transactionDate >= range.startDate
+                && expense.transactionDate <= range.endDate
+                && merchantMatches(targetKey: merchantKey, expenseDescription: expense.descriptionText)
+        }
+
+        guard filtered.isEmpty == false else {
+            return HomeAnswer(
+                queryID: query.id,
+                kind: .message,
+                title: "Merchant Spend (\(MerchantNormalizer.displayName(merchantName)))",
+                subtitle: "No merchant spending in this range.",
+                primaryValue: nil,
+                rows: []
+            )
+        }
+
+        let total = filtered.reduce(0.0) { $0 + $1.ledgerSignedAmount() }
+        let recentDate = filtered.map(\.transactionDate).max().map(shortDate) ?? "N/A"
+
+        return HomeAnswer(
+            queryID: query.id,
+            kind: .metric,
+            title: "Merchant Spend (\(MerchantNormalizer.displayName(merchantName)))",
+            subtitle: rangeLabel(for: range),
+            primaryValue: currency(total),
+            rows: [
+                HomeAnswerRow(title: "Transactions", value: "\(filtered.count)"),
+                HomeAnswerRow(title: "Latest activity", value: recentDate),
+                HomeAnswerRow(title: "Total", value: currency(total))
+            ]
+        )
+    }
+
+    private func merchantMonthComparisonAnswer(
+        query: HomeQuery,
+        variableExpenses: [VariableExpense],
+        now: Date
+    ) -> HomeAnswer {
+        let merchantName = query.targetName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let merchantName, merchantName.isEmpty == false else {
+            return HomeAnswer(
+                queryID: query.id,
+                kind: .message,
+                title: "Merchant Comparison",
+                subtitle: "Choose a merchant to compare.",
+                primaryValue: nil,
+                rows: []
+            )
+        }
+
+        let merchantKey = MerchantNormalizer.normalizeKey(merchantName)
+        let filtered = variableExpenses.filter {
+            merchantMatches(targetKey: merchantKey, expenseDescription: $0.descriptionText)
+        }
+        guard filtered.isEmpty == false else {
+            return HomeAnswer(
+                queryID: query.id,
+                kind: .message,
+                title: "Merchant Comparison (\(MerchantNormalizer.displayName(merchantName)))",
+                subtitle: "No matching merchant spending found.",
+                primaryValue: nil,
+                rows: []
+            )
+        }
+
+        let ranges = comparisonRanges(for: query, now: now)
+        let currentTotal = filtered.reduce(0.0) { partial, expense in
+            guard expense.transactionDate >= ranges.current.startDate, expense.transactionDate <= ranges.current.endDate else {
+                return partial
+            }
+            return partial + expense.ledgerSignedAmount()
+        }
+        let previousTotal = filtered.reduce(0.0) { partial, expense in
+            guard expense.transactionDate >= ranges.previous.startDate, expense.transactionDate <= ranges.previous.endDate else {
+                return partial
+            }
+            return partial + expense.ledgerSignedAmount()
+        }
+
+        return comparisonAnswer(
+            query: query,
+            currentTotal: currentTotal,
+            previousTotal: previousTotal,
+            currentRange: ranges.current,
+            previousRange: ranges.previous,
+            defaultTitle: "Merchant Comparison (\(MerchantNormalizer.displayName(merchantName)))",
+            periodTitle: "Merchant Comparison (\(MerchantNormalizer.displayName(merchantName)))"
+        )
+    }
+
+    private func topMerchantsThisMonthAnswer(
+        query: HomeQuery,
+        variableExpenses: [VariableExpense],
+        now: Date
+    ) -> HomeAnswer {
+        let range = query.dateRange ?? monthRange(containing: now)
+        let merchantTotals = merchantTotals(in: range, variableExpenses: variableExpenses)
+
+        guard merchantTotals.isEmpty == false else {
+            return HomeAnswer(
+                queryID: query.id,
+                kind: .message,
+                title: "Top Merchants",
+                subtitle: "No merchant spending in this range yet.",
+                primaryValue: nil,
+                rows: []
+            )
+        }
+
+        let rows = merchantTotals
+            .sorted { $0.total > $1.total }
+            .prefix(query.resultLimit)
+            .map { merchant in
+                HomeAnswerRow(title: merchant.name, value: currency(merchant.total))
+            }
+
+        return HomeAnswer(
+            queryID: query.id,
+            kind: .list,
+            title: "Top Merchants",
+            subtitle: rangeLabel(for: range),
+            primaryValue: rows.first?.value,
+            rows: Array(rows)
+        )
+    }
+
+    private func topCategoryChangesThisMonthAnswer(
+        query: HomeQuery,
+        categories: [Category],
+        plannedExpenses: [PlannedExpense],
+        variableExpenses: [VariableExpense],
+        now: Date
+    ) -> HomeAnswer {
+        let ranges = comparisonRanges(for: query, now: now)
+        let current = HomeCategoryMetricsCalculator.calculate(
+            categories: categories,
+            plannedExpenses: plannedExpenses,
+            variableExpenses: variableExpenses,
+            rangeStart: ranges.current.startDate,
+            rangeEnd: ranges.current.endDate
+        )
+        let previous = HomeCategoryMetricsCalculator.calculate(
+            categories: categories,
+            plannedExpenses: plannedExpenses,
+            variableExpenses: variableExpenses,
+            rangeStart: ranges.previous.startDate,
+            rangeEnd: ranges.previous.endDate
+        )
+
+        let deltas = rankedCategoryDeltas(current: current.metrics, previous: previous.metrics)
+        guard deltas.isEmpty == false else {
+            return HomeAnswer(
+                queryID: query.id,
+                kind: .message,
+                title: "Top Category Changes",
+                subtitle: "No category changes in these periods yet.",
+                primaryValue: nil,
+                rows: []
+            )
+        }
+
+        let rows = deltas.prefix(query.resultLimit).map { delta in
+            HomeAnswerRow(
+                title: delta.name,
+                value: "\(deltaSummary(delta.delta)) (\(currency(delta.current)) vs \(currency(delta.previous)))"
+            )
+        }
+
+        return HomeAnswer(
+            queryID: query.id,
+            kind: .list,
+            title: "Top Category Changes",
+            subtitle: "\(rangeLabel(for: ranges.current)) vs \(rangeLabel(for: ranges.previous))",
+            primaryValue: rows.first?.value,
+            rows: Array(rows)
+        )
+    }
+
+    private func topCardChangesThisMonthAnswer(
+        query: HomeQuery,
+        plannedExpenses: [PlannedExpense],
+        variableExpenses: [VariableExpense],
+        now: Date
+    ) -> HomeAnswer {
+        let ranges = comparisonRanges(for: query, now: now)
+        let deltas = rankedCardDeltas(
+            currentRange: ranges.current,
+            previousRange: ranges.previous,
+            plannedExpenses: plannedExpenses,
+            variableExpenses: variableExpenses
+        )
+
+        guard deltas.isEmpty == false else {
+            return HomeAnswer(
+                queryID: query.id,
+                kind: .message,
+                title: "Top Card Changes",
+                subtitle: "No card changes in these periods yet.",
+                primaryValue: nil,
+                rows: []
+            )
+        }
+
+        let rows = deltas.prefix(query.resultLimit).map { delta in
+            HomeAnswerRow(
+                title: delta.name,
+                value: "\(deltaSummary(delta.delta)) (\(currency(delta.current)) vs \(currency(delta.previous)))"
+            )
+        }
+
+        return HomeAnswer(
+            queryID: query.id,
+            kind: .list,
+            title: "Top Card Changes",
+            subtitle: "\(rangeLabel(for: ranges.current)) vs \(rangeLabel(for: ranges.previous))",
+            primaryValue: rows.first?.value,
+            rows: Array(rows)
+        )
+    }
+
     // MARK: - Helpers
 
     private func comparisonRanges(
@@ -2211,6 +2489,99 @@ struct HomeQueryEngine {
             guard income.date >= range.startDate, income.date <= range.endDate else { return partial }
             return partial + income.amount
         }
+    }
+
+    private func merchantTotals(
+        in range: HomeQueryDateRange,
+        variableExpenses: [VariableExpense]
+    ) -> [(name: String, total: Double)] {
+        var totalsByMerchant: [String: Double] = [:]
+        var displayNameByMerchant: [String: String] = [:]
+
+        for expense in variableExpenses {
+            guard expense.transactionDate >= range.startDate, expense.transactionDate <= range.endDate else {
+                continue
+            }
+
+            let key = MerchantNormalizer.normalizeKey(expense.descriptionText)
+            guard key.isEmpty == false else { continue }
+            totalsByMerchant[key, default: 0] += expense.ledgerSignedAmount()
+            displayNameByMerchant[key] = MerchantNormalizer.displayName(expense.descriptionText)
+        }
+
+        return totalsByMerchant.map { key, total in
+            (name: displayNameByMerchant[key] ?? key, total: total)
+        }
+    }
+
+    private func merchantMatches(
+        targetKey: String,
+        expenseDescription: String
+    ) -> Bool {
+        let normalizedExpense = MerchantNormalizer.normalizeKey(expenseDescription)
+        guard targetKey.isEmpty == false, normalizedExpense.isEmpty == false else {
+            return false
+        }
+
+        return normalizedExpense == targetKey
+            || normalizedExpense.hasPrefix(targetKey + " ")
+            || targetKey.hasPrefix(normalizedExpense + " ")
+    }
+
+    private func rankedCategoryDeltas(
+        current: [CategorySpendMetric],
+        previous: [CategorySpendMetric]
+    ) -> [(name: String, current: Double, previous: Double, delta: Double)] {
+        let currentByName = Dictionary(uniqueKeysWithValues: current.map { ($0.categoryName, $0.totalSpent) })
+        let previousByName = Dictionary(uniqueKeysWithValues: previous.map { ($0.categoryName, $0.totalSpent) })
+        let names = Set(currentByName.keys).union(previousByName.keys)
+
+        return names
+            .map { name in
+                let currentTotal = currentByName[name] ?? 0
+                let previousTotal = previousByName[name] ?? 0
+                return (name: name, current: currentTotal, previous: previousTotal, delta: currentTotal - previousTotal)
+            }
+            .filter { $0.current != 0 || $0.previous != 0 }
+            .sorted { abs($0.delta) > abs($1.delta) }
+    }
+
+    private func rankedCardDeltas(
+        currentRange: HomeQueryDateRange,
+        previousRange: HomeQueryDateRange,
+        plannedExpenses: [PlannedExpense],
+        variableExpenses: [VariableExpense]
+    ) -> [(name: String, current: Double, previous: Double, delta: Double)] {
+        func cardTotals(in range: HomeQueryDateRange) -> [String: Double] {
+            var totals: [String: Double] = [:]
+
+            for expense in plannedExpenses where expense.expenseDate >= range.startDate && expense.expenseDate <= range.endDate {
+                let name = expense.card?.name.trimmingCharacters(in: .whitespacesAndNewlines)
+                let cardName = (name?.isEmpty == false) ? name! : "Unassigned Card"
+                totals[cardName, default: 0] += expense.effectiveAmount()
+            }
+
+            for expense in variableExpenses where expense.transactionDate >= range.startDate && expense.transactionDate <= range.endDate {
+                let name = expense.card?.name.trimmingCharacters(in: .whitespacesAndNewlines)
+                let cardName = (name?.isEmpty == false) ? name! : "Unassigned Card"
+                totals[cardName, default: 0] += expense.ledgerSignedAmount()
+            }
+
+            return totals
+        }
+
+        let currentByName = cardTotals(in: currentRange)
+        let previousByName = cardTotals(in: previousRange)
+        let names = Set(currentByName.keys).union(previousByName.keys)
+
+        return names
+            .map { name in
+                let currentTotal = currentByName[name] ?? 0
+                let previousTotal = previousByName[name] ?? 0
+                return (name: name, current: currentTotal, previous: previousTotal, delta: currentTotal - previousTotal)
+            }
+            .filter { $0.current != 0 || $0.previous != 0 }
+            .sorted { abs($0.delta) > abs($1.delta) }
     }
 
     private func totalSpend(

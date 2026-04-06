@@ -1010,6 +1010,137 @@ struct HomeQueryEngineTests {
         #expect(answer.rows.first?.title == "Dinner")
     }
 
+    @Test func merchantSpendTotal_filtersVariableExpensesByNormalizedMerchant() throws {
+        let engine = makeEngine()
+        let range = HomeQueryDateRange(startDate: date(2026, 4, 1), endDate: date(2026, 4, 30))
+        let query = HomeQuery(intent: .merchantSpendTotal, dateRange: range, targetName: "Starbucks")
+
+        let variableExpenses = [
+            VariableExpense(descriptionText: "STARBUCKS #1234", amount: 8, transactionDate: date(2026, 4, 3)),
+            VariableExpense(descriptionText: "Starbucks Store 99", amount: 12, transactionDate: date(2026, 4, 6)),
+            VariableExpense(descriptionText: "Target", amount: 40, transactionDate: date(2026, 4, 6))
+        ]
+
+        let answer = engine.execute(
+            query: query,
+            categories: [],
+            plannedExpenses: [],
+            variableExpenses: variableExpenses,
+            now: date(2026, 4, 10)
+        )
+
+        #expect(answer.kind == .metric)
+        #expect(answer.title.contains("Starbucks"))
+        #expect((answer.primaryValue ?? "").filter(\.isNumber).contains("20"))
+    }
+
+    @Test func merchantMonthComparison_comparesNormalizedMerchantAcrossRanges() throws {
+        let engine = makeEngine()
+        let query = HomeQuery(intent: .compareMerchantThisMonthToPreviousMonth, targetName: "Starbucks")
+
+        let variableExpenses = [
+            VariableExpense(descriptionText: "STARBUCKS #1234", amount: 15, transactionDate: date(2026, 2, 4)),
+            VariableExpense(descriptionText: "Starbucks", amount: 10, transactionDate: date(2026, 1, 20)),
+            VariableExpense(descriptionText: "Target", amount: 99, transactionDate: date(2026, 2, 8))
+        ]
+
+        let answer = engine.execute(
+            query: query,
+            categories: [],
+            plannedExpenses: [],
+            variableExpenses: variableExpenses,
+            now: date(2026, 2, 15)
+        )
+
+        #expect(answer.kind == .comparison)
+        #expect(answer.title.contains("Starbucks"))
+        #expect((answer.primaryValue ?? "").contains("15"))
+        #expect(answer.rows[1].value.contains("10"))
+    }
+
+    @Test func topMerchantsThisMonth_returnsRankedMerchantRows() throws {
+        let engine = makeEngine()
+        let range = HomeQueryDateRange(startDate: date(2026, 4, 1), endDate: date(2026, 4, 30))
+        let query = HomeQuery(intent: .topMerchantsThisMonth, dateRange: range, resultLimit: 2)
+
+        let variableExpenses = [
+            VariableExpense(descriptionText: "Starbucks", amount: 20, transactionDate: date(2026, 4, 4)),
+            VariableExpense(descriptionText: "Target", amount: 75, transactionDate: date(2026, 4, 5)),
+            VariableExpense(descriptionText: "Trader Joe's", amount: 55, transactionDate: date(2026, 4, 6))
+        ]
+
+        let answer = engine.execute(
+            query: query,
+            categories: [],
+            plannedExpenses: [],
+            variableExpenses: variableExpenses,
+            now: date(2026, 4, 10)
+        )
+
+        #expect(answer.kind == .list)
+        #expect(answer.title == "Top Merchants")
+        #expect(answer.rows.count == 2)
+        #expect(answer.rows.first?.title == "Target")
+    }
+
+    @Test func topCategoryChangesThisMonth_ranksLargestCategoryDeltas() throws {
+        let engine = makeEngine()
+        let query = HomeQuery(intent: .topCategoryChangesThisMonth, resultLimit: 2)
+
+        let groceries = Category(name: "Groceries", hexColor: "#00AA00")
+        let travel = Category(name: "Travel", hexColor: "#0000AA")
+        let dining = Category(name: "Dining", hexColor: "#AA0000")
+        let plannedExpenses = [
+            PlannedExpense(title: "Groceries Current", plannedAmount: 500, expenseDate: date(2026, 2, 3), category: groceries),
+            PlannedExpense(title: "Groceries Previous", plannedAmount: 200, expenseDate: date(2026, 1, 3), category: groceries),
+            PlannedExpense(title: "Dining Current", plannedAmount: 100, expenseDate: date(2026, 2, 6), category: dining),
+            PlannedExpense(title: "Dining Previous", plannedAmount: 400, expenseDate: date(2026, 1, 6), category: dining),
+            PlannedExpense(title: "Travel Current", plannedAmount: 150, expenseDate: date(2026, 2, 10), category: travel)
+        ]
+
+        let answer = engine.execute(
+            query: query,
+            categories: [groceries, travel, dining],
+            plannedExpenses: plannedExpenses,
+            variableExpenses: [],
+            now: date(2026, 2, 15)
+        )
+
+        #expect(answer.kind == .list)
+        #expect(answer.title == "Top Category Changes")
+        #expect(answer.rows.count == 2)
+        #expect(answer.rows.first?.title == "Groceries" || answer.rows.first?.title == "Dining")
+    }
+
+    @Test func topCardChangesThisMonth_ranksLargestCardDeltas() throws {
+        let engine = makeEngine()
+        let query = HomeQuery(intent: .topCardChangesThisMonth, resultLimit: 2)
+
+        let category = Category(name: "General", hexColor: "#00AA00")
+        let appleCard = Card(name: "Apple Card")
+        let travelCard = Card(name: "Travel Card")
+        let plannedExpenses = [
+            PlannedExpense(title: "Apple Current", plannedAmount: 400, expenseDate: date(2026, 2, 3), card: appleCard, category: category),
+            PlannedExpense(title: "Apple Previous", plannedAmount: 100, expenseDate: date(2026, 1, 3), card: appleCard, category: category),
+            PlannedExpense(title: "Travel Previous", plannedAmount: 300, expenseDate: date(2026, 1, 8), card: travelCard, category: category)
+        ]
+        let variableExpenses = [
+            VariableExpense(descriptionText: "Travel Current", amount: 150, transactionDate: date(2026, 2, 9), card: travelCard, category: category)
+        ]
+
+        let answer = engine.execute(
+            query: query,
+            categories: [category],
+            plannedExpenses: plannedExpenses,
+            variableExpenses: variableExpenses,
+            now: date(2026, 2, 15)
+        )
+
+        #expect(answer.kind == .list)
+        #expect(answer.title == "Top Card Changes")
+        #expect(answer.rows.count == 2)
+    }
+
     // MARK: - Helpers
 
     private func makeEngine() -> HomeQueryEngine {

@@ -9,6 +9,8 @@ import Foundation
 
 enum HomeAssistantSignalTargetSource {
     case matchedEntity
+    case merchantPhrase
+    case weakMerchantPhrase
     case inferredComparisonText
 }
 
@@ -27,6 +29,7 @@ struct HomeAssistantIntentBuilder {
         case category
         case card
         case incomeSource
+        case merchant
     }
 
     private let categoryNames: [String]
@@ -84,25 +87,29 @@ struct HomeAssistantIntentBuilder {
         let explicitComparisonRequested = expectsExplicitComparisonDates(in: signals.rawPrompt)
         let explicitComparisonResolved = explicitComparisonRequested && dateRange != nil && comparisonDateRange != nil
         let matchedEntityTarget = signals.targetSource == .matchedEntity
-        let unresolvedComparisonTarget = signals.comparisonDetected
-            && signalTarget != nil
-            && signals.targetSource == .inferredComparisonText
-            && targetClassification == nil
-
-        if explicitComparisonResolved && matchedEntityTarget == false {
-            metric = .monthComparison
+        let weakMerchantTarget = signals.targetSource == .weakMerchantPhrase
+        if weakMerchantTarget && signals.comparisonDetected {
+            metric = .merchantMonthComparison
             targetName = nil
-        } else if unresolvedComparisonTarget {
-            metric = .categoryMonthComparison
+        } else if explicitComparisonResolved
+            && (signals.targetSource == .inferredComparisonText || (matchedEntityTarget == false && targetClassification != .merchant))
+        {
+            metric = .monthComparison
             targetName = nil
         } else if signals.comparisonDetected {
             if let targetClassification {
                 metric = scopedComparisonMetric(for: targetClassification)
+            } else if let signalTarget, signals.targetSource == .inferredComparisonText || signals.targetSource == .merchantPhrase {
+                metric = .merchantMonthComparison
+                targetName = signalTarget
             } else {
                 metric = .monthComparison
             }
         } else if let signalMetric = signals.metric, shouldOverrideMetric(current: metric, with: signalMetric) {
             metric = signalMetric
+            if targetName == nil {
+                targetName = signalTarget
+            }
         }
 
         let conflictDetected = hasConflict(
@@ -110,6 +117,7 @@ struct HomeAssistantIntentBuilder {
             signalTarget: signalTarget,
             comparisonDetected: signals.comparisonDetected,
             targetClassification: targetClassification,
+            weakMerchantTarget: weakMerchantTarget,
             explicitComparisonRequested: explicitComparisonRequested,
             comparisonDateRange: comparisonDateRange
         )
@@ -121,6 +129,7 @@ struct HomeAssistantIntentBuilder {
             explicitComparisonRequested: explicitComparisonRequested,
             explicitComparisonResolved: explicitComparisonResolved,
             scopedComparisonResolved: signals.comparisonDetected && targetClassification != nil,
+            weakMerchantTarget: weakMerchantTarget,
             injectedTarget: injectedTargetName != nil,
             injectedDateRange: injectedDateRange != nil,
             injectedComparisonDateRange: injectedComparisonDateRange != nil
@@ -149,6 +158,7 @@ struct HomeAssistantIntentBuilder {
         signalTarget: String?,
         comparisonDetected: Bool,
         targetClassification: ScopedComparisonTarget?,
+        weakMerchantTarget: Bool,
         explicitComparisonRequested: Bool,
         comparisonDateRange: HomeQueryDateRange?
     ) -> Bool {
@@ -158,6 +168,10 @@ struct HomeAssistantIntentBuilder {
         }
 
         if explicitComparisonRequested, comparisonDateRange == nil {
+            return true
+        }
+
+        if weakMerchantTarget {
             return true
         }
 
@@ -179,10 +193,15 @@ struct HomeAssistantIntentBuilder {
         explicitComparisonRequested: Bool,
         explicitComparisonResolved: Bool,
         scopedComparisonResolved: Bool,
+        weakMerchantTarget: Bool,
         injectedTarget: Bool,
         injectedDateRange: Bool,
         injectedComparisonDateRange: Bool
     ) -> HomeQueryConfidenceBand {
+        if weakMerchantTarget {
+            return .medium
+        }
+
         if explicitComparisonResolved {
             return .high
         }
@@ -263,7 +282,7 @@ struct HomeAssistantIntentBuilder {
             return .incomeSource
         }
 
-        return nil
+        return .merchant
     }
 
     private func scopedComparisonMetric(for target: ScopedComparisonTarget) -> HomeQueryMetric {
@@ -274,6 +293,8 @@ struct HomeAssistantIntentBuilder {
             return .cardMonthComparison
         case .incomeSource:
             return .incomeSourceMonthComparison
+        case .merchant:
+            return .merchantMonthComparison
         }
     }
 

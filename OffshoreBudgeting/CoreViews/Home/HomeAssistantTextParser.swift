@@ -45,7 +45,7 @@ struct HomeAssistantTextParser {
         let metric = intent.metric
 
         switch intent {
-        case .periodOverview, .spendThisMonth, .compareThisMonthToPreviousMonth, .compareCategoryThisMonthToPreviousMonth, .compareCardThisMonthToPreviousMonth, .compareIncomeSourceThisMonthToPreviousMonth, .cardSpendTotal, .incomeAverageActual, .savingsStatus, .incomeSourceShare, .categorySpendShare, .presetCategorySpend, .safeSpendToday, .forecastSavings, .nextPlannedExpense, .spendTrendsSummary, .cardSnapshotSummary:
+        case .periodOverview, .spendThisMonth, .compareThisMonthToPreviousMonth, .compareCategoryThisMonthToPreviousMonth, .compareCardThisMonthToPreviousMonth, .compareIncomeSourceThisMonthToPreviousMonth, .compareMerchantThisMonthToPreviousMonth, .cardSpendTotal, .incomeAverageActual, .savingsStatus, .incomeSourceShare, .categorySpendShare, .presetCategorySpend, .safeSpendToday, .forecastSavings, .nextPlannedExpense, .spendTrendsSummary, .cardSnapshotSummary, .merchantSpendTotal:
             return HomeQueryPlan(
                 metric: metric,
                 dateRange: dateRange,
@@ -62,7 +62,7 @@ struct HomeAssistantTextParser {
                 confidenceBand: confidenceBand,
                 periodUnit: periodUnit
             )
-        case .topCategoriesThisMonth, .largestRecentTransactions, .cardVariableSpendingHabits, .presetDueSoon, .presetHighestCost, .presetTopCategory, .categoryPotentialSavings, .categoryReallocationGuidance:
+        case .topCategoriesThisMonth, .largestRecentTransactions, .cardVariableSpendingHabits, .presetDueSoon, .presetHighestCost, .presetTopCategory, .categoryPotentialSavings, .categoryReallocationGuidance, .topMerchantsThisMonth, .topCategoryChangesThisMonth, .topCardChangesThisMonth:
             return HomeQueryPlan(
                 metric: metric,
                 dateRange: dateRange,
@@ -91,10 +91,6 @@ struct HomeAssistantTextParser {
     // MARK: - Matching
 
     private func resolvedIntent(from text: String) -> HomeQueryIntent? {
-        if matchesCompareIntent(in: text) {
-            return .compareThisMonthToPreviousMonth
-        }
-
         if matchesSavingsAverageIntent(in: text) {
             return .savingsAverageRecentPeriods
         }
@@ -117,6 +113,29 @@ struct HomeAssistantTextParser {
 
         if matchesCardSnapshotIntent(in: text) {
             return .cardSnapshotSummary
+        }
+
+        if matchesTopCategoryChangesIntent(in: text) {
+            return .topCategoryChangesThisMonth
+        }
+
+        if matchesTopCardChangesIntent(in: text) {
+            return .topCardChangesThisMonth
+        }
+
+        if matchesTopMerchantsIntent(in: text) {
+            return .topMerchantsThisMonth
+        }
+
+        if matchesMerchantSpendIntent(in: text) {
+            return .merchantSpendTotal
+        }
+
+        if matchesCompareIntent(in: text) {
+            if matchesMerchantCompareIntent(in: text) {
+                return .compareMerchantThisMonthToPreviousMonth
+            }
+            return .compareThisMonthToPreviousMonth
         }
 
         if matchesSavingsStatusIntent(in: text) {
@@ -256,12 +275,98 @@ struct HomeAssistantTextParser {
             && containsAny(text, keywords: summaryKeywords)
     }
 
+    private func matchesMerchantSpendIntent(in text: String) -> Bool {
+        let spendKeywords = ["spend", "spent", "spending", "expense", "expenses", "how much"]
+        let merchantKeywords = ["merchant", "merchants", "store", "stores"]
+        let merchantPhraseDetected = extractedMerchantPhraseCandidate(in: text) != nil
+        return containsAny(text, keywords: spendKeywords)
+            && ((containsAny(text, keywords: merchantKeywords) && containsAny(text, keywords: spendKeywords))
+                || merchantPhraseDetected)
+    }
+
+    private func matchesMerchantCompareIntent(in text: String) -> Bool {
+        let explicitMerchantKeywords = containsAny(text, keywords: ["merchant", "merchants", "store", "stores"])
+        let merchantPhraseDetected = extractedMerchantPhraseCandidate(in: text) != nil
+        return explicitMerchantKeywords || merchantPhraseDetected
+    }
+
+    private func matchesTopMerchantsIntent(in text: String) -> Bool {
+        let rankingKeywords = ["top", "highest", "most", "biggest", "largest"]
+        let merchantKeywords = ["merchant", "merchants", "store", "stores"]
+        return containsAny(text, keywords: rankingKeywords)
+            && containsAny(text, keywords: merchantKeywords)
+    }
+
+    private func matchesTopCategoryChangesIntent(in text: String) -> Bool {
+        let categoryKeywords = ["category", "categories"]
+        let changeKeywords = ["changed most", "change most", "increased most", "decreased most", "biggest change", "largest change", "top changes"]
+        return containsAny(text, keywords: categoryKeywords)
+            && containsAny(text, keywords: changeKeywords)
+    }
+
+    private func matchesTopCardChangesIntent(in text: String) -> Bool {
+        let cardKeywords = ["card", "cards"]
+        let changeKeywords = ["changed most", "change most", "increased most", "decreased most", "biggest change", "largest change", "top changes"]
+        return containsAny(text, keywords: cardKeywords)
+            && containsAny(text, keywords: changeKeywords)
+    }
+
     private func matchesSpendIntent(in text: String) -> Bool {
         let spendKeywords = [
             "spend", "spent", "spending", "expense", "expenses",
             "outflow", "total", "total spend", "how much"
         ]
         return containsAny(text, keywords: spendKeywords)
+    }
+
+    private func extractedMerchantPhraseCandidate(in text: String) -> String? {
+        let patterns = [
+            "\\b(?:spent|spend|spending|expense|expenses)\\s+at\\s+([a-z0-9 '&\\-\\.]+?)(?:\\s+(?:this|last|in|from|vs|versus|please|so|for)\\b|$)",
+            "\\b(?:spent|spend|spending|expense|expenses)\\s+on\\s+([a-z][a-z0-9 '&\\-\\.]*?)(?:\\s+(?:this|last|in|from|vs|versus|please|so|for)\\b|$)"
+        ]
+
+        for pattern in patterns {
+            guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else {
+                continue
+            }
+            let searchRange = NSRange(text.startIndex..., in: text)
+            guard let match = regex.firstMatch(in: text, options: [], range: searchRange),
+                  let candidateRange = Range(match.range(at: 1), in: text) else {
+                continue
+            }
+
+            let candidate = String(text[candidateRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+            if merchantCandidateLooksValid(candidate) {
+                return candidate
+            }
+        }
+
+        return nil
+    }
+
+    private func merchantCandidateLooksValid(_ candidate: String) -> Bool {
+        let normalized = candidate
+            .lowercased()
+            .replacingOccurrences(of: "[^a-z0-9\\s]", with: " ", options: .regularExpression)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard normalized.isEmpty == false else { return false }
+
+        let invalidSubstrings = [
+            "category", "categories", "preset", "presets", "period", "periods",
+            "month", "year", "week", "day", "today", "yesterday",
+            "income", "source", "sources", "card", "cards",
+            "groceries preset", "this category", "other categories"
+        ]
+        if invalidSubstrings.contains(where: normalized.contains) {
+            return false
+        }
+
+        if normalized.range(of: "^\\d{4}(-\\d{1,2}(-\\d{1,2})?)?$", options: .regularExpression) != nil {
+            return false
+        }
+
+        return normalized.contains(where: \.isLetter)
     }
 
     private func matchesTopCategoriesIntent(in text: String) -> Bool {
@@ -495,7 +600,7 @@ struct HomeAssistantTextParser {
         case .periodOverview:
             // Broad overview prompts are inherently less specific than direct metric requests.
             return .medium
-        case .spendThisMonth, .topCategoriesThisMonth, .compareThisMonthToPreviousMonth, .compareCategoryThisMonthToPreviousMonth, .compareCardThisMonthToPreviousMonth, .compareIncomeSourceThisMonthToPreviousMonth, .largestRecentTransactions, .cardSpendTotal, .cardVariableSpendingHabits, .incomeAverageActual, .savingsStatus, .savingsAverageRecentPeriods, .incomeSourceShare, .categorySpendShare, .incomeSourceShareTrend, .categorySpendShareTrend, .presetDueSoon, .presetHighestCost, .presetTopCategory, .presetCategorySpend, .categoryPotentialSavings, .categoryReallocationGuidance, .safeSpendToday, .forecastSavings, .nextPlannedExpense, .spendTrendsSummary, .cardSnapshotSummary:
+        case .spendThisMonth, .topCategoriesThisMonth, .compareThisMonthToPreviousMonth, .compareCategoryThisMonthToPreviousMonth, .compareCardThisMonthToPreviousMonth, .compareIncomeSourceThisMonthToPreviousMonth, .compareMerchantThisMonthToPreviousMonth, .largestRecentTransactions, .cardSpendTotal, .cardVariableSpendingHabits, .incomeAverageActual, .savingsStatus, .savingsAverageRecentPeriods, .incomeSourceShare, .categorySpendShare, .incomeSourceShareTrend, .categorySpendShareTrend, .presetDueSoon, .presetHighestCost, .presetTopCategory, .presetCategorySpend, .categoryPotentialSavings, .categoryReallocationGuidance, .safeSpendToday, .forecastSavings, .nextPlannedExpense, .spendTrendsSummary, .cardSnapshotSummary, .merchantSpendTotal, .topMerchantsThisMonth, .topCategoryChangesThisMonth, .topCardChangesThisMonth:
             return .high
         }
     }

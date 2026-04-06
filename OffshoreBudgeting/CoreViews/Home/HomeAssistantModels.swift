@@ -40,6 +40,7 @@ enum HomeQueryIntent: String, CaseIterable, Codable, Equatable {
     case compareCategoryThisMonthToPreviousMonth
     case compareCardThisMonthToPreviousMonth
     case compareIncomeSourceThisMonthToPreviousMonth
+    case compareMerchantThisMonthToPreviousMonth
     case largestRecentTransactions
     case cardSpendTotal
     case cardVariableSpendingHabits
@@ -61,6 +62,10 @@ enum HomeQueryIntent: String, CaseIterable, Codable, Equatable {
     case nextPlannedExpense
     case spendTrendsSummary
     case cardSnapshotSummary
+    case merchantSpendTotal
+    case topMerchantsThisMonth
+    case topCategoryChangesThisMonth
+    case topCardChangesThisMonth
 }
 
 enum HomeQueryMetric: String, Codable, Equatable {
@@ -71,6 +76,7 @@ enum HomeQueryMetric: String, Codable, Equatable {
     case categoryMonthComparison
     case cardMonthComparison
     case incomeSourceMonthComparison
+    case merchantMonthComparison
     case largestTransactions
     case cardSpendTotal
     case cardVariableSpendingHabits
@@ -92,6 +98,10 @@ enum HomeQueryMetric: String, Codable, Equatable {
     case nextPlannedExpense
     case spendTrendsSummary
     case cardSnapshotSummary
+    case merchantSpendTotal
+    case topMerchants
+    case topCategoryChanges
+    case topCardChanges
 }
 
 enum HomeQueryConfidenceBand: String, Codable, Equatable {
@@ -156,6 +166,8 @@ extension HomeQueryMetric {
             return .compareCardThisMonthToPreviousMonth
         case .incomeSourceMonthComparison:
             return .compareIncomeSourceThisMonthToPreviousMonth
+        case .merchantMonthComparison:
+            return .compareMerchantThisMonthToPreviousMonth
         case .largestTransactions:
             return .largestRecentTransactions
         case .cardSpendTotal:
@@ -198,6 +210,14 @@ extension HomeQueryMetric {
             return .spendTrendsSummary
         case .cardSnapshotSummary:
             return .cardSnapshotSummary
+        case .merchantSpendTotal:
+            return .merchantSpendTotal
+        case .topMerchants:
+            return .topMerchantsThisMonth
+        case .topCategoryChanges:
+            return .topCategoryChangesThisMonth
+        case .topCardChanges:
+            return .topCardChangesThisMonth
         }
     }
 }
@@ -219,6 +239,8 @@ extension HomeQueryIntent {
             return .cardMonthComparison
         case .compareIncomeSourceThisMonthToPreviousMonth:
             return .incomeSourceMonthComparison
+        case .compareMerchantThisMonthToPreviousMonth:
+            return .merchantMonthComparison
         case .largestRecentTransactions:
             return .largestTransactions
         case .cardSpendTotal:
@@ -261,6 +283,14 @@ extension HomeQueryIntent {
             return .spendTrendsSummary
         case .cardSnapshotSummary:
             return .cardSnapshotSummary
+        case .merchantSpendTotal:
+            return .merchantSpendTotal
+        case .topMerchantsThisMonth:
+            return .topMerchants
+        case .topCategoryChangesThisMonth:
+            return .topCategoryChanges
+        case .topCardChangesThisMonth:
+            return .topCardChanges
         }
     }
 }
@@ -271,6 +301,233 @@ struct HomeAssistantSessionContext {
     var lastResultLimit: Int?
     var lastTargetName: String?
     var lastPeriodUnit: HomeQueryPeriodUnit?
+    var recentAnswerContexts: [HomeAssistantAnswerContext] = []
+}
+
+enum HomeAssistantAnswerTargetType: String, Codable, Equatable {
+    case category
+    case card
+    case incomeSource
+    case merchant
+}
+
+struct HomeAssistantAnswerContext: Identifiable, Codable, Equatable {
+    let id: UUID
+    let query: HomeQuery
+    let answerTitle: String
+    let answerKind: HomeAnswerKind
+    let userPrompt: String?
+    let targetName: String?
+    let targetType: HomeAssistantAnswerTargetType?
+    let rowTitles: [String]
+    let rowValues: [String]
+    let scenarioPercent: Double?
+    let generatedAt: Date
+
+    init(
+        id: UUID = UUID(),
+        query: HomeQuery,
+        answerTitle: String,
+        answerKind: HomeAnswerKind,
+        userPrompt: String? = nil,
+        targetName: String? = nil,
+        targetType: HomeAssistantAnswerTargetType? = nil,
+        rowTitles: [String] = [],
+        rowValues: [String] = [],
+        scenarioPercent: Double? = nil,
+        generatedAt: Date = Date()
+    ) {
+        self.id = id
+        self.query = query
+        self.answerTitle = answerTitle
+        self.answerKind = answerKind
+        self.userPrompt = userPrompt
+        self.targetName = targetName
+        self.targetType = targetType
+        self.rowTitles = rowTitles
+        self.rowValues = rowValues
+        self.scenarioPercent = scenarioPercent
+        self.generatedAt = generatedAt
+    }
+}
+
+enum HomeAssistantFollowUpAnchorDecision: Equatable {
+    case none
+    case matched(HomeAssistantAnswerContext)
+    case ambiguous([HomeAssistantAnswerContext])
+}
+
+struct HomeAssistantFollowUpAnchorResolver {
+    private static let recentContextLimit = 3
+
+    func resolve(
+        prompt: String,
+        recentContexts: [HomeAssistantAnswerContext]
+    ) -> HomeAssistantFollowUpAnchorDecision {
+        let normalizedPrompt = normalized(prompt)
+        guard isFollowUpShaped(normalizedPrompt) else { return .none }
+
+        let candidates = Array(recentContexts.suffix(Self.recentContextLimit).reversed())
+        guard candidates.isEmpty == false else { return .none }
+
+        let scored = candidates
+            .map { (context: $0, score: score($0, normalizedPrompt: normalizedPrompt)) }
+            .filter { $0.score > 0 }
+            .sorted { lhs, rhs in
+                if lhs.score == rhs.score {
+                    return lhs.context.generatedAt > rhs.context.generatedAt
+                }
+                return lhs.score > rhs.score
+            }
+
+        guard let top = scored.first else { return .none }
+        guard top.score >= 6 else { return .none }
+
+        if scored.count > 1, let second = scored.dropFirst().first, top.score - second.score <= 1 {
+            return .ambiguous([top.context, second.context])
+        }
+
+        return .matched(top.context)
+    }
+
+    private func isFollowUpShaped(_ normalizedPrompt: String) -> Bool {
+        let followUpPhrases = [
+            "that", "this", "it", "those", "them",
+            "how about", "what about", "and if", "same", "same for", "again",
+            "instead", "will that", "does that", "is that right", "so if",
+            "reduce", "increase", "cut", "save", "reallocate", "rebalance"
+        ]
+        return followUpPhrases.contains(where: { normalizedPrompt.contains($0) })
+    }
+
+    private func score(
+        _ context: HomeAssistantAnswerContext,
+        normalizedPrompt: String
+    ) -> Int {
+        var score = 0
+        let promptTokens = significantTokens(in: normalizedPrompt)
+
+        if normalizedPrompt.contains("that")
+            || normalizedPrompt.contains("this")
+            || normalizedPrompt.contains("it")
+            || normalizedPrompt.contains("same")
+            || normalizedPrompt.contains("instead")
+        {
+            score += 2
+        }
+
+        if let targetName = context.targetName {
+            let normalizedTarget = normalized(targetName)
+            if normalizedPrompt.contains(normalizedTarget) {
+                score += 5
+            }
+
+            let targetTokens = significantTokens(in: normalizedTarget)
+            let overlap = promptTokens.intersection(targetTokens).count
+            score += min(6, overlap * 3)
+        }
+
+        let rowTokenOverlap = rowTokenOverlapScore(context: context, promptTokens: promptTokens)
+        score += rowTokenOverlap
+
+        if let scenarioPercent = context.scenarioPercent,
+           let promptPercent = extractedPercent(from: normalizedPrompt),
+           abs(promptPercent - scenarioPercent) < 0.001 {
+            score += 3
+        } else if extractedPercent(from: normalizedPrompt) != nil {
+            score += 1
+        }
+
+        if promptHasDateLanguage(normalizedPrompt),
+           context.query.dateRange != nil || context.query.comparisonDateRange != nil {
+            score += 1
+        }
+
+        score += metricFamilyCueScore(context: context, normalizedPrompt: normalizedPrompt)
+        return score
+    }
+
+    private func rowTokenOverlapScore(
+        context: HomeAssistantAnswerContext,
+        promptTokens: Set<String>
+    ) -> Int {
+        let rowTokens = significantTokens(
+            in: (context.rowTitles + context.rowValues).joined(separator: " ")
+        )
+        let overlap = promptTokens.intersection(rowTokens).count
+        return min(4, overlap * 2)
+    }
+
+    private func metricFamilyCueScore(
+        context: HomeAssistantAnswerContext,
+        normalizedPrompt: String
+    ) -> Int {
+        switch context.query.intent.metric {
+        case .categoryReallocationGuidance:
+            if ["reduce", "increase", "save", "reallocate", "rebalance"].contains(where: normalizedPrompt.contains) {
+                return 4
+            }
+        case .categoryPotentialSavings:
+            if ["reduce", "cut", "save", "savings", "decrease"].contains(where: normalizedPrompt.contains) {
+                return 4
+            }
+        case .monthComparison, .categoryMonthComparison, .cardMonthComparison, .incomeSourceMonthComparison, .merchantMonthComparison:
+            if ["compare", "vs", "versus", "difference", "changed", "instead"].contains(where: normalizedPrompt.contains) {
+                return 4
+            }
+        case .merchantSpendTotal:
+            if ["merchant", "spend", "spent", "how much"].contains(where: normalizedPrompt.contains) {
+                return 2
+            }
+        default:
+            break
+        }
+        return 0
+    }
+
+    private func promptHasDateLanguage(_ normalizedPrompt: String) -> Bool {
+        let patterns = [
+            "\\b(jan|january|feb|february|mar|march|apr|april|may|jun|june|jul|july|aug|august|sep|sept|september|oct|october|nov|november|dec|december|today|yesterday|week|month|year)\\b",
+            "\\d{4}-\\d{1,2}-\\d{1,2}"
+        ]
+        return patterns.contains { pattern in
+            normalizedPrompt.range(of: pattern, options: .regularExpression) != nil
+        }
+    }
+
+    private func extractedPercent(from normalizedPrompt: String) -> Double? {
+        guard let regex = try? NSRegularExpression(pattern: "(\\d+(?:\\.\\d+)?)\\s*%", options: []) else {
+            return nil
+        }
+        let searchRange = NSRange(normalizedPrompt.startIndex..., in: normalizedPrompt)
+        guard let match = regex.firstMatch(in: normalizedPrompt, options: [], range: searchRange),
+              let valueRange = Range(match.range(at: 1), in: normalizedPrompt) else {
+            return nil
+        }
+        return Double(normalizedPrompt[valueRange])
+    }
+
+    private func significantTokens(in text: String) -> Set<String> {
+        let stopWords: Set<String> = [
+            "the", "and", "for", "that", "this", "with", "from", "what", "about",
+            "same", "will", "does", "mean", "your", "have", "been", "into", "than",
+            "please", "month", "year"
+        ]
+        return Set(
+            normalized(text)
+                .split(separator: " ")
+                .map(String.init)
+                .filter { $0.count > 2 && stopWords.contains($0) == false }
+        )
+    }
+
+    private func normalized(_ text: String) -> String {
+        text
+            .lowercased()
+            .replacingOccurrences(of: "[^a-z0-9\\s%]", with: " ", options: .regularExpression)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 }
 
 struct HomeQuery: Identifiable, Codable, Equatable {
@@ -323,7 +580,9 @@ struct HomeQuery: Identifiable, Codable, Equatable {
             baseline = 1
         case .categoryPotentialSavings, .categoryReallocationGuidance:
             baseline = 3
-        case .spendThisMonth, .compareThisMonthToPreviousMonth, .compareCategoryThisMonthToPreviousMonth, .compareCardThisMonthToPreviousMonth, .compareIncomeSourceThisMonthToPreviousMonth, .cardSpendTotal, .incomeAverageActual, .savingsStatus, .incomeSourceShare, .categorySpendShare, .safeSpendToday, .forecastSavings, .nextPlannedExpense, .spendTrendsSummary, .cardSnapshotSummary:
+        case .topMerchantsThisMonth, .topCategoryChangesThisMonth, .topCardChangesThisMonth:
+            baseline = 3
+        case .spendThisMonth, .compareThisMonthToPreviousMonth, .compareCategoryThisMonthToPreviousMonth, .compareCardThisMonthToPreviousMonth, .compareIncomeSourceThisMonthToPreviousMonth, .compareMerchantThisMonthToPreviousMonth, .cardSpendTotal, .incomeAverageActual, .savingsStatus, .incomeSourceShare, .categorySpendShare, .safeSpendToday, .forecastSavings, .nextPlannedExpense, .spendTrendsSummary, .cardSnapshotSummary, .merchantSpendTotal:
             baseline = 1
         }
 

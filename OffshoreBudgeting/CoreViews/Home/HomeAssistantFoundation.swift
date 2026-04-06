@@ -169,6 +169,7 @@ struct HomeAssistantPanelView: View {
     private let entityMatcher = HomeAssistantEntityMatcher()
     private let aliasMatcher = HomeAssistantAliasMatcher()
     private let mutationService = HomeAssistantMutationService()
+    private let followUpAnchorResolver = HomeAssistantFollowUpAnchorResolver()
     private var intentBuilder: HomeAssistantIntentBuilder {
         HomeAssistantIntentBuilder(
             categoryNames: categories.map(\.name),
@@ -926,6 +927,12 @@ struct HomeAssistantPanelView: View {
         )
         
         updateSessionContext(after: query)
+        rememberAnswerContext(
+            for: query,
+            rawAnswer: baseAnswer,
+            presentedAnswer: answer,
+            userPrompt: userPrompt
+        )
         appendAnswer(answer)
     }
     
@@ -946,6 +953,10 @@ struct HomeAssistantPanelView: View {
         }
         
         if handleConversationalPrompt(prompt) {
+            return
+        }
+
+        if handleAnchoredFollowUpPrompt(prompt) {
             return
         }
         
@@ -2997,6 +3008,10 @@ struct HomeAssistantPanelView: View {
                     return "incomeSource"
                 }
                 return "matchedEntity"
+            case .merchantPhrase?:
+                return "merchant"
+            case .weakMerchantPhrase?:
+                return "merchantCandidate"
             case .inferredComparisonText?:
                 return "unresolved"
             case nil:
@@ -3082,6 +3097,10 @@ struct HomeAssistantPanelView: View {
         switch source {
         case .matchedEntity:
             return "matchedEntity"
+        case .merchantPhrase:
+            return "merchantPhrase"
+        case .weakMerchantPhrase:
+            return "weakMerchantPhrase"
         case .inferredComparisonText:
             return "inferredComparisonText"
         }
@@ -3369,7 +3388,8 @@ struct HomeAssistantPanelView: View {
         
         let shouldRunBestEffort = plan.confidenceBand == .medium
             && reasons.contains(.missingComparisonDate) == false
-        
+            && reasons.contains(.missingMerchantTarget) == false
+
         return HomeAssistantClarificationPlan(
             reasons: reasons,
             subtitle: subtitle,
@@ -3438,6 +3458,8 @@ struct HomeAssistantPanelView: View {
                         && normalizedPrompt.contains("all sources") == false
             {
                 reasons.append(.missingIncomeSourceTarget)
+            } else if requiresMerchantTarget(plan.metric) {
+                reasons.append(.missingMerchantTarget)
             }
         }
         
@@ -3563,6 +3585,29 @@ struct HomeAssistantPanelView: View {
                 )
             )
         }
+
+        if reasons.contains(.missingMerchantTarget) {
+            suggestions.append(
+                HomeAssistantSuggestion(
+                    title: "Top merchants",
+                    query: HomeQuery(
+                        intent: .topMerchantsThisMonth,
+                        dateRange: plan.dateRange ?? monthRange(containing: now),
+                        resultLimit: 3
+                    )
+                )
+            )
+            suggestions.append(
+                HomeAssistantSuggestion(
+                    title: "Largest recent expenses",
+                    query: HomeQuery(
+                        intent: .largestRecentTransactions,
+                        dateRange: plan.dateRange ?? monthRange(containing: now),
+                        resultLimit: 5
+                    )
+                )
+            )
+        }
         
         if reasons.contains(.broadPrompt) {
             suggestions.append(
@@ -3677,7 +3722,7 @@ struct HomeAssistantPanelView: View {
             return false
         case .savingsAverageRecentPeriods, .incomeSourceShareTrend, .categorySpendShareTrend:
             return false
-        case .overview, .spendTotal, .topCategories, .monthComparison, .categoryMonthComparison, .cardMonthComparison, .incomeSourceMonthComparison, .largestTransactions, .cardSpendTotal, .cardVariableSpendingHabits, .incomeAverageActual, .savingsStatus, .incomeSourceShare, .categorySpendShare, .presetDueSoon, .categoryPotentialSavings, .categoryReallocationGuidance, .safeSpendToday, .forecastSavings, .nextPlannedExpense, .spendTrendsSummary, .cardSnapshotSummary:
+        case .overview, .spendTotal, .topCategories, .monthComparison, .categoryMonthComparison, .cardMonthComparison, .incomeSourceMonthComparison, .merchantMonthComparison, .largestTransactions, .cardSpendTotal, .cardVariableSpendingHabits, .incomeAverageActual, .savingsStatus, .incomeSourceShare, .categorySpendShare, .presetDueSoon, .categoryPotentialSavings, .categoryReallocationGuidance, .safeSpendToday, .forecastSavings, .nextPlannedExpense, .spendTrendsSummary, .cardSnapshotSummary, .merchantSpendTotal, .topMerchants, .topCategoryChanges, .topCardChanges:
             return true
         }
     }
@@ -3736,6 +3781,15 @@ struct HomeAssistantPanelView: View {
     private func requiresIncomeTarget(_ metric: HomeQueryMetric) -> Bool {
         switch metric {
         case .incomeSourceShare, .incomeSourceShareTrend, .incomeSourceMonthComparison:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func requiresMerchantTarget(_ metric: HomeQueryMetric) -> Bool {
+        switch metric {
+        case .merchantSpendTotal, .merchantMonthComparison:
             return true
         default:
             return false
@@ -3801,6 +3855,199 @@ struct HomeAssistantPanelView: View {
             sessionContext.lastResultLimit = nil
         }
     }
+
+    private func rememberAnswerContext(
+        for query: HomeQuery,
+        rawAnswer: HomeAnswer,
+        presentedAnswer: HomeAnswer,
+        userPrompt: String?
+    ) {
+        let context = HomeAssistantAnswerContext(
+            query: query,
+            answerTitle: presentedAnswer.title,
+            answerKind: rawAnswer.kind,
+            userPrompt: userPrompt,
+            targetName: query.targetName,
+            targetType: targetType(for: query.intent.metric),
+            rowTitles: Array(rawAnswer.rows.prefix(5).map(\.title)),
+            rowValues: Array(rawAnswer.rows.prefix(5).map(\.value)),
+            scenarioPercent: extractedPercentValue(from: rawAnswer.subtitle ?? userPrompt ?? ""),
+            generatedAt: presentedAnswer.generatedAt
+        )
+
+        sessionContext.recentAnswerContexts.append(context)
+        if sessionContext.recentAnswerContexts.count > 3 {
+            sessionContext.recentAnswerContexts = Array(sessionContext.recentAnswerContexts.suffix(3))
+        }
+    }
+
+    private func targetType(for metric: HomeQueryMetric) -> HomeAssistantAnswerTargetType? {
+        switch metric {
+        case .categorySpendShare, .categorySpendShareTrend, .categoryPotentialSavings, .categoryReallocationGuidance, .categoryMonthComparison:
+            return .category
+        case .cardSpendTotal, .cardVariableSpendingHabits, .cardMonthComparison, .cardSnapshotSummary, .topCardChanges:
+            return .card
+        case .incomeAverageActual, .incomeSourceShare, .incomeSourceShareTrend, .incomeSourceMonthComparison:
+            return .incomeSource
+        case .merchantSpendTotal, .merchantMonthComparison, .topMerchants:
+            return .merchant
+        default:
+            return nil
+        }
+    }
+
+    private func extractedPercentValue(from text: String) -> Double? {
+        let normalized = normalizedPrompt(text)
+        guard let regex = try? NSRegularExpression(pattern: "(\\d+(?:\\.\\d+)?)\\s*%", options: []) else {
+            return nil
+        }
+        let searchRange = NSRange(normalized.startIndex..., in: normalized)
+        guard let match = regex.firstMatch(in: normalized, options: [], range: searchRange),
+              let valueRange = Range(match.range(at: 1), in: normalized) else {
+            return nil
+        }
+        return Double(normalized[valueRange])
+    }
+
+    private func handleAnchoredFollowUpPrompt(_ rawPrompt: String) -> Bool {
+        let decision = followUpAnchorResolver.resolve(
+            prompt: rawPrompt,
+            recentContexts: sessionContext.recentAnswerContexts
+        )
+
+        switch decision {
+        case .none:
+            return false
+        case let .matched(context):
+            guard let plan = anchoredFollowUpPlan(for: rawPrompt, context: context) else {
+                return false
+            }
+            handleResolvedPlan(
+                plan,
+                rawPrompt: rawPrompt,
+                allowsBroadBundle: false,
+                source: .contextual
+            )
+            return true
+        case let .ambiguous(contexts):
+            presentAnchoredFollowUpClarification(contexts, userPrompt: rawPrompt)
+            return true
+        }
+    }
+
+    private func anchoredFollowUpPlan(
+        for rawPrompt: String,
+        context: HomeAssistantAnswerContext
+    ) -> HomeQueryPlan? {
+        let normalized = normalizedPrompt(rawPrompt)
+        let parsedDateRange = parser.parseDateRange(rawPrompt, defaultPeriodUnit: defaultQueryPeriodUnit)
+        let parsedComparisonRanges = extractedComparisonDateRanges(for: rawPrompt)
+        let parsedLimit = parser.parseLimit(rawPrompt)
+
+        var metric = context.query.intent.metric
+        var targetName = resolvedAnchoredTargetName(for: rawPrompt, context: context) ?? context.targetName
+        var confidenceBand: HomeQueryConfidenceBand = .high
+
+        if context.query.intent.metric == .categoryReallocationGuidance,
+           ["save", "savings", "cut", "reduce", "decrease"].contains(where: normalized.contains) {
+            metric = .categoryPotentialSavings
+        } else if context.query.intent.metric == .categoryPotentialSavings,
+                  ["reallocate", "rebalance", "other categories", "increase"].contains(where: normalized.contains) {
+            metric = .categoryReallocationGuidance
+        }
+
+        if targetName == nil {
+            targetName = context.targetName
+            confidenceBand = .medium
+        }
+
+        return HomeQueryPlan(
+            metric: metric,
+            dateRange: parsedComparisonRanges?.primary ?? parsedDateRange ?? context.query.dateRange,
+            comparisonDateRange: parsedComparisonRanges?.comparison ?? context.query.comparisonDateRange,
+            resultLimit: parsedLimit ?? context.query.resultLimit,
+            confidenceBand: confidenceBand,
+            targetName: targetName,
+            periodUnit: context.query.periodUnit
+        )
+    }
+
+    private func resolvedAnchoredTargetName(
+        for rawPrompt: String,
+        context: HomeAssistantAnswerContext
+    ) -> String? {
+        switch context.targetType {
+        case .category:
+            return aliasTarget(in: rawPrompt, entityType: .category)
+                ?? entityMatcher.bestCategoryMatch(in: rawPrompt, categories: categories)
+                ?? bestPartialCategoryMatch(in: rawPrompt, anchoredTarget: context.targetName)
+        case .card:
+            return aliasTarget(in: rawPrompt, entityType: .card)
+                ?? entityMatcher.bestCardMatch(in: rawPrompt, cards: cards)
+        case .incomeSource:
+            return aliasTarget(in: rawPrompt, entityType: .incomeSource)
+                ?? entityMatcher.bestIncomeSourceMatch(in: rawPrompt, incomes: incomes)
+        case .merchant:
+            return extractedMerchantTarget(from: rawPrompt) ?? context.targetName
+        case nil:
+            return context.targetName
+        }
+    }
+
+    private func bestPartialCategoryMatch(
+        in rawPrompt: String,
+        anchoredTarget: String?
+    ) -> String? {
+        guard let anchoredTarget else { return nil }
+        let promptTokens = significantTokens(in: rawPrompt)
+        let anchoredTokens = significantTokens(in: anchoredTarget)
+        guard promptTokens.intersection(anchoredTokens).isEmpty == false else { return nil }
+        return anchoredTarget
+    }
+
+    private func significantTokens(in text: String) -> Set<String> {
+        let stopWords: Set<String> = [
+            "the", "and", "for", "that", "this", "with", "from", "what", "about",
+            "same", "will", "does", "mean", "your", "have", "been", "into", "than",
+            "please", "month", "year", "save", "savings", "reduce", "increase"
+        ]
+
+        return Set(
+            normalizedPrompt(text)
+                .split(separator: " ")
+                .map(String.init)
+                .filter { $0.count > 2 && stopWords.contains($0) == false }
+        )
+    }
+
+    private func presentAnchoredFollowUpClarification(
+        _ contexts: [HomeAssistantAnswerContext],
+        userPrompt: String
+    ) {
+        clarificationSuggestions = contexts.map { context in
+            HomeAssistantSuggestion(
+                title: context.targetName ?? context.answerTitle,
+                query: context.query
+            )
+        }
+        lastClarificationReasons = []
+
+        appendAnswer(
+            HomeAnswer(
+                queryID: UUID(),
+                kind: .message,
+                userPrompt: userPrompt,
+                title: String(localized: "assistant.quickClarification", defaultValue: "Quick clarification", comment: "Assistant clarification card title."),
+                subtitle: "I found more than one recent answer this could refer to. Pick the one you want to continue from.",
+                rows: contexts.prefix(2).map { context in
+                    HomeAnswerRow(
+                        title: context.targetName ?? context.answerTitle,
+                        value: context.answerTitle
+                    )
+                }
+            )
+        )
+    }
     
     private func contextualPlan(for rawPrompt: String) -> HomeQueryPlan? {
         guard let lastMetric = sessionContext.lastMetric else { return nil }
@@ -3839,7 +4086,7 @@ struct HomeAssistantPanelView: View {
             .trimmingCharacters(in: .whitespacesAndNewlines)
         
         switch plan.metric {
-        case .cardSpendTotal, .cardVariableSpendingHabits, .cardMonthComparison, .nextPlannedExpense, .spendTrendsSummary, .cardSnapshotSummary:
+        case .cardSpendTotal, .cardVariableSpendingHabits, .cardMonthComparison, .nextPlannedExpense, .spendTrendsSummary, .cardSnapshotSummary, .topCardChanges:
             let isAllCards = normalized.contains("all cards")
             let card = isAllCards
             ? nil
@@ -3915,8 +4162,20 @@ struct HomeAssistantPanelView: View {
                 targetName: category,
                 periodUnit: plan.periodUnit
             )
+
+        case .merchantSpendTotal, .merchantMonthComparison:
+            let merchant = extractedMerchantTarget(from: rawPrompt)
+            return HomeQueryPlan(
+                metric: plan.metric,
+                dateRange: plan.dateRange,
+                comparisonDateRange: plan.comparisonDateRange,
+                resultLimit: plan.resultLimit,
+                confidenceBand: merchant == nil ? plan.confidenceBand : .high,
+                targetName: merchant,
+                periodUnit: plan.periodUnit
+            )
             
-        case .overview, .spendTotal, .topCategories, .monthComparison, .largestTransactions, .savingsStatus, .savingsAverageRecentPeriods, .presetDueSoon, .presetHighestCost, .presetTopCategory, .safeSpendToday, .forecastSavings:
+        case .overview, .spendTotal, .topCategories, .monthComparison, .largestTransactions, .savingsStatus, .savingsAverageRecentPeriods, .presetDueSoon, .presetHighestCost, .presetTopCategory, .safeSpendToday, .forecastSavings, .topMerchants, .topCategoryChanges:
             return plan
         }
     }
@@ -3927,13 +4186,23 @@ struct HomeAssistantPanelView: View {
     ) -> HomeAssistantParsedSignals {
         let comparisonRanges = extractedComparisonDateRanges(for: rawPrompt)
         let signalTarget = extractedSignalTarget(for: rawPrompt)
+        let comparisonDetected = detectComparison(rawPrompt)
+        let targetSource = extractedSignalTargetSource(for: rawPrompt)
+        let signalMetric: HomeQueryMetric?
+        if targetSource == .merchantPhrase, signalTarget != nil {
+            signalMetric = comparisonDetected ? .merchantMonthComparison : .merchantSpendTotal
+        } else if targetSource == .weakMerchantPhrase, comparisonDetected {
+            signalMetric = .merchantMonthComparison
+        } else {
+            signalMetric = nil
+        }
         return HomeAssistantParsedSignals(
-            metric: nil,
+            metric: signalMetric,
             targetName: signalTarget,
-            targetSource: extractedSignalTargetSource(for: rawPrompt),
+            targetSource: targetSource,
             dateRange: comparisonRanges?.primary ?? extractedSignalDateRange(for: rawPrompt),
             comparisonDateRange: comparisonRanges?.comparison,
-            comparisonDetected: detectComparison(rawPrompt),
+            comparisonDetected: comparisonDetected,
             rawPrompt: rawPrompt
         )
     }
@@ -3973,11 +4242,48 @@ struct HomeAssistantPanelView: View {
             return source
         }
 
+        if let merchant = extractedMerchantTarget(from: rawPrompt) {
+            return merchant
+        }
+
         if detectComparison(rawPrompt),
            appearsToRequestExplicitComparisonDates(in: normalized) == false,
            let unmatchedTarget = unmatchedComparisonTarget(in: rawPrompt)
         {
             return unmatchedTarget
+        }
+
+        return nil
+    }
+
+    private func extractedMerchantTarget(from rawPrompt: String) -> String? {
+        let normalized = normalizedPrompt(rawPrompt)
+
+        let explicitPatterns = [
+            "\\bat\\s+([a-z0-9 '&\\-\\.]+?)(?:\\s+(this|last|in|from|vs|versus|please|so|year|month|week|today|yesterday|for)\\b|$)",
+            "\\bmerchant\\s+([a-z0-9 '&\\-\\.]+?)(?:\\s+(this|last|in|from|vs|versus|please|so|year|month|week|today|yesterday|for)\\b|$)",
+            "\\bstore\\s+([a-z0-9 '&\\-\\.]+?)(?:\\s+(this|last|in|from|vs|versus|please|so|year|month|week|today|yesterday|for)\\b|$)",
+            "\\b(?:spent|spend|spending|expense|expenses)\\s+on\\s+([a-z0-9 '&\\-\\.]+?)(?:\\s+(this|last|in|from|vs|versus|please|so|year|month|week|today|yesterday|for)\\b|$)",
+            "\\bcompare\\s+([a-z][a-z0-9 '&\\-\\.]*?)\\s+(?:spend|spending|expense|expenses)\\s+(?:from|between|vs|versus|this|last|in)\\b",
+            "\\bcompare\\s+([a-z][a-z0-9 '&\\-\\.]*?)\\s+(?:from|between|vs|versus|this|last|in)\\b",
+            "^([a-z][a-z0-9 '&\\-\\.]*?)\\s+(?:spend|spending|expense|expenses)\\s+(?:from|between|vs|versus|this|last|in)\\b"
+        ]
+
+        for pattern in explicitPatterns {
+            guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else {
+                continue
+            }
+            let searchRange = NSRange(normalized.startIndex..., in: normalized)
+            guard let match = regex.firstMatch(in: normalized, options: [], range: searchRange),
+                  let valueRange = Range(match.range(at: 1), in: normalized) else {
+                continue
+            }
+
+            let candidate = String(normalized[valueRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+            if merchantCandidateIsMeaningful(candidate),
+               merchantCandidateConflictsWithKnownEntity(candidate) == false {
+                return MerchantNormalizer.displayName(candidate)
+            }
         }
 
         return nil
@@ -3999,6 +4305,14 @@ struct HomeAssistantPanelView: View {
             return .matchedEntity
         }
 
+        if extractedMerchantTarget(from: rawPrompt) != nil {
+            return .merchantPhrase
+        }
+
+        if hasWeakMerchantComparisonPrompt(in: rawPrompt) {
+            return .weakMerchantPhrase
+        }
+
         if detectComparison(rawPrompt),
            appearsToRequestExplicitComparisonDates(in: normalized) == false,
            unmatchedComparisonTarget(in: rawPrompt) != nil
@@ -4007,6 +4321,55 @@ struct HomeAssistantPanelView: View {
         }
 
         return nil
+    }
+
+    private func merchantCandidateIsMeaningful(_ candidate: String) -> Bool {
+        let normalized = candidate
+            .lowercased()
+            .replacingOccurrences(of: "[^a-z0-9\\s]", with: " ", options: .regularExpression)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard normalized.isEmpty == false else { return false }
+
+        let genericFillers: Set<String> = [
+            "spend", "spent", "spending", "expense", "expenses",
+            "amount", "total", "totals", "year", "month", "week",
+            "today", "yesterday", "so far", "all categories", "all spending"
+        ]
+        return genericFillers.contains(normalized) == false
+    }
+
+    private func merchantCandidateConflictsWithKnownEntity(_ candidate: String) -> Bool {
+        aliasTarget(in: candidate, entityType: .category) != nil
+            || entityMatcher.bestCategoryMatch(in: candidate, categories: categories) != nil
+            || aliasTarget(in: candidate, entityType: .card) != nil
+            || entityMatcher.bestCardMatch(in: candidate, cards: cards) != nil
+            || aliasTarget(in: candidate, entityType: .incomeSource) != nil
+            || entityMatcher.bestIncomeSourceMatch(in: candidate, incomes: incomes) != nil
+    }
+
+    private func hasWeakMerchantComparisonPrompt(in rawPrompt: String) -> Bool {
+        let normalized = normalizedPrompt(rawPrompt)
+        guard detectComparison(rawPrompt) else { return false }
+        guard hasExplicitGlobalComparisonScope(in: normalized) == false else { return false }
+        guard extractedMerchantTarget(from: rawPrompt) == nil else { return false }
+        guard aliasTarget(in: rawPrompt, entityType: .category) == nil,
+              entityMatcher.bestCategoryMatch(in: rawPrompt, categories: categories) == nil,
+              aliasTarget(in: rawPrompt, entityType: .card) == nil,
+              entityMatcher.bestCardMatch(in: rawPrompt, cards: cards) == nil,
+              aliasTarget(in: rawPrompt, entityType: .incomeSource) == nil,
+              entityMatcher.bestIncomeSourceMatch(in: rawPrompt, incomes: incomes) == nil else {
+            return false
+        }
+
+        let weakPatterns = [
+            "\\bcompare\\s+(?:merchant|store)\\s+(?:spend|spending|expense|expenses)?\\s*(?:from|between|vs|versus|this|last|in)\\b",
+            "\\bcompare\\s+[a-z][a-z0-9 '&\\-\\.]*\\s+(?:spend|spending|expense|expenses)\\s+(?:from|between|vs|versus|this|last|in)\\b"
+        ]
+
+        return weakPatterns.contains { pattern in
+            normalized.range(of: pattern, options: .regularExpression) != nil
+        }
     }
 
     private func unmatchedComparisonTarget(in rawPrompt: String) -> String? {
@@ -4696,6 +5059,12 @@ struct HomeAssistantPanelView: View {
         )
         
         updateSessionContext(after: overviewQuery)
+        rememberAnswerContext(
+            for: overviewQuery,
+            rawAnswer: bundled,
+            presentedAnswer: styled,
+            userPrompt: userPrompt
+        )
         appendAnswer(styled)
     }
     
@@ -4819,7 +5188,8 @@ struct HomeAssistantPanelView: View {
         case .compareThisMonthToPreviousMonth,
              .compareCategoryThisMonthToPreviousMonth,
              .compareCardThisMonthToPreviousMonth,
-             .compareIncomeSourceThisMonthToPreviousMonth:
+             .compareIncomeSourceThisMonthToPreviousMonth,
+             .compareMerchantThisMonthToPreviousMonth:
             let ranges = visibleComparisonRanges(for: query)
             let scopePrefix: String
             switch query.intent {
@@ -4829,6 +5199,8 @@ struct HomeAssistantPanelView: View {
                 scopePrefix = query.targetName.map { "Compared: \($0) card in " } ?? "Compared: "
             case .compareIncomeSourceThisMonthToPreviousMonth:
                 scopePrefix = query.targetName.map { "Compared: \($0) income in " } ?? "Compared: "
+            case .compareMerchantThisMonthToPreviousMonth:
+                scopePrefix = query.targetName.map { "Compared: \($0) at " } ?? "Compared: "
             default:
                 scopePrefix = "Compared: "
             }
@@ -4855,12 +5227,18 @@ struct HomeAssistantPanelView: View {
              .cardVariableSpendingHabits,
              .categorySpendShare,
              .categorySpendShareTrend,
+             .topCategoryChangesThisMonth,
+             .topCardChangesThisMonth,
              .spendTrendsSummary,
              .cardSnapshotSummary,
              .presetCategorySpend,
              .categoryPotentialSavings,
              .categoryReallocationGuidance:
             return ["Planned expenses", "Variable expenses"]
+        case .compareMerchantThisMonthToPreviousMonth,
+             .merchantSpendTotal,
+             .topMerchantsThisMonth:
+            return ["Variable expenses"]
         case .nextPlannedExpense:
             return ["Planned expenses"]
         case .compareIncomeSourceThisMonthToPreviousMonth,
@@ -4936,13 +5314,13 @@ struct HomeAssistantPanelView: View {
         }
         
         switch query.intent {
-        case .cardSpendTotal, .cardVariableSpendingHabits, .compareCardThisMonthToPreviousMonth, .nextPlannedExpense, .spendTrendsSummary, .cardSnapshotSummary:
+        case .cardSpendTotal, .cardVariableSpendingHabits, .compareCardThisMonthToPreviousMonth, .nextPlannedExpense, .spendTrendsSummary, .cardSnapshotSummary, .topCardChangesThisMonth:
             return HomeAssistantPersonaEchoContext(
                 cardName: targetName,
                 categoryName: nil,
                 incomeSourceName: nil
             )
-        case .categorySpendShare, .categorySpendShareTrend, .categoryPotentialSavings, .categoryReallocationGuidance, .presetCategorySpend, .compareCategoryThisMonthToPreviousMonth:
+        case .categorySpendShare, .categorySpendShareTrend, .categoryPotentialSavings, .categoryReallocationGuidance, .presetCategorySpend, .compareCategoryThisMonthToPreviousMonth, .topCategoryChangesThisMonth:
             return HomeAssistantPersonaEchoContext(
                 cardName: nil,
                 categoryName: targetName,

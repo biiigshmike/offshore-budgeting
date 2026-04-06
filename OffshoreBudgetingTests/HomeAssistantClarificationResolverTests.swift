@@ -163,6 +163,29 @@ struct HomeAssistantClarificationResolverTests {
         #expect(decision?.reasons.contains(.missingIncomeSourceTarget) == true)
     }
 
+    @Test func resolve_merchantComparisonWithoutTarget_requestsMerchantTarget() throws {
+        let resolver = makeResolver()
+        let plan = HomeQueryPlan(
+            metric: .merchantMonthComparison,
+            dateRange: HomeQueryDateRange(
+                startDate: date(2026, 2, 1, 0, 0, 0),
+                endDate: date(2026, 2, 28, 23, 59, 59)
+            ),
+            resultLimit: nil,
+            confidenceBand: .medium
+        )
+
+        let decision = resolver.resolve(
+            plan: plan,
+            rawPrompt: "Compare merchant spending this month vs last month",
+            now: fixedNow
+        )
+
+        #expect(decision?.reasons.contains(.missingMerchantTarget) == true)
+        #expect(decision?.suggestions.contains(where: { $0.title == "Top merchants" }) == true)
+        #expect(decision?.shouldRunBestEffort == false)
+    }
+
     @Test func resolve_explicitComparisonMissingSecondDate_blocksBestEffort() throws {
         let resolver = makeResolver()
         let plan = HomeQueryPlan(

@@ -229,4 +229,105 @@ struct HomeAssistantModelsTests {
         #expect(updated.recurrenceFrequencyRaw == RecurrenceFrequency.monthly.rawValue)
         #expect(updated.recurrenceInterval == 1)
     }
+
+    // MARK: - Follow-up Anchoring
+
+    @Test func followUpAnchorResolver_matchesLatestRelevantAnswer() throws {
+        let resolver = HomeAssistantFollowUpAnchorResolver()
+        let context = HomeAssistantAnswerContext(
+            query: HomeQuery(
+                intent: .categoryReallocationGuidance,
+                dateRange: HomeQueryDateRange(
+                    startDate: Date(timeIntervalSince1970: 1_000),
+                    endDate: Date(timeIntervalSince1970: 2_000)
+                ),
+                targetName: "Bills & Utilities"
+            ),
+            answerTitle: "Reallocation Guidance (Bills & Utilities)",
+            answerKind: .list,
+            userPrompt: "Category reallocation guidance",
+            targetName: "Bills & Utilities",
+            targetType: .category,
+            rowTitles: ["Current Bills & Utilities", "Reduce other categories by", "Shopping"],
+            rowValues: ["$2,399.94", "$239.99", "$106.30 (from $261.50)"],
+            scenarioPercent: 10
+        )
+
+        let decision = resolver.resolve(
+            prompt: "Reduce bills by 10% will save me 239.99?",
+            recentContexts: [context]
+        )
+
+        #expect(decision == .matched(context))
+    }
+
+    @Test func followUpAnchorResolver_usesRecentFallbackWhenLatestIsWeakMatch() throws {
+        let resolver = HomeAssistantFollowUpAnchorResolver()
+        let older = HomeAssistantAnswerContext(
+            query: HomeQuery(intent: .merchantSpendTotal, targetName: "Starbucks"),
+            answerTitle: "Merchant Spend (Starbucks)",
+            answerKind: .message,
+            userPrompt: "What did I spend at Starbucks this year?",
+            targetName: "Starbucks",
+            targetType: .merchant,
+            rowTitles: ["Transactions", "Latest activity", "Total"],
+            rowValues: ["17", "Mar 27, 2026", "$425.00"],
+            generatedAt: Date(timeIntervalSince1970: 1_000)
+        )
+        let latest = HomeAssistantAnswerContext(
+            query: HomeQuery(intent: .periodOverview),
+            answerTitle: "Budget Overview",
+            answerKind: .message,
+            userPrompt: "How am I doing this month?",
+            rowTitles: ["Total spend"],
+            rowValues: ["$1,234.00"],
+            generatedAt: Date(timeIntervalSince1970: 2_000)
+        )
+
+        let decision = resolver.resolve(
+            prompt: "What about Starbucks instead?",
+            recentContexts: [older, latest]
+        )
+
+        #expect(decision == .matched(older))
+    }
+
+    @Test func followUpAnchorResolver_returnsAmbiguousWhenTwoRecentAnswersFit() throws {
+        let resolver = HomeAssistantFollowUpAnchorResolver()
+        let first = HomeAssistantAnswerContext(
+            query: HomeQuery(intent: .categoryPotentialSavings, targetName: "Groceries"),
+            answerTitle: "Potential Savings (Groceries)",
+            answerKind: .list,
+            userPrompt: "If I cut groceries, what could I save?",
+            targetName: "Groceries",
+            targetType: .category,
+            rowTitles: ["Current spend"],
+            rowValues: ["$500.00"],
+            scenarioPercent: 10,
+            generatedAt: Date(timeIntervalSince1970: 1_000)
+        )
+        let second = HomeAssistantAnswerContext(
+            query: HomeQuery(intent: .categoryPotentialSavings, targetName: "Dining"),
+            answerTitle: "Potential Savings (Dining)",
+            answerKind: .list,
+            userPrompt: "If I cut dining, what could I save?",
+            targetName: "Dining",
+            targetType: .category,
+            rowTitles: ["Current spend"],
+            rowValues: ["$420.00"],
+            scenarioPercent: 10,
+            generatedAt: Date(timeIntervalSince1970: 2_000)
+        )
+
+        let decision = resolver.resolve(
+            prompt: "Will that save me 10%?",
+            recentContexts: [first, second]
+        )
+
+        if case let .ambiguous(contexts) = decision {
+            #expect(contexts.count == 2)
+        } else {
+            Issue.record("Expected ambiguous follow-up anchor decision")
+        }
+    }
 }

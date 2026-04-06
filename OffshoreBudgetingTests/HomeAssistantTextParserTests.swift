@@ -147,6 +147,43 @@ struct HomeAssistantTextParserTests {
         #expect(query?.intent == .cardSnapshotSummary)
     }
 
+    @Test func parse_merchantSpendPrompt_mapsToMerchantSpendIntent() throws {
+        let query = makeParser().parse("How much did I spend at Starbucks this month?")
+
+        #expect(query?.intent == .merchantSpendTotal)
+    }
+
+    @Test func parse_merchantSpendOnPrompt_mapsToMerchantSpendIntent() throws {
+        let query = makeParser().parse("What is the amount I have spent on Starbucks so far this year?")
+
+        #expect(query?.intent == .merchantSpendTotal)
+        #expect(query?.dateRange != nil)
+    }
+
+    @Test func parse_topMerchantsPrompt_mapsToTopMerchantsIntent() throws {
+        let query = makeParser().parse("Top merchants this month")
+
+        #expect(query?.intent == .topMerchantsThisMonth)
+    }
+
+    @Test func parse_topCategoryChangesPrompt_mapsToTopCategoryChangesIntent() throws {
+        let query = makeParser().parse("Which categories changed most vs last month?")
+
+        #expect(query?.intent == .topCategoryChangesThisMonth)
+    }
+
+    @Test func parse_topCardChangesPrompt_mapsToTopCardChangesIntent() throws {
+        let query = makeParser().parse("Which cards changed most vs last month?")
+
+        #expect(query?.intent == .topCardChangesThisMonth)
+    }
+
+    @Test func parse_compareMerchantPrompt_mapsToMerchantComparisonIntent() throws {
+        let query = makeParser().parse("Compare merchant Starbucks this month vs last month")
+
+        #expect(query?.intent == .compareMerchantThisMonthToPreviousMonth)
+    }
+
     @Test func parse_savingsAveragePrompt_mapsToSavingsAverageIntent() throws {
         let query = makeParser().parse("For the last 4 periods, what was my average savings?")
 
