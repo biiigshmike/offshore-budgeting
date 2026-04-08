@@ -383,6 +383,7 @@ struct HomeView: View {
                 commandHub.activate(.home)
             }
             bootstrapAppliedDatesIfNeeded()
+            syncAppliedRangeToCurrentDefaultBudgetingPeriodIfNeeded()
             applyDefaultBudgetingPeriodIfSettingsChanged()
             syncDraftToAppliedIfNeeded()
             if hasLoadedDashboardSnapshot == false {
@@ -1383,16 +1384,30 @@ struct HomeView: View {
     }
 
     private func applyDefaultBudgetingPeriodToApplied() {
-        let now = Date()
-        let period = BudgetingPeriod(rawValue: defaultBudgetingPeriodRaw) ?? .monthly
-        let range = period.defaultRange(containing: now, calendar: .current)
-
-        setAppliedRange(start: range.start, end: range.end)
+        let canonicalSeed = HomeViewBootstrap.canonicalAppliedRangeSeed(
+            defaultBudgetingPeriodRaw: defaultBudgetingPeriodRaw,
+            now: Date(),
+            calendar: .current
+        )
+        setAppliedRange(start: canonicalSeed.start, end: canonicalSeed.end)
     }
 
     private func applyDefaultBudgetingPeriodIfSettingsChanged() {
         guard lastSyncedDefaultBudgetingPeriodRaw != defaultBudgetingPeriodRaw else { return }
         applyDefaultBudgetingPeriodToApplied()
+        lastSyncedDefaultBudgetingPeriodRaw = defaultBudgetingPeriodRaw
+    }
+
+    private func syncAppliedRangeToCurrentDefaultBudgetingPeriodIfNeeded() {
+        let canonicalSeed = HomeViewBootstrap.canonicalAppliedRangeSeed(
+            defaultBudgetingPeriodRaw: defaultBudgetingPeriodRaw,
+            now: Date(),
+            calendar: .current
+        )
+
+        guard appliedStartDate != canonicalSeed.start || appliedEndDate != canonicalSeed.end else { return }
+
+        setAppliedRange(start: canonicalSeed.start, end: canonicalSeed.end)
         lastSyncedDefaultBudgetingPeriodRaw = defaultBudgetingPeriodRaw
     }
 

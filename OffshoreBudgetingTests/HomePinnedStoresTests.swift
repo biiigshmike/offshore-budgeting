@@ -35,6 +35,29 @@ struct HomePinnedStoresTests {
         return defaults
     }
 
+    private func appliedStartKey(workspaceID: UUID) -> String {
+        "home_appliedStartTimestamp_\(workspaceID.uuidString)"
+    }
+
+    private func appliedEndKey(workspaceID: UUID) -> String {
+        "home_appliedEndTimestamp_\(workspaceID.uuidString)"
+    }
+
+    private func makeCalendar(timeZoneID: String = "America/Los_Angeles") -> Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: timeZoneID) ?? .current
+        return calendar
+    }
+
+    private func makeDate(
+        year: Int,
+        month: Int,
+        day: Int,
+        calendar: Calendar
+    ) -> Date {
+        calendar.date(from: DateComponents(year: year, month: month, day: day))!
+    }
+
     private func clearKeys(workspaceID: UUID) {
         UserDefaults.standard.removeObject(forKey: pinnedItemsKey(workspaceID: workspaceID))
         UserDefaults.standard.removeObject(forKey: pinnedCardsKey(workspaceID: workspaceID))
@@ -197,6 +220,99 @@ struct HomePinnedStoresTests {
                 "widget:\(HomeWidgetID.spendTrends.rawValue):\(HomeTileSize.small.rawValue)"
             ]
         )
+    }
+
+    @Test func canonicalAppliedRangeSeed_monthlyUsesCurrentMonth() {
+        let calendar = makeCalendar()
+        let now = makeDate(year: 2026, month: 4, day: 8, calendar: calendar)
+
+        let seed = HomeViewBootstrap.canonicalAppliedRangeSeed(
+            defaultBudgetingPeriodRaw: BudgetingPeriod.monthly.rawValue,
+            now: now,
+            calendar: calendar
+        )
+
+        #expect(seed.start == makeDate(year: 2026, month: 4, day: 1, calendar: calendar))
+        #expect(seed.end == makeDate(year: 2026, month: 4, day: 30, calendar: calendar))
+        #expect(seed.lastSyncedDefaultBudgetingPeriodRaw == BudgetingPeriod.monthly.rawValue)
+    }
+
+    @Test func canonicalAppliedRangeSeed_dailyUsesToday() {
+        let calendar = makeCalendar()
+        let now = makeDate(year: 2026, month: 4, day: 8, calendar: calendar)
+
+        let seed = HomeViewBootstrap.canonicalAppliedRangeSeed(
+            defaultBudgetingPeriodRaw: BudgetingPeriod.daily.rawValue,
+            now: now,
+            calendar: calendar
+        )
+
+        #expect(seed.start == now)
+        #expect(seed.end == now)
+    }
+
+    @Test func canonicalAppliedRangeSeed_weeklyUsesCurrentWeek() {
+        let calendar = makeCalendar()
+        let now = makeDate(year: 2026, month: 4, day: 8, calendar: calendar)
+
+        let seed = HomeViewBootstrap.canonicalAppliedRangeSeed(
+            defaultBudgetingPeriodRaw: BudgetingPeriod.weekly.rawValue,
+            now: now,
+            calendar: calendar
+        )
+
+        #expect(seed.start == makeDate(year: 2026, month: 4, day: 5, calendar: calendar))
+        #expect(seed.end == makeDate(year: 2026, month: 4, day: 11, calendar: calendar))
+    }
+
+    @Test func canonicalAppliedRangeSeed_quarterlyUsesCurrentQuarter() {
+        let calendar = makeCalendar()
+        let now = makeDate(year: 2026, month: 4, day: 8, calendar: calendar)
+
+        let seed = HomeViewBootstrap.canonicalAppliedRangeSeed(
+            defaultBudgetingPeriodRaw: BudgetingPeriod.quarterly.rawValue,
+            now: now,
+            calendar: calendar
+        )
+
+        #expect(seed.start == makeDate(year: 2026, month: 4, day: 1, calendar: calendar))
+        #expect(seed.end == makeDate(year: 2026, month: 6, day: 30, calendar: calendar))
+    }
+
+    @Test func canonicalAppliedRangeSeed_yearlyUsesCurrentYear() {
+        let calendar = makeCalendar()
+        let now = makeDate(year: 2026, month: 4, day: 8, calendar: calendar)
+
+        let seed = HomeViewBootstrap.canonicalAppliedRangeSeed(
+            defaultBudgetingPeriodRaw: BudgetingPeriod.yearly.rawValue,
+            now: now,
+            calendar: calendar
+        )
+
+        #expect(seed.start == makeDate(year: 2026, month: 1, day: 1, calendar: calendar))
+        #expect(seed.end == makeDate(year: 2026, month: 12, day: 31, calendar: calendar))
+    }
+
+    @Test func bootstrapAppliedRangeSeed_preservesStoredRangeUntilHomeLaunchSync() {
+        let defaults = makeDefaults()
+        let calendar = makeCalendar()
+        let workspaceID = UUID()
+        let storedStart = makeDate(year: 2026, month: 3, day: 1, calendar: calendar)
+        let storedEnd = makeDate(year: 2026, month: 3, day: 31, calendar: calendar)
+
+        defaults.set(storedStart.timeIntervalSince1970, forKey: appliedStartKey(workspaceID: workspaceID))
+        defaults.set(storedEnd.timeIntervalSince1970, forKey: appliedEndKey(workspaceID: workspaceID))
+
+        let seed = HomeViewBootstrap.initialAppliedRangeSeed(
+            workspaceID: workspaceID,
+            defaultBudgetingPeriodRaw: BudgetingPeriod.monthly.rawValue,
+            defaults: defaults,
+            now: makeDate(year: 2026, month: 4, day: 8, calendar: calendar),
+            calendar: calendar
+        )
+
+        #expect(seed.start == storedStart)
+        #expect(seed.end == storedEnd)
     }
 
     @Test func layoutCapabilities_phoneNeverSupportsMultiColumn() throws {

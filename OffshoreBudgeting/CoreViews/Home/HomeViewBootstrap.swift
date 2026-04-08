@@ -29,6 +29,20 @@ struct HomeViewBootstrap {
     private static let legacyAppliedStartKey = "home_appliedStartTimestamp"
     private static let legacyAppliedEndKey = "home_appliedEndTimestamp"
 
+    static func canonicalAppliedRangeSeed(
+        defaultBudgetingPeriodRaw: String,
+        now: Date = .now,
+        calendar: Calendar = .current
+    ) -> AppliedRangeSeed {
+        let period = BudgetingPeriod(rawValue: defaultBudgetingPeriodRaw) ?? .monthly
+        let range = period.defaultRange(containing: now, calendar: calendar)
+        return AppliedRangeSeed(
+            start: range.start,
+            end: range.end,
+            lastSyncedDefaultBudgetingPeriodRaw: defaultBudgetingPeriodRaw
+        )
+    }
+
     static func initialPinnedItems(
         workspaceID: UUID,
         fallbackCardIDs: [UUID],
@@ -94,12 +108,10 @@ struct HomeViewBootstrap {
             )
         }
 
-        let period = BudgetingPeriod(rawValue: defaultBudgetingPeriodRaw) ?? .monthly
-        let range = period.defaultRange(containing: now, calendar: calendar)
-        return AppliedRangeSeed(
-            start: range.start,
-            end: range.end,
-            lastSyncedDefaultBudgetingPeriodRaw: defaultBudgetingPeriodRaw
+        return canonicalAppliedRangeSeed(
+            defaultBudgetingPeriodRaw: defaultBudgetingPeriodRaw,
+            now: now,
+            calendar: calendar
         )
     }
 }
