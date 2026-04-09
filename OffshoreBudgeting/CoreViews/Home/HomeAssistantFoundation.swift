@@ -103,6 +103,7 @@ struct HomeAssistantPanelView: View {
     let onDismiss: () -> Void
     let shouldUseLargeMinimumSize: Bool
     
+    @Query private var budgets: [Budget]
     @Query private var categories: [Category]
     @Query private var cards: [Card]
     @Query private var presets: [Preset]
@@ -168,6 +169,11 @@ struct HomeAssistantPanelView: View {
     private let telemetryStore = HomeAssistantTelemetryStore()
     private let entityMatcher = HomeAssistantEntityMatcher()
     private let aliasMatcher = HomeAssistantAliasMatcher()
+    private let requestRoutingResolver = HomeAssistantRequestRoutingResolver()
+    private let dailySpendAnswerBuilder = HomeAssistantDailySpendAnswerBuilder()
+    private let incomePeriodSummaryAnswerBuilder = HomeAssistantIncomePeriodSummaryAnswerBuilder()
+    private let categoryAvailabilityAnswerBuilder = HomeAssistantCategoryAvailabilityAnswerBuilder()
+    private let cardSummaryAnswerBuilder = HomeAssistantCardSummaryAnswerBuilder()
     private let mutationService = HomeAssistantMutationService()
     private let followUpAnchorResolver = HomeAssistantFollowUpAnchorResolver()
     private var intentBuilder: HomeAssistantIntentBuilder {
@@ -201,6 +207,11 @@ struct HomeAssistantPanelView: View {
         self.shouldUseLargeMinimumSize = shouldUseLargeMinimumSize
         
         let workspaceID = workspace.id
+
+        _budgets = Query(
+            filter: #Predicate<Budget> { $0.workspace?.id == workspaceID },
+            sort: [SortDescriptor(\Budget.startDate, order: .reverse)]
+        )
         
         _categories = Query(
             filter: #Predicate<Category> { $0.workspace?.id == workspaceID },
@@ -3214,12 +3225,15 @@ struct HomeAssistantPanelView: View {
         allowsBroadBundle: Bool,
         source: HomeAssistantPlanResolutionSource
     ) {
-        if let entityDisambiguation = entityDisambiguationPlan(for: plan, rawPrompt: rawPrompt) {
+        let routedRequest = requestRoutingResolver.resolve(prompt: rawPrompt, basePlan: plan)
+        let routedPlan = routedRequest.plan
+
+        if let entityDisambiguation = entityDisambiguationPlan(for: routedPlan, rawPrompt: rawPrompt) {
             recordTelemetry(
                 for: rawPrompt,
                 outcome: .clarification,
                 source: source,
-                plan: plan,
+                plan: routedPlan,
                 notes: "entity_disambiguation"
             )
             presentClarificationTurn(
@@ -3229,14 +3243,14 @@ struct HomeAssistantPanelView: View {
             return
         }
         
-        let clarificationPlan = clarificationPlan(for: plan, rawPrompt: rawPrompt)
+        let clarificationPlan = clarificationPlan(for: routedPlan, rawPrompt: rawPrompt)
         
         if let clarificationPlan, clarificationPlan.shouldRunBestEffort == false {
             recordTelemetry(
                 for: rawPrompt,
                 outcome: .clarification,
                 source: source,
-                plan: plan,
+                plan: routedPlan,
                 notes: "clarification_required"
             )
             presentClarificationTurn(
@@ -3246,23 +3260,31 @@ struct HomeAssistantPanelView: View {
             return
         }
         
-        if allowsBroadBundle && shouldRunBroadOverviewBundle(for: rawPrompt, plan: plan) {
-            runBroadOverviewBundle(userPrompt: rawPrompt, basePlan: plan)
+        if allowsBroadBundle && shouldRunBroadOverviewBundle(for: rawPrompt, plan: routedPlan) {
+            runBroadOverviewBundle(userPrompt: rawPrompt, basePlan: routedPlan)
             recordTelemetry(
                 for: rawPrompt,
                 outcome: .resolved,
                 source: source,
-                plan: plan,
+                plan: routedPlan,
                 notes: clarificationPlan == nil ? "broad_bundle" : "broad_bundle_with_clarification_chips"
             )
         } else {
-            runQuery(plan.query, userPrompt: rawPrompt, confidenceBand: plan.confidenceBand)
+            runRoutedRequest(
+                routedRequest,
+                userPrompt: rawPrompt
+            )
             recordTelemetry(
                 for: rawPrompt,
                 outcome: .resolved,
                 source: source,
-                plan: plan,
-                notes: clarificationPlan == nil ? nil : "resolved_with_clarification_chips"
+                plan: routedPlan,
+                notes: routedRequest.shape == .single
+                    ? (clarificationPlan == nil ? nil : "resolved_with_clarification_chips")
+                    : bundledRoutingTelemetryNote(
+                        for: routedRequest.shape,
+                        hasClarificationPlan: clarificationPlan != nil
+                    )
             )
         }
         
@@ -3722,7 +3744,7 @@ struct HomeAssistantPanelView: View {
             return false
         case .savingsAverageRecentPeriods, .incomeSourceShareTrend, .categorySpendShareTrend:
             return false
-        case .overview, .spendTotal, .topCategories, .monthComparison, .categoryMonthComparison, .cardMonthComparison, .incomeSourceMonthComparison, .merchantMonthComparison, .largestTransactions, .cardSpendTotal, .cardVariableSpendingHabits, .incomeAverageActual, .savingsStatus, .incomeSourceShare, .categorySpendShare, .presetDueSoon, .categoryPotentialSavings, .categoryReallocationGuidance, .safeSpendToday, .forecastSavings, .nextPlannedExpense, .spendTrendsSummary, .cardSnapshotSummary, .merchantSpendTotal, .topMerchants, .topCategoryChanges, .topCardChanges:
+        case .overview, .spendTotal, .spendAveragePerPeriod, .topCategories, .monthComparison, .categoryMonthComparison, .cardMonthComparison, .incomeSourceMonthComparison, .merchantMonthComparison, .largestTransactions, .cardSpendTotal, .cardVariableSpendingHabits, .incomeAverageActual, .savingsStatus, .incomeSourceShare, .categorySpendShare, .presetDueSoon, .categoryPotentialSavings, .categoryReallocationGuidance, .safeSpendToday, .forecastSavings, .nextPlannedExpense, .spendTrendsSummary, .cardSnapshotSummary, .merchantSpendTotal, .merchantSpendSummary, .topMerchants, .topCategoryChanges, .topCardChanges:
             return true
         }
     }
@@ -3789,7 +3811,7 @@ struct HomeAssistantPanelView: View {
 
     private func requiresMerchantTarget(_ metric: HomeQueryMetric) -> Bool {
         switch metric {
-        case .merchantSpendTotal, .merchantMonthComparison:
+        case .merchantSpendTotal, .merchantSpendSummary, .merchantMonthComparison:
             return true
         default:
             return false
@@ -3889,7 +3911,7 @@ struct HomeAssistantPanelView: View {
             return .card
         case .incomeAverageActual, .incomeSourceShare, .incomeSourceShareTrend, .incomeSourceMonthComparison:
             return .incomeSource
-        case .merchantSpendTotal, .merchantMonthComparison, .topMerchants:
+        case .merchantSpendTotal, .merchantSpendSummary, .merchantMonthComparison, .topMerchants:
             return .merchant
         default:
             return nil
@@ -4163,7 +4185,7 @@ struct HomeAssistantPanelView: View {
                 periodUnit: plan.periodUnit
             )
 
-        case .merchantSpendTotal, .merchantMonthComparison:
+        case .merchantSpendTotal, .merchantSpendSummary, .merchantMonthComparison:
             let merchant = extractedMerchantTarget(from: rawPrompt)
             return HomeQueryPlan(
                 metric: plan.metric,
@@ -4175,14 +4197,14 @@ struct HomeAssistantPanelView: View {
                 periodUnit: plan.periodUnit
             )
             
-        case .overview, .spendTotal, .topCategories, .monthComparison, .largestTransactions, .savingsStatus, .savingsAverageRecentPeriods, .presetDueSoon, .presetHighestCost, .presetTopCategory, .safeSpendToday, .forecastSavings, .topMerchants, .topCategoryChanges:
+        case .overview, .spendTotal, .spendAveragePerPeriod, .topCategories, .monthComparison, .largestTransactions, .savingsStatus, .savingsAverageRecentPeriods, .presetDueSoon, .presetHighestCost, .presetTopCategory, .safeSpendToday, .forecastSavings, .topMerchants, .topCategoryChanges:
             return plan
         }
     }
 
     private func parsedSignals(
         for rawPrompt: String,
-        fallbackPlan _: HomeQueryPlan
+        fallbackPlan: HomeQueryPlan
     ) -> HomeAssistantParsedSignals {
         let comparisonRanges = extractedComparisonDateRanges(for: rawPrompt)
         let signalTarget = extractedSignalTarget(for: rawPrompt)
@@ -4190,7 +4212,11 @@ struct HomeAssistantPanelView: View {
         let targetSource = extractedSignalTargetSource(for: rawPrompt)
         let signalMetric: HomeQueryMetric?
         if targetSource == .merchantPhrase, signalTarget != nil {
-            signalMetric = comparisonDetected ? .merchantMonthComparison : .merchantSpendTotal
+            if fallbackPlan.metric == .merchantSpendSummary {
+                signalMetric = .merchantSpendSummary
+            } else {
+                signalMetric = comparisonDetected ? .merchantMonthComparison : .merchantSpendTotal
+            }
         } else if targetSource == .weakMerchantPhrase, comparisonDetected {
             signalMetric = .merchantMonthComparison
         } else {
@@ -4264,6 +4290,7 @@ struct HomeAssistantPanelView: View {
             "\\bmerchant\\s+([a-z0-9 '&\\-\\.]+?)(?:\\s+(this|last|in|from|vs|versus|please|so|year|month|week|today|yesterday|for)\\b|$)",
             "\\bstore\\s+([a-z0-9 '&\\-\\.]+?)(?:\\s+(this|last|in|from|vs|versus|please|so|year|month|week|today|yesterday|for)\\b|$)",
             "\\b(?:spent|spend|spending|expense|expenses)\\s+on\\s+([a-z0-9 '&\\-\\.]+?)(?:\\s+(this|last|in|from|vs|versus|please|so|year|month|week|today|yesterday|for)\\b|$)",
+            "\\b(?:summarize|summary of)\\s+(?:my\\s+)?([a-z0-9 '&\\-\\.]+?)\\s+(?:spend|spending|expense|expenses)\\b",
             "\\bcompare\\s+([a-z][a-z0-9 '&\\-\\.]*?)\\s+(?:spend|spending|expense|expenses)\\s+(?:from|between|vs|versus|this|last|in)\\b",
             "\\bcompare\\s+([a-z][a-z0-9 '&\\-\\.]*?)\\s+(?:from|between|vs|versus|this|last|in)\\b",
             "^([a-z][a-z0-9 '&\\-\\.]*?)\\s+(?:spend|spending|expense|expenses)\\s+(?:from|between|vs|versus|this|last|in)\\b"
@@ -4930,7 +4957,7 @@ struct HomeAssistantPanelView: View {
         
         return broadOverviewPhrases.contains { normalized.contains($0) }
     }
-    
+
     private func runBroadOverviewBundle(
         userPrompt: String,
         basePlan: HomeQueryPlan
@@ -5067,7 +5094,372 @@ struct HomeAssistantPanelView: View {
         )
         appendAnswer(styled)
     }
-    
+
+    private func runRoutedRequest(
+        _ routedRequest: HomeAssistantRequestRoutingResolution,
+        userPrompt: String
+    ) {
+        switch routedRequest.shape {
+        case .single:
+            runQuery(
+                routedRequest.plan.query,
+                userPrompt: userPrompt,
+                confidenceBand: routedRequest.plan.confidenceBand
+            )
+        case .spendAndWhere:
+            runSpendWhereBundle(userPrompt: userPrompt, basePlan: routedRequest.plan)
+        case .spendByDay:
+            runSpendByDayAnswer(userPrompt: userPrompt, basePlan: routedRequest.plan)
+        case .incomePeriodSummary:
+            runIncomePeriodSummaryAnswer(userPrompt: userPrompt, basePlan: routedRequest.plan)
+        case .savingsDiagnostic:
+            runSavingsDiagnosticAnswer(userPrompt: userPrompt, basePlan: routedRequest.plan)
+        case .categoryAvailability:
+            runCategoryAvailabilityAnswer(userPrompt: userPrompt, basePlan: routedRequest.plan)
+        case .spendDrivers:
+            runSpendDriversAnswer(userPrompt: userPrompt, basePlan: routedRequest.plan)
+        case .cardSummary:
+            runCardSummaryAnswer(userPrompt: userPrompt, basePlan: routedRequest.plan)
+        }
+    }
+
+    private func bundledRoutingTelemetryNote(
+        for shape: HomeAssistantRequestShape,
+        hasClarificationPlan: Bool
+    ) -> String {
+        let base: String
+        switch shape {
+        case .single:
+            base = "single"
+        case .spendAndWhere:
+            base = "spend_where_bundle"
+        case .spendByDay:
+            base = "spend_by_day"
+        case .incomePeriodSummary:
+            base = "income_period_summary"
+        case .savingsDiagnostic:
+            base = "savings_diagnostic"
+        case .categoryAvailability:
+            base = "category_availability"
+        case .spendDrivers:
+            base = "spend_drivers"
+        case .cardSummary:
+            base = "card_summary"
+        }
+
+        return hasClarificationPlan ? "\(base)_with_clarification_chips" : base
+    }
+
+    private func runSpendWhereBundle(
+        userPrompt: String,
+        basePlan: HomeQueryPlan
+    ) {
+        let range = basePlan.dateRange
+        let now = Date()
+
+        let spendQuery = HomeQuery(intent: .spendThisMonth, dateRange: range)
+        let merchantsQuery = HomeQuery(intent: .topMerchantsThisMonth, dateRange: range, resultLimit: 5)
+
+        let spendAnswer = applyConfidenceTone(
+            to: engine.execute(
+                query: spendQuery,
+                categories: categories,
+                presets: presets,
+                plannedExpenses: plannedExpenses,
+                variableExpenses: variableExpenses,
+                incomes: incomes,
+                savingsEntries: savingsEntries,
+                now: now
+            ),
+            confidenceBand: basePlan.confidenceBand
+        )
+        let merchantsAnswer = applyConfidenceTone(
+            to: engine.execute(
+                query: merchantsQuery,
+                categories: categories,
+                presets: presets,
+                plannedExpenses: plannedExpenses,
+                variableExpenses: variableExpenses,
+                incomes: incomes,
+                savingsEntries: savingsEntries,
+                now: now
+            ),
+            confidenceBand: basePlan.confidenceBand
+        )
+
+        guard merchantsAnswer.kind != .message, merchantsAnswer.rows.isEmpty == false else {
+            runQuery(spendQuery, userPrompt: userPrompt, confidenceBand: basePlan.confidenceBand)
+            return
+        }
+
+        let bundled = HomeAnswer(
+            queryID: spendQuery.id,
+            kind: .list,
+            userPrompt: userPrompt,
+            title: spendWhereBundleTitle(for: userPrompt),
+            subtitle: spendAnswer.subtitle ?? merchantsAnswer.subtitle,
+            primaryValue: spendAnswer.primaryValue,
+            rows: merchantsAnswer.rows
+        )
+
+        let styled = personaFormatter.styledAnswer(
+            from: bundled,
+            userPrompt: userPrompt,
+            personaID: selectedPersonaID,
+            seedContext: personaSeedContext(for: spendQuery),
+            footerContext: personaFooterContext(for: [spendQuery, merchantsQuery]),
+            echoContext: personaEchoContext(for: spendQuery),
+            visibleProvenance: visibleProvenance(for: [spendQuery, merchantsQuery])
+        )
+
+        updateSessionContext(after: spendQuery)
+        rememberAnswerContext(
+            for: spendQuery,
+            rawAnswer: bundled,
+            presentedAnswer: styled,
+            userPrompt: userPrompt
+        )
+        appendAnswer(styled)
+    }
+
+    private func spendWhereBundleTitle(for prompt: String) -> String {
+        let normalized = normalizedPrompt(prompt)
+        if let scopeSuffix = promptTimeScopeSuffix(normalizedPrompt: normalized) {
+            return "Spend \(scopeSuffix) and Where"
+        }
+        return "Spend and Where"
+    }
+
+    private func runSpendByDayAnswer(
+        userPrompt: String,
+        basePlan: HomeQueryPlan
+    ) {
+        let range = basePlan.dateRange ?? monthRange(containing: Date())
+        let query = HomeQuery(
+            intent: .spendThisMonth,
+            dateRange: range,
+            resultLimit: basePlan.resultLimit
+        )
+        let rawAnswer = dailySpendAnswerBuilder.makeAnswer(
+            queryID: query.id,
+            userPrompt: userPrompt,
+            dateRange: range,
+            plannedExpenses: plannedExpenses,
+            variableExpenses: variableExpenses
+        )
+        let answer = personaFormatter.styledAnswer(
+            from: rawAnswer,
+            userPrompt: userPrompt,
+            personaID: selectedPersonaID,
+            seedContext: personaSeedContext(for: query),
+            footerContext: personaFooterContext(for: [query]),
+            echoContext: personaEchoContext(for: query),
+            visibleProvenance: visibleProvenance(for: query)
+        )
+
+        updateSessionContext(after: query)
+        rememberAnswerContext(
+            for: query,
+            rawAnswer: rawAnswer,
+            presentedAnswer: answer,
+            userPrompt: userPrompt
+        )
+        appendAnswer(answer)
+    }
+
+    private func runIncomePeriodSummaryAnswer(
+        userPrompt: String,
+        basePlan: HomeQueryPlan
+    ) {
+        let range = basePlan.dateRange ?? monthRange(containing: Date())
+        let query = HomeQuery(intent: .incomeAverageActual, dateRange: range)
+        let rawAnswer = incomePeriodSummaryAnswerBuilder.makeAnswer(
+            queryID: query.id,
+            userPrompt: userPrompt,
+            dateRange: range,
+            incomes: incomes
+        )
+        appendStyledRoutedAnswer(
+            rawAnswer,
+            userPrompt: userPrompt,
+            primaryQuery: query,
+            footerQueries: [query]
+        )
+    }
+
+    private func runSavingsDiagnosticAnswer(
+        userPrompt: String,
+        basePlan: HomeQueryPlan
+    ) {
+        let range = basePlan.dateRange ?? monthRange(containing: Date())
+        let savingsQuery = HomeQuery(intent: .savingsStatus, dateRange: range)
+        let categoriesQuery = HomeQuery(intent: .topCategoriesThisMonth, dateRange: range, resultLimit: 3)
+        let savings = engine.execute(
+            query: savingsQuery,
+            categories: categories,
+            presets: presets,
+            plannedExpenses: plannedExpenses,
+            variableExpenses: variableExpenses,
+            incomes: incomes,
+            savingsEntries: savingsEntries
+        )
+        let topCategories = engine.execute(
+            query: categoriesQuery,
+            categories: categories,
+            presets: presets,
+            plannedExpenses: plannedExpenses,
+            variableExpenses: variableExpenses,
+            incomes: incomes,
+            savingsEntries: savingsEntries
+        )
+
+        var rows = savings.rows
+        rows.append(contentsOf: sectionRows("Top spend driver", from: topCategories, maxRows: 3))
+        let rawAnswer = HomeAnswer(
+            queryID: savingsQuery.id,
+            kind: .list,
+            userPrompt: userPrompt,
+            title: "Savings Diagnostic",
+            subtitle: savings.subtitle ?? topCategories.subtitle,
+            primaryValue: savings.primaryValue,
+            rows: rows
+        )
+        appendStyledRoutedAnswer(
+            rawAnswer,
+            userPrompt: userPrompt,
+            primaryQuery: savingsQuery,
+            footerQueries: [savingsQuery, categoriesQuery]
+        )
+    }
+
+    private func runCategoryAvailabilityAnswer(
+        userPrompt: String,
+        basePlan: HomeQueryPlan
+    ) {
+        let range = basePlan.dateRange ?? monthRange(containing: Date())
+        let query = HomeQuery(intent: .topCategoriesThisMonth, dateRange: range)
+        let rawAnswer = categoryAvailabilityAnswerBuilder.makeAnswer(
+            queryID: query.id,
+            userPrompt: userPrompt,
+            dateRange: range,
+            budgets: budgets,
+            categories: categories,
+            plannedExpenses: plannedExpenses,
+            variableExpenses: variableExpenses
+        )
+        appendStyledRoutedAnswer(
+            rawAnswer,
+            userPrompt: userPrompt,
+            primaryQuery: query,
+            footerQueries: [query]
+        )
+    }
+
+    private func runSpendDriversAnswer(
+        userPrompt: String,
+        basePlan: HomeQueryPlan
+    ) {
+        let range = basePlan.dateRange ?? monthRange(containing: Date())
+        let categoryChangesQuery = HomeQuery(intent: .topCategoryChangesThisMonth, dateRange: range, resultLimit: 3)
+        let cardChangesQuery = HomeQuery(intent: .topCardChangesThisMonth, dateRange: range, resultLimit: 3)
+        let merchantsQuery = HomeQuery(intent: .topMerchantsThisMonth, dateRange: range, resultLimit: 3)
+        let categoryChanges = engine.execute(
+            query: categoryChangesQuery,
+            categories: categories,
+            presets: presets,
+            plannedExpenses: plannedExpenses,
+            variableExpenses: variableExpenses,
+            incomes: incomes,
+            savingsEntries: savingsEntries
+        )
+        let cardChanges = engine.execute(
+            query: cardChangesQuery,
+            categories: categories,
+            presets: presets,
+            plannedExpenses: plannedExpenses,
+            variableExpenses: variableExpenses,
+            incomes: incomes,
+            savingsEntries: savingsEntries
+        )
+        let merchants = engine.execute(
+            query: merchantsQuery,
+            categories: categories,
+            presets: presets,
+            plannedExpenses: plannedExpenses,
+            variableExpenses: variableExpenses,
+            incomes: incomes,
+            savingsEntries: savingsEntries
+        )
+
+        var rows: [HomeAnswerRow] = []
+        rows.append(contentsOf: sectionRows("Category change", from: categoryChanges, maxRows: 3))
+        rows.append(contentsOf: sectionRows("Card change", from: cardChanges, maxRows: 3))
+        rows.append(contentsOf: sectionRows("Merchant", from: merchants, maxRows: 3))
+
+        let rawAnswer = HomeAnswer(
+            queryID: categoryChangesQuery.id,
+            kind: rows.isEmpty ? .message : .list,
+            userPrompt: userPrompt,
+            title: "Spending Drivers",
+            subtitle: rows.isEmpty ? "No driver signals in this range yet." : categoryChanges.subtitle,
+            primaryValue: categoryChanges.primaryValue,
+            rows: rows
+        )
+        appendStyledRoutedAnswer(
+            rawAnswer,
+            userPrompt: userPrompt,
+            primaryQuery: categoryChangesQuery,
+            footerQueries: [categoryChangesQuery, cardChangesQuery, merchantsQuery]
+        )
+    }
+
+    private func runCardSummaryAnswer(
+        userPrompt: String,
+        basePlan: HomeQueryPlan
+    ) {
+        let range = basePlan.dateRange ?? monthRange(containing: Date())
+        let query = HomeQuery(intent: .cardSnapshotSummary, dateRange: range, targetName: basePlan.targetName)
+        let rawAnswer = cardSummaryAnswerBuilder.makeAnswer(
+            queryID: query.id,
+            userPrompt: userPrompt,
+            dateRange: range,
+            cards: cards,
+            targetName: basePlan.targetName
+        )
+        appendStyledRoutedAnswer(
+            rawAnswer,
+            userPrompt: userPrompt,
+            primaryQuery: query,
+            footerQueries: [query]
+        )
+    }
+
+    private func appendStyledRoutedAnswer(
+        _ rawAnswer: HomeAnswer,
+        userPrompt: String,
+        primaryQuery: HomeQuery,
+        footerQueries: [HomeQuery]
+    ) {
+        let styled = personaFormatter.styledAnswer(
+            from: rawAnswer,
+            userPrompt: userPrompt,
+            personaID: selectedPersonaID,
+            seedContext: personaSeedContext(for: primaryQuery),
+            footerContext: personaFooterContext(for: footerQueries),
+            echoContext: personaEchoContext(for: primaryQuery),
+            visibleProvenance: visibleProvenance(for: footerQueries)
+        )
+
+        updateSessionContext(after: primaryQuery)
+        rememberAnswerContext(
+            for: primaryQuery,
+            rawAnswer: rawAnswer,
+            presentedAnswer: styled,
+            userPrompt: userPrompt
+        )
+        appendAnswer(styled)
+    }
+
     private func sectionRows(_ section: String, from answer: HomeAnswer, maxRows: Int) -> [HomeAnswerRow] {
         var rows: [HomeAnswerRow] = []
         
@@ -5218,6 +5610,7 @@ struct HomeAssistantPanelView: View {
         case .periodOverview:
             return ["Planned expenses", "Variable expenses", "Income", "Savings"]
         case .spendThisMonth,
+             .spendAveragePerPeriod,
              .topCategoriesThisMonth,
              .compareThisMonthToPreviousMonth,
              .compareCategoryThisMonthToPreviousMonth,
@@ -5237,6 +5630,7 @@ struct HomeAssistantPanelView: View {
             return ["Planned expenses", "Variable expenses"]
         case .compareMerchantThisMonthToPreviousMonth,
              .merchantSpendTotal,
+             .merchantSpendSummary,
              .topMerchantsThisMonth:
             return ["Variable expenses"]
         case .nextPlannedExpense:
@@ -5332,6 +5726,8 @@ struct HomeAssistantPanelView: View {
                 categoryName: nil,
                 incomeSourceName: targetName
             )
+        case .merchantSpendTotal, .merchantSpendSummary, .compareMerchantThisMonthToPreviousMonth:
+            return nil
         default:
             return nil
         }

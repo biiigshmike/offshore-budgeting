@@ -12,6 +12,203 @@ import Testing
 @MainActor
 struct HomeAssistantModelsTests {
 
+    // MARK: - Compound Prompt Resolution
+
+    @Test func compoundPromptResolver_spendAndWherePrompt_detectsCombinedRequest() throws {
+        let resolver = HomeAssistantCompoundPromptResolver()
+
+        #expect(resolver.isSpendAndWherePrompt("What did I spend today and where?"))
+        #expect(resolver.isSpendAndWherePrompt("How much did I spend today and where did it go?"))
+    }
+
+    @Test func compoundPromptResolver_singleIntentPrompts_doNotTriggerCombinedRequest() throws {
+        let resolver = HomeAssistantCompoundPromptResolver()
+
+        #expect(resolver.isSpendAndWherePrompt("What did I spend today?") == false)
+        #expect(resolver.isSpendAndWherePrompt("Which stores did I shop at today?") == false)
+        #expect(resolver.isSpendAndWherePrompt("List expenses today") == false)
+    }
+
+    @Test func requestRoutingResolver_spendAndWherePrompt_routesToBundledShape() throws {
+        let resolver = HomeAssistantRequestRoutingResolver(calendar: calendar)
+        let plan = HomeQueryPlan(
+            metric: .spendTotal,
+            dateRange: dayRange(2026, 4, 8),
+            resultLimit: nil,
+            confidenceBand: .high
+        )
+
+        let resolution = resolver.resolve(
+            prompt: "Where did I shop today and how much did I spend?",
+            basePlan: plan,
+            now: date(2026, 4, 8, 17, 0, 0)
+        )
+
+        #expect(resolution.shape == .spendAndWhere)
+        #expect(resolution.plan.dateRange == dayRange(2026, 4, 8))
+    }
+
+    @Test func requestRoutingResolver_dailySpendPrompt_routesToGroupedShapeAndCapsSoFarRange() throws {
+        let resolver = HomeAssistantRequestRoutingResolver(calendar: calendar)
+        let april = HomeQueryDateRange(
+            startDate: date(2026, 4, 1, 0, 0, 0),
+            endDate: date(2026, 4, 30, 23, 59, 59)
+        )
+        let plan = HomeQueryPlan(
+            metric: .spendTotal,
+            dateRange: april,
+            resultLimit: nil,
+            confidenceBand: .high
+        )
+
+        let resolution = resolver.resolve(
+            prompt: "Break down my spending by day thus far in April please",
+            basePlan: plan,
+            now: date(2026, 4, 8, 17, 0, 0)
+        )
+
+        #expect(resolution.shape == .spendByDay)
+        #expect(resolution.plan.dateRange?.startDate == date(2026, 4, 1, 0, 0, 0))
+        #expect(resolution.plan.dateRange?.endDate == date(2026, 4, 8, 17, 0, 0))
+    }
+
+    @Test func requestRoutingResolver_dailySpendVariation_routesToGroupedShape() throws {
+        let resolver = HomeAssistantRequestRoutingResolver(calendar: calendar)
+        let monthToDate = HomeQueryDateRange(
+            startDate: date(2026, 4, 1, 0, 0, 0),
+            endDate: date(2026, 4, 8, 23, 59, 59)
+        )
+        let plan = HomeQueryPlan(
+            metric: .spendTotal,
+            dateRange: monthToDate,
+            resultLimit: nil,
+            confidenceBand: .high
+        )
+
+        let resolution = resolver.resolve(
+            prompt: "Show my daily spending so far this month",
+            basePlan: plan,
+            now: date(2026, 4, 8, 17, 0, 0)
+        )
+
+        #expect(resolution.shape == .spendByDay)
+        #expect(resolution.plan.dateRange?.endDate == date(2026, 4, 8, 17, 0, 0))
+    }
+
+    @Test func requestRoutingResolver_homeParityPrompts_routeToCatalogShapes() throws {
+        let resolver = HomeAssistantRequestRoutingResolver(calendar: calendar)
+        let range = dayRange(2026, 4, 8)
+        let cases: [(prompt: String, metric: HomeQueryMetric, expectedShape: HomeAssistantRequestShape)] = [
+            ("What income came in this month?", .incomeAverageActual, .incomePeriodSummary),
+            ("Who paid me this month?", .incomeAverageActual, .incomePeriodSummary),
+            ("Why am I behind on savings this month?", .savingsStatus, .savingsDiagnostic),
+            ("Where do I still have room in my budget?", .topCategories, .categoryAvailability),
+            ("Why is my spending higher this month?", .topCategoryChanges, .spendDrivers),
+            ("Which card did I use the most this month?", .cardSnapshotSummary, .cardSummary)
+        ]
+
+        for testCase in cases {
+            let plan = HomeQueryPlan(
+                metric: testCase.metric,
+                dateRange: range,
+                resultLimit: nil,
+                confidenceBand: .high
+            )
+
+            let resolution = resolver.resolve(
+                prompt: testCase.prompt,
+                basePlan: plan,
+                now: date(2026, 4, 8, 17, 0, 0)
+            )
+
+            #expect(resolution.shape == testCase.expectedShape)
+        }
+    }
+
+    @Test func requestRoutingResolver_homeParityFalsePositiveGuards_staySingle() throws {
+        let resolver = HomeAssistantRequestRoutingResolver(calendar: calendar)
+        let range = dayRange(2026, 4, 8)
+        let cases: [(prompt: String, metric: HomeQueryMetric)] = [
+            ("Which stores did I shop at today?", .topMerchants),
+            ("What did I buy today?", .largestTransactions),
+            ("What are my projected savings this month?", .forecastSavings),
+            ("What is my average spend per month?", .spendAveragePerPeriod),
+            ("What is my average spend per month at Target?", .merchantSpendSummary)
+        ]
+
+        for testCase in cases {
+            let plan = HomeQueryPlan(
+                metric: testCase.metric,
+                dateRange: range,
+                resultLimit: nil,
+                confidenceBand: .high
+            )
+
+            let resolution = resolver.resolve(
+                prompt: testCase.prompt,
+                basePlan: plan,
+                now: date(2026, 4, 8, 17, 0, 0)
+            )
+
+            #expect(resolution.shape == .single)
+        }
+    }
+
+    @Test func dailySpendAnswerBuilder_groupsSpendByCalendarDay() throws {
+        let builder = HomeAssistantDailySpendAnswerBuilder(calendar: calendar)
+        let category = Category(name: "General", hexColor: "#00AA00")
+        let range = HomeQueryDateRange(
+            startDate: date(2026, 4, 1, 0, 0, 0),
+            endDate: date(2026, 4, 3, 23, 59, 59)
+        )
+
+        let answer = builder.makeAnswer(
+            queryID: UUID(),
+            userPrompt: "Break down my spending by day in April",
+            dateRange: range,
+            plannedExpenses: [
+                PlannedExpense(title: "Rent", plannedAmount: 100, expenseDate: date(2026, 4, 1, 12, 0, 0), category: category)
+            ],
+            variableExpenses: [
+                VariableExpense(descriptionText: "Coffee", amount: 15, transactionDate: date(2026, 4, 1, 9, 0, 0), category: category),
+                VariableExpense(descriptionText: "Groceries", amount: 40, transactionDate: date(2026, 4, 2, 18, 0, 0), category: category)
+            ]
+        )
+
+        #expect(answer.kind == .list)
+        #expect(answer.title == "Daily Spending")
+        #expect(answer.primaryValue?.filter(\.isNumber) == "15500")
+        #expect(answer.rows.count == 2)
+        #expect(answer.rows[0].value.filter(\.isNumber) == "11500")
+        #expect(answer.rows[1].value.filter(\.isNumber) == "4000")
+    }
+
+    @Test func incomePeriodSummaryAnswerBuilder_reportsActualPlannedAndSources() throws {
+        let builder = HomeAssistantIncomePeriodSummaryAnswerBuilder()
+        let range = HomeQueryDateRange(
+            startDate: date(2026, 4, 1, 0, 0, 0),
+            endDate: date(2026, 4, 30, 23, 59, 59)
+        )
+
+        let answer = builder.makeAnswer(
+            queryID: UUID(),
+            userPrompt: "What income came in this month?",
+            dateRange: range,
+            incomes: [
+                Income(source: "Salary", amount: 2_000, date: date(2026, 4, 5, 12, 0, 0), isPlanned: true),
+                Income(source: "Salary", amount: 2_100, date: date(2026, 4, 5, 12, 0, 0), isPlanned: false),
+                Income(source: "Side Gig", amount: 150, date: date(2026, 4, 7, 12, 0, 0), isPlanned: false)
+            ]
+        )
+
+        #expect(answer.kind == .list)
+        #expect(answer.title == "Income Summary")
+        #expect(answer.primaryValue?.filter(\.isNumber) == "225000")
+        #expect(answer.rows.contains { $0.title == "Actual income" && $0.value.filter(\.isNumber) == "225000" })
+        #expect(answer.rows.contains { $0.title == "Planned income" && $0.value.filter(\.isNumber) == "200000" })
+        #expect(answer.rows.contains { $0.title == "Salary" && $0.value.filter(\.isNumber) == "210000" })
+    }
+
     // MARK: - HomeQueryDateRange
 
     @Test func queryDateRange_reordersWhenInputIsDescending() throws {
@@ -329,5 +526,30 @@ struct HomeAssistantModelsTests {
         } else {
             Issue.record("Expected ambiguous follow-up anchor decision")
         }
+    }
+
+    private var calendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .gmt
+        return calendar
+    }
+
+    private func date(_ year: Int, _ month: Int, _ day: Int, _ hour: Int, _ minute: Int, _ second: Int) -> Date {
+        var comps = DateComponents()
+        comps.year = year
+        comps.month = month
+        comps.day = day
+        comps.hour = hour
+        comps.minute = minute
+        comps.second = second
+        comps.timeZone = TimeZone(secondsFromGMT: 0)
+        return calendar.date(from: comps) ?? .distantPast
+    }
+
+    private func dayRange(_ year: Int, _ month: Int, _ day: Int) -> HomeQueryDateRange {
+        HomeQueryDateRange(
+            startDate: date(year, month, day, 0, 0, 0),
+            endDate: date(year, month, day, 23, 59, 59)
+        )
     }
 }

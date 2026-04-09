@@ -42,6 +42,7 @@ enum HomeQueryIntent: String, CaseIterable, Codable, Equatable {
     case compareIncomeSourceThisMonthToPreviousMonth
     case compareMerchantThisMonthToPreviousMonth
     case largestRecentTransactions
+    case spendAveragePerPeriod
     case cardSpendTotal
     case cardVariableSpendingHabits
     case incomeAverageActual
@@ -63,6 +64,7 @@ enum HomeQueryIntent: String, CaseIterable, Codable, Equatable {
     case spendTrendsSummary
     case cardSnapshotSummary
     case merchantSpendTotal
+    case merchantSpendSummary
     case topMerchantsThisMonth
     case topCategoryChangesThisMonth
     case topCardChangesThisMonth
@@ -78,6 +80,7 @@ enum HomeQueryMetric: String, Codable, Equatable {
     case incomeSourceMonthComparison
     case merchantMonthComparison
     case largestTransactions
+    case spendAveragePerPeriod
     case cardSpendTotal
     case cardVariableSpendingHabits
     case incomeAverageActual
@@ -99,6 +102,7 @@ enum HomeQueryMetric: String, Codable, Equatable {
     case spendTrendsSummary
     case cardSnapshotSummary
     case merchantSpendTotal
+    case merchantSpendSummary
     case topMerchants
     case topCategoryChanges
     case topCardChanges
@@ -170,6 +174,8 @@ extension HomeQueryMetric {
             return .compareMerchantThisMonthToPreviousMonth
         case .largestTransactions:
             return .largestRecentTransactions
+        case .spendAveragePerPeriod:
+            return .spendAveragePerPeriod
         case .cardSpendTotal:
             return .cardSpendTotal
         case .cardVariableSpendingHabits:
@@ -212,6 +218,8 @@ extension HomeQueryMetric {
             return .cardSnapshotSummary
         case .merchantSpendTotal:
             return .merchantSpendTotal
+        case .merchantSpendSummary:
+            return .merchantSpendSummary
         case .topMerchants:
             return .topMerchantsThisMonth
         case .topCategoryChanges:
@@ -243,6 +251,8 @@ extension HomeQueryIntent {
             return .merchantMonthComparison
         case .largestRecentTransactions:
             return .largestTransactions
+        case .spendAveragePerPeriod:
+            return .spendAveragePerPeriod
         case .cardSpendTotal:
             return .cardSpendTotal
         case .cardVariableSpendingHabits:
@@ -285,6 +295,8 @@ extension HomeQueryIntent {
             return .cardSnapshotSummary
         case .merchantSpendTotal:
             return .merchantSpendTotal
+        case .merchantSpendSummary:
+            return .merchantSpendSummary
         case .topMerchantsThisMonth:
             return .topMerchants
         case .topCategoryChangesThisMonth:
@@ -475,7 +487,7 @@ struct HomeAssistantFollowUpAnchorResolver {
             if ["compare", "vs", "versus", "difference", "changed", "instead"].contains(where: normalizedPrompt.contains) {
                 return 4
             }
-        case .merchantSpendTotal:
+        case .merchantSpendTotal, .merchantSpendSummary:
             if ["merchant", "spend", "spent", "how much"].contains(where: normalizedPrompt.contains) {
                 return 2
             }
@@ -580,9 +592,9 @@ struct HomeQuery: Identifiable, Codable, Equatable {
             baseline = 1
         case .categoryPotentialSavings, .categoryReallocationGuidance:
             baseline = 3
-        case .topMerchantsThisMonth, .topCategoryChangesThisMonth, .topCardChangesThisMonth:
+        case .merchantSpendSummary, .topMerchantsThisMonth, .topCategoryChangesThisMonth, .topCardChangesThisMonth:
             baseline = 3
-        case .spendThisMonth, .compareThisMonthToPreviousMonth, .compareCategoryThisMonthToPreviousMonth, .compareCardThisMonthToPreviousMonth, .compareIncomeSourceThisMonthToPreviousMonth, .compareMerchantThisMonthToPreviousMonth, .cardSpendTotal, .incomeAverageActual, .savingsStatus, .incomeSourceShare, .categorySpendShare, .safeSpendToday, .forecastSavings, .nextPlannedExpense, .spendTrendsSummary, .cardSnapshotSummary, .merchantSpendTotal:
+        case .spendThisMonth, .spendAveragePerPeriod, .compareThisMonthToPreviousMonth, .compareCategoryThisMonthToPreviousMonth, .compareCardThisMonthToPreviousMonth, .compareIncomeSourceThisMonthToPreviousMonth, .compareMerchantThisMonthToPreviousMonth, .cardSpendTotal, .incomeAverageActual, .savingsStatus, .incomeSourceShare, .categorySpendShare, .safeSpendToday, .forecastSavings, .nextPlannedExpense, .spendTrendsSummary, .cardSnapshotSummary, .merchantSpendTotal:
             baseline = 1
         }
 

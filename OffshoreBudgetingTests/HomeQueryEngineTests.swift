@@ -1034,6 +1034,63 @@ struct HomeQueryEngineTests {
         #expect((answer.primaryValue ?? "").filter(\.isNumber).contains("20"))
     }
 
+    @Test func spendAveragePerPeriod_returnsAverageAcrossRequestedPeriodUnit() throws {
+        let engine = makeEngine()
+        let range = HomeQueryDateRange(startDate: date(2026, 1, 1), endDate: date(2026, 3, 31))
+        let query = HomeQuery(intent: .spendAveragePerPeriod, dateRange: range, periodUnit: .month)
+        let category = Category(name: "General", hexColor: "#00AA00")
+
+        let plannedExpenses = [
+            PlannedExpense(title: "Rent", plannedAmount: 300, expenseDate: date(2026, 1, 2), category: category)
+        ]
+        let variableExpenses = [
+            VariableExpense(descriptionText: "Target", amount: 120, transactionDate: date(2026, 2, 4), category: category),
+            VariableExpense(descriptionText: "Coffee", amount: 30, transactionDate: date(2026, 3, 9), category: category)
+        ]
+
+        let answer = engine.execute(
+            query: query,
+            categories: [category],
+            plannedExpenses: plannedExpenses,
+            variableExpenses: variableExpenses,
+            now: date(2026, 4, 10)
+        )
+
+        #expect(answer.kind == .metric)
+        #expect(answer.title == "Average Spending")
+        #expect((answer.primaryValue ?? "").filter(\.isNumber).contains("150"))
+        #expect(answer.rows.contains(where: { $0.title == "Periods sampled" && $0.value == "3" }))
+        #expect(answer.rows.contains(where: { $0.title == "Expenses counted" && $0.value == "3" }))
+    }
+
+    @Test func merchantSpendSummary_returnsTotalAveragesCountAndLatestActivity() throws {
+        let engine = makeEngine()
+        let range = HomeQueryDateRange(startDate: date(2026, 1, 1), endDate: date(2026, 3, 31))
+        let query = HomeQuery(intent: .merchantSpendSummary, dateRange: range, targetName: "Target", periodUnit: .month)
+
+        let variableExpenses = [
+            VariableExpense(descriptionText: "Target #001", amount: 60, transactionDate: date(2026, 1, 5)),
+            VariableExpense(descriptionText: "TARGET Store", amount: 90, transactionDate: date(2026, 3, 9)),
+            VariableExpense(descriptionText: "Coffee Shop", amount: 30, transactionDate: date(2026, 3, 10))
+        ]
+
+        let answer = engine.execute(
+            query: query,
+            categories: [],
+            plannedExpenses: [],
+            variableExpenses: variableExpenses,
+            now: date(2026, 4, 10)
+        )
+
+        #expect(answer.kind == .list)
+        #expect(answer.title.contains("Target"))
+        #expect((answer.primaryValue ?? "").filter(\.isNumber).contains("50"))
+        #expect(answer.rows.contains(where: { $0.title == "Total" && $0.value.filter(\.isNumber).contains("150") }))
+        #expect(answer.rows.contains(where: { $0.title == "Average per month" && $0.value.filter(\.isNumber).contains("50") }))
+        #expect(answer.rows.contains(where: { $0.title == "Average transaction" && $0.value.filter(\.isNumber).contains("75") }))
+        #expect(answer.rows.contains(where: { $0.title == "Transactions" && $0.value == "2" }))
+    }
+
     @Test func merchantMonthComparison_comparesNormalizedMerchantAcrossRanges() throws {
         let engine = makeEngine()
         let query = HomeQuery(intent: .compareMerchantThisMonthToPreviousMonth, targetName: "Starbucks")
@@ -1081,6 +1138,34 @@ struct HomeQueryEngineTests {
         #expect(answer.title == "Top Merchants")
         #expect(answer.rows.count == 2)
         #expect(answer.rows.first?.title == "Target")
+    }
+
+    @Test func topMerchantsThisMonth_aggregatesSameDayMerchantActivity() throws {
+        let engine = makeEngine()
+        let range = HomeQueryDateRange(startDate: date(2026, 4, 8, 0, 0, 0), endDate: date(2026, 4, 8, 23, 59, 59))
+        let query = HomeQuery(intent: .topMerchantsThisMonth, dateRange: range, resultLimit: 3)
+
+        let variableExpenses = [
+            VariableExpense(descriptionText: "STARBUCKS #1234", amount: 8, transactionDate: date(2026, 4, 8, 9, 30, 0)),
+            VariableExpense(descriptionText: "STARBUCKS #5678", amount: 12, transactionDate: date(2026, 4, 8, 14, 15, 0)),
+            VariableExpense(descriptionText: "Target", amount: 25, transactionDate: date(2026, 4, 8, 18, 0, 0))
+        ]
+
+        let answer = engine.execute(
+            query: query,
+            categories: [],
+            plannedExpenses: [],
+            variableExpenses: variableExpenses,
+            now: date(2026, 4, 8, 20, 0, 0)
+        )
+        let firstRow = answer.rows.first
+        let starbucksRow = answer.rows.first(where: { $0.title.contains("Starbucks") })
+
+        #expect(answer.kind == .list)
+        #expect(answer.title == "Top Merchants")
+        #expect(answer.rows.count == 2)
+        #expect(firstRow?.title == "Target")
+        #expect(starbucksRow?.value.filter(\.isNumber) == "2000")
     }
 
     @Test func topCategoryChangesThisMonth_ranksLargestCategoryDeltas() throws {
@@ -1166,6 +1251,19 @@ struct HomeQueryEngineTests {
         comps.hour = 12
         comps.minute = 0
         comps.second = 0
+        comps.timeZone = TimeZone(secondsFromGMT: 0)
+
+        return Calendar(identifier: .gregorian).date(from: comps) ?? .distantPast
+    }
+
+    private func date(_ year: Int, _ month: Int, _ day: Int, _ hour: Int, _ minute: Int, _ second: Int) -> Date {
+        var comps = DateComponents()
+        comps.year = year
+        comps.month = month
+        comps.day = day
+        comps.hour = hour
+        comps.minute = minute
+        comps.second = second
         comps.timeZone = TimeZone(secondsFromGMT: 0)
 
         return Calendar(identifier: .gregorian).date(from: comps) ?? .distantPast

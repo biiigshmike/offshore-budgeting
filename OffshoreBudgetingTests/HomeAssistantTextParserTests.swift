@@ -160,10 +160,54 @@ struct HomeAssistantTextParserTests {
         #expect(query?.dateRange != nil)
     }
 
+    @Test func parse_spendAveragePrompt_mapsToSpendAverageIntent() throws {
+        let query = makeParser().parse("What is my average spend per month?")
+
+        #expect(query?.intent == .spendAveragePerPeriod)
+        #expect(query?.periodUnit == .month)
+    }
+
+    @Test func parse_merchantAveragePrompt_mapsToMerchantSummaryIntent() throws {
+        let query = makeParser().parse("What is my average spend per month at Target?")
+
+        #expect(query?.intent == .merchantSpendSummary)
+        #expect(query?.periodUnit == .month)
+    }
+
+    @Test func parse_merchantSummaryPrompt_mapsToMerchantSummaryIntent() throws {
+        let query = makeParser().parse("Summarize my Target spending")
+
+        #expect(query?.intent == .merchantSpendSummary)
+    }
+
     @Test func parse_topMerchantsPrompt_mapsToTopMerchantsIntent() throws {
         let query = makeParser().parse("Top merchants this month")
 
         #expect(query?.intent == .topMerchantsThisMonth)
+    }
+
+    @Test func parse_storeDiscoveryPrompt_withToday_mapsToTopMerchantsIntent() throws {
+        let query = makeParser().parse("Which stores did I shop at today?")
+
+        #expect(query?.intent == .topMerchantsThisMonth)
+        #expect(query?.dateRange?.startDate == date(2026, 2, 15, 0, 0, 0))
+        #expect(query?.dateRange?.endDate == date(2026, 2, 15, 23, 59, 59))
+    }
+
+    @Test func parse_whereDidIShopPrompt_withToday_mapsToTopMerchantsIntent() throws {
+        let query = makeParser().parse("Where did I shop today?")
+
+        #expect(query?.intent == .topMerchantsThisMonth)
+        #expect(query?.dateRange?.startDate == date(2026, 2, 15, 0, 0, 0))
+        #expect(query?.dateRange?.endDate == date(2026, 2, 15, 23, 59, 59))
+    }
+
+    @Test func parse_whereDidISpendMoneyPrompt_withYesterday_mapsToTopMerchantsIntent() throws {
+        let query = makeParser().parse("Where did I spend money yesterday?")
+
+        #expect(query?.intent == .topMerchantsThisMonth)
+        #expect(query?.dateRange?.startDate == date(2026, 2, 14, 0, 0, 0))
+        #expect(query?.dateRange?.endDate == date(2026, 2, 14, 23, 59, 59))
     }
 
     @Test func parse_topCategoryChangesPrompt_mapsToTopCategoryChangesIntent() throws {
@@ -435,6 +479,66 @@ struct HomeAssistantTextParserTests {
 
         #expect(plan?.metric == .topCategories)
         #expect(plan?.confidenceBand == .low)
+    }
+
+    @Test func phrasePack_homeParityQuestionFamilies_mapToExpectedIntent() throws {
+        let parser = makeParser()
+        let cases: [IntentPhraseCase] = [
+            IntentPhraseCase(prompt: "How much did I spend today and where?", expectedIntent: .spendThisMonth),
+            IntentPhraseCase(prompt: "Where did I spend today?", expectedIntent: .topMerchantsThisMonth),
+            IntentPhraseCase(prompt: "Where did my money go yesterday?", expectedIntent: .topMerchantsThisMonth),
+            IntentPhraseCase(prompt: "What did I buy today?", expectedIntent: .largestRecentTransactions),
+            IntentPhraseCase(prompt: "What were my purchases this week?", expectedIntent: .largestRecentTransactions),
+            IntentPhraseCase(prompt: "What is my average spend per month?", expectedIntent: .spendAveragePerPeriod),
+            IntentPhraseCase(prompt: "Average spending this month", expectedIntent: .spendAveragePerPeriod),
+            IntentPhraseCase(prompt: "What is my average spend per month at Target?", expectedIntent: .merchantSpendSummary),
+            IntentPhraseCase(prompt: "Summarize my Target spending", expectedIntent: .merchantSpendSummary),
+            IntentPhraseCase(prompt: "Where am I spending the most this month?", expectedIntent: .topCategoriesThisMonth),
+            IntentPhraseCase(prompt: "What category is driving my spending this month?", expectedIntent: .topCategoryChangesThisMonth),
+            IntentPhraseCase(prompt: "Which categories are over budget this month?", expectedIntent: .topCategoriesThisMonth),
+            IntentPhraseCase(prompt: "Where do I still have room in my budget?", expectedIntent: .topCategoriesThisMonth),
+            IntentPhraseCase(prompt: "Which categories have money left?", expectedIntent: .topCategoriesThisMonth),
+            IntentPhraseCase(prompt: "When did I spend the most this month?", expectedIntent: .spendThisMonth),
+            IntentPhraseCase(prompt: "Why did spending spike this month?", expectedIntent: .topCategoryChangesThisMonth),
+            IntentPhraseCase(prompt: "Which card did I use the most this month?", expectedIntent: .cardSnapshotSummary),
+            IntentPhraseCase(prompt: "Which card has the most activity?", expectedIntent: .cardSnapshotSummary),
+            IntentPhraseCase(prompt: "How much did I spend on Apple Card this month?", expectedIntent: .cardSpendTotal),
+            IntentPhraseCase(prompt: "What income came in this month?", expectedIntent: .incomeAverageActual),
+            IntentPhraseCase(prompt: "Who paid me this month?", expectedIntent: .incomeAverageActual),
+            IntentPhraseCase(prompt: "When did I get paid this month?", expectedIntent: .incomeAverageActual),
+            IntentPhraseCase(prompt: "How much actual income came in this month?", expectedIntent: .incomeAverageActual),
+            IntentPhraseCase(prompt: "What are my projected savings this month?", expectedIntent: .forecastSavings),
+            IntentPhraseCase(prompt: "Why am I behind on savings this month?", expectedIntent: .savingsStatus),
+            IntentPhraseCase(prompt: "When is my next planned expense?", expectedIntent: .nextPlannedExpense),
+            IntentPhraseCase(prompt: "What bill is coming up next?", expectedIntent: .nextPlannedExpense),
+            IntentPhraseCase(prompt: "What recurring payment is coming up next?", expectedIntent: .presetDueSoon),
+            IntentPhraseCase(prompt: "Who did I pay the most this month?", expectedIntent: .topMerchantsThisMonth),
+            IntentPhraseCase(prompt: "How much did I spend at Target today?", expectedIntent: .merchantSpendTotal),
+            IntentPhraseCase(prompt: "What is my budget status this month?", expectedIntent: .periodOverview),
+            IntentPhraseCase(prompt: "Why does my budget feel tight?", expectedIntent: .topCategoryChangesThisMonth)
+        ]
+
+        for phraseCase in cases {
+            let query = parser.parse(phraseCase.prompt)
+            #expect(query?.intent == phraseCase.expectedIntent)
+        }
+    }
+
+    @Test func phrasePack_homeParityUnsupportedQuestions_doNotFalsePositive() throws {
+        let parser = makeParser()
+        let prompts = [
+            "Where is the settings screen?",
+            "Why is the app slow?",
+            "Who created this budget?",
+            "What model is Marina using?",
+            "How much storage is the app using?",
+            "What is the average temperature this month?"
+        ]
+
+        for prompt in prompts {
+            let query = parser.parse(prompt)
+            #expect(query == nil)
+        }
     }
 
     // MARK: - Phrase Packs

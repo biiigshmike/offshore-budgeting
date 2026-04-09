@@ -57,6 +57,14 @@ struct HomeQueryEngine {
                 now: now
             )
 
+        case .spendAveragePerPeriod:
+            return spendAveragePerPeriodAnswer(
+                query: query,
+                plannedExpenses: plannedExpenses,
+                variableExpenses: variableExpenses,
+                now: now
+            )
+
         case .topCategoriesThisMonth:
             return topCategoriesThisMonthAnswer(
                 query: query,
@@ -257,6 +265,12 @@ struct HomeQueryEngine {
                 variableExpenses: variableExpenses,
                 now: now
             )
+        case .merchantSpendSummary:
+            return merchantSpendSummaryAnswer(
+                query: query,
+                variableExpenses: variableExpenses,
+                now: now
+            )
         case .topMerchantsThisMonth:
             return topMerchantsThisMonthAnswer(
                 query: query,
@@ -448,6 +462,56 @@ struct HomeQueryEngine {
             primaryValue: currency(total),
             rows: [
                 HomeAnswerRow(title: "Total", value: currency(total))
+            ]
+        )
+    }
+
+    private func spendAveragePerPeriodAnswer(
+        query: HomeQuery,
+        plannedExpenses: [PlannedExpense],
+        variableExpenses: [VariableExpense],
+        now: Date
+    ) -> HomeAnswer {
+        let range = query.dateRange ?? yearRange(containing: now)
+        let unit = query.periodUnit ?? .month
+        let periods = periodRanges(in: range, unit: unit)
+        let total = totalSpend(
+            plannedExpenses: plannedExpenses,
+            variableExpenses: variableExpenses,
+            range: range
+        )
+        let transactionCount = expenseCount(
+            plannedExpenses: plannedExpenses,
+            variableExpenses: variableExpenses,
+            range: range
+        )
+
+        guard total != 0 || transactionCount > 0 else {
+            return HomeAnswer(
+                queryID: query.id,
+                kind: .message,
+                title: "Average Spending",
+                subtitle: "No spending in this range yet.",
+                primaryValue: nil,
+                rows: []
+            )
+        }
+
+        let periodCount = max(periods.count, 1)
+        let average = total / Double(periodCount)
+        let periodLabel = periodUnitLabel(unit)
+
+        return HomeAnswer(
+            queryID: query.id,
+            kind: .metric,
+            title: "Average Spending",
+            subtitle: rangeLabel(for: range),
+            primaryValue: currency(average),
+            rows: [
+                HomeAnswerRow(title: "Average per \(periodLabel)", value: currency(average)),
+                HomeAnswerRow(title: "Total spend", value: currency(total)),
+                HomeAnswerRow(title: "Periods sampled", value: "\(periodCount)"),
+                HomeAnswerRow(title: "Expenses counted", value: "\(transactionCount)")
             ]
         )
     }
@@ -2200,6 +2264,81 @@ struct HomeQueryEngine {
         )
     }
 
+    private func merchantSpendSummaryAnswer(
+        query: HomeQuery,
+        variableExpenses: [VariableExpense],
+        now: Date
+    ) -> HomeAnswer {
+        let range = query.dateRange ?? yearRange(containing: now)
+        let unit = query.periodUnit ?? .month
+        let merchantName = query.targetName?.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard let merchantName, merchantName.isEmpty == false else {
+            return HomeAnswer(
+                queryID: query.id,
+                kind: .message,
+                title: "Merchant Spend Summary",
+                subtitle: "Choose a merchant to summarize.",
+                primaryValue: nil,
+                rows: []
+            )
+        }
+
+        let merchantKey = MerchantNormalizer.normalizeKey(merchantName)
+        let filtered = variableExpenses
+            .filter { expense in
+                expense.transactionDate >= range.startDate
+                    && expense.transactionDate <= range.endDate
+                    && merchantMatches(targetKey: merchantKey, expenseDescription: expense.descriptionText)
+            }
+            .sorted { $0.transactionDate > $1.transactionDate }
+
+        guard filtered.isEmpty == false else {
+            return HomeAnswer(
+                queryID: query.id,
+                kind: .message,
+                title: "Merchant Spend Summary (\(MerchantNormalizer.displayName(merchantName)))",
+                subtitle: "No merchant spending in this range.",
+                primaryValue: nil,
+                rows: []
+            )
+        }
+
+        let total = filtered.reduce(0.0) { $0 + $1.ledgerSignedAmount() }
+        let periods = max(periodRanges(in: range, unit: unit).count, 1)
+        let averagePerPeriod = total / Double(periods)
+        let averageTransaction = total / Double(filtered.count)
+        let latestActivity = filtered.first.map { shortDate($0.transactionDate) } ?? "N/A"
+        let periodLabel = periodUnitLabel(unit)
+
+        var rows: [HomeAnswerRow] = [
+            HomeAnswerRow(title: "Total", value: currency(total)),
+            HomeAnswerRow(title: "Average per \(periodLabel)", value: currency(averagePerPeriod)),
+            HomeAnswerRow(title: "Average transaction", value: currency(averageTransaction)),
+            HomeAnswerRow(title: "Transactions", value: "\(filtered.count)"),
+            HomeAnswerRow(title: "Latest activity", value: latestActivity)
+        ]
+
+        let recentRows = filtered.prefix(query.resultLimit).map { expense in
+            HomeAnswerRow(
+                title: expense.descriptionText,
+                value: "\(currency(expense.ledgerSignedAmount())) on \(shortDate(expense.transactionDate))"
+            )
+        }
+        if recentRows.isEmpty == false {
+            rows.append(contentsOf: recentRows)
+        }
+
+        return HomeAnswer(
+            queryID: query.id,
+            kind: .list,
+            title: "Merchant Spend Summary (\(MerchantNormalizer.displayName(merchantName)))",
+            subtitle: rangeLabel(for: range),
+            primaryValue: currency(averagePerPeriod),
+            rows: rows
+        )
+    }
+
     private func merchantMonthComparisonAnswer(
         query: HomeQuery,
         variableExpenses: [VariableExpense],
@@ -2612,6 +2751,20 @@ struct HomeQueryEngine {
         }
     }
 
+    private func expenseCount(
+        plannedExpenses: [PlannedExpense],
+        variableExpenses: [VariableExpense],
+        range: HomeQueryDateRange
+    ) -> Int {
+        let plannedCount = plannedExpenses.filter { expense in
+            expense.expenseDate >= range.startDate && expense.expenseDate <= range.endDate
+        }.count
+        let variableCount = variableExpenses.filter { expense in
+            expense.transactionDate >= range.startDate && expense.transactionDate <= range.endDate
+        }.count
+        return plannedCount + variableCount
+    }
+
     private func largestTransaction(
         in range: HomeQueryDateRange,
         plannedExpenses: [PlannedExpense],
@@ -2822,6 +2975,69 @@ struct HomeQueryEngine {
                     return yearRange(containing: date)
                 }
                 .reversed()
+        }
+    }
+
+    private func periodRanges(
+        in range: HomeQueryDateRange,
+        unit: HomeQueryPeriodUnit
+    ) -> [HomeQueryDateRange] {
+        var ranges: [HomeQueryDateRange] = []
+        var cursor = periodRange(containing: range.startDate, unit: unit).startDate
+
+        while cursor <= range.endDate {
+            let period = periodRange(containing: cursor, unit: unit)
+            ranges.append(
+                HomeQueryDateRange(
+                    startDate: max(period.startDate, range.startDate),
+                    endDate: min(period.endDate, range.endDate)
+                )
+            )
+
+            guard let next = nextPeriodStart(after: cursor, unit: unit), next > cursor else {
+                break
+            }
+            cursor = next
+        }
+
+        return ranges
+    }
+
+    private func periodRange(
+        containing date: Date,
+        unit: HomeQueryPeriodUnit
+    ) -> HomeQueryDateRange {
+        switch unit {
+        case .day:
+            let start = calendar.startOfDay(for: date)
+            let end = calendar.date(byAdding: DateComponents(day: 1, second: -1), to: start) ?? start
+            return HomeQueryDateRange(startDate: start, endDate: end)
+        case .week:
+            return weekRange(containing: date)
+        case .month:
+            return monthRange(containing: date)
+        case .quarter:
+            return quarterRange(containing: date)
+        case .year:
+            return yearRange(containing: date)
+        }
+    }
+
+    private func nextPeriodStart(
+        after date: Date,
+        unit: HomeQueryPeriodUnit
+    ) -> Date? {
+        switch unit {
+        case .day:
+            return calendar.date(byAdding: .day, value: 1, to: date)
+        case .week:
+            return calendar.date(byAdding: .weekOfYear, value: 1, to: date)
+        case .month:
+            return calendar.date(byAdding: .month, value: 1, to: date)
+        case .quarter:
+            return calendar.date(byAdding: .month, value: 3, to: date)
+        case .year:
+            return calendar.date(byAdding: .year, value: 1, to: date)
         }
     }
 

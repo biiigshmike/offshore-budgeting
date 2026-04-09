@@ -12,6 +12,7 @@ import Foundation
 struct HomeAssistantTextParser {
     private let calendar: Calendar
     private let nowProvider: () -> Date
+    private let capabilityCatalog = HomeAssistantCapabilityCatalog()
 
     init(
         calendar: Calendar = .current,
@@ -45,7 +46,7 @@ struct HomeAssistantTextParser {
         let metric = intent.metric
 
         switch intent {
-        case .periodOverview, .spendThisMonth, .compareThisMonthToPreviousMonth, .compareCategoryThisMonthToPreviousMonth, .compareCardThisMonthToPreviousMonth, .compareIncomeSourceThisMonthToPreviousMonth, .compareMerchantThisMonthToPreviousMonth, .cardSpendTotal, .incomeAverageActual, .savingsStatus, .incomeSourceShare, .categorySpendShare, .presetCategorySpend, .safeSpendToday, .forecastSavings, .nextPlannedExpense, .spendTrendsSummary, .cardSnapshotSummary, .merchantSpendTotal:
+        case .periodOverview, .spendThisMonth, .spendAveragePerPeriod, .compareThisMonthToPreviousMonth, .compareCategoryThisMonthToPreviousMonth, .compareCardThisMonthToPreviousMonth, .compareIncomeSourceThisMonthToPreviousMonth, .compareMerchantThisMonthToPreviousMonth, .cardSpendTotal, .incomeAverageActual, .savingsStatus, .incomeSourceShare, .categorySpendShare, .presetCategorySpend, .safeSpendToday, .forecastSavings, .nextPlannedExpense, .spendTrendsSummary, .cardSnapshotSummary, .merchantSpendTotal, .merchantSpendSummary:
             return HomeQueryPlan(
                 metric: metric,
                 dateRange: dateRange,
@@ -91,6 +92,10 @@ struct HomeAssistantTextParser {
     // MARK: - Matching
 
     private func resolvedIntent(from text: String) -> HomeQueryIntent? {
+        if let capability = capabilityCatalog.resolve(prompt: text) {
+            return capability.fallbackMetric.intent
+        }
+
         if matchesSavingsAverageIntent(in: text) {
             return .savingsAverageRecentPeriods
         }
@@ -124,6 +129,10 @@ struct HomeAssistantTextParser {
         }
 
         if matchesTopMerchantsIntent(in: text) {
+            return .topMerchantsThisMonth
+        }
+
+        if matchesMerchantDiscoveryIntent(in: text) {
             return .topMerchantsThisMonth
         }
 
@@ -259,6 +268,9 @@ struct HomeAssistantTextParser {
         text.contains("next planned expense")
             || text.contains("upcoming planned expense")
             || text.contains("planned expenses are coming up")
+            || text.contains("what bill is coming up next")
+            || text.contains("which bill is coming up next")
+            || text.contains("when is my next bill")
             || (text.contains("next") && text.contains("planned") && text.contains("expense"))
     }
 
@@ -297,6 +309,45 @@ struct HomeAssistantTextParser {
             && containsAny(text, keywords: merchantKeywords)
     }
 
+    private func matchesMerchantDiscoveryIntent(in text: String) -> Bool {
+        guard text.contains("how much") == false else { return false }
+        guard extractedMerchantPhraseCandidate(in: text) == nil else { return false }
+
+        let merchantKeywords = ["merchant", "merchants", "store", "stores"]
+        let shoppingKeywords = ["shop", "shopped", "shopping", "purchase", "purchases", "bought", "buy"]
+        let spendKeywords = ["spend", "spent", "spending", "expense", "expenses"]
+        let discoveryPhrases = [
+            "which stores",
+            "what stores",
+            "which merchants",
+            "what merchants",
+            "where did i shop",
+            "where have i shopped",
+            "where did i spend",
+            "where have i spent",
+            "where did my money go",
+            "where did i spend money",
+            "where have i spent money",
+            "where did i make purchases",
+            "where have i made purchases"
+        ]
+
+        if containsAny(text, keywords: discoveryPhrases) {
+            return true
+        }
+
+        let asksWhichMerchant = containsAny(text, keywords: merchantKeywords)
+            && containsAny(text, keywords: ["which", "what", "where"])
+            && (containsAny(text, keywords: shoppingKeywords) || containsAny(text, keywords: spendKeywords))
+        if asksWhichMerchant {
+            return true
+        }
+
+        return text.contains("where")
+            && containsAny(text, keywords: shoppingKeywords)
+            && containsAny(text, keywords: ["today", "yesterday", "last week", "this week", "this month", "last month"])
+    }
+
     private func matchesTopCategoryChangesIntent(in text: String) -> Bool {
         let categoryKeywords = ["category", "categories"]
         let changeKeywords = ["changed most", "change most", "increased most", "decreased most", "biggest change", "largest change", "top changes"]
@@ -314,15 +365,24 @@ struct HomeAssistantTextParser {
     private func matchesSpendIntent(in text: String) -> Bool {
         let spendKeywords = [
             "spend", "spent", "spending", "expense", "expenses",
-            "outflow", "total", "total spend", "how much"
+            "outflow", "total spend"
         ]
-        return containsAny(text, keywords: spendKeywords)
+        if containsAny(text, keywords: spendKeywords) {
+            return true
+        }
+
+        let financialKeywords = [
+            "money", "budget", "charge", "charges", "paid", "pay",
+            "merchant", "store", "shop", "shopping", "transaction", "transactions"
+        ]
+        return text.contains("how much")
+            && containsAny(text, keywords: financialKeywords)
     }
 
     private func extractedMerchantPhraseCandidate(in text: String) -> String? {
         let patterns = [
-            "\\b(?:spent|spend|spending|expense|expenses)\\s+at\\s+([a-z0-9 '&\\-\\.]+?)(?:\\s+(?:this|last|in|from|vs|versus|please|so|for)\\b|$)",
-            "\\b(?:spent|spend|spending|expense|expenses)\\s+on\\s+([a-z][a-z0-9 '&\\-\\.]*?)(?:\\s+(?:this|last|in|from|vs|versus|please|so|for)\\b|$)"
+            "\\b(?:spent|spend|spending|expense|expenses)\\s+at\\s+([a-z0-9 '&\\-\\.]+?)(?:\\s+(?:today|yesterday|tomorrow|tonight|this|last|in|from|vs|versus|please|so|for)\\b|$)",
+            "\\b(?:spent|spend|spending|expense|expenses)\\s+on\\s+([a-z][a-z0-9 '&\\-\\.]*?)(?:\\s+(?:today|yesterday|tomorrow|tonight|this|last|in|from|vs|versus|please|so|for)\\b|$)"
         ]
 
         for pattern in patterns {
@@ -400,7 +460,7 @@ struct HomeAssistantTextParser {
         let rankingKeywords = ["largest", "biggest", "highest", "top"]
         let transactionKeywords = [
             "transaction", "transactions", "purchase", "purchases",
-            "charge", "charges", "expense", "expenses"
+            "charge", "charges", "expense", "expenses", "buy", "bought"
         ]
 
         return containsAny(text, keywords: rankingKeywords)
@@ -410,7 +470,7 @@ struct HomeAssistantTextParser {
     private func matchesExpenseListIntent(in text: String) -> Bool {
         let transactionKeywords = [
             "transaction", "transactions", "purchase", "purchases",
-            "charge", "charges", "expense", "expenses"
+            "charge", "charges", "expense", "expenses", "buy", "bought"
         ]
         let spendListPhrases = [
             "what did i spend my money on",
@@ -446,7 +506,7 @@ struct HomeAssistantTextParser {
 
     private func matchesCardSpendingHabitsIntent(in text: String) -> Bool {
         let cardKeywords = ["card", "cards", "all cards"]
-        let habitKeywords = ["habits", "habit", "patterns", "pattern", "behavior", "trends", "trend"]
+        let habitKeywords = ["habits", "habit", "patterns", "pattern", "behavior", "trends", "trend", "average", "avg", "mean"]
         let variableKeywords = ["variable spend", "variable spending", "spending habits"]
 
         return (containsAny(text, keywords: cardKeywords) && containsAny(text, keywords: habitKeywords))
@@ -600,7 +660,7 @@ struct HomeAssistantTextParser {
         case .periodOverview:
             // Broad overview prompts are inherently less specific than direct metric requests.
             return .medium
-        case .spendThisMonth, .topCategoriesThisMonth, .compareThisMonthToPreviousMonth, .compareCategoryThisMonthToPreviousMonth, .compareCardThisMonthToPreviousMonth, .compareIncomeSourceThisMonthToPreviousMonth, .compareMerchantThisMonthToPreviousMonth, .largestRecentTransactions, .cardSpendTotal, .cardVariableSpendingHabits, .incomeAverageActual, .savingsStatus, .savingsAverageRecentPeriods, .incomeSourceShare, .categorySpendShare, .incomeSourceShareTrend, .categorySpendShareTrend, .presetDueSoon, .presetHighestCost, .presetTopCategory, .presetCategorySpend, .categoryPotentialSavings, .categoryReallocationGuidance, .safeSpendToday, .forecastSavings, .nextPlannedExpense, .spendTrendsSummary, .cardSnapshotSummary, .merchantSpendTotal, .topMerchantsThisMonth, .topCategoryChangesThisMonth, .topCardChangesThisMonth:
+        case .spendThisMonth, .spendAveragePerPeriod, .topCategoriesThisMonth, .compareThisMonthToPreviousMonth, .compareCategoryThisMonthToPreviousMonth, .compareCardThisMonthToPreviousMonth, .compareIncomeSourceThisMonthToPreviousMonth, .compareMerchantThisMonthToPreviousMonth, .largestRecentTransactions, .cardSpendTotal, .cardVariableSpendingHabits, .incomeAverageActual, .savingsStatus, .savingsAverageRecentPeriods, .incomeSourceShare, .categorySpendShare, .incomeSourceShareTrend, .categorySpendShareTrend, .presetDueSoon, .presetHighestCost, .presetTopCategory, .presetCategorySpend, .categoryPotentialSavings, .categoryReallocationGuidance, .safeSpendToday, .forecastSavings, .nextPlannedExpense, .spendTrendsSummary, .cardSnapshotSummary, .merchantSpendTotal, .merchantSpendSummary, .topMerchantsThisMonth, .topCategoryChangesThisMonth, .topCardChangesThisMonth:
             return .high
         }
     }
@@ -1039,6 +1099,22 @@ struct HomeAssistantTextParser {
         from text: String,
         defaultPeriodUnit: HomeQueryPeriodUnit
     ) -> HomeQueryPeriodUnit? {
+        if text.range(of: "\\b(per|each|every)\\s+day\\b", options: .regularExpression) != nil {
+            return .day
+        }
+        if text.range(of: "\\b(per|each|every)\\s+week\\b", options: .regularExpression) != nil {
+            return .week
+        }
+        if text.range(of: "\\b(per|each|every)\\s+month\\b", options: .regularExpression) != nil || text.contains("monthly") {
+            return .month
+        }
+        if text.range(of: "\\b(per|each|every)\\s+quarter\\b", options: .regularExpression) != nil || text.contains("quarterly") {
+            return .quarter
+        }
+        if text.range(of: "\\b(per|each|every)\\s+year\\b", options: .regularExpression) != nil || text.contains("yearly") || text.contains("annually") {
+            return .year
+        }
+
         guard let range = text.range(of: "\\b(last|past)\\s+(\\d{1,2})\\s+(period|periods|day|days|week|weeks|month|months|quarter|quarters|year|years)\\b", options: .regularExpression) else {
             return nil
         }
