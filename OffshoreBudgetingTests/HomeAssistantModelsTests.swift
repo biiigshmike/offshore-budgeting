@@ -100,10 +100,13 @@ struct HomeAssistantModelsTests {
         let range = dayRange(2026, 4, 8)
         let cases: [(prompt: String, metric: HomeQueryMetric, expectedShape: HomeAssistantRequestShape)] = [
             ("What income came in this month?", .incomeAverageActual, .incomePeriodSummary),
+            ("What got deposited this month?", .incomeAverageActual, .incomePeriodSummary),
             ("Who paid me this month?", .incomeAverageActual, .incomePeriodSummary),
             ("Why am I behind on savings this month?", .savingsStatus, .savingsDiagnostic),
             ("Where do I still have room in my budget?", .topCategories, .categoryAvailability),
+            ("Which budgets still have headroom this month?", .topCategories, .categoryAvailability),
             ("Why is my spending higher this month?", .topCategoryChanges, .spendDrivers),
+            ("What's eating my budget this month?", .topCategoryChanges, .spendDrivers),
             ("Which card did I use the most this month?", .cardSnapshotSummary, .cardSummary)
         ]
 
@@ -133,7 +136,9 @@ struct HomeAssistantModelsTests {
             ("What did I buy today?", .largestTransactions),
             ("What are my projected savings this month?", .forecastSavings),
             ("What is my average spend per month?", .spendAveragePerPeriod),
-            ("What is my average spend per month at Target?", .merchantSpendSummary)
+            ("What is my average spend per month at Target?", .merchantSpendSummary),
+            ("How much went to Starbucks this month?", .merchantSpendTotal),
+            ("What did I put on Apple Card this month?", .cardSpendTotal)
         ]
 
         for testCase in cases {

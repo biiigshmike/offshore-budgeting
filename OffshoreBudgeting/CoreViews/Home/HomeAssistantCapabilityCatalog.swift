@@ -119,8 +119,12 @@ struct HomeAssistantCapabilityCatalog {
             "and where",
             "which stores",
             "what stores",
+            "which places",
+            "what places",
             "which merchants",
             "what merchants",
+            "where all did i spend",
+            "where all did i shop",
             "where did it go",
             "where did my money go"
         ])
@@ -128,7 +132,7 @@ struct HomeAssistantCapabilityCatalog {
     }
 
     private func isSpendByTime(_ prompt: String) -> Bool {
-        let spend = containsAny(prompt, ["spend", "spent", "spending", "expenses", "money"])
+        let spend = containsAny(prompt, ["spend", "spent", "spending", "expenses", "money", "cost", "costs"])
         let timeBreakdown = containsAny(prompt, [
             "by day",
             "per day",
@@ -137,7 +141,9 @@ struct HomeAssistantCapabilityCatalog {
             "when did i spend",
             "when did i spend money",
             "which day",
-            "what day"
+            "what day",
+            "most expensive day",
+            "cost me the most"
         ])
         return spend && timeBreakdown
     }
@@ -147,54 +153,99 @@ struct HomeAssistantCapabilityCatalog {
             "who did i pay the most",
             "who did i pay most",
             "who got the most",
-            "who took the most"
+            "who took the most",
+            "who did i buy from",
+            "which vendors got",
+            "which payees got",
+            "what places did i spend at",
+            "what places did i shop at"
         ])
     }
 
     private func isMerchantSpendSummary(_ prompt: String) -> Bool {
-        let spend = containsAny(prompt, ["spend", "spent", "spending", "expense", "expenses"])
-        let summary = containsAny(prompt, ["average", "avg", "mean", "summary", "summarize", "how often"])
+        let spend = containsAny(prompt, ["spend", "spent", "spending", "expense", "expenses", "purchase", "purchases"])
+        let summary = containsAny(prompt, [
+            "average", "avg", "mean", "summary", "summarize", "how often",
+            "typical", "usually", "normal", "tend to"
+        ])
         guard spend && summary else { return false }
 
-        if prompt.contains(" at ") || prompt.contains(" merchant ") || prompt.contains(" store ") {
+        if prompt.contains(" at ")
+            || prompt.contains(" with ")
+            || prompt.contains(" to ")
+            || prompt.contains(" merchant ")
+            || prompt.contains(" store ")
+            || prompt.contains(" payee ")
+            || prompt.contains(" vendor ")
+        {
             return true
         }
 
-        let summaryMerchantPattern = "\\b(?:summarize|summary of)\\s+(?:my\\s+)?[a-z0-9 '&\\-\\.]+\\s+(?:spend|spending|expenses)\\b"
-        return prompt.range(of: summaryMerchantPattern, options: .regularExpression) != nil
+        let summaryMerchantPatterns = [
+            "\\b(?:summarize|summary of)\\s+(?:my\\s+)?[a-z0-9 '&\\-\\.]+\\s+(?:spend|spending|expenses|purchase|purchases)\\b",
+            "\\b(?:typical|usual|usually|normal)\\s+(?:monthly\\s+)?[a-z0-9 '&\\-\\.]+\\s+(?:spend|spending|purchase|purchases)\\b"
+        ]
+        return summaryMerchantPatterns.contains {
+            prompt.range(of: $0, options: .regularExpression) != nil
+        }
     }
 
     private func isSpendAverage(_ prompt: String) -> Bool {
-        guard containsAny(prompt, ["average", "avg", "mean"]) else { return false }
+        guard containsAny(prompt, ["average", "avg", "mean", "typical", "usually", "normal"]) else { return false }
         guard containsAny(prompt, ["spend", "spent", "spending", "expense", "expenses"]) else { return false }
         guard containsAny(prompt, ["income", "savings", "save", "card", "cards"]) == false else { return false }
         return true
     }
 
     private func isCategoryAvailability(_ prompt: String) -> Bool {
-        if containsAny(prompt, ["over budget", "near budget", "close to budget"])
+        if containsAny(prompt, ["over budget", "under budget", "near budget", "close to budget", "close to the limit"])
             && containsAny(prompt, ["category", "categories", "budget"])
         {
             return true
         }
 
-        return containsAny(prompt, [
+        let directMatch = containsAny(prompt, [
             "where do i still have room",
             "where do i have room",
             "which categories have room",
             "which categories are available",
             "which categories have money left",
+            "which budgets still have headroom",
+            "which categories are tight",
+            "which budget buckets are almost full",
+            "which envelopes have money left",
             "categories have money left",
             "category availability",
             "room in my budget",
             "available in my budget",
             "left in my budget",
-            "remaining in my budget"
+            "remaining in my budget",
+            "almost full"
+        ])
+        if directMatch {
+            return true
+        }
+
+        if prompt.contains("how much room do i have left") {
+            return true
+        }
+
+        let financeContext = containsAny(prompt, ["budget", "budgets", "category", "categories", "spend", "spending"])
+        return financeContext && containsAny(prompt, [
+            "left to spend",
+            "room left",
+            "headroom",
+            "breathing room",
+            "close to the limit"
         ])
     }
 
     private func isIncomeSummary(_ prompt: String) -> Bool {
-        let income = containsAny(prompt, ["income", "paycheck", "paid me", "pay me", "get paid", "got paid", "came in"])
+        let income = containsAny(prompt, [
+            "income", "paycheck", "paid me", "pay me", "get paid", "got paid",
+            "came in", "deposited", "deposit", "bring in", "brought in", "earned",
+            "came through", "paid out"
+        ])
         let summary = containsAny(prompt, [
             "what income came in",
             "income came in",
@@ -206,12 +257,20 @@ struct HomeAssistantCapabilityCatalog {
             "who has paid me",
             "when did i get paid",
             "when did i got paid",
-            "did i hit income"
+            "did i hit income",
+            "what got deposited",
+            "how much did i bring in",
+            "which income sources paid out",
+            "payments came through"
         ])
         return income && summary
     }
 
     private func isSavingsDiagnostic(_ prompt: String) -> Bool {
+        if prompt.contains("on track to save") {
+            return false
+        }
+
         let savings = containsAny(prompt, ["savings", "save", "saving"])
         let diagnostic = containsAny(prompt, [
             "why",
@@ -234,7 +293,11 @@ struct HomeAssistantCapabilityCatalog {
             "lower",
             "spike",
             "increased",
-            "changed"
+            "changed",
+            "overspending",
+            "eating my budget",
+            "pushing spending up",
+            "leaking money"
         ])
         return spend && driver
     }
@@ -263,8 +326,13 @@ struct HomeAssistantCapabilityCatalog {
             "used most",
             "spent most",
             "most activity",
+            "card activity",
+            "activity",
             "average charge",
             "average spend",
+            "leaning on most",
+            "carrying most of my spending",
+            "saw the most action",
             "planned and variable",
             "why is",
             "higher",

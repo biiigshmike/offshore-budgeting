@@ -242,6 +242,8 @@ struct HomeAssistantTextParser {
             || text.contains("left after planned expenses")
             || text.contains("current balance")
             || text.contains("over budget")
+            || text.contains("under budget")
+            || text.contains("how tight is my budget")
         {
             return true
         }
@@ -262,6 +264,7 @@ struct HomeAssistantTextParser {
         text.contains("forecast savings")
             || text.contains("projected savings")
             || text.contains("on track for savings")
+            || text.contains("on track to save")
     }
 
     private func matchesNextPlannedExpenseIntent(in text: String) -> Bool {
@@ -288,8 +291,8 @@ struct HomeAssistantTextParser {
     }
 
     private func matchesMerchantSpendIntent(in text: String) -> Bool {
-        let spendKeywords = ["spend", "spent", "spending", "expense", "expenses", "how much"]
-        let merchantKeywords = ["merchant", "merchants", "store", "stores"]
+        let spendKeywords = ["spend", "spent", "spending", "expense", "expenses", "how much", "purchase", "purchases", "paid", "went"]
+        let merchantKeywords = ["merchant", "merchants", "store", "stores", "payee", "payees", "vendor", "vendors", "place", "places"]
         let merchantPhraseDetected = extractedMerchantPhraseCandidate(in: text) != nil
         return containsAny(text, keywords: spendKeywords)
             && ((containsAny(text, keywords: merchantKeywords) && containsAny(text, keywords: spendKeywords))
@@ -297,14 +300,14 @@ struct HomeAssistantTextParser {
     }
 
     private func matchesMerchantCompareIntent(in text: String) -> Bool {
-        let explicitMerchantKeywords = containsAny(text, keywords: ["merchant", "merchants", "store", "stores"])
+        let explicitMerchantKeywords = containsAny(text, keywords: ["merchant", "merchants", "store", "stores", "payee", "payees", "vendor", "vendors"])
         let merchantPhraseDetected = extractedMerchantPhraseCandidate(in: text) != nil
         return explicitMerchantKeywords || merchantPhraseDetected
     }
 
     private func matchesTopMerchantsIntent(in text: String) -> Bool {
         let rankingKeywords = ["top", "highest", "most", "biggest", "largest"]
-        let merchantKeywords = ["merchant", "merchants", "store", "stores"]
+        let merchantKeywords = ["merchant", "merchants", "store", "stores", "payee", "payees", "vendor", "vendors", "place", "places"]
         return containsAny(text, keywords: rankingKeywords)
             && containsAny(text, keywords: merchantKeywords)
     }
@@ -313,21 +316,28 @@ struct HomeAssistantTextParser {
         guard text.contains("how much") == false else { return false }
         guard extractedMerchantPhraseCandidate(in: text) == nil else { return false }
 
-        let merchantKeywords = ["merchant", "merchants", "store", "stores"]
+        let merchantKeywords = ["merchant", "merchants", "store", "stores", "payee", "payees", "vendor", "vendors", "place", "places"]
         let shoppingKeywords = ["shop", "shopped", "shopping", "purchase", "purchases", "bought", "buy"]
         let spendKeywords = ["spend", "spent", "spending", "expense", "expenses"]
         let discoveryPhrases = [
             "which stores",
             "what stores",
+            "which places",
+            "what places",
             "which merchants",
             "what merchants",
+            "which vendors got",
+            "which payees got",
             "where did i shop",
             "where have i shopped",
             "where did i spend",
             "where have i spent",
+            "where all did i spend",
+            "where all did i shop",
             "where did my money go",
             "where did i spend money",
             "where have i spent money",
+            "who did i buy from",
             "where did i make purchases",
             "where have i made purchases"
         ]
@@ -382,7 +392,11 @@ struct HomeAssistantTextParser {
     private func extractedMerchantPhraseCandidate(in text: String) -> String? {
         let patterns = [
             "\\b(?:spent|spend|spending|expense|expenses)\\s+at\\s+([a-z0-9 '&\\-\\.]+?)(?:\\s+(?:today|yesterday|tomorrow|tonight|this|last|in|from|vs|versus|please|so|for)\\b|$)",
-            "\\b(?:spent|spend|spending|expense|expenses)\\s+on\\s+([a-z][a-z0-9 '&\\-\\.]*?)(?:\\s+(?:today|yesterday|tomorrow|tonight|this|last|in|from|vs|versus|please|so|for)\\b|$)"
+            "\\b(?:spent|spend|spending|expense|expenses)\\s+on\\s+([a-z][a-z0-9 '&\\-\\.]*?)(?:\\s+(?:today|yesterday|tomorrow|tonight|this|last|in|from|vs|versus|please|so|for)\\b|$)",
+            "\\b(?:spent|spend|spending|expense|expenses)\\s+with\\s+([a-z][a-z0-9 '&\\-\\.]*?)(?:\\s+(?:today|yesterday|tomorrow|tonight|this|last|in|from|vs|versus|please|so|for)\\b|$)",
+            "\\b(?:how much\\s+)?went\\s+to\\s+([a-z][a-z0-9 '&\\-\\.]*?)(?:\\s+(?:today|yesterday|tomorrow|tonight|this|last|in|from|vs|versus|please|so|for)\\b|$)",
+            "\\b(?:paid|pay)\\s+(?:to\\s+)?([a-z][a-z0-9 '&\\-\\.]*?)(?:\\s+(?:today|yesterday|tomorrow|tonight|this|last|in|from|vs|versus|please|so|for)\\b|$)",
+            "\\bbuy\\s+from\\s+([a-z][a-z0-9 '&\\-\\.]*?)(?:\\s+(?:today|yesterday|tomorrow|tonight|this|last|in|from|vs|versus|please|so|for)\\b|$)"
         ]
 
         for pattern in patterns {
@@ -431,7 +445,7 @@ struct HomeAssistantTextParser {
 
     private func matchesTopCategoriesIntent(in text: String) -> Bool {
         let rankingKeywords = ["top", "highest", "most", "biggest", "largest"]
-        let categoryKeywords = ["category", "categories", "bucket", "buckets"]
+        let categoryKeywords = ["category", "categories", "bucket", "buckets", "envelope", "envelopes"]
 
         if containsAny(text, keywords: rankingKeywords) && containsAny(text, keywords: categoryKeywords) {
             return true
@@ -442,6 +456,15 @@ struct HomeAssistantTextParser {
             || text.contains("where do i spend most")
             || text.contains("where do i spend the most")
             || (text.contains("where") && containsAny(text, keywords: ["spend most", "spending most", "most spending"])) {
+            return true
+        }
+
+        if containsAny(text, keywords: [
+            "what am i overspending on",
+            "what category am i blowing past",
+            "where am i blowing money",
+            "where am i leaking money"
+        ]) {
             return true
         }
 
@@ -497,7 +520,7 @@ struct HomeAssistantTextParser {
     }
 
     private func matchesCardSpendIntent(in text: String) -> Bool {
-        let spendKeywords = ["spend", "spent", "spending", "total spent", "charges"]
+        let spendKeywords = ["spend", "spent", "spending", "total spent", "charges", "put on", "charged to"]
         let cardKeywords = ["card", "cards", "all cards"]
 
         return containsAny(text, keywords: spendKeywords)
@@ -506,7 +529,7 @@ struct HomeAssistantTextParser {
 
     private func matchesCardSpendingHabitsIntent(in text: String) -> Bool {
         let cardKeywords = ["card", "cards", "all cards"]
-        let habitKeywords = ["habits", "habit", "patterns", "pattern", "behavior", "trends", "trend", "average", "avg", "mean"]
+        let habitKeywords = ["habits", "habit", "patterns", "pattern", "behavior", "trends", "trend", "average", "avg", "mean", "typical", "usually", "normal"]
         let variableKeywords = ["variable spend", "variable spending", "spending habits"]
 
         return (containsAny(text, keywords: cardKeywords) && containsAny(text, keywords: habitKeywords))
@@ -514,7 +537,7 @@ struct HomeAssistantTextParser {
     }
 
     private func matchesIncomeAverageIntent(in text: String) -> Bool {
-        let incomeKeywords = ["income", "actual income"]
+        let incomeKeywords = ["income", "actual income", "deposited", "deposit", "bring in", "brought in", "earned", "came through"]
         let averageKeywords = ["average", "avg", "mean"]
 
         return containsAny(text, keywords: incomeKeywords)

@@ -4287,9 +4287,17 @@ struct HomeAssistantPanelView: View {
 
         let explicitPatterns = [
             "\\bat\\s+([a-z0-9 '&\\-\\.]+?)(?:\\s+(this|last|in|from|vs|versus|please|so|year|month|week|today|yesterday|for)\\b|$)",
+            "\\bwith\\s+([a-z0-9 '&\\-\\.]+?)(?:\\s+(this|last|in|from|vs|versus|please|so|year|month|week|today|yesterday|for)\\b|$)",
+            "\\bto\\s+([a-z0-9 '&\\-\\.]+?)(?:\\s+(this|last|in|from|vs|versus|please|so|year|month|week|today|yesterday|for)\\b|$)",
             "\\bmerchant\\s+([a-z0-9 '&\\-\\.]+?)(?:\\s+(this|last|in|from|vs|versus|please|so|year|month|week|today|yesterday|for)\\b|$)",
             "\\bstore\\s+([a-z0-9 '&\\-\\.]+?)(?:\\s+(this|last|in|from|vs|versus|please|so|year|month|week|today|yesterday|for)\\b|$)",
+            "\\bpayee\\s+([a-z0-9 '&\\-\\.]+?)(?:\\s+(this|last|in|from|vs|versus|please|so|year|month|week|today|yesterday|for)\\b|$)",
+            "\\bvendor\\s+([a-z0-9 '&\\-\\.]+?)(?:\\s+(this|last|in|from|vs|versus|please|so|year|month|week|today|yesterday|for)\\b|$)",
             "\\b(?:spent|spend|spending|expense|expenses)\\s+on\\s+([a-z0-9 '&\\-\\.]+?)(?:\\s+(this|last|in|from|vs|versus|please|so|year|month|week|today|yesterday|for)\\b|$)",
+            "\\b(?:spent|spend|spending|expense|expenses)\\s+with\\s+([a-z0-9 '&\\-\\.]+?)(?:\\s+(this|last|in|from|vs|versus|please|so|year|month|week|today|yesterday|for)\\b|$)",
+            "\\b(?:how much\\s+)?went\\s+to\\s+([a-z0-9 '&\\-\\.]+?)(?:\\s+(this|last|in|from|vs|versus|please|so|year|month|week|today|yesterday|for)\\b|$)",
+            "\\b(?:paid|pay)\\s+(?:to\\s+)?([a-z0-9 '&\\-\\.]+?)(?:\\s+(this|last|in|from|vs|versus|please|so|year|month|week|today|yesterday|for)\\b|$)",
+            "\\bbuy\\s+from\\s+([a-z0-9 '&\\-\\.]+?)(?:\\s+(this|last|in|from|vs|versus|please|so|year|month|week|today|yesterday|for)\\b|$)",
             "\\b(?:summarize|summary of)\\s+(?:my\\s+)?([a-z0-9 '&\\-\\.]+?)\\s+(?:spend|spending|expense|expenses)\\b",
             "\\bcompare\\s+([a-z][a-z0-9 '&\\-\\.]*?)\\s+(?:spend|spending|expense|expenses)\\s+(?:from|between|vs|versus|this|last|in)\\b",
             "\\bcompare\\s+([a-z][a-z0-9 '&\\-\\.]*?)\\s+(?:from|between|vs|versus|this|last|in)\\b",

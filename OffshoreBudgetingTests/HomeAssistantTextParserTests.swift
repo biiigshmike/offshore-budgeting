@@ -532,7 +532,9 @@ struct HomeAssistantTextParserTests {
             "Who created this budget?",
             "What model is Marina using?",
             "How much storage is the app using?",
-            "What is the average temperature this month?"
+            "What is the average temperature this month?",
+            "Which vendors support refunds?",
+            "How much headroom does the API have?"
         ]
 
         for prompt in prompts {
@@ -572,6 +574,43 @@ struct HomeAssistantTextParserTests {
             IntentPhraseCase(prompt: "How much do I spend per month on groceries recurring payments?", expectedIntent: .presetCategorySpend),
             IntentPhraseCase(prompt: "If I cut groceries, what could I save?", expectedIntent: .categoryPotentialSavings),
             IntentPhraseCase(prompt: "If I reduce groceries, how should I rebalance other categories?", expectedIntent: .categoryReallocationGuidance)
+        ]
+
+        for phraseCase in cases {
+            let query = parser.parse(phraseCase.prompt)
+            #expect(query?.intent == phraseCase.expectedIntent)
+        }
+    }
+
+    @Test func phrasePack_bankerLanguageVariants_mapToExpectedIntent() throws {
+        let parser = makeParser()
+        let cases: [IntentPhraseCase] = [
+            IntentPhraseCase(prompt: "Which budgets still have headroom this month?", expectedIntent: .topCategoriesThisMonth),
+            IntentPhraseCase(prompt: "How much room do I have left this month?", expectedIntent: .topCategoriesThisMonth),
+            IntentPhraseCase(prompt: "What got deposited this month?", expectedIntent: .incomeAverageActual),
+            IntentPhraseCase(prompt: "How much did I bring in this month?", expectedIntent: .incomeAverageActual),
+            IntentPhraseCase(prompt: "How much went to Starbucks this month?", expectedIntent: .merchantSpendTotal),
+            IntentPhraseCase(prompt: "Which vendors got most of my money this month?", expectedIntent: .topMerchantsThisMonth),
+            IntentPhraseCase(prompt: "What did I put on Apple Card this month?", expectedIntent: .cardSpendTotal),
+            IntentPhraseCase(prompt: "Am I on track to save this month?", expectedIntent: .forecastSavings)
+        ]
+
+        for phraseCase in cases {
+            let query = parser.parse(phraseCase.prompt)
+            #expect(query?.intent == phraseCase.expectedIntent)
+        }
+    }
+
+    @Test func phrasePack_casualAdvisorVariants_mapToExpectedIntent() throws {
+        let parser = makeParser()
+        let cases: [IntentPhraseCase] = [
+            IntentPhraseCase(prompt: "What do I usually spend in a month?", expectedIntent: .spendAveragePerPeriod),
+            IntentPhraseCase(prompt: "What do I usually spend at Starbucks?", expectedIntent: .merchantSpendSummary),
+            IntentPhraseCase(prompt: "What places did I spend at today?", expectedIntent: .topMerchantsThisMonth),
+            IntentPhraseCase(prompt: "Which day cost me the most this month?", expectedIntent: .spendThisMonth),
+            IntentPhraseCase(prompt: "What's eating my budget this month?", expectedIntent: .topCategoryChangesThisMonth),
+            IntentPhraseCase(prompt: "What card saw the most action?", expectedIntent: .cardSnapshotSummary),
+            IntentPhraseCase(prompt: "How tight is my budget right now?", expectedIntent: .periodOverview)
         ]
 
         for phraseCase in cases {
