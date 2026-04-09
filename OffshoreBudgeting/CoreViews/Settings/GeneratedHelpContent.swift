@@ -121,6 +121,20 @@ struct GeneratedHelpSection: Identifiable, Hashable {
         self.mediaItems = mediaItems
         self.linkItems = linkItems
     }
+
+    init(
+        id: String,
+        resolvedHeader: String?,
+        resolvedBodyText: String,
+        mediaItems: [GeneratedHelpSectionMediaItem] = [],
+        linkItems: [GeneratedHelpSectionLinkItem] = []
+    ) {
+        self.id = id
+        self.header = resolvedHeader
+        self.bodyText = resolvedBodyText
+        self.mediaItems = mediaItems
+        self.linkItems = linkItems
+    }
 }
 
 struct GeneratedHelpLeafTopic: Identifiable, Hashable {
@@ -677,23 +691,8 @@ enum GeneratedHelpContent {
                     id: "home-marina-2",
                     header: "Questions People Commonly Ask",
                     body: "The most common Marina questions fall into a few predictable groups: period check-ins, spend totals, category focus, card focus, income source questions, savings direction, recurring preset questions, and month-over-month comparisons.\n\nStrong examples are: How am I doing this month? What did I spend last month? Top categories this month. Compare this month vs last month. Compare groceries this month vs last month. Compare my Apple Card this month vs last month. What share of my spending is groceries this month? What portion of my income comes from Salary this month?\n\nMarina is most reliable when the request is one metric, one scope, one target, and one time frame."
-                ),
-                textSection(
-                    id: "home-marina-3",
-                    header: "What Marina Can Answer Today",
-                    body: "Marina currently works best for deterministic budgeting questions that map to a built-in Home analysis. That includes overview, total spend, top categories, recent largest expenses, global month comparison, category month comparison, card month comparison, income source month comparison, card totals, card spending habits, income averages, savings status, savings averages, income share, category share, share trends, preset due and preset cost questions, potential category savings, and category reallocation guidance.\n\nIn practice, that means requests like Compare this month vs last month, Compare transportation this month vs last month, Compare my Apple Card vs last month, How much did I spend this month, and What share of spending is groceries this month should be in Marina's comfort zone."
-                ),
-                textSection(
-                    id: "home-marina-4",
-                    header: "Why Comparisons Still Feel Confusing",
-                    body: "When a comparison feels wrong, the issue is usually not only language understanding. Marina can only answer comparisons that the current Home engine knows how to compute.\n\nThe biggest confusion comes from four gaps. First, merchant-level questions like Compare Starbucks vs last month do not map to Marina's modeled entities unless Starbucks is already represented as a category, card, or income source. Second, multi-target comparisons like Compare groceries and dining require a side-by-side engine capability that Marina does not yet have. Third, arbitrary period-vs-period comparisons like Compare January to March or Q1 vs Q4 are broader than the current current-vs-previous comparison model. Fourth, explanation questions like Why did groceries go up require a diagnostic breakdown layer, not just a total comparison."
-                ),
-                textSection(
-                    id: "home-marina-5",
-                    header: "Best Prompt Pattern Right Now",
-                    body: "For the highest reliability, ask Marina in this shape: one metric, one target, one period. Good patterns are Compare [category] this month vs last month, Compare [card] this month vs last month, How much did I spend on [category] this month, What share of spending is [category] this month, and What portion of income comes from [source] this month.\n\nIf Marina asks for clarification, that usually means the request is close to supported but missing a stable target or date scope. If Marina gives a broad answer instead of the one you wanted, the request may be asking for a capability the engine does not model yet."
                 )
-            ]
+            ] + MarinaCapabilityGuide.helpSections(prefix: "home-marina")
         ),
         GeneratedHelpLeafTopic(
             id: "home-widgets",

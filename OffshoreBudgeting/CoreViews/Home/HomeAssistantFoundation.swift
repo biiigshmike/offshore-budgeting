@@ -1216,6 +1216,17 @@ struct HomeAssistantPanelView: View {
             appendAnswer(personaFormatter.greetingAnswer(for: selectedPersonaID))
             return true
         }
+
+        if MarinaCapabilityGuide.matchesPrompt(prompt) {
+            let raw = MarinaCapabilityGuide.makeAnswer(for: prompt)
+            let styled = personaFormatter.styledAnswer(
+                from: raw,
+                userPrompt: prompt,
+                personaID: selectedPersonaID
+            )
+            appendAnswer(styled)
+            return true
+        }
         return false
     }
     
