@@ -222,6 +222,61 @@ struct HomeAssistantTextParserTests {
         #expect(query?.intent == .topCardChangesThisMonth)
     }
 
+    @Test func coverageMatrix_existingFinanceFamilies_keepExpectedRouting() throws {
+        let cases: [IntentPhraseCase] = [
+            .init(prompt: "Walk me through my spending this month", expectedIntent: .spendThisMonth),
+            .init(prompt: "What did I pay for today?", expectedIntent: .largestRecentTransactions),
+            .init(prompt: "Where's my money going this month?", expectedIntent: .topCategoriesThisMonth),
+            .init(prompt: "Which vendors got most of my money this month?", expectedIntent: .topMerchantsThisMonth),
+            .init(prompt: "How much went to Starbucks this month?", expectedIntent: .merchantSpendTotal),
+            .init(prompt: "What did I spend with Starbucks this month?", expectedIntent: .merchantSpendTotal),
+            .init(prompt: "What is my average purchase at Starbucks?", expectedIntent: .merchantSpendSummary),
+            .init(prompt: "Which envelopes have money left?", expectedIntent: .topCategoriesThisMonth),
+            .init(prompt: "What got deposited this month?", expectedIntent: .incomeAverageActual),
+            .init(prompt: "When was my last paycheck?", expectedIntent: .incomeAverageActual),
+            .init(prompt: "Which card am I leaning on most?", expectedIntent: .cardSnapshotSummary),
+            .init(prompt: "What did I put on Apple Card this month?", expectedIntent: .cardSpendTotal),
+            .init(prompt: "Am I on track to save this month?", expectedIntent: .forecastSavings),
+            .init(prompt: "Why am I saving less this month?", expectedIntent: .savingsStatus),
+            .init(prompt: "What changed in my spending this month?", expectedIntent: .topCategoryChangesThisMonth)
+        ]
+
+        for testCase in cases {
+            let query = makeParser().parse(testCase.prompt)
+            #expect(query?.intent == testCase.expectedIntent)
+        }
+    }
+
+    @Test func coverageMatrix_falsePositiveNeighbors_whatIfMerchantPrompt_staysNil() throws {
+        let parser = makeParser()
+        #expect(parser.parse("What if I spent $25/week at Starbucks?") == nil)
+    }
+
+    @Test func coverageMatrix_falsePositiveNeighbors_affordabilityPrompt_staysNil() throws {
+        let parser = makeParser()
+        #expect(parser.parse("Can I afford Starbucks this month?") == nil)
+    }
+
+    @Test func coverageMatrix_falsePositiveNeighbors_appStoragePrompt_staysNil() throws {
+        let parser = makeParser()
+        #expect(parser.parse("How much storage is the app using?") == nil)
+    }
+
+    @Test func coverageMatrix_falsePositiveNeighbors_cardStylePrompt_staysNil() throws {
+        let parser = makeParser()
+        #expect(parser.parse("Which card style looks best?") == nil)
+    }
+
+    @Test func coverageMatrix_falsePositiveNeighbors_dataPrompt_staysNil() throws {
+        let parser = makeParser()
+        #expect(parser.parse("Where did my data go?") == nil)
+    }
+
+    @Test func coverageMatrix_falsePositiveNeighbors_storeLocatorPrompt_staysNil() throws {
+        let parser = makeParser()
+        #expect(parser.parse("Which stores support Apple Pay near me?") == nil)
+    }
+
     @Test func parse_compareMerchantPrompt_mapsToMerchantComparisonIntent() throws {
         let query = makeParser().parse("Compare merchant Starbucks this month vs last month")
 
@@ -539,7 +594,9 @@ struct HomeAssistantTextParserTests {
 
         for prompt in prompts {
             let query = parser.parse(prompt)
-            #expect(query == nil)
+            if query != nil {
+                fatalError("Shipping false-positive prompt mismatch: \(prompt) -> \(String(describing: query?.intent))")
+            }
         }
     }
 
@@ -740,6 +797,62 @@ struct HomeAssistantTextParserTests {
             #expect(plan?.metric == confidenceCase.expectedMetric)
             #expect(plan?.confidenceBand == .low)
         }
+    }
+
+    @Test func phrasePack_shippingCoverageMatrix_mapToExpectedIntent() throws {
+        let parser = makeParser()
+        let cases: [IntentPhraseCase] = [
+            IntentPhraseCase(prompt: "Walk me through my spending this month", expectedIntent: .spendThisMonth),
+            IntentPhraseCase(prompt: "Which day cost me the most this month?", expectedIntent: .spendThisMonth),
+            IntentPhraseCase(prompt: "What did I pay for today?", expectedIntent: .largestRecentTransactions),
+            IntentPhraseCase(prompt: "Which vendors got most of my money this month?", expectedIntent: .topMerchantsThisMonth),
+            IntentPhraseCase(prompt: "What did I spend with Starbucks this month?", expectedIntent: .merchantSpendTotal),
+            IntentPhraseCase(prompt: "What is my typical spend at Starbucks?", expectedIntent: .merchantSpendSummary),
+            IntentPhraseCase(prompt: "Which budget buckets are almost full?", expectedIntent: .topCategoriesThisMonth),
+            IntentPhraseCase(prompt: "Which envelopes have money left?", expectedIntent: .topCategoriesThisMonth),
+            IntentPhraseCase(prompt: "What got deposited this month?", expectedIntent: .incomeAverageActual),
+            IntentPhraseCase(prompt: "Where is my income coming from this month?", expectedIntent: .incomeAverageActual),
+            IntentPhraseCase(prompt: "What card carries most of my spending?", expectedIntent: .cardSnapshotSummary),
+            IntentPhraseCase(prompt: "Show me my Apple Card activity", expectedIntent: .cardSnapshotSummary),
+            IntentPhraseCase(prompt: "Am I on track to save this month?", expectedIntent: .forecastSavings),
+            IntentPhraseCase(prompt: "What changed in my spending this month?", expectedIntent: .topCategoryChangesThisMonth),
+            IntentPhraseCase(prompt: "Where am I leaking money?", expectedIntent: .topCategoryChangesThisMonth)
+        ]
+
+        for phraseCase in cases {
+            let query = parser.parse(phraseCase.prompt)
+            #expect(query?.intent == phraseCase.expectedIntent)
+        }
+    }
+
+    @Test func phrasePack_shippingCoverageFalsePositiveNeighbors_whatIfGroceries_staysNil() throws {
+        let parser = makeParser()
+        #expect(parser.parse("What if I spend more on groceries?") == nil)
+    }
+
+    @Test func phrasePack_shippingCoverageFalsePositiveNeighbors_affordabilityCadence_staysNil() throws {
+        let parser = makeParser()
+        #expect(parser.parse("Can I afford Starbucks every week?") == nil)
+    }
+
+    @Test func phrasePack_shippingCoverageFalsePositiveNeighbors_cardSettings_staysNil() throws {
+        let parser = makeParser()
+        #expect(parser.parse("Where is my Apple Card settings page?") == nil)
+    }
+
+    @Test func phrasePack_shippingCoverageFalsePositiveNeighbors_vendorPlatformPrompt_staysNil() throws {
+        let parser = makeParser()
+        #expect(parser.parse("What vendor powers Marina?") == nil)
+    }
+
+    @Test func phrasePack_shippingCoverageFalsePositiveNeighbors_appChangesPrompt_staysNil() throws {
+        let parser = makeParser()
+        #expect(parser.parse("What changed in the app this month?") == nil)
+    }
+
+    @Test func phrasePack_shippingCoverageFalsePositiveNeighbors_designEnvelopePrompt_staysNil() throws {
+        let parser = makeParser()
+        #expect(parser.parse("Which envelopes does the design use?") == nil)
     }
 
     // MARK: - Command Parsing

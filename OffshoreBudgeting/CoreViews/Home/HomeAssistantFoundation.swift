@@ -102,6 +102,8 @@ struct HomeAssistantPanelView: View {
     let workspace: Workspace
     let onDismiss: () -> Void
     let shouldUseLargeMinimumSize: Bool
+    let assistantDateRange: HomeQueryDateRange?
+    let onOpenWhatIfPlanner: (HomeAssistantWhatIfPlannerDraft) -> Void
     
     @Query private var budgets: [Budget]
     @Query private var categories: [Category]
@@ -155,6 +157,8 @@ struct HomeAssistantPanelView: View {
     @State private var pendingPlannedExpenseAmountPlan: HomeAssistantCommandPlan? = nil
     @State private var pendingPlannedExpenseAmountExpense: PlannedExpense? = nil
     @State private var pendingPlannedExpenseCandidates: [PlannedExpense] = []
+    @State private var pendingWhatIfContext: HomeAssistantWhatIfContext? = nil
+    @State private var pendingWhatIfCategoryMappingContext: HomeAssistantWhatIfContext? = nil
     @FocusState private var isPromptFieldFocused: Bool
     @AppStorage("general_defaultBudgetingPeriod")
     private var defaultBudgetingPeriodRaw: String = BudgetingPeriod.monthly.rawValue
@@ -170,6 +174,8 @@ struct HomeAssistantPanelView: View {
     private let entityMatcher = HomeAssistantEntityMatcher()
     private let aliasMatcher = HomeAssistantAliasMatcher()
     private let requestRoutingResolver = HomeAssistantRequestRoutingResolver()
+    private let whatIfParser = HomeAssistantWhatIfParser()
+    private let whatIfAnswerBuilder = HomeAssistantWhatIfAnswerBuilder()
     private let dailySpendAnswerBuilder = HomeAssistantDailySpendAnswerBuilder()
     private let incomePeriodSummaryAnswerBuilder = HomeAssistantIncomePeriodSummaryAnswerBuilder()
     private let categoryAvailabilityAnswerBuilder = HomeAssistantCategoryAvailabilityAnswerBuilder()
@@ -200,11 +206,15 @@ struct HomeAssistantPanelView: View {
     init(
         workspace: Workspace,
         onDismiss: @escaping () -> Void,
-        shouldUseLargeMinimumSize: Bool
+        shouldUseLargeMinimumSize: Bool,
+        assistantDateRange: HomeQueryDateRange? = nil,
+        onOpenWhatIfPlanner: @escaping (HomeAssistantWhatIfPlannerDraft) -> Void = { _ in }
     ) {
         self.workspace = workspace
         self.onDismiss = onDismiss
         self.shouldUseLargeMinimumSize = shouldUseLargeMinimumSize
+        self.assistantDateRange = assistantDateRange
+        self.onOpenWhatIfPlanner = onOpenWhatIfPlanner
         
         let workspaceID = workspace.id
 
@@ -967,6 +977,14 @@ struct HomeAssistantPanelView: View {
             return
         }
 
+        if resolvePendingWhatIfFollowUp(with: prompt) {
+            return
+        }
+
+        if handleWhatIfPrompt(prompt) {
+            return
+        }
+
         if handleAnchoredFollowUpPrompt(prompt) {
             return
         }
@@ -1000,6 +1018,181 @@ struct HomeAssistantPanelView: View {
             notes: "no_plan_resolved"
         )
         appendAnswer(personaFormatter.unresolvedPromptAnswer(for: prompt, personaID: selectedPersonaID))
+    }
+
+    private func handleWhatIfPrompt(_ prompt: String) -> Bool {
+        guard let result = whatIfParser.parse(
+            prompt,
+            categories: categories,
+            fallbackDateRange: assistantDateRange,
+            dateParser: parser,
+            defaultPeriodUnit: defaultQueryPeriodUnit
+        ) else {
+            return false
+        }
+
+        switch result {
+        case let .clarification(message):
+            clarificationSuggestions = []
+            lastClarificationReasons = []
+            appendAnswer(
+                HomeAnswer(
+                    queryID: UUID(),
+                    kind: .message,
+                    userPrompt: prompt,
+                    title: "What If needs one concrete change",
+                    subtitle: message,
+                    rows: []
+                )
+            )
+            return true
+        case let .request(request):
+            let built = whatIfAnswerBuilder.makeAnswer(
+                queryID: UUID(),
+                userPrompt: prompt,
+                request: request,
+                categories: categories,
+                plannedExpenses: plannedExpenses,
+                variableExpenses: variableExpenses,
+                incomes: incomes
+            )
+            let styled = personaFormatter.styledAnswer(
+                from: built.rawAnswer,
+                userPrompt: prompt,
+                personaID: selectedPersonaID,
+                seedContext: personaSeedContext(for: built.primaryQuery),
+                footerContext: personaFooterContext(for: built.footerQueries),
+                echoContext: personaEchoContext(for: built.primaryQuery),
+                visibleProvenance: visibleProvenance(for: built.footerQueries)
+            )
+
+            pendingWhatIfContext = built.context
+            pendingWhatIfCategoryMappingContext = nil
+            appendAnswer(styled)
+            return true
+        }
+    }
+
+    private func resolvePendingWhatIfFollowUp(with prompt: String) -> Bool {
+        if let pendingWhatIfCategoryMappingContext {
+            return resolvePendingWhatIfCategoryMapping(prompt, context: pendingWhatIfCategoryMappingContext)
+        }
+
+        guard let pendingWhatIfContext else { return false }
+        let normalized = normalizedPrompt(prompt)
+        let wantsPlannerHandoff = [
+            "open this in what if",
+            "open this in planner",
+            "open in what if",
+            "open in planner",
+            "put this in what if",
+            "put this in planner",
+            "add this to what if",
+            "use this in what if",
+            "save this to what if",
+            "move this to what if"
+        ].contains(where: normalized.contains)
+
+        guard wantsPlannerHandoff else { return false }
+
+        if pendingWhatIfContext.requiresExactCadenceSelection {
+            appendAnswer(
+                HomeAnswer(
+                    queryID: UUID(),
+                    kind: .message,
+                    userPrompt: prompt,
+                    title: "Pick one cadence first",
+                    subtitle: "I can open the planner after you tell me which interval to use.",
+                    rows: []
+                )
+            )
+            return true
+        }
+
+        if let draft = pendingWhatIfContext.directPlannerDraft {
+            onOpenWhatIfPlanner(draft)
+            appendAnswer(
+                HomeAnswer(
+                    queryID: UUID(),
+                    kind: .message,
+                    userPrompt: prompt,
+                    title: "Opening What If planner",
+                    subtitle: "I carried this hypothetical over as a temporary draft. Nothing is saved until you save it there.",
+                    rows: []
+                )
+            )
+            return true
+        }
+
+        if pendingWhatIfContext.requiresPlannerCategoryName,
+           pendingWhatIfContext.exactAdditionalSpendForPlanner != nil {
+            pendingWhatIfCategoryMappingContext = pendingWhatIfContext
+            appendAnswer(
+                HomeAnswer(
+                    queryID: UUID(),
+                    kind: .message,
+                    userPrompt: prompt,
+                    title: "Which category should I map this to?",
+                    subtitle: "The planner is category-based, so tell me the category you want this merchant scenario applied to.",
+                    rows: []
+                )
+            )
+            return true
+        }
+
+        return false
+    }
+
+    private func resolvePendingWhatIfCategoryMapping(
+        _ prompt: String,
+        context: HomeAssistantWhatIfContext
+    ) -> Bool {
+        guard let matchedCategory = aliasTarget(in: prompt, entityType: .category)
+                ?? entityMatcher.bestCategoryMatch(in: prompt, categories: categories)
+        else {
+            appendAnswer(
+                HomeAnswer(
+                    queryID: UUID(),
+                    kind: .message,
+                    userPrompt: prompt,
+                    title: "I still need the category",
+                    subtitle: "Tell me which category should absorb this hypothetical so I can open the planner with the right draft.",
+                    rows: []
+                )
+            )
+            return true
+        }
+
+        guard let additionalSpend = context.exactAdditionalSpendForPlanner,
+              let category = categories.first(where: { $0.name == matchedCategory })
+        else {
+            return false
+        }
+
+        let baselineByCategoryID = whatIfBaselineSpendByCategoryID(in: context.resolvedDateRange)
+        let projectedCategorySpend = baselineByCategoryID[category.id, default: 0] + additionalSpend
+        let draft = HomeAssistantWhatIfPlannerDraft(
+            categoryScenarioSpendByID: [category.id: CurrencyFormatter.roundedToCurrency(projectedCategorySpend)],
+            plannedIncomeOverride: nil,
+            actualIncomeOverride: nil,
+            sourcePrompt: context.request.targetName ?? matchedCategory,
+            summary: "Mapped Marina What If to \(matchedCategory)."
+        )
+
+        pendingWhatIfCategoryMappingContext = nil
+        pendingWhatIfContext = context
+        onOpenWhatIfPlanner(draft)
+        appendAnswer(
+            HomeAnswer(
+                queryID: UUID(),
+                kind: .message,
+                userPrompt: prompt,
+                title: "Opening What If planner",
+                subtitle: "I mapped this hypothetical into \(matchedCategory) as a temporary draft. Nothing is saved until you save it there.",
+                rows: []
+            )
+        )
+        return true
     }
     
     private func handleConversationalPrompt(_ prompt: String) -> Bool {
@@ -3215,6 +3408,8 @@ struct HomeAssistantPanelView: View {
         sessionContext = HomeAssistantSessionContext()
         clarificationSuggestions = []
         lastClarificationReasons = []
+        pendingWhatIfContext = nil
+        pendingWhatIfCategoryMappingContext = nil
         clearMutationPendingState()
         conversationStore.saveAnswers([], workspaceID: workspace.id)
     }
@@ -5550,6 +5745,24 @@ struct HomeAssistantPanelView: View {
     private func shortQueryID(_ id: UUID) -> String {
         let raw = id.uuidString.replacingOccurrences(of: "-", with: "")
         return String(raw.prefix(8)).uppercased()
+    }
+
+    private func whatIfBaselineSpendByCategoryID(
+        in range: HomeQueryDateRange
+    ) -> [UUID: Double] {
+        var totals: [UUID: Double] = [:]
+
+        for expense in plannedExpenses where expense.expenseDate >= range.startDate && expense.expenseDate <= range.endDate {
+            guard let category = expense.category else { continue }
+            totals[category.id, default: 0] += max(0, CurrencyFormatter.roundedToCurrency(expense.effectiveAmount()))
+        }
+
+        for expense in variableExpenses where expense.transactionDate >= range.startDate && expense.transactionDate <= range.endDate {
+            guard let category = expense.category else { continue }
+            totals[category.id, default: 0] += expense.ledgerSignedAmount()
+        }
+
+        return totals.mapValues { CurrencyFormatter.roundedToCurrency(max(0, $0)) }
     }
 
     private func visibleProvenance(for query: HomeQuery) -> String? {

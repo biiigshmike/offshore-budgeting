@@ -214,6 +214,430 @@ struct HomeAssistantModelsTests {
         #expect(answer.rows.contains { $0.title == "Salary" && $0.value.filter(\.isNumber) == "210000" })
     }
 
+    // MARK: - What If
+
+    @Test func whatIfParser_recurringMerchantAffordabilityPrompt_parsesMerchantAndCadenceRange() throws {
+        let parser = HomeAssistantWhatIfParser(
+            calendar: calendar,
+            nowProvider: { date(2026, 4, 9, 9, 0, 0) }
+        )
+        let dateParser = HomeAssistantTextParser(
+            calendar: calendar,
+            nowProvider: { date(2026, 4, 9, 9, 0, 0) }
+        )
+
+        let result = parser.parse(
+            "Can I afford to spend 25 every 3 or 4 days at Starbucks?",
+            categories: [Category(name: "Dining", hexColor: "#FF9900")],
+            fallbackDateRange: HomeQueryDateRange(
+                startDate: date(2026, 4, 1, 0, 0, 0),
+                endDate: date(2026, 4, 30, 23, 59, 59)
+            ),
+            dateParser: dateParser,
+            defaultPeriodUnit: .month
+        )
+
+        guard case let .request(request)? = result else {
+            Issue.record("Expected What If request")
+            return
+        }
+
+        #expect(request.targetName == "Starbucks")
+        #expect(request.isAffordabilityPrompt)
+        if case let .recurringAmount(amount, minimumDayInterval, maximumDayInterval) = request.valueMode {
+            #expect(amount == 25)
+            #expect(minimumDayInterval == 3)
+            #expect(maximumDayInterval == 4)
+        } else {
+            Issue.record("Expected recurring What If value mode")
+        }
+    }
+
+    @Test func whatIfParser_additionalMerchantPrompt_parsesAdditionalSpend() throws {
+        let parser = HomeAssistantWhatIfParser(
+            calendar: calendar,
+            nowProvider: { date(2026, 4, 9, 9, 0, 0) }
+        )
+        let dateParser = HomeAssistantTextParser(
+            calendar: calendar,
+            nowProvider: { date(2026, 4, 9, 9, 0, 0) }
+        )
+
+        let result = parser.parse(
+            "What if I spent an additional 100 at Starbucks this month?",
+            categories: [Category(name: "Dining", hexColor: "#FF9900")],
+            fallbackDateRange: nil,
+            dateParser: dateParser,
+            defaultPeriodUnit: .month
+        )
+
+        guard case let .request(request)? = result else {
+            Issue.record("Expected What If request")
+            return
+        }
+
+        #expect(request.targetName == "Starbucks")
+        if case let .additionalAmount(amount) = request.valueMode {
+            #expect(amount == 100)
+        } else {
+            Issue.record("Expected additional amount What If value mode")
+        }
+    }
+
+    @Test func whatIfParser_coverageMatrix_handlesShorthandAndClarifyCases() throws {
+        let parser = HomeAssistantWhatIfParser(
+            calendar: calendar,
+            nowProvider: { date(2026, 4, 9, 9, 0, 0) }
+        )
+        let dateParser = HomeAssistantTextParser(
+            calendar: calendar,
+            nowProvider: { date(2026, 4, 9, 9, 0, 0) }
+        )
+        let categories = [
+            Category(name: "Dining", hexColor: "#FF9900"),
+            Category(name: "Groceries", hexColor: "#00AA88")
+        ]
+        let cases: [WhatIfCoverageCase] = [
+            .init(prompt: "What if I were to spend $25/week at Starbucks?", expectedBehavior: .answer, expectedTargetName: "Starbucks", expectedTargetKind: "merchant"),
+            .init(prompt: "What if I spent 25/wk at Starbucks?", expectedBehavior: .answer, expectedTargetName: "Starbucks", expectedTargetKind: "merchant"),
+            .init(prompt: "What if Starbucks cost me 25 weekly?", expectedBehavior: .answer, expectedTargetName: "Starbucks", expectedTargetKind: "merchant"),
+            .init(prompt: "Can I afford 40 per week on dining?", expectedBehavior: .answer, expectedTargetName: "Dining", expectedTargetKind: "category"),
+            .init(prompt: "What if groceries were 300 this month?", expectedBehavior: .answer, expectedTargetName: "Groceries", expectedTargetKind: "category"),
+            .init(prompt: "Can I afford Starbucks this month?", expectedBehavior: .clarify, expectedTargetName: nil, expectedTargetKind: nil)
+        ]
+
+        for testCase in cases {
+            let result = parser.parse(
+                testCase.prompt,
+                categories: categories,
+                fallbackDateRange: HomeQueryDateRange(
+                    startDate: date(2026, 4, 1, 0, 0, 0),
+                    endDate: date(2026, 4, 30, 23, 59, 59)
+                ),
+                dateParser: dateParser,
+                defaultPeriodUnit: .month
+            )
+
+            switch (testCase.expectedBehavior, result) {
+            case (.answer, .request(let request)?):
+                #expect(request.targetName == testCase.expectedTargetName)
+                #expect(whatIfTargetKindLabel(request.targetKind) == testCase.expectedTargetKind)
+            case (.clarify, .clarification?):
+                break
+            default:
+                Issue.record("Unexpected What If coverage result for prompt: \(testCase.prompt)")
+            }
+        }
+    }
+
+    @Test func whatIfCoverageMatrix_supportedPromptFamilies_parseToExpectedTargets() throws {
+        let parser = HomeAssistantWhatIfParser(
+            calendar: calendar,
+            nowProvider: { date(2026, 4, 9, 9, 0, 0) }
+        )
+        let dateParser = HomeAssistantTextParser(
+            calendar: calendar,
+            nowProvider: { date(2026, 4, 9, 9, 0, 0) }
+        )
+        let categories = [
+            Category(name: "Dining", hexColor: "#FF9900"),
+            Category(name: "Groceries", hexColor: "#00AA88")
+        ]
+        let range = HomeQueryDateRange(
+            startDate: date(2026, 4, 1, 0, 0, 0),
+            endDate: date(2026, 4, 30, 23, 59, 59)
+        )
+        let cases: [(prompt: String, targetName: String?, expectedKind: HomeAssistantWhatIfTargetKind)] = [
+            ("What if I were to spend $25/week at Starbucks?", "Starbucks", .merchant),
+            ("What if Starbucks cost me 25 weekly?", "Starbucks", .merchant),
+            ("Can I afford 40 per week at Starbucks?", "Starbucks", .merchant),
+            ("What if I spent an additional 100 at Starbucks this month?", "Starbucks", .merchant),
+            ("What if groceries were 300 this month?", "Groceries", .category(categories[1].id)),
+            ("What if I cut Dining by 50?", "Dining", .category(categories[0].id)),
+            ("What if planned income was 5000 this month?", "Planned income", .plannedIncome)
+        ]
+
+        for testCase in cases {
+            let result = parser.parse(
+                testCase.prompt,
+                categories: categories,
+                fallbackDateRange: range,
+                dateParser: dateParser,
+                defaultPeriodUnit: .month
+            )
+
+            guard case let .request(request)? = result else {
+                Issue.record("Expected What If request for \(testCase.prompt)")
+                continue
+            }
+
+            #expect(request.targetName == testCase.targetName)
+            #expect(request.targetKind == testCase.expectedKind)
+        }
+    }
+
+    @Test func whatIfCoverageMatrix_closeButIncompletePrompts_requestClarification() throws {
+        let parser = HomeAssistantWhatIfParser(
+            calendar: calendar,
+            nowProvider: { date(2026, 4, 9, 9, 0, 0) }
+        )
+        let dateParser = HomeAssistantTextParser(
+            calendar: calendar,
+            nowProvider: { date(2026, 4, 9, 9, 0, 0) }
+        )
+        let categories = [Category(name: "Dining", hexColor: "#FF9900")]
+        let prompts = [
+            "Can I afford Starbucks?",
+            "What if I spent more at Starbucks?",
+            "What if I were to spend weekly at Starbucks?"
+        ]
+
+        for prompt in prompts {
+            let result = parser.parse(
+                prompt,
+                categories: categories,
+                fallbackDateRange: nil,
+                dateParser: dateParser,
+                defaultPeriodUnit: .month
+            )
+
+            guard case .clarification? = result else {
+                Issue.record("Expected clarification for \(prompt)")
+                continue
+            }
+        }
+    }
+
+    @Test func whatIfCoverageMatrix_neighborPrompts_doNotHijackNormalAnalytics() throws {
+        let parser = HomeAssistantWhatIfParser(
+            calendar: calendar,
+            nowProvider: { date(2026, 4, 9, 9, 0, 0) }
+        )
+        let dateParser = HomeAssistantTextParser(
+            calendar: calendar,
+            nowProvider: { date(2026, 4, 9, 9, 0, 0) }
+        )
+        let categories = [Category(name: "Dining", hexColor: "#FF9900")]
+        let prompts = [
+            "What did I spend at Starbucks this month?",
+            "How much did I spend at Starbucks this month?",
+            "Which stores did I shop at today?"
+        ]
+
+        for prompt in prompts {
+            let result = parser.parse(
+                prompt,
+                categories: categories,
+                fallbackDateRange: nil,
+                dateParser: dateParser,
+                defaultPeriodUnit: .month
+            )
+
+            #expect(result == nil)
+        }
+    }
+
+    @Test func whatIfAnswerBuilder_additionalMerchantPrompt_projectsOutcomeAndPlannerCategoryFollowUp() throws {
+        let builder = HomeAssistantWhatIfAnswerBuilder(
+            calendar: calendar,
+            nowProvider: { date(2026, 4, 9, 9, 0, 0) }
+        )
+        let request = HomeAssistantWhatIfRequest(
+            targetKind: .merchant,
+            targetName: "Starbucks",
+            valueMode: .additionalAmount(100),
+            dateRange: HomeQueryDateRange(
+                startDate: date(2026, 4, 1, 0, 0, 0),
+                endDate: date(2026, 4, 30, 23, 59, 59)
+            ),
+            isAffordabilityPrompt: false
+        )
+
+        let result = builder.makeAnswer(
+            queryID: UUID(),
+            userPrompt: "What if I spent an additional 100 at Starbucks this month?",
+            request: request,
+            categories: [Category(name: "Dining", hexColor: "#FF9900")],
+            plannedExpenses: [
+                PlannedExpense(title: "Rent", plannedAmount: 500, expenseDate: date(2026, 4, 2, 12, 0, 0))
+            ],
+            variableExpenses: [
+                VariableExpense(descriptionText: "Starbucks", amount: 25, transactionDate: date(2026, 4, 4, 9, 0, 0)),
+                VariableExpense(descriptionText: "Groceries", amount: 75, transactionDate: date(2026, 4, 5, 9, 0, 0))
+            ],
+            incomes: [
+                Income(source: "Paycheck", amount: 1_200, date: date(2026, 4, 1, 12, 0, 0), isPlanned: false),
+                Income(source: "Paycheck", amount: 1_300, date: date(2026, 4, 1, 12, 0, 0), isPlanned: true)
+            ]
+        )
+
+        #expect(result.rawAnswer.primaryValue?.filter(\.isNumber) == "50000")
+        #expect(result.rawAnswer.rows.contains { $0.title == "Current Starbucks" && $0.value.filter(\.isNumber) == "2500" })
+        #expect(result.rawAnswer.rows.contains { $0.title == "Projected Starbucks" && $0.value.filter(\.isNumber) == "12500" })
+        #expect(result.context.requiresPlannerCategoryName)
+        #expect(result.context.exactAdditionalSpendForPlanner == 100)
+    }
+
+    @Test func whatIfAnswerBuilder_ambiguousRecurringPrompt_returnsRangeAndBlocksPlannerUntilCadenceChosen() throws {
+        let builder = HomeAssistantWhatIfAnswerBuilder(
+            calendar: calendar,
+            nowProvider: { date(2026, 4, 9, 9, 0, 0) }
+        )
+        let request = HomeAssistantWhatIfRequest(
+            targetKind: .merchant,
+            targetName: "Starbucks",
+            valueMode: .recurringAmount(amount: 25, minimumDayInterval: 3, maximumDayInterval: 4),
+            dateRange: HomeQueryDateRange(
+                startDate: date(2026, 4, 1, 0, 0, 0),
+                endDate: date(2026, 4, 30, 23, 59, 59)
+            ),
+            isAffordabilityPrompt: true
+        )
+
+        let result = builder.makeAnswer(
+            queryID: UUID(),
+            userPrompt: "Can I afford to spend 25 every 3 or 4 days at Starbucks?",
+            request: request,
+            categories: [],
+            plannedExpenses: [],
+            variableExpenses: [],
+            incomes: [
+                Income(source: "Paycheck", amount: 500, date: date(2026, 4, 1, 12, 0, 0), isPlanned: false)
+            ]
+        )
+
+        #expect(result.rawAnswer.primaryValue?.contains("-") == true)
+        #expect(result.context.requiresExactCadenceSelection)
+        #expect(result.context.exactAdditionalSpendForPlanner == nil)
+    }
+
+    @Test func whatIfCoverageMatrix_supportedPromptFamilies_parseAsExpected() throws {
+        let parser = HomeAssistantWhatIfParser(
+            calendar: calendar,
+            nowProvider: { date(2026, 4, 9, 9, 0, 0) }
+        )
+        let dateParser = HomeAssistantTextParser(
+            calendar: calendar,
+            nowProvider: { date(2026, 4, 9, 9, 0, 0) }
+        )
+        let categories = [
+            Category(name: "Dining", hexColor: "#FF9900"),
+            Category(name: "Groceries", hexColor: "#00AA00")
+        ]
+
+        let cases: [(prompt: String, targetName: String, expectedMode: String)] = [
+            ("What if I were to spend $25/week at Starbucks?", "Starbucks", "recurring"),
+            ("What if I spend 25 weekly at Starbucks?", "Starbucks", "recurring"),
+            ("Can I afford to spend 40 per week at Starbucks?", "Starbucks", "recurring"),
+            ("What if Starbucks costs me 25 weekly?", "Starbucks", "recurring"),
+            ("What if Starbucks runs me 25 weekly?", "Starbucks", "recurring"),
+            ("What if I spent an additional 100 at Starbucks this month?", "Starbucks", "additional"),
+            ("What if groceries were 300 this month?", "Groceries", "set"),
+            ("What if I cut groceries by 10 percent?", "Groceries", "percent"),
+            ("What if actual income was 4200 this month?", "Actual income", "set")
+        ]
+
+        for testCase in cases {
+            let result = parser.parse(
+                testCase.prompt,
+                categories: categories,
+                fallbackDateRange: HomeQueryDateRange(
+                    startDate: date(2026, 4, 1, 0, 0, 0),
+                    endDate: date(2026, 4, 30, 23, 59, 59)
+                ),
+                dateParser: dateParser,
+                defaultPeriodUnit: .month
+            )
+
+            guard case let .request(request)? = result else {
+                Issue.record("Expected What If request for \(testCase.prompt)")
+                continue
+            }
+
+            #expect(request.targetName == testCase.targetName)
+            switch (testCase.expectedMode, request.valueMode) {
+            case ("recurring", .recurringAmount):
+                break
+            case ("additional", .additionalAmount):
+                break
+            case ("set", .setAmount):
+                break
+            case ("percent", .adjustPercent):
+                break
+            default:
+                Issue.record("Unexpected What If mode for \(testCase.prompt)")
+            }
+        }
+    }
+
+    @Test func whatIfCoverageMatrix_closeButUnderspecifiedPrompts_clarifyInsteadOfGuessing() throws {
+        let parser = HomeAssistantWhatIfParser(
+            calendar: calendar,
+            nowProvider: { date(2026, 4, 9, 9, 0, 0) }
+        )
+        let dateParser = HomeAssistantTextParser(
+            calendar: calendar,
+            nowProvider: { date(2026, 4, 9, 9, 0, 0) }
+        )
+        let categories = [Category(name: "Dining", hexColor: "#FF9900")]
+        let prompts = [
+            "Can I afford Starbucks?",
+            "What if I spend more this month?",
+            "What if I were to spend at Starbucks?",
+            "What if income changed?"
+        ]
+
+        for prompt in prompts {
+            let result = parser.parse(
+                prompt,
+                categories: categories,
+                fallbackDateRange: HomeQueryDateRange(
+                    startDate: date(2026, 4, 1, 0, 0, 0),
+                    endDate: date(2026, 4, 30, 23, 59, 59)
+                ),
+                dateParser: dateParser,
+                defaultPeriodUnit: .month
+            )
+
+            guard case .clarification? = result else {
+                Issue.record("Expected clarification for \(prompt)")
+                continue
+            }
+        }
+    }
+
+    @Test func whatIfCoverageMatrix_nonWhatIfPrompts_doNotParseAsWhatIf() throws {
+        let parser = HomeAssistantWhatIfParser(
+            calendar: calendar,
+            nowProvider: { date(2026, 4, 9, 9, 0, 0) }
+        )
+        let dateParser = HomeAssistantTextParser(
+            calendar: calendar,
+            nowProvider: { date(2026, 4, 9, 9, 0, 0) }
+        )
+        let categories = [Category(name: "Dining", hexColor: "#FF9900")]
+        let prompts = [
+            "What did I spend at Starbucks this month?",
+            "How much did I spend at Starbucks this month?",
+            "Which stores did I shop at today?",
+            "What is my average spend at Starbucks?"
+        ]
+
+        for prompt in prompts {
+            let result = parser.parse(
+                prompt,
+                categories: categories,
+                fallbackDateRange: HomeQueryDateRange(
+                    startDate: date(2026, 4, 1, 0, 0, 0),
+                    endDate: date(2026, 4, 30, 23, 59, 59)
+                ),
+                dateParser: dateParser,
+                defaultPeriodUnit: .month
+            )
+            #expect(result == nil)
+        }
+    }
+
     // MARK: - HomeQueryDateRange
 
     @Test func queryDateRange_reordersWhenInputIsDescending() throws {
@@ -556,5 +980,30 @@ struct HomeAssistantModelsTests {
             startDate: date(year, month, day, 0, 0, 0),
             endDate: date(year, month, day, 23, 59, 59)
         )
+    }
+
+    private struct WhatIfCoverageCase {
+        enum Behavior {
+            case answer
+            case clarify
+        }
+
+        let prompt: String
+        let expectedBehavior: Behavior
+        let expectedTargetName: String?
+        let expectedTargetKind: String?
+    }
+
+    private func whatIfTargetKindLabel(_ kind: HomeAssistantWhatIfTargetKind) -> String {
+        switch kind {
+        case .merchant:
+            return "merchant"
+        case .category:
+            return "category"
+        case .actualIncome:
+            return "actualIncome"
+        case .plannedIncome:
+            return "plannedIncome"
+        }
     }
 }

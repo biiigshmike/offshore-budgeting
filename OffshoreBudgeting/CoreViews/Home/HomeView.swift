@@ -74,6 +74,7 @@ struct HomeView: View {
 
     @State private var isShowingWhatIfPlanner: Bool = false
     @State private var whatIfInitialScenarioID: UUID? = nil
+    @State private var whatIfInitialDraft: HomeAssistantWhatIfPlannerDraft? = nil
     @State private var isShowingAssistantPanel: Bool = false
 
     // MARK: - Data Fixups
@@ -310,14 +311,20 @@ struct HomeView: View {
                 savingsEntries: savingsEntries,
                 startDate: appliedStartDate,
                 endDate: appliedEndDate,
-                initialScenarioID: whatIfInitialScenarioID
+                initialScenarioID: whatIfInitialScenarioID,
+                initialDraft: whatIfInitialDraft
             )
         }
         .fullScreenCover(isPresented: $isShowingAssistantPanel, onDismiss: dismissAssistantPanel) {
             HomeAssistantPanelView(
                 workspace: workspace,
                 onDismiss: dismissAssistantPanel,
-                shouldUseLargeMinimumSize: false
+                shouldUseLargeMinimumSize: false,
+                assistantDateRange: HomeQueryDateRange(
+                    startDate: appliedStartDate,
+                    endDate: appliedEndDate
+                ),
+                onOpenWhatIfPlanner: openWhatIfPlanner
             )
         }
         .postBoardingTip(
@@ -464,7 +471,21 @@ struct HomeView: View {
 
     private func openWhatIfPlanner(_ initialScenarioID: UUID?) {
         whatIfInitialScenarioID = initialScenarioID
+        whatIfInitialDraft = nil
         isShowingWhatIfPlanner = true
+    }
+
+    private func openWhatIfPlanner(_ draft: HomeAssistantWhatIfPlannerDraft) {
+        whatIfInitialScenarioID = nil
+        whatIfInitialDraft = draft
+        if isShowingAssistantPanel {
+            dismissAssistantPanel()
+            DispatchQueue.main.async {
+                isShowingWhatIfPlanner = true
+            }
+        } else {
+            isShowingWhatIfPlanner = true
+        }
     }
 
     private func presentAssistantPanel() {

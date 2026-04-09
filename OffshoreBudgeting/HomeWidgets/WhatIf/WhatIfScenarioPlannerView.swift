@@ -44,6 +44,7 @@ struct WhatIfScenarioPlannerView: View {
     /// If provided, the planner will open with this scenario selected.
     /// Used by Home inline previews to jump straight into a pinned scenario.
     let initialScenarioID: UUID?
+    let initialDraft: HomeAssistantWhatIfPlannerDraft?
     
     @State private var pinnedRefreshTick: Int = 0
 
@@ -626,8 +627,16 @@ struct WhatIfScenarioPlannerView: View {
 
         baselineBoundsByCategoryID = buildBaselineBoundsByCategoryID()
 
-        let defaultScenario = store.ensureDefaultGlobalScenario()
         scenarios = store.listGlobalScenarios()
+
+        if let initialDraft {
+            selectedScenarioID = nil
+            applyTransientDraft(initialDraft)
+            didLoad = true
+            return
+        }
+
+        let defaultScenario = store.ensureDefaultGlobalScenario()
 
         let chosen = initialScenarioID ?? defaultScenario.id
 
@@ -779,6 +788,23 @@ struct WhatIfScenarioPlannerView: View {
 
         store.setSelectedGlobalScenarioID(id)
         scenarios = store.listGlobalScenarios()
+    }
+
+    private func applyTransientDraft(_ draft: HomeAssistantWhatIfPlannerDraft) {
+        var overrides: [UUID: WhatIfScenarioStore.WhatIfCategoryBounds] = [:]
+
+        for (categoryID, scenarioSpend) in draft.categoryScenarioSpendByID {
+            let baseline = baselineBoundsByCategoryID[categoryID, default: .init(min: 0, max: 0)]
+            overrides[categoryID] = .init(
+                min: baseline.min,
+                max: baseline.max,
+                scenarioSpend: scenarioSpend
+            )
+        }
+
+        applyMergedScenarioBounds(overrides: overrides, animated: false)
+        scenarioPlannedIncomeTotal = draft.plannedIncomeOverride
+        scenarioActualIncomeTotal = draft.actualIncomeOverride
     }
 
     private func selectScenario(_ id: UUID) {

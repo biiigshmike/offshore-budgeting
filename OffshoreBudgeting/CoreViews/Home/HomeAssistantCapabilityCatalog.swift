@@ -149,7 +149,20 @@ struct HomeAssistantCapabilityCatalog {
     }
 
     private func isMerchantPayeeDiscovery(_ prompt: String) -> Bool {
-        containsAny(prompt, [
+        let unsupportedCommerceContext = containsAny(prompt, [
+            "near me",
+            "apple pay",
+            "support apple pay",
+            "supports apple pay",
+            "settings",
+            "setting",
+            "vendor powers"
+        ])
+        if unsupportedCommerceContext {
+            return false
+        }
+
+        return containsAny(prompt, [
             "who did i pay the most",
             "who did i pay most",
             "who got the most",
@@ -157,8 +170,11 @@ struct HomeAssistantCapabilityCatalog {
             "who did i buy from",
             "which vendors got",
             "which payees got",
+            "which stores did i shop at",
+            "where did i shop",
             "what places did i spend at",
-            "what places did i shop at"
+            "what places did i shop at",
+            "where did i spend money"
         ])
     }
 
@@ -183,7 +199,8 @@ struct HomeAssistantCapabilityCatalog {
 
         let summaryMerchantPatterns = [
             "\\b(?:summarize|summary of)\\s+(?:my\\s+)?[a-z0-9 '&\\-\\.]+\\s+(?:spend|spending|expenses|purchase|purchases)\\b",
-            "\\b(?:typical|usual|usually|normal)\\s+(?:monthly\\s+)?[a-z0-9 '&\\-\\.]+\\s+(?:spend|spending|purchase|purchases)\\b"
+            "\\b(?:typical|usual|usually|normal)\\s+(?:monthly\\s+)?[a-z0-9 '&\\-\\.]+\\s+(?:spend|spending|purchase|purchases)\\b",
+            "\\bwhat\\s+is\\s+my\\s+(?:average|avg|typical|usual|usually|normal)\\s+(?:purchase|spend|spending)\\s+at\\s+[a-z0-9 '&\\-\\.]+\\b"
         ]
         return summaryMerchantPatterns.contains {
             prompt.range(of: $0, options: .regularExpression) != nil
@@ -260,6 +277,9 @@ struct HomeAssistantCapabilityCatalog {
             "did i hit income",
             "what got deposited",
             "how much did i bring in",
+            "when was my last paycheck",
+            "where is my income coming from",
+            "where s my income coming from",
             "which income sources paid out",
             "payments came through"
         ])
@@ -284,7 +304,7 @@ struct HomeAssistantCapabilityCatalog {
     }
 
     private func isSpendDriverDiagnostic(_ prompt: String) -> Bool {
-        let spend = containsAny(prompt, ["spend", "spent", "spending", "expenses", "budget"])
+        let spend = containsAny(prompt, ["spend", "spent", "spending", "expenses", "budget", "money"])
         let driver = containsAny(prompt, [
             "why",
             "driver",
@@ -303,6 +323,17 @@ struct HomeAssistantCapabilityCatalog {
     }
 
     private func isCardSummary(_ prompt: String) -> Bool {
+        if containsAny(prompt, [
+            "card style",
+            "styles",
+            "looks best",
+            "settings page",
+            "settings",
+            "design"
+        ]) {
+            return false
+        }
+
         if containsAny(prompt, [
             "changed most",
             "change most",
@@ -332,6 +363,7 @@ struct HomeAssistantCapabilityCatalog {
             "average spend",
             "leaning on most",
             "carrying most of my spending",
+            "carries most of my spending",
             "saw the most action",
             "planned and variable",
             "why is",
