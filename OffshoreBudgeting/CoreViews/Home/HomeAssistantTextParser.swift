@@ -1249,16 +1249,16 @@ struct HomeAssistantCommandParser {
         let amount: Double?
         let originalAmount: Double?
         switch intent {
-        case .editExpense, .editIncome, .updatePlannedExpenseAmount:
+        case .editExpense, .editIncome, .updatePlannedExpenseAmount, .editPreset, .editPlannedExpense:
             originalAmount = amountPair?.from ?? amounts.first
             amount = amountPair?.to ?? amounts.last
-        case .addExpense, .addIncome, .addPreset, .markIncomeReceived:
+        case .addExpense, .addIncome, .addPreset, .markIncomeReceived, .addPlannedExpense:
             originalAmount = nil
             amount = amounts.first
-        case .deleteExpense, .deleteIncome, .moveExpenseCategory, .deleteLastExpense, .deleteLastIncome:
+        case .deleteExpense, .deleteIncome, .moveExpenseCategory, .deleteLastExpense, .deleteLastIncome, .deletePlannedExpense:
             originalAmount = nil
             amount = amounts.first
-        case .addBudget, .addCard, .editCard, .deleteCard, .addCategory:
+        case .addBudget, .editBudget, .deleteBudget, .addCard, .editCard, .deleteCard, .addCategory, .editCategory, .deleteCategory, .deletePreset:
             originalAmount = nil
             amount = nil
         }
@@ -1268,6 +1268,7 @@ struct HomeAssistantCommandParser {
         let cardName = extractedCardName(from: trimmed)
         let categoryName = extractedCategoryName(from: trimmed)
         let entityName = extractedEntityName(from: trimmed, intent: intent)
+        let updatedEntityName = extractedUpdatedEntityName(from: trimmed, intent: intent)
         let incomeKind = extractedIncomeKind(from: normalized)
         let categoryColor = extractedCategoryColor(from: trimmed)
         let cardTheme = extractedCardTheme(from: normalized)
@@ -1292,6 +1293,7 @@ struct HomeAssistantCommandParser {
             cardName: cardName,
             categoryName: categoryName,
             entityName: entityName,
+            updatedEntityName: updatedEntityName,
             isPlannedIncome: incomeKind,
             categoryColorHex: categoryColor.hex,
             categoryColorName: categoryColor.name,
@@ -1430,6 +1432,42 @@ struct HomeAssistantCommandParser {
     }
 
     private func resolvedIntent(from normalized: String) -> HomeAssistantCommandIntent? {
+        if matchesEntityMutationIntent(in: normalized, entityKeyword: "planned expense", verbs: ["delete", "remove"]) {
+            return .deletePlannedExpense
+        }
+
+        if matchesEntityMutationIntent(in: normalized, entityKeyword: "planned expense", verbs: ["edit", "update", "change", "set"]) {
+            return .editPlannedExpense
+        }
+
+        if matchesCreateEntityIntent(in: normalized, entityKeyword: "planned expense") {
+            return .addPlannedExpense
+        }
+
+        if matchesEntityMutationIntent(in: normalized, entityKeyword: "budget", verbs: ["delete", "remove"]) {
+            return .deleteBudget
+        }
+
+        if matchesEntityMutationIntent(in: normalized, entityKeyword: "budget", verbs: ["edit", "update", "change", "rename"]) {
+            return .editBudget
+        }
+
+        if matchesEntityMutationIntent(in: normalized, entityKeyword: "preset", verbs: ["delete", "remove"]) {
+            return .deletePreset
+        }
+
+        if matchesEntityMutationIntent(in: normalized, entityKeyword: "preset", verbs: ["edit", "update", "change", "rename"]) {
+            return .editPreset
+        }
+
+        if matchesEntityMutationIntent(in: normalized, entityKeyword: "category", verbs: ["delete", "remove"]) {
+            return .deleteCategory
+        }
+
+        if matchesEntityMutationIntent(in: normalized, entityKeyword: "category", verbs: ["edit", "update", "change", "rename"]) {
+            return .editCategory
+        }
+
         if normalized.contains("mark")
             && normalized.contains("income")
             && (normalized.contains("received") || normalized.contains("as received"))
@@ -1527,6 +1565,17 @@ struct HomeAssistantCommandParser {
         let creationVerbs = ["add", "create", "new", "make"]
         let hasVerb = creationVerbs.contains { normalized.contains($0) }
         return hasVerb && normalized.contains(entityKeyword)
+    }
+
+    private func matchesEntityMutationIntent(
+        in normalized: String,
+        entityKeyword: String,
+        verbs: [String]
+    ) -> Bool {
+        let escapedKeyword = NSRegularExpression.escapedPattern(for: entityKeyword)
+        let hasVerb = verbs.contains { normalized.range(of: "\\b\($0)\\b", options: .regularExpression) != nil }
+        guard hasVerb else { return false }
+        return normalized.range(of: "\\b\(escapedKeyword)\\b", options: .regularExpression) != nil
     }
 
     private func extractedFromToAmounts(from text: String) -> (from: Double, to: Double)? {
@@ -1691,22 +1740,19 @@ struct HomeAssistantCommandParser {
         ]
 
         for pattern in patterns {
-            guard
-                let range = text.range(of: pattern, options: [.regularExpression, .caseInsensitive])
-            else {
+            guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else {
                 continue
             }
-
-            var value = String(text[range])
-            value = value
-                .replacingOccurrences(of: "on ", with: "")
-                .replacingOccurrences(of: "to ", with: "")
-                .replacingOccurrences(of: "using ", with: "")
-                .replacingOccurrences(of: " card", with: "")
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-
-            if value.isEmpty == false {
-                return stripTrailingPunctuation(value)
+            let nsrange = NSRange(text.startIndex..<text.endIndex, in: text)
+            let matches = regex.matches(in: text, options: [], range: nsrange)
+            for match in matches.reversed() {
+                guard match.numberOfRanges > 1, let range = Range(match.range(at: 1), in: text) else {
+                    continue
+                }
+                let value = String(text[range]).trimmingCharacters(in: .whitespacesAndNewlines)
+                if value.isEmpty == false {
+                    return stripTrailingPunctuation(value)
+                }
             }
         }
 
@@ -1751,20 +1797,24 @@ struct HomeAssistantCommandParser {
                 "\\b(?:called|named)\\s+(.+)$",
                 "\\bcard\\s+(?:named\\s+|called\\s+)?(.+)$"
             ]
-        case .addCategory:
+        case .addCategory, .editCategory, .deleteCategory:
             patterns = [
                 "\\b(?:called|named)\\s+(.+)$",
                 "\\bcategory\\s+(.+)$"
             ]
-        case .addPreset:
+        case .addPreset, .editPreset, .deletePreset:
             patterns = [
                 "\\b(?:called|named)\\s+(.+)$",
                 "\\bpreset\\s+(.+)$"
             ]
-        case .addBudget:
+        case .addBudget, .editBudget, .deleteBudget:
             patterns = [
                 "\\b(?:called|named)\\s+(.+)$",
                 "\\bbudget\\s+(.+)$"
+            ]
+        case .addPlannedExpense, .editPlannedExpense, .deletePlannedExpense:
+            patterns = [
+                "\\bplanned expense\\s+(.+)$"
             ]
         case .addExpense, .addIncome, .editExpense, .deleteExpense, .editIncome, .deleteIncome, .markIncomeReceived, .moveExpenseCategory, .updatePlannedExpenseAmount, .deleteLastExpense, .deleteLastIncome:
             return nil
@@ -1789,7 +1839,7 @@ struct HomeAssistantCommandParser {
                 raw = trimEntityNameAtAttributeBoundaries(raw, intent: intent)
             }
             raw = stripTrailingPunctuation(raw)
-            if intent == .addPreset {
+            if intent == .addPreset || intent == .editPreset || intent == .addPlannedExpense || intent == .editPlannedExpense {
                 raw = raw.replacingOccurrences(
                     of: "\\s+\\$?[-]?[0-9][0-9,]*(?:\\.[0-9]{1,2})?$",
                     with: "",
@@ -1803,6 +1853,40 @@ struct HomeAssistantCommandParser {
         }
 
         return nil
+    }
+
+    private func extractedUpdatedEntityName(
+        from text: String,
+        intent: HomeAssistantCommandIntent
+    ) -> String? {
+        let supportsRename: Set<HomeAssistantCommandIntent> = [
+            .editCard, .editCategory, .editPreset, .editBudget, .editPlannedExpense
+        ]
+        guard supportsRename.contains(intent) else { return nil }
+
+        let compactText = text
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard let range = compactText.range(of: "\\bto\\s+(.+)$", options: [.regularExpression, .caseInsensitive]) else {
+            return nil
+        }
+
+        var raw = String(compactText[range])
+            .replacingOccurrences(of: "to", with: "", options: [.caseInsensitive, .anchored], range: nil)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if let quoted = extractQuotedEntityName(from: raw) {
+            raw = quoted
+        } else {
+            raw = trimUpdatedEntityNameAtAttributeBoundaries(raw, intent: intent)
+        }
+
+        raw = sanitizeCreationPhrase(stripTrailingPunctuation(raw))
+        if parseAmountToken(raw) != nil {
+            return nil
+        }
+        return raw.isEmpty ? nil : raw
     }
 
     private func extractQuotedEntityName(from text: String) -> String? {
@@ -1844,23 +1928,84 @@ struct HomeAssistantCommandParser {
             return [
                 "\\s+\\b(?:theme|effect|style)\\b.*$",
                 "\\s+\\b(?:with|using)\\s+\\b(?:theme|effect|style)\\b.*$",
-                "\\s+\\b(?:with|using)\\s+\\b(?:\(cardStyleTokens))\\b.*$"
+                "\\s+\\b(?:with|using)\\s+\\b(?:\(cardStyleTokens))\\b.*$",
+                "\\s+\\bto\\b.*$"
             ]
-        case .addCategory:
-            return ["\\s+\\b(?:color|colour)\\b.*$"]
-        case .addPreset:
+        case .addCategory, .editCategory, .deleteCategory:
+            return [
+                "\\s+\\b(?:color|colour)\\b.*$",
+                "\\s+\\bto\\b.*$"
+            ]
+        case .addPreset, .editPreset, .deletePreset:
             return [
                 "\\s+\\$?[-]?[0-9][0-9,]*(?:\\.[0-9]{1,2})?\\b.*$",
-                "\\s+\\bon\\s+.+\\s+card\\b.*$"
+                "\\s+\\bon\\s+.+\\s+card\\b.*$",
+                "\\s+\\b(?:card|category|schedule|frequency|rename|amount)\\b.*$",
+                "\\s+\\bto\\b.*$"
             ]
-        case .addBudget:
+        case .addBudget, .editBudget, .deleteBudget:
             return [
                 "\\s+\\bfor\\b.*$",
-                "\\s+\\bfrom\\b.*$"
+                "\\s+\\bfrom\\b.*$",
+                "\\s+\\bto\\b.*$"
+            ]
+        case .addPlannedExpense, .editPlannedExpense, .deletePlannedExpense:
+            return [
+                "\\s+\\$?[-]?[0-9][0-9,]*(?:\\.[0-9]{1,2})?\\b.*$",
+                "\\s+\\bon\\s+.+\\s+card\\b.*$",
+                "\\s+\\bcategory\\b.*$",
+                "\\s+\\bto\\b.*$"
             ]
         case .addExpense, .addIncome, .editExpense, .deleteExpense, .editIncome, .deleteIncome, .markIncomeReceived, .moveExpenseCategory, .updatePlannedExpenseAmount, .deleteLastExpense, .deleteLastIncome:
             return []
         }
+    }
+
+    private func trimUpdatedEntityNameAtAttributeBoundaries(
+        _ text: String,
+        intent: HomeAssistantCommandIntent
+    ) -> String {
+        let boundaries: [String]
+        switch intent {
+        case .editCard:
+            boundaries = [
+                "\\s+\\b(?:theme|effect|style)\\b.*$"
+            ]
+        case .editCategory:
+            boundaries = [
+                "\\s+\\b(?:color|colour)\\b.*$"
+            ]
+        case .editPreset:
+            boundaries = [
+                "\\s+\\bon\\s+.+\\s+card\\b.*$",
+                "\\s+\\bcategory\\b.*$",
+                "\\s+\\b(?:weekly|monthly|daily|yearly|biweekly|every)\\b.*$"
+            ]
+        case .editBudget:
+            boundaries = []
+        case .editPlannedExpense:
+            boundaries = [
+                "\\s+\\bon\\s+.+\\s+card\\b.*$",
+                "\\s+\\bcategory\\b.*$",
+                "\\s+\\b(?:planned|actual)\\b.*$"
+            ]
+        default:
+            boundaries = []
+        }
+
+        guard boundaries.isEmpty == false else { return text }
+        var earliest: Range<String.Index>? = nil
+        for pattern in boundaries {
+            guard let range = text.range(of: pattern, options: [.regularExpression, .caseInsensitive]) else {
+                continue
+            }
+            if let earliest, range.lowerBound >= earliest.lowerBound {
+                continue
+            }
+            earliest = range
+        }
+        guard let earliest else { return text }
+        return String(text[..<earliest.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private func extractedCategoryColor(from text: String) -> (hex: String?, name: String?) {
@@ -1942,7 +2087,6 @@ struct HomeAssistantCommandParser {
 
         if normalized.contains("planned expense")
             || normalized.contains("planned")
-            || normalized.contains("preset")
             || normalized.contains("rent")
             || normalized.contains("mortgage")
             || normalized.contains("subscription")

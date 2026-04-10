@@ -911,6 +911,13 @@ struct HomeAssistantTextParserTests {
         #expect(command?.cardThemeRaw == "aqua")
     }
 
+    @Test func commandParser_editCardPrompt_extractsRenameTarget() throws {
+        let command = makeCommandParser().parse("edit card named Apple Card to Travel Card")
+        #expect(command?.intent == .editCard)
+        #expect(command?.entityName == "Apple Card")
+        #expect(command?.updatedEntityName == "Travel Card")
+    }
+
     @Test func commandParser_deleteCardPrompt_extractsDeleteIntent() throws {
         let command = makeCommandParser().parse("remove card named New Account")
         #expect(command?.intent == .deleteCard)
@@ -928,6 +935,19 @@ struct HomeAssistantTextParserTests {
         #expect(command?.intent == .addCategory)
         #expect(command?.entityName == "Dining")
         #expect(command?.categoryColorHex == "#22C55E")
+    }
+
+    @Test func commandParser_editCategoryPrompt_extractsRenameTarget() throws {
+        let command = makeCommandParser().parse("edit category groceries to dining")
+        #expect(command?.intent == .editCategory)
+        #expect(command?.entityName == "groceries")
+        #expect(command?.updatedEntityName == "dining")
+    }
+
+    @Test func commandParser_deleteCategoryPrompt_extractsDeleteIntent() throws {
+        let command = makeCommandParser().parse("delete category groceries")
+        #expect(command?.intent == .deleteCategory)
+        #expect(command?.entityName == "groceries")
     }
 
     @Test func commandParser_addPresetPrompt_extractsPresetIntentAmount() throws {
@@ -971,9 +991,35 @@ struct HomeAssistantTextParserTests {
         #expect(command?.recurrenceInterval == 2)
     }
 
+    @Test func commandParser_editPresetPrompt_extractsIntentAndRenameTarget() throws {
+        let command = makeCommandParser().parse("edit preset rent to mortgage")
+        #expect(command?.intent == .editPreset)
+        #expect(command?.entityName == "rent")
+        #expect(command?.updatedEntityName == "mortgage")
+    }
+
+    @Test func commandParser_deletePresetPrompt_extractsDeleteIntent() throws {
+        let command = makeCommandParser().parse("delete preset rent")
+        #expect(command?.intent == .deletePreset)
+        #expect(command?.entityName == "rent")
+    }
+
     @Test func commandParser_addBudgetPrompt_extractsBudgetIntent() throws {
         let command = makeCommandParser().parse("create budget for March 2026")
         #expect(command?.intent == .addBudget)
+    }
+
+    @Test func commandParser_editBudgetPrompt_extractsIntent() throws {
+        let command = makeCommandParser().parse("edit budget March 2026 to April 2026")
+        #expect(command?.intent == .editBudget)
+        #expect(command?.entityName == "March 2026")
+        #expect(command?.updatedEntityName == "April 2026")
+    }
+
+    @Test func commandParser_deleteBudgetPrompt_extractsDeleteIntent() throws {
+        let command = makeCommandParser().parse("delete budget March 2026")
+        #expect(command?.intent == .deleteBudget)
+        #expect(command?.entityName == "March 2026")
     }
 
     @Test func commandParser_addIncomePrompt_stripsIncomeKindFromSource() throws {
@@ -1055,8 +1101,28 @@ struct HomeAssistantTextParserTests {
 
     @Test func commandParser_updatePlannedExpenseAmountPrompt_withActualTarget_extractsTarget() throws {
         let command = makeCommandParser().parse("Update planned expense rent actual to $1450")
-        #expect(command?.intent == .updatePlannedExpenseAmount)
+        #expect(command?.intent == .editPlannedExpense)
         #expect(command?.plannedExpenseAmountTarget == .actual)
+    }
+
+    @Test func commandParser_addPlannedExpensePrompt_extractsIntentAndFields() throws {
+        let command = makeCommandParser().parse("create planned expense rent 1450 on 2026-03-01")
+        #expect(command?.intent == .addPlannedExpense)
+        #expect(command?.entityName == "rent")
+        #expect(command?.amount == 1450)
+        #expect(command?.date == date(2026, 3, 1, 0, 0, 0))
+    }
+
+    @Test func commandParser_editPlannedExpensePrompt_extractsIntentAndRenameTarget() throws {
+        let command = makeCommandParser().parse("edit planned expense rent actual to $1450")
+        #expect(command?.intent == .editPlannedExpense)
+        #expect(command?.amount == 1450)
+    }
+
+    @Test func commandParser_deletePlannedExpensePrompt_extractsDeleteIntent() throws {
+        let command = makeCommandParser().parse("delete planned expense rent")
+        #expect(command?.intent == .deletePlannedExpense)
+        #expect(command?.entityName == "rent")
     }
 
     @Test func commandParser_deleteLastExpensePrompt_mapsToIntent() throws {

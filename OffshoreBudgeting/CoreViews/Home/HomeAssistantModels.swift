@@ -695,11 +695,20 @@ enum HomeAssistantCommandIntent: String, Equatable {
     case addExpense
     case addIncome
     case addBudget
+    case editBudget
+    case deleteBudget
     case addCard
     case editCard
     case deleteCard
     case addPreset
+    case editPreset
+    case deletePreset
     case addCategory
+    case editCategory
+    case deleteCategory
+    case addPlannedExpense
+    case editPlannedExpense
+    case deletePlannedExpense
     case editExpense
     case deleteExpense
     case editIncome
@@ -735,6 +744,7 @@ struct HomeAssistantCommandPlan: Equatable {
     let cardName: String?
     let categoryName: String?
     let entityName: String?
+    let updatedEntityName: String?
     let isPlannedIncome: Bool?
     let categoryColorHex: String?
     let categoryColorName: String?
@@ -767,6 +777,7 @@ struct HomeAssistantCommandPlan: Equatable {
         cardName: String? = nil,
         categoryName: String? = nil,
         entityName: String? = nil,
+        updatedEntityName: String? = nil,
         isPlannedIncome: Bool? = nil,
         categoryColorHex: String? = nil,
         categoryColorName: String? = nil,
@@ -798,6 +809,7 @@ struct HomeAssistantCommandPlan: Equatable {
         self.cardName = cardName
         self.categoryName = categoryName
         self.entityName = entityName
+        self.updatedEntityName = updatedEntityName
         self.isPlannedIncome = isPlannedIncome
         self.categoryColorHex = categoryColorHex
         self.categoryColorName = categoryColorName
@@ -822,9 +834,13 @@ struct HomeAssistantCommandPlan: Equatable {
 extension HomeAssistantCommandPlan {
     func updating(
         cardName: String? = nil,
+        categoryName: String? = nil,
+        entityName: String? = nil,
+        updatedEntityName: String? = nil,
         isPlannedIncome: Bool? = nil,
         recurrenceFrequencyRaw: String? = nil,
-        recurrenceInterval: Int? = nil
+        recurrenceInterval: Int? = nil,
+        plannedExpenseAmountTarget: HomeAssistantPlannedExpenseAmountTarget? = nil
     ) -> HomeAssistantCommandPlan {
         HomeAssistantCommandPlan(
             intent: intent,
@@ -837,8 +853,9 @@ extension HomeAssistantCommandPlan {
             notes: notes,
             source: source,
             cardName: cardName ?? self.cardName,
-            categoryName: categoryName,
-            entityName: entityName,
+            categoryName: categoryName ?? self.categoryName,
+            entityName: entityName ?? self.entityName,
+            updatedEntityName: updatedEntityName ?? self.updatedEntityName,
             isPlannedIncome: isPlannedIncome ?? self.isPlannedIncome,
             categoryColorHex: categoryColorHex,
             categoryColorName: categoryColorName,
@@ -852,7 +869,7 @@ extension HomeAssistantCommandPlan {
             yearlyMonth: yearlyMonth,
             yearlyDayOfMonth: yearlyDayOfMonth,
             recurrenceEndDate: recurrenceEndDate,
-            plannedExpenseAmountTarget: plannedExpenseAmountTarget,
+            plannedExpenseAmountTarget: plannedExpenseAmountTarget ?? self.plannedExpenseAmountTarget,
             attachAllCards: attachAllCards,
             attachAllPresets: attachAllPresets,
             selectedCardNames: selectedCardNames,

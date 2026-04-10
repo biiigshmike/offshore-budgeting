@@ -137,12 +137,23 @@ struct HomeAssistantPanelView: View {
     @State private var pendingExpenseDisambiguationPlan: HomeAssistantCommandPlan? = nil
     @State private var pendingIncomeDisambiguationPlan: HomeAssistantCommandPlan? = nil
     @State private var pendingCardDisambiguationPlan: HomeAssistantCommandPlan? = nil
+    @State private var pendingCategoryDisambiguationPlan: HomeAssistantCommandPlan? = nil
+    @State private var pendingPresetDisambiguationPlan: HomeAssistantCommandPlan? = nil
+    @State private var pendingBudgetDisambiguationPlan: HomeAssistantCommandPlan? = nil
+    @State private var pendingPlannedExpenseDisambiguationPlan: HomeAssistantCommandPlan? = nil
     @State private var pendingExpenseCandidates: [VariableExpense] = []
     @State private var pendingIncomeCandidates: [Income] = []
     @State private var pendingCardCandidates: [Card] = []
+    @State private var pendingCategoryCandidates: [Category] = []
+    @State private var pendingPresetCandidates: [Preset] = []
+    @State private var pendingBudgetCandidates: [Budget] = []
     @State private var pendingDeleteExpense: VariableExpense? = nil
     @State private var pendingDeleteIncome: Income? = nil
     @State private var pendingDeleteCard: Card? = nil
+    @State private var pendingDeleteCategory: Category? = nil
+    @State private var pendingDeletePreset: Preset? = nil
+    @State private var pendingDeleteBudget: Budget? = nil
+    @State private var pendingDeletePlannedExpense: PlannedExpense? = nil
     @State private var pendingBudgetCreationPlan: HomeAssistantCommandPlan? = nil
     @State private var pendingBudgetCreationStep: HomeAssistantBudgetCreationStep? = nil
     @State private var pendingBudgetSelectedCardIDs: Set<UUID> = []
@@ -1267,6 +1278,10 @@ struct HomeAssistantPanelView: View {
             handleAddIncomeCommand(command)
         case .addBudget:
             handleAddBudgetCommand(command)
+        case .editBudget:
+            handleEditBudgetCommand(command)
+        case .deleteBudget:
+            handleDeleteBudgetCommand(command)
         case .addCard:
             handleAddCardCommand(command)
         case .editCard:
@@ -1275,8 +1290,22 @@ struct HomeAssistantPanelView: View {
             handleDeleteCardCommand(command)
         case .addPreset:
             handleAddPresetCommand(command)
+        case .editPreset:
+            handleEditPresetCommand(command)
+        case .deletePreset:
+            handleDeletePresetCommand(command)
         case .addCategory:
             handleAddCategoryCommand(command)
+        case .editCategory:
+            handleEditCategoryCommand(command)
+        case .deleteCategory:
+            handleDeleteCategoryCommand(command)
+        case .addPlannedExpense:
+            handleAddPlannedExpenseCommand(command)
+        case .editPlannedExpense:
+            handleEditPlannedExpenseCommand(command)
+        case .deletePlannedExpense:
+            handleDeletePlannedExpenseCommand(command)
         case .editExpense:
             handleEditExpenseCommand(command)
         case .deleteExpense:
@@ -1322,16 +1351,38 @@ struct HomeAssistantPanelView: View {
             return true
         }
         
-        if pendingDeleteExpense != nil || pendingDeleteIncome != nil || pendingDeleteCard != nil {
+        if pendingDeleteExpense != nil
+            || pendingDeleteIncome != nil
+            || pendingDeleteCard != nil
+            || pendingDeleteCategory != nil
+            || pendingDeletePreset != nil
+            || pendingDeleteBudget != nil
+            || pendingDeletePlannedExpense != nil
+        {
             resolveDeleteConfirmation(with: prompt)
             return true
         }
-        
+
         if pendingCardCandidates.isEmpty == false {
             resolveCardDisambiguation(with: prompt)
             return true
         }
-        
+
+        if pendingCategoryCandidates.isEmpty == false {
+            resolveCategoryDisambiguation(with: prompt)
+            return true
+        }
+
+        if pendingPresetCandidates.isEmpty == false {
+            resolvePresetDisambiguation(with: prompt)
+            return true
+        }
+
+        if pendingBudgetCandidates.isEmpty == false {
+            resolveBudgetDisambiguation(with: prompt)
+            return true
+        }
+
         if pendingExpenseCandidates.isEmpty == false {
             resolveExpenseDisambiguation(with: prompt)
             return true
@@ -1586,12 +1637,257 @@ struct HomeAssistantPanelView: View {
             )
         }
     }
+
+    private func handleEditCategoryCommand(_ command: HomeAssistantCommandPlan) {
+        guard command.updatedEntityName != nil || command.categoryColorHex != nil || command.categoryColorName != nil else {
+            appendMutationMessage(
+                title: "Need category edit details",
+                subtitle: "Tell me the new name or color for the category.",
+                rows: []
+            )
+            return
+        }
+
+        let matches = matchedCategories(for: command)
+        guard matches.isEmpty == false else {
+            appendMutationMessage(
+                title: "No matching category found",
+                subtitle: "Try adding the category name so I can update it.",
+                rows: []
+            )
+            return
+        }
+
+        if matches.count > 1 {
+            pendingCategoryDisambiguationPlan = command
+            pendingCategoryCandidates = Array(matches.prefix(3))
+            presentCategoryDisambiguationPrompt(action: "edit")
+            return
+        }
+
+        executeCategoryEdit(matches[0], using: command)
+    }
+
+    private func handleDeleteCategoryCommand(_ command: HomeAssistantCommandPlan) {
+        let matches = matchedCategories(for: command)
+        guard matches.isEmpty == false else {
+            appendMutationMessage(
+                title: "No matching category found",
+                subtitle: "Try adding the category name so I can delete it.",
+                rows: []
+            )
+            return
+        }
+
+        if matches.count > 1 {
+            pendingCategoryDisambiguationPlan = command
+            pendingCategoryCandidates = Array(matches.prefix(3))
+            presentCategoryDisambiguationPrompt(action: "delete")
+            return
+        }
+
+        executeCategoryDelete(matches[0])
+    }
+
+    private func handleEditPresetCommand(_ command: HomeAssistantCommandPlan) {
+        let hasRecurrenceEdit = command.recurrenceFrequencyRaw != nil
+        guard command.updatedEntityName != nil
+            || command.amount != nil
+            || command.cardName != nil
+            || command.categoryName != nil
+            || hasRecurrenceEdit
+        else {
+            appendMutationMessage(
+                title: "Need preset edit details",
+                subtitle: "Tell me what to change for the preset, like amount, card, category, or schedule.",
+                rows: []
+            )
+            return
+        }
+
+        let matches = matchedPresets(for: command)
+        guard matches.isEmpty == false else {
+            appendMutationMessage(
+                title: "No matching preset found",
+                subtitle: "Try adding the preset title so I can update it.",
+                rows: []
+            )
+            return
+        }
+
+        if matches.count > 1 {
+            pendingPresetDisambiguationPlan = command
+            pendingPresetCandidates = Array(matches.prefix(3))
+            presentPresetDisambiguationPrompt(action: "edit")
+            return
+        }
+
+        executePresetEdit(matches[0], using: command)
+    }
+
+    private func handleDeletePresetCommand(_ command: HomeAssistantCommandPlan) {
+        let matches = matchedPresets(for: command)
+        guard matches.isEmpty == false else {
+            appendMutationMessage(
+                title: "No matching preset found",
+                subtitle: "Try adding the preset title so I can delete it.",
+                rows: []
+            )
+            return
+        }
+
+        if matches.count > 1 {
+            pendingPresetDisambiguationPlan = command
+            pendingPresetCandidates = Array(matches.prefix(3))
+            presentPresetDisambiguationPrompt(action: "delete")
+            return
+        }
+
+        executePresetDelete(matches[0])
+    }
+
+    private func handleEditBudgetCommand(_ command: HomeAssistantCommandPlan) {
+        guard command.updatedEntityName != nil || command.dateRange != nil else {
+            appendMutationMessage(
+                title: "Need budget edit details",
+                subtitle: "Tell me the new name or period for the budget.",
+                rows: []
+            )
+            return
+        }
+
+        let matches = matchedBudgets(for: command)
+        guard matches.isEmpty == false else {
+            appendMutationMessage(
+                title: "No matching budget found",
+                subtitle: "Try adding the budget name so I can update it.",
+                rows: []
+            )
+            return
+        }
+
+        if matches.count > 1 {
+            pendingBudgetDisambiguationPlan = command
+            pendingBudgetCandidates = Array(matches.prefix(3))
+            presentBudgetDisambiguationPrompt(action: "edit")
+            return
+        }
+
+        executeBudgetEdit(matches[0], using: command)
+    }
+
+    private func handleDeleteBudgetCommand(_ command: HomeAssistantCommandPlan) {
+        let matches = matchedBudgets(for: command)
+        guard matches.isEmpty == false else {
+            appendMutationMessage(
+                title: "No matching budget found",
+                subtitle: "Try adding the budget name so I can delete it.",
+                rows: []
+            )
+            return
+        }
+
+        if matches.count > 1 {
+            pendingBudgetDisambiguationPlan = command
+            pendingBudgetCandidates = Array(matches.prefix(3))
+            presentBudgetDisambiguationPrompt(action: "delete")
+            return
+        }
+
+        executeBudgetDelete(matches[0])
+    }
+
+    private func handleAddPlannedExpenseCommand(_ command: HomeAssistantCommandPlan) {
+        guard let amount = command.amount, amount > 0 else {
+            appendMutationMessage(
+                title: "Need planned expense amount",
+                subtitle: "Tell me the amount to schedule for this planned expense.",
+                rows: []
+            )
+            return
+        }
+
+        let title = (command.entityName ?? command.notes ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard title.isEmpty == false else {
+            appendMutationMessage(
+                title: "Need planned expense title",
+                subtitle: "Tell me the title for the planned expense.",
+                rows: []
+            )
+            return
+        }
+
+        executeAddPlannedExpense(command)
+    }
+
+    private func handleEditPlannedExpenseCommand(_ command: HomeAssistantCommandPlan) {
+        guard command.updatedEntityName != nil
+            || command.amount != nil
+            || command.date != nil
+            || command.cardName != nil
+            || command.categoryName != nil
+        else {
+            appendMutationMessage(
+                title: "Need planned expense edit details",
+                subtitle: "Tell me what to change for the planned expense, like amount, date, card, category, or title.",
+                rows: []
+            )
+            return
+        }
+
+        let matches = mutationService.matchedPlannedExpenses(for: command, plannedExpenses: plannedExpenses)
+        guard matches.isEmpty == false else {
+            appendMutationMessage(
+                title: "No matching planned expense found",
+                subtitle: "Try adding the title or date so I can find the planned expense.",
+                rows: []
+            )
+            return
+        }
+
+        if matches.count > 1 {
+            pendingPlannedExpenseDisambiguationPlan = command
+            pendingPlannedExpenseCandidates = Array(matches.prefix(3))
+            presentPlannedExpenseDisambiguationPrompt()
+            return
+        }
+
+        if command.amount != nil && command.plannedExpenseAmountTarget == nil {
+            pendingPlannedExpenseAmountPlan = command
+            pendingPlannedExpenseAmountExpense = matches[0]
+            presentPlannedExpenseAmountTargetPrompt()
+            return
+        }
+
+        executePlannedExpenseEdit(matches[0], using: command)
+    }
+
+    private func handleDeletePlannedExpenseCommand(_ command: HomeAssistantCommandPlan) {
+        let matches = mutationService.matchedPlannedExpenses(for: command, plannedExpenses: plannedExpenses)
+        guard matches.isEmpty == false else {
+            appendMutationMessage(
+                title: "No matching planned expense found",
+                subtitle: "Try adding the title or date so I can find the planned expense.",
+                rows: []
+            )
+            return
+        }
+
+        if matches.count > 1 {
+            pendingPlannedExpenseDisambiguationPlan = command
+            pendingPlannedExpenseCandidates = Array(matches.prefix(3))
+            presentPlannedExpenseDisambiguationPrompt()
+            return
+        }
+
+        executePlannedExpenseDelete(matches[0])
+    }
     
     private func handleEditCardCommand(_ command: HomeAssistantCommandPlan) {
-        guard command.cardThemeRaw != nil || command.cardEffectRaw != nil else {
+        guard command.cardThemeRaw != nil || command.cardEffectRaw != nil || command.updatedEntityName != nil else {
             appendMutationMessage(
                 title: "Need card edit details",
-                subtitle: "Tell me the theme or effect to update for the card.",
+                subtitle: "Tell me the new name, theme, or effect to update for the card.",
                 rows: []
             )
             return
@@ -2029,6 +2325,35 @@ struct HomeAssistantPanelView: View {
             )
         }
     }
+
+    private func executeAddPlannedExpense(_ command: HomeAssistantCommandPlan) {
+        guard let amount = command.amount, amount > 0 else {
+            appendMutationMessage(title: "Need planned expense amount", subtitle: "Tell me the amount to save.", rows: [])
+            return
+        }
+
+        let title = (command.entityName ?? command.notes ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard title.isEmpty == false else {
+            appendMutationMessage(title: "Need planned expense title", subtitle: "Tell me the planned expense title.", rows: [])
+            return
+        }
+
+        do {
+            let result = try mutationService.addPlannedExpense(
+                title: title,
+                amount: amount,
+                date: calendarStartOfDay(command.date ?? Date()),
+                card: resolveCard(from: command.cardName),
+                category: resolveCategory(from: command.categoryName),
+                workspace: workspace,
+                modelContext: modelContext
+            )
+            clearMutationPendingState()
+            appendMutationMessage(title: result.title, subtitle: result.subtitle, rows: result.rows)
+        } catch {
+            appendMutationMessage(title: "Could not create planned expense", subtitle: error.localizedDescription, rows: [])
+        }
+    }
     
     private func executeExpenseEdit(_ expense: VariableExpense, using command: HomeAssistantCommandPlan) {
         do {
@@ -2069,8 +2394,9 @@ struct HomeAssistantPanelView: View {
     
     private func executeCardEdit(_ card: Card, using command: HomeAssistantCommandPlan) {
         do {
-            let result = try mutationService.editCardStyle(
+            let result = try mutationService.editCard(
                 card: card,
+                newName: command.updatedEntityName,
                 themeRaw: command.cardThemeRaw,
                 effectRaw: command.cardEffectRaw,
                 modelContext: modelContext
@@ -2083,6 +2409,75 @@ struct HomeAssistantPanelView: View {
                 subtitle: error.localizedDescription,
                 rows: []
             )
+        }
+    }
+
+    private func executeCategoryEdit(_ category: Category, using command: HomeAssistantCommandPlan) {
+        let colorResolution = MarinaColorResolver.resolve(
+            rawPrompt: command.rawPrompt,
+            parserHex: command.categoryColorHex,
+            parserName: command.categoryColorName
+        )
+
+        do {
+            let result = try mutationService.editCategory(
+                category,
+                newName: command.updatedEntityName,
+                colorHex: colorResolution.hex,
+                modelContext: modelContext
+            )
+            clearMutationPendingState()
+            appendMutationMessage(title: result.title, subtitle: result.subtitle, rows: result.rows)
+        } catch {
+            appendMutationMessage(title: "Could not edit category", subtitle: error.localizedDescription, rows: [])
+        }
+    }
+
+    private func executePresetEdit(_ preset: Preset, using command: HomeAssistantCommandPlan) {
+        do {
+            let result = try mutationService.editPreset(
+                preset,
+                command: command,
+                card: resolveCard(from: command.cardName),
+                category: resolveCategory(from: command.categoryName),
+                workspace: workspace,
+                modelContext: modelContext
+            )
+            clearMutationPendingState()
+            appendMutationMessage(title: result.title, subtitle: result.subtitle, rows: result.rows)
+        } catch {
+            appendMutationMessage(title: "Could not edit preset", subtitle: error.localizedDescription, rows: [])
+        }
+    }
+
+    private func executeBudgetEdit(_ budget: Budget, using command: HomeAssistantCommandPlan) {
+        do {
+            let result = try mutationService.editBudget(
+                budget,
+                command: command,
+                workspace: workspace,
+                modelContext: modelContext
+            )
+            clearMutationPendingState()
+            appendMutationMessage(title: result.title, subtitle: result.subtitle, rows: result.rows)
+        } catch {
+            appendMutationMessage(title: "Could not edit budget", subtitle: error.localizedDescription, rows: [])
+        }
+    }
+
+    private func executePlannedExpenseEdit(_ expense: PlannedExpense, using command: HomeAssistantCommandPlan) {
+        do {
+            let result = try mutationService.editPlannedExpense(
+                expense,
+                command: command,
+                card: resolveCard(from: command.cardName),
+                category: resolveCategory(from: command.categoryName),
+                modelContext: modelContext
+            )
+            clearMutationPendingState()
+            appendMutationMessage(title: result.title, subtitle: result.subtitle, rows: result.rows)
+        } catch {
+            appendMutationMessage(title: "Could not edit planned expense", subtitle: error.localizedDescription, rows: [])
         }
     }
     
@@ -2143,6 +2538,86 @@ struct HomeAssistantPanelView: View {
             appendMutationMessage(title: result.title, subtitle: result.subtitle, rows: result.rows)
         } catch {
             appendMutationMessage(title: "Could not delete card", subtitle: error.localizedDescription, rows: [])
+        }
+    }
+
+    private func executeCategoryDelete(_ category: Category) {
+        if confirmBeforeDeleting {
+            pendingDeleteCategory = category
+            appendMutationMessage(
+                title: "Confirm delete",
+                subtitle: "Delete this category? Reply with yes to confirm or no to cancel.",
+                rows: [HomeAnswerRow(title: "Category", value: categoryDisplayLabel(category))]
+            )
+            return
+        }
+
+        do {
+            let result = try mutationService.deleteCategory(category, modelContext: modelContext)
+            clearMutationPendingState()
+            appendMutationMessage(title: result.title, subtitle: result.subtitle, rows: result.rows)
+        } catch {
+            appendMutationMessage(title: "Could not delete category", subtitle: error.localizedDescription, rows: [])
+        }
+    }
+
+    private func executePresetDelete(_ preset: Preset) {
+        if confirmBeforeDeleting {
+            pendingDeletePreset = preset
+            appendMutationMessage(
+                title: "Confirm delete",
+                subtitle: "Delete this preset? Reply with yes to confirm or no to cancel.",
+                rows: [HomeAnswerRow(title: "Preset", value: presetDisplayLabel(preset))]
+            )
+            return
+        }
+
+        do {
+            let result = try mutationService.deletePreset(preset, modelContext: modelContext)
+            clearMutationPendingState()
+            appendMutationMessage(title: result.title, subtitle: result.subtitle, rows: result.rows)
+        } catch {
+            appendMutationMessage(title: "Could not delete preset", subtitle: error.localizedDescription, rows: [])
+        }
+    }
+
+    private func executeBudgetDelete(_ budget: Budget) {
+        if confirmBeforeDeleting {
+            pendingDeleteBudget = budget
+            appendMutationMessage(
+                title: "Confirm delete",
+                subtitle: "Delete this budget and its generated planned expenses? Reply with yes to confirm or no to cancel.",
+                rows: [HomeAnswerRow(title: "Budget", value: budgetDisplayLabel(budget))]
+            )
+            return
+        }
+
+        do {
+            let result = try mutationService.deleteBudget(budget, modelContext: modelContext)
+            clearMutationPendingState()
+            appendMutationMessage(title: result.title, subtitle: result.subtitle, rows: result.rows)
+        } catch {
+            appendMutationMessage(title: "Could not delete budget", subtitle: error.localizedDescription, rows: [])
+        }
+    }
+
+    private func executePlannedExpenseDelete(_ expense: PlannedExpense) {
+        if confirmBeforeDeleting {
+            pendingDeletePlannedExpense = expense
+            appendMutationMessage(
+                title: "Confirm delete",
+                subtitle: "Delete this planned expense? Reply with yes to confirm or no to cancel.",
+                rows: [HomeAnswerRow(title: "Planned Expense", value: plannedExpenseDisplayLabel(expense))]
+            )
+            return
+        }
+
+        do {
+            let result = try mutationService.deletePlannedExpense(expense, modelContext: modelContext)
+            clearMutationPendingState()
+            appendMutationMessage(title: result.title, subtitle: result.subtitle, rows: result.rows)
+        } catch {
+            appendMutationMessage(title: "Could not delete planned expense", subtitle: error.localizedDescription, rows: [])
         }
     }
     
@@ -2618,6 +3093,39 @@ struct HomeAssistantPanelView: View {
             rows: rows
         )
     }
+
+    private func presentCategoryDisambiguationPrompt(action: String) {
+        let rows = pendingCategoryCandidates.enumerated().map { index, category in
+            HomeAnswerRow(title: "\(index + 1)", value: categoryDisplayLabel(category))
+        }
+        appendMutationMessage(
+            title: "Choose category",
+            subtitle: "Reply with the category to \(action).",
+            rows: rows
+        )
+    }
+
+    private func presentPresetDisambiguationPrompt(action: String) {
+        let rows = pendingPresetCandidates.enumerated().map { index, preset in
+            HomeAnswerRow(title: "\(index + 1)", value: presetDisplayLabel(preset))
+        }
+        appendMutationMessage(
+            title: "Choose preset",
+            subtitle: "Reply with the preset to \(action).",
+            rows: rows
+        )
+    }
+
+    private func presentBudgetDisambiguationPrompt(action: String) {
+        let rows = pendingBudgetCandidates.enumerated().map { index, budget in
+            HomeAnswerRow(title: "\(index + 1)", value: budgetDisplayLabel(budget))
+        }
+        appendMutationMessage(
+            title: "Choose budget",
+            subtitle: "Reply with the budget to \(action).",
+            rows: rows
+        )
+    }
     
     private func presentCardThemeSelectionPrompt() {
         let rows = CardThemeOption.allCases.enumerated().map { index, option in
@@ -2682,6 +3190,41 @@ struct HomeAssistantPanelView: View {
             return candidates.filter { $0.title == match }
         }
         return []
+    }
+
+    private func selectedCategoryCandidate(from prompt: String, candidates: [Category]) -> Category? {
+        let indexes = selectedIndexes(from: prompt, max: candidates.count)
+        if let first = indexes.first {
+            return candidates[first]
+        }
+        if let match = entityMatcher.bestCategoryMatch(in: prompt, categories: candidates) {
+            return candidates.first { $0.name == match }
+        }
+        return nil
+    }
+
+    private func selectedPresetCandidate(from prompt: String, candidates: [Preset]) -> Preset? {
+        let indexes = selectedIndexes(from: prompt, max: candidates.count)
+        if let first = indexes.first {
+            return candidates[first]
+        }
+        let names = candidates.map(\.title)
+        if let match = entityMatcher.bestMatch(in: prompt, candidateNames: names) {
+            return candidates.first { $0.title == match }
+        }
+        return nil
+    }
+
+    private func selectedBudgetCandidate(from prompt: String, candidates: [Budget]) -> Budget? {
+        let indexes = selectedIndexes(from: prompt, max: candidates.count)
+        if let first = indexes.first {
+            return candidates[first]
+        }
+        let names = candidates.map(\.name)
+        if let match = entityMatcher.bestMatch(in: prompt, candidateNames: names) {
+            return candidates.first { $0.name == match }
+        }
+        return nil
     }
     
     private func selectedIndexes(from prompt: String, max: Int) -> [Int] {
@@ -2754,9 +3297,8 @@ struct HomeAssistantPanelView: View {
     
     private func resolvePlannedExpenseDisambiguation(with prompt: String) {
         guard pendingPlannedExpenseCandidates.isEmpty == false else { return }
-        guard let command = pendingPlannedExpenseAmountPlan else { return }
-        guard let amount = command.amount, amount > 0 else { return }
-        
+        guard let command = pendingPlannedExpenseDisambiguationPlan ?? pendingPlannedExpenseAmountPlan else { return }
+
         let selected = selectedPlannedExpenseCandidate(
             from: prompt,
             candidates: pendingPlannedExpenseCandidates
@@ -2765,15 +3307,32 @@ struct HomeAssistantPanelView: View {
             presentPlannedExpenseDisambiguationPrompt()
             return
         }
-        
+
         pendingPlannedExpenseCandidates = []
+        pendingPlannedExpenseDisambiguationPlan = nil
+
+        if command.intent == .deletePlannedExpense {
+            executePlannedExpenseDelete(selected)
+            return
+        }
+
+        if command.intent == .editPlannedExpense {
+            if command.amount != nil && command.plannedExpenseAmountTarget == nil {
+                pendingPlannedExpenseAmountPlan = command
+                pendingPlannedExpenseAmountExpense = selected
+                presentPlannedExpenseAmountTargetPrompt()
+                return
+            }
+            executePlannedExpenseEdit(selected, using: command)
+            return
+        }
+
         pendingPlannedExpenseAmountExpense = selected
-        
+        guard let amount = command.amount, amount > 0 else { return }
         guard let target = command.plannedExpenseAmountTarget else {
             presentPlannedExpenseAmountTargetPrompt()
             return
         }
-        
         executePlannedExpenseAmountUpdate(selected, amount: amount, target: target)
     }
     
@@ -2797,7 +3356,15 @@ struct HomeAssistantPanelView: View {
             presentPlannedExpenseAmountTargetPrompt()
             return
         }
-        
+
+        if plan.intent == .editPlannedExpense {
+            executePlannedExpenseEdit(
+                expense,
+                using: plan.updating(plannedExpenseAmountTarget: target)
+            )
+            return
+        }
+
         executePlannedExpenseAmountUpdate(expense, amount: amount, target: target)
     }
     
@@ -2835,6 +3402,60 @@ struct HomeAssistantPanelView: View {
             executeCardDelete(selected)
         } else {
             executeCardEdit(selected, using: command)
+        }
+    }
+
+    private func resolveCategoryDisambiguation(with prompt: String) {
+        guard pendingCategoryCandidates.isEmpty == false else { return }
+        guard let command = pendingCategoryDisambiguationPlan else { return }
+
+        let selected = selectedCategoryCandidate(from: prompt, candidates: pendingCategoryCandidates)
+        guard let selected else {
+            let action = command.intent == .deleteCategory ? "delete" : "edit"
+            presentCategoryDisambiguationPrompt(action: action)
+            return
+        }
+
+        if command.intent == .deleteCategory {
+            executeCategoryDelete(selected)
+        } else {
+            executeCategoryEdit(selected, using: command)
+        }
+    }
+
+    private func resolvePresetDisambiguation(with prompt: String) {
+        guard pendingPresetCandidates.isEmpty == false else { return }
+        guard let command = pendingPresetDisambiguationPlan else { return }
+
+        let selected = selectedPresetCandidate(from: prompt, candidates: pendingPresetCandidates)
+        guard let selected else {
+            let action = command.intent == .deletePreset ? "delete" : "edit"
+            presentPresetDisambiguationPrompt(action: action)
+            return
+        }
+
+        if command.intent == .deletePreset {
+            executePresetDelete(selected)
+        } else {
+            executePresetEdit(selected, using: command)
+        }
+    }
+
+    private func resolveBudgetDisambiguation(with prompt: String) {
+        guard pendingBudgetCandidates.isEmpty == false else { return }
+        guard let command = pendingBudgetDisambiguationPlan else { return }
+
+        let selected = selectedBudgetCandidate(from: prompt, candidates: pendingBudgetCandidates)
+        guard let selected else {
+            let action = command.intent == .deleteBudget ? "delete" : "edit"
+            presentBudgetDisambiguationPrompt(action: action)
+            return
+        }
+
+        if command.intent == .deleteBudget {
+            executeBudgetDelete(selected)
+        } else {
+            executeBudgetEdit(selected, using: command)
         }
     }
     
@@ -2876,6 +3497,54 @@ struct HomeAssistantPanelView: View {
                     appendMutationMessage(title: result.title, subtitle: result.subtitle, rows: result.rows)
                 } catch {
                     appendMutationMessage(title: "Could not delete card", subtitle: error.localizedDescription, rows: [])
+                }
+                return
+            }
+
+            if let category = pendingDeleteCategory {
+                pendingDeleteCategory = nil
+                do {
+                    let result = try mutationService.deleteCategory(category, modelContext: modelContext)
+                    clearMutationPendingState()
+                    appendMutationMessage(title: result.title, subtitle: result.subtitle, rows: result.rows)
+                } catch {
+                    appendMutationMessage(title: "Could not delete category", subtitle: error.localizedDescription, rows: [])
+                }
+                return
+            }
+
+            if let preset = pendingDeletePreset {
+                pendingDeletePreset = nil
+                do {
+                    let result = try mutationService.deletePreset(preset, modelContext: modelContext)
+                    clearMutationPendingState()
+                    appendMutationMessage(title: result.title, subtitle: result.subtitle, rows: result.rows)
+                } catch {
+                    appendMutationMessage(title: "Could not delete preset", subtitle: error.localizedDescription, rows: [])
+                }
+                return
+            }
+
+            if let budget = pendingDeleteBudget {
+                pendingDeleteBudget = nil
+                do {
+                    let result = try mutationService.deleteBudget(budget, modelContext: modelContext)
+                    clearMutationPendingState()
+                    appendMutationMessage(title: result.title, subtitle: result.subtitle, rows: result.rows)
+                } catch {
+                    appendMutationMessage(title: "Could not delete budget", subtitle: error.localizedDescription, rows: [])
+                }
+                return
+            }
+
+            if let expense = pendingDeletePlannedExpense {
+                pendingDeletePlannedExpense = nil
+                do {
+                    let result = try mutationService.deletePlannedExpense(expense, modelContext: modelContext)
+                    clearMutationPendingState()
+                    appendMutationMessage(title: result.title, subtitle: result.subtitle, rows: result.rows)
+                } catch {
+                    appendMutationMessage(title: "Could not delete planned expense", subtitle: error.localizedDescription, rows: [])
                 }
                 return
             }
@@ -3081,15 +3750,26 @@ struct HomeAssistantPanelView: View {
         pendingExpenseDisambiguationPlan = nil
         pendingIncomeDisambiguationPlan = nil
         pendingCardDisambiguationPlan = nil
+        pendingCategoryDisambiguationPlan = nil
+        pendingPresetDisambiguationPlan = nil
+        pendingBudgetDisambiguationPlan = nil
+        pendingPlannedExpenseDisambiguationPlan = nil
         pendingExpenseCandidates = []
         pendingPlannedExpenseAmountPlan = nil
         pendingPlannedExpenseAmountExpense = nil
         pendingPlannedExpenseCandidates = []
         pendingIncomeCandidates = []
         pendingCardCandidates = []
+        pendingCategoryCandidates = []
+        pendingPresetCandidates = []
+        pendingBudgetCandidates = []
         pendingDeleteExpense = nil
         pendingDeleteIncome = nil
         pendingDeleteCard = nil
+        pendingDeleteCategory = nil
+        pendingDeletePreset = nil
+        pendingDeleteBudget = nil
+        pendingDeletePlannedExpense = nil
         pendingBudgetCreationPlan = nil
         pendingBudgetCreationStep = nil
         pendingBudgetSelectedCardIDs = []
@@ -3122,6 +3802,60 @@ struct HomeAssistantPanelView: View {
         
         let rankedFromPrompt = entityMatcher.rankedMatches(in: command.rawPrompt, candidateNames: candidateNames, limit: 3)
         return rankedFromPrompt.compactMap { name in cards.first(where: { $0.name == name }) }
+    }
+
+    private func matchedCategories(for command: HomeAssistantCommandPlan) -> [Category] {
+        guard categories.isEmpty == false else { return [] }
+        let explicitName = (command.entityName ?? command.categoryName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if explicitName.isEmpty == false {
+            let exactMatches = categories.filter { $0.name.compare(explicitName, options: .caseInsensitive) == .orderedSame }
+            if exactMatches.isEmpty == false {
+                return exactMatches
+            }
+            let ranked = entityMatcher.rankedMatches(in: explicitName, candidateNames: categories.map(\.name), limit: 3)
+            if ranked.isEmpty == false {
+                return ranked.compactMap { name in categories.first(where: { $0.name == name }) }
+            }
+        }
+
+        let ranked = entityMatcher.rankedMatches(in: command.rawPrompt, candidateNames: categories.map(\.name), limit: 3)
+        return ranked.compactMap { name in categories.first(where: { $0.name == name }) }
+    }
+
+    private func matchedPresets(for command: HomeAssistantCommandPlan) -> [Preset] {
+        guard presets.isEmpty == false else { return [] }
+        let explicitName = (command.entityName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if explicitName.isEmpty == false {
+            let exactMatches = presets.filter { $0.title.compare(explicitName, options: .caseInsensitive) == .orderedSame }
+            if exactMatches.isEmpty == false {
+                return exactMatches
+            }
+            let ranked = entityMatcher.rankedMatches(in: explicitName, candidateNames: presets.map(\.title), limit: 3)
+            if ranked.isEmpty == false {
+                return ranked.compactMap { name in presets.first(where: { $0.title == name }) }
+            }
+        }
+
+        let ranked = entityMatcher.rankedMatches(in: command.rawPrompt, candidateNames: presets.map(\.title), limit: 3)
+        return ranked.compactMap { name in presets.first(where: { $0.title == name }) }
+    }
+
+    private func matchedBudgets(for command: HomeAssistantCommandPlan) -> [Budget] {
+        guard budgets.isEmpty == false else { return [] }
+        let explicitName = (command.entityName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if explicitName.isEmpty == false {
+            let exactMatches = budgets.filter { $0.name.compare(explicitName, options: .caseInsensitive) == .orderedSame }
+            if exactMatches.isEmpty == false {
+                return exactMatches
+            }
+            let ranked = entityMatcher.rankedMatches(in: explicitName, candidateNames: budgets.map(\.name), limit: 3)
+            if ranked.isEmpty == false {
+                return ranked.compactMap { name in budgets.first(where: { $0.name == name }) }
+            }
+        }
+
+        let ranked = entityMatcher.rankedMatches(in: command.rawPrompt, candidateNames: budgets.map(\.name), limit: 3)
+        return ranked.compactMap { name in budgets.first(where: { $0.name == name }) }
     }
     
     private func resolveCard(from cardName: String?) -> Card? {
@@ -4486,6 +5220,22 @@ struct HomeAssistantPanelView: View {
         }
 
         return nil
+    }
+
+    private func categoryDisplayLabel(_ category: Category) -> String {
+        "\(category.name) • \(category.hexColor)"
+    }
+
+    private func presetDisplayLabel(_ preset: Preset) -> String {
+        "\(preset.title) • \(CurrencyFormatter.string(from: preset.plannedAmount)) • \(preset.frequency.displayName)"
+    }
+
+    private func budgetDisplayLabel(_ budget: Budget) -> String {
+        "\(budget.name) • \(shortDate(budget.startDate)) – \(shortDate(budget.endDate))"
+    }
+
+    private func plannedExpenseDisplayLabel(_ expense: PlannedExpense) -> String {
+        "\(expense.title) • \(CurrencyFormatter.string(from: expense.plannedAmount)) • \(shortDate(expense.expenseDate))"
     }
 
     private func extractedMerchantTarget(from rawPrompt: String) -> String? {
@@ -6116,7 +6866,7 @@ private enum MarinaColorResolver {
 }
 
 @MainActor
-private final class HomeAssistantMutationService {
+final class HomeAssistantMutationService {
     private let transactionEntryService = TransactionEntryService()
     
     func addBudget(
@@ -6280,6 +7030,46 @@ private final class HomeAssistantMutationService {
             ]
         )
     }
+
+    func addPlannedExpense(
+        title: String,
+        amount: Double,
+        date: Date,
+        card: Card?,
+        category: Category?,
+        workspace: Workspace,
+        modelContext: ModelContext
+    ) throws -> HomeAssistantMutationResult {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.isEmpty == false else {
+            throw TransactionEntryService.ValidationError.missingDescription
+        }
+        guard amount > 0 else {
+            throw TransactionEntryService.ValidationError.invalidAmount
+        }
+
+        let expense = PlannedExpense(
+            title: trimmed,
+            plannedAmount: amount,
+            actualAmount: 0,
+            expenseDate: Calendar.current.startOfDay(for: date),
+            workspace: workspace,
+            card: card,
+            category: category
+        )
+        modelContext.insert(expense)
+        try modelContext.save()
+
+        return HomeAssistantMutationResult(
+            title: "Planned expense created",
+            subtitle: "Saved planned expense \(trimmed).",
+            rows: [
+                HomeAnswerRow(title: "Amount", value: CurrencyFormatter.string(from: amount)),
+                HomeAnswerRow(title: "Date", value: AppDateFormat.abbreviatedDate(expense.expenseDate)),
+                HomeAnswerRow(title: "Card", value: card?.name ?? "None")
+            ]
+        )
+    }
     
     func addExpense(
         amount: Double,
@@ -6406,6 +7196,151 @@ private final class HomeAssistantMutationService {
             rows: [
                 HomeAnswerRow(title: "Theme", value: CardThemeOption(rawValue: card.theme)?.displayName ?? "Ruby"),
                 HomeAnswerRow(title: "Effect", value: CardEffectOption(rawValue: card.effect)?.displayName ?? "Plastic")
+            ]
+        )
+    }
+
+    func editCard(
+        card: Card,
+        newName: String?,
+        themeRaw: String?,
+        effectRaw: String?,
+        modelContext: ModelContext
+    ) throws -> HomeAssistantMutationResult {
+        if let newName {
+            let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty == false {
+                card.name = trimmed
+            }
+        }
+
+        if let themeRaw, let theme = CardThemeOption(rawValue: themeRaw) {
+            card.theme = theme.rawValue
+        }
+
+        if let effectRaw, let effect = CardEffectOption(rawValue: effectRaw) {
+            card.effect = effect.rawValue
+        }
+
+        try modelContext.save()
+
+        return HomeAssistantMutationResult(
+            title: "Card updated",
+            subtitle: "Updated \(card.name).",
+            rows: [
+                HomeAnswerRow(title: "Name", value: card.name),
+                HomeAnswerRow(title: "Theme", value: CardThemeOption(rawValue: card.theme)?.displayName ?? "Ruby"),
+                HomeAnswerRow(title: "Effect", value: CardEffectOption(rawValue: card.effect)?.displayName ?? "Plastic")
+            ]
+        )
+    }
+
+    func editCategory(
+        _ category: Category,
+        newName: String?,
+        colorHex: String?,
+        modelContext: ModelContext
+    ) throws -> HomeAssistantMutationResult {
+        if let newName {
+            let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty == false {
+                category.name = trimmed
+            }
+        }
+
+        if let colorHex, colorHex.isEmpty == false {
+            category.hexColor = colorHex
+        }
+
+        try modelContext.save()
+
+        return HomeAssistantMutationResult(
+            title: "Category updated",
+            subtitle: "Updated \(category.name).",
+            rows: [
+                HomeAnswerRow(title: "Name", value: category.name),
+                HomeAnswerRow(title: "Color", value: category.hexColor)
+            ]
+        )
+    }
+
+    func editPreset(
+        _ preset: Preset,
+        command: HomeAssistantCommandPlan,
+        card: Card?,
+        category: Category?,
+        workspace: Workspace,
+        modelContext: ModelContext
+    ) throws -> HomeAssistantMutationResult {
+        if let newName = command.updatedEntityName?.trimmingCharacters(in: .whitespacesAndNewlines), newName.isEmpty == false {
+            preset.title = newName
+        }
+        if let amount = command.amount, amount > 0 {
+            preset.plannedAmount = amount
+        }
+        if let card {
+            preset.defaultCard = card
+        }
+        if command.categoryName != nil {
+            preset.defaultCategory = category
+        }
+        if let frequencyRaw = command.recurrenceFrequencyRaw, RecurrenceFrequency(rawValue: frequencyRaw) != nil {
+            preset.frequencyRaw = frequencyRaw
+            preset.interval = max(1, command.recurrenceInterval ?? preset.interval)
+            if let weeklyWeekday = command.weeklyWeekday {
+                preset.weeklyWeekday = weeklyWeekday
+            }
+            if let monthlyDayOfMonth = command.monthlyDayOfMonth {
+                preset.monthlyDayOfMonth = monthlyDayOfMonth
+            }
+            if let monthlyIsLastDay = command.monthlyIsLastDay {
+                preset.monthlyIsLastDay = monthlyIsLastDay
+            }
+            if let yearlyMonth = command.yearlyMonth {
+                preset.yearlyMonth = yearlyMonth
+            }
+            if let yearlyDayOfMonth = command.yearlyDayOfMonth {
+                preset.yearlyDayOfMonth = yearlyDayOfMonth
+            }
+        }
+
+        syncGeneratedPlannedExpenses(for: preset, workspace: workspace, modelContext: modelContext)
+        try modelContext.save()
+
+        return HomeAssistantMutationResult(
+            title: "Preset updated",
+            subtitle: "Updated \(preset.title).",
+            rows: [
+                HomeAnswerRow(title: "Amount", value: CurrencyFormatter.string(from: preset.plannedAmount)),
+                HomeAnswerRow(title: "Card", value: preset.defaultCard?.name ?? "None"),
+                HomeAnswerRow(title: "Frequency", value: preset.frequency.displayName)
+            ]
+        )
+    }
+
+    func editBudget(
+        _ budget: Budget,
+        command: HomeAssistantCommandPlan,
+        workspace: Workspace,
+        modelContext: ModelContext
+    ) throws -> HomeAssistantMutationResult {
+        if let newName = command.updatedEntityName?.trimmingCharacters(in: .whitespacesAndNewlines), newName.isEmpty == false {
+            budget.name = newName
+        }
+        if let range = command.dateRange {
+            budget.startDate = Calendar.current.startOfDay(for: range.startDate)
+            budget.endDate = Calendar.current.startOfDay(for: range.endDate)
+        }
+
+        syncGeneratedPlannedExpenses(for: budget, workspace: workspace, modelContext: modelContext)
+        try modelContext.save()
+
+        return HomeAssistantMutationResult(
+            title: "Budget updated",
+            subtitle: "Updated \(budget.name).",
+            rows: [
+                HomeAnswerRow(title: "Start", value: AppDateFormat.abbreviatedDate(budget.startDate)),
+                HomeAnswerRow(title: "End", value: AppDateFormat.abbreviatedDate(budget.endDate))
             ]
         )
     }
@@ -6579,6 +7514,47 @@ private final class HomeAssistantMutationService {
             ]
         )
     }
+
+    func editPlannedExpense(
+        _ expense: PlannedExpense,
+        command: HomeAssistantCommandPlan,
+        card: Card?,
+        category: Category?,
+        modelContext: ModelContext
+    ) throws -> HomeAssistantMutationResult {
+        if let newName = command.updatedEntityName?.trimmingCharacters(in: .whitespacesAndNewlines), newName.isEmpty == false {
+            expense.title = newName
+        }
+        if let date = command.date {
+            expense.expenseDate = Calendar.current.startOfDay(for: date)
+        }
+        if let card {
+            expense.card = card
+        }
+        if command.categoryName != nil {
+            expense.category = category
+        }
+        if let amount = command.amount, amount > 0 {
+            switch command.plannedExpenseAmountTarget ?? .planned {
+            case .planned:
+                expense.plannedAmount = amount
+            case .actual:
+                expense.actualAmount = amount
+            }
+        }
+
+        try modelContext.save()
+
+        return HomeAssistantMutationResult(
+            title: "Planned expense updated",
+            subtitle: "Updated \(expense.title).",
+            rows: [
+                HomeAnswerRow(title: "Planned", value: CurrencyFormatter.string(from: expense.plannedAmount)),
+                HomeAnswerRow(title: "Actual", value: CurrencyFormatter.string(from: expense.actualAmount)),
+                HomeAnswerRow(title: "Date", value: AppDateFormat.abbreviatedDate(expense.expenseDate))
+            ]
+        )
+    }
     
     func deleteExpense(
         _ expense: VariableExpense,
@@ -6649,6 +7625,85 @@ private final class HomeAssistantMutationService {
         return HomeAssistantMutationResult(
             title: "Card deleted",
             subtitle: "Removed \(card.name) and its linked entries.",
+            rows: []
+        )
+    }
+
+    func deleteCategory(
+        _ category: Category,
+        modelContext: ModelContext
+    ) throws -> HomeAssistantMutationResult {
+        if let variableExpenses = category.variableExpenses {
+            for expense in variableExpenses {
+                expense.category = nil
+            }
+        }
+        if let plannedExpenses = category.plannedExpenses {
+            for expense in plannedExpenses {
+                expense.category = nil
+            }
+        }
+        if let presets = category.defaultForPresets {
+            for preset in presets {
+                preset.defaultCategory = nil
+            }
+        }
+        if let limits = category.budgetCategoryLimits {
+            for limit in limits {
+                modelContext.delete(limit)
+            }
+        }
+        modelContext.delete(category)
+        try modelContext.save()
+
+        return HomeAssistantMutationResult(
+            title: "Category deleted",
+            subtitle: "Removed \(category.name).",
+            rows: []
+        )
+    }
+
+    func deletePreset(
+        _ preset: Preset,
+        modelContext: ModelContext
+    ) throws -> HomeAssistantMutationResult {
+        if let links = preset.budgetPresetLinks {
+            for link in links {
+                modelContext.delete(link)
+            }
+        }
+        modelContext.delete(preset)
+        try modelContext.save()
+
+        return HomeAssistantMutationResult(
+            title: "Preset deleted",
+            subtitle: "Removed \(preset.title).",
+            rows: []
+        )
+    }
+
+    func deleteBudget(
+        _ budget: Budget,
+        modelContext: ModelContext
+    ) throws -> HomeAssistantMutationResult {
+        try BudgetDeletionService.deleteBudgetAndGeneratedPlannedExpenses(budget, modelContext: modelContext)
+        return HomeAssistantMutationResult(
+            title: "Budget deleted",
+            subtitle: "Removed \(budget.name).",
+            rows: []
+        )
+    }
+
+    func deletePlannedExpense(
+        _ expense: PlannedExpense,
+        modelContext: ModelContext
+    ) throws -> HomeAssistantMutationResult {
+        PlannedExpenseDeletionService.delete(expense, modelContext: modelContext)
+        try modelContext.save()
+
+        return HomeAssistantMutationResult(
+            title: "Planned expense deleted",
+            subtitle: "The planned expense was removed.",
             rows: []
         )
     }
@@ -6815,6 +7870,165 @@ private final class HomeAssistantMutationService {
                 return lhs.1 > rhs.1
             }
             .map(\.0)
+    }
+
+    private func syncGeneratedPlannedExpenses(
+        for preset: Preset,
+        workspace: Workspace,
+        modelContext: ModelContext
+    ) {
+        let linkedBudgets = (preset.budgetPresetLinks ?? []).compactMap(\.budget)
+        for budget in linkedBudgets {
+            deleteGeneratedPlannedExpenses(
+                budgetID: budget.id,
+                presetID: preset.id,
+                modelContext: modelContext
+            )
+
+            let selectedPresets = (budget.presetLinks ?? []).compactMap(\.preset)
+            let selectedCardIDs = Set((budget.cardLinks ?? []).compactMap { $0.card?.id })
+            materializePlannedExpenses(
+                for: budget,
+                selectedPresets: selectedPresets,
+                selectedCardIDs: selectedCardIDs,
+                workspace: workspace,
+                modelContext: modelContext
+            )
+        }
+
+        applyPresetAttributesToGeneratedExpenses(preset: preset, modelContext: modelContext)
+    }
+
+    private func syncGeneratedPlannedExpenses(
+        for budget: Budget,
+        workspace: Workspace,
+        modelContext: ModelContext
+    ) {
+        let selectedPresetIDs = Set((budget.presetLinks ?? []).compactMap { $0.preset?.id })
+        let selectedCardIDs = Set((budget.cardLinks ?? []).compactMap { $0.card?.id })
+
+        deleteGeneratedPlannedExpensesNotMatchingSelection(
+            budgetID: budget.id,
+            selectedPresetIDs: selectedPresetIDs,
+            windowStart: Calendar.current.startOfDay(for: budget.startDate),
+            windowEnd: Calendar.current.startOfDay(for: budget.endDate),
+            selectedCardIDs: selectedCardIDs,
+            modelContext: modelContext
+        )
+
+        materializePlannedExpenses(
+            for: budget,
+            selectedPresets: (budget.presetLinks ?? []).compactMap(\.preset),
+            selectedCardIDs: selectedCardIDs,
+            workspace: workspace,
+            modelContext: modelContext
+        )
+    }
+
+    private func deleteGeneratedPlannedExpensesNotMatchingSelection(
+        budgetID: UUID,
+        selectedPresetIDs: Set<UUID>,
+        windowStart: Date,
+        windowEnd: Date,
+        selectedCardIDs: Set<UUID>,
+        modelContext: ModelContext
+    ) {
+        let descriptor = FetchDescriptor<PlannedExpense>(
+            predicate: #Predicate { expense in
+                expense.sourceBudgetID == budgetID
+            }
+        )
+
+        do {
+            let matches = try modelContext.fetch(descriptor)
+            for expense in matches {
+                let presetID = expense.sourcePresetID
+                let inSelectedPresets = presetID.map { selectedPresetIDs.contains($0) } ?? false
+                let day = Calendar.current.startOfDay(for: expense.expenseDate)
+                let inWindow = (day >= windowStart && day <= windowEnd)
+                let cardID = expense.card?.id
+                let cardStillLinked = cardID.map { selectedCardIDs.contains($0) } ?? true
+
+                if !inSelectedPresets || !inWindow || !cardStillLinked {
+                    PlannedExpenseDeletionService.delete(expense, modelContext: modelContext)
+                }
+            }
+        } catch {
+            return
+        }
+    }
+
+    private func deleteGeneratedPlannedExpenses(
+        budgetID: UUID,
+        presetID: UUID,
+        modelContext: ModelContext
+    ) {
+        let descriptor = FetchDescriptor<PlannedExpense>(
+            predicate: #Predicate { expense in
+                expense.sourceBudgetID == budgetID &&
+                expense.sourcePresetID == presetID
+            }
+        )
+
+        do {
+            let matches = try modelContext.fetch(descriptor)
+            for expense in matches {
+                PlannedExpenseDeletionService.delete(expense, modelContext: modelContext)
+            }
+        } catch {
+            return
+        }
+    }
+
+    private func applyPresetAttributesToGeneratedExpenses(
+        preset: Preset,
+        modelContext: ModelContext
+    ) {
+        let presetID = preset.id
+        let descriptor = FetchDescriptor<PlannedExpense>(
+            predicate: #Predicate { expense in
+                expense.sourcePresetID == presetID
+            }
+        )
+
+        do {
+            let matches = try modelContext.fetch(descriptor)
+            for expense in matches {
+                expense.title = preset.title
+                expense.plannedAmount = preset.plannedAmount
+                expense.category = preset.defaultCategory
+
+                if let budgetID = expense.sourceBudgetID,
+                   let budgetCardIDs = budgetCardIDs(for: budgetID, modelContext: modelContext),
+                   let defaultCard = preset.defaultCard,
+                   budgetCardIDs.contains(defaultCard.id) {
+                    expense.card = defaultCard
+                } else if expense.sourceBudgetID == nil {
+                    expense.card = preset.defaultCard
+                } else {
+                    expense.card = nil
+                }
+            }
+        } catch {
+            return
+        }
+    }
+
+    private func budgetCardIDs(
+        for budgetID: UUID,
+        modelContext: ModelContext
+    ) -> Set<UUID>? {
+        let descriptor = FetchDescriptor<BudgetCardLink>(
+            predicate: #Predicate { link in
+                link.budget?.id == budgetID
+            }
+        )
+
+        do {
+            return Set(try modelContext.fetch(descriptor).compactMap { $0.card?.id })
+        } catch {
+            return nil
+        }
     }
 }
 
