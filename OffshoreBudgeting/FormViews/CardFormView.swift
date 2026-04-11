@@ -50,7 +50,7 @@ struct CardFormView: View {
 
 // MARK: - Effect Grid (capsules painted with theme + effect)
 
-private struct EffectCapsuleGrid: View {
+struct EffectCapsuleGrid: View {
     @Binding var selection: CardEffectOption
     let currentTheme: CardThemeOption
 
@@ -82,7 +82,7 @@ private struct EffectCapsuleGrid: View {
 
 // MARK: - Theme Grid (capsules painted with theme)
 
-private struct ThemeCapsuleGrid: View {
+struct ThemeCapsuleGrid: View {
     @Binding var selection: CardThemeOption
 
     private let columns = [
@@ -113,7 +113,7 @@ private struct ThemeCapsuleGrid: View {
 
 // MARK: - Painted Capsule UI
 
-private struct PaintedCapsule: View {
+struct PaintedCapsule: View {
     let title: String
     let theme: CardThemeOption
     let effect: CardEffectOption

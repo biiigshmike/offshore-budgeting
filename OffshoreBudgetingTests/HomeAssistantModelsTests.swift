@@ -799,6 +799,33 @@ struct HomeAssistantModelsTests {
         #expect(decoded == original)
     }
 
+    @Test func answer_codableRoundTrip_preservesInlineCreateFormAttachment() throws {
+        let original = HomeAnswer(
+            id: UUID(uuidString: "AAAAAAAA-8888-7777-6666-555555555555")!,
+            queryID: UUID(uuidString: "BBBBBBBB-2222-3333-4444-555555555555")!,
+            kind: .message,
+            title: "Create Expense",
+            subtitle: nil,
+            rows: [],
+            attachment: .inlineCreateForm(
+                HomeAssistantInlineCreateForm(
+                    entity: .expense,
+                    summary: nil,
+                    amountText: "18.50",
+                    date: Date(timeIntervalSince1970: 5_000),
+                    notesText: "Coffee",
+                    selectedCardID: UUID(uuidString: "CCCCCCCC-1111-2222-3333-444444444444")!
+                )
+            ),
+            generatedAt: Date(timeIntervalSince1970: 12_346)
+        )
+
+        let encoded = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(HomeAnswer.self, from: encoded)
+
+        #expect(decoded == original)
+    }
+
     // MARK: - Command Plan Updates
 
     @Test func commandPlanUpdating_cardName_preservesParsedAttributes() throws {

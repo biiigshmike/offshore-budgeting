@@ -650,6 +650,7 @@ struct HomeAnswer: Identifiable, Codable, Equatable {
     let subtitle: String?
     let primaryValue: String?
     let rows: [HomeAnswerRow]
+    let attachment: HomeAssistantAttachment?
     let generatedAt: Date
 
     init(
@@ -661,6 +662,7 @@ struct HomeAnswer: Identifiable, Codable, Equatable {
         subtitle: String? = nil,
         primaryValue: String? = nil,
         rows: [HomeAnswerRow] = [],
+        attachment: HomeAssistantAttachment? = nil,
         generatedAt: Date = Date()
     ) {
         self.id = id
@@ -671,7 +673,148 @@ struct HomeAnswer: Identifiable, Codable, Equatable {
         self.subtitle = subtitle
         self.primaryValue = primaryValue
         self.rows = rows
+        self.attachment = attachment
         self.generatedAt = generatedAt
+    }
+}
+
+enum HomeAssistantAttachment: Codable, Equatable {
+    case inlineCreateForm(HomeAssistantInlineCreateForm)
+
+    private enum CodingKeys: String, CodingKey {
+        case kind
+        case form
+    }
+
+    private enum Kind: String, Codable {
+        case inlineCreateForm
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        switch try container.decode(Kind.self, forKey: .kind) {
+        case .inlineCreateForm:
+            self = .inlineCreateForm(try container.decode(HomeAssistantInlineCreateForm.self, forKey: .form))
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case let .inlineCreateForm(form):
+            try container.encode(Kind.inlineCreateForm, forKey: .kind)
+            try container.encode(form, forKey: .form)
+        }
+    }
+}
+
+enum HomeAssistantInlineCreateEntity: String, Codable, Equatable, CaseIterable, Identifiable {
+    case expense
+    case income
+    case budget
+    case card
+    case preset
+    case category
+    case plannedExpense
+
+    var id: String { rawValue }
+
+    var displayTitle: String {
+        switch self {
+        case .expense:
+            return "Expense"
+        case .income:
+            return "Income"
+        case .budget:
+            return "Budget"
+        case .card:
+            return "Card"
+        case .preset:
+            return "Preset"
+        case .category:
+            return "Category"
+        case .plannedExpense:
+            return "Planned Expense"
+        }
+    }
+}
+
+struct HomeAssistantInlineCreateForm: Codable, Equatable {
+    let entity: HomeAssistantInlineCreateEntity
+    var summary: String?
+    var nameText: String
+    var amountText: String
+    var date: Date
+    var secondaryDate: Date
+    var sourceText: String
+    var notesText: String
+    var isPlannedIncome: Bool
+    var selectedCardID: UUID?
+    var selectedCategoryID: UUID?
+    var selectedCardIDs: [UUID]
+    var selectedPresetIDs: [UUID]
+    var cardThemeRaw: String
+    var cardEffectRaw: String
+    var categoryColorHex: String
+    var recurrenceFrequencyRaw: String
+    var recurrenceInterval: Int
+    var weeklyWeekday: Int
+    var monthlyDayOfMonth: Int
+    var monthlyIsLastDay: Bool
+    var yearlyMonth: Int
+    var yearlyDayOfMonth: Int
+    var showsValidation: Bool
+
+    init(
+        entity: HomeAssistantInlineCreateEntity,
+        summary: String? = nil,
+        nameText: String = "",
+        amountText: String = "",
+        date: Date = .now,
+        secondaryDate: Date = .now,
+        sourceText: String = "",
+        notesText: String = "",
+        isPlannedIncome: Bool = false,
+        selectedCardID: UUID? = nil,
+        selectedCategoryID: UUID? = nil,
+        selectedCardIDs: [UUID] = [],
+        selectedPresetIDs: [UUID] = [],
+        cardThemeRaw: String = CardThemeOption.ruby.rawValue,
+        cardEffectRaw: String = CardEffectOption.plastic.rawValue,
+        categoryColorHex: String = "#3B82F6",
+        recurrenceFrequencyRaw: String = RecurrenceFrequency.monthly.rawValue,
+        recurrenceInterval: Int = 1,
+        weeklyWeekday: Int = 6,
+        monthlyDayOfMonth: Int = 15,
+        monthlyIsLastDay: Bool = false,
+        yearlyMonth: Int = 1,
+        yearlyDayOfMonth: Int = 15,
+        showsValidation: Bool = false
+    ) {
+        self.entity = entity
+        self.summary = summary
+        self.nameText = nameText
+        self.amountText = amountText
+        self.date = date
+        self.secondaryDate = secondaryDate
+        self.sourceText = sourceText
+        self.notesText = notesText
+        self.isPlannedIncome = isPlannedIncome
+        self.selectedCardID = selectedCardID
+        self.selectedCategoryID = selectedCategoryID
+        self.selectedCardIDs = selectedCardIDs
+        self.selectedPresetIDs = selectedPresetIDs
+        self.cardThemeRaw = cardThemeRaw
+        self.cardEffectRaw = cardEffectRaw
+        self.categoryColorHex = categoryColorHex
+        self.recurrenceFrequencyRaw = recurrenceFrequencyRaw
+        self.recurrenceInterval = recurrenceInterval
+        self.weeklyWeekday = weeklyWeekday
+        self.monthlyDayOfMonth = monthlyDayOfMonth
+        self.monthlyIsLastDay = monthlyIsLastDay
+        self.yearlyMonth = yearlyMonth
+        self.yearlyDayOfMonth = yearlyDayOfMonth
+        self.showsValidation = showsValidation
     }
 }
 

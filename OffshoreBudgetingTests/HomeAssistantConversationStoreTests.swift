@@ -40,6 +40,68 @@ struct HomeAssistantConversationStoreTests {
         #expect(loaded == expected)
     }
 
+    @Test func saveAnswers_withInlineCreateAttachment_preservesAttachmentPayload() throws {
+        let setup = makeStore()
+        defer { clearDefaults(setup.suiteName) }
+
+        let workspaceID = UUID()
+        let expected = [
+            HomeAnswer(
+                queryID: UUID(),
+                kind: .message,
+                title: "Create Expense",
+                subtitle: nil,
+                attachment: .inlineCreateForm(
+                    HomeAssistantInlineCreateForm(
+                        entity: .expense,
+                        summary: "Prefilled from your message.",
+                        amountText: "18",
+                        date: Date(timeIntervalSince1970: 1_234),
+                        notesText: "Coffee",
+                        selectedCardID: UUID(),
+                        selectedCategoryID: UUID(),
+                        showsValidation: true
+                    )
+                )
+            )
+        ]
+
+        setup.store.saveAnswers(expected, workspaceID: workspaceID)
+        let loaded = setup.store.loadAnswers(workspaceID: workspaceID)
+
+        #expect(loaded == expected)
+    }
+
+    @Test func saveAnswers_thenLoadAnswers_preservesInlineCreateFormDrafts() throws {
+        let setup = makeStore()
+        defer { clearDefaults(setup.suiteName) }
+
+        let workspaceID = UUID()
+        let expected = [
+            HomeAnswer(
+                queryID: UUID(),
+                kind: .message,
+                title: "Create Card",
+                subtitle: nil,
+                attachment: .inlineCreateForm(
+                    HomeAssistantInlineCreateForm(
+                        entity: .card,
+                        summary: nil,
+                        nameText: "Travel Card",
+                        cardThemeRaw: CardThemeOption.sunset.rawValue,
+                        cardEffectRaw: CardEffectOption.glass.rawValue,
+                        showsValidation: true
+                    )
+                )
+            )
+        ]
+
+        setup.store.saveAnswers(expected, workspaceID: workspaceID)
+        let loaded = setup.store.loadAnswers(workspaceID: workspaceID)
+
+        #expect(loaded == expected)
+    }
+
     // MARK: - Limit
 
     @Test func saveAnswers_trimsToMaxStoredAnswersKeepingMostRecent() throws {

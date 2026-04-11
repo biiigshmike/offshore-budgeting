@@ -29,6 +29,7 @@ struct HomeAssistantPanelView: View {
     }
     
     private enum HomeAssistantCreateEntityKind {
+        case expense
         case budget
         case income
         case card
@@ -212,6 +213,10 @@ struct HomeAssistantPanelView: View {
     private var defaultQueryPeriodUnit: HomeQueryPeriodUnit {
         let period = BudgetingPeriod(rawValue: defaultBudgetingPeriodRaw) ?? .monthly
         return period.queryPeriodUnit
+    }
+
+    private var defaultBudgetingPeriod: BudgetingPeriod {
+        BudgetingPeriod(rawValue: defaultBudgetingPeriodRaw) ?? .monthly
     }
     
     init(
@@ -404,6 +409,12 @@ struct HomeAssistantPanelView: View {
             Menu {
                 Section(String(localized: "assistant.createNew.section", defaultValue: "Create New", comment: "Section title for assistant create-new menu.")) {
                     Button {
+                        handleCreateMenuSelection(.expense)
+                    } label: {
+                        Label("Expense", systemImage: "plus.circle")
+                    }
+
+                    Button {
                         handleCreateMenuSelection(.budget)
                     } label: {
                         Label(String(localized: "app.section.budgets", defaultValue: "Budgets", comment: "Main tab title for the Budgets section."), systemImage: "chart.pie.fill")
@@ -432,6 +443,7 @@ struct HomeAssistantPanelView: View {
                     } label: {
                         Label(String(localized: "categories.title.singular", defaultValue: "Category", comment: "Label for category entity."), systemImage: "tag.fill")
                     }
+
                 }
             } label: {
                 Image(systemName: "plus")
@@ -459,19 +471,42 @@ struct HomeAssistantPanelView: View {
     }
     
     private func handleCreateMenuSelection(_ kind: HomeAssistantCreateEntityKind) {
-        let guidance = creationGuidance(for: kind)
-        appendMutationMessage(
-            title: guidance.title,
-            subtitle: guidance.subtitle,
-            rows: guidance.rows
+        appendInlineCreateForm(
+            makeInlineCreateForm(
+                for: {
+                    switch kind {
+                    case .expense:
+                        return .expense
+                    case .budget:
+                        return .budget
+                    case .income:
+                        return .income
+                    case .card:
+                        return .card
+                    case .preset:
+                        return .preset
+                    case .category:
+                        return .category
+                    }
+                }(),
+                command: nil
+            )
         )
-        isPromptFieldFocused = true
     }
     
     private func creationGuidance(
         for kind: HomeAssistantCreateEntityKind
     ) -> (title: String, subtitle: String, rows: [HomeAnswerRow]) {
         switch kind {
+        case .expense:
+            return (
+                title: "Create New Expense",
+                subtitle: "Log an expense with its description, amount, date, card, and optional category.",
+                rows: [
+                    HomeAnswerRow(title: "Example 1", value: "log $25 for coffee on Apple Card"),
+                    HomeAnswerRow(title: "Example 2", value: "add expense groceries $84 on Friday")
+                ]
+            )
         case .budget:
             return (
                 title: "Create New Budget",
@@ -519,7 +554,377 @@ struct HomeAssistantPanelView: View {
             )
         }
     }
-    
+
+    private func appendInlineCreateForm(_ form: HomeAssistantInlineCreateForm) {
+        clearMutationPendingState()
+        appendAnswer(
+            HomeAnswer(
+                queryID: UUID(),
+                kind: .message,
+                title: "Create \(form.entity.displayTitle)",
+                subtitle: nil,
+                attachment: .inlineCreateForm(form)
+            )
+        )
+    }
+
+    private func inlineCreateFormBinding(for answerID: UUID) -> Binding<HomeAssistantInlineCreateForm>? {
+        guard currentInlineCreateForm(for: answerID) != nil else { return nil }
+        return Binding(
+            get: { currentInlineCreateForm(for: answerID) ?? makeInlineCreateForm(for: .expense, command: nil) },
+            set: { updated in
+                updateInlineCreateForm(answerID: answerID, form: updated)
+            }
+        )
+    }
+
+    private func currentInlineCreateForm(for answerID: UUID) -> HomeAssistantInlineCreateForm? {
+        guard let answer = answers.first(where: { $0.id == answerID }),
+              case let .inlineCreateForm(form)? = answer.attachment else {
+            return nil
+        }
+        return form
+    }
+
+    private func updateInlineCreateForm(answerID: UUID, form: HomeAssistantInlineCreateForm) {
+        guard let index = answers.firstIndex(where: { $0.id == answerID }) else { return }
+        let answer = answers[index]
+        answers[index] = HomeAnswer(
+            id: answer.id,
+            queryID: answer.queryID,
+            kind: answer.kind,
+            userPrompt: answer.userPrompt,
+            title: answer.title,
+            subtitle: answer.subtitle,
+            primaryValue: answer.primaryValue,
+            rows: answer.rows,
+            attachment: .inlineCreateForm(form),
+            generatedAt: answer.generatedAt
+        )
+        conversationStore.saveAnswers(answers, workspaceID: workspace.id)
+    }
+
+    private func finalizeInlineCreateForm(
+        answerID: UUID,
+        subtitle: String,
+        rows: [HomeAnswerRow]
+    ) {
+        guard let index = answers.firstIndex(where: { $0.id == answerID }) else { return }
+        let answer = answers[index]
+        answers[index] = HomeAnswer(
+            id: answer.id,
+            queryID: answer.queryID,
+            kind: answer.kind,
+            userPrompt: answer.userPrompt,
+            title: answer.title,
+            subtitle: subtitle,
+            primaryValue: answer.primaryValue,
+            rows: rows,
+            attachment: nil,
+            generatedAt: answer.generatedAt
+        )
+        conversationStore.saveAnswers(answers, workspaceID: workspace.id)
+    }
+
+    private func cancelInlineCreateForm(answerID: UUID) {
+        guard let form = currentInlineCreateForm(for: answerID) else { return }
+        finalizeInlineCreateForm(
+            answerID: answerID,
+            subtitle: "Draft canceled.",
+            rows: inlineCreateSummaryRows(for: form)
+        )
+    }
+
+    private func submitInlineCreateForm(answerID: UUID) {
+        guard var form = currentInlineCreateForm(for: answerID) else { return }
+        form.showsValidation = true
+        updateInlineCreateForm(answerID: answerID, form: form)
+
+        do {
+            let result = try executeInlineCreateForm(form)
+            finalizeInlineCreateForm(
+                answerID: answerID,
+                subtitle: "Sent back to Marina.",
+                rows: inlineCreateSummaryRows(for: form)
+            )
+            clearMutationPendingState()
+            appendMutationMessage(title: result.title, subtitle: result.subtitle, rows: result.rows)
+        } catch {
+            appendMutationMessage(
+                title: "Could not create \(form.entity.displayTitle.lowercased())",
+                subtitle: error.localizedDescription,
+                rows: []
+            )
+        }
+    }
+
+    private func missingSelectionError(_ description: String) -> NSError {
+        NSError(domain: "HomeAssistantInlineCreateForm", code: 400, userInfo: [NSLocalizedDescriptionKey: description])
+    }
+
+    private func executeInlineCreateForm(_ form: HomeAssistantInlineCreateForm) throws -> HomeAssistantMutationResult {
+        switch form.entity {
+        case .expense:
+            guard let amount = CurrencyFormatter.parseAmount(form.amountText), amount > 0 else {
+                throw TransactionEntryService.ValidationError.invalidAmount
+            }
+            guard let card = cards.first(where: { $0.id == form.selectedCardID }) else {
+                throw missingSelectionError("Select a card to continue.")
+            }
+            return try mutationService.addExpense(
+                amount: amount,
+                notes: form.notesText.trimmingCharacters(in: .whitespacesAndNewlines),
+                date: calendarStartOfDay(form.date),
+                card: card,
+                category: categories.first(where: { $0.id == form.selectedCategoryID }),
+                workspace: workspace,
+                modelContext: modelContext
+            )
+        case .income:
+            guard let amount = CurrencyFormatter.parseAmount(form.amountText), amount > 0 else {
+                throw TransactionEntryService.ValidationError.invalidAmount
+            }
+            let frequency = RecurrenceFrequency(rawValue: form.recurrenceFrequencyRaw) ?? .none
+            return try mutationService.addIncome(
+                amount: amount,
+                source: form.sourceText.trimmingCharacters(in: .whitespacesAndNewlines),
+                date: calendarStartOfDay(form.date),
+                isPlanned: form.isPlannedIncome,
+                recurrenceFrequencyRaw: frequency.rawValue,
+                recurrenceInterval: form.recurrenceInterval,
+                weeklyWeekday: form.weeklyWeekday,
+                monthlyDayOfMonth: form.monthlyDayOfMonth,
+                monthlyIsLastDay: form.monthlyIsLastDay,
+                yearlyMonth: form.yearlyMonth,
+                yearlyDayOfMonth: form.yearlyDayOfMonth,
+                recurrenceEndDate: frequency == .none ? nil : calendarStartOfDay(form.secondaryDate),
+                workspace: workspace,
+                modelContext: modelContext
+            )
+        case .budget:
+            return try mutationService.addBudget(
+                name: form.nameText.trimmingCharacters(in: .whitespacesAndNewlines),
+                dateRange: HomeQueryDateRange(startDate: form.date, endDate: form.secondaryDate),
+                cards: cards.filter { form.selectedCardIDs.contains($0.id) },
+                presets: presets.filter { form.selectedPresetIDs.contains($0.id) },
+                workspace: workspace,
+                modelContext: modelContext
+            )
+        case .card:
+            return try mutationService.addCard(
+                name: form.nameText.trimmingCharacters(in: .whitespacesAndNewlines),
+                themeRaw: form.cardThemeRaw,
+                effectRaw: form.cardEffectRaw,
+                workspace: workspace,
+                modelContext: modelContext
+            )
+        case .preset:
+            guard let amount = CurrencyFormatter.parseAmount(form.amountText), amount > 0 else {
+                throw TransactionEntryService.ValidationError.invalidAmount
+            }
+            guard let card = cards.first(where: { $0.id == form.selectedCardID }) else {
+                throw missingSelectionError("Select a default card to continue.")
+            }
+            return try mutationService.addPreset(
+                title: form.nameText.trimmingCharacters(in: .whitespacesAndNewlines),
+                plannedAmount: amount,
+                frequencyRaw: form.recurrenceFrequencyRaw,
+                interval: max(1, form.recurrenceInterval),
+                weeklyWeekday: form.weeklyWeekday,
+                monthlyDayOfMonth: form.monthlyDayOfMonth,
+                monthlyIsLastDay: form.monthlyIsLastDay,
+                yearlyMonth: form.yearlyMonth,
+                yearlyDayOfMonth: form.yearlyDayOfMonth,
+                card: card,
+                category: categories.first(where: { $0.id == form.selectedCategoryID }),
+                workspace: workspace,
+                modelContext: modelContext
+            )
+        case .category:
+            return try mutationService.addCategory(
+                name: form.nameText.trimmingCharacters(in: .whitespacesAndNewlines),
+                colorHex: form.categoryColorHex,
+                workspace: workspace,
+                modelContext: modelContext
+            )
+        case .plannedExpense:
+            throw missingSelectionError("Create a preset to generate planned expenses, or log a regular expense instead.")
+        }
+    }
+
+    private func inlineCreateSummaryRows(for form: HomeAssistantInlineCreateForm) -> [HomeAnswerRow] {
+        switch form.entity {
+        case .expense:
+            return [
+                HomeAnswerRow(title: "Description", value: form.notesText.trimmingCharacters(in: .whitespacesAndNewlines)),
+                HomeAnswerRow(title: "Amount", value: form.amountText),
+                HomeAnswerRow(title: "Card", value: cards.first(where: { $0.id == form.selectedCardID })?.name ?? "Select"),
+                HomeAnswerRow(title: "Date", value: AppDateFormat.abbreviatedDate(form.date))
+            ]
+        case .income:
+            var rows = [
+                HomeAnswerRow(title: "Source", value: form.sourceText.trimmingCharacters(in: .whitespacesAndNewlines)),
+                HomeAnswerRow(title: "Amount", value: form.amountText),
+                HomeAnswerRow(title: "Type", value: form.isPlannedIncome ? "Planned" : "Actual")
+            ]
+            let frequency = RecurrenceFrequency(rawValue: form.recurrenceFrequencyRaw) ?? .none
+            if frequency != .none {
+                rows.append(HomeAnswerRow(title: "Repeat", value: frequency.displayName))
+            }
+            return rows
+        case .budget:
+            return [
+                HomeAnswerRow(title: "Name", value: form.nameText.trimmingCharacters(in: .whitespacesAndNewlines)),
+                HomeAnswerRow(title: "Start", value: AppDateFormat.abbreviatedDate(form.date)),
+                HomeAnswerRow(title: "End", value: AppDateFormat.abbreviatedDate(form.secondaryDate)),
+                HomeAnswerRow(title: "Cards", value: AppNumberFormat.integer(form.selectedCardIDs.count)),
+                HomeAnswerRow(title: "Presets", value: AppNumberFormat.integer(form.selectedPresetIDs.count))
+            ]
+        case .card:
+            return [
+                HomeAnswerRow(title: "Name", value: form.nameText.trimmingCharacters(in: .whitespacesAndNewlines)),
+                HomeAnswerRow(title: "Theme", value: CardThemeOption(rawValue: form.cardThemeRaw)?.displayName ?? "Ruby"),
+                HomeAnswerRow(title: "Effect", value: CardEffectOption(rawValue: form.cardEffectRaw)?.displayName ?? "Plastic")
+            ]
+        case .preset:
+            return [
+                HomeAnswerRow(title: "Name", value: form.nameText.trimmingCharacters(in: .whitespacesAndNewlines)),
+                HomeAnswerRow(title: "Amount", value: form.amountText),
+                HomeAnswerRow(title: "Card", value: cards.first(where: { $0.id == form.selectedCardID })?.name ?? "Select")
+            ]
+        case .category:
+            return [
+                HomeAnswerRow(title: "Name", value: form.nameText.trimmingCharacters(in: .whitespacesAndNewlines)),
+                HomeAnswerRow(title: "Color", value: form.categoryColorHex)
+            ]
+        case .plannedExpense:
+            return []
+        }
+    }
+
+    private func amountInputString(_ value: Double?) -> String {
+        guard let value else { return "" }
+        if value.rounded() == value {
+            return String(Int(value))
+        }
+        return String(format: "%.2f", value)
+    }
+
+    private func calendarStartOfDay(_ date: Date) -> Date {
+        Calendar.current.startOfDay(for: date)
+    }
+
+    private func makeInlineCreateForm(
+        for entity: HomeAssistantInlineCreateEntity,
+        command: HomeAssistantCommandPlan?
+    ) -> HomeAssistantInlineCreateForm {
+        let now = calendarStartOfDay(Date())
+        let periodRange = defaultBudgetingPeriod.defaultRange(containing: now, calendar: .current)
+        let seededRange = command?.dateRange ?? HomeQueryDateRange(startDate: periodRange.start, endDate: periodRange.end)
+        let colorResolution = MarinaColorResolver.resolve(
+            rawPrompt: command?.rawPrompt ?? "",
+            parserHex: command?.categoryColorHex,
+            parserName: command?.categoryColorName
+        )
+        let resolvedCardID = command?.cardName.flatMap { resolveCard(from: $0)?.id } ?? (cards.count == 1 ? cards.first?.id : nil)
+        let resolvedCategoryID = command?.categoryName.flatMap { resolveCategory(from: $0)?.id }
+
+        switch entity {
+        case .expense:
+            return HomeAssistantInlineCreateForm(
+                entity: .expense,
+                summary: command == nil ? nil : "I prefilled the expense details from your message.",
+                amountText: amountInputString(command?.amount),
+                date: command?.date ?? now,
+                notesText: command?.notes ?? "",
+                selectedCardID: resolvedCardID,
+                selectedCategoryID: resolvedCategoryID
+            )
+        case .income:
+            return HomeAssistantInlineCreateForm(
+                entity: .income,
+                summary: command == nil ? nil : "I prefilled the income details from your message.",
+                amountText: amountInputString(command?.amount),
+                date: command?.date ?? now,
+                secondaryDate: command?.recurrenceEndDate ?? command?.date ?? now,
+                sourceText: command?.source ?? command?.notes ?? "",
+                isPlannedIncome: command?.isPlannedIncome ?? false,
+                recurrenceFrequencyRaw: command?.recurrenceFrequencyRaw ?? RecurrenceFrequency.none.rawValue,
+                recurrenceInterval: max(1, command?.recurrenceInterval ?? 1),
+                weeklyWeekday: command?.weeklyWeekday ?? 6,
+                monthlyDayOfMonth: command?.monthlyDayOfMonth ?? 15,
+                monthlyIsLastDay: command?.monthlyIsLastDay ?? false,
+                yearlyMonth: command?.yearlyMonth ?? 1,
+                yearlyDayOfMonth: command?.yearlyDayOfMonth ?? 15
+            )
+        case .budget:
+            return HomeAssistantInlineCreateForm(
+                entity: .budget,
+                summary: command == nil ? nil : "I prefilled the budget details from your message.",
+                nameText: command?.entityName ?? BudgetNameSuggestion.suggestedName(start: seededRange.startDate, end: seededRange.endDate, calendar: .current),
+                date: seededRange.startDate,
+                secondaryDate: seededRange.endDate,
+                selectedCardIDs: command?.attachAllCards == true ? cards.map(\.id) : resolvedSelectedCardIDs(from: command),
+                selectedPresetIDs: command?.attachAllPresets == true ? presets.map(\.id) : resolvedSelectedPresetIDs(from: command)
+            )
+        case .card:
+            return HomeAssistantInlineCreateForm(
+                entity: .card,
+                summary: command == nil ? nil : "I prefilled the card details from your message.",
+                nameText: command?.entityName ?? command?.notes ?? "",
+                cardThemeRaw: command?.cardThemeRaw ?? CardThemeOption.ruby.rawValue,
+                cardEffectRaw: command?.cardEffectRaw ?? CardEffectOption.plastic.rawValue
+            )
+        case .preset:
+            return HomeAssistantInlineCreateForm(
+                entity: .preset,
+                summary: command == nil ? nil : "I prefilled the preset details from your message.",
+                nameText: command?.entityName ?? command?.notes ?? "",
+                amountText: amountInputString(command?.amount),
+                selectedCardID: resolvedCardID,
+                selectedCategoryID: resolvedCategoryID,
+                recurrenceFrequencyRaw: command?.recurrenceFrequencyRaw ?? RecurrenceFrequency.monthly.rawValue,
+                recurrenceInterval: max(1, command?.recurrenceInterval ?? 1),
+                weeklyWeekday: command?.weeklyWeekday ?? 6,
+                monthlyDayOfMonth: command?.monthlyDayOfMonth ?? 15,
+                monthlyIsLastDay: command?.monthlyIsLastDay ?? false,
+                yearlyMonth: command?.yearlyMonth ?? 1,
+                yearlyDayOfMonth: command?.yearlyDayOfMonth ?? 15
+            )
+        case .category:
+            return HomeAssistantInlineCreateForm(
+                entity: .category,
+                summary: command == nil ? nil : "I prefilled the category details from your message.",
+                nameText: command?.entityName ?? command?.notes ?? "",
+                categoryColorHex: colorResolution.hex
+            )
+        case .plannedExpense:
+            return HomeAssistantInlineCreateForm(
+                entity: .plannedExpense,
+                summary: command == nil ? nil : "I prefilled the planned expense details from your message.",
+                nameText: command?.entityName ?? command?.notes ?? "",
+                amountText: amountInputString(command?.amount),
+                date: command?.date ?? now,
+                selectedCardID: resolvedCardID,
+                selectedCategoryID: resolvedCategoryID
+            )
+        }
+    }
+
+    private func resolvedSelectedCardIDs(from command: HomeAssistantCommandPlan?) -> [UUID] {
+        guard let command else { return [] }
+        return command.selectedCardNames.compactMap { name in
+            resolveCard(from: name)?.id
+        }
+    }
+
+    private func resolvedSelectedPresetIDs(from command: HomeAssistantCommandPlan?) -> [UUID] {
+        guard let command else { return [] }
+        return command.selectedPresetTitles.compactMap { title in
+            presets.first(where: { $0.title.compare(title, options: .caseInsensitive) == .orderedSame })?.id
+        }
+    }
+
     @ViewBuilder
     private var promptTextField: some View {
         if #available(iOS 26.0, *) {
@@ -853,6 +1258,21 @@ struct HomeAssistantPanelView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
+                }
+
+                if let formBinding = inlineCreateFormBinding(for: answer.id) {
+                    HomeAssistantInlineCreateFormCard(
+                        form: formBinding,
+                        cards: cards,
+                        categories: categories,
+                        presets: presets,
+                        onSubmit: {
+                            submitInlineCreateForm(answerID: answer.id)
+                        },
+                        onCancel: {
+                            cancelInlineCreateForm(answerID: answer.id)
+                        }
+                    )
                 }
                 
                 if let provenance = subtitlePresentation.provenance {
@@ -1427,215 +1847,27 @@ struct HomeAssistantPanelView: View {
     }
     
     private func handleAddExpenseCommand(_ command: HomeAssistantCommandPlan) {
-        guard let amount = command.amount, amount > 0 else {
-            appendMutationMessage(
-                title: "Need expense amount",
-                subtitle: "Tell me the amount to log, like: log $25 for Starbucks.",
-                rows: []
-            )
-            return
-        }
-        
-        let notes = (command.notes ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        guard notes.isEmpty == false else {
-            appendMutationMessage(
-                title: "Need expense description",
-                subtitle: "Tell me where or what this expense is for.",
-                rows: []
-            )
-            return
-        }
-        
-        if let cardName = command.cardName,
-           resolveCard(from: cardName) != nil {
-            executeAddExpense(command)
-            return
-        }
-        
-        pendingExpenseCardPlan = command
-        pendingExpenseCardOptions = cards
-        presentCardSelectionPrompt(for: command)
+        appendInlineCreateForm(makeInlineCreateForm(for: .expense, command: command))
     }
     
     private func handleAddIncomeCommand(_ command: HomeAssistantCommandPlan) {
-        guard let amount = command.amount, amount > 0 else {
-            appendMutationMessage(
-                title: "Need income amount",
-                subtitle: "Tell me the amount to log, like: log income $1,250.",
-                rows: []
-            )
-            return
-        }
-        
-        let source = (command.source ?? command.notes ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        guard source.isEmpty == false else {
-            appendMutationMessage(
-                title: "Need income source",
-                subtitle: "Tell me where this income came from.",
-                rows: []
-            )
-            return
-        }
-        
-        guard command.isPlannedIncome != nil else {
-            pendingIncomeKindPlan = command
-            appendMutationMessage(
-                title: String(localized: "assistant.quickClarification", defaultValue: "Quick clarification", comment: "Assistant clarification card title."),
-                subtitle: "Should I log this income as planned or actual?",
-                rows: [
-                    HomeAnswerRow(title: "1", value: "Planned"),
-                    HomeAnswerRow(title: "2", value: "Actual")
-                ]
-            )
-            return
-        }
-        
-        executeAddIncome(command)
+        appendInlineCreateForm(makeInlineCreateForm(for: .income, command: command))
     }
     
     private func handleAddBudgetCommand(_ command: HomeAssistantCommandPlan) {
-        pendingBudgetCreationPlan = command
-        pendingBudgetSelectedCardIDs = []
-        pendingBudgetSelectedPresetIDs = []
-        pendingBudgetMatchingPresets = matchingPresets(for: command)
-        
-        if let attachAllCards = command.attachAllCards {
-            pendingBudgetSelectedCardIDs = attachAllCards ? Set(cards.map(\.id)) : []
-            if let attachAllPresets = command.attachAllPresets {
-                pendingBudgetSelectedPresetIDs = attachAllPresets ? Set(pendingBudgetMatchingPresets.map(\.id)) : []
-                executePendingBudgetCreation(plan: command)
-                return
-            }
-            pendingBudgetCreationStep = .presetsChoice
-            presentBudgetPresetsChoicePrompt()
-            return
-        }
-        
-        pendingBudgetCreationStep = .cardsChoice
-        presentBudgetCardsChoicePrompt()
+        appendInlineCreateForm(makeInlineCreateForm(for: .budget, command: command))
     }
     
     private func handleAddCardCommand(_ command: HomeAssistantCommandPlan) {
-        let name = (command.entityName ?? command.notes ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        guard name.isEmpty == false else {
-            appendMutationMessage(
-                title: "Need card name",
-                subtitle: "Tell me the card name to create.",
-                rows: []
-            )
-            return
-        }
-        
-        do {
-            let result = try mutationService.addCard(
-                name: name,
-                themeRaw: command.cardThemeRaw,
-                effectRaw: command.cardEffectRaw,
-                workspace: workspace,
-                modelContext: modelContext
-            )
-            clearMutationPendingState()
-            appendMutationMessage(title: result.title, subtitle: result.subtitle, rows: result.rows)
-            
-            if command.cardThemeRaw == nil || command.cardEffectRaw == nil {
-                pendingCardStyleCardName = name
-                pendingCardStyleStep = .offer
-                appendMutationMessage(
-                    title: "Want to style this card?",
-                    subtitle: "Reply yes and I can show themes and effects, or no to keep defaults.",
-                    rows: []
-                )
-            }
-        } catch {
-            appendMutationMessage(
-                title: "Could not create card",
-                subtitle: error.localizedDescription,
-                rows: []
-            )
-        }
+        appendInlineCreateForm(makeInlineCreateForm(for: .card, command: command))
     }
     
     private func handleAddPresetCommand(_ command: HomeAssistantCommandPlan) {
-        guard let amount = command.amount, amount > 0 else {
-            appendMutationMessage(
-                title: "Need preset amount",
-                subtitle: "Tell me the planned amount for this preset.",
-                rows: []
-            )
-            return
-        }
-        
-        let title = (command.entityName ?? command.notes ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        guard title.isEmpty == false else {
-            appendMutationMessage(
-                title: "Need preset title",
-                subtitle: "Tell me the preset title to create.",
-                rows: []
-            )
-            return
-        }
-        
-        if command.recurrenceFrequencyRaw == nil {
-            pendingPresetRecurrencePlan = command
-            presentPresetRecurrencePrompt()
-            return
-        }
-        
-        if let cardName = command.cardName,
-           resolveCard(from: cardName) != nil {
-            executeAddPreset(command)
-            return
-        }
-        
-        pendingPresetCardPlan = command
-        presentPresetCardSelectionPrompt()
+        appendInlineCreateForm(makeInlineCreateForm(for: .preset, command: command))
     }
     
     private func handleAddCategoryCommand(_ command: HomeAssistantCommandPlan) {
-        let name = (command.entityName ?? command.notes ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        guard name.isEmpty == false else {
-            appendMutationMessage(
-                title: "Need category name",
-                subtitle: "Tell me the category name to create.",
-                rows: []
-            )
-            return
-        }
-        
-        let colorResolution = MarinaColorResolver.resolve(
-            rawPrompt: command.rawPrompt,
-            parserHex: command.categoryColorHex,
-            parserName: command.categoryColorName
-        )
-        
-        if colorResolution.requiresConfirmation {
-            pendingCategoryColorPlan = command
-            pendingCategoryColorHex = colorResolution.hex
-            pendingCategoryColorName = colorResolution.name
-            appendMutationMessage(
-                title: String(localized: "assistant.quickClarification", defaultValue: "Quick clarification", comment: "Assistant clarification card title."),
-                subtitle: "I mapped that color to \(colorResolution.name) (\(colorResolution.hex)). Reply yes to use it or no to keep default blue.",
-                rows: []
-            )
-            return
-        }
-        
-        do {
-            let result = try mutationService.addCategory(
-                name: name,
-                colorHex: colorResolution.hex,
-                workspace: workspace,
-                modelContext: modelContext
-            )
-            clearMutationPendingState()
-            appendMutationMessage(title: result.title, subtitle: result.subtitle, rows: result.rows)
-        } catch {
-            appendMutationMessage(
-                title: "Could not create category",
-                subtitle: error.localizedDescription,
-                rows: []
-            )
-        }
+        appendInlineCreateForm(makeInlineCreateForm(for: .category, command: command))
     }
 
     private func handleEditCategoryCommand(_ command: HomeAssistantCommandPlan) {
@@ -1798,26 +2030,21 @@ struct HomeAssistantPanelView: View {
     }
 
     private func handleAddPlannedExpenseCommand(_ command: HomeAssistantCommandPlan) {
-        guard let amount = command.amount, amount > 0 else {
-            appendMutationMessage(
-                title: "Need planned expense amount",
-                subtitle: "Tell me the amount to schedule for this planned expense.",
-                rows: []
-            )
-            return
+        let amountLine: String
+        if let amount = command.amount {
+            amountLine = CurrencyFormatter.string(from: amount)
+        } else {
+            amountLine = "the amount"
         }
 
-        let title = (command.entityName ?? command.notes ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        guard title.isEmpty == false else {
-            appendMutationMessage(
-                title: "Need planned expense title",
-                subtitle: "Tell me the title for the planned expense.",
-                rows: []
-            )
-            return
-        }
-
-        executeAddPlannedExpense(command)
+        appendMutationMessage(
+            title: "Use a preset or an expense instead",
+            subtitle: "Planned expenses come from presets. Create a preset for something recurring, or create an expense if this is a one-off entry.",
+            rows: [
+                HomeAnswerRow(title: "Recurring", value: "Create a preset for \(command.entityName ?? command.notes ?? "this item")"),
+                HomeAnswerRow(title: "One-off", value: "Create an expense for \(amountLine)")
+            ]
+        )
     }
 
     private func handleEditPlannedExpenseCommand(_ command: HomeAssistantCommandPlan) {
@@ -3895,10 +4122,6 @@ struct HomeAssistantPanelView: View {
         AppDateFormat.shortDate(date)
     }
     
-    private func calendarStartOfDay(_ date: Date) -> Date {
-        Calendar.current.startOfDay(for: date)
-    }
-    
     private func resolvedPlan(
         for prompt: String
     ) -> (plan: HomeQueryPlan, source: HomeAssistantPlanResolutionSource)? {
@@ -4103,6 +4326,7 @@ struct HomeAssistantPanelView: View {
             subtitle: answer.subtitle,
             primaryValue: answer.primaryValue,
             rows: answer.rows,
+            attachment: answer.attachment,
             generatedAt: answer.generatedAt
         )
         
@@ -5786,6 +6010,7 @@ struct HomeAssistantPanelView: View {
                 subtitle: subtitle,
                 primaryValue: answer.primaryValue,
                 rows: answer.rows,
+                attachment: answer.attachment,
                 generatedAt: answer.generatedAt
             )
         case .low:
@@ -5802,6 +6027,7 @@ struct HomeAssistantPanelView: View {
                 subtitle: subtitle,
                 primaryValue: answer.primaryValue,
                 rows: answer.rows,
+                attachment: answer.attachment,
                 generatedAt: answer.generatedAt
             )
         }
@@ -5828,6 +6054,7 @@ struct HomeAssistantPanelView: View {
             subtitle: answer.subtitle,
             primaryValue: answer.primaryValue,
             rows: answer.rows,
+            attachment: answer.attachment,
             generatedAt: answer.generatedAt
         )
     }
@@ -7106,9 +7333,82 @@ final class HomeAssistantMutationService {
         source: String,
         date: Date,
         isPlanned: Bool,
+        recurrenceFrequencyRaw: String? = nil,
+        recurrenceInterval: Int? = nil,
+        weeklyWeekday: Int? = nil,
+        monthlyDayOfMonth: Int? = nil,
+        monthlyIsLastDay: Bool? = nil,
+        yearlyMonth: Int? = nil,
+        yearlyDayOfMonth: Int? = nil,
+        recurrenceEndDate: Date? = nil,
         workspace: Workspace,
         modelContext: ModelContext
     ) throws -> HomeAssistantMutationResult {
+        let resolvedFrequency = RecurrenceFrequency(rawValue: recurrenceFrequencyRaw ?? RecurrenceFrequency.none.rawValue) ?? .none
+
+        if resolvedFrequency != .none {
+            guard let recurrenceEndDate else {
+                throw NSError(
+                    domain: "HomeAssistantMutationService",
+                    code: 400,
+                    userInfo: [NSLocalizedDescriptionKey: "Repeat income needs an end date."]
+                )
+            }
+
+            let startDay = Calendar.current.startOfDay(for: date)
+            let endDay = Calendar.current.startOfDay(for: recurrenceEndDate)
+            guard endDay >= startDay else {
+                throw NSError(
+                    domain: "HomeAssistantMutationService",
+                    code: 400,
+                    userInfo: [NSLocalizedDescriptionKey: "Repeat income end date must be on or after the start date."]
+                )
+            }
+
+            let series = IncomeSeries(
+                source: source.trimmingCharacters(in: .whitespacesAndNewlines),
+                amount: amount,
+                isPlanned: isPlanned,
+                frequencyRaw: resolvedFrequency.rawValue,
+                interval: max(1, recurrenceInterval ?? 1),
+                weeklyWeekday: weeklyWeekday ?? 6,
+                monthlyDayOfMonth: monthlyDayOfMonth ?? 15,
+                monthlyIsLastDay: monthlyIsLastDay ?? false,
+                yearlyMonth: yearlyMonth ?? 1,
+                yearlyDayOfMonth: yearlyDayOfMonth ?? 15,
+                startDate: startDay,
+                endDate: endDay,
+                workspace: workspace
+            )
+            modelContext.insert(series)
+
+            let occurrenceDays = IncomeScheduleEngine.occurrences(for: series)
+            for occurrenceDay in occurrenceDays {
+                let income = Income(
+                    source: series.source,
+                    amount: series.amount,
+                    date: Calendar.current.startOfDay(for: occurrenceDay),
+                    isPlanned: series.isPlanned,
+                    isException: false,
+                    workspace: workspace,
+                    series: series
+                )
+                modelContext.insert(income)
+            }
+
+            try modelContext.save()
+
+            return HomeAssistantMutationResult(
+                title: "Income logged",
+                subtitle: "Saved recurring \(isPlanned ? "planned" : "actual") income for \(source).",
+                rows: [
+                    HomeAnswerRow(title: "Amount", value: CurrencyFormatter.string(from: amount)),
+                    HomeAnswerRow(title: "Source", value: source),
+                    HomeAnswerRow(title: "Frequency", value: resolvedFrequency.displayName)
+                ]
+            )
+        }
+
         _ = try transactionEntryService.addIncome(
             source: source,
             amount: amount,
