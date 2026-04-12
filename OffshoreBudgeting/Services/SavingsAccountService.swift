@@ -15,6 +15,57 @@ enum SavingsAccountService {
         let recalculatedTotal: Double
     }
 
+    enum ManualSavingsSyncReason: String {
+        case upToDate
+        case closedPeriodsNeedRefresh
+        case runningTotalNeedsRebuild
+        case savingsDataNeedsRepair
+        case processingStateNeedsRefresh
+
+        var message: String {
+            switch self {
+            case .upToDate:
+                return "Savings Account is up to date."
+            case .closedPeriodsNeedRefresh:
+                return "Closed periods need to be refreshed."
+            case .runningTotalNeedsRebuild:
+                return "Running total needs to be rebuilt."
+            case .savingsDataNeedsRepair:
+                return "Savings data needs repair."
+            case .processingStateNeedsRefresh:
+                return "Savings sync state needs to be refreshed."
+            }
+        }
+    }
+
+    struct ManualSavingsSyncStatus {
+        let isUpToDate: Bool
+        let canSync: Bool
+        let reason: ManualSavingsSyncReason
+        let expectedChangeCount: Int
+        let wouldChangeRunningTotal: Bool
+        let currentTotal: Double
+        let projectedTotal: Double
+    }
+
+    struct ManualSavingsSyncResult {
+        let status: ManualSavingsSyncStatus
+        let didApplyChanges: Bool
+        let insertedPeriodCloseCount: Int
+        let refreshedPeriodCloseCount: Int
+        let repairedSavingsDataCount: Int
+        let rebuiltRunningTotal: Bool
+        let refreshedProcessingState: Bool
+
+        var meaningfulChangeCount: Int {
+            insertedPeriodCloseCount
+                + refreshedPeriodCloseCount
+                + repairedSavingsDataCount
+                + (rebuiltRunningTotal ? 1 : 0)
+                + (refreshedProcessingState ? 1 : 0)
+        }
+    }
+
     static func ensureSavingsAccount(
         for workspace: Workspace,
         modelContext: ModelContext
@@ -44,6 +95,172 @@ enum SavingsAccountService {
 
     static func balance(for account: SavingsAccount) -> Double {
         account.total
+    }
+
+    static func manualSyncStatus(
+        for workspace: Workspace,
+        defaultBudgetingPeriodRaw: String,
+        incomes: [Income],
+        plannedExpenses: [PlannedExpense],
+        variableExpenses: [VariableExpense],
+        modelContext: ModelContext,
+        now: Date = .now
+    ) -> ManualSavingsSyncStatus {
+        manualSyncEvaluation(
+            for: workspace,
+            defaultBudgetingPeriodRaw: defaultBudgetingPeriodRaw,
+            incomes: incomes,
+            plannedExpenses: plannedExpenses,
+            variableExpenses: variableExpenses,
+            modelContext: modelContext,
+            now: now
+        ).status
+    }
+
+    static func runManualSyncIfNeeded(
+        for workspace: Workspace,
+        defaultBudgetingPeriodRaw: String,
+        incomes: [Income],
+        plannedExpenses: [PlannedExpense],
+        variableExpenses: [VariableExpense],
+        modelContext: ModelContext,
+        now: Date = .now
+    ) -> ManualSavingsSyncResult {
+        let evaluation = manualSyncEvaluation(
+            for: workspace,
+            defaultBudgetingPeriodRaw: defaultBudgetingPeriodRaw,
+            incomes: incomes,
+            plannedExpenses: plannedExpenses,
+            variableExpenses: variableExpenses,
+            modelContext: modelContext,
+            now: now
+        )
+
+        guard evaluation.status.canSync else {
+            trace("Manual savings sync skipped: already up to date.")
+            return ManualSavingsSyncResult(
+                status: evaluation.status,
+                didApplyChanges: false,
+                insertedPeriodCloseCount: 0,
+                refreshedPeriodCloseCount: 0,
+                repairedSavingsDataCount: 0,
+                rebuiltRunningTotal: false,
+                refreshedProcessingState: false
+            )
+        }
+
+        let didNeedPrimaryAccount = evaluation.expectedPeriodCloseMutations.isEmpty == false
+            || evaluation.normalizationPreview.didMutate
+            || evaluation.shouldRebuildRunningTotal
+            || evaluation.shouldRefreshProcessingState
+        if didNeedPrimaryAccount {
+            _ = ensureSavingsAccount(for: workspace, modelContext: modelContext)
+        }
+
+        var repairedSavingsDataCount = 0
+        if evaluation.normalizationPreview.didMutate {
+            let normalizationReport = normalizeSavingsData(for: workspace, modelContext: modelContext)
+            repairedSavingsDataCount =
+                normalizationReport.mergedAccountsCount +
+                normalizationReport.reassignedEntriesCount +
+                normalizationReport.dedupedPeriodCloseCount +
+                normalizationReport.dedupedManualAdjustmentCount +
+                normalizationReport.removedReconciliationSettlementCount
+        }
+
+        let refreshedAccount = ensureSavingsAccount(for: workspace, modelContext: modelContext)
+        let period = BudgetingPeriod(rawValue: defaultBudgetingPeriodRaw) ?? .monthly
+        let workspaceID = workspace.id
+
+        var insertedPeriodCloseCount = 0
+        var refreshedPeriodCloseCount = 0
+        if let firstClosedRange = evaluation.firstClosedRange,
+           let latestClosedRange = evaluation.latestClosedRange {
+            var cursor: (start: Date, end: Date)? = firstClosedRange
+            while let currentRange = cursor, currentRange.start <= latestClosedRange.start {
+                let mutation = refreshOrInsertPeriodClose(
+                    workspace: workspace,
+                    workspaceID: workspaceID,
+                    account: refreshedAccount,
+                    range: currentRange,
+                    incomes: incomes,
+                    plannedExpenses: plannedExpenses,
+                    variableExpenses: variableExpenses,
+                    modelContext: modelContext,
+                    allowInsert: periodHasActivity(
+                        in: currentRange,
+                        incomes: incomes,
+                        plannedExpenses: plannedExpenses,
+                        variableExpenses: variableExpenses
+                    )
+                )
+
+                switch mutation {
+                case .inserted:
+                    insertedPeriodCloseCount += 1
+                case .refreshed:
+                    refreshedPeriodCloseCount += 1
+                case .unchanged, .skipped:
+                    break
+                }
+
+                guard let next = nextRange(after: currentRange, period: period) else { break }
+                cursor = next
+            }
+        }
+
+        let previousTotal = refreshedAccount.total
+        recalculateAccountTotal(accountID: refreshedAccount.id, modelContext: modelContext)
+        let rebuiltRunningTotal = !currencyEquals(previousTotal, refreshedAccount.total)
+
+        var refreshedProcessingState = false
+        if evaluation.shouldRefreshProcessingState, let latestClosedRange = evaluation.latestClosedRange {
+            if refreshedAccount.didBackfillHistory == false {
+                refreshedAccount.didBackfillHistory = true
+                refreshedProcessingState = true
+            }
+            if !isSameDay(refreshedAccount.autoCaptureThroughDate, latestClosedRange.end) {
+                refreshedAccount.autoCaptureThroughDate = latestClosedRange.end
+                refreshedProcessingState = true
+            }
+        }
+
+        let didApplyChanges = insertedPeriodCloseCount > 0
+            || refreshedPeriodCloseCount > 0
+            || repairedSavingsDataCount > 0
+            || rebuiltRunningTotal
+            || refreshedProcessingState
+
+        if didApplyChanges {
+            refreshedAccount.updatedAt = .now
+            try? modelContext.save()
+        }
+
+        let finalStatus = manualSyncStatus(
+            for: workspace,
+            defaultBudgetingPeriodRaw: defaultBudgetingPeriodRaw,
+            incomes: incomes,
+            plannedExpenses: plannedExpenses,
+            variableExpenses: variableExpenses,
+            modelContext: modelContext,
+            now: now
+        )
+
+        trace(
+            "Manual savings sync applied inserted=\(insertedPeriodCloseCount) " +
+            "refreshed=\(refreshedPeriodCloseCount) repaired=\(repairedSavingsDataCount) " +
+            "rebuilt=\(rebuiltRunningTotal) state=\(refreshedProcessingState)"
+        )
+
+        return ManualSavingsSyncResult(
+            status: finalStatus,
+            didApplyChanges: didApplyChanges,
+            insertedPeriodCloseCount: insertedPeriodCloseCount,
+            refreshedPeriodCloseCount: refreshedPeriodCloseCount,
+            repairedSavingsDataCount: repairedSavingsDataCount,
+            rebuiltRunningTotal: rebuiltRunningTotal,
+            refreshedProcessingState: refreshedProcessingState
+        )
     }
 
     @discardableResult
@@ -144,6 +361,215 @@ enum SavingsAccountService {
         return account.total
     }
 
+    private struct ManualSavingsSyncEvaluation {
+        let status: ManualSavingsSyncStatus
+        let normalizationPreview: SavingsNormalizationPreview
+        let expectedPeriodCloseMutations: [ExpectedPeriodCloseMutation]
+        let shouldRebuildRunningTotal: Bool
+        let shouldRefreshProcessingState: Bool
+        let firstClosedRange: (start: Date, end: Date)?
+        let latestClosedRange: (start: Date, end: Date)?
+    }
+
+    private struct SavingsNormalizationPreview {
+        let mergedAccountsCount: Int
+        let reassignedEntriesCount: Int
+        let dedupedPeriodCloseCount: Int
+        let dedupedManualAdjustmentCount: Int
+        let removedReconciliationSettlementCount: Int
+
+        var totalRepairCount: Int {
+            mergedAccountsCount
+                + reassignedEntriesCount
+                + dedupedPeriodCloseCount
+                + dedupedManualAdjustmentCount
+                + removedReconciliationSettlementCount
+        }
+
+        var didMutate: Bool {
+            totalRepairCount > 0
+        }
+    }
+
+    private enum ExpectedPeriodCloseMutationKind {
+        case insert
+        case refresh
+    }
+
+    private struct ExpectedPeriodCloseMutation {
+        let range: (start: Date, end: Date)
+        let amount: Double
+        let kind: ExpectedPeriodCloseMutationKind
+    }
+
+    private static func manualSyncEvaluation(
+        for workspace: Workspace,
+        defaultBudgetingPeriodRaw: String,
+        incomes: [Income],
+        plannedExpenses: [PlannedExpense],
+        variableExpenses: [VariableExpense],
+        modelContext: ModelContext,
+        now: Date
+    ) -> ManualSavingsSyncEvaluation {
+        let accounts = workspaceSavingsAccounts(for: workspace, modelContext: modelContext)
+        let primaryAccount = accounts.first
+        let workspaceEntries = workspaceSavingsEntries(for: workspace, modelContext: modelContext)
+        let normalizationPreview = previewNormalization(
+            accounts: accounts,
+            workspaceEntries: workspaceEntries,
+            primaryAccountID: primaryAccount?.id
+        )
+
+        let canonicalPeriodCloseEntries = canonicalPeriodCloseEntriesByKey(from: workspaceEntries)
+        let canonicalManualAdjustments = canonicalManualAdjustmentsByKey(from: workspaceEntries)
+        let canonicalKeys = Set(canonicalPeriodCloseEntries.keys)
+        let keptEntries = workspaceEntries.filter { entry in
+            if entry.kind == .reconciliationSettlement {
+                return false
+            }
+            if entry.kind == .periodClose {
+                guard
+                    let key = periodCloseKey(for: entry),
+                    canonicalKeys.contains(key)
+                else {
+                    return false
+                }
+            }
+            if entry.kind == .manualAdjustment {
+                let key = manualDeduplicationKey(for: entry)
+                if canonicalManualAdjustments[key]?.id != entry.id {
+                    return false
+                }
+            }
+            return true
+        }
+
+        let period = BudgetingPeriod(rawValue: defaultBudgetingPeriodRaw) ?? .monthly
+        let latestClosedRange = latestClosedPeriodRange(
+            defaultBudgetingPeriodRaw: defaultBudgetingPeriodRaw,
+            now: now
+        )
+        let firstActivityDate = firstSavingsActivityDate(
+            incomes: incomes,
+            plannedExpenses: plannedExpenses,
+            variableExpenses: variableExpenses
+        )
+
+        var expectedPeriodCloseMutations: [ExpectedPeriodCloseMutation] = []
+        var expectedPeriodCloseAmounts: [PeriodCloseDeduplicationKey: Double] = [:]
+        var hasClosedActivityPastProcessingState = false
+        var firstClosedRange: (start: Date, end: Date)? = nil
+
+        if let latestClosedRange, let firstActivityDate {
+            let firstRange = periodRange(containing: firstActivityDate, period: period)
+            firstClosedRange = firstRange.start <= latestClosedRange.start ? firstRange : nil
+
+            var cursor = firstClosedRange
+            while let currentRange = cursor, currentRange.start <= latestClosedRange.start {
+                let key = PeriodCloseDeduplicationKey(
+                    periodStart: Calendar.current.startOfDay(for: currentRange.start),
+                    periodEnd: Calendar.current.startOfDay(for: currentRange.end)
+                )
+                let hasActivity = periodHasActivity(
+                    in: currentRange,
+                    incomes: incomes,
+                    plannedExpenses: plannedExpenses,
+                    variableExpenses: variableExpenses
+                )
+                if hasActivity, shouldTreatRangeAsUnprocessed(currentRange, account: primaryAccount) {
+                    hasClosedActivityPastProcessingState = true
+                }
+
+                let expectedAmount = periodDelta(
+                    in: currentRange,
+                    incomes: incomes,
+                    plannedExpenses: plannedExpenses,
+                    variableExpenses: variableExpenses
+                )
+                let note = periodCloseNote(start: currentRange.start, end: currentRange.end)
+
+                if let entry = canonicalPeriodCloseEntries[key] {
+                    expectedPeriodCloseAmounts[key] = expectedAmount
+                    if periodCloseNeedsRefresh(
+                        entry,
+                        range: currentRange,
+                        expectedAmount: expectedAmount,
+                        note: note,
+                        workspaceID: workspace.id,
+                        accountID: primaryAccount?.id
+                    ) {
+                        expectedPeriodCloseMutations.append(
+                            ExpectedPeriodCloseMutation(
+                                range: currentRange,
+                                amount: expectedAmount,
+                                kind: .refresh
+                            )
+                        )
+                    }
+                } else if hasActivity {
+                    expectedPeriodCloseAmounts[key] = expectedAmount
+                    expectedPeriodCloseMutations.append(
+                        ExpectedPeriodCloseMutation(
+                            range: currentRange,
+                            amount: expectedAmount,
+                            kind: .insert
+                        )
+                    )
+                }
+
+                guard let next = nextRange(after: currentRange, period: period) else { break }
+                cursor = next
+            }
+        }
+
+        let projectedTotal = projectedManualSyncTotal(
+            workspaceEntries: keptEntries,
+            canonicalPeriodCloseEntries: canonicalPeriodCloseEntries,
+            expectedPeriodCloseAmounts: expectedPeriodCloseAmounts
+        )
+        let currentTotal = primaryAccount?.total ?? 0
+        let shouldRebuildRunningTotal = !currencyEquals(currentTotal, projectedTotal)
+        let shouldRefreshProcessingState = hasClosedActivityPastProcessingState
+
+        let expectedChangeCount = normalizationPreview.totalRepairCount
+            + expectedPeriodCloseMutations.count
+            + (shouldRebuildRunningTotal ? 1 : 0)
+            + (shouldRefreshProcessingState ? 1 : 0)
+
+        let reason: ManualSavingsSyncReason
+        if expectedChangeCount == 0 {
+            reason = .upToDate
+        } else if expectedPeriodCloseMutations.isEmpty == false {
+            reason = .closedPeriodsNeedRefresh
+        } else if normalizationPreview.didMutate {
+            reason = .savingsDataNeedsRepair
+        } else if shouldRebuildRunningTotal {
+            reason = .runningTotalNeedsRebuild
+        } else {
+            reason = .processingStateNeedsRefresh
+        }
+
+        let status = ManualSavingsSyncStatus(
+            isUpToDate: expectedChangeCount == 0,
+            canSync: expectedChangeCount > 0,
+            reason: reason,
+            expectedChangeCount: expectedChangeCount,
+            wouldChangeRunningTotal: !currencyEquals(currentTotal, projectedTotal),
+            currentTotal: currentTotal,
+            projectedTotal: projectedTotal
+        )
+
+        return ManualSavingsSyncEvaluation(
+            status: status,
+            normalizationPreview: normalizationPreview,
+            expectedPeriodCloseMutations: expectedPeriodCloseMutations,
+            shouldRebuildRunningTotal: shouldRebuildRunningTotal,
+            shouldRefreshProcessingState: shouldRefreshProcessingState,
+            firstClosedRange: firstClosedRange,
+            latestClosedRange: latestClosedRange
+        )
+    }
+
     // MARK: - Debug Trace
 
     private static var isTraceEnabled: Bool {
@@ -240,7 +666,7 @@ enum SavingsAccountService {
 
         var cursor = refreshStartRange
         while let currentRange = cursor, currentRange.start <= latestClosedRange.start {
-            refreshOrInsertPeriodClose(
+            _ = refreshOrInsertPeriodClose(
                 workspace: workspace,
                 workspaceID: workspaceID,
                 account: account,
@@ -569,7 +995,7 @@ enum SavingsAccountService {
         )
 
         while cursor.start <= latest.start {
-            refreshOrInsertPeriodClose(
+            _ = refreshOrInsertPeriodClose(
                 workspace: workspace,
                 workspaceID: workspace.id,
                 account: account,
@@ -647,6 +1073,124 @@ enum SavingsAccountService {
         let normalizedNote: String
     }
 
+    private enum PeriodCloseRefreshMutation {
+        case inserted
+        case refreshed
+        case unchanged
+        case skipped
+    }
+
+    private static func previewNormalization(
+        accounts: [SavingsAccount],
+        workspaceEntries: [SavingsLedgerEntry],
+        primaryAccountID: UUID?
+    ) -> SavingsNormalizationPreview {
+        let reassignedEntriesCount = workspaceEntries.reduce(into: 0) { partial, entry in
+            if entry.account?.id != primaryAccountID {
+                partial += 1
+            }
+        }
+
+        let canonicalPeriodCloseEntries = canonicalPeriodCloseEntriesByKey(from: workspaceEntries)
+        let dedupedPeriodCloseCount = workspaceEntries.reduce(into: 0) { partial, entry in
+            guard entry.kind == .periodClose else { return }
+            guard let key = periodCloseKey(for: entry) else { return }
+            if canonicalPeriodCloseEntries[key]?.id != entry.id {
+                partial += 1
+            }
+        }
+
+        let canonicalManualAdjustments = canonicalManualAdjustmentsByKey(from: workspaceEntries)
+        let dedupedManualAdjustmentCount = workspaceEntries.reduce(into: 0) { partial, entry in
+            guard entry.kind == .manualAdjustment else { return }
+            let key = manualDeduplicationKey(for: entry)
+            if canonicalManualAdjustments[key]?.id != entry.id {
+                partial += 1
+            }
+        }
+
+        let removedReconciliationSettlementCount = workspaceEntries.reduce(into: 0) { partial, entry in
+            if entry.kind == .reconciliationSettlement {
+                partial += 1
+            }
+        }
+
+        return SavingsNormalizationPreview(
+            mergedAccountsCount: max(accounts.count - 1, 0),
+            reassignedEntriesCount: primaryAccountID == nil ? 0 : reassignedEntriesCount,
+            dedupedPeriodCloseCount: dedupedPeriodCloseCount,
+            dedupedManualAdjustmentCount: dedupedManualAdjustmentCount,
+            removedReconciliationSettlementCount: removedReconciliationSettlementCount
+        )
+    }
+
+    private static func canonicalPeriodCloseEntriesByKey(
+        from entries: [SavingsLedgerEntry]
+    ) -> [PeriodCloseDeduplicationKey: SavingsLedgerEntry] {
+        let sortedEntries = entries.sorted { lhs, rhs in
+            if lhs.createdAt == rhs.createdAt {
+                return lhs.id.uuidString < rhs.id.uuidString
+            }
+            return lhs.createdAt < rhs.createdAt
+        }
+
+        var canonicalEntries: [PeriodCloseDeduplicationKey: SavingsLedgerEntry] = [:]
+        for entry in sortedEntries {
+            guard entry.kind == .periodClose, let key = periodCloseKey(for: entry) else { continue }
+            if canonicalEntries[key] == nil {
+                canonicalEntries[key] = entry
+            }
+        }
+        return canonicalEntries
+    }
+
+    private static func canonicalManualAdjustmentsByKey(
+        from entries: [SavingsLedgerEntry]
+    ) -> [ManualDeduplicationKey: SavingsLedgerEntry] {
+        let sortedEntries = entries.sorted { lhs, rhs in
+            if lhs.createdAt == rhs.createdAt {
+                return lhs.id.uuidString < rhs.id.uuidString
+            }
+            return lhs.createdAt < rhs.createdAt
+        }
+
+        var canonicalEntries: [ManualDeduplicationKey: SavingsLedgerEntry] = [:]
+        for entry in sortedEntries where entry.kind == .manualAdjustment {
+            let key = manualDeduplicationKey(for: entry)
+            if canonicalEntries[key] == nil {
+                canonicalEntries[key] = entry
+            }
+        }
+        return canonicalEntries
+    }
+
+    private static func periodCloseKey(
+        for entry: SavingsLedgerEntry
+    ) -> PeriodCloseDeduplicationKey? {
+        guard
+            let periodStartDate = entry.periodStartDate,
+            let periodEndDate = entry.periodEndDate
+        else {
+            return nil
+        }
+
+        return PeriodCloseDeduplicationKey(
+            periodStart: Calendar.current.startOfDay(for: periodStartDate),
+            periodEnd: Calendar.current.startOfDay(for: periodEndDate)
+        )
+    }
+
+    private static func manualDeduplicationKey(
+        for entry: SavingsLedgerEntry
+    ) -> ManualDeduplicationKey {
+        ManualDeduplicationKey(
+            accountID: entry.account?.id,
+            day: Calendar.current.startOfDay(for: entry.date),
+            roundedAmount: CurrencyFormatter.roundedToCurrency(entry.amount),
+            normalizedNote: normalizeManualNoteForDeduplication(entry.note)
+        )
+    }
+
     private static func repairDuplicateEntries(
         for workspace: Workspace,
         preferredAccount: SavingsAccount,
@@ -719,6 +1263,114 @@ enum SavingsAccountService {
             .joined(separator: " ")
     }
 
+    private static func firstSavingsActivityDate(
+        incomes: [Income],
+        plannedExpenses: [PlannedExpense],
+        variableExpenses: [VariableExpense]
+    ) -> Date? {
+        (
+            incomes.filter { !$0.isPlanned }.map(\.date)
+                + plannedExpenses.map(\.expenseDate)
+                + variableExpenses.map(\.transactionDate)
+        ).min()
+    }
+
+    private static func latestClosedPeriodRange(
+        defaultBudgetingPeriodRaw: String,
+        now: Date
+    ) -> (start: Date, end: Date)? {
+        guard let latestClosedPeriodEnd = latestClosedPeriodEnd(
+            defaultBudgetingPeriodRaw: defaultBudgetingPeriodRaw,
+            now: now
+        ) else {
+            return nil
+        }
+
+        let period = BudgetingPeriod(rawValue: defaultBudgetingPeriodRaw) ?? .monthly
+        return periodRange(containing: latestClosedPeriodEnd, period: period)
+    }
+
+    private static func shouldTreatRangeAsUnprocessed(
+        _ range: (start: Date, end: Date),
+        account: SavingsAccount?
+    ) -> Bool {
+        guard let account else { return true }
+        if account.didBackfillHistory == false {
+            return true
+        }
+        guard let autoCaptureThroughDate = account.autoCaptureThroughDate else {
+            return true
+        }
+        return autoCaptureThroughDate < range.end
+    }
+
+    private static func periodCloseNeedsRefresh(
+        _ entry: SavingsLedgerEntry,
+        range: (start: Date, end: Date),
+        expectedAmount: Double,
+        note: String,
+        workspaceID: UUID,
+        accountID: UUID?
+    ) -> Bool {
+        if !currencyEquals(entry.amount, expectedAmount) {
+            return true
+        }
+        if entry.note != note {
+            return true
+        }
+        if entry.workspace?.id != workspaceID {
+            return true
+        }
+        if entry.account?.id != accountID {
+            return true
+        }
+        if entry.date != range.end {
+            return true
+        }
+        guard
+            let periodStartDate = entry.periodStartDate,
+            let periodEndDate = entry.periodEndDate
+        else {
+            return true
+        }
+        return !isSameDay(periodStartDate, range.start)
+            || !isSameDay(periodEndDate, range.end)
+    }
+
+    private static func projectedManualSyncTotal(
+        workspaceEntries: [SavingsLedgerEntry],
+        canonicalPeriodCloseEntries: [PeriodCloseDeduplicationKey: SavingsLedgerEntry],
+        expectedPeriodCloseAmounts: [PeriodCloseDeduplicationKey: Double]
+    ) -> Double {
+        let nonPeriodCloseTotal = workspaceEntries.reduce(into: 0.0) { partial, entry in
+            if entry.kind != .periodClose {
+                partial += entry.amount
+            }
+        }
+
+        var retainedPeriodCloseTotal = 0.0
+        for (key, entry) in canonicalPeriodCloseEntries {
+            retainedPeriodCloseTotal += expectedPeriodCloseAmounts[key] ?? entry.amount
+        }
+
+        return CurrencyFormatter.roundedToCurrency(nonPeriodCloseTotal + retainedPeriodCloseTotal)
+    }
+
+    private static func currencyEquals(_ lhs: Double, _ rhs: Double) -> Bool {
+        CurrencyFormatter.roundedToCurrency(lhs) == CurrencyFormatter.roundedToCurrency(rhs)
+    }
+
+    private static func isSameDay(_ lhs: Date?, _ rhs: Date?) -> Bool {
+        switch (lhs, rhs) {
+        case (.none, .none):
+            return true
+        case let (.some(left), .some(right)):
+            return Calendar.current.isDate(left, inSameDayAs: right)
+        default:
+            return false
+        }
+    }
+
     @discardableResult
     private static func removeMirroredReconciliationSettlements(
         for workspace: Workspace,
@@ -773,7 +1425,11 @@ enum SavingsAccountService {
             predicate: #Predicate<SavingsLedgerEntry> { entry in
                 entry.workspace?.id == workspaceID &&
                 entry.kindRaw == periodCloseRaw
-            }
+            },
+            sortBy: [
+                SortDescriptor(\SavingsLedgerEntry.createdAt, order: .forward),
+                SortDescriptor(\SavingsLedgerEntry.id, order: .forward)
+            ]
         )
         let entries = (try? modelContext.fetch(descriptor)) ?? []
         return entries.first { entry in
@@ -793,7 +1449,7 @@ enum SavingsAccountService {
         modelContext: ModelContext,
         allowInsert: Bool = true,
         isBackfill: Bool = false
-    ) {
+    ) -> PeriodCloseRefreshMutation {
         let delta = periodDelta(
             in: range,
             incomes: incomes,
@@ -831,13 +1487,14 @@ enum SavingsAccountService {
                     "Refreshed period-close start=\(AppDateFormat.abbreviatedDate(range.start)) " +
                     "end=\(AppDateFormat.abbreviatedDate(range.end)) amount=\(delta)"
                 )
+                return .refreshed
             } else {
                 trace(
                     "Period-close unchanged start=\(AppDateFormat.abbreviatedDate(range.start)) " +
                     "end=\(AppDateFormat.abbreviatedDate(range.end))"
                 )
+                return .unchanged
             }
-            return
         }
 
         guard allowInsert else {
@@ -845,7 +1502,7 @@ enum SavingsAccountService {
                 "Skipped missing period-close start=\(AppDateFormat.abbreviatedDate(range.start)) " +
                 "end=\(AppDateFormat.abbreviatedDate(range.end))"
             )
-            return
+            return .skipped
         }
 
         let entry = SavingsLedgerEntry(
@@ -863,6 +1520,7 @@ enum SavingsAccountService {
             "\(isBackfill ? "Backfill inserted" : "Inserted") period-close start=\(AppDateFormat.abbreviatedDate(range.start)) " +
             "end=\(AppDateFormat.abbreviatedDate(range.end)) amount=\(delta)"
         )
+        return .inserted
     }
 
     private static func periodDelta(

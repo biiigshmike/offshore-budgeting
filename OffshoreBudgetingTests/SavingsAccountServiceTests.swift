@@ -56,6 +56,88 @@ struct SavingsAccountServiceTests {
         return cal.date(from: DateComponents(year: year, month: month, day: day)) ?? .distantPast
     }
 
+    private func makeMonthlySavingsFixture(
+        in context: ModelContext
+    ) throws -> (
+        workspace: Workspace,
+        card: Card,
+        category: Offshore.Category,
+        incomes: [Income],
+        plannedExpenses: [PlannedExpense],
+        variableExpenses: [VariableExpense]
+    ) {
+        let ws = Workspace(name: "WS", hexColor: "#3B82F6")
+        let card = Card(name: "Visa", workspace: ws)
+        let cat = Offshore.Category(name: "General", hexColor: "#22AA66", workspace: ws)
+        context.insert(ws)
+        context.insert(card)
+        context.insert(cat)
+
+        let incomes = [
+            Income(
+                source: "Pay",
+                amount: 2500,
+                date: makeDate(2026, 1, 5),
+                isPlanned: false,
+                workspace: ws,
+                card: card
+            ),
+            Income(
+                source: "Pay",
+                amount: 2600,
+                date: makeDate(2026, 2, 5),
+                isPlanned: false,
+                workspace: ws,
+                card: card
+            )
+        ]
+        let plannedExpenses = [
+            PlannedExpense(
+                title: "Rent",
+                plannedAmount: 1000,
+                actualAmount: 1000,
+                expenseDate: makeDate(2026, 1, 10),
+                workspace: ws,
+                card: card,
+                category: cat
+            ),
+            PlannedExpense(
+                title: "Rent",
+                plannedAmount: 1000,
+                actualAmount: 1000,
+                expenseDate: makeDate(2026, 2, 10),
+                workspace: ws,
+                card: card,
+                category: cat
+            )
+        ]
+        let variableExpenses = [
+            VariableExpense(
+                descriptionText: "Groceries",
+                amount: 500,
+                transactionDate: makeDate(2026, 1, 15),
+                workspace: ws,
+                card: card,
+                category: cat
+            ),
+            VariableExpense(
+                descriptionText: "Groceries",
+                amount: 400,
+                transactionDate: makeDate(2026, 2, 15),
+                workspace: ws,
+                card: card,
+                category: cat
+            )
+        ]
+
+        incomes.forEach(context.insert)
+        plannedExpenses.forEach(context.insert)
+        variableExpenses.forEach(context.insert)
+        try context.save()
+
+        return (ws, card, cat, incomes, plannedExpenses, variableExpenses)
+    }
+
     // MARK: - Overlap
 
     @Test func budgetRangeOverlap_picksLargestOverlap_thenNewestStartDateOnTie() {
@@ -826,6 +908,317 @@ struct SavingsAccountServiceTests {
         #expect(accounts.count == 1)
         let rebuiltAccount = try #require(accounts.first)
         #expect(rebuiltAccount.total == 400)
+    }
+
+    // MARK: - Manual Sync
+
+    @Test func manualSyncStatus_reportsUnavailableWhenSavingsAccountIsCurrent() throws {
+        let context = try makeContext()
+        let fixture = try makeMonthlySavingsFixture(in: context)
+
+        SavingsAccountService.runAutoCaptureIfNeeded(
+            for: fixture.workspace,
+            defaultBudgetingPeriodRaw: BudgetingPeriod.monthly.rawValue,
+            incomes: fixture.incomes,
+            plannedExpenses: fixture.plannedExpenses,
+            variableExpenses: fixture.variableExpenses,
+            modelContext: context,
+            now: makeDate(2026, 3, 15)
+        )
+
+        let status = SavingsAccountService.manualSyncStatus(
+            for: fixture.workspace,
+            defaultBudgetingPeriodRaw: BudgetingPeriod.monthly.rawValue,
+            incomes: fixture.incomes,
+            plannedExpenses: fixture.plannedExpenses,
+            variableExpenses: fixture.variableExpenses,
+            modelContext: context,
+            now: makeDate(2026, 3, 15)
+        )
+
+        #expect(status.isUpToDate)
+        #expect(status.canSync == false)
+        #expect(status.reason == SavingsAccountService.ManualSavingsSyncReason.upToDate)
+        #expect(status.expectedChangeCount == 0)
+    }
+
+    @Test func manualSync_doesNotCreateLedgerRowWhenNothingChanged() throws {
+        let context = try makeContext()
+        let fixture = try makeMonthlySavingsFixture(in: context)
+
+        SavingsAccountService.runAutoCaptureIfNeeded(
+            for: fixture.workspace,
+            defaultBudgetingPeriodRaw: BudgetingPeriod.monthly.rawValue,
+            incomes: fixture.incomes,
+            plannedExpenses: fixture.plannedExpenses,
+            variableExpenses: fixture.variableExpenses,
+            modelContext: context,
+            now: makeDate(2026, 3, 15)
+        )
+
+        let rowsBefore = try fetchAll(SavingsLedgerEntry.self, in: context).count
+
+        let result = SavingsAccountService.runManualSyncIfNeeded(
+            for: fixture.workspace,
+            defaultBudgetingPeriodRaw: BudgetingPeriod.monthly.rawValue,
+            incomes: fixture.incomes,
+            plannedExpenses: fixture.plannedExpenses,
+            variableExpenses: fixture.variableExpenses,
+            modelContext: context,
+            now: makeDate(2026, 3, 15)
+        )
+
+        let rowsAfter = try fetchAll(SavingsLedgerEntry.self, in: context).count
+        #expect(result.didApplyChanges == false)
+        #expect(result.meaningfulChangeCount == 0)
+        #expect(rowsAfter == rowsBefore)
+    }
+
+    @Test func manualSync_createsAtMostOneMeaningfulRepairPass_forMissingClosedPeriod() throws {
+        let context = try makeContext()
+        let fixture = try makeMonthlySavingsFixture(in: context)
+
+        SavingsAccountService.runAutoCaptureIfNeeded(
+            for: fixture.workspace,
+            defaultBudgetingPeriodRaw: BudgetingPeriod.monthly.rawValue,
+            incomes: fixture.incomes,
+            plannedExpenses: fixture.plannedExpenses,
+            variableExpenses: fixture.variableExpenses,
+            modelContext: context,
+            now: makeDate(2026, 2, 15)
+        )
+
+        let firstResult = SavingsAccountService.runManualSyncIfNeeded(
+            for: fixture.workspace,
+            defaultBudgetingPeriodRaw: BudgetingPeriod.monthly.rawValue,
+            incomes: fixture.incomes,
+            plannedExpenses: fixture.plannedExpenses,
+            variableExpenses: fixture.variableExpenses,
+            modelContext: context,
+            now: makeDate(2026, 3, 15)
+        )
+
+        let periodCloseEntries = try fetchAll(SavingsLedgerEntry.self, in: context)
+            .filter { $0.workspace?.id == fixture.workspace.id && $0.kind == .periodClose }
+            .sorted { $0.date < $1.date }
+
+        #expect(firstResult.didApplyChanges)
+        #expect(firstResult.insertedPeriodCloseCount == 1)
+        #expect(firstResult.refreshedPeriodCloseCount == 0)
+        #expect(periodCloseEntries.count == 2)
+        #expect(periodCloseEntries.map { $0.amount } == [1000, 1200])
+
+        let secondResult = SavingsAccountService.runManualSyncIfNeeded(
+            for: fixture.workspace,
+            defaultBudgetingPeriodRaw: BudgetingPeriod.monthly.rawValue,
+            incomes: fixture.incomes,
+            plannedExpenses: fixture.plannedExpenses,
+            variableExpenses: fixture.variableExpenses,
+            modelContext: context,
+            now: makeDate(2026, 3, 15)
+        )
+
+        let rowsAfterSecondRun = try fetchAll(SavingsLedgerEntry.self, in: context)
+            .filter { $0.workspace?.id == fixture.workspace.id }
+        #expect(secondResult.didApplyChanges == false)
+        #expect(secondResult.meaningfulChangeCount == 0)
+        #expect(rowsAfterSecondRun.count == 2)
+    }
+
+    @Test func manualSyncStatus_reportsStaleAfterBackdatedClosedPeriodActivity_untilSyncRepairsIt() throws {
+        let context = try makeContext()
+        let fixture = try makeMonthlySavingsFixture(in: context)
+
+        SavingsAccountService.runAutoCaptureIfNeeded(
+            for: fixture.workspace,
+            defaultBudgetingPeriodRaw: BudgetingPeriod.monthly.rawValue,
+            incomes: fixture.incomes,
+            plannedExpenses: fixture.plannedExpenses,
+            variableExpenses: fixture.variableExpenses,
+            modelContext: context,
+            now: makeDate(2026, 3, 15)
+        )
+
+        let backdatedExpense = VariableExpense(
+            descriptionText: "Utilities",
+            amount: 200,
+            transactionDate: makeDate(2026, 2, 20),
+            workspace: fixture.workspace,
+            card: fixture.card,
+            category: fixture.category
+        )
+        context.insert(backdatedExpense)
+        try context.save()
+
+        let staleStatus = SavingsAccountService.manualSyncStatus(
+            for: fixture.workspace,
+            defaultBudgetingPeriodRaw: BudgetingPeriod.monthly.rawValue,
+            incomes: fixture.incomes,
+            plannedExpenses: fixture.plannedExpenses,
+            variableExpenses: fixture.variableExpenses + [backdatedExpense],
+            modelContext: context,
+            now: makeDate(2026, 3, 21)
+        )
+
+        #expect(staleStatus.isUpToDate == false)
+        #expect(staleStatus.canSync)
+        #expect(
+            staleStatus.reason == SavingsAccountService.ManualSavingsSyncReason.closedPeriodsNeedRefresh
+        )
+
+        let result = SavingsAccountService.runManualSyncIfNeeded(
+            for: fixture.workspace,
+            defaultBudgetingPeriodRaw: BudgetingPeriod.monthly.rawValue,
+            incomes: fixture.incomes,
+            plannedExpenses: fixture.plannedExpenses,
+            variableExpenses: fixture.variableExpenses + [backdatedExpense],
+            modelContext: context,
+            now: makeDate(2026, 3, 21)
+        )
+
+        let periodCloseEntries = try fetchAll(SavingsLedgerEntry.self, in: context)
+            .filter { $0.workspace?.id == fixture.workspace.id && $0.kind == .periodClose }
+            .sorted { $0.date < $1.date }
+
+        #expect(result.didApplyChanges)
+        #expect(result.insertedPeriodCloseCount == 0)
+        #expect(result.refreshedPeriodCloseCount == 1)
+        #expect(periodCloseEntries.map { $0.amount } == [1000, 1000])
+
+        let refreshedStatus = SavingsAccountService.manualSyncStatus(
+            for: fixture.workspace,
+            defaultBudgetingPeriodRaw: BudgetingPeriod.monthly.rawValue,
+            incomes: fixture.incomes,
+            plannedExpenses: fixture.plannedExpenses,
+            variableExpenses: fixture.variableExpenses + [backdatedExpense],
+            modelContext: context,
+            now: makeDate(2026, 3, 21)
+        )
+        #expect(refreshedStatus.isUpToDate)
+    }
+
+    @Test func manualSyncStatus_detectsBrokenRunningTotalAndRepairsItWithoutExtraRows() throws {
+        let context = try makeContext()
+        let fixture = try makeMonthlySavingsFixture(in: context)
+
+        SavingsAccountService.runAutoCaptureIfNeeded(
+            for: fixture.workspace,
+            defaultBudgetingPeriodRaw: BudgetingPeriod.monthly.rawValue,
+            incomes: fixture.incomes,
+            plannedExpenses: fixture.plannedExpenses,
+            variableExpenses: fixture.variableExpenses,
+            modelContext: context,
+            now: makeDate(2026, 3, 15)
+        )
+
+        let account = try #require(fetchAll(SavingsAccount.self, in: context).first)
+        let rowsBefore = try fetchAll(SavingsLedgerEntry.self, in: context).count
+        account.total = 9999
+        try context.save()
+
+        let staleStatus = SavingsAccountService.manualSyncStatus(
+            for: fixture.workspace,
+            defaultBudgetingPeriodRaw: BudgetingPeriod.monthly.rawValue,
+            incomes: fixture.incomes,
+            plannedExpenses: fixture.plannedExpenses,
+            variableExpenses: fixture.variableExpenses,
+            modelContext: context,
+            now: makeDate(2026, 3, 15)
+        )
+
+        #expect(staleStatus.isUpToDate == false)
+        #expect(staleStatus.canSync)
+        #expect(
+            staleStatus.reason == SavingsAccountService.ManualSavingsSyncReason.runningTotalNeedsRebuild
+        )
+        #expect(staleStatus.wouldChangeRunningTotal)
+
+        let result = SavingsAccountService.runManualSyncIfNeeded(
+            for: fixture.workspace,
+            defaultBudgetingPeriodRaw: BudgetingPeriod.monthly.rawValue,
+            incomes: fixture.incomes,
+            plannedExpenses: fixture.plannedExpenses,
+            variableExpenses: fixture.variableExpenses,
+            modelContext: context,
+            now: makeDate(2026, 3, 15)
+        )
+
+        let rowsAfter = try fetchAll(SavingsLedgerEntry.self, in: context).count
+        let repairedAccount = try #require(fetchAll(SavingsAccount.self, in: context).first)
+        #expect(result.didApplyChanges)
+        #expect(result.rebuiltRunningTotal)
+        #expect(rowsAfter == rowsBefore)
+        #expect(repairedAccount.total == 2200)
+    }
+
+    @Test func manualSyncStatus_detectsDuplicateSavingsDataAsStale() throws {
+        let context = try makeContext()
+        let fixture = try makeMonthlySavingsFixture(in: context)
+
+        SavingsAccountService.runAutoCaptureIfNeeded(
+            for: fixture.workspace,
+            defaultBudgetingPeriodRaw: BudgetingPeriod.monthly.rawValue,
+            incomes: fixture.incomes,
+            plannedExpenses: fixture.plannedExpenses,
+            variableExpenses: fixture.variableExpenses,
+            modelContext: context,
+            now: makeDate(2026, 2, 15)
+        )
+
+        let account = try #require(fetchAll(SavingsAccount.self, in: context).first)
+        let allEntries = try fetchAll(SavingsLedgerEntry.self, in: context)
+        let existingPeriodCloseEntries = allEntries.filter {
+            $0.workspace?.id == fixture.workspace.id && $0.kind == .periodClose
+        }
+        let oldest = try #require(existingPeriodCloseEntries.first)
+
+        let duplicate = SavingsLedgerEntry(
+            date: oldest.date,
+            amount: oldest.amount,
+            note: "Period close Jan duplicate",
+            kindRaw: SavingsLedgerEntryKind.periodClose.rawValue,
+            periodStartDate: oldest.periodStartDate,
+            periodEndDate: oldest.periodEndDate,
+            createdAt: makeDate(2026, 2, 2),
+            updatedAt: makeDate(2026, 2, 2),
+            workspace: fixture.workspace,
+            account: account
+        )
+        context.insert(duplicate)
+        try context.save()
+
+        let staleStatus = SavingsAccountService.manualSyncStatus(
+            for: fixture.workspace,
+            defaultBudgetingPeriodRaw: BudgetingPeriod.monthly.rawValue,
+            incomes: fixture.incomes,
+            plannedExpenses: fixture.plannedExpenses,
+            variableExpenses: fixture.variableExpenses,
+            modelContext: context,
+            now: makeDate(2026, 3, 15)
+        )
+
+        #expect(staleStatus.isUpToDate == false)
+        #expect(staleStatus.canSync)
+        #expect(
+            staleStatus.reason == SavingsAccountService.ManualSavingsSyncReason.closedPeriodsNeedRefresh
+                || staleStatus.reason == SavingsAccountService.ManualSavingsSyncReason.savingsDataNeedsRepair
+        )
+
+        let result = SavingsAccountService.runManualSyncIfNeeded(
+            for: fixture.workspace,
+            defaultBudgetingPeriodRaw: BudgetingPeriod.monthly.rawValue,
+            incomes: fixture.incomes,
+            plannedExpenses: fixture.plannedExpenses,
+            variableExpenses: fixture.variableExpenses,
+            modelContext: context,
+            now: makeDate(2026, 3, 15)
+        )
+
+        let repairedPeriodCloseEntries = try fetchAll(SavingsLedgerEntry.self, in: context)
+            .filter { $0.workspace?.id == fixture.workspace.id && $0.kind == .periodClose }
+        #expect(result.didApplyChanges)
+        #expect(result.repairedSavingsDataCount >= 1 || result.refreshedPeriodCloseCount >= 1)
+        #expect(repairedPeriodCloseEntries.count == 2)
     }
 
     // MARK: - Positive Offset

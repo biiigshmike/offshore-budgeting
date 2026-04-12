@@ -102,6 +102,9 @@ struct SavingsAccountView: View {
 
     @Query private var savingsAccounts: [SavingsAccount]
     @Query private var savingsEntries: [SavingsLedgerEntry]
+    @Query private var incomes: [Income]
+    @Query private var plannedExpenses: [PlannedExpense]
+    @Query private var variableExpenses: [VariableExpense]
 
     @State private var didInitializeDateRange: Bool = false
     @State private var draftStartDate: Date = .now
@@ -136,6 +139,21 @@ struct SavingsAccountView: View {
         _savingsEntries = Query(
             filter: #Predicate<SavingsLedgerEntry> { $0.workspace?.id == workspaceID },
             sort: [SortDescriptor(\SavingsLedgerEntry.date, order: .reverse)]
+        )
+
+        _incomes = Query(
+            filter: #Predicate<Income> { $0.workspace?.id == workspaceID },
+            sort: [SortDescriptor(\Income.date, order: .forward)]
+        )
+
+        _plannedExpenses = Query(
+            filter: #Predicate<PlannedExpense> { $0.workspace?.id == workspaceID },
+            sort: [SortDescriptor(\PlannedExpense.expenseDate, order: .forward)]
+        )
+
+        _variableExpenses = Query(
+            filter: #Predicate<VariableExpense> { $0.workspace?.id == workspaceID },
+            sort: [SortDescriptor(\VariableExpense.transactionDate, order: .forward)]
         )
     }
 
@@ -213,6 +231,17 @@ struct SavingsAccountView: View {
 
     private var runningTotal: Double {
         graphSnapshot?.runningTotal ?? account?.total ?? 0
+    }
+
+    private var manualSyncStatus: SavingsAccountService.ManualSavingsSyncStatus {
+        SavingsAccountService.manualSyncStatus(
+            for: workspace,
+            defaultBudgetingPeriodRaw: defaultBudgetingPeriodRaw,
+            incomes: incomes,
+            plannedExpenses: plannedExpenses,
+            variableExpenses: variableExpenses,
+            modelContext: modelContext
+        )
     }
 
     private var currentPeriodChartPoints: [SavingsChartPoint] {
@@ -343,6 +372,17 @@ struct SavingsAccountView: View {
                 }
 
                 Text("Running Total includes all dates in your savings ledger.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
+                Button {
+                    runManualSync()
+                } label: {
+                    Label("Refresh Savings", systemImage: "arrow.clockwise")
+                }
+                .disabled(!manualSyncStatus.canSync)
+
+                Text(manualSyncStatus.reason.message)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -717,6 +757,20 @@ struct SavingsAccountView: View {
 
     private func deleteEntry(_ entry: SavingsLedgerEntry) {
         SavingsAccountService.deleteEntry(entry, modelContext: modelContext)
+    }
+
+    private func runManualSync() {
+        let result = SavingsAccountService.runManualSyncIfNeeded(
+            for: workspace,
+            defaultBudgetingPeriodRaw: defaultBudgetingPeriodRaw,
+            incomes: incomes,
+            plannedExpenses: plannedExpenses,
+            variableExpenses: variableExpenses,
+            modelContext: modelContext
+        )
+
+        guard result.didApplyChanges else { return }
+        rebuildGraphSnapshot(reason: "manualSavingsSync")
     }
 
     private func handleCommand(_ commandID: String) {
