@@ -744,7 +744,7 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
     }
 
     private func debugLog(_ message: String) {
-        #if DEBUG
+        #if DEBUG && !targetEnvironment(macCatalyst)
         print("[ShoppingModeLocationService] \(message)")
         #endif
     }

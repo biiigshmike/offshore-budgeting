@@ -1508,11 +1508,13 @@ enum DebugSeeder {
     // MARK: - Excursion
 
     private static func seedExcursionModeActive(now: Date) {
+        #if !targetEnvironment(macCatalyst)
         SpendingSessionStore.activate(hours: 2, now: now)
 
         Task { @MainActor in
             ShoppingModeManager.shared.refreshIfExpired(now: now)
         }
+        #endif
     }
 }
 #endif

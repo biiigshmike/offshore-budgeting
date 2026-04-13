@@ -121,47 +121,49 @@ struct SettingsNotificationsView: View {
 
             // MARK: - Excursion Mode
 
-            Section("Excursion Mode") {
-                if shoppingModeManager.status.isActive, let expiresAt = shoppingModeManager.status.expiresAt {
-                    LabeledContent("Status") {
-                        Text("Active")
-                            .foregroundStyle(.green)
+            if isExcursionControlsAvailable {
+                Section("Excursion Mode") {
+                    if shoppingModeManager.status.isActive, let expiresAt = shoppingModeManager.status.expiresAt {
+                        LabeledContent("Status") {
+                            Text("Active")
+                                .foregroundStyle(.green)
+                        }
+
+                        LabeledContent("Ends") {
+                            Text(expiresAt, format: .dateTime.hour().minute())
+                        }
+
+                        Button("Stop Excursion Mode", role: .destructive) {
+                            shoppingModeManager.end()
+                        }
+                    } else {
+                        LabeledContent("Status") {
+                            Text("Inactive")
+                                .foregroundStyle(.secondary)
+                        }
+
+                        Menu("Start Excursion Mode") {
+                            #if DEBUG
+                            Button("1 minute") {
+                                Task { await startDebugExcursionMode(minutes: 1) }
+                            }
+                            #endif
+                            Button("1 hour") {
+                                Task { await startExcursionMode(hours: 1) }
+                            }
+                            Button("2 hours") {
+                                Task { await startExcursionMode(hours: 2) }
+                            }
+                            Button("4 hours") {
+                                Task { await startExcursionMode(hours: 4) }
+                            }
+                        }
                     }
 
-                    LabeledContent("Ends") {
-                        Text(expiresAt, format: .dateTime.hour().minute())
-                    }
-
-                    Button("Stop Excursion Mode", role: .destructive) {
-                        shoppingModeManager.end()
-                    }
-                } else {
-                    LabeledContent("Status") {
-                        Text("Inactive")
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Menu("Start Excursion Mode") {
-                        #if DEBUG
-                        Button("1 minute") {
-                            Task { await startDebugExcursionMode(minutes: 1) }
-                        }
-                        #endif
-                        Button("1 hour") {
-                            Task { await startExcursionMode(hours: 1) }
-                        }
-                        Button("2 hours") {
-                            Task { await startExcursionMode(hours: 2) }
-                        }
-                        Button("4 hours") {
-                            Task { await startExcursionMode(hours: 4) }
-                        }
-                    }
+                    Text(locationStatusText)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
-
-                Text(locationStatusText)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
             }
 
             // MARK: - Denied
@@ -207,6 +209,14 @@ struct SettingsNotificationsView: View {
 
     private var canEditReminderToggles: Bool {
         canEditReminderTime
+    }
+
+    private var isExcursionControlsAvailable: Bool {
+        #if targetEnvironment(macCatalyst)
+        return false
+        #else
+        return true
+        #endif
     }
 
     // MARK: - UI
