@@ -787,59 +787,13 @@ struct HomeAssistantTextParser {
         from text: String,
         defaultPeriodUnit: HomeQueryPeriodUnit
     ) -> HomeQueryDateRange? {
-        let now = nowProvider()
-        let startOfToday = calendar.startOfDay(for: now)
-
-        if let explicitRange = extractedExplicitDateRange(from: text) {
-            return explicitRange
-        }
-
-        if let singleDateRange = extractedSingleDateRange(from: text) {
-            return singleDateRange
-        }
-
-        if let periodRange = extractedPastPeriodsDateRange(from: text, now: now, defaultPeriodUnit: defaultPeriodUnit) {
-            return periodRange
-        }
-
-        if text.contains("today") {
-            return dayRange(for: startOfToday)
-        }
-
-        if text.contains("yesterday") {
-            let yesterday = calendar.date(byAdding: .day, value: -1, to: startOfToday) ?? startOfToday
-            return dayRange(for: yesterday)
-        }
-
-        if text.contains("last month") || text.contains("previous month") {
-            let thisMonthStart = monthRange(containing: now).startDate
-            let previousMonthDate = calendar.date(byAdding: .month, value: -1, to: thisMonthStart) ?? thisMonthStart
-            return monthRange(containing: previousMonthDate)
-        }
-
-        if text.contains("this month") || text.contains("current month") || text.contains("month to date") {
-            return monthRange(containing: now)
-        }
-
-        if text.contains("last year") || text.contains("previous year") {
-            let thisYearStart = yearRange(containing: now).startDate
-            let previousYearDate = calendar.date(byAdding: .year, value: -1, to: thisYearStart) ?? thisYearStart
-            return yearRange(containing: previousYearDate)
-        }
-
-        if text.contains("this year") || text.contains("current year") || text.contains("year to date") {
-            return yearRange(containing: now)
-        }
-
-        if let namedMonthRange = extractedNamedMonthRange(from: text, now: now) {
-            return namedMonthRange
-        }
-
-        if let unitRange = rollingDateRange(from: text, now: now) {
-            return unitRange
-        }
-
-        return nil
+        MarinaDateResolver(
+            calendar: calendar,
+            nowProvider: nowProvider
+        ).resolveTextRange(
+            text,
+            defaultPeriodUnit: defaultPeriodUnit
+        )?.queryDateRange
     }
 
     private func extractedExplicitDateRange(from text: String) -> HomeQueryDateRange? {

@@ -153,6 +153,28 @@ struct HomeQueryPlan: Equatable {
     }
 }
 
+extension HomeQueryPlan {
+    func updating(
+        metric: HomeQueryMetric? = nil,
+        dateRange: HomeQueryDateRange?? = nil,
+        comparisonDateRange: HomeQueryDateRange?? = nil,
+        resultLimit: Int?? = nil,
+        confidenceBand: HomeQueryConfidenceBand? = nil,
+        targetName: String?? = nil,
+        periodUnit: HomeQueryPeriodUnit?? = nil
+    ) -> HomeQueryPlan {
+        HomeQueryPlan(
+            metric: metric ?? self.metric,
+            dateRange: dateRange ?? self.dateRange,
+            comparisonDateRange: comparisonDateRange ?? self.comparisonDateRange,
+            resultLimit: resultLimit ?? self.resultLimit,
+            confidenceBand: confidenceBand ?? self.confidenceBand,
+            targetName: targetName ?? self.targetName,
+            periodUnit: periodUnit ?? self.periodUnit
+        )
+    }
+}
+
 extension HomeQueryMetric {
     var intent: HomeQueryIntent {
         switch self {
@@ -308,6 +330,7 @@ extension HomeQueryIntent {
 }
 
 struct HomeAssistantSessionContext {
+    var lastQueryPlan: HomeQueryPlan?
     var lastMetric: HomeQueryMetric?
     var lastDateRange: HomeQueryDateRange?
     var lastResultLimit: Int?
@@ -675,6 +698,45 @@ struct HomeAnswer: Identifiable, Codable, Equatable {
         self.rows = rows
         self.attachment = attachment
         self.generatedAt = generatedAt
+    }
+}
+
+struct HomeAssistantExecutedQueryAnswerNormalizer {
+    func normalize(_ answer: HomeAnswer, for query: HomeQuery) -> HomeAnswer {
+        guard isEmptyExecutedQueryAnswer(answer) else { return answer }
+
+        switch query.intent {
+        case .spendThisMonth:
+            let value = CurrencyFormatter.string(from: 0)
+            return HomeAnswer(
+                id: answer.id,
+                queryID: answer.queryID,
+                kind: .metric,
+                userPrompt: answer.userPrompt,
+                title: answer.title,
+                subtitle: query.dateRange.map(metricRangeLabel) ?? answer.subtitle,
+                primaryValue: value,
+                rows: [
+                    HomeAnswerRow(title: "Total", value: value)
+                ],
+                attachment: answer.attachment,
+                generatedAt: answer.generatedAt
+            )
+        default:
+            return answer
+        }
+    }
+
+    private func isEmptyExecutedQueryAnswer(_ answer: HomeAnswer) -> Bool {
+        answer.kind == .message && answer.primaryValue == nil && answer.rows.isEmpty
+    }
+
+    private func metricRangeLabel(_ dateRange: HomeQueryDateRange) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        formatter.locale = .autoupdatingCurrent
+        return "\(formatter.string(from: dateRange.startDate)) - \(formatter.string(from: dateRange.endDate))"
     }
 }
 

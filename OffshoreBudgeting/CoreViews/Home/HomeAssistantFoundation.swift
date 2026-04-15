@@ -15,7 +15,8 @@ enum HomeAssistantState: Equatable {
     case presented
 }
 
-private enum HomeAssistantPlanResolutionSource: String {
+enum HomeAssistantPlanResolutionSource: String {
+    case model
     case parser
     case contextual
     case entityAware
@@ -181,11 +182,13 @@ struct HomeAssistantPanelView: View {
     private let engine = HomeQueryEngine()
     private let parser = HomeAssistantTextParser()
     private let commandParser = HomeAssistantCommandParser()
+    private let languageRouter = MarinaLanguageRouter()
     private let conversationStore = HomeAssistantConversationStore()
     private let telemetryStore = HomeAssistantTelemetryStore()
     private let entityMatcher = HomeAssistantEntityMatcher()
     private let aliasMatcher = HomeAssistantAliasMatcher()
     private let requestRoutingResolver = HomeAssistantRequestRoutingResolver()
+    private let executedQueryAnswerNormalizer = HomeAssistantExecutedQueryAnswerNormalizer()
     private let whatIfParser = HomeAssistantWhatIfParser()
     private let whatIfAnswerBuilder = HomeAssistantWhatIfAnswerBuilder()
     private let dailySpendAnswerBuilder = HomeAssistantDailySpendAnswerBuilder()
@@ -1359,8 +1362,9 @@ struct HomeAssistantPanelView: View {
             incomes: incomes,
             savingsEntries: savingsEntries
         )
-        
-        let rawAnswer = applyConfidenceTone(to: baseAnswer, confidenceBand: confidenceBand)
+
+        let normalizedAnswer = executedQueryAnswerNormalizer.normalize(baseAnswer, for: query)
+        let rawAnswer = applyConfidenceTone(to: normalizedAnswer, confidenceBand: confidenceBand)
         let titledAnswer = applyPromptAwareTitle(
             to: rawAnswer,
             query: query,
@@ -1381,7 +1385,7 @@ struct HomeAssistantPanelView: View {
         updateSessionContext(after: query)
         rememberAnswerContext(
             for: query,
-            rawAnswer: baseAnswer,
+            rawAnswer: normalizedAnswer,
             presentedAnswer: answer,
             userPrompt: userPrompt
         )
@@ -1423,32 +1427,10 @@ struct HomeAssistantPanelView: View {
         if handleUnsupportedPrompt(prompt) {
             return
         }
-        
-        if let command = commandParser.parse(prompt, defaultPeriodUnit: defaultQueryPeriodUnit) {
-            handleCommandPlan(command, rawPrompt: prompt)
-            return
+
+        Task { @MainActor in
+            await interpretPrompt(prompt)
         }
-        
-        if let resolved = resolvedPlan(for: prompt) {
-            handleResolvedPlan(
-                resolved.plan,
-                rawPrompt: prompt,
-                allowsBroadBundle: resolved.source == .parser,
-                source: resolved.source
-            )
-            return
-        }
-        
-        clarificationSuggestions = []
-        lastClarificationReasons = []
-        recordTelemetry(
-            for: prompt,
-            outcome: .unresolved,
-            source: nil,
-            plan: nil,
-            notes: "no_plan_resolved"
-        )
-        appendAnswer(personaFormatter.unresolvedPromptAnswer(for: prompt, personaID: selectedPersonaID))
     }
 
     private func handleWhatIfPrompt(_ prompt: String) -> Bool {
@@ -1686,7 +1668,8 @@ struct HomeAssistantPanelView: View {
     
     private func handleCommandPlan(
         _ command: HomeAssistantCommandPlan,
-        rawPrompt: String
+        rawPrompt: String,
+        source: HomeAssistantPlanResolutionSource? = nil
     ) {
         clarificationSuggestions = []
         lastClarificationReasons = []
@@ -1749,7 +1732,7 @@ struct HomeAssistantPanelView: View {
         recordTelemetry(
             for: rawPrompt,
             outcome: .resolved,
-            source: nil,
+            source: source,
             plan: nil,
             notes: "mutation_\(command.intent.rawValue)"
         )
@@ -4387,7 +4370,8 @@ struct HomeAssistantPanelView: View {
         _ plan: HomeQueryPlan,
         rawPrompt: String,
         allowsBroadBundle: Bool,
-        source: HomeAssistantPlanResolutionSource
+        source: HomeAssistantPlanResolutionSource,
+        overrideClarificationPlan: HomeAssistantClarificationPlan? = nil
     ) {
         let routedRequest = requestRoutingResolver.resolve(prompt: rawPrompt, basePlan: plan)
         let routedPlan = routedRequest.plan
@@ -4407,7 +4391,7 @@ struct HomeAssistantPanelView: View {
             return
         }
         
-        let clarificationPlan = clarificationPlan(for: routedPlan, rawPrompt: rawPrompt)
+        let clarificationPlan = overrideClarificationPlan ?? clarificationPlan(for: routedPlan, rawPrompt: rawPrompt)
         
         if let clarificationPlan, clarificationPlan.shouldRunBestEffort == false {
             recordTelemetry(
@@ -4901,6 +4885,349 @@ struct HomeAssistantPanelView: View {
             .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
+
+    @MainActor
+    private func interpretPrompt(_ prompt: String) async {
+        let interpreted = await languageRouter.interpret(
+            prompt: prompt,
+            context: makeMarinaRouterContext(),
+            heuristicFallback: {
+                heuristicInterpretedRequest(for: prompt)
+            }
+        )
+
+        handleInterpretedRequest(interpreted, rawPrompt: prompt)
+    }
+
+    private func heuristicInterpretedRequest(for prompt: String) -> MarinaInterpretedRequest {
+        if let command = commandParser.parse(prompt, defaultPeriodUnit: defaultQueryPeriodUnit) {
+            return .command(command, source: .parser)
+        }
+
+        if let resolved = resolvedPlan(for: prompt) {
+            return .query(resolved.plan, source: resolved.source)
+        }
+
+        return .unresolved
+    }
+
+    @MainActor
+    private func handleInterpretedRequest(
+        _ interpreted: MarinaInterpretedRequest,
+        rawPrompt: String
+    ) {
+        switch interpreted {
+        case .query(let plan, let source):
+            let effectivePlan = source == .model
+                ? normalizedModelQueryPlan(plan, rawPrompt: rawPrompt)
+                : plan
+            handleResolvedPlan(
+                effectivePlan,
+                rawPrompt: rawPrompt,
+                allowsBroadBundle: allowsBroadBundle(for: source),
+                source: source
+            )
+        case .command(let command, let source):
+            let effectiveCommand = source == .model
+                ? normalizedModelCommandPlan(command, rawPrompt: rawPrompt)
+                : command
+            handleCommandPlan(effectiveCommand, rawPrompt: rawPrompt, source: source)
+        case .clarification(let clarification, let source):
+            handleMarinaClarification(
+                clarification,
+                rawPrompt: rawPrompt,
+                source: source
+            )
+        case .unresolved:
+            clarificationSuggestions = []
+            lastClarificationReasons = []
+            recordTelemetry(
+                for: rawPrompt,
+                outcome: .unresolved,
+                source: nil,
+                plan: nil,
+                notes: "no_plan_resolved"
+            )
+            appendAnswer(personaFormatter.unresolvedPromptAnswer(for: rawPrompt, personaID: selectedPersonaID))
+        }
+    }
+
+    private func makeMarinaRouterContext() -> MarinaLanguageRouterContext {
+        let mostRecentAnswerContext = sessionContext.recentAnswerContexts.last
+        return MarinaLanguageRouterContext(
+            workspaceName: workspace.name,
+            defaultPeriodUnit: defaultQueryPeriodUnit,
+            sessionContext: sessionContext,
+            priorQueryContext: MarinaPriorQueryContext(
+                lastQueryPlan: sessionContext.lastQueryPlan,
+                lastMetric: sessionContext.lastMetric,
+                lastTargetName: sessionContext.lastTargetName ?? mostRecentAnswerContext?.targetName,
+                lastTargetType: mostRecentAnswerContext?.targetType,
+                lastDateRange: sessionContext.lastDateRange,
+                lastResultLimit: sessionContext.lastResultLimit,
+                lastPeriodUnit: sessionContext.lastPeriodUnit
+            ),
+            cardNames: cards.map(\.name).sorted(),
+            categoryNames: categories.map(\.name).sorted(),
+            incomeSourceNames: Array(Set(incomes.map(\.source))).sorted(),
+            presetTitles: presets.map(\.title).sorted(),
+            budgetNames: budgets.map(\.name).sorted(),
+            aliasSummaries: assistantAliasRules.map {
+                MarinaAliasSummary(
+                    entityTypeRaw: $0.entityType.rawValue,
+                    aliasKey: $0.aliasKey,
+                    targetValue: $0.targetValue
+                )
+            },
+            now: Date()
+        )
+    }
+
+    private func allowsBroadBundle(for source: HomeAssistantPlanResolutionSource) -> Bool {
+        source == .parser || source == .model
+    }
+
+    private func normalizedModelQueryPlan(
+        _ plan: HomeQueryPlan,
+        rawPrompt: String
+    ) -> HomeQueryPlan {
+        var normalizedPlan = plan
+
+        if normalizedPlan.targetName == nil {
+            normalizedPlan = enrichPlanWithEntities(normalizedPlan, rawPrompt: rawPrompt)
+        } else {
+            normalizedPlan = canonicalizedModelTargetPlan(normalizedPlan, rawPrompt: rawPrompt)
+        }
+
+        return normalizedPlan
+    }
+
+    private func canonicalizedModelTargetPlan(
+        _ plan: HomeQueryPlan,
+        rawPrompt: String
+    ) -> HomeQueryPlan {
+        guard let targetName = plan.targetName?.trimmingCharacters(in: .whitespacesAndNewlines),
+              targetName.isEmpty == false else {
+            return plan
+        }
+
+        switch plan.metric {
+        case .cardSpendTotal, .cardVariableSpendingHabits, .cardMonthComparison, .cardSnapshotSummary, .nextPlannedExpense, .spendTrendsSummary, .topCardChanges:
+            let canonical = aliasTarget(in: targetName, entityType: .card)
+                ?? entityMatcher.bestCardMatch(in: targetName, cards: cards)
+                ?? aliasTarget(in: rawPrompt, entityType: .card)
+                ?? entityMatcher.bestCardMatch(in: rawPrompt, cards: cards)
+            return HomeQueryPlan(
+                metric: plan.metric,
+                dateRange: plan.dateRange,
+                comparisonDateRange: plan.comparisonDateRange,
+                resultLimit: plan.resultLimit,
+                confidenceBand: canonical == nil ? plan.confidenceBand : .high,
+                targetName: canonical ?? plan.targetName,
+                periodUnit: plan.periodUnit
+            )
+        case .incomeAverageActual, .incomeSourceShare, .incomeSourceShareTrend, .incomeSourceMonthComparison:
+            let canonical = aliasTarget(in: targetName, entityType: .incomeSource)
+                ?? entityMatcher.bestIncomeSourceMatch(in: targetName, incomes: incomes)
+                ?? aliasTarget(in: rawPrompt, entityType: .incomeSource)
+                ?? entityMatcher.bestIncomeSourceMatch(in: rawPrompt, incomes: incomes)
+            return HomeQueryPlan(
+                metric: plan.metric,
+                dateRange: plan.dateRange,
+                comparisonDateRange: plan.comparisonDateRange,
+                resultLimit: plan.resultLimit,
+                confidenceBand: canonical == nil ? plan.confidenceBand : .high,
+                targetName: canonical ?? plan.targetName,
+                periodUnit: plan.periodUnit
+            )
+        case .categorySpendShare, .categorySpendShareTrend, .categoryPotentialSavings, .categoryReallocationGuidance, .categoryMonthComparison, .presetCategorySpend:
+            let canonical = aliasTarget(in: targetName, entityType: .category)
+                ?? entityMatcher.bestCategoryMatch(in: targetName, categories: categories)
+                ?? aliasTarget(in: rawPrompt, entityType: .category)
+                ?? entityMatcher.bestCategoryMatch(in: rawPrompt, categories: categories)
+            return HomeQueryPlan(
+                metric: plan.metric,
+                dateRange: plan.dateRange,
+                comparisonDateRange: plan.comparisonDateRange,
+                resultLimit: plan.resultLimit,
+                confidenceBand: canonical == nil ? plan.confidenceBand : .high,
+                targetName: canonical ?? plan.targetName,
+                periodUnit: plan.periodUnit
+            )
+        case .merchantSpendTotal, .merchantSpendSummary, .merchantMonthComparison:
+            let merchant = MerchantNormalizer.displayName(targetName)
+            return HomeQueryPlan(
+                metric: plan.metric,
+                dateRange: plan.dateRange,
+                comparisonDateRange: plan.comparisonDateRange,
+                resultLimit: plan.resultLimit,
+                confidenceBand: plan.confidenceBand,
+                targetName: merchant,
+                periodUnit: plan.periodUnit
+            )
+        case .overview, .spendTotal, .topCategories, .monthComparison, .largestTransactions, .spendAveragePerPeriod, .savingsStatus, .savingsAverageRecentPeriods, .presetDueSoon, .presetHighestCost, .presetTopCategory, .safeSpendToday, .forecastSavings, .topMerchants, .topCategoryChanges:
+            return plan
+        }
+    }
+
+    private func normalizedModelCommandPlan(
+        _ command: HomeAssistantCommandPlan,
+        rawPrompt: String
+    ) -> HomeAssistantCommandPlan {
+        command.updating(
+            cardName: normalizedModelCommandCardName(command.cardName, rawPrompt: rawPrompt),
+            categoryName: normalizedModelCommandCategoryName(command.categoryName, rawPrompt: rawPrompt),
+            entityName: normalizedModelCommandEntityName(command.entityName, intent: command.intent, rawPrompt: rawPrompt),
+            updatedEntityName: command.updatedEntityName?.trimmingCharacters(in: .whitespacesAndNewlines),
+            isPlannedIncome: command.isPlannedIncome
+        )
+    }
+
+    private func normalizedModelCommandCardName(_ rawValue: String?, rawPrompt: String) -> String? {
+        if let rawValue,
+           let canonical = aliasTarget(in: rawValue, entityType: .card)
+            ?? entityMatcher.bestCardMatch(in: rawValue, cards: cards) {
+            return canonical
+        }
+
+        return aliasTarget(in: rawPrompt, entityType: .card)
+            ?? entityMatcher.bestCardMatch(in: rawPrompt, cards: cards)
+            ?? rawValue
+    }
+
+    private func normalizedModelCommandCategoryName(_ rawValue: String?, rawPrompt: String) -> String? {
+        if let rawValue,
+           let canonical = aliasTarget(in: rawValue, entityType: .category)
+            ?? entityMatcher.bestCategoryMatch(in: rawValue, categories: categories) {
+            return canonical
+        }
+
+        return aliasTarget(in: rawPrompt, entityType: .category)
+            ?? entityMatcher.bestCategoryMatch(in: rawPrompt, categories: categories)
+            ?? rawValue
+    }
+
+    private func normalizedModelCommandEntityName(
+        _ rawValue: String?,
+        intent: HomeAssistantCommandIntent,
+        rawPrompt: String
+    ) -> String? {
+        let trimmed = rawValue?.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let trimmed, trimmed.isEmpty == false else {
+            return entityNameFromPrompt(for: intent, rawPrompt: rawPrompt)
+        }
+
+        return entityNameFromString(trimmed, for: intent) ?? entityNameFromPrompt(for: intent, rawPrompt: rawPrompt) ?? trimmed
+    }
+
+    private func entityNameFromPrompt(
+        for intent: HomeAssistantCommandIntent,
+        rawPrompt: String
+    ) -> String? {
+        let command = commandParser.parse(rawPrompt, defaultPeriodUnit: defaultQueryPeriodUnit)
+        return entityNameFromString(command?.entityName, for: intent) ?? command?.entityName
+    }
+
+    private func entityNameFromString(
+        _ rawValue: String?,
+        for intent: HomeAssistantCommandIntent
+    ) -> String? {
+        guard let rawValue else { return nil }
+
+        switch intent {
+        case .addCard, .editCard, .deleteCard:
+            return aliasTarget(in: rawValue, entityType: .card)
+                ?? entityMatcher.bestCardMatch(in: rawValue, cards: cards)
+                ?? rawValue
+        case .addCategory, .editCategory, .deleteCategory, .moveExpenseCategory:
+            return aliasTarget(in: rawValue, entityType: .category)
+                ?? entityMatcher.bestCategoryMatch(in: rawValue, categories: categories)
+                ?? rawValue
+        case .addPreset, .editPreset, .deletePreset:
+            return aliasTarget(in: rawValue, entityType: .preset)
+                ?? entityMatcher.bestPresetMatch(in: rawValue, presets: presets)
+                ?? rawValue
+        case .addBudget, .editBudget, .deleteBudget:
+            return matchedBudgetName(in: rawValue) ?? rawValue
+        case .addExpense, .editExpense, .deleteExpense, .deleteLastExpense:
+            return rawValue
+        case .addIncome, .editIncome, .deleteIncome, .deleteLastIncome, .markIncomeReceived:
+            return entityMatcher.bestIncomeSourceMatch(in: rawValue, incomes: incomes) ?? rawValue
+        case .addPlannedExpense, .editPlannedExpense, .deletePlannedExpense, .updatePlannedExpenseAmount:
+            return rawValue
+        }
+    }
+
+    private func matchedBudgetName(in rawValue: String) -> String? {
+        let normalized = normalizedPrompt(rawValue)
+        return budgets.first {
+            normalizedPrompt($0.name) == normalized
+        }?.name ?? budgets.first {
+            normalizedPrompt($0.name).contains(normalized) || normalized.contains(normalizedPrompt($0.name))
+        }?.name
+    }
+
+    @MainActor
+    private func handleMarinaClarification(
+        _ clarification: MarinaClarificationRequest,
+        rawPrompt: String,
+        source: HomeAssistantPlanResolutionSource?
+    ) {
+        if let commandPlan = clarification.commandPlan {
+            let effectiveCommand = source == .model
+                ? normalizedModelCommandPlan(commandPlan, rawPrompt: rawPrompt)
+                : commandPlan
+            handleCommandPlan(effectiveCommand, rawPrompt: rawPrompt, source: source)
+            return
+        }
+
+        if let queryPlan = clarification.queryPlan {
+            let effectiveSource = source ?? .model
+            let effectivePlan = effectiveSource == .model
+                ? normalizedModelQueryPlan(queryPlan, rawPrompt: rawPrompt)
+                : queryPlan
+            let customPlan = HomeAssistantClarificationPlan(
+                reasons: clarification.reasons,
+                subtitle: clarification.subtitle,
+                suggestions: clarificationSuggestions(
+                    for: effectivePlan,
+                    reasons: clarification.reasons,
+                    normalizedPrompt: normalizedPrompt(rawPrompt)
+                ),
+                shouldRunBestEffort: clarification.shouldRunBestEffort
+            )
+            recordTelemetry(
+                for: rawPrompt,
+                outcome: .clarification,
+                source: effectiveSource,
+                plan: effectivePlan,
+                notes: "model_query_clarification"
+            )
+            presentClarificationTurn(
+                customPlan,
+                userPrompt: rawPrompt
+            )
+            return
+        }
+
+        let fallbackPlan = HomeAssistantClarificationPlan(
+            reasons: clarification.reasons,
+            subtitle: clarification.subtitle,
+            suggestions: [],
+            shouldRunBestEffort: false
+        )
+        recordTelemetry(
+            for: rawPrompt,
+            outcome: .clarification,
+            source: source,
+            plan: nil,
+            notes: "model_clarification"
+        )
+        presentClarificationTurn(
+            fallbackPlan,
+            userPrompt: rawPrompt
+        )
+    }
     
     private func isDateExpected(for metric: HomeQueryMetric) -> Bool {
         switch metric {
@@ -5019,6 +5346,15 @@ struct HomeAssistantPanelView: View {
     }
     
     private func updateSessionContext(after query: HomeQuery) {
+        sessionContext.lastQueryPlan = HomeQueryPlan(
+            metric: query.intent.metric,
+            dateRange: query.dateRange,
+            comparisonDateRange: query.comparisonDateRange,
+            resultLimit: query.resultLimit,
+            confidenceBand: .high,
+            targetName: query.targetName,
+            periodUnit: query.periodUnit
+        )
         sessionContext.lastMetric = query.intent.metric
         sessionContext.lastDateRange = query.dateRange
         sessionContext.lastTargetName = query.targetName

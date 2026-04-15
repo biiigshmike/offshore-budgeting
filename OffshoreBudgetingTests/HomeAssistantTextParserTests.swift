@@ -1167,6 +1167,8 @@ struct HomeAssistantTextParserTests {
     private func makeParser() -> HomeAssistantTextParser {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .current
+        calendar.firstWeekday = 2
+        calendar.minimumDaysInFirstWeek = 4
 
         return HomeAssistantTextParser(
             calendar: calendar,
@@ -1177,6 +1179,8 @@ struct HomeAssistantTextParserTests {
     private func makeCommandParser() -> HomeAssistantCommandParser {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .current
+        calendar.firstWeekday = 2
+        calendar.minimumDaysInFirstWeek = 4
 
         let queryParser = HomeAssistantTextParser(
             calendar: calendar,

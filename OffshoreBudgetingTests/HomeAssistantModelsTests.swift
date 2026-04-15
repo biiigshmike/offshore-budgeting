@@ -12,6 +12,603 @@ import Testing
 @MainActor
 struct HomeAssistantModelsTests {
 
+    // MARK: - Marina Clarification
+
+    @Test func marinaStructuredIntentPlanBuilder_spendPromptsWithoutDate_requireClarification() throws {
+        let builder = makeBuilder()
+        let prompts = [
+            "What have I spent",
+            "How much did I spend",
+            "Spending"
+        ]
+
+        for prompt in prompts {
+            let structuredIntent = MarinaStructuredIntent.query(
+                MarinaStructuredQueryIntent(
+                    metricRaw: HomeQueryMetric.spendTotal.rawValue,
+                    targetName: nil,
+                    targetTypeRaw: nil,
+                    dateStartISO8601: nil,
+                    dateEndISO8601: nil,
+                    comparisonDateStartISO8601: nil,
+                    comparisonDateEndISO8601: nil,
+                    resultLimit: nil,
+                    periodUnitRaw: nil,
+                    confidenceRaw: HomeQueryConfidenceBand.high.rawValue,
+                    clarification: nil
+                )
+            )
+
+            let result = builder.buildRequest(
+                from: structuredIntent,
+                prompt: prompt,
+                defaultPeriodUnit: .month
+            )
+
+            guard case let .clarification(request, source) = result else {
+                Issue.record("Expected clarification for \(prompt)")
+                continue
+            }
+
+            #expect(source == .model)
+            #expect(request.reasons.contains(.missingDate))
+            #expect(request.queryPlan?.metric == .spendTotal)
+            #expect(request.queryPlan?.dateRange == nil)
+            #expect(request.shouldRunBestEffort == false)
+        }
+    }
+
+    @Test func marinaStructuredIntentPlanBuilder_spendPromptWithDate_buildsValidQuery() throws {
+        let builder = makeBuilder()
+        let structuredIntent = MarinaStructuredIntent.query(
+            MarinaStructuredQueryIntent(
+                metricRaw: HomeQueryMetric.spendTotal.rawValue,
+                targetName: nil,
+                targetTypeRaw: nil,
+                dateStartISO8601: "2026-04-01",
+                dateEndISO8601: "2026-04-30",
+                comparisonDateStartISO8601: nil,
+                comparisonDateEndISO8601: nil,
+                resultLimit: nil,
+                periodUnitRaw: HomeQueryPeriodUnit.month.rawValue,
+                confidenceRaw: HomeQueryConfidenceBand.high.rawValue,
+                clarification: nil
+            )
+        )
+
+        let result = builder.buildRequest(
+            from: structuredIntent,
+            prompt: "What did I spend this month",
+            defaultPeriodUnit: .month
+        )
+
+        guard case let .query(plan, source) = result else {
+            Issue.record("Expected valid query")
+            return
+        }
+
+        #expect(source == .model)
+        #expect(plan.metric == .spendTotal)
+        #expect(plan.dateRange?.startDate == date(2026, 4, 1, 0, 0, 0))
+        #expect(plan.dateRange?.endDate == date(2026, 4, 30, 23, 59, 59))
+    }
+
+    @Test func marinaStructuredIntentPlanBuilder_followUpLastWeek_keepsSpendMetric() throws {
+        let builder = makeBuilder()
+        let structuredIntent = MarinaStructuredIntent.query(
+            MarinaStructuredQueryIntent(
+                metricRaw: "total_spent",
+                targetName: nil,
+                targetTypeRaw: nil,
+                dateStartISO8601: "2026-04-06",
+                dateEndISO8601: "2026-04-12",
+                comparisonDateStartISO8601: nil,
+                comparisonDateEndISO8601: nil,
+                resultLimit: nil,
+                periodUnitRaw: HomeQueryPeriodUnit.week.rawValue,
+                confidenceRaw: HomeQueryConfidenceBand.high.rawValue,
+                clarification: nil
+            )
+        )
+
+        let result = builder.buildRequest(
+            from: structuredIntent,
+            prompt: "What did I spend last week",
+            defaultPeriodUnit: .month,
+            priorQueryContext: makePriorQueryContext(
+                metric: .spendTotal,
+                targetName: nil,
+                targetType: nil,
+                dateRange: monthRange(2026, 4)
+            )
+        )
+
+        guard case let .query(plan, source) = result else {
+            Issue.record("Expected valid follow-up query")
+            return
+        }
+
+        #expect(source == .model)
+        #expect(plan.metric == .spendTotal)
+        #expect(plan.dateRange == weekRange(2026, 4, 6))
+    }
+
+    @Test func marinaStructuredIntentPlanBuilder_metricAliases_resolveToSpendTotal() throws {
+        let builder = makeBuilder()
+        let aliases = ["total_spent", "spend_total", "spending", "spent"]
+
+        for alias in aliases {
+            let structuredIntent = MarinaStructuredIntent.query(
+                MarinaStructuredQueryIntent(
+                    metricRaw: alias,
+                    targetName: nil,
+                    targetTypeRaw: nil,
+                    dateStartISO8601: "2026-04-06",
+                    dateEndISO8601: "2026-04-12",
+                    comparisonDateStartISO8601: nil,
+                    comparisonDateEndISO8601: nil,
+                    resultLimit: nil,
+                    periodUnitRaw: HomeQueryPeriodUnit.week.rawValue,
+                    confidenceRaw: HomeQueryConfidenceBand.high.rawValue,
+                    clarification: nil
+                )
+            )
+
+            let result = builder.buildRequest(
+                from: structuredIntent,
+                prompt: "What did I spend last week",
+                defaultPeriodUnit: .month,
+                priorQueryContext: makePriorQueryContext(
+                    metric: .spendTotal,
+                    targetName: nil,
+                    targetType: nil,
+                    dateRange: monthRange(2026, 4)
+                )
+            )
+
+            guard case let .query(plan, source) = result else {
+                Issue.record("Expected alias \(alias) to build a valid spend query")
+                continue
+            }
+
+            #expect(source == .model)
+            #expect(plan.metric == .spendTotal)
+            #expect(plan.dateRange == weekRange(2026, 4, 6))
+        }
+    }
+
+    @Test func marinaStructuredIntentPlanBuilder_executableQueryIgnoresModelClarification() throws {
+        let builder = makeBuilder()
+        let structuredIntent = MarinaStructuredIntent.query(
+            MarinaStructuredQueryIntent(
+                metricRaw: "total_spent",
+                targetName: nil,
+                targetTypeRaw: nil,
+                dateStartISO8601: "2026-04-06",
+                dateEndISO8601: "2026-04-12",
+                comparisonDateStartISO8601: nil,
+                comparisonDateEndISO8601: nil,
+                resultLimit: nil,
+                periodUnitRaw: HomeQueryPeriodUnit.week.rawValue,
+                confidenceRaw: HomeQueryConfidenceBand.high.rawValue,
+                clarification: MarinaStructuredClarification(
+                    subtitle: "Pick a category first.",
+                    missingFields: [.categoryName],
+                    ambiguities: [],
+                    shouldRunBestEffort: false
+                )
+            )
+        )
+
+        let result = builder.buildRequest(
+            from: structuredIntent,
+            prompt: "What did I spend last week",
+            defaultPeriodUnit: .month,
+            priorQueryContext: makePriorQueryContext(
+                metric: .spendTotal,
+                targetName: nil,
+                targetType: nil,
+                dateRange: monthRange(2026, 4)
+            )
+        )
+
+        guard case let .query(plan, source) = result else {
+            Issue.record("Expected executable spend query to ignore model clarification")
+            return
+        }
+
+        #expect(source == .model)
+        #expect(plan.metric == .spendTotal)
+        #expect(plan.dateRange == weekRange(2026, 4, 6))
+    }
+
+    @Test func marinaStructuredIntentPlanBuilder_followUpLastMonth_inheritsPriorMetricAndTarget() throws {
+        let builder = makeBuilder()
+        let structuredIntent = MarinaStructuredIntent.query(
+            MarinaStructuredQueryIntent(
+                metricRaw: nil,
+                targetName: nil,
+                targetTypeRaw: nil,
+                dateStartISO8601: "2026-03-01",
+                dateEndISO8601: "2026-03-31",
+                comparisonDateStartISO8601: nil,
+                comparisonDateEndISO8601: nil,
+                resultLimit: nil,
+                periodUnitRaw: nil,
+                confidenceRaw: HomeQueryConfidenceBand.high.rawValue,
+                clarification: nil
+            )
+        )
+
+        let result = builder.buildRequest(
+            from: structuredIntent,
+            prompt: "What about last month",
+            defaultPeriodUnit: .month,
+            priorQueryContext: makePriorQueryContext(
+                metric: .spendTotal,
+                targetName: "Groceries",
+                targetType: .category,
+                dateRange: monthRange(2026, 4)
+            )
+        )
+
+        guard case let .query(plan, source) = result else {
+            Issue.record("Expected prior-context follow-up query")
+            return
+        }
+
+        #expect(source == .model)
+        #expect(plan.metric == .spendTotal)
+        #expect(plan.targetName == "Groceries")
+        #expect(plan.dateRange == monthRange(2026, 3))
+        #expect(plan.periodUnit == .month)
+    }
+
+    @Test func marinaStructuredIntentPlanBuilder_followUpAndGroceries_inheritsMetricAndDate() throws {
+        let builder = makeBuilder()
+        let structuredIntent = MarinaStructuredIntent.query(
+            MarinaStructuredQueryIntent(
+                metricRaw: nil,
+                targetName: "Groceries",
+                targetTypeRaw: MarinaStructuredTargetType.category.rawValue,
+                dateStartISO8601: nil,
+                dateEndISO8601: nil,
+                comparisonDateStartISO8601: nil,
+                comparisonDateEndISO8601: nil,
+                resultLimit: nil,
+                periodUnitRaw: nil,
+                confidenceRaw: HomeQueryConfidenceBand.high.rawValue,
+                clarification: nil
+            )
+        )
+
+        let april = monthRange(2026, 4)
+        let result = builder.buildRequest(
+            from: structuredIntent,
+            prompt: "And groceries?",
+            defaultPeriodUnit: .month,
+            priorQueryContext: makePriorQueryContext(
+                metric: .spendTotal,
+                targetName: nil,
+                targetType: nil,
+                dateRange: april
+            )
+        )
+
+        guard case let .query(plan, source) = result else {
+            Issue.record("Expected target follow-up query")
+            return
+        }
+
+        #expect(source == .model)
+        #expect(plan.metric == .spendTotal)
+        #expect(plan.targetName == "Groceries")
+        #expect(plan.dateRange == april)
+    }
+
+    @Test func marinaStructuredIntentPlanBuilder_missingModelDates_fallsBackToPromptLastWeek() throws {
+        let builder = makeBuilder()
+        let structuredIntent = MarinaStructuredIntent.query(
+            MarinaStructuredQueryIntent(
+                metricRaw: HomeQueryMetric.spendTotal.rawValue,
+                targetName: nil,
+                targetTypeRaw: nil,
+                dateStartISO8601: nil,
+                dateEndISO8601: nil,
+                comparisonDateStartISO8601: nil,
+                comparisonDateEndISO8601: nil,
+                resultLimit: nil,
+                periodUnitRaw: HomeQueryPeriodUnit.week.rawValue,
+                confidenceRaw: HomeQueryConfidenceBand.high.rawValue,
+                clarification: nil
+            )
+        )
+
+        let result = builder.buildRequest(
+            from: structuredIntent,
+            prompt: "What did I spend last week",
+            defaultPeriodUnit: .month
+        )
+
+        guard case let .query(plan, _) = result else {
+            Issue.record("Expected last week prompt to resolve without model dates")
+            return
+        }
+
+        #expect(plan.dateRange == weekRange(2026, 4, 6))
+    }
+
+    @Test func marinaStructuredIntentPlanBuilder_missingModelDates_fallsBackToPromptExplicitRange() throws {
+        let builder = makeBuilder()
+        let structuredIntent = MarinaStructuredIntent.query(
+            MarinaStructuredQueryIntent(
+                metricRaw: HomeQueryMetric.spendTotal.rawValue,
+                targetName: nil,
+                targetTypeRaw: nil,
+                dateStartISO8601: nil,
+                dateEndISO8601: nil,
+                comparisonDateStartISO8601: nil,
+                comparisonDateEndISO8601: nil,
+                resultLimit: nil,
+                periodUnitRaw: HomeQueryPeriodUnit.month.rawValue,
+                confidenceRaw: HomeQueryConfidenceBand.high.rawValue,
+                clarification: nil
+            )
+        )
+
+        let result = builder.buildRequest(
+            from: structuredIntent,
+            prompt: "What did I spend between April 1, 2026 and April 14, 2026",
+            defaultPeriodUnit: .month
+        )
+
+        guard case let .query(plan, _) = result else {
+            Issue.record("Expected explicit prompt range to resolve without model dates")
+            return
+        }
+
+        #expect(
+            plan.dateRange == HomeQueryDateRange(
+                startDate: date(2026, 4, 1, 0, 0, 0),
+                endDate: date(2026, 4, 14, 23, 59, 59)
+            )
+        )
+    }
+
+    @Test func marinaLanguageRouter_followUpClarificationFallsBackToHeuristicQuery() async throws {
+        let router = MarinaLanguageRouter(
+            availability: StubAvailability(status: .available),
+            modelService: StubStructuredInterpreter(
+                result: .success(
+                    .clarification(
+                        MarinaStructuredClarification(
+                            subtitle: "I need a little more detail.",
+                            missingFields: [],
+                            ambiguities: [],
+                            shouldRunBestEffort: false
+                        )
+                    )
+                )
+            ),
+            planBuilder: makeBuilder()
+        )
+
+        let fallbackPlan = HomeQueryPlan(
+            metric: .spendTotal,
+            dateRange: weekRange(2026, 4, 6),
+            resultLimit: nil,
+            confidenceBand: .medium,
+            targetName: nil,
+            periodUnit: .week
+        )
+
+        let result = await router.interpret(
+            prompt: "What did I spend last week",
+            context: makeRouterContext(
+                priorQueryContext: makePriorQueryContext(
+                    metric: .spendTotal,
+                    targetName: nil,
+                    targetType: nil,
+                    dateRange: monthRange(2026, 4)
+                )
+            ),
+            heuristicFallback: {
+                .query(fallbackPlan, source: .contextual)
+            }
+        )
+
+        guard case let .query(plan, source) = result else {
+            Issue.record("Expected heuristic fallback query")
+            return
+        }
+
+        #expect(source == .contextual)
+        #expect(plan == fallbackPlan)
+    }
+
+    @Test func marinaLanguageRouter_followUpWrongMetricFallsBackToHeuristicQuery() async throws {
+        let router = MarinaLanguageRouter(
+            availability: StubAvailability(status: .available),
+            modelService: StubStructuredInterpreter(
+                result: .success(
+                    .query(
+                        MarinaStructuredQueryIntent(
+                            metricRaw: HomeQueryMetric.overview.rawValue,
+                            targetName: nil,
+                            targetTypeRaw: nil,
+                            dateStartISO8601: "2026-04-06",
+                            dateEndISO8601: "2026-04-12",
+                            comparisonDateStartISO8601: nil,
+                            comparisonDateEndISO8601: nil,
+                            resultLimit: nil,
+                            periodUnitRaw: HomeQueryPeriodUnit.week.rawValue,
+                            confidenceRaw: HomeQueryConfidenceBand.high.rawValue,
+                            clarification: nil
+                        )
+                    )
+                )
+            ),
+            planBuilder: makeBuilder()
+        )
+
+        let fallbackPlan = HomeQueryPlan(
+            metric: .spendTotal,
+            dateRange: weekRange(2026, 4, 6),
+            resultLimit: nil,
+            confidenceBand: .medium,
+            targetName: nil,
+            periodUnit: .week
+        )
+
+        let result = await router.interpret(
+            prompt: "What did I spend last week",
+            context: makeRouterContext(
+                priorQueryContext: makePriorQueryContext(
+                    metric: .spendTotal,
+                    targetName: nil,
+                    targetType: nil,
+                    dateRange: monthRange(2026, 4)
+                )
+            ),
+            heuristicFallback: {
+                .query(fallbackPlan, source: .contextual)
+            }
+        )
+
+        guard case let .query(plan, source) = result else {
+            Issue.record("Expected wrong metric follow-up to fall back to heuristic query")
+            return
+        }
+
+        #expect(source == .contextual)
+        #expect(plan == fallbackPlan)
+    }
+
+    @Test func marinaLanguageRouter_unavailableModel_usesHeuristicFollowUpQuery() async throws {
+        let router = MarinaLanguageRouter(
+            availability: StubAvailability(status: .unavailable(reason: "test")),
+            modelService: StubStructuredInterpreter(result: .success(.unresolved)),
+            planBuilder: makeBuilder()
+        )
+
+        let fallbackPlan = HomeQueryPlan(
+            metric: .spendTotal,
+            dateRange: monthRange(2026, 3),
+            resultLimit: nil,
+            confidenceBand: .medium,
+            targetName: "Groceries",
+            periodUnit: .month
+        )
+
+        let result = await router.interpret(
+            prompt: "What about last month",
+            context: makeRouterContext(
+                priorQueryContext: makePriorQueryContext(
+                    metric: .spendTotal,
+                    targetName: "Groceries",
+                    targetType: .category,
+                    dateRange: monthRange(2026, 4)
+                )
+            ),
+            heuristicFallback: {
+                .query(fallbackPlan, source: .contextual)
+            }
+        )
+
+        guard case let .query(plan, source) = result else {
+            Issue.record("Expected unavailable model to use heuristic query")
+            return
+        }
+
+        #expect(source == .contextual)
+        #expect(plan == fallbackPlan)
+    }
+
+    @Test func marinaLanguageRouter_queryLikeFailureWithoutFallback_returnsClarification() async throws {
+        let router = MarinaLanguageRouter(
+            availability: StubAvailability(status: .available),
+            modelService: StubStructuredInterpreter(result: .success(.unresolved)),
+            planBuilder: makeBuilder()
+        )
+
+        let result = await router.interpret(
+            prompt: "What did I spend last week",
+            context: makeRouterContext(
+                priorQueryContext: makePriorQueryContext(
+                    metric: .spendTotal,
+                    targetName: nil,
+                    targetType: nil,
+                    dateRange: monthRange(2026, 4)
+                )
+            ),
+            heuristicFallback: {
+                .unresolved
+            }
+        )
+
+        guard case let .clarification(request, source) = result else {
+            Issue.record("Expected query-like unresolved flow to return clarification")
+            return
+        }
+
+        #expect(source == .model)
+        #expect(request.reasons == [.lowConfidenceLanguage])
+        #expect(request.shouldRunBestEffort == false)
+    }
+
+    @Test func executedQueryAnswerNormalizer_emptySpendQuery_becomesMetricCard() throws {
+        let normalizer = HomeAssistantExecutedQueryAnswerNormalizer()
+        let query = HomeQuery(
+            intent: .spendThisMonth,
+            dateRange: weekRange(2026, 4, 6)
+        )
+        let raw = HomeAnswer(
+            queryID: query.id,
+            kind: .message,
+            title: "Spend This Month",
+            subtitle: "No spending in this range yet.",
+            primaryValue: nil,
+            rows: []
+        )
+
+        let normalized = normalizer.normalize(raw, for: query)
+
+        #expect(normalized.kind == .metric)
+        #expect(normalized.primaryValue == CurrencyFormatter.string(from: 0))
+        #expect(normalized.rows.count == 1)
+        #expect(normalized.rows.first?.title == "Total")
+        #expect(normalized.rows.first?.value == CurrencyFormatter.string(from: 0))
+        #expect(normalized.subtitle?.contains("2026") == true)
+    }
+
+    @Test func executedQueryAnswerNormalizer_emptySpendQueryExplicitRange_becomesMetricCard() throws {
+        let normalizer = HomeAssistantExecutedQueryAnswerNormalizer()
+        let query = HomeQuery(
+            intent: .spendThisMonth,
+            dateRange: HomeQueryDateRange(
+                startDate: date(2026, 4, 1, 0, 0, 0),
+                endDate: date(2026, 4, 7, 0, 0, 0)
+            )
+        )
+        let raw = HomeAnswer(
+            queryID: query.id,
+            kind: .message,
+            title: "Spend This Month",
+            subtitle: "No spending in this range yet.",
+            primaryValue: nil,
+            rows: []
+        )
+
+        let normalized = normalizer.normalize(raw, for: query)
+
+        #expect(normalized.kind == .metric)
+        #expect(normalized.primaryValue == CurrencyFormatter.string(from: 0))
+        #expect(normalized.rows.count == 1)
+        #expect(normalized.rows.first?.title == "Total")
+        #expect(normalized.rows.first?.value == CurrencyFormatter.string(from: 0))
+        #expect(normalized.subtitle?.contains("Apr") == true || normalized.subtitle?.contains("2026") == true)
+    }
+
     // MARK: - Compound Prompt Resolution
 
     @Test func compoundPromptResolver_spendAndWherePrompt_detectsCombinedRequest() throws {
@@ -987,6 +1584,8 @@ struct HomeAssistantModelsTests {
     private var calendar: Calendar {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .gmt
+        calendar.firstWeekday = 2
+        calendar.minimumDaysInFirstWeek = 4
         return calendar
     }
 
@@ -1006,6 +1605,76 @@ struct HomeAssistantModelsTests {
         HomeQueryDateRange(
             startDate: date(year, month, day, 0, 0, 0),
             endDate: date(year, month, day, 23, 59, 59)
+        )
+    }
+
+    private func monthRange(_ year: Int, _ month: Int) -> HomeQueryDateRange {
+        let start = date(year, month, 1, 0, 0, 0)
+        let endDay = calendar.range(of: .day, in: .month, for: start)?.count ?? 28
+        return HomeQueryDateRange(
+            startDate: start,
+            endDate: date(year, month, endDay, 23, 59, 59)
+        )
+    }
+
+    private func weekRange(_ year: Int, _ month: Int, _ day: Int) -> HomeQueryDateRange {
+        HomeQueryDateRange(
+            startDate: date(year, month, day, 0, 0, 0),
+            endDate: date(year, month, day + 6, 23, 59, 59)
+        )
+    }
+
+    private func makeBuilder(now: Date? = nil) -> MarinaStructuredIntentPlanBuilder {
+        let resolvedNow = now ?? date(2026, 4, 15, 12, 0, 0)
+        return MarinaStructuredIntentPlanBuilder(
+            calendar: calendar,
+            nowProvider: { resolvedNow }
+        )
+    }
+
+    private func makePriorQueryContext(
+        metric: HomeQueryMetric,
+        targetName: String?,
+        targetType: HomeAssistantAnswerTargetType?,
+        dateRange: HomeQueryDateRange,
+        resultLimit: Int? = nil,
+        periodUnit: HomeQueryPeriodUnit = .month
+    ) -> MarinaPriorQueryContext {
+        let plan = HomeQueryPlan(
+            metric: metric,
+            dateRange: dateRange,
+            resultLimit: resultLimit,
+            confidenceBand: .high,
+            targetName: targetName,
+            periodUnit: periodUnit
+        )
+
+        return MarinaPriorQueryContext(
+            lastQueryPlan: plan,
+            lastMetric: metric,
+            lastTargetName: targetName,
+            lastTargetType: targetType,
+            lastDateRange: dateRange,
+            lastResultLimit: resultLimit,
+            lastPeriodUnit: periodUnit
+        )
+    }
+
+    private func makeRouterContext(
+        priorQueryContext: MarinaPriorQueryContext
+    ) -> MarinaLanguageRouterContext {
+        MarinaLanguageRouterContext(
+            workspaceName: "Test Workspace",
+            defaultPeriodUnit: .month,
+            sessionContext: HomeAssistantSessionContext(),
+            priorQueryContext: priorQueryContext,
+            cardNames: [],
+            categoryNames: ["Groceries"],
+            incomeSourceNames: [],
+            presetTitles: [],
+            budgetNames: [],
+            aliasSummaries: [],
+            now: date(2026, 4, 15, 12, 0, 0)
         )
     }
 
@@ -1032,5 +1701,24 @@ struct HomeAssistantModelsTests {
         case .plannedIncome:
             return "plannedIncome"
         }
+    }
+}
+
+private struct StubAvailability: MarinaModelAvailabilityProviding {
+    let status: MarinaModelAvailability.Status
+
+    func currentStatus() -> MarinaModelAvailability.Status {
+        status
+    }
+}
+
+private struct StubStructuredInterpreter: MarinaStructuredIntentInterpreting {
+    let result: Result<MarinaStructuredIntent, Error>
+
+    func interpret(
+        prompt: String,
+        context: MarinaLanguageRouterContext
+    ) async throws -> MarinaStructuredIntent {
+        try result.get()
     }
 }
