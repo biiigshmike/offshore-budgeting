@@ -127,6 +127,7 @@ struct MarinaStructuredIntentPlanBuilder {
             resultLimit: queryIntent.resultLimit,
             confidenceBand: confidenceBand,
             targetName: queryIntent.targetName,
+            targetTypeRaw: queryIntent.targetTypeRaw,
             periodUnit: HomeQueryPeriodUnit(rawValue: queryIntent.periodUnitRaw ?? "") ?? defaultPeriodUnit
         )
         let plan = mergePriorContext(
@@ -527,7 +528,7 @@ struct MarinaStructuredIntentPlanBuilder {
             return false
         case .savingsAverageRecentPeriods, .incomeSourceShareTrend, .categorySpendShareTrend:
             return false
-        case .overview, .spendTotal, .spendAveragePerPeriod, .topCategories, .monthComparison, .categoryMonthComparison, .cardMonthComparison, .incomeSourceMonthComparison, .merchantMonthComparison, .largestTransactions, .cardSpendTotal, .cardVariableSpendingHabits, .incomeAverageActual, .savingsStatus, .incomeSourceShare, .categorySpendShare, .presetDueSoon, .categoryPotentialSavings, .categoryReallocationGuidance, .safeSpendToday, .forecastSavings, .nextPlannedExpense, .spendTrendsSummary, .cardSnapshotSummary, .merchantSpendTotal, .merchantSpendSummary, .topMerchants, .topCategoryChanges, .topCardChanges:
+        case .overview, .spendTotal, .categorySpendTotal, .spendAveragePerPeriod, .topCategories, .monthComparison, .categoryMonthComparison, .cardMonthComparison, .incomeSourceMonthComparison, .merchantMonthComparison, .largestTransactions, .cardSpendTotal, .cardVariableSpendingHabits, .incomeAverageActual, .savingsStatus, .incomeSourceShare, .categorySpendShare, .presetDueSoon, .categoryPotentialSavings, .categoryReallocationGuidance, .safeSpendToday, .forecastSavings, .nextPlannedExpense, .spendTrendsSummary, .cardSnapshotSummary, .merchantSpendTotal, .merchantSpendSummary, .topMerchants, .topCategoryChanges, .topCardChanges:
             return true
         }
     }
@@ -610,7 +611,8 @@ struct MarinaStructuredIntentPlanBuilder {
     }
 
     private func requiresCategoryTarget(_ metric: HomeQueryMetric) -> Bool {
-        metric == .categorySpendShare
+        metric == .categorySpendTotal
+            || metric == .categorySpendShare
             || metric == .categorySpendShareTrend
             || metric == .categoryPotentialSavings
             || metric == .categoryReallocationGuidance
@@ -650,6 +652,7 @@ private extension MarinaPriorQueryContext {
             resultLimit: lastResultLimit ?? lastQueryPlan?.resultLimit,
             confidenceBand: .high,
             targetName: lastTargetName ?? lastQueryPlan?.targetName,
+            targetTypeRaw: lastQueryPlan?.targetTypeRaw,
             periodUnit: lastPeriodUnit ?? lastQueryPlan?.periodUnit
         )
     }

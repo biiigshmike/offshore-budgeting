@@ -56,6 +56,14 @@ struct HomeQueryEngine {
                 variableExpenses: variableExpenses,
                 now: now
             )
+        case .categorySpendTotal:
+            return categorySpendTotalAnswer(
+                query: query,
+                categories: categories,
+                plannedExpenses: plannedExpenses,
+                variableExpenses: variableExpenses,
+                now: now
+            )
 
         case .spendAveragePerPeriod:
             return spendAveragePerPeriodAnswer(
@@ -1269,6 +1277,75 @@ struct HomeQueryEngine {
             queryID: query.id,
             kind: .list,
             title: "Category Spend Share",
+            subtitle: rangeLabel(for: range),
+            primaryValue: currency(metricsResult.totalSpent),
+            rows: rows
+        )
+    }
+
+    private func categorySpendTotalAnswer(
+        query: HomeQuery,
+        categories: [Category],
+        plannedExpenses: [PlannedExpense],
+        variableExpenses: [VariableExpense],
+        now: Date
+    ) -> HomeAnswer {
+        let range = query.dateRange ?? monthRange(containing: now)
+        let metricsResult = HomeCategoryMetricsCalculator.calculate(
+            categories: categories,
+            plannedExpenses: plannedExpenses,
+            variableExpenses: variableExpenses,
+            rangeStart: range.startDate,
+            rangeEnd: range.endDate
+        )
+
+        guard metricsResult.metrics.isEmpty == false else {
+            return HomeAnswer(
+                queryID: query.id,
+                kind: .message,
+                title: "Category Spend",
+                subtitle: "No category spending in this range yet.",
+                rows: []
+            )
+        }
+
+        if let targetName = query.targetName {
+            guard let metric = metricsResult.metrics.first(where: { $0.categoryName.caseInsensitiveCompare(targetName) == .orderedSame }) else {
+                return HomeAnswer(
+                    queryID: query.id,
+                    kind: .message,
+                    title: "Category Spend (\(targetName))",
+                    subtitle: "No matching category found in this range.",
+                    rows: []
+                )
+            }
+
+            return HomeAnswer(
+                queryID: query.id,
+                kind: .metric,
+                title: "Category Spend (\(metric.categoryName))",
+                subtitle: rangeLabel(for: range),
+                primaryValue: currency(metric.totalSpent),
+                rows: [
+                    HomeAnswerRow(title: "Category spend", value: currency(metric.totalSpent)),
+                    HomeAnswerRow(title: "Share", value: percent(metric.percentOfTotal))
+                ]
+            )
+        }
+
+        let rows = metricsResult.metrics
+            .prefix(5)
+            .map { metric in
+                HomeAnswerRow(
+                    title: metric.categoryName,
+                    value: currency(metric.totalSpent)
+                )
+            }
+
+        return HomeAnswer(
+            queryID: query.id,
+            kind: .list,
+            title: "Category Spend",
             subtitle: rangeLabel(for: range),
             primaryValue: currency(metricsResult.totalSpent),
             rows: rows

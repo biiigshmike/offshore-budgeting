@@ -127,7 +127,9 @@ struct HomeAssistantPanelView: View {
     @State private var isShowingClearConversationAlert = false
     @State private var sessionContext = HomeAssistantSessionContext()
     @State private var clarificationSuggestions: [HomeAssistantSuggestion] = []
+    @State private var recoverySuggestions: [HomeAssistantRecoverySuggestion] = []
     @State private var lastClarificationReasons: [HomeAssistantClarificationReason] = []
+    @State private var activeClarificationContext: HomeAssistantClarificationContext? = nil
     @State private var selectedEmptySuggestionGroup: EmptySuggestionGroup?
     @State private var personaSessionSeed: UInt64 = UInt64.random(in: UInt64.min...UInt64.max)
     @State private var personaCooldownSessionID: String = UUID().uuidString
@@ -187,6 +189,8 @@ struct HomeAssistantPanelView: View {
     private let telemetryStore = HomeAssistantTelemetryStore()
     private let entityMatcher = HomeAssistantEntityMatcher()
     private let aliasMatcher = HomeAssistantAliasMatcher()
+    private let entityResolutionResolver = HomeAssistantEntityResolver()
+    private let planReconciler = HomeAssistantPlanReconciler()
     private let requestRoutingResolver = HomeAssistantRequestRoutingResolver()
     private let executedQueryAnswerNormalizer = HomeAssistantExecutedQueryAnswerNormalizer()
     private let whatIfParser = HomeAssistantWhatIfParser()
@@ -1019,20 +1023,36 @@ struct HomeAssistantPanelView: View {
         .animation(.easeInOut(duration: 0.2), value: selectedEmptySuggestionGroup)
     }
     
-    private func inlineConversationSuggestions(for answer: HomeAnswer) -> [HomeAssistantSuggestion] {
+    private func inlineConversationSuggestionSections(
+        for answer: HomeAnswer
+    ) -> [(title: String, suggestions: [HomeAssistantSuggestion], isRecovery: Bool)] {
+        var sections: [(title: String, suggestions: [HomeAssistantSuggestion], isRecovery: Bool)] = []
+
         if clarificationSuggestions.isEmpty == false {
-            return clarificationSuggestions
+            let title = lastClarificationReasons.isEmpty ? "Clarification" : "Clarification (\(lastClarificationReasons.count))"
+            sections.append((title: title, suggestions: clarificationSuggestions, isRecovery: false))
         }
-        
+
+        if recoverySuggestions.isEmpty == false {
+            sections.append((
+                title: "Recovery",
+                suggestions: recoverySuggestions.map(\.suggestion),
+                isRecovery: true
+            ))
+        }
+
+        let groundedQuery = sessionContext.recentAnswerContexts.last?.executedPlan?.query
+            ?? sessionContext.recentAnswerContexts.last?.query
         let followUps = personaFormatter.followUpSuggestions(
             after: answer,
+            executedQuery: groundedQuery,
             personaID: selectedPersonaID
         )
         if followUps.isEmpty == false {
-            return followUps
+            sections.append((title: "Follow-Up Suggestions", suggestions: followUps, isRecovery: false))
         }
-        
-        return []
+
+        return sections
     }
     
     private func emptyStateSuggestions(for group: EmptySuggestionGroup) -> [HomeAssistantSuggestion] {
@@ -1082,20 +1102,6 @@ struct HomeAssistantPanelView: View {
         }
     }
     
-    private var activeSuggestionHeaderTitle: String {
-        if clarificationSuggestions.isEmpty == false {
-            return lastClarificationReasons.isEmpty
-            ? "Clarify"
-            : "Clarify (\(lastClarificationReasons.count))"
-        }
-        
-        if answers.isEmpty {
-            return "Suggested Questions"
-        }
-        
-        return "Follow-Up Suggestions"
-    }
-    
     private var selectedPersonaProfile: HomeAssistantPersonaProfile {
         HomeAssistantPersonaCatalog.profile(for: selectedPersonaID)
     }
@@ -1128,9 +1134,9 @@ struct HomeAssistantPanelView: View {
                     assistantMessageBubble(for: answer)
                     
                     if index == answers.count - 1, selectedEmptySuggestionGroup == nil {
-                        let followUps = inlineConversationSuggestions(for: answer)
-                        if followUps.isEmpty == false {
-                            assistantFollowUpRail(suggestions: followUps)
+                        let sections = inlineConversationSuggestionSections(for: answer)
+                        if sections.isEmpty == false {
+                            assistantFollowUpRail(sections: sections)
                         }
                     }
                 }
@@ -1138,15 +1144,17 @@ struct HomeAssistantPanelView: View {
         }
     }
     
-    private func assistantFollowUpRail(suggestions: [HomeAssistantSuggestion]) -> some View {
-        let isClarificationRail = clarificationSuggestions.isEmpty == false
+    private func assistantFollowUpRail(
+        sections: [(title: String, suggestions: [HomeAssistantSuggestion], isRecovery: Bool)]
+    ) -> some View {
+        let hasPrioritySections = sections.contains { $0.title != "Follow-Up Suggestions" }
         
         return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                Text(activeSuggestionHeaderTitle)
+                Text("Suggestions")
                     .font(.subheadline.weight(.semibold))
                 Spacer(minLength: 0)
-                if isClarificationRail == false {
+                if hasPrioritySections == false {
                     if #available(iOS 26.0, *) {
                         Button {
                             withAnimation(.easeInOut(duration: 0.2)) {
@@ -1189,19 +1197,39 @@ struct HomeAssistantPanelView: View {
                 }
             }
             
-            if isClarificationRail || followUpsCollapsed == false {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 10) {
-                        ForEach(suggestions) { suggestion in
-                            Button {
-                                runQuery(suggestion.query, userPrompt: suggestion.title)
-                            } label: {
-                                Text(suggestion.title)
-                                    .lineLimit(1)
-                                    .padding(.horizontal, 12)
-                                    .frame(height: 33)
+            if hasPrioritySections || followUpsCollapsed == false {
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(Array(sections.enumerated()), id: \.offset) { _, section in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(section.title)
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(.secondary)
+
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 10) {
+                                    ForEach(section.suggestions) { suggestion in
+                                        Button {
+                                            runQuery(suggestion.query, userPrompt: suggestion.title)
+                                        } label: {
+                                            Text(suggestion.title)
+                                                .lineLimit(1)
+                                                .padding(.horizontal, 12)
+                                                .frame(height: 33)
+                                        }
+                                        .modifier(AssistantChipButtonModifier())
+                                    }
+                                }
                             }
-                            .modifier(AssistantChipButtonModifier())
+
+                            if section.isRecovery {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    ForEach(recoverySuggestions.prefix(3)) { recovery in
+                                        Text("\(recovery.suggestion.title): \(recovery.reasoning)")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -1348,10 +1376,14 @@ struct HomeAssistantPanelView: View {
     private func runQuery(
         _ query: HomeQuery,
         userPrompt: String?,
-        confidenceBand: HomeQueryConfidenceBand = .high
+        confidenceBand: HomeQueryConfidenceBand = .high,
+        explanation: String? = nil,
+        executedPlan: HomeQueryPlan? = nil
     ) {
         clarificationSuggestions = []
+        recoverySuggestions = []
         lastClarificationReasons = []
+        activeClarificationContext = nil
         
         let baseAnswer = engine.execute(
             query: query,
@@ -1370,10 +1402,11 @@ struct HomeAssistantPanelView: View {
             query: query,
             userPrompt: userPrompt
         )
+        let explainedAnswer = applyResolutionExplanation(explanation, to: titledAnswer)
         let personaUserPrompt = (confidenceBand == .high || rawAnswer.kind != .comparison) ? userPrompt : nil
         
         let answer = personaFormatter.styledAnswer(
-            from: titledAnswer,
+            from: explainedAnswer,
             userPrompt: personaUserPrompt,
             personaID: selectedPersonaID,
             seedContext: personaSeedContext(for: query),
@@ -1382,9 +1415,18 @@ struct HomeAssistantPanelView: View {
             visibleProvenance: visibleProvenance(for: query)
         )
         
-        updateSessionContext(after: query)
+        updateSessionContext(after: executedPlan ?? HomeQueryPlan(
+            metric: query.intent.metric,
+            dateRange: query.dateRange,
+            comparisonDateRange: query.comparisonDateRange,
+            resultLimit: query.resultLimit,
+            confidenceBand: confidenceBand,
+            targetName: query.targetName,
+            periodUnit: query.periodUnit
+        ))
         rememberAnswerContext(
             for: query,
+            executedPlan: executedPlan,
             rawAnswer: normalizedAnswer,
             presentedAnswer: answer,
             userPrompt: userPrompt
@@ -1400,6 +1442,10 @@ struct HomeAssistantPanelView: View {
         defer { promptText = "" }
         
         if resolvePendingMutationTurn(with: prompt) {
+            return
+        }
+
+        if handleClarificationRejection(prompt) {
             return
         }
         
@@ -1447,7 +1493,9 @@ struct HomeAssistantPanelView: View {
         switch result {
         case let .clarification(message):
             clarificationSuggestions = []
+            recoverySuggestions = []
             lastClarificationReasons = []
+            activeClarificationContext = nil
             appendAnswer(
                 HomeAnswer(
                     queryID: UUID(),
@@ -1672,7 +1720,9 @@ struct HomeAssistantPanelView: View {
         source: HomeAssistantPlanResolutionSource? = nil
     ) {
         clarificationSuggestions = []
+        recoverySuggestions = []
         lastClarificationReasons = []
+        activeClarificationContext = nil
         
         switch command.intent {
         case .addExpense:
@@ -4310,6 +4360,7 @@ struct HomeAssistantPanelView: View {
             primaryValue: answer.primaryValue,
             rows: answer.rows,
             attachment: answer.attachment,
+            explanation: answer.explanation,
             generatedAt: answer.generatedAt
         )
         
@@ -4359,7 +4410,9 @@ struct HomeAssistantPanelView: View {
         pendingUserPromptForNextAnswer = nil
         sessionContext = HomeAssistantSessionContext()
         clarificationSuggestions = []
+        recoverySuggestions = []
         lastClarificationReasons = []
+        activeClarificationContext = nil
         pendingWhatIfContext = nil
         pendingWhatIfCategoryMappingContext = nil
         clearMutationPendingState()
@@ -4371,43 +4424,88 @@ struct HomeAssistantPanelView: View {
         rawPrompt: String,
         allowsBroadBundle: Bool,
         source: HomeAssistantPlanResolutionSource,
-        overrideClarificationPlan: HomeAssistantClarificationPlan? = nil
+        overrideClarificationPlan: HomeAssistantClarificationPlan? = nil,
+        overrideResolution: HomeAssistantEntityResolution? = nil
     ) {
-        let routedRequest = requestRoutingResolver.resolve(prompt: rawPrompt, basePlan: plan)
+        let resolution = overrideResolution ?? resolveEntityResolution(for: plan, rawPrompt: rawPrompt)
+        let reconciliation = planReconciler.reconcile(plan: plan, resolution: resolution)
+        let resolvedPlan = reconciliation.plan
+        let routedRequest = requestRoutingResolver.resolve(prompt: rawPrompt, basePlan: resolvedPlan)
         let routedPlan = routedRequest.plan
+        let enrichedResolution = resolutionWithRecoverySuggestions(
+            resolution,
+            basePlan: routedPlan,
+            rawPrompt: rawPrompt,
+            explanation: reconciliation.explanation
+        )
+        let requiredClarification = requiredFieldClarificationPlan(for: routedPlan, rawPrompt: rawPrompt)
+        let ambiguityClarification = ambiguityClarificationPlan(for: routedPlan, resolution: enrichedResolution)
+        let clarificationPlan = mergeClarificationPlans(
+            overrideClarificationPlan ?? requiredClarification,
+            ambiguityClarification
+        )
 
-        if let entityDisambiguation = entityDisambiguationPlan(for: routedPlan, rawPrompt: rawPrompt) {
+        if let requiredClarification, requiredClarification.shouldRunBestEffort == false {
             recordTelemetry(
                 for: rawPrompt,
                 outcome: .clarification,
                 source: source,
                 plan: routedPlan,
-                notes: "entity_disambiguation"
+                notes: "required_clarification"
             )
             presentClarificationTurn(
-                entityDisambiguation,
-                userPrompt: rawPrompt
+                clarificationPlan ?? requiredClarification,
+                userPrompt: rawPrompt,
+                context: clarificationContext(
+                    for: routedPlan,
+                    rawPrompt: rawPrompt,
+                    resolution: enrichedResolution
+                )
             )
             return
         }
-        
-        let clarificationPlan = overrideClarificationPlan ?? clarificationPlan(for: routedPlan, rawPrompt: rawPrompt)
-        
-        if let clarificationPlan, clarificationPlan.shouldRunBestEffort == false {
+
+        if enrichedResolution.isTieAmbiguity {
             recordTelemetry(
                 for: rawPrompt,
                 outcome: .clarification,
                 source: source,
                 plan: routedPlan,
-                notes: "clarification_required"
+                notes: "tie_band_ambiguity"
             )
             presentClarificationTurn(
-                clarificationPlan,
-                userPrompt: rawPrompt
+                clarificationPlan ?? HomeAssistantClarificationPlan(
+                    reasons: [.lowConfidenceLanguage],
+                    subtitle: "I found a few close matches. Pick one to continue.",
+                    suggestions: [],
+                    shouldRunBestEffort: false
+                ),
+                userPrompt: rawPrompt,
+                context: clarificationContext(
+                    for: routedPlan,
+                    rawPrompt: rawPrompt,
+                    resolution: enrichedResolution
+                )
             )
             return
         }
-        
+
+        if enrichedResolution.confidence == .low {
+            recordTelemetry(
+                for: rawPrompt,
+                outcome: .clarification,
+                source: source,
+                plan: routedPlan,
+                notes: "recovery_only"
+            )
+            presentRecoveryTurn(
+                enrichedResolution.recoverySuggestions,
+                userPrompt: rawPrompt,
+                subtitle: "I couldn’t lock onto a safe match, so here are the best fallback paths."
+            )
+            return
+        }
+
         if allowsBroadBundle && shouldRunBroadOverviewBundle(for: rawPrompt, plan: routedPlan) {
             runBroadOverviewBundle(userPrompt: rawPrompt, basePlan: routedPlan)
             recordTelemetry(
@@ -4420,7 +4518,9 @@ struct HomeAssistantPanelView: View {
         } else {
             runRoutedRequest(
                 routedRequest,
-                userPrompt: rawPrompt
+                userPrompt: rawPrompt,
+                explanation: reconciliation.explanation,
+                executedPlan: routedPlan
             )
             recordTelemetry(
                 for: rawPrompt,
@@ -4435,13 +4535,251 @@ struct HomeAssistantPanelView: View {
                     )
             )
         }
-        
+
         if let clarificationPlan {
             presentClarificationTurn(
                 clarificationPlan,
-                userPrompt: nil
+                userPrompt: nil,
+                context: clarificationContext(
+                    for: routedPlan,
+                    rawPrompt: rawPrompt,
+                    resolution: enrichedResolution
+                )
             )
         }
+    }
+
+    private func resolveEntityResolution(
+        for plan: HomeQueryPlan,
+        rawPrompt: String,
+        rejectedCandidateNames: [String] = []
+    ) -> HomeAssistantEntityResolution {
+        entityResolutionResolver.resolve(
+            input: HomeAssistantEntityResolutionInput(
+                prompt: rawPrompt,
+                targetPhrase: plan.targetName ?? extractedSignalTarget(for: rawPrompt) ?? rawPrompt,
+                categories: categories.map(\.name).sorted(),
+                cards: cards.map(\.name).sorted(),
+                merchants: merchantCandidateNames(),
+                presets: presets.map(\.title).sorted(),
+                budgets: budgets.map(\.name).sorted(),
+                incomeSources: Array(Set(incomes.map(\.source))).sorted(),
+                aliasRules: assistantAliasRules,
+                rejectedCandidateNames: rejectedCandidateNames
+            )
+        )
+    }
+
+    @MainActor
+    private func merchantCandidateNames() -> [String] {
+        Array(
+            Set(
+                variableExpenses
+                    .map(\.descriptionText)
+                    .map(MerchantNormalizer.displayName)
+                    .filter { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false }
+            )
+        ).sorted()
+    }
+
+    private func resolutionWithRecoverySuggestions(
+        _ resolution: HomeAssistantEntityResolution,
+        basePlan: HomeQueryPlan,
+        rawPrompt: String,
+        explanation: String?
+    ) -> HomeAssistantEntityResolution {
+        let recovery = buildRecoverySuggestions(from: resolution, basePlan: basePlan, rawPrompt: rawPrompt)
+        return HomeAssistantEntityResolution(
+            resolvedPhrase: resolution.resolvedPhrase,
+            bestMatch: resolution.bestMatch,
+            ambiguityCandidates: resolution.ambiguityCandidates,
+            rankedCandidates: resolution.rankedCandidates,
+            confidence: resolution.confidence,
+            originalCandidates: resolution.originalCandidates,
+            rejectedCandidateNames: resolution.rejectedCandidateNames,
+            recoverySuggestions: recovery,
+            explanation: explanation,
+            isTieAmbiguity: resolution.isTieAmbiguity
+        )
+    }
+
+    private func requiredFieldClarificationPlan(
+        for basePlan: HomeQueryPlan,
+        rawPrompt: String
+    ) -> HomeAssistantClarificationPlan? {
+        guard let derivedPlan = clarificationPlan(for: basePlan, rawPrompt: rawPrompt) else {
+            return nil
+        }
+
+        let allowedReasons: Set<HomeAssistantClarificationReason> = [
+            .missingDate,
+            .missingComparisonDate,
+            .missingCategoryTarget,
+            .missingCardTarget,
+            .missingIncomeSourceTarget,
+            .missingMerchantTarget
+        ]
+        let filteredReasons = derivedPlan.reasons.filter { allowedReasons.contains($0) }
+        guard filteredReasons.isEmpty == false else { return nil }
+
+        return HomeAssistantClarificationPlan(
+            reasons: filteredReasons,
+            subtitle: derivedPlan.subtitle,
+            suggestions: clarificationSuggestions(
+                for: basePlan,
+                reasons: filteredReasons,
+                normalizedPrompt: normalizedPrompt(rawPrompt)
+            ),
+            shouldRunBestEffort: derivedPlan.shouldRunBestEffort
+        )
+    }
+
+    private func ambiguityClarificationPlan(
+        for basePlan: HomeQueryPlan,
+        resolution: HomeAssistantEntityResolution
+    ) -> HomeAssistantClarificationPlan? {
+        guard resolution.ambiguityCandidates.isEmpty == false else { return nil }
+
+        let suggestions = resolution.ambiguityCandidates.prefix(4).map { match in
+            suggestionForMatch(match, basePlan: basePlan)
+        }
+
+        return HomeAssistantClarificationPlan(
+            reasons: [.lowConfidenceLanguage],
+            subtitle: "I found a few close matches. Pick one to continue.",
+            suggestions: suggestions,
+            shouldRunBestEffort: resolution.isTieAmbiguity == false
+        )
+    }
+
+    private func mergeClarificationPlans(
+        _ lhs: HomeAssistantClarificationPlan?,
+        _ rhs: HomeAssistantClarificationPlan?
+    ) -> HomeAssistantClarificationPlan? {
+        switch (lhs, rhs) {
+        case (nil, nil):
+            return nil
+        case let (plan?, nil), let (nil, plan?):
+            return plan
+        case let (left?, right?):
+            let reasons = uniqueClarificationReasons(left.reasons + right.reasons)
+            var suggestions: [HomeAssistantSuggestion] = []
+            var seenTitles: Set<String> = []
+            for suggestion in left.suggestions + right.suggestions {
+                if seenTitles.insert(suggestion.title).inserted {
+                    suggestions.append(suggestion)
+                }
+            }
+            return HomeAssistantClarificationPlan(
+                reasons: reasons,
+                subtitle: right.subtitle,
+                suggestions: Array(suggestions.prefix(4)),
+                shouldRunBestEffort: left.shouldRunBestEffort || right.shouldRunBestEffort
+            )
+        }
+    }
+
+    private func clarificationContext(
+        for plan: HomeQueryPlan,
+        rawPrompt: String,
+        resolution: HomeAssistantEntityResolution
+    ) -> HomeAssistantClarificationContext? {
+        guard resolution.originalCandidates.isEmpty == false else { return nil }
+        return HomeAssistantClarificationContext(
+            originalCandidates: resolution.originalCandidates,
+            activeCandidates: resolution.ambiguityCandidates.isEmpty ? resolution.originalCandidates : resolution.ambiguityCandidates,
+            rejectedCandidateNames: resolution.rejectedCandidateNames,
+            currentBestMatch: resolution.bestMatch,
+            originalPrompt: rawPrompt,
+            basePlan: plan,
+            resolution: resolution
+        )
+    }
+
+    private func suggestionForMatch(
+        _ match: HomeAssistantEntityMatch,
+        basePlan: HomeQueryPlan
+    ) -> HomeAssistantSuggestion {
+        let resolution = HomeAssistantEntityResolution(
+            resolvedPhrase: match.name,
+            bestMatch: match,
+            rankedCandidates: [match],
+            confidence: match.confidence
+        )
+        let reconciled = planReconciler.reconcile(plan: basePlan, resolution: resolution).plan
+        return HomeAssistantSuggestion(
+            title: match.name,
+            query: reconciled.query,
+            confidenceScore: match.score,
+            reasoning: "Matched as \(match.entityType.rawValue) via \(match.source.rawValue)."
+        )
+    }
+
+    private func buildRecoverySuggestions(
+        from resolution: HomeAssistantEntityResolution,
+        basePlan: HomeQueryPlan,
+        rawPrompt: String
+    ) -> [HomeAssistantRecoverySuggestion] {
+        var suggestions: [HomeAssistantRecoverySuggestion] = resolution.rankedCandidates.prefix(3).map { match in
+            HomeAssistantRecoverySuggestion(
+                suggestion: suggestionForMatch(match, basePlan: basePlan),
+                confidenceScore: match.score,
+                reasoning: "Likely \(match.entityType.rawValue) match from \(match.source.rawValue)."
+            )
+        }
+
+        let broadFallback = HomeAssistantRecoverySuggestion(
+            suggestion: HomeAssistantSuggestion(
+                title: "Show all results for this period",
+                query: basePlan.updating(
+                    metric: basePlan.metric == .monthComparison ? .monthComparison : .spendTotal,
+                    targetName: .some(nil),
+                    targetTypeRaw: .some(nil)
+                ).query,
+                confidenceScore: 0.1,
+                reasoning: "Broad fallback across the current period."
+            ),
+            confidenceScore: 0.1,
+            reasoning: "Broad fallback across the current period."
+        )
+
+        if suggestions.allSatisfy({ $0.confidenceScore < 0.45 }) {
+            suggestions.append(broadFallback)
+        }
+
+        return suggestions.sorted { lhs, rhs in
+            if lhs.confidenceScore == rhs.confidenceScore {
+                return lhs.suggestion.title.localizedCaseInsensitiveCompare(rhs.suggestion.title) == .orderedAscending
+            }
+            return lhs.confidenceScore > rhs.confidenceScore
+        }
+    }
+
+    private func presentRecoveryTurn(
+        _ suggestions: [HomeAssistantRecoverySuggestion],
+        userPrompt: String?,
+        subtitle: String
+    ) {
+        clarificationSuggestions = []
+        recoverySuggestions = suggestions
+        lastClarificationReasons = []
+        activeClarificationContext = nil
+
+        appendAnswer(
+            HomeAnswer(
+                queryID: UUID(),
+                kind: .message,
+                userPrompt: userPrompt,
+                title: "Try one of these",
+                subtitle: subtitle,
+                rows: suggestions.prefix(3).map {
+                    HomeAnswerRow(
+                        title: $0.suggestion.title,
+                        value: $0.reasoning
+                    )
+                }
+            )
+        )
     }
     
     private func entityDisambiguationPlan(
@@ -4570,10 +4908,13 @@ struct HomeAssistantPanelView: View {
     
     private func presentClarificationTurn(
         _ clarificationPlan: HomeAssistantClarificationPlan,
-        userPrompt: String?
+        userPrompt: String?,
+        context: HomeAssistantClarificationContext? = nil
     ) {
         clarificationSuggestions = clarificationPlan.suggestions
+        recoverySuggestions = []
         lastClarificationReasons = clarificationPlan.reasons
+        activeClarificationContext = context
         
         let clarificationAnswer = HomeAnswer(
             queryID: UUID(),
@@ -4586,6 +4927,44 @@ struct HomeAssistantPanelView: View {
         )
         
         appendAnswer(clarificationAnswer)
+    }
+
+    private func handleClarificationRejection(_ prompt: String) -> Bool {
+        guard let context = activeClarificationContext else { return false }
+        let normalized = normalizedPrompt(prompt)
+        guard ["no", "n", "nope", "nah"].contains(normalized) else { return false }
+
+        let rejectedName = context.currentBestMatch?.name ?? context.activeCandidates.first?.name
+        let rejectedNames = context.rejectedCandidateNames + (rejectedName.map { [$0] } ?? [])
+        let resolution = resolveEntityResolution(
+            for: context.basePlan,
+            rawPrompt: context.originalPrompt,
+            rejectedCandidateNames: rejectedNames
+        )
+
+        if resolution.rankedCandidates.isEmpty {
+            let enrichedResolution = resolutionWithRecoverySuggestions(
+                resolution,
+                basePlan: context.basePlan,
+                rawPrompt: context.originalPrompt,
+                explanation: "Using recovery options after rejection"
+            )
+            presentRecoveryTurn(
+                enrichedResolution.recoverySuggestions,
+                userPrompt: prompt,
+                subtitle: "Okay, I dropped that option. Here are the next best paths."
+            )
+            return true
+        }
+
+        handleResolvedPlan(
+            context.basePlan,
+            rawPrompt: context.originalPrompt,
+            allowsBroadBundle: false,
+            source: .contextual,
+            overrideResolution: resolution
+        )
+        return true
     }
     
     private func clarificationReasons(
@@ -4940,7 +5319,9 @@ struct HomeAssistantPanelView: View {
             )
         case .unresolved:
             clarificationSuggestions = []
+            recoverySuggestions = []
             lastClarificationReasons = []
+            activeClarificationContext = nil
             recordTelemetry(
                 for: rawPrompt,
                 outcome: .unresolved,
@@ -4991,17 +5372,13 @@ struct HomeAssistantPanelView: View {
         _ plan: HomeQueryPlan,
         rawPrompt: String
     ) -> HomeQueryPlan {
-        var normalizedPlan = plan
-
-        if normalizedPlan.targetName == nil {
-            normalizedPlan = enrichPlanWithEntities(normalizedPlan, rawPrompt: rawPrompt)
-        } else {
-            normalizedPlan = canonicalizedModelTargetPlan(normalizedPlan, rawPrompt: rawPrompt)
-        }
-
-        return normalizedPlan
+        plan.updating(
+            targetName: .some(plan.targetName?.trimmingCharacters(in: .whitespacesAndNewlines)),
+            targetTypeRaw: .some(plan.targetTypeRaw?.trimmingCharacters(in: .whitespacesAndNewlines))
+        )
     }
 
+    @MainActor
     private func canonicalizedModelTargetPlan(
         _ plan: HomeQueryPlan,
         rawPrompt: String
@@ -5040,7 +5417,7 @@ struct HomeAssistantPanelView: View {
                 targetName: canonical ?? plan.targetName,
                 periodUnit: plan.periodUnit
             )
-        case .categorySpendShare, .categorySpendShareTrend, .categoryPotentialSavings, .categoryReallocationGuidance, .categoryMonthComparison, .presetCategorySpend:
+        case .categorySpendTotal, .categorySpendShare, .categorySpendShareTrend, .categoryPotentialSavings, .categoryReallocationGuidance, .categoryMonthComparison, .presetCategorySpend:
             let canonical = aliasTarget(in: targetName, entityType: .category)
                 ?? entityMatcher.bestCategoryMatch(in: targetName, categories: categories)
                 ?? aliasTarget(in: rawPrompt, entityType: .category)
@@ -5235,7 +5612,7 @@ struct HomeAssistantPanelView: View {
             return false
         case .savingsAverageRecentPeriods, .incomeSourceShareTrend, .categorySpendShareTrend:
             return false
-        case .overview, .spendTotal, .spendAveragePerPeriod, .topCategories, .monthComparison, .categoryMonthComparison, .cardMonthComparison, .incomeSourceMonthComparison, .merchantMonthComparison, .largestTransactions, .cardSpendTotal, .cardVariableSpendingHabits, .incomeAverageActual, .savingsStatus, .incomeSourceShare, .categorySpendShare, .presetDueSoon, .categoryPotentialSavings, .categoryReallocationGuidance, .safeSpendToday, .forecastSavings, .nextPlannedExpense, .spendTrendsSummary, .cardSnapshotSummary, .merchantSpendTotal, .merchantSpendSummary, .topMerchants, .topCategoryChanges, .topCardChanges:
+        case .overview, .spendTotal, .categorySpendTotal, .spendAveragePerPeriod, .topCategories, .monthComparison, .categoryMonthComparison, .cardMonthComparison, .incomeSourceMonthComparison, .merchantMonthComparison, .largestTransactions, .cardSpendTotal, .cardVariableSpendingHabits, .incomeAverageActual, .savingsStatus, .incomeSourceShare, .categorySpendShare, .presetDueSoon, .categoryPotentialSavings, .categoryReallocationGuidance, .safeSpendToday, .forecastSavings, .nextPlannedExpense, .spendTrendsSummary, .cardSnapshotSummary, .merchantSpendTotal, .merchantSpendSummary, .topMerchants, .topCategoryChanges, .topCardChanges:
             return true
         }
     }
@@ -5275,7 +5652,7 @@ struct HomeAssistantPanelView: View {
     
     private func requiresCategoryTarget(_ metric: HomeQueryMetric) -> Bool {
         switch metric {
-        case .categorySpendShare, .categorySpendShareTrend, .categoryPotentialSavings, .categoryReallocationGuidance, .presetCategorySpend, .categoryMonthComparison:
+        case .categorySpendTotal, .categorySpendShare, .categorySpendShareTrend, .categoryPotentialSavings, .categoryReallocationGuidance, .presetCategorySpend, .categoryMonthComparison:
             return true
         default:
             return false
@@ -5344,35 +5721,58 @@ struct HomeAssistantPanelView: View {
         
         return unique
     }
-    
-    private func updateSessionContext(after query: HomeQuery) {
-        sessionContext.lastQueryPlan = HomeQueryPlan(
-            metric: query.intent.metric,
-            dateRange: query.dateRange,
-            comparisonDateRange: query.comparisonDateRange,
-            resultLimit: query.resultLimit,
-            confidenceBand: .high,
-            targetName: query.targetName,
-            periodUnit: query.periodUnit
+
+    private func applyResolutionExplanation(
+        _ explanation: String?,
+        to answer: HomeAnswer
+    ) -> HomeAnswer {
+        guard let explanation = explanation?.trimmingCharacters(in: .whitespacesAndNewlines),
+              explanation.isEmpty == false else {
+            return answer
+        }
+
+        let mergedSubtitle: String
+        if let subtitle = answer.subtitle, subtitle.isEmpty == false {
+            mergedSubtitle = "\(explanation). \(subtitle)"
+        } else {
+            mergedSubtitle = explanation
+        }
+
+        return HomeAnswer(
+            id: answer.id,
+            queryID: answer.queryID,
+            kind: answer.kind,
+            userPrompt: answer.userPrompt,
+            title: answer.title,
+            subtitle: mergedSubtitle,
+            primaryValue: answer.primaryValue,
+            rows: answer.rows,
+            attachment: answer.attachment,
+            explanation: explanation,
+            generatedAt: answer.generatedAt
         )
-        sessionContext.lastMetric = query.intent.metric
-        sessionContext.lastDateRange = query.dateRange
-        sessionContext.lastTargetName = query.targetName
-        sessionContext.lastPeriodUnit = query.periodUnit
+    }
+    
+    private func updateSessionContext(after plan: HomeQueryPlan) {
+        sessionContext.lastQueryPlan = plan
+        sessionContext.lastMetric = plan.metric
+        sessionContext.lastDateRange = plan.dateRange
+        sessionContext.lastTargetName = plan.targetName
+        sessionContext.lastPeriodUnit = plan.periodUnit
         
-        if query.intent == .topCategoriesThisMonth
-            || query.intent == .largestRecentTransactions
-            || query.intent == .savingsAverageRecentPeriods
-            || query.intent == .incomeSourceShareTrend
-            || query.intent == .categorySpendShareTrend
-            || query.intent == .presetDueSoon
-            || query.intent == .presetHighestCost
-            || query.intent == .presetTopCategory
-            || query.intent == .cardVariableSpendingHabits
-            || query.intent == .categoryPotentialSavings
-            || query.intent == .categoryReallocationGuidance
+        if plan.metric == .topCategories
+            || plan.metric == .largestTransactions
+            || plan.metric == .savingsAverageRecentPeriods
+            || plan.metric == .incomeSourceShareTrend
+            || plan.metric == .categorySpendShareTrend
+            || plan.metric == .presetDueSoon
+            || plan.metric == .presetHighestCost
+            || plan.metric == .presetTopCategory
+            || plan.metric == .cardVariableSpendingHabits
+            || plan.metric == .categoryPotentialSavings
+            || plan.metric == .categoryReallocationGuidance
         {
-            sessionContext.lastResultLimit = query.resultLimit
+            sessionContext.lastResultLimit = plan.resultLimit
         } else {
             sessionContext.lastResultLimit = nil
         }
@@ -5380,6 +5780,7 @@ struct HomeAssistantPanelView: View {
 
     private func rememberAnswerContext(
         for query: HomeQuery,
+        executedPlan: HomeQueryPlan?,
         rawAnswer: HomeAnswer,
         presentedAnswer: HomeAnswer,
         userPrompt: String?
@@ -5394,6 +5795,7 @@ struct HomeAssistantPanelView: View {
             rowTitles: Array(rawAnswer.rows.prefix(5).map(\.title)),
             rowValues: Array(rawAnswer.rows.prefix(5).map(\.value)),
             scenarioPercent: extractedPercentValue(from: rawAnswer.subtitle ?? userPrompt ?? ""),
+            executedPlan: executedPlan,
             generatedAt: presentedAnswer.generatedAt
         )
 
@@ -5405,7 +5807,7 @@ struct HomeAssistantPanelView: View {
 
     private func targetType(for metric: HomeQueryMetric) -> HomeAssistantAnswerTargetType? {
         switch metric {
-        case .categorySpendShare, .categorySpendShareTrend, .categoryPotentialSavings, .categoryReallocationGuidance, .categoryMonthComparison:
+        case .categorySpendTotal, .categorySpendShare, .categorySpendShareTrend, .categoryPotentialSavings, .categoryReallocationGuidance, .categoryMonthComparison:
             return .category
         case .cardSpendTotal, .cardVariableSpendingHabits, .cardMonthComparison, .cardSnapshotSummary, .topCardChanges:
             return .card
@@ -5552,7 +5954,9 @@ struct HomeAssistantPanelView: View {
                 query: context.query
             )
         }
+        recoverySuggestions = []
         lastClarificationReasons = []
+        activeClarificationContext = nil
 
         appendAnswer(
             HomeAnswer(
@@ -5644,7 +6048,7 @@ struct HomeAssistantPanelView: View {
                 periodUnit: plan.periodUnit
             )
             
-        case .categorySpendShare, .categorySpendShareTrend, .categoryPotentialSavings, .categoryReallocationGuidance, .categoryMonthComparison:
+        case .categorySpendTotal, .categorySpendShare, .categorySpendShareTrend, .categoryPotentialSavings, .categoryReallocationGuidance, .categoryMonthComparison:
             let isAllCategories = normalized.contains("all categories")
             let category = isAllCategories
             ? nil
@@ -6612,9 +7016,19 @@ struct HomeAssistantPanelView: View {
             )
         )
         
-        updateSessionContext(after: overviewQuery)
+        let overviewPlan = HomeQueryPlan(
+            metric: overviewQuery.intent.metric,
+            dateRange: overviewQuery.dateRange,
+            comparisonDateRange: overviewQuery.comparisonDateRange,
+            resultLimit: overviewQuery.resultLimit,
+            confidenceBand: .high,
+            targetName: overviewQuery.targetName,
+            periodUnit: overviewQuery.periodUnit
+        )
+        updateSessionContext(after: overviewPlan)
         rememberAnswerContext(
             for: overviewQuery,
+            executedPlan: overviewPlan,
             rawAnswer: bundled,
             presentedAnswer: styled,
             userPrompt: userPrompt
@@ -6624,14 +7038,18 @@ struct HomeAssistantPanelView: View {
 
     private func runRoutedRequest(
         _ routedRequest: HomeAssistantRequestRoutingResolution,
-        userPrompt: String
+        userPrompt: String,
+        explanation: String? = nil,
+        executedPlan: HomeQueryPlan? = nil
     ) {
         switch routedRequest.shape {
         case .single:
             runQuery(
                 routedRequest.plan.query,
                 userPrompt: userPrompt,
-                confidenceBand: routedRequest.plan.confidenceBand
+                confidenceBand: routedRequest.plan.confidenceBand,
+                explanation: explanation,
+                executedPlan: executedPlan ?? routedRequest.plan
             )
         case .spendAndWhere:
             runSpendWhereBundle(userPrompt: userPrompt, basePlan: routedRequest.plan)
@@ -6739,9 +7157,19 @@ struct HomeAssistantPanelView: View {
             visibleProvenance: visibleProvenance(for: [spendQuery, merchantsQuery])
         )
 
-        updateSessionContext(after: spendQuery)
+        let spendPlan = HomeQueryPlan(
+            metric: spendQuery.intent.metric,
+            dateRange: spendQuery.dateRange,
+            comparisonDateRange: spendQuery.comparisonDateRange,
+            resultLimit: spendQuery.resultLimit,
+            confidenceBand: basePlan.confidenceBand,
+            targetName: spendQuery.targetName,
+            periodUnit: spendQuery.periodUnit
+        )
+        updateSessionContext(after: spendPlan)
         rememberAnswerContext(
             for: spendQuery,
+            executedPlan: spendPlan,
             rawAnswer: bundled,
             presentedAnswer: styled,
             userPrompt: userPrompt
@@ -6784,9 +7212,19 @@ struct HomeAssistantPanelView: View {
             visibleProvenance: visibleProvenance(for: query)
         )
 
-        updateSessionContext(after: query)
+        let dailyPlan = HomeQueryPlan(
+            metric: query.intent.metric,
+            dateRange: query.dateRange,
+            comparisonDateRange: query.comparisonDateRange,
+            resultLimit: query.resultLimit,
+            confidenceBand: basePlan.confidenceBand,
+            targetName: query.targetName,
+            periodUnit: query.periodUnit
+        )
+        updateSessionContext(after: dailyPlan)
         rememberAnswerContext(
             for: query,
+            executedPlan: dailyPlan,
             rawAnswer: rawAnswer,
             presentedAnswer: answer,
             userPrompt: userPrompt
@@ -6977,9 +7415,19 @@ struct HomeAssistantPanelView: View {
             visibleProvenance: visibleProvenance(for: footerQueries)
         )
 
-        updateSessionContext(after: primaryQuery)
+        let routedPlan = HomeQueryPlan(
+            metric: primaryQuery.intent.metric,
+            dateRange: primaryQuery.dateRange,
+            comparisonDateRange: primaryQuery.comparisonDateRange,
+            resultLimit: primaryQuery.resultLimit,
+            confidenceBand: .high,
+            targetName: primaryQuery.targetName,
+            periodUnit: primaryQuery.periodUnit
+        )
+        updateSessionContext(after: routedPlan)
         rememberAnswerContext(
             for: primaryQuery,
+            executedPlan: routedPlan,
             rawAnswer: rawAnswer,
             presentedAnswer: styled,
             userPrompt: userPrompt
@@ -7155,6 +7603,7 @@ struct HomeAssistantPanelView: View {
         case .periodOverview:
             return ["Planned expenses", "Variable expenses", "Income", "Savings"]
         case .spendThisMonth,
+             .categorySpendTotal,
              .spendAveragePerPeriod,
              .topCategoriesThisMonth,
              .compareThisMonthToPreviousMonth,
@@ -7259,7 +7708,7 @@ struct HomeAssistantPanelView: View {
                 categoryName: nil,
                 incomeSourceName: nil
             )
-        case .categorySpendShare, .categorySpendShareTrend, .categoryPotentialSavings, .categoryReallocationGuidance, .presetCategorySpend, .compareCategoryThisMonthToPreviousMonth, .topCategoryChangesThisMonth:
+        case .categorySpendTotal, .categorySpendShare, .categorySpendShareTrend, .categoryPotentialSavings, .categoryReallocationGuidance, .presetCategorySpend, .compareCategoryThisMonthToPreviousMonth, .topCategoryChangesThisMonth:
             return HomeAssistantPersonaEchoContext(
                 cardName: nil,
                 categoryName: targetName,

@@ -1176,6 +1176,8 @@ enum HomeAssistantAliasEntityType: String, Codable, CaseIterable, Identifiable {
     case card
     case category
     case incomeSource
+    case merchant
+    case budget
     case preset
 
     var id: String { rawValue }

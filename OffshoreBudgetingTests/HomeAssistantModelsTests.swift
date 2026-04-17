@@ -303,6 +303,7 @@ struct HomeAssistantModelsTests {
         #expect(source == .model)
         #expect(plan.metric == .spendTotal)
         #expect(plan.targetName == "Groceries")
+        #expect(plan.targetTypeRaw == MarinaStructuredTargetType.category.rawValue)
         #expect(plan.dateRange == april)
     }
 

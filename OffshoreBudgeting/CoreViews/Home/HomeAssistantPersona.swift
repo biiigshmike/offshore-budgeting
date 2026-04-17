@@ -261,6 +261,7 @@ struct HomeAssistantPersonaFormatter {
 
     func followUpSuggestions(
         after answer: HomeAnswer,
+        executedQuery: HomeQuery? = nil,
         personaID: HomeAssistantPersonaID
     ) -> [HomeAssistantSuggestion] {
         let confidenceCue = confidenceCue(for: answer)
@@ -315,6 +316,33 @@ struct HomeAssistantPersonaFormatter {
                 makeSuggestion("Variable spending habits by card", query: HomeQuery(intent: .cardVariableSpendingHabits)),
                 makeSuggestion("Top categories this month", query: HomeQuery(intent: .topCategoriesThisMonth, resultLimit: 5))
             ]
+        }
+
+        if let executedQuery {
+            switch executedQuery.intent {
+            case .categorySpendTotal, .categorySpendShare, .categorySpendShareTrend, .compareCategoryThisMonthToPreviousMonth, .categoryPotentialSavings, .categoryReallocationGuidance:
+                return [
+                    makeSuggestion("Compare with last month", query: HomeQuery(intent: .compareCategoryThisMonthToPreviousMonth, dateRange: executedQuery.dateRange, targetName: executedQuery.targetName)),
+                    makeSuggestion("Top categories this month", query: HomeQuery(intent: .topCategoriesThisMonth, dateRange: executedQuery.dateRange, resultLimit: 3))
+                ]
+            case .merchantSpendTotal, .merchantSpendSummary, .compareMerchantThisMonthToPreviousMonth:
+                return [
+                    makeSuggestion("Largest expenses this month", query: HomeQuery(intent: .largestRecentTransactions, dateRange: executedQuery.dateRange, resultLimit: 5)),
+                    makeSuggestion("Top merchants this month", query: HomeQuery(intent: .topMerchantsThisMonth, dateRange: executedQuery.dateRange, resultLimit: 3))
+                ]
+            case .cardSpendTotal, .cardVariableSpendingHabits, .compareCardThisMonthToPreviousMonth, .cardSnapshotSummary:
+                return [
+                    makeSuggestion("Compare with last month", query: HomeQuery(intent: .compareCardThisMonthToPreviousMonth, dateRange: executedQuery.dateRange, targetName: executedQuery.targetName)),
+                    makeSuggestion("Variable spending habits by card", query: HomeQuery(intent: .cardVariableSpendingHabits, dateRange: executedQuery.dateRange))
+                ]
+            case .compareThisMonthToPreviousMonth, .spendThisMonth:
+                return [
+                    makeSuggestion("Top 3 categories this month", query: HomeQuery(intent: .topCategoriesThisMonth, dateRange: executedQuery.dateRange, resultLimit: 3)),
+                    makeSuggestion("Compare with last month", query: HomeQuery(intent: .compareThisMonthToPreviousMonth, dateRange: executedQuery.dateRange))
+                ]
+            default:
+                break
+            }
         }
 
         switch answer.kind {

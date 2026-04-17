@@ -55,4 +55,26 @@ struct HomeAssistantAliasMatcherTests {
 
         #expect(cardMatch == nil)
     }
+
+    @Test func matchedTarget_supportsMerchantAndBudgetScopes() throws {
+        let matcher = HomeAssistantAliasMatcher()
+        let rules = [
+            AssistantAliasRule(aliasKey: "starbs", targetValue: "Starbucks", entityType: .merchant),
+            AssistantAliasRule(aliasKey: "trip fund", targetValue: "Travel Budget", entityType: .budget)
+        ]
+
+        let merchantMatch = matcher.matchedTarget(
+            in: "show starbs spending",
+            entityType: .merchant,
+            rules: rules
+        )
+        let budgetMatch = matcher.matchedTarget(
+            in: "trip fund",
+            entityType: .budget,
+            rules: rules
+        )
+
+        #expect(merchantMatch == "Starbucks")
+        #expect(budgetMatch == "Travel Budget")
+    }
 }

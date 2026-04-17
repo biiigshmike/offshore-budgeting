@@ -46,7 +46,7 @@ struct HomeAssistantTextParser {
         let metric = intent.metric
 
         switch intent {
-        case .periodOverview, .spendThisMonth, .spendAveragePerPeriod, .compareThisMonthToPreviousMonth, .compareCategoryThisMonthToPreviousMonth, .compareCardThisMonthToPreviousMonth, .compareIncomeSourceThisMonthToPreviousMonth, .compareMerchantThisMonthToPreviousMonth, .cardSpendTotal, .incomeAverageActual, .savingsStatus, .incomeSourceShare, .categorySpendShare, .presetCategorySpend, .safeSpendToday, .forecastSavings, .nextPlannedExpense, .spendTrendsSummary, .cardSnapshotSummary, .merchantSpendTotal, .merchantSpendSummary:
+        case .periodOverview, .spendThisMonth, .categorySpendTotal, .spendAveragePerPeriod, .compareThisMonthToPreviousMonth, .compareCategoryThisMonthToPreviousMonth, .compareCardThisMonthToPreviousMonth, .compareIncomeSourceThisMonthToPreviousMonth, .compareMerchantThisMonthToPreviousMonth, .cardSpendTotal, .incomeAverageActual, .savingsStatus, .incomeSourceShare, .categorySpendShare, .presetCategorySpend, .safeSpendToday, .forecastSavings, .nextPlannedExpense, .spendTrendsSummary, .cardSnapshotSummary, .merchantSpendTotal, .merchantSpendSummary:
             return HomeQueryPlan(
                 metric: metric,
                 dateRange: dateRange,
@@ -738,7 +738,7 @@ struct HomeAssistantTextParser {
         case .periodOverview:
             // Broad overview prompts are inherently less specific than direct metric requests.
             return .medium
-        case .spendThisMonth, .spendAveragePerPeriod, .topCategoriesThisMonth, .compareThisMonthToPreviousMonth, .compareCategoryThisMonthToPreviousMonth, .compareCardThisMonthToPreviousMonth, .compareIncomeSourceThisMonthToPreviousMonth, .compareMerchantThisMonthToPreviousMonth, .largestRecentTransactions, .cardSpendTotal, .cardVariableSpendingHabits, .incomeAverageActual, .savingsStatus, .savingsAverageRecentPeriods, .incomeSourceShare, .categorySpendShare, .incomeSourceShareTrend, .categorySpendShareTrend, .presetDueSoon, .presetHighestCost, .presetTopCategory, .presetCategorySpend, .categoryPotentialSavings, .categoryReallocationGuidance, .safeSpendToday, .forecastSavings, .nextPlannedExpense, .spendTrendsSummary, .cardSnapshotSummary, .merchantSpendTotal, .merchantSpendSummary, .topMerchantsThisMonth, .topCategoryChangesThisMonth, .topCardChangesThisMonth:
+        case .spendThisMonth, .categorySpendTotal, .spendAveragePerPeriod, .topCategoriesThisMonth, .compareThisMonthToPreviousMonth, .compareCategoryThisMonthToPreviousMonth, .compareCardThisMonthToPreviousMonth, .compareIncomeSourceThisMonthToPreviousMonth, .compareMerchantThisMonthToPreviousMonth, .largestRecentTransactions, .cardSpendTotal, .cardVariableSpendingHabits, .incomeAverageActual, .savingsStatus, .savingsAverageRecentPeriods, .incomeSourceShare, .categorySpendShare, .incomeSourceShareTrend, .categorySpendShareTrend, .presetDueSoon, .presetHighestCost, .presetTopCategory, .presetCategorySpend, .categoryPotentialSavings, .categoryReallocationGuidance, .safeSpendToday, .forecastSavings, .nextPlannedExpense, .spendTrendsSummary, .cardSnapshotSummary, .merchantSpendTotal, .merchantSpendSummary, .topMerchantsThisMonth, .topCategoryChangesThisMonth, .topCardChangesThisMonth:
             return .high
         }
     }

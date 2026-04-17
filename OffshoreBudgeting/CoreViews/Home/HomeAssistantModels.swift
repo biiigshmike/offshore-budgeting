@@ -35,6 +35,7 @@ enum HomeQueryPeriodUnit: String, Codable, Equatable {
 enum HomeQueryIntent: String, CaseIterable, Codable, Equatable {
     case periodOverview
     case spendThisMonth
+    case categorySpendTotal
     case topCategoriesThisMonth
     case compareThisMonthToPreviousMonth
     case compareCategoryThisMonthToPreviousMonth
@@ -73,6 +74,7 @@ enum HomeQueryIntent: String, CaseIterable, Codable, Equatable {
 enum HomeQueryMetric: String, Codable, Equatable {
     case overview
     case spendTotal
+    case categorySpendTotal
     case topCategories
     case monthComparison
     case categoryMonthComparison
@@ -114,13 +116,14 @@ enum HomeQueryConfidenceBand: String, Codable, Equatable {
     case low
 }
 
-struct HomeQueryPlan: Equatable {
+struct HomeQueryPlan: Codable, Equatable {
     let metric: HomeQueryMetric
     let dateRange: HomeQueryDateRange?
     let comparisonDateRange: HomeQueryDateRange?
     let resultLimit: Int?
     let confidenceBand: HomeQueryConfidenceBand
     let targetName: String?
+    let targetTypeRaw: String?
     let periodUnit: HomeQueryPeriodUnit?
 
     init(
@@ -130,6 +133,7 @@ struct HomeQueryPlan: Equatable {
         resultLimit: Int?,
         confidenceBand: HomeQueryConfidenceBand,
         targetName: String? = nil,
+        targetTypeRaw: String? = nil,
         periodUnit: HomeQueryPeriodUnit? = nil
     ) {
         self.metric = metric
@@ -138,6 +142,7 @@ struct HomeQueryPlan: Equatable {
         self.resultLimit = resultLimit
         self.confidenceBand = confidenceBand
         self.targetName = targetName
+        self.targetTypeRaw = targetTypeRaw
         self.periodUnit = periodUnit
     }
 
@@ -161,6 +166,7 @@ extension HomeQueryPlan {
         resultLimit: Int?? = nil,
         confidenceBand: HomeQueryConfidenceBand? = nil,
         targetName: String?? = nil,
+        targetTypeRaw: String?? = nil,
         periodUnit: HomeQueryPeriodUnit?? = nil
     ) -> HomeQueryPlan {
         HomeQueryPlan(
@@ -170,6 +176,7 @@ extension HomeQueryPlan {
             resultLimit: resultLimit ?? self.resultLimit,
             confidenceBand: confidenceBand ?? self.confidenceBand,
             targetName: targetName ?? self.targetName,
+            targetTypeRaw: targetTypeRaw ?? self.targetTypeRaw,
             periodUnit: periodUnit ?? self.periodUnit
         )
     }
@@ -182,6 +189,8 @@ extension HomeQueryMetric {
             return .periodOverview
         case .spendTotal:
             return .spendThisMonth
+        case .categorySpendTotal:
+            return .categorySpendTotal
         case .topCategories:
             return .topCategoriesThisMonth
         case .monthComparison:
@@ -259,6 +268,8 @@ extension HomeQueryIntent {
             return .overview
         case .spendThisMonth:
             return .spendTotal
+        case .categorySpendTotal:
+            return .categorySpendTotal
         case .topCategoriesThisMonth:
             return .topCategories
         case .compareThisMonthToPreviousMonth:
@@ -346,6 +357,136 @@ enum HomeAssistantAnswerTargetType: String, Codable, Equatable {
     case merchant
 }
 
+enum HomeAssistantResolvedEntityType: String, Codable, Equatable, CaseIterable {
+    case category
+    case card
+    case merchant
+    case preset
+    case budget
+    case incomeSource
+}
+
+enum HomeAssistantResolutionConfidence: String, Codable, Equatable, Comparable {
+    case exact
+    case high
+    case medium
+    case low
+
+    private var rank: Int {
+        switch self {
+        case .exact:
+            return 3
+        case .high:
+            return 2
+        case .medium:
+            return 1
+        case .low:
+            return 0
+        }
+    }
+
+    static func < (lhs: HomeAssistantResolutionConfidence, rhs: HomeAssistantResolutionConfidence) -> Bool {
+        lhs.rank < rhs.rank
+    }
+}
+
+enum HomeAssistantResolutionSource: String, Codable, Equatable {
+    case exact
+    case alias
+    case fuzzy
+}
+
+struct HomeAssistantEntityMatch: Codable, Equatable, Identifiable {
+    let id: UUID
+    let name: String
+    let entityType: HomeAssistantResolvedEntityType
+    let confidence: HomeAssistantResolutionConfidence
+    let source: HomeAssistantResolutionSource
+    let score: Double
+
+    init(
+        id: UUID = UUID(),
+        name: String,
+        entityType: HomeAssistantResolvedEntityType,
+        confidence: HomeAssistantResolutionConfidence,
+        source: HomeAssistantResolutionSource,
+        score: Double
+    ) {
+        self.id = id
+        self.name = name
+        self.entityType = entityType
+        self.confidence = confidence
+        self.source = source
+        self.score = score
+    }
+}
+
+struct HomeAssistantRecoverySuggestion: Codable, Equatable, Identifiable {
+    let id: UUID
+    let suggestion: HomeAssistantSuggestion
+    let confidenceScore: Double
+    let reasoning: String
+
+    init(
+        id: UUID = UUID(),
+        suggestion: HomeAssistantSuggestion,
+        confidenceScore: Double,
+        reasoning: String
+    ) {
+        self.id = id
+        self.suggestion = suggestion
+        self.confidenceScore = confidenceScore
+        self.reasoning = reasoning
+    }
+}
+
+struct HomeAssistantEntityResolution: Codable, Equatable {
+    let resolvedPhrase: String
+    let bestMatch: HomeAssistantEntityMatch?
+    let ambiguityCandidates: [HomeAssistantEntityMatch]
+    let rankedCandidates: [HomeAssistantEntityMatch]
+    let confidence: HomeAssistantResolutionConfidence
+    let originalCandidates: [HomeAssistantEntityMatch]
+    let rejectedCandidateNames: [String]
+    let recoverySuggestions: [HomeAssistantRecoverySuggestion]
+    let explanation: String?
+    let isTieAmbiguity: Bool
+
+    init(
+        resolvedPhrase: String,
+        bestMatch: HomeAssistantEntityMatch? = nil,
+        ambiguityCandidates: [HomeAssistantEntityMatch] = [],
+        rankedCandidates: [HomeAssistantEntityMatch] = [],
+        confidence: HomeAssistantResolutionConfidence = .low,
+        originalCandidates: [HomeAssistantEntityMatch] = [],
+        rejectedCandidateNames: [String] = [],
+        recoverySuggestions: [HomeAssistantRecoverySuggestion] = [],
+        explanation: String? = nil,
+        isTieAmbiguity: Bool = false
+    ) {
+        self.resolvedPhrase = resolvedPhrase
+        self.bestMatch = bestMatch
+        self.ambiguityCandidates = ambiguityCandidates
+        self.rankedCandidates = rankedCandidates
+        self.confidence = confidence
+        self.originalCandidates = originalCandidates
+        self.rejectedCandidateNames = rejectedCandidateNames
+        self.recoverySuggestions = recoverySuggestions
+        self.explanation = explanation
+        self.isTieAmbiguity = isTieAmbiguity
+    }
+}
+
+struct HomeAssistantClarificationContext: Equatable {
+    let originalCandidates: [HomeAssistantEntityMatch]
+    let activeCandidates: [HomeAssistantEntityMatch]
+    let rejectedCandidateNames: [String]
+    let currentBestMatch: HomeAssistantEntityMatch?
+    let originalPrompt: String
+    let basePlan: HomeQueryPlan
+    let resolution: HomeAssistantEntityResolution
+}
+
 struct HomeAssistantAnswerContext: Identifiable, Codable, Equatable {
     let id: UUID
     let query: HomeQuery
@@ -357,6 +498,7 @@ struct HomeAssistantAnswerContext: Identifiable, Codable, Equatable {
     let rowTitles: [String]
     let rowValues: [String]
     let scenarioPercent: Double?
+    let executedPlan: HomeQueryPlan?
     let generatedAt: Date
 
     init(
@@ -370,6 +512,7 @@ struct HomeAssistantAnswerContext: Identifiable, Codable, Equatable {
         rowTitles: [String] = [],
         rowValues: [String] = [],
         scenarioPercent: Double? = nil,
+        executedPlan: HomeQueryPlan? = nil,
         generatedAt: Date = Date()
     ) {
         self.id = id
@@ -382,6 +525,7 @@ struct HomeAssistantAnswerContext: Identifiable, Codable, Equatable {
         self.rowTitles = rowTitles
         self.rowValues = rowValues
         self.scenarioPercent = scenarioPercent
+        self.executedPlan = executedPlan
         self.generatedAt = generatedAt
     }
 }
@@ -617,7 +761,7 @@ struct HomeQuery: Identifiable, Codable, Equatable {
             baseline = 3
         case .merchantSpendSummary, .topMerchantsThisMonth, .topCategoryChangesThisMonth, .topCardChangesThisMonth:
             baseline = 3
-        case .spendThisMonth, .spendAveragePerPeriod, .compareThisMonthToPreviousMonth, .compareCategoryThisMonthToPreviousMonth, .compareCardThisMonthToPreviousMonth, .compareIncomeSourceThisMonthToPreviousMonth, .compareMerchantThisMonthToPreviousMonth, .cardSpendTotal, .incomeAverageActual, .savingsStatus, .incomeSourceShare, .categorySpendShare, .safeSpendToday, .forecastSavings, .nextPlannedExpense, .spendTrendsSummary, .cardSnapshotSummary, .merchantSpendTotal:
+        case .spendThisMonth, .categorySpendTotal, .spendAveragePerPeriod, .compareThisMonthToPreviousMonth, .compareCategoryThisMonthToPreviousMonth, .compareCardThisMonthToPreviousMonth, .compareIncomeSourceThisMonthToPreviousMonth, .compareMerchantThisMonthToPreviousMonth, .cardSpendTotal, .incomeAverageActual, .savingsStatus, .incomeSourceShare, .categorySpendShare, .safeSpendToday, .forecastSavings, .nextPlannedExpense, .spendTrendsSummary, .cardSnapshotSummary, .merchantSpendTotal:
             baseline = 1
         }
 
@@ -674,6 +818,7 @@ struct HomeAnswer: Identifiable, Codable, Equatable {
     let primaryValue: String?
     let rows: [HomeAnswerRow]
     let attachment: HomeAssistantAttachment?
+    let explanation: String?
     let generatedAt: Date
 
     init(
@@ -686,6 +831,7 @@ struct HomeAnswer: Identifiable, Codable, Equatable {
         primaryValue: String? = nil,
         rows: [HomeAnswerRow] = [],
         attachment: HomeAssistantAttachment? = nil,
+        explanation: String? = nil,
         generatedAt: Date = Date()
     ) {
         self.id = id
@@ -697,6 +843,7 @@ struct HomeAnswer: Identifiable, Codable, Equatable {
         self.primaryValue = primaryValue
         self.rows = rows
         self.attachment = attachment
+        self.explanation = explanation
         self.generatedAt = generatedAt
     }
 }
@@ -720,6 +867,7 @@ struct HomeAssistantExecutedQueryAnswerNormalizer {
                     HomeAnswerRow(title: "Total", value: value)
                 ],
                 attachment: answer.attachment,
+                explanation: answer.explanation,
                 generatedAt: answer.generatedAt
             )
         default:
@@ -882,15 +1030,25 @@ struct HomeAssistantInlineCreateForm: Codable, Equatable {
 
 // MARK: - Suggestions
 
-struct HomeAssistantSuggestion: Identifiable, Equatable {
+struct HomeAssistantSuggestion: Identifiable, Codable, Equatable {
     let id: UUID
     let title: String
     let query: HomeQuery
+    let confidenceScore: Double?
+    let reasoning: String?
 
-    init(id: UUID = UUID(), title: String, query: HomeQuery) {
+    init(
+        id: UUID = UUID(),
+        title: String,
+        query: HomeQuery,
+        confidenceScore: Double? = nil,
+        reasoning: String? = nil
+    ) {
         self.id = id
         self.title = title
         self.query = query
+        self.confidenceScore = confidenceScore
+        self.reasoning = reasoning
     }
 }
 
