@@ -1025,22 +1025,7 @@ struct HomeAssistantPanelView: View {
     
     private func inlineConversationSuggestionSections(
         for answer: HomeAnswer
-    ) -> [(title: String, suggestions: [HomeAssistantSuggestion], isRecovery: Bool)] {
-        var sections: [(title: String, suggestions: [HomeAssistantSuggestion], isRecovery: Bool)] = []
-
-        if clarificationSuggestions.isEmpty == false {
-            let title = lastClarificationReasons.isEmpty ? "Clarification" : "Clarification (\(lastClarificationReasons.count))"
-            sections.append((title: title, suggestions: clarificationSuggestions, isRecovery: false))
-        }
-
-        if recoverySuggestions.isEmpty == false {
-            sections.append((
-                title: "Recovery",
-                suggestions: recoverySuggestions.map(\.suggestion),
-                isRecovery: true
-            ))
-        }
-
+    ) -> [HomeAssistantSuggestionSection] {
         let groundedQuery = sessionContext.recentAnswerContexts.last?.executedPlan?.query
             ?? sessionContext.recentAnswerContexts.last?.query
         let followUps = personaFormatter.followUpSuggestions(
@@ -1048,10 +1033,15 @@ struct HomeAssistantPanelView: View {
             executedQuery: groundedQuery,
             personaID: selectedPersonaID
         )
-        if followUps.isEmpty == false {
-            sections.append((title: "Follow-Up Suggestions", suggestions: followUps, isRecovery: false))
-        }
-
+        let sections = HomeAssistantSuggestionSectionBuilder.build(
+            clarificationSuggestions: clarificationSuggestions,
+            clarificationReasonCount: lastClarificationReasons.count,
+            recoverySuggestions: recoverySuggestions,
+            followUpSuggestions: followUps
+        )
+        MarinaDebugLogger.log(
+            "[MarinaSuggestions] answer='\(answer.title)' sections=\(sections.map { "\($0.title):\($0.suggestions.count)" }.joined(separator: ", "))"
+        )
         return sections
     }
     
@@ -1145,7 +1135,7 @@ struct HomeAssistantPanelView: View {
     }
     
     private func assistantFollowUpRail(
-        sections: [(title: String, suggestions: [HomeAssistantSuggestion], isRecovery: Bool)]
+        sections: [HomeAssistantSuggestionSection]
     ) -> some View {
         let hasPrioritySections = sections.contains { $0.title != "Follow-Up Suggestions" }
         
@@ -4162,6 +4152,9 @@ struct HomeAssistantPanelView: View {
             let fallbackPlan = enrichPlanWithEntities(plan, rawPrompt: prompt)
             let signals = parsedSignals(for: prompt, fallbackPlan: fallbackPlan)
             let resolvedPlan = intentBuilder.buildPlan(from: signals, fallbackPlan: fallbackPlan)
+            MarinaDebugLogger.log(
+                "[MarinaResolution] parserRaw plan=\(plan) fallback=\(fallbackPlan) resolved=\(resolvedPlan)"
+            )
             return (resolvedPlan, .parser)
         }
         
@@ -4432,6 +4425,9 @@ struct HomeAssistantPanelView: View {
         let resolvedPlan = reconciliation.plan
         let routedRequest = requestRoutingResolver.resolve(prompt: rawPrompt, basePlan: resolvedPlan)
         let routedPlan = routedRequest.plan
+        MarinaDebugLogger.log(
+            "[MarinaResolution] inputPlan=\(plan) resolutionConfidence=\(resolution.confidence.rawValue) reconciledPlan=\(resolvedPlan) routedPlan=\(routedPlan)"
+        )
         let enrichedResolution = resolutionWithRecoverySuggestions(
             resolution,
             basePlan: routedPlan,
@@ -4440,57 +4436,104 @@ struct HomeAssistantPanelView: View {
         )
         let requiredClarification = requiredFieldClarificationPlan(for: routedPlan, rawPrompt: rawPrompt)
         let ambiguityClarification = ambiguityClarificationPlan(for: routedPlan, resolution: enrichedResolution)
-        let clarificationPlan = mergeClarificationPlans(
-            overrideClarificationPlan ?? requiredClarification,
-            ambiguityClarification
+        let clarificationPlan = actionableClarificationPlan(
+            mergeClarificationPlans(
+                overrideClarificationPlan ?? requiredClarification,
+                ambiguityClarification
+            ),
+            basePlan: routedPlan,
+            rawPrompt: rawPrompt
         )
 
         if let requiredClarification, requiredClarification.shouldRunBestEffort == false {
+            let blockingClarification = actionableClarificationPlan(
+                clarificationPlan ?? requiredClarification,
+                basePlan: routedPlan,
+                rawPrompt: rawPrompt
+            )
+            let finalOutcome = MarinaTurnOutcomeEvaluator.outcome(
+                hasExecutableQuery: true,
+                requiredFieldsMissing: true,
+                clarificationIsActionable: blockingClarification != nil,
+                shouldRecover: blockingClarification == nil
+            )
+            logFinalTurnOutcome(
+                finalOutcome,
+                rawPrompt: rawPrompt,
+                notes: "required_fields_missing clarificationActionable=\(blockingClarification != nil)"
+            )
             recordTelemetry(
                 for: rawPrompt,
                 outcome: .clarification,
                 source: source,
                 plan: routedPlan,
-                notes: "required_clarification"
+                notes: blockingClarification == nil ? "required_clarification_recovery" : "required_clarification"
             )
-            presentClarificationTurn(
-                clarificationPlan ?? requiredClarification,
-                userPrompt: rawPrompt,
-                context: clarificationContext(
-                    for: routedPlan,
-                    rawPrompt: rawPrompt,
-                    resolution: enrichedResolution
+            if let blockingClarification {
+                presentClarificationTurn(
+                    blockingClarification,
+                    userPrompt: rawPrompt,
+                    context: clarificationContext(
+                        for: routedPlan,
+                        rawPrompt: rawPrompt,
+                        resolution: enrichedResolution
+                    )
                 )
-            )
+            } else {
+                presentRecoveryTurn(
+                    enrichedResolution.recoverySuggestions,
+                    userPrompt: rawPrompt,
+                    subtitle: "I still need one more detail, so here are the safest fallback paths."
+                )
+            }
             return
         }
 
         if enrichedResolution.isTieAmbiguity {
+            let finalOutcome = MarinaTurnOutcomeEvaluator.outcome(
+                hasExecutableQuery: false,
+                requiredFieldsMissing: false,
+                clarificationIsActionable: clarificationPlan != nil,
+                shouldRecover: clarificationPlan == nil
+            )
+            logFinalTurnOutcome(
+                finalOutcome,
+                rawPrompt: rawPrompt,
+                notes: "tie_ambiguity clarificationActionable=\(clarificationPlan != nil)"
+            )
             recordTelemetry(
                 for: rawPrompt,
                 outcome: .clarification,
                 source: source,
                 plan: routedPlan,
-                notes: "tie_band_ambiguity"
+                notes: clarificationPlan == nil ? "tie_band_ambiguity_recovery" : "tie_band_ambiguity"
             )
-            presentClarificationTurn(
-                clarificationPlan ?? HomeAssistantClarificationPlan(
-                    reasons: [.lowConfidenceLanguage],
-                    subtitle: "I found a few close matches. Pick one to continue.",
-                    suggestions: [],
-                    shouldRunBestEffort: false
-                ),
-                userPrompt: rawPrompt,
-                context: clarificationContext(
-                    for: routedPlan,
-                    rawPrompt: rawPrompt,
-                    resolution: enrichedResolution
+            if let clarificationPlan {
+                presentClarificationTurn(
+                    clarificationPlan,
+                    userPrompt: rawPrompt,
+                    context: clarificationContext(
+                        for: routedPlan,
+                        rawPrompt: rawPrompt,
+                        resolution: enrichedResolution
+                    )
                 )
-            )
+            } else {
+                presentRecoveryTurn(
+                    enrichedResolution.recoverySuggestions,
+                    userPrompt: rawPrompt,
+                    subtitle: "I found a few close matches, but none were clear enough to run safely."
+                )
+            }
             return
         }
 
         if enrichedResolution.confidence == .low {
+            logFinalTurnOutcome(
+                .recovery,
+                rawPrompt: rawPrompt,
+                notes: "low_confidence recoverySuggestions=\(enrichedResolution.recoverySuggestions.count)"
+            )
             recordTelemetry(
                 for: rawPrompt,
                 outcome: .clarification,
@@ -4508,6 +4551,11 @@ struct HomeAssistantPanelView: View {
 
         if allowsBroadBundle && shouldRunBroadOverviewBundle(for: rawPrompt, plan: routedPlan) {
             runBroadOverviewBundle(userPrompt: rawPrompt, basePlan: routedPlan)
+            logFinalTurnOutcome(
+                .answer,
+                rawPrompt: rawPrompt,
+                notes: "executed_broad_bundle clarificationAttached=\(clarificationPlan != nil)"
+            )
             recordTelemetry(
                 for: rawPrompt,
                 outcome: .resolved,
@@ -4521,6 +4569,11 @@ struct HomeAssistantPanelView: View {
                 userPrompt: rawPrompt,
                 explanation: reconciliation.explanation,
                 executedPlan: routedPlan
+            )
+            logFinalTurnOutcome(
+                .answer,
+                rawPrompt: rawPrompt,
+                notes: "executed_query clarificationAttached=\(clarificationPlan != nil)"
             )
             recordTelemetry(
                 for: rawPrompt,
@@ -4780,6 +4833,9 @@ struct HomeAssistantPanelView: View {
                 }
             )
         )
+        MarinaDebugLogger.log(
+            "[MarinaClarification] recovery count=\(suggestions.count) subtitle='\(subtitle)'"
+        )
     }
     
     private func entityDisambiguationPlan(
@@ -4911,10 +4967,19 @@ struct HomeAssistantPanelView: View {
         userPrompt: String?,
         context: HomeAssistantClarificationContext? = nil
     ) {
+        guard clarificationPlan.suggestions.isEmpty == false else {
+            MarinaDebugLogger.log(
+                "[MarinaClarification] skipped empty clarification subtitle='\(clarificationPlan.subtitle)'"
+            )
+            return
+        }
         clarificationSuggestions = clarificationPlan.suggestions
         recoverySuggestions = []
         lastClarificationReasons = clarificationPlan.reasons
         activeClarificationContext = context
+        MarinaDebugLogger.log(
+            "[MarinaClarification] present reasons=\(clarificationPlan.reasons.map(\.rawValue)) suggestions=\(clarificationPlan.suggestions.count)"
+        )
         
         let clarificationAnswer = HomeAnswer(
             queryID: UUID(),
@@ -4927,6 +4992,43 @@ struct HomeAssistantPanelView: View {
         )
         
         appendAnswer(clarificationAnswer)
+    }
+
+    private func actionableClarificationPlan(
+        _ plan: HomeAssistantClarificationPlan?,
+        basePlan: HomeQueryPlan,
+        rawPrompt: String
+    ) -> HomeAssistantClarificationPlan? {
+        guard let plan else { return nil }
+        if plan.suggestions.isEmpty == false {
+            MarinaDebugLogger.log(
+                "[MarinaClarification] actionable existing reasons=\(plan.reasons.map(\.rawValue)) suggestions=\(plan.suggestions.count)"
+            )
+            return plan
+        }
+
+        guard plan.reasons.contains(where: \.requiresUserResolution) else {
+            MarinaDebugLogger.log(
+                "[MarinaClarification] discarded non-actionable clarification reasons=\(plan.reasons.map(\.rawValue))"
+            )
+            return nil
+        }
+
+        let synthesized = clarificationSuggestions(
+            for: basePlan,
+            reasons: plan.reasons,
+            normalizedPrompt: normalizedPrompt(rawPrompt)
+        )
+        MarinaDebugLogger.log(
+            "[MarinaClarification] synthesized reasons=\(plan.reasons.map(\.rawValue)) suggestions=\(synthesized.count)"
+        )
+        guard synthesized.isEmpty == false else { return nil }
+        return HomeAssistantClarificationPlan(
+            reasons: plan.reasons,
+            subtitle: plan.subtitle,
+            suggestions: synthesized,
+            shouldRunBestEffort: plan.shouldRunBestEffort
+        )
     }
 
     private func handleClarificationRejection(_ prompt: String) -> Bool {
@@ -5563,46 +5665,112 @@ struct HomeAssistantPanelView: View {
             let effectivePlan = effectiveSource == .model
                 ? normalizedModelQueryPlan(queryPlan, rawPrompt: rawPrompt)
                 : queryPlan
-            let customPlan = HomeAssistantClarificationPlan(
-                reasons: clarification.reasons,
-                subtitle: clarification.subtitle,
-                suggestions: clarificationSuggestions(
-                    for: effectivePlan,
+            MarinaDebugLogger.log(
+                "[MarinaFinalization] modelClarification queryPlanExists=true actionable=\(clarification.isActionable) reconciledCandidate=true"
+            )
+            let customPlan = clarification.isActionable
+                ? HomeAssistantClarificationPlan(
                     reasons: clarification.reasons,
-                    normalizedPrompt: normalizedPrompt(rawPrompt)
-                ),
-                shouldRunBestEffort: clarification.shouldRunBestEffort
-            )
-            recordTelemetry(
-                for: rawPrompt,
-                outcome: .clarification,
+                    subtitle: clarification.subtitle,
+                    suggestions: clarificationSuggestions(
+                        for: effectivePlan,
+                        reasons: clarification.reasons,
+                        normalizedPrompt: normalizedPrompt(rawPrompt)
+                    ),
+                    shouldRunBestEffort: clarification.shouldRunBestEffort
+                )
+                : nil
+            handleResolvedPlan(
+                effectivePlan,
+                rawPrompt: rawPrompt,
+                allowsBroadBundle: allowsBroadBundle(for: effectiveSource),
                 source: effectiveSource,
-                plan: effectivePlan,
-                notes: "model_query_clarification"
-            )
-            presentClarificationTurn(
-                customPlan,
-                userPrompt: rawPrompt
+                overrideClarificationPlan: customPlan
             )
             return
         }
 
-        let fallbackPlan = HomeAssistantClarificationPlan(
-            reasons: clarification.reasons,
-            subtitle: clarification.subtitle,
-            suggestions: [],
-            shouldRunBestEffort: false
+        let fallback = heuristicInterpretedRequest(for: rawPrompt)
+        MarinaDebugLogger.log(
+            "[MarinaFinalization] modelClarification queryPlanExists=false actionable=\(clarification.isActionable) fallbackQueryExists=\(fallback.executableQueryPlan != nil)"
         )
+        if case let .query(fallbackPlan, fallbackSource) = fallback {
+            MarinaDebugLogger.log(
+                "[MarinaFinalization] proceeding_after_clarification_skip prompt='\(rawPrompt)' source=\(fallbackSource.rawValue)"
+            )
+            handleResolvedPlan(
+                fallbackPlan,
+                rawPrompt: rawPrompt,
+                allowsBroadBundle: allowsBroadBundle(for: fallbackSource),
+                source: fallbackSource
+            )
+            return
+        }
+
+        if clarification.isActionable,
+           let basePlan = resolvedPlan(for: rawPrompt)?.plan ?? sessionContext.lastQueryPlan {
+            let customPlan = actionableClarificationPlan(
+                HomeAssistantClarificationPlan(
+                    reasons: clarification.reasons,
+                    subtitle: clarification.subtitle,
+                    suggestions: clarificationSuggestions(
+                        for: basePlan,
+                        reasons: clarification.reasons,
+                        normalizedPrompt: normalizedPrompt(rawPrompt)
+                    ),
+                    shouldRunBestEffort: clarification.shouldRunBestEffort
+                ),
+                basePlan: basePlan,
+                rawPrompt: rawPrompt
+            )
+
+            if let customPlan {
+                recordTelemetry(
+                    for: rawPrompt,
+                    outcome: .clarification,
+                    source: source,
+                    plan: basePlan,
+                    notes: "model_clarification"
+                )
+                presentClarificationTurn(
+                    customPlan,
+                    userPrompt: rawPrompt
+                )
+                logFinalTurnOutcome(
+                    .clarification,
+                    rawPrompt: rawPrompt,
+                    notes: "actionable_model_clarification"
+                )
+                return
+            }
+        }
+
+        clarificationSuggestions = []
+        recoverySuggestions = []
+        lastClarificationReasons = []
+        activeClarificationContext = nil
         recordTelemetry(
             for: rawPrompt,
-            outcome: .clarification,
+            outcome: .unresolved,
             source: source,
             plan: nil,
-            notes: "model_clarification"
+            notes: "clarification_discarded_unresolved"
         )
-        presentClarificationTurn(
-            fallbackPlan,
-            userPrompt: rawPrompt
+        logFinalTurnOutcome(
+            .unresolved,
+            rawPrompt: rawPrompt,
+            notes: "no_executable_plan clarificationActionable=\(clarification.isActionable)"
+        )
+        appendAnswer(personaFormatter.unresolvedPromptAnswer(for: rawPrompt, personaID: selectedPersonaID))
+    }
+
+    private func logFinalTurnOutcome(
+        _ outcome: MarinaTurnFinalOutcome,
+        rawPrompt: String,
+        notes: String
+    ) {
+        MarinaDebugLogger.log(
+            "[MarinaFinalization] outcome=\(outcome.rawValue) prompt='\(rawPrompt)' \(notes)"
         )
     }
     

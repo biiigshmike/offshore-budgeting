@@ -376,6 +376,137 @@ struct HomeAssistantModelsTests {
         )
     }
 
+    @Test func marinaStructuredIntentPlanBuilder_explicitRelativeComparison_doesNotInheritStalePriorRanges() throws {
+        let builder = makeBuilder()
+        let structuredIntent = MarinaStructuredIntent.query(
+            MarinaStructuredQueryIntent(
+                metricRaw: HomeQueryMetric.monthComparison.rawValue,
+                targetName: "Groceries",
+                targetTypeRaw: MarinaStructuredTargetType.category.rawValue,
+                dateStartISO8601: nil,
+                dateEndISO8601: nil,
+                comparisonDateStartISO8601: nil,
+                comparisonDateEndISO8601: nil,
+                resultLimit: nil,
+                periodUnitRaw: HomeQueryPeriodUnit.month.rawValue,
+                confidenceRaw: HomeQueryConfidenceBand.high.rawValue,
+                clarification: nil
+            )
+        )
+
+        let result = builder.buildRequest(
+            from: structuredIntent,
+            prompt: "Compare groceries this month to last month",
+            defaultPeriodUnit: .month,
+            priorQueryContext: makePriorQueryContext(
+                metric: .monthComparison,
+                targetName: "Groceries",
+                targetType: .category,
+                dateRange: monthRange(2025, 1),
+                resultLimit: nil,
+                periodUnit: .month,
+                lastQueryPlan: HomeQueryPlan(
+                    metric: .monthComparison,
+                    dateRange: monthRange(2025, 1),
+                    comparisonDateRange: monthRange(2025, 2),
+                    resultLimit: nil,
+                    confidenceBand: .high,
+                    targetName: "Groceries",
+                    targetTypeRaw: MarinaStructuredTargetType.category.rawValue,
+                    periodUnit: .month
+                )
+            )
+        )
+
+        guard case let .query(plan, source) = result else {
+            Issue.record("Expected explicit relative comparison query")
+            return
+        }
+
+        #expect(source == .model)
+        #expect(plan.metric == .monthComparison)
+        #expect(plan.dateRange == monthRange(2026, 4))
+        #expect(plan.comparisonDateRange == monthRange(2026, 3))
+    }
+
+    @Test func marinaStructuredIntentPlanBuilder_lastWeekVsPreviousWeek_usesCurrentRelativeWeeks() throws {
+        let builder = makeBuilder()
+        let structuredIntent = MarinaStructuredIntent.query(
+            MarinaStructuredQueryIntent(
+                metricRaw: HomeQueryMetric.monthComparison.rawValue,
+                targetName: nil,
+                targetTypeRaw: nil,
+                dateStartISO8601: nil,
+                dateEndISO8601: nil,
+                comparisonDateStartISO8601: nil,
+                comparisonDateEndISO8601: nil,
+                resultLimit: nil,
+                periodUnitRaw: HomeQueryPeriodUnit.week.rawValue,
+                confidenceRaw: HomeQueryConfidenceBand.high.rawValue,
+                clarification: nil
+            )
+        )
+
+        let result = builder.buildRequest(
+            from: structuredIntent,
+            prompt: "Compare last week to previous week",
+            defaultPeriodUnit: .month,
+            priorQueryContext: makePriorQueryContext(
+                metric: .monthComparison,
+                targetName: nil,
+                targetType: nil,
+                dateRange: monthRange(2025, 1)
+            )
+        )
+
+        guard case let .query(plan, _) = result else {
+            Issue.record("Expected weekly comparison query")
+            return
+        }
+
+        #expect(plan.dateRange == weekRange(2026, 4, 6))
+        #expect(plan.comparisonDateRange == weekRange(2026, 3, 30))
+    }
+
+    @Test func marinaStructuredIntentPlanBuilder_namedMonthPrompt_doesNotInheritCurrentRelativeMonth() throws {
+        let builder = makeBuilder()
+        let structuredIntent = MarinaStructuredIntent.query(
+            MarinaStructuredQueryIntent(
+                metricRaw: HomeQueryMetric.categorySpendTotal.rawValue,
+                targetName: "Groceries",
+                targetTypeRaw: MarinaStructuredTargetType.category.rawValue,
+                dateStartISO8601: nil,
+                dateEndISO8601: nil,
+                comparisonDateStartISO8601: nil,
+                comparisonDateEndISO8601: nil,
+                resultLimit: nil,
+                periodUnitRaw: HomeQueryPeriodUnit.month.rawValue,
+                confidenceRaw: HomeQueryConfidenceBand.high.rawValue,
+                clarification: nil
+            )
+        )
+
+        let result = builder.buildRequest(
+            from: structuredIntent,
+            prompt: "What did I spend on groceries in March?",
+            defaultPeriodUnit: .month,
+            priorQueryContext: makePriorQueryContext(
+                metric: .categorySpendTotal,
+                targetName: "Groceries",
+                targetType: .category,
+                dateRange: monthRange(2026, 4)
+            )
+        )
+
+        guard case let .query(plan, _) = result else {
+            Issue.record("Expected named month query")
+            return
+        }
+
+        #expect(plan.dateRange == monthRange(2026, 3))
+        #expect(plan.targetName == "Groceries")
+    }
+
     @Test func marinaLanguageRouter_followUpClarificationFallsBackToHeuristicQuery() async throws {
         let router = MarinaLanguageRouter(
             availability: StubAvailability(status: .available),
@@ -557,6 +688,242 @@ struct HomeAssistantModelsTests {
         #expect(request.shouldRunBestEffort == false)
     }
 
+    @Test func marinaTurnOutcomeEvaluator_executableQueryOverridesRecovery() throws {
+        let outcome = MarinaTurnOutcomeEvaluator.outcome(
+            hasExecutableQuery: true,
+            requiredFieldsMissing: false,
+            clarificationIsActionable: false,
+            shouldRecover: true
+        )
+
+        #expect(outcome == .answer)
+    }
+
+    @Test func marinaTurnOutcomeEvaluator_actionableClarificationWithoutExecutableQuery_isClarification() throws {
+        let outcome = MarinaTurnOutcomeEvaluator.outcome(
+            hasExecutableQuery: false,
+            requiredFieldsMissing: true,
+            clarificationIsActionable: true,
+            shouldRecover: false
+        )
+
+        #expect(outcome == .clarification)
+    }
+
+    @Test func marinaTurnOutcomeEvaluator_noExecutableAndNonActionableClarification_isUnresolved() throws {
+        let outcome = MarinaTurnOutcomeEvaluator.outcome(
+            hasExecutableQuery: false,
+            requiredFieldsMissing: false,
+            clarificationIsActionable: false,
+            shouldRecover: false
+        )
+
+        #expect(outcome == .unresolved)
+    }
+
+    @Test func marinaTurnOutcomeEvaluator_lowConfidencePath_isRecovery() throws {
+        let outcome = MarinaTurnOutcomeEvaluator.outcome(
+            hasExecutableQuery: false,
+            requiredFieldsMissing: false,
+            clarificationIsActionable: false,
+            shouldRecover: true
+        )
+
+        #expect(outcome == .recovery)
+    }
+
+    @Test func marinaLanguageRouter_nonActionableClarificationWithoutPriorContext_prefersExecutableFallback() async throws {
+        let router = MarinaLanguageRouter(
+            availability: StubAvailability(status: .available),
+            modelService: StubStructuredInterpreter(
+                result: .success(
+                    .query(
+                        MarinaStructuredQueryIntent(
+                            metricRaw: "expenses.groceries.total",
+                            targetName: "Groceries",
+                            targetTypeRaw: MarinaStructuredTargetType.category.rawValue,
+                            dateStartISO8601: nil,
+                            dateEndISO8601: nil,
+                            comparisonDateStartISO8601: nil,
+                            comparisonDateEndISO8601: nil,
+                            resultLimit: nil,
+                            periodUnitRaw: HomeQueryPeriodUnit.month.rawValue,
+                            confidenceRaw: HomeQueryConfidenceBand.high.rawValue,
+                            clarification: MarinaStructuredClarification(
+                                subtitle: "This query calculates the total amount spent on groceries for the specified period.",
+                                missingFields: [],
+                                ambiguities: [],
+                                shouldRunBestEffort: false
+                            )
+                        )
+                    )
+                )
+            ),
+            planBuilder: makeBuilder()
+        )
+
+        let fallbackPlan = HomeQueryPlan(
+            metric: .categorySpendTotal,
+            dateRange: monthRange(2026, 3),
+            resultLimit: nil,
+            confidenceBand: .medium,
+            targetName: "Groceries",
+            targetTypeRaw: MarinaStructuredTargetType.category.rawValue,
+            periodUnit: .month
+        )
+
+        let result = await router.interpret(
+            prompt: "What did I spend on groceries last month?",
+            context: makeRouterContext(
+                priorQueryContext: emptyPriorQueryContext()
+            ),
+            heuristicFallback: {
+                .query(fallbackPlan, source: .contextual)
+            }
+        )
+
+        guard case let .query(plan, source) = result else {
+            Issue.record("Expected executable fallback query for non-actionable clarification")
+            return
+        }
+
+        #expect(source == .contextual)
+        #expect(plan == fallbackPlan)
+        #expect(
+            MarinaTurnOutcomeEvaluator.outcome(
+                hasExecutableQuery: true,
+                requiredFieldsMissing: false,
+                clarificationIsActionable: false,
+                shouldRecover: false
+            ) == .answer
+        )
+    }
+
+    @Test func marinaLanguageRouter_actionableClarificationWithoutExecutableFallback_remainsClarification() async throws {
+        let router = MarinaLanguageRouter(
+            availability: StubAvailability(status: .available),
+            modelService: StubStructuredInterpreter(
+                result: .success(
+                    .clarification(
+                        MarinaStructuredClarification(
+                            subtitle: "Pick a category so I can continue.",
+                            missingFields: [.targetName],
+                            ambiguities: [],
+                            shouldRunBestEffort: false
+                        )
+                    )
+                )
+            ),
+            planBuilder: makeBuilder()
+        )
+
+        let result = await router.interpret(
+            prompt: "What did I spend?",
+            context: makeRouterContext(
+                priorQueryContext: emptyPriorQueryContext()
+            ),
+            heuristicFallback: {
+                .unresolved
+            }
+        )
+
+        guard case let .clarification(request, source) = result else {
+            Issue.record("Expected actionable clarification to remain clarification")
+            return
+        }
+
+        #expect(source == .model)
+        #expect(request.isActionable)
+        #expect(request.reasons.contains(.missingDate) || request.reasons.contains(.missingCategoryTarget) || request.reasons.contains(.lowConfidenceLanguage))
+        #expect(
+            MarinaTurnOutcomeEvaluator.outcome(
+                hasExecutableQuery: false,
+                requiredFieldsMissing: true,
+                clarificationIsActionable: request.isActionable,
+                shouldRecover: false
+            ) == .clarification
+        )
+    }
+
+    @Test func marinaLanguageRouter_identicalPromptAnswersDeterministicallyWithoutPriorSuccess() async throws {
+        let router = MarinaLanguageRouter(
+            availability: StubAvailability(status: .available),
+            modelService: StubStructuredInterpreter(
+                result: .success(
+                    .query(
+                        MarinaStructuredQueryIntent(
+                            metricRaw: "total_spent_on_groceries",
+                            targetName: "Groceries",
+                            targetTypeRaw: MarinaStructuredTargetType.category.rawValue,
+                            dateStartISO8601: nil,
+                            dateEndISO8601: nil,
+                            comparisonDateStartISO8601: nil,
+                            comparisonDateEndISO8601: nil,
+                            resultLimit: nil,
+                            periodUnitRaw: HomeQueryPeriodUnit.month.rawValue,
+                            confidenceRaw: HomeQueryConfidenceBand.high.rawValue,
+                            clarification: MarinaStructuredClarification(
+                                subtitle: "This query calculates the total amount spent on groceries for the specified period.",
+                                missingFields: [],
+                                ambiguities: [],
+                                shouldRunBestEffort: false
+                            )
+                        )
+                    )
+                )
+            ),
+            planBuilder: makeBuilder()
+        )
+
+        let fallbackPlan = HomeQueryPlan(
+            metric: .categorySpendTotal,
+            dateRange: monthRange(2026, 3),
+            resultLimit: nil,
+            confidenceBand: .medium,
+            targetName: "Groceries",
+            targetTypeRaw: MarinaStructuredTargetType.category.rawValue,
+            periodUnit: .month
+        )
+
+        let context = makeRouterContext(priorQueryContext: emptyPriorQueryContext())
+        let first = await router.interpret(
+            prompt: "What did I spend on groceries last month?",
+            context: context,
+            heuristicFallback: {
+                .query(fallbackPlan, source: .contextual)
+            }
+        )
+        let second = await router.interpret(
+            prompt: "What did I spend on groceries last month?",
+            context: context,
+            heuristicFallback: {
+                .query(fallbackPlan, source: .contextual)
+            }
+        )
+
+        guard case let .query(firstPlan, firstSource) = first else {
+            Issue.record("Expected first identical prompt to answer via fallback query")
+            return
+        }
+        guard case let .query(secondPlan, secondSource) = second else {
+            Issue.record("Expected second identical prompt to answer via fallback query")
+            return
+        }
+
+        #expect(firstSource == .contextual)
+        #expect(secondSource == .contextual)
+        #expect(firstPlan == fallbackPlan)
+        #expect(secondPlan == fallbackPlan)
+        #expect(
+            MarinaTurnOutcomeEvaluator.outcome(
+                hasExecutableQuery: true,
+                requiredFieldsMissing: false,
+                clarificationIsActionable: false,
+                shouldRecover: false
+            ) == .answer
+        )
+    }
+
     @Test func executedQueryAnswerNormalizer_emptySpendQuery_becomesMetricCard() throws {
         let normalizer = HomeAssistantExecutedQueryAnswerNormalizer()
         let query = HomeQuery(
@@ -608,6 +975,32 @@ struct HomeAssistantModelsTests {
         #expect(normalized.rows.first?.title == "Total")
         #expect(normalized.rows.first?.value == CurrencyFormatter.string(from: 0))
         #expect(normalized.subtitle?.contains("Apr") == true || normalized.subtitle?.contains("2026") == true)
+    }
+
+    @Test func suggestionSectionBuilder_prioritizesClarificationRecoveryThenFollowUps() throws {
+        let clarification = [
+            HomeAssistantSuggestion(title: "Clarify", query: HomeQuery(intent: .spendThisMonth))
+        ]
+        let recovery = [
+            HomeAssistantRecoverySuggestion(
+                suggestion: HomeAssistantSuggestion(title: "Recover", query: HomeQuery(intent: .topCategoriesThisMonth)),
+                confidenceScore: 0.4,
+                reasoning: "Fallback"
+            )
+        ]
+        let followUps = [
+            HomeAssistantSuggestion(title: "Follow up", query: HomeQuery(intent: .compareThisMonthToPreviousMonth))
+        ]
+
+        let sections = HomeAssistantSuggestionSectionBuilder.build(
+            clarificationSuggestions: clarification,
+            clarificationReasonCount: 1,
+            recoverySuggestions: recovery,
+            followUpSuggestions: followUps
+        )
+
+        #expect(sections.map(\.title) == ["Clarification (1)", "Recovery", "Follow-Up Suggestions"])
+        #expect(sections[0].suggestions.first?.title == "Clarify")
     }
 
     // MARK: - Compound Prompt Resolution
@@ -1639,9 +2032,10 @@ struct HomeAssistantModelsTests {
         targetType: HomeAssistantAnswerTargetType?,
         dateRange: HomeQueryDateRange,
         resultLimit: Int? = nil,
-        periodUnit: HomeQueryPeriodUnit = .month
+        periodUnit: HomeQueryPeriodUnit = .month,
+        lastQueryPlan: HomeQueryPlan? = nil
     ) -> MarinaPriorQueryContext {
-        let plan = HomeQueryPlan(
+        let plan = lastQueryPlan ?? HomeQueryPlan(
             metric: metric,
             dateRange: dateRange,
             resultLimit: resultLimit,
@@ -1676,6 +2070,18 @@ struct HomeAssistantModelsTests {
             budgetNames: [],
             aliasSummaries: [],
             now: date(2026, 4, 15, 12, 0, 0)
+        )
+    }
+
+    private func emptyPriorQueryContext() -> MarinaPriorQueryContext {
+        MarinaPriorQueryContext(
+            lastQueryPlan: nil,
+            lastMetric: nil,
+            lastTargetName: nil,
+            lastTargetType: nil,
+            lastDateRange: nil,
+            lastResultLimit: nil,
+            lastPeriodUnit: nil
         )
     }
 

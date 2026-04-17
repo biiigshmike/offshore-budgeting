@@ -634,30 +634,38 @@ struct HomeQueryEngine {
         let filteredPlanned = filteredPlannedExpenses(plannedExpenses, matchingCategoryName: targetName)
         let filteredVariable = filteredVariableExpenses(variableExpenses, matchingCategoryName: targetName)
         let ranges = comparisonRanges(for: query, now: now)
+        let currentTotal = totalSpend(
+            plannedExpenses: filteredPlanned,
+            variableExpenses: filteredVariable,
+            range: ranges.current
+        )
+        let previousTotal = totalSpend(
+            plannedExpenses: filteredPlanned,
+            variableExpenses: filteredVariable,
+            range: ranges.previous
+        )
+        logScopedComparison(
+            scope: "category",
+            target: targetName,
+            currentRange: ranges.current,
+            previousRange: ranges.previous,
+            currentTotal: currentTotal,
+            previousTotal: previousTotal,
+            branch: currentTotal == 0 && previousTotal == 0 ? "empty_both" : "comparison"
+        )
 
-        guard filteredPlanned.isEmpty == false || filteredVariable.isEmpty == false else {
-            return HomeAnswer(
+        if currentTotal == 0 && previousTotal == 0 {
+            return scopedComparisonEmptyState(
                 queryID: query.id,
-                kind: .message,
                 title: "Category Comparison (\(targetName))",
-                subtitle: "No matching category spending found.",
-                primaryValue: nil,
-                rows: []
+                subtitle: "No activity in either comparison period yet."
             )
         }
 
         return comparisonAnswer(
             query: query,
-            currentTotal: totalSpend(
-                plannedExpenses: filteredPlanned,
-                variableExpenses: filteredVariable,
-                range: ranges.current
-            ),
-            previousTotal: totalSpend(
-                plannedExpenses: filteredPlanned,
-                variableExpenses: filteredVariable,
-                range: ranges.previous
-            ),
+            currentTotal: currentTotal,
+            previousTotal: previousTotal,
             currentRange: ranges.current,
             previousRange: ranges.previous,
             defaultTitle: "Category Comparison (\(targetName))",
@@ -685,30 +693,38 @@ struct HomeQueryEngine {
         let filteredPlanned = filteredPlannedExpenses(plannedExpenses, matchingCardName: targetName)
         let filteredVariable = filteredVariableExpenses(variableExpenses, matchingCardName: targetName)
         let ranges = comparisonRanges(for: query, now: now)
+        let currentTotal = totalSpend(
+            plannedExpenses: filteredPlanned,
+            variableExpenses: filteredVariable,
+            range: ranges.current
+        )
+        let previousTotal = totalSpend(
+            plannedExpenses: filteredPlanned,
+            variableExpenses: filteredVariable,
+            range: ranges.previous
+        )
+        logScopedComparison(
+            scope: "card",
+            target: targetName,
+            currentRange: ranges.current,
+            previousRange: ranges.previous,
+            currentTotal: currentTotal,
+            previousTotal: previousTotal,
+            branch: currentTotal == 0 && previousTotal == 0 ? "empty_both" : "comparison"
+        )
 
-        guard filteredPlanned.isEmpty == false || filteredVariable.isEmpty == false else {
-            return HomeAnswer(
+        if currentTotal == 0 && previousTotal == 0 {
+            return scopedComparisonEmptyState(
                 queryID: query.id,
-                kind: .message,
                 title: "Card Comparison (\(targetName))",
-                subtitle: "No matching card spending found.",
-                primaryValue: nil,
-                rows: []
+                subtitle: "No activity in either comparison period yet."
             )
         }
 
         return comparisonAnswer(
             query: query,
-            currentTotal: totalSpend(
-                plannedExpenses: filteredPlanned,
-                variableExpenses: filteredVariable,
-                range: ranges.current
-            ),
-            previousTotal: totalSpend(
-                plannedExpenses: filteredPlanned,
-                variableExpenses: filteredVariable,
-                range: ranges.previous
-            ),
+            currentTotal: currentTotal,
+            previousTotal: previousTotal,
             currentRange: ranges.current,
             previousRange: ranges.previous,
             defaultTitle: "Card Comparison (\(targetName))",
@@ -2434,18 +2450,9 @@ struct HomeQueryEngine {
         }
 
         let merchantKey = MerchantNormalizer.normalizeKey(merchantName)
+        let merchantTitle = merchantPresentationName(merchantName)
         let filtered = variableExpenses.filter {
             merchantMatches(targetKey: merchantKey, expenseDescription: $0.descriptionText)
-        }
-        guard filtered.isEmpty == false else {
-            return HomeAnswer(
-                queryID: query.id,
-                kind: .message,
-                title: "Merchant Comparison (\(MerchantNormalizer.displayName(merchantName)))",
-                subtitle: "No matching merchant spending found.",
-                primaryValue: nil,
-                rows: []
-            )
         }
 
         let ranges = comparisonRanges(for: query, now: now)
@@ -2461,6 +2468,23 @@ struct HomeQueryEngine {
             }
             return partial + expense.ledgerSignedAmount()
         }
+        logScopedComparison(
+            scope: "merchant",
+            target: merchantName,
+            currentRange: ranges.current,
+            previousRange: ranges.previous,
+            currentTotal: currentTotal,
+            previousTotal: previousTotal,
+            branch: currentTotal == 0 && previousTotal == 0 ? "empty_both" : "comparison"
+        )
+
+        if currentTotal == 0 && previousTotal == 0 {
+            return scopedComparisonEmptyState(
+                queryID: query.id,
+                title: "Merchant Comparison (\(merchantTitle))",
+                subtitle: "No activity in either comparison period yet."
+            )
+        }
 
         return comparisonAnswer(
             query: query,
@@ -2468,8 +2492,8 @@ struct HomeQueryEngine {
             previousTotal: previousTotal,
             currentRange: ranges.current,
             previousRange: ranges.previous,
-            defaultTitle: "Merchant Comparison (\(MerchantNormalizer.displayName(merchantName)))",
-            periodTitle: "Merchant Comparison (\(MerchantNormalizer.displayName(merchantName)))"
+            defaultTitle: "Merchant Comparison (\(merchantTitle))",
+            periodTitle: "Merchant Comparison (\(merchantTitle))"
         )
     }
 
@@ -2656,6 +2680,44 @@ struct HomeQueryEngine {
                 HomeAnswerRow(title: previousLabel, value: currency(previousTotal))
             ]
         )
+    }
+
+    private func scopedComparisonEmptyState(
+        queryID: UUID,
+        title: String,
+        subtitle: String
+    ) -> HomeAnswer {
+        HomeAnswer(
+            queryID: queryID,
+            kind: .message,
+            title: title,
+            subtitle: subtitle,
+            primaryValue: nil,
+            rows: []
+        )
+    }
+
+    private func logScopedComparison(
+        scope: String,
+        target: String,
+        currentRange: HomeQueryDateRange,
+        previousRange: HomeQueryDateRange,
+        currentTotal: Double,
+        previousTotal: Double,
+        branch: String
+    ) {
+        MarinaDebugLogger.log(
+            "[MarinaComparison] scope=\(scope) target='\(target)' current=\(rangeLabel(for: currentRange)) previous=\(rangeLabel(for: previousRange)) currentTotal=\(currentTotal) previousTotal=\(previousTotal) branch=\(branch)"
+        )
+    }
+
+    private func merchantPresentationName(_ raw: String) -> String {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.isEmpty == false else { return "" }
+        if trimmed.rangeOfCharacter(from: CharacterSet.lowercaseLetters) != nil || trimmed.contains("'") {
+            return trimmed
+        }
+        return MerchantNormalizer.displayName(trimmed)
     }
 
     private func filteredPlannedExpenses(

@@ -440,6 +440,70 @@ struct HomeAssistantRecoverySuggestion: Codable, Equatable, Identifiable {
     }
 }
 
+struct HomeAssistantSuggestionSection: Equatable, Identifiable {
+    let id: String
+    let title: String
+    let suggestions: [HomeAssistantSuggestion]
+    let isRecovery: Bool
+
+    init(
+        title: String,
+        suggestions: [HomeAssistantSuggestion],
+        isRecovery: Bool
+    ) {
+        self.id = "\(title)|\(isRecovery)"
+        self.title = title
+        self.suggestions = suggestions
+        self.isRecovery = isRecovery
+    }
+}
+
+enum HomeAssistantSuggestionSectionBuilder {
+    static func build(
+        clarificationSuggestions: [HomeAssistantSuggestion],
+        clarificationReasonCount: Int,
+        recoverySuggestions: [HomeAssistantRecoverySuggestion],
+        followUpSuggestions: [HomeAssistantSuggestion]
+    ) -> [HomeAssistantSuggestionSection] {
+        var sections: [HomeAssistantSuggestionSection] = []
+
+        if clarificationSuggestions.isEmpty == false {
+            let title = clarificationReasonCount == 0
+                ? "Clarification"
+                : "Clarification (\(clarificationReasonCount))"
+            sections.append(
+                HomeAssistantSuggestionSection(
+                    title: title,
+                    suggestions: clarificationSuggestions,
+                    isRecovery: false
+                )
+            )
+        }
+
+        if recoverySuggestions.isEmpty == false {
+            sections.append(
+                HomeAssistantSuggestionSection(
+                    title: "Recovery",
+                    suggestions: recoverySuggestions.map(\.suggestion),
+                    isRecovery: true
+                )
+            )
+        }
+
+        if followUpSuggestions.isEmpty == false {
+            sections.append(
+                HomeAssistantSuggestionSection(
+                    title: "Follow-Up Suggestions",
+                    suggestions: followUpSuggestions,
+                    isRecovery: false
+                )
+            )
+        }
+
+        return sections
+    }
+}
+
 struct HomeAssistantEntityResolution: Codable, Equatable {
     let resolvedPhrase: String
     let bestMatch: HomeAssistantEntityMatch?

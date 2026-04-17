@@ -14,6 +14,13 @@ enum MarinaInterpretedRequest: Equatable {
     case unresolved
 }
 
+extension MarinaInterpretedRequest {
+    var executableQueryPlan: HomeQueryPlan? {
+        guard case let .query(plan, _) = self else { return nil }
+        return plan
+    }
+}
+
 enum MarinaStructuredIntentKind: String, Equatable {
     case query
     case command
@@ -61,6 +68,16 @@ struct MarinaStructuredClarification: Equatable {
     let missingFields: [MarinaStructuredMissingField]
     let ambiguities: [MarinaStructuredAmbiguity]
     let shouldRunBestEffort: Bool
+}
+
+extension MarinaStructuredClarification {
+    var isActionable: Bool {
+        missingFields.isEmpty == false || ambiguities.isEmpty == false
+    }
+
+    var isMeaningful: Bool {
+        subtitle?.isEmpty == false || missingFields.isEmpty == false || ambiguities.isEmpty == false
+    }
 }
 
 struct MarinaStructuredQueryIntent: Equatable {
@@ -125,6 +142,7 @@ struct MarinaClarificationRequest: Equatable {
     let shouldRunBestEffort: Bool
     let queryPlan: HomeQueryPlan?
     let commandPlan: HomeAssistantCommandPlan?
+    let isActionable: Bool
 }
 
 struct MarinaPriorQueryContext: Equatable {
@@ -171,5 +189,35 @@ enum MarinaDebugLogger {
         #if DEBUG
         print("[MarinaTrace] \(message())")
         #endif
+    }
+}
+
+enum MarinaTurnFinalOutcome: String, Equatable {
+    case answer
+    case clarification
+    case recovery
+    case unresolved
+}
+
+enum MarinaTurnOutcomeEvaluator {
+    static func outcome(
+        hasExecutableQuery: Bool,
+        requiredFieldsMissing: Bool,
+        clarificationIsActionable: Bool,
+        shouldRecover: Bool
+    ) -> MarinaTurnFinalOutcome {
+        if hasExecutableQuery && requiredFieldsMissing == false {
+            return .answer
+        }
+
+        if shouldRecover {
+            return .recovery
+        }
+
+        if clarificationIsActionable {
+            return .clarification
+        }
+
+        return .unresolved
     }
 }

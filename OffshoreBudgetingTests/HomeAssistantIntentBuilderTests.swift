@@ -360,6 +360,72 @@ struct HomeAssistantIntentBuilderTests {
         #expect(plan.confidenceBand == .medium)
     }
 
+    @Test func buildPlan_explicitRelativeDates_overrideStaleFallbackRanges() throws {
+        let builder = makeBuilder()
+        let staleJanuary = monthRange(2025, 1)
+        let staleFebruary = monthRange(2025, 2)
+        let april = monthRange(2026, 4)
+        let march = monthRange(2026, 3)
+        let fallbackPlan = HomeQueryPlan(
+            metric: .monthComparison,
+            dateRange: staleJanuary,
+            comparisonDateRange: staleFebruary,
+            resultLimit: nil,
+            confidenceBand: .medium,
+            targetName: "Groceries"
+        )
+
+        let plan = builder.buildPlan(
+            from: HomeAssistantParsedSignals(
+                metric: .monthComparison,
+                targetName: "Groceries",
+                targetSource: .matchedEntity,
+                dateRange: april,
+                comparisonDateRange: march,
+                comparisonDetected: true,
+                rawPrompt: "Compare groceries this month to last month"
+            ),
+            fallbackPlan: fallbackPlan
+        )
+
+        #expect(plan.metric == .categoryMonthComparison)
+        #expect(plan.targetName == "Groceries")
+        #expect(plan.dateRange == april)
+        #expect(plan.comparisonDateRange == march)
+    }
+
+    @Test func buildPlan_previousWeekSignals_overrideStaleFallbackRanges() throws {
+        let builder = makeBuilder()
+        let staleJanuary = monthRange(2025, 1)
+        let staleFebruary = monthRange(2025, 2)
+        let currentWeek = weekRange(2026, 4, 6)
+        let previousWeek = weekRange(2026, 3, 30)
+        let fallbackPlan = HomeQueryPlan(
+            metric: .monthComparison,
+            dateRange: staleJanuary,
+            comparisonDateRange: staleFebruary,
+            resultLimit: nil,
+            confidenceBand: .medium
+        )
+
+        let plan = builder.buildPlan(
+            from: HomeAssistantParsedSignals(
+                metric: .monthComparison,
+                targetName: nil,
+                targetSource: nil,
+                dateRange: currentWeek,
+                comparisonDateRange: previousWeek,
+                comparisonDetected: true,
+                rawPrompt: "Compare last week to previous week"
+            ),
+            fallbackPlan: fallbackPlan
+        )
+
+        #expect(plan.metric == .monthComparison)
+        #expect(plan.dateRange == currentWeek)
+        #expect(plan.comparisonDateRange == previousWeek)
+    }
+
     private func makeBuilder() -> HomeAssistantIntentBuilder {
         HomeAssistantIntentBuilder(
             categoryNames: ["Groceries", "Transportation"],
@@ -372,6 +438,13 @@ struct HomeAssistantIntentBuilderTests {
         HomeQueryDateRange(
             startDate: date(year, month, 1, 0, 0, 0),
             endDate: date(year, month, 28, 23, 59, 59)
+        )
+    }
+
+    private func weekRange(_ year: Int, _ month: Int, _ day: Int) -> HomeQueryDateRange {
+        HomeQueryDateRange(
+            startDate: date(year, month, day, 0, 0, 0),
+            endDate: date(year, month, day + 6, 23, 59, 59)
         )
     }
 

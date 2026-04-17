@@ -110,7 +110,7 @@ struct MarinaDateResolver {
             return dayRange(for: yesterday)
         }
 
-        if normalized.contains("last week"),
+        if (normalized.contains("last week") || normalized.contains("previous week")),
            let currentWeek = calendar.dateInterval(of: .weekOfYear, for: now) {
             let previousWeekAnchor = calendar.date(byAdding: .weekOfYear, value: -1, to: currentWeek.start) ?? currentWeek.start
             return fullWeekRange(containing: previousWeekAnchor)

@@ -55,6 +55,10 @@ struct HomeAssistantIntentBuilder {
         var dateRange = fallbackPlan.dateRange
         var comparisonDateRange = fallbackPlan.comparisonDateRange
         var confidenceBand = fallbackPlan.confidenceBand
+        let promptHasExplicitDate = containsExplicitDateLanguage(in: signals.rawPrompt)
+        MarinaDebugLogger.log(
+            "[MarinaIntentBuilder] rawPrompt='\(signals.rawPrompt)' fallbackDate=\(String(describing: fallbackPlan.dateRange)) fallbackComparison=\(String(describing: fallbackPlan.comparisonDateRange)) signalDate=\(String(describing: signals.dateRange)) signalComparison=\(String(describing: signals.comparisonDateRange)) explicitDate=\(promptHasExplicitDate)"
+        )
 
         let injectedTargetName: String?
         if let signalTarget = sanitized(signals.targetName), targetName == nil {
@@ -65,7 +69,8 @@ struct HomeAssistantIntentBuilder {
         }
 
         let injectedDateRange: HomeQueryDateRange?
-        if dateRange == nil, let signalDateRange = signals.dateRange {
+        if let signalDateRange = signals.dateRange,
+           dateRange == nil || promptHasExplicitDate {
             dateRange = signalDateRange
             injectedDateRange = signalDateRange
         } else {
@@ -73,7 +78,8 @@ struct HomeAssistantIntentBuilder {
         }
 
         let injectedComparisonDateRange: HomeQueryDateRange?
-        if comparisonDateRange == nil, let signalComparisonDateRange = signals.comparisonDateRange {
+        if let signalComparisonDateRange = signals.comparisonDateRange,
+           comparisonDateRange == nil || promptHasExplicitDate {
             comparisonDateRange = signalComparisonDateRange
             injectedComparisonDateRange = signalComparisonDateRange
         } else {
@@ -135,7 +141,7 @@ struct HomeAssistantIntentBuilder {
             injectedComparisonDateRange: injectedComparisonDateRange != nil
         )
 
-        return HomeQueryPlan(
+        let resolvedPlan = HomeQueryPlan(
             metric: metric,
             dateRange: dateRange,
             comparisonDateRange: comparisonDateRange,
@@ -144,6 +150,10 @@ struct HomeAssistantIntentBuilder {
             targetName: targetName,
             periodUnit: fallbackPlan.periodUnit
         )
+        MarinaDebugLogger.log(
+            "[MarinaIntentBuilder] resolved metric=\(resolvedPlan.metric.rawValue) date=\(String(describing: resolvedPlan.dateRange)) comparison=\(String(describing: resolvedPlan.comparisonDateRange)) target=\(resolvedPlan.targetName ?? "nil") confidence=\(resolvedPlan.confidenceBand.rawValue)"
+        )
+        return resolvedPlan
     }
 
     private func shouldOverrideMetric(
@@ -253,6 +263,22 @@ struct HomeAssistantIntentBuilder {
             && normalized.contains(" to ")
             && explicitDateTokenCount >= 2
         return hasExplicitDateToken && (hasComparisonBridge || hasToBridge)
+    }
+
+    private func containsExplicitDateLanguage(in rawPrompt: String) -> Bool {
+        let normalized = normalizedPrompt(rawPrompt)
+        let phrases = [
+            "today", "yesterday", "this week", "current week", "last week", "previous week",
+            "this month", "current month", "month to date", "last month", "previous month",
+            "this year", "current year", "year to date", "last year", "previous year",
+            "from ", "between "
+        ]
+        if phrases.contains(where: normalized.contains) {
+            return true
+        }
+
+        let explicitDateTokenPattern = "\\b(jan|january|feb|february|mar|march|apr|april|may|jun|june|jul|july|aug|august|sep|sept|september|oct|october|nov|november|dec|december|q[1-4]|\\d{4}-\\d{1,2}-\\d{1,2}|\\d{4})\\b"
+        return normalized.range(of: explicitDateTokenPattern, options: .regularExpression) != nil
     }
 
     private func regexMatchCount(

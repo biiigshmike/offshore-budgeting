@@ -48,6 +48,15 @@ enum HomeAssistantClarificationReason: String, CaseIterable, Hashable {
             return "Your phrasing is ambiguous, so I need one clear direction."
         }
     }
+
+    var requiresUserResolution: Bool {
+        switch self {
+        case .missingDate, .missingComparisonDate, .missingCategoryTarget, .missingCardTarget, .missingIncomeSourceTarget, .missingMerchantTarget:
+            return true
+        case .broadPrompt, .lowConfidenceLanguage:
+            return false
+        }
+    }
 }
 
 // MARK: - Resolver

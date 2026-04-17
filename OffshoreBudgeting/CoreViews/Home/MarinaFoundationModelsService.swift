@@ -333,7 +333,7 @@ private func makeStructuredIntent(from flat: MarinaFoundationModelsFlatResponse)
                 resultLimit: flat.queryResultLimit,
                 periodUnitRaw: flat.queryPeriodUnitRaw?.nilIfBlank,
                 confidenceRaw: flat.queryConfidenceRaw?.nilIfBlank,
-                clarification: clarification.isMeaningful ? clarification : nil
+                clarification: clarification.isActionable ? clarification : nil
             )
         )
     case .command:
@@ -370,7 +370,7 @@ private func makeStructuredIntent(from flat: MarinaFoundationModelsFlatResponse)
                 attachAllPresets: flat.attachAllPresets,
                 selectedCardNames: flat.selectedCardNames,
                 selectedPresetTitles: flat.selectedPresetTitles,
-                clarification: clarification.isMeaningful ? clarification : nil
+                clarification: clarification.isActionable ? clarification : nil
             )
         )
     case .clarification:
@@ -388,12 +388,6 @@ private extension String {
     }
 }
 
-@available(iOS 26.0, macOS 26.0, *)
-private extension MarinaStructuredClarification {
-    var isMeaningful: Bool {
-        subtitle?.isEmpty == false || missingFields.isEmpty == false || ambiguities.isEmpty == false
-    }
-}
 #else
 private func interpretWithFoundationModels(
     prompt _: String,

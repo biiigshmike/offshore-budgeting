@@ -322,23 +322,47 @@ struct HomeAssistantPersonaFormatter {
             switch executedQuery.intent {
             case .categorySpendTotal, .categorySpendShare, .categorySpendShareTrend, .compareCategoryThisMonthToPreviousMonth, .categoryPotentialSavings, .categoryReallocationGuidance:
                 return [
-                    makeSuggestion("Compare with last month", query: HomeQuery(intent: .compareCategoryThisMonthToPreviousMonth, dateRange: executedQuery.dateRange, targetName: executedQuery.targetName)),
-                    makeSuggestion("Top categories this month", query: HomeQuery(intent: .topCategoriesThisMonth, dateRange: executedQuery.dateRange, resultLimit: 3))
+                    makeSuggestion(
+                        comparisonFollowUpLabel(for: executedQuery),
+                        query: HomeQuery(intent: .compareCategoryThisMonthToPreviousMonth, dateRange: executedQuery.dateRange, targetName: executedQuery.targetName)
+                    ),
+                    makeSuggestion(
+                        scopedFollowUpLabel(base: "Top categories", for: executedQuery),
+                        query: HomeQuery(intent: .topCategoriesThisMonth, dateRange: executedQuery.dateRange, resultLimit: 3)
+                    )
                 ]
             case .merchantSpendTotal, .merchantSpendSummary, .compareMerchantThisMonthToPreviousMonth:
                 return [
-                    makeSuggestion("Largest expenses this month", query: HomeQuery(intent: .largestRecentTransactions, dateRange: executedQuery.dateRange, resultLimit: 5)),
-                    makeSuggestion("Top merchants this month", query: HomeQuery(intent: .topMerchantsThisMonth, dateRange: executedQuery.dateRange, resultLimit: 3))
+                    makeSuggestion(
+                        scopedFollowUpLabel(base: "Largest expenses", for: executedQuery),
+                        query: HomeQuery(intent: .largestRecentTransactions, dateRange: executedQuery.dateRange, resultLimit: 5)
+                    ),
+                    makeSuggestion(
+                        scopedFollowUpLabel(base: "Top merchants", for: executedQuery),
+                        query: HomeQuery(intent: .topMerchantsThisMonth, dateRange: executedQuery.dateRange, resultLimit: 3)
+                    )
                 ]
             case .cardSpendTotal, .cardVariableSpendingHabits, .compareCardThisMonthToPreviousMonth, .cardSnapshotSummary:
                 return [
-                    makeSuggestion("Compare with last month", query: HomeQuery(intent: .compareCardThisMonthToPreviousMonth, dateRange: executedQuery.dateRange, targetName: executedQuery.targetName)),
-                    makeSuggestion("Variable spending habits by card", query: HomeQuery(intent: .cardVariableSpendingHabits, dateRange: executedQuery.dateRange))
+                    makeSuggestion(
+                        comparisonFollowUpLabel(for: executedQuery),
+                        query: HomeQuery(intent: .compareCardThisMonthToPreviousMonth, dateRange: executedQuery.dateRange, targetName: executedQuery.targetName)
+                    ),
+                    makeSuggestion(
+                        scopedFollowUpLabel(base: "Variable spending habits by card", for: executedQuery),
+                        query: HomeQuery(intent: .cardVariableSpendingHabits, dateRange: executedQuery.dateRange)
+                    )
                 ]
             case .compareThisMonthToPreviousMonth, .spendThisMonth:
                 return [
-                    makeSuggestion("Top 3 categories this month", query: HomeQuery(intent: .topCategoriesThisMonth, dateRange: executedQuery.dateRange, resultLimit: 3)),
-                    makeSuggestion("Compare with last month", query: HomeQuery(intent: .compareThisMonthToPreviousMonth, dateRange: executedQuery.dateRange))
+                    makeSuggestion(
+                        scopedFollowUpLabel(base: "Top 3 categories", for: executedQuery),
+                        query: HomeQuery(intent: .topCategoriesThisMonth, dateRange: executedQuery.dateRange, resultLimit: 3)
+                    ),
+                    makeSuggestion(
+                        comparisonFollowUpLabel(for: executedQuery),
+                        query: HomeQuery(intent: .compareThisMonthToPreviousMonth, dateRange: executedQuery.dateRange)
+                    )
                 ]
             default:
                 break
@@ -425,6 +449,97 @@ struct HomeAssistantPersonaFormatter {
 
     private func followUpTitle(action: String) -> String {
         return action
+    }
+
+    private func comparisonFollowUpLabel(for executedQuery: HomeQuery) -> String {
+        switch followUpScope(for: executedQuery) {
+        case .week:
+            return followUpTitle(action: "Compare with previous week")
+        case .month:
+            return followUpTitle(action: "Compare with last month")
+        case .year:
+            return followUpTitle(action: "Compare with last year")
+        case .period:
+            return followUpTitle(action: "Compare with previous period")
+        }
+    }
+
+    private func scopedFollowUpLabel(base: String, for executedQuery: HomeQuery) -> String {
+        switch followUpScope(for: executedQuery) {
+        case .week:
+            return followUpTitle(action: "\(base) this week")
+        case .month:
+            return followUpTitle(action: "\(base) this month")
+        case .year:
+            return followUpTitle(action: "\(base) this year")
+        case .period:
+            return followUpTitle(action: "\(base) this period")
+        }
+    }
+
+    private func followUpScope(for executedQuery: HomeQuery) -> FollowUpScopeUnit {
+        if let periodUnit = executedQuery.periodUnit {
+            return scope(for: periodUnit)
+        }
+
+        guard let dateRange = executedQuery.dateRange else {
+            return .month
+        }
+
+        if isFullYear(dateRange) {
+            return .year
+        }
+
+        if isFullMonth(dateRange) {
+            return .month
+        }
+
+        if isWeeklyRange(dateRange) {
+            return .week
+        }
+
+        return .period
+    }
+
+    private func scope(for unit: HomeQueryPeriodUnit) -> FollowUpScopeUnit {
+        switch unit {
+        case .week:
+            return .week
+        case .month:
+            return .month
+        case .year:
+            return .year
+        case .day, .quarter:
+            return .period
+        }
+    }
+
+    private func isFullMonth(_ range: HomeQueryDateRange) -> Bool {
+        let calendar = Calendar.current
+        let start = calendar.startOfDay(for: range.startDate)
+        let end = calendar.startOfDay(for: range.endDate)
+        let monthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: start)) ?? start
+        let monthEnd = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: monthStart) ?? monthStart
+        return calendar.isDate(start, inSameDayAs: monthStart)
+            && calendar.isDate(end, inSameDayAs: monthEnd)
+    }
+
+    private func isFullYear(_ range: HomeQueryDateRange) -> Bool {
+        let calendar = Calendar.current
+        let start = calendar.startOfDay(for: range.startDate)
+        let end = calendar.startOfDay(for: range.endDate)
+        let yearStart = calendar.date(from: calendar.dateComponents([.year], from: start)) ?? start
+        let yearEnd = calendar.date(byAdding: DateComponents(year: 1, day: -1), to: yearStart) ?? yearStart
+        return calendar.isDate(start, inSameDayAs: yearStart)
+            && calendar.isDate(end, inSameDayAs: yearEnd)
+    }
+
+    private func isWeeklyRange(_ range: HomeQueryDateRange) -> Bool {
+        let calendar = Calendar.current
+        let start = calendar.startOfDay(for: range.startDate)
+        let end = calendar.startOfDay(for: range.endDate)
+        let span = calendar.dateComponents([.day], from: start, to: end).day ?? 0
+        return span == 6
     }
 
     private func randomLine(from lines: [String], key: String) -> String? {
@@ -951,6 +1066,13 @@ struct HomeAssistantPersonaFormatter {
 
         return hash
     }
+}
+
+private enum FollowUpScopeUnit {
+    case week
+    case month
+    case year
+    case period
 }
 
 private enum ConfidenceCue {

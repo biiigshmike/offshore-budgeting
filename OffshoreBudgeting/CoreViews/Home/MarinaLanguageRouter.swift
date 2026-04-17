@@ -67,6 +67,9 @@ struct MarinaLanguageRouter {
                 )
             case .clarification(let clarification, _):
                 let fallback = heuristicFallback()
+                MarinaDebugLogger.log(
+                    "model clarification prompt='\(prompt)' actionable=\(clarification.isActionable) fallbackQueryExists=\(fallback.executableQueryPlan != nil)"
+                )
                 if shouldPreferHeuristicFallback(
                     fallback,
                     over: clarification,
@@ -155,7 +158,8 @@ struct MarinaLanguageRouter {
             reasons: [.lowConfidenceLanguage],
             shouldRunBestEffort: false,
             queryPlan: nil,
-            commandPlan: nil
+            commandPlan: nil,
+            isActionable: false
         )
         MarinaDebugLogger.log("query-like clarification prompt='\(prompt)' reason=\(failureReason)")
         return .clarification(clarification, source: .model)
@@ -167,10 +171,16 @@ struct MarinaLanguageRouter {
         prompt: String,
         priorQueryContext: MarinaPriorQueryContext
     ) -> Bool {
-        guard priorQueryContext.hasContext else { return false }
         guard case .query = fallback else { return false }
         guard clarification.shouldRunBestEffort == false else { return false }
         guard clarification.commandPlan == nil else { return false }
+
+        if clarification.isActionable == false {
+            MarinaDebugLogger.log(
+                "clarification fallback preferred prompt='\(prompt)' reason=non_actionable priorContext=\(priorQueryContext.hasContext)"
+            )
+            return true
+        }
 
         if clarification.reasons.isEmpty {
             return true
@@ -248,7 +258,8 @@ struct MarinaLanguageRouter {
                 reasons: reasons,
                 shouldRunBestEffort: false,
                 queryPlan: plan,
-                commandPlan: nil
+                commandPlan: nil,
+                isActionable: true
             ),
             source: .model
         )

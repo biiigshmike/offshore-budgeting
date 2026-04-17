@@ -708,6 +708,73 @@ struct HomeQueryEngineTests {
         #expect(answer.rows[1].value.contains("250"))
     }
 
+    @Test func categoryMonthComparison_oneSideEmpty_keepsComparisonAnswer() throws {
+        let engine = makeEngine()
+        let currentRange = HomeQueryDateRange(
+            startDate: date(2026, 4, 1),
+            endDate: date(2026, 4, 16)
+        )
+        let previousRange = HomeQueryDateRange(
+            startDate: date(2026, 3, 1),
+            endDate: date(2026, 3, 31)
+        )
+        let query = HomeQuery(
+            intent: .compareCategoryThisMonthToPreviousMonth,
+            dateRange: currentRange,
+            comparisonDateRange: previousRange,
+            targetName: "Groceries"
+        )
+
+        let groceries = Category(name: "Groceries", hexColor: "#00AA00")
+        let variable: [VariableExpense] = [
+            VariableExpense(descriptionText: "April Groceries", amount: 120, transactionDate: date(2026, 4, 10), category: groceries)
+        ]
+
+        let answer = engine.execute(
+            query: query,
+            categories: [groceries],
+            plannedExpenses: [],
+            variableExpenses: variable,
+            now: date(2026, 4, 16)
+        )
+
+        #expect(answer.kind == .comparison)
+        #expect(answer.title.contains("Groceries"))
+        #expect(answer.rows[0].value.contains("120"))
+        #expect(answer.rows[1].value.contains("0"))
+    }
+
+    @Test func categoryMonthComparison_bothSidesEmpty_returnsScopedEmptyState() throws {
+        let engine = makeEngine()
+        let currentRange = HomeQueryDateRange(
+            startDate: date(2026, 4, 1),
+            endDate: date(2026, 4, 16)
+        )
+        let previousRange = HomeQueryDateRange(
+            startDate: date(2026, 3, 1),
+            endDate: date(2026, 3, 31)
+        )
+        let query = HomeQuery(
+            intent: .compareCategoryThisMonthToPreviousMonth,
+            dateRange: currentRange,
+            comparisonDateRange: previousRange,
+            targetName: "Groceries"
+        )
+
+        let groceries = Category(name: "Groceries", hexColor: "#00AA00")
+        let answer = engine.execute(
+            query: query,
+            categories: [groceries],
+            plannedExpenses: [],
+            variableExpenses: [],
+            now: date(2026, 4, 16)
+        )
+
+        #expect(answer.kind == .message)
+        #expect(answer.title.contains("Groceries"))
+        #expect(answer.subtitle == "No activity in either comparison period yet.")
+    }
+
     @Test func compareExplicitPeriods_usesProvidedRangesInsteadOfPreviousEquivalent() throws {
         let engine = makeEngine()
         let january = HomeQueryDateRange(
@@ -829,6 +896,42 @@ struct HomeQueryEngineTests {
         #expect(answer.title.contains("Apple Card"))
         #expect((answer.primaryValue ?? "").contains("400"))
         #expect(answer.rows[1].value.contains("175"))
+    }
+
+    @Test func merchantMonthComparison_oneSideEmpty_keepsComparisonAnswer() throws {
+        let engine = makeEngine()
+        let currentRange = HomeQueryDateRange(
+            startDate: date(2026, 4, 1),
+            endDate: date(2026, 4, 16)
+        )
+        let previousRange = HomeQueryDateRange(
+            startDate: date(2026, 3, 1),
+            endDate: date(2026, 3, 31)
+        )
+        let query = HomeQuery(
+            intent: .compareMerchantThisMonthToPreviousMonth,
+            dateRange: currentRange,
+            comparisonDateRange: previousRange,
+            targetName: "Trader Joe's"
+        )
+
+        let groceries = Category(name: "Groceries", hexColor: "#00AA00")
+        let variable: [VariableExpense] = [
+            VariableExpense(descriptionText: "Trader Joe's", amount: 85, transactionDate: date(2026, 4, 8), category: groceries)
+        ]
+
+        let answer = engine.execute(
+            query: query,
+            categories: [groceries],
+            plannedExpenses: [],
+            variableExpenses: variable,
+            now: date(2026, 4, 16)
+        )
+
+        #expect(answer.kind == .comparison)
+        #expect(answer.title.contains("Trader Joe"))
+        #expect(answer.rows[0].value.contains("85"))
+        #expect(answer.rows[1].value.contains("0"))
     }
 
     @Test func incomeSourceMonthComparison_filtersToTargetSource() throws {
