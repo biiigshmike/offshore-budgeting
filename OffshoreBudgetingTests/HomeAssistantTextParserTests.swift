@@ -160,6 +160,13 @@ struct HomeAssistantTextParserTests {
         #expect(query?.dateRange != nil)
     }
 
+    @Test func parse_merchantSpendInFebruaryPrompt_mapsToMerchantSpendIntent() throws {
+        let query = makeParser().parse("What did I spend on Starbucks in February?")
+
+        #expect(query?.intent == .merchantSpendTotal)
+        #expect(query?.dateRange != nil)
+    }
+
     @Test func parse_spendAveragePrompt_mapsToSpendAverageIntent() throws {
         let query = makeParser().parse("What is my average spend per month?")
 

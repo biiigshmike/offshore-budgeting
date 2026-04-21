@@ -174,11 +174,16 @@ struct HomeAssistantPanelView: View {
     @State private var pendingPlannedExpenseCandidates: [PlannedExpense] = []
     @State private var pendingWhatIfContext: HomeAssistantWhatIfContext? = nil
     @State private var pendingWhatIfCategoryMappingContext: HomeAssistantWhatIfContext? = nil
+    @State private var nlqClarificationPayload: MarinaNLQClarificationPayload? = nil
+    @State private var nlqClarificationOriginalPrompt: String? = nil
+    @State private var nlqExecutionContext: MarinaNLQExecutionContext? = nil
     @FocusState private var isPromptFieldFocused: Bool
     @AppStorage("general_defaultBudgetingPeriod")
     private var defaultBudgetingPeriodRaw: String = BudgetingPeriod.monthly.rawValue
     @AppStorage("general_confirmBeforeDeleting")
     private var confirmBeforeDeleting: Bool = true
+    @AppStorage("debug_marina_nlq_v1_enabled")
+    private var marinaNLQv1Enabled: Bool = false
     
     @Environment(\.modelContext) private var modelContext
     private let engine = HomeQueryEngine()
@@ -979,7 +984,7 @@ struct HomeAssistantPanelView: View {
                             ForEach(emptyStateSuggestions(for: selectedGroup)) { suggestion in
                                 Button {
                                     selectedEmptySuggestionGroup = nil
-                                    runQuery(suggestion.query, userPrompt: suggestion.title)
+                                    handleSuggestionTap(suggestion)
                                 } label: {
                                     Text(suggestion.title)
                                         .lineLimit(1)
@@ -1199,7 +1204,7 @@ struct HomeAssistantPanelView: View {
                                 HStack(spacing: 10) {
                                     ForEach(section.suggestions) { suggestion in
                                         Button {
-                                            runQuery(suggestion.query, userPrompt: suggestion.title)
+                                            handleSuggestionTap(suggestion)
                                         } label: {
                                             Text(suggestion.title)
                                                 .lineLimit(1)
@@ -1374,6 +1379,7 @@ struct HomeAssistantPanelView: View {
         recoverySuggestions = []
         lastClarificationReasons = []
         activeClarificationContext = nil
+        clearNLQClarificationState()
         
         let baseAnswer = engine.execute(
             query: query,
@@ -1435,6 +1441,11 @@ struct HomeAssistantPanelView: View {
             return
         }
 
+        if marinaNLQv1Enabled, let nlqPayload = nlqClarificationPayload {
+            handleNLQClarificationInput(prompt, payload: nlqPayload)
+            return
+        }
+
         if handleClarificationRejection(prompt) {
             return
         }
@@ -1456,12 +1467,14 @@ struct HomeAssistantPanelView: View {
             return
         }
 
-        if handleAnchoredFollowUpPrompt(prompt) {
-            return
-        }
-        
-        if handleUnsupportedPrompt(prompt) {
-            return
+        if marinaNLQv1Enabled == false {
+            if handleAnchoredFollowUpPrompt(prompt) {
+                return
+            }
+
+            if handleUnsupportedPrompt(prompt) {
+                return
+            }
         }
 
         Task { @MainActor in
@@ -4406,6 +4419,7 @@ struct HomeAssistantPanelView: View {
         recoverySuggestions = []
         lastClarificationReasons = []
         activeClarificationContext = nil
+        clearNLQClarificationState()
         pendingWhatIfContext = nil
         pendingWhatIfCategoryMappingContext = nil
         clearMutationPendingState()
@@ -4420,28 +4434,37 @@ struct HomeAssistantPanelView: View {
         overrideClarificationPlan: HomeAssistantClarificationPlan? = nil,
         overrideResolution: HomeAssistantEntityResolution? = nil
     ) {
+        let normalized = normalizedPrompt(rawPrompt)
         let resolution = overrideResolution ?? resolveEntityResolution(for: plan, rawPrompt: rawPrompt)
         let reconciliation = planReconciler.reconcile(plan: plan, resolution: resolution)
         let resolvedPlan = reconciliation.plan
         let routedRequest = requestRoutingResolver.resolve(prompt: rawPrompt, basePlan: resolvedPlan)
         let routedPlan = routedRequest.plan
+        let eligibility = HomeAssistantExecutionEligibilityEvaluator.evaluate(
+            plan: routedPlan,
+            normalizedPrompt: normalized,
+            activeBudgetDateRange: activeBudgetDateRange(),
+            now: Date()
+        )
+        let executionPlan = eligibility.planWithDateFallback
+        let executionPolicy = executionPlan.metric.executionPolicy
         MarinaDebugLogger.log(
-            "[MarinaResolution] inputPlan=\(plan) resolutionConfidence=\(resolution.confidence.rawValue) reconciledPlan=\(resolvedPlan) routedPlan=\(routedPlan)"
+            "[MarinaResolution] inputPlan=\(plan) resolutionConfidence=\(resolution.confidence.rawValue) reconciledPlan=\(resolvedPlan) routedPlan=\(routedPlan) executionPlan=\(executionPlan) unresolvedRequirements=\(eligibility.unresolvedRequirements)"
         )
         let enrichedResolution = resolutionWithRecoverySuggestions(
             resolution,
-            basePlan: routedPlan,
+            basePlan: executionPlan,
             rawPrompt: rawPrompt,
             explanation: reconciliation.explanation
         )
-        let requiredClarification = requiredFieldClarificationPlan(for: routedPlan, rawPrompt: rawPrompt)
-        let ambiguityClarification = ambiguityClarificationPlan(for: routedPlan, resolution: enrichedResolution)
+        let requiredClarification = requiredFieldClarificationPlan(for: executionPlan, rawPrompt: rawPrompt)
+        let ambiguityClarification = ambiguityClarificationPlan(for: executionPlan, resolution: enrichedResolution)
         let clarificationPlan = actionableClarificationPlan(
             mergeClarificationPlans(
                 overrideClarificationPlan ?? requiredClarification,
                 ambiguityClarification
             ),
-            basePlan: routedPlan,
+            basePlan: executionPlan,
             rawPrompt: rawPrompt
         )
 
@@ -4466,7 +4489,7 @@ struct HomeAssistantPanelView: View {
                 for: rawPrompt,
                 outcome: .clarification,
                 source: source,
-                plan: routedPlan,
+                plan: executionPlan,
                 notes: blockingClarification == nil ? "required_clarification_recovery" : "required_clarification"
             )
             if let blockingClarification {
@@ -4474,7 +4497,7 @@ struct HomeAssistantPanelView: View {
                     blockingClarification,
                     userPrompt: rawPrompt,
                     context: clarificationContext(
-                        for: routedPlan,
+                        for: executionPlan,
                         rawPrompt: rawPrompt,
                         resolution: enrichedResolution
                     )
@@ -4505,7 +4528,7 @@ struct HomeAssistantPanelView: View {
                 for: rawPrompt,
                 outcome: .clarification,
                 source: source,
-                plan: routedPlan,
+                plan: executionPlan,
                 notes: clarificationPlan == nil ? "tie_band_ambiguity_recovery" : "tie_band_ambiguity"
             )
             if let clarificationPlan {
@@ -4513,7 +4536,7 @@ struct HomeAssistantPanelView: View {
                     clarificationPlan,
                     userPrompt: rawPrompt,
                     context: clarificationContext(
-                        for: routedPlan,
+                        for: executionPlan,
                         rawPrompt: rawPrompt,
                         resolution: enrichedResolution
                     )
@@ -4528,17 +4551,17 @@ struct HomeAssistantPanelView: View {
             return
         }
 
-        if enrichedResolution.confidence == .low {
+        if enrichedResolution.confidence == .low && eligibility.unresolvedRequirements.isEmpty == false {
             logFinalTurnOutcome(
                 .recovery,
                 rawPrompt: rawPrompt,
-                notes: "low_confidence recoverySuggestions=\(enrichedResolution.recoverySuggestions.count)"
+                notes: "low_confidence unresolvedRequirements=\(eligibility.unresolvedRequirements) recoverySuggestions=\(enrichedResolution.recoverySuggestions.count)"
             )
             recordTelemetry(
                 for: rawPrompt,
                 outcome: .clarification,
                 source: source,
-                plan: routedPlan,
+                plan: executionPlan,
                 notes: "recovery_only"
             )
             presentRecoveryTurn(
@@ -4549,8 +4572,15 @@ struct HomeAssistantPanelView: View {
             return
         }
 
-        if allowsBroadBundle && shouldRunBroadOverviewBundle(for: rawPrompt, plan: routedPlan) {
-            runBroadOverviewBundle(userPrompt: rawPrompt, basePlan: routedPlan)
+        if enrichedResolution.confidence == .low
+            && executionPolicy.supportsBroadExecution
+            && executionPlan.targetName == nil
+        {
+            MarinaDebugLogger.log("[MarinaFinalization] low-confidence ignored for broad targetless metric=\(executionPlan.metric.rawValue)")
+        }
+
+        if allowsBroadBundle && shouldRunBroadOverviewBundle(for: rawPrompt, plan: executionPlan) {
+            runBroadOverviewBundle(userPrompt: rawPrompt, basePlan: executionPlan)
             logFinalTurnOutcome(
                 .answer,
                 rawPrompt: rawPrompt,
@@ -4560,15 +4590,19 @@ struct HomeAssistantPanelView: View {
                 for: rawPrompt,
                 outcome: .resolved,
                 source: source,
-                plan: routedPlan,
+                plan: executionPlan,
                 notes: clarificationPlan == nil ? "broad_bundle" : "broad_bundle_with_clarification_chips"
             )
         } else {
+            let executionRoutedRequest = HomeAssistantRequestRoutingResolution(
+                shape: routedRequest.shape,
+                plan: executionPlan
+            )
             runRoutedRequest(
-                routedRequest,
+                executionRoutedRequest,
                 userPrompt: rawPrompt,
                 explanation: reconciliation.explanation,
-                executedPlan: routedPlan
+                executedPlan: executionPlan
             )
             logFinalTurnOutcome(
                 .answer,
@@ -4579,7 +4613,7 @@ struct HomeAssistantPanelView: View {
                 for: rawPrompt,
                 outcome: .resolved,
                 source: source,
-                plan: routedPlan,
+                plan: executionPlan,
                 notes: routedRequest.shape == .single
                     ? (clarificationPlan == nil ? nil : "resolved_with_clarification_chips")
                     : bundledRoutingTelemetryNote(
@@ -4594,7 +4628,7 @@ struct HomeAssistantPanelView: View {
                 clarificationPlan,
                 userPrompt: nil,
                 context: clarificationContext(
-                    for: routedPlan,
+                    for: executionPlan,
                     rawPrompt: rawPrompt,
                     resolution: enrichedResolution
                 )
@@ -5074,19 +5108,23 @@ struct HomeAssistantPanelView: View {
         normalizedPrompt: String
     ) -> [HomeAssistantClarificationReason] {
         var reasons: [HomeAssistantClarificationReason] = []
+        let eligibility = HomeAssistantExecutionEligibilityEvaluator.evaluate(
+            plan: plan,
+            normalizedPrompt: normalizedPrompt,
+            activeBudgetDateRange: activeBudgetDateRange(),
+            now: Date()
+        )
+        let executionPolicy = plan.metric.executionPolicy
         
         if plan.confidenceBand == .low {
             reasons.append(.lowConfidenceLanguage)
         }
 
-        if plan.comparisonDateRange == nil
-            && appearsToRequestExplicitComparisonDates(in: normalizedPrompt)
-        {
+        if eligibility.unresolvedRequirements.contains(.comparisonDateScope) {
             reasons.append(.missingComparisonDate)
         }
         
-        if plan.dateRange == nil
-            && isDateExpected(for: plan.metric)
+        if eligibility.unresolvedRequirements.contains(.dateScope)
             && hasExplicitDatePhrase(in: normalizedPrompt) == false
         {
             reasons.append(.missingDate)
@@ -5099,7 +5137,7 @@ struct HomeAssistantPanelView: View {
             reasons.append(.broadPrompt)
         }
         
-        if plan.targetName == nil {
+        if executionPolicy.requiresTarget && plan.targetName == nil {
             if requiresCategoryTarget(plan.metric) && normalizedPrompt.contains("all categories") == false {
                 reasons.append(.missingCategoryTarget)
             } else if requiresCardTarget(plan.metric) && normalizedPrompt.contains("all cards") == false {
@@ -5367,8 +5405,38 @@ struct HomeAssistantPanelView: View {
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    private func clearNLQClarificationState() {
+        nlqClarificationPayload = nil
+        nlqClarificationOriginalPrompt = nil
+    }
+
+    private func handleSuggestionTap(_ suggestion: HomeAssistantSuggestion) {
+        if marinaNLQv1Enabled, let payload = nlqClarificationPayload,
+           payload.options.contains(where: { $0.displayLabel == suggestion.title })
+        {
+            handleNLQClarificationInput(suggestion.title, payload: payload)
+            return
+        }
+
+        runQuery(suggestion.query, userPrompt: suggestion.title)
+    }
+
     @MainActor
     private func interpretPrompt(_ prompt: String) async {
+        if marinaNLQv1Enabled {
+            let provider = MarinaDataProvider(modelContext: modelContext, workspaceID: workspace.id)
+            let pipeline = MarinaNLQPipeline(provider: provider, defaultPeriodUnit: defaultQueryPeriodUnit)
+
+            let pipelineResult = pipeline.run(
+                prompt: prompt,
+                activeBudgetPeriod: activeBudgetDateRange(),
+                priorContext: nlqExecutionContext,
+                now: Date()
+            )
+            _ = handleNLQPipelineResult(pipelineResult, originalPrompt: prompt)
+            return
+        }
+
         let interpreted = await languageRouter.interpret(
             prompt: prompt,
             context: makeMarinaRouterContext(),
@@ -5378,6 +5446,96 @@ struct HomeAssistantPanelView: View {
         )
 
         handleInterpretedRequest(interpreted, rawPrompt: prompt)
+    }
+
+    @MainActor
+    private func handleNLQPipelineResult(
+        _ result: MarinaNLQPipelineResult,
+        originalPrompt: String
+    ) -> Bool {
+        switch result {
+        case .answer(let answer, let executionContext):
+            clearNLQClarificationState()
+            nlqExecutionContext = executionContext
+            clarificationSuggestions = []
+            recoverySuggestions = []
+            lastClarificationReasons = []
+            activeClarificationContext = nil
+            let styled = personaFormatter.styledAnswer(
+                from: answer,
+                userPrompt: answer.userPrompt ?? originalPrompt,
+                personaID: selectedPersonaID
+            )
+            appendAnswer(styled)
+            return true
+        case .clarification(let payload):
+            nlqClarificationPayload = payload
+            nlqClarificationOriginalPrompt = originalPrompt
+            clarificationSuggestions = payload.options.map { option in
+                HomeAssistantSuggestion(
+                    title: option.displayLabel,
+                    query: HomeQuery(intent: .spendThisMonth)
+                )
+            }
+            recoverySuggestions = []
+            lastClarificationReasons = [.lowConfidenceLanguage]
+            activeClarificationContext = nil
+            appendAnswer(
+                HomeAnswer(
+                    queryID: UUID(),
+                    kind: .message,
+                    userPrompt: originalPrompt,
+                    title: String(localized: "assistant.quickClarification", defaultValue: "Quick clarification", comment: "Assistant clarification card title."),
+                    subtitle: payload.message,
+                    rows: []
+                )
+            )
+            return true
+        case .recovery(let message):
+            clearNLQClarificationState()
+            clarificationSuggestions = []
+            recoverySuggestions = []
+            appendAnswer(
+                HomeAnswer(
+                    queryID: UUID(),
+                    kind: .message,
+                    userPrompt: originalPrompt,
+                    title: "Try one of these",
+                    subtitle: message,
+                    rows: []
+                )
+            )
+            return true
+        }
+    }
+
+    @MainActor
+    private func handleNLQClarificationInput(
+        _ typedInput: String,
+        payload: MarinaNLQClarificationPayload
+    ) {
+        let provider = MarinaDataProvider(modelContext: modelContext, workspaceID: workspace.id)
+        let pipeline = MarinaNLQPipeline(provider: provider, defaultPeriodUnit: defaultQueryPeriodUnit)
+        let seedPrompt = nlqClarificationOriginalPrompt ?? typedInput
+        let result = pipeline.resolveClarificationResponse(
+            typedInput: typedInput,
+            payload: payload,
+            prompt: seedPrompt,
+            activeBudgetPeriod: activeBudgetDateRange(),
+            priorContext: nlqExecutionContext,
+            now: Date()
+        )
+        _ = handleNLQPipelineResult(result, originalPrompt: typedInput)
+    }
+
+    private func activeBudgetDateRange() -> HomeQueryDateRange? {
+        let now = Date()
+        if let activeBudget = budgets.first(where: { budget in
+            budget.startDate <= now && budget.endDate >= now
+        }) {
+            return HomeQueryDateRange(startDate: activeBudget.startDate, endDate: activeBudget.endDate)
+        }
+        return nil
     }
 
     private func heuristicInterpretedRequest(for prompt: String) -> MarinaInterpretedRequest {
@@ -5397,6 +5555,17 @@ struct HomeAssistantPanelView: View {
         _ interpreted: MarinaInterpretedRequest,
         rawPrompt: String
     ) {
+        if marinaNLQv1Enabled {
+            if case .query(_, .model) = interpreted {
+                MarinaDebugLogger.log("[MarinaNLQ] blocked model query in NLQ-authoritative mode")
+                return
+            }
+            if case .clarification(_, .some(.model)) = interpreted {
+                MarinaDebugLogger.log("[MarinaNLQ] blocked model clarification in NLQ-authoritative mode")
+                return
+            }
+        }
+
         switch interpreted {
         case .query(let plan, let source):
             let effectivePlan = source == .model
@@ -5544,7 +5713,7 @@ struct HomeAssistantPanelView: View {
                 targetName: merchant,
                 periodUnit: plan.periodUnit
             )
-        case .overview, .spendTotal, .topCategories, .monthComparison, .largestTransactions, .spendAveragePerPeriod, .savingsStatus, .savingsAverageRecentPeriods, .presetDueSoon, .presetHighestCost, .presetTopCategory, .safeSpendToday, .forecastSavings, .topMerchants, .topCategoryChanges:
+        case .overview, .spendTotal, .topCategories, .monthComparison, .largestTransactions, .mostFrequentTransactions, .spendAveragePerPeriod, .savingsStatus, .savingsAverageRecentPeriods, .presetDueSoon, .presetHighestCost, .presetTopCategory, .safeSpendToday, .forecastSavings, .topMerchants, .topCategoryChanges:
             return plan
         }
     }
@@ -5775,14 +5944,7 @@ struct HomeAssistantPanelView: View {
     }
     
     private func isDateExpected(for metric: HomeQueryMetric) -> Bool {
-        switch metric {
-        case .presetHighestCost, .presetTopCategory, .presetCategorySpend:
-            return false
-        case .savingsAverageRecentPeriods, .incomeSourceShareTrend, .categorySpendShareTrend:
-            return false
-        case .overview, .spendTotal, .categorySpendTotal, .spendAveragePerPeriod, .topCategories, .monthComparison, .categoryMonthComparison, .cardMonthComparison, .incomeSourceMonthComparison, .merchantMonthComparison, .largestTransactions, .cardSpendTotal, .cardVariableSpendingHabits, .incomeAverageActual, .savingsStatus, .incomeSourceShare, .categorySpendShare, .presetDueSoon, .categoryPotentialSavings, .categoryReallocationGuidance, .safeSpendToday, .forecastSavings, .nextPlannedExpense, .spendTrendsSummary, .cardSnapshotSummary, .merchantSpendTotal, .merchantSpendSummary, .topMerchants, .topCategoryChanges, .topCardChanges:
-            return true
-        }
+        metric.executionPolicy.requiresDateScope
     }
     
     private func hasExplicitDatePhrase(in normalizedPrompt: String) -> Bool {
@@ -5819,39 +5981,19 @@ struct HomeAssistantPanelView: View {
     }
     
     private func requiresCategoryTarget(_ metric: HomeQueryMetric) -> Bool {
-        switch metric {
-        case .categorySpendTotal, .categorySpendShare, .categorySpendShareTrend, .categoryPotentialSavings, .categoryReallocationGuidance, .presetCategorySpend, .categoryMonthComparison:
-            return true
-        default:
-            return false
-        }
+        metric.executionPolicy.targetRequirement == .category
     }
     
     private func requiresCardTarget(_ metric: HomeQueryMetric) -> Bool {
-        switch metric {
-        case .cardSpendTotal, .cardVariableSpendingHabits, .cardMonthComparison:
-            return true
-        default:
-            return false
-        }
+        metric.executionPolicy.targetRequirement == .card
     }
     
     private func requiresIncomeTarget(_ metric: HomeQueryMetric) -> Bool {
-        switch metric {
-        case .incomeSourceShare, .incomeSourceShareTrend, .incomeSourceMonthComparison:
-            return true
-        default:
-            return false
-        }
+        metric.executionPolicy.targetRequirement == .incomeSource
     }
 
     private func requiresMerchantTarget(_ metric: HomeQueryMetric) -> Bool {
-        switch metric {
-        case .merchantSpendTotal, .merchantSpendSummary, .merchantMonthComparison:
-            return true
-        default:
-            return false
-        }
+        metric.executionPolicy.targetRequirement == .merchant
     }
     
     private func monthRange(containing date: Date) -> HomeQueryDateRange {
@@ -6269,7 +6411,7 @@ struct HomeAssistantPanelView: View {
                 periodUnit: plan.periodUnit
             )
             
-        case .overview, .spendTotal, .spendAveragePerPeriod, .topCategories, .monthComparison, .largestTransactions, .savingsStatus, .savingsAverageRecentPeriods, .presetDueSoon, .presetHighestCost, .presetTopCategory, .safeSpendToday, .forecastSavings, .topMerchants, .topCategoryChanges:
+        case .overview, .spendTotal, .spendAveragePerPeriod, .topCategories, .monthComparison, .largestTransactions, .mostFrequentTransactions, .savingsStatus, .savingsAverageRecentPeriods, .presetDueSoon, .presetHighestCost, .presetTopCategory, .safeSpendToday, .forecastSavings, .topMerchants, .topCategoryChanges:
             return plan
         }
     }
@@ -6313,6 +6455,7 @@ struct HomeAssistantPanelView: View {
 
     private func extractedSignalTarget(for rawPrompt: String) -> String? {
         let normalized = normalizedPrompt(rawPrompt)
+        let targetPromptView = targetExtractionPromptView(for: rawPrompt)
         if hasExplicitGlobalComparisonScope(in: normalized)
             || normalized.contains("all cards")
             || normalized.contains("all categories")
@@ -6322,31 +6465,31 @@ struct HomeAssistantPanelView: View {
             return nil
         }
 
-        if let category = aliasTarget(in: rawPrompt, entityType: .category)
-            ?? entityMatcher.bestCategoryMatch(in: rawPrompt, categories: categories)
+        if let category = aliasTarget(in: targetPromptView, entityType: .category)
+            ?? entityMatcher.bestCategoryMatch(in: targetPromptView, categories: categories)
         {
             return category
         }
 
-        if let card = aliasTarget(in: rawPrompt, entityType: .card)
-            ?? entityMatcher.bestCardMatch(in: rawPrompt, cards: cards)
+        if let card = aliasTarget(in: targetPromptView, entityType: .card)
+            ?? entityMatcher.bestCardMatch(in: targetPromptView, cards: cards)
         {
             return card
         }
 
-        if let source = aliasTarget(in: rawPrompt, entityType: .incomeSource)
-            ?? entityMatcher.bestIncomeSourceMatch(in: rawPrompt, incomes: incomes)
+        if let source = aliasTarget(in: targetPromptView, entityType: .incomeSource)
+            ?? entityMatcher.bestIncomeSourceMatch(in: targetPromptView, incomes: incomes)
         {
             return source
         }
 
-        if let merchant = extractedMerchantTarget(from: rawPrompt) {
+        if let merchant = extractedMerchantTarget(from: targetPromptView) {
             return merchant
         }
 
         if detectComparison(rawPrompt),
            appearsToRequestExplicitComparisonDates(in: normalized) == false,
-           let unmatchedTarget = unmatchedComparisonTarget(in: rawPrompt)
+           let unmatchedTarget = unmatchedComparisonTarget(in: targetPromptView)
         {
             return unmatchedTarget
         }
@@ -6414,21 +6557,22 @@ struct HomeAssistantPanelView: View {
 
     private func extractedSignalTargetSource(for rawPrompt: String) -> HomeAssistantSignalTargetSource? {
         let normalized = normalizedPrompt(rawPrompt)
+        let targetPromptView = targetExtractionPromptView(for: rawPrompt)
         if hasExplicitGlobalComparisonScope(in: normalized) {
             return nil
         }
 
-        if aliasTarget(in: rawPrompt, entityType: .category) != nil
-            || entityMatcher.bestCategoryMatch(in: rawPrompt, categories: categories) != nil
-            || aliasTarget(in: rawPrompt, entityType: .card) != nil
-            || entityMatcher.bestCardMatch(in: rawPrompt, cards: cards) != nil
-            || aliasTarget(in: rawPrompt, entityType: .incomeSource) != nil
-            || entityMatcher.bestIncomeSourceMatch(in: rawPrompt, incomes: incomes) != nil
+        if aliasTarget(in: targetPromptView, entityType: .category) != nil
+            || entityMatcher.bestCategoryMatch(in: targetPromptView, categories: categories) != nil
+            || aliasTarget(in: targetPromptView, entityType: .card) != nil
+            || entityMatcher.bestCardMatch(in: targetPromptView, cards: cards) != nil
+            || aliasTarget(in: targetPromptView, entityType: .incomeSource) != nil
+            || entityMatcher.bestIncomeSourceMatch(in: targetPromptView, incomes: incomes) != nil
         {
             return .matchedEntity
         }
 
-        if extractedMerchantTarget(from: rawPrompt) != nil {
+        if extractedMerchantTarget(from: targetPromptView) != nil {
             return .merchantPhrase
         }
 
@@ -6438,7 +6582,7 @@ struct HomeAssistantPanelView: View {
 
         if detectComparison(rawPrompt),
            appearsToRequestExplicitComparisonDates(in: normalized) == false,
-           unmatchedComparisonTarget(in: rawPrompt) != nil
+           unmatchedComparisonTarget(in: targetPromptView) != nil
         {
             return .inferredComparisonText
         }
@@ -6497,7 +6641,6 @@ struct HomeAssistantPanelView: View {
 
     private func unmatchedComparisonTarget(in rawPrompt: String) -> String? {
         let normalized = normalizedPrompt(rawPrompt)
-        guard detectComparison(rawPrompt) else { return nil }
 
         let candidate: String
         if let vsRange = normalized.range(of: " vs ") ?? normalized.range(of: " versus ") {
@@ -6518,11 +6661,56 @@ struct HomeAssistantPanelView: View {
             .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
-        guard reduced.isEmpty == false else { return nil }
+        guard reduced.isEmpty == false,
+              merchantCandidateIsMeaningful(reduced) else { return nil }
         return reduced
             .split(separator: " ")
             .map { $0.capitalized }
             .joined(separator: " ")
+    }
+
+    private func targetExtractionPromptView(for rawPrompt: String) -> String {
+        var view = normalizedPrompt(rawPrompt)
+
+        view = view.replacingOccurrences(
+            of: "\\bcompared\\s+to\\s+.+$",
+            with: "",
+            options: [.regularExpression, .caseInsensitive]
+        )
+        view = view.replacingOccurrences(
+            of: "\\b(?:vs|versus)\\s+.+$",
+            with: "",
+            options: [.regularExpression, .caseInsensitive]
+        )
+        view = view.replacingOccurrences(
+            of: "\\bcompare\\s+(.+?)\\s+to\\s+.+$",
+            with: "compare $1",
+            options: [.regularExpression, .caseInsensitive]
+        )
+        view = view.replacingOccurrences(
+            of: "\\s+from\\s+.+?\\s+to\\s+.+$",
+            with: "",
+            options: [.regularExpression, .caseInsensitive]
+        )
+        view = view.replacingOccurrences(
+            of: "\\s+between\\s+.+?\\s+and\\s+.+$",
+            with: "",
+            options: [.regularExpression, .caseInsensitive]
+        )
+        view = view.replacingOccurrences(
+            of: "\\s+in\\s+(?:jan|january|feb|february|mar|march|apr|april|may|jun|june|jul|july|aug|august|sep|sept|september|oct|october|nov|november|dec|december|\\d{4}|this\\s+(?:month|period|week|year)|last\\s+(?:month|period|week|year)|previous\\s+(?:month|period|week|year)).*$",
+            with: "",
+            options: [.regularExpression, .caseInsensitive]
+        )
+        view = view.replacingOccurrences(
+            of: "\\s+(?:this|last|previous|current)\\s+(?:month|period|week|year)$",
+            with: "",
+            options: [.regularExpression, .caseInsensitive]
+        )
+
+        return view
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private func extractedSignalDateRange(for rawPrompt: String) -> HomeQueryDateRange? {
@@ -7778,6 +7966,7 @@ struct HomeAssistantPanelView: View {
              .compareCategoryThisMonthToPreviousMonth,
              .compareCardThisMonthToPreviousMonth,
              .largestRecentTransactions,
+             .mostFrequentTransactions,
              .cardSpendTotal,
              .cardVariableSpendingHabits,
              .categorySpendShare,

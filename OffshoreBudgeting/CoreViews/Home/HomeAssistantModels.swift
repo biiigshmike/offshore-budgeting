@@ -43,6 +43,7 @@ enum HomeQueryIntent: String, CaseIterable, Codable, Equatable {
     case compareIncomeSourceThisMonthToPreviousMonth
     case compareMerchantThisMonthToPreviousMonth
     case largestRecentTransactions
+    case mostFrequentTransactions
     case spendAveragePerPeriod
     case cardSpendTotal
     case cardVariableSpendingHabits
@@ -82,6 +83,7 @@ enum HomeQueryMetric: String, Codable, Equatable {
     case incomeSourceMonthComparison
     case merchantMonthComparison
     case largestTransactions
+    case mostFrequentTransactions
     case spendAveragePerPeriod
     case cardSpendTotal
     case cardVariableSpendingHabits
@@ -205,6 +207,8 @@ extension HomeQueryMetric {
             return .compareMerchantThisMonthToPreviousMonth
         case .largestTransactions:
             return .largestRecentTransactions
+        case .mostFrequentTransactions:
+            return .mostFrequentTransactions
         case .spendAveragePerPeriod:
             return .spendAveragePerPeriod
         case .cardSpendTotal:
@@ -284,6 +288,8 @@ extension HomeQueryIntent {
             return .merchantMonthComparison
         case .largestRecentTransactions:
             return .largestTransactions
+        case .mostFrequentTransactions:
+            return .mostFrequentTransactions
         case .spendAveragePerPeriod:
             return .spendAveragePerPeriod
         case .cardSpendTotal:
@@ -811,7 +817,7 @@ struct HomeQuery: Identifiable, Codable, Equatable {
             baseline = 1
         case .topCategoriesThisMonth:
             baseline = defaultTopCategoryLimit
-        case .largestRecentTransactions:
+        case .largestRecentTransactions, .mostFrequentTransactions:
             baseline = defaultRecentTransactionsLimit
         case .cardVariableSpendingHabits:
             baseline = 3

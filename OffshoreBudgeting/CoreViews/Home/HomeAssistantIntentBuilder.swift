@@ -61,7 +61,7 @@ struct HomeAssistantIntentBuilder {
         )
 
         let injectedTargetName: String?
-        if let signalTarget = sanitized(signals.targetName), targetName == nil {
+        if let signalTarget = sanitizedTargetOrNil(signals.targetName), targetName == nil {
             targetName = signalTarget
             injectedTargetName = signalTarget
         } else {
@@ -86,9 +86,11 @@ struct HomeAssistantIntentBuilder {
             injectedComparisonDateRange = nil
         }
 
-        let resolvedTarget = sanitized(targetName)
-        let fallbackTarget = sanitized(fallbackPlan.targetName)
-        let signalTarget = sanitized(signals.targetName)
+        targetName = sanitizedTargetOrNil(targetName)
+
+        let resolvedTarget = sanitizedTargetOrNil(targetName)
+        let fallbackTarget = sanitizedTargetOrNil(fallbackPlan.targetName)
+        let signalTarget = sanitizedTargetOrNil(signals.targetName)
         let targetClassification = resolvedTarget.flatMap(resolvedScopedComparisonTarget(for:))
         let explicitComparisonRequested = expectsExplicitComparisonDates(in: signals.rawPrompt)
         let explicitComparisonResolved = explicitComparisonRequested && dateRange != nil && comparisonDateRange != nil
@@ -111,7 +113,14 @@ struct HomeAssistantIntentBuilder {
             } else {
                 metric = .monthComparison
             }
-        } else if let signalMetric = signals.metric, shouldOverrideMetric(current: metric, with: signalMetric) {
+        } else if let signalMetric = signals.metric,
+                  shouldOverrideMetric(
+                    current: metric,
+                    currentTarget: targetName,
+                    currentDateRange: dateRange,
+                    with: signalMetric,
+                    signalTarget: signalTarget
+                  ) {
             metric = signalMetric
             if targetName == nil {
                 targetName = signalTarget
@@ -157,10 +166,73 @@ struct HomeAssistantIntentBuilder {
     }
 
     private func shouldOverrideMetric(
-        current _: HomeQueryMetric,
-        with _: HomeQueryMetric
+        current: HomeQueryMetric,
+        currentTarget: String?,
+        currentDateRange: HomeQueryDateRange?,
+        with candidate: HomeQueryMetric,
+        signalTarget: String?
     ) -> Bool {
-        true
+        guard current != candidate else { return false }
+
+        if protectsTargetlessRankingFallback(
+            current: current,
+            currentTarget: currentTarget,
+            currentDateRange: currentDateRange,
+            candidate: candidate,
+            signalTarget: signalTarget
+        ) {
+            MarinaDebugLogger.log(
+                "[MarinaIntentBuilder] kept fallback ranking metric=\(current.rawValue) over aggregate candidate=\(candidate.rawValue)"
+            )
+            return false
+        }
+
+        let candidateStrength = metricSpecificityScore(metric: candidate, hasScopedTarget: signalTarget != nil)
+        let currentStrength = metricSpecificityScore(metric: current, hasScopedTarget: false)
+
+        guard candidateStrength > currentStrength else {
+            MarinaDebugLogger.log(
+                "[MarinaIntentBuilder] kept fallback metric=\(current.rawValue) candidate=\(candidate.rawValue) (candidateStrength=\(candidateStrength), currentStrength=\(currentStrength))"
+            )
+            return false
+        }
+
+        if metricsConflict(current: current, candidate: candidate) {
+            MarinaDebugLogger.log(
+                "[MarinaIntentBuilder] kept fallback metric due to conflict current=\(current.rawValue) candidate=\(candidate.rawValue)"
+            )
+            return false
+        }
+
+        return true
+    }
+
+    private func protectsTargetlessRankingFallback(
+        current: HomeQueryMetric,
+        currentTarget: String?,
+        currentDateRange: HomeQueryDateRange?,
+        candidate: HomeQueryMetric,
+        signalTarget: String?
+    ) -> Bool {
+        let protectedRankingMetrics: Set<HomeQueryMetric> = [
+            .topMerchants,
+            .largestTransactions
+        ]
+        let aggregateMetrics: Set<HomeQueryMetric> = [
+            .merchantSpendTotal,
+            .categorySpendTotal,
+            .cardSpendTotal
+        ]
+
+        guard protectedRankingMetrics.contains(current),
+              aggregateMetrics.contains(candidate),
+              currentTarget == nil,
+              currentDateRange != nil,
+              signalTarget == nil else {
+            return false
+        }
+
+        return true
     }
 
     private func hasConflict(
@@ -324,11 +396,126 @@ struct HomeAssistantIntentBuilder {
         }
     }
 
-    private func sanitized(_ text: String?) -> String? {
-        guard let text = text?.trimmingCharacters(in: .whitespacesAndNewlines), text.isEmpty == false else {
+    private func sanitizedTargetOrNil(_ text: String?) -> String? {
+        guard var value = text?.trimmingCharacters(in: .whitespacesAndNewlines),
+              value.isEmpty == false else {
             return nil
         }
-        return text
+
+        value = stripExplicitTemporalFragments(from: value)
+        value = value.replacingOccurrences(
+            of: "\\s+(?:in|from)\\s+(?:jan|january|feb|february|mar|march|apr|april|may|jun|june|jul|july|aug|august|sep|sept|september|oct|october|nov|november|dec|december|\\d{4}|this\\s+(?:month|period|week|year)|last\\s+(?:month|period|week|year)|previous\\s+(?:month|period|week|year)).*$",
+            with: "",
+            options: [.regularExpression, .caseInsensitive]
+        ).trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard value.isEmpty == false else { return nil }
+        let normalized = normalizedPrompt(value)
+        guard normalized.isEmpty == false else { return nil }
+
+        let blockedPhrases: Set<String> = [
+            "what is my current",
+            "how much did i spend",
+            "show me",
+            "tell me",
+            "in march",
+            "last",
+            "last period",
+            "this month",
+            "this period"
+        ]
+        if blockedPhrases.contains(normalized) {
+            return nil
+        }
+
+        let tokens = normalized.split(separator: " ").map(String.init)
+        guard tokens.isEmpty == false else { return nil }
+
+        let fillerTokens: Set<String> = [
+            "what", "is", "my", "how", "much", "did", "i", "show", "me", "tell", "current",
+            "in", "on", "for", "from", "to", "between", "and", "compare", "compared", "vs", "versus",
+            "this", "last", "period", "month", "week", "year", "spend", "spending", "expense", "expenses"
+        ]
+
+        let hasMeaningfulToken = tokens.contains { token in
+            fillerTokens.contains(token) == false && isDateLikeToken(token) == false
+        }
+        guard hasMeaningfulToken else { return nil }
+
+        return value
+    }
+
+    private func stripExplicitTemporalFragments(from text: String) -> String {
+        let fragments = [
+            "\\bof\\s+all\\s+time\\b",
+            "\\ball\\s*[- ]time\\b",
+            "\\bever\\b"
+        ]
+
+        var output = text
+        for fragment in fragments {
+            output = output.replacingOccurrences(
+                of: fragment,
+                with: " ",
+                options: [.regularExpression, .caseInsensitive]
+            )
+        }
+
+        return output
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func isDateLikeToken(_ token: String) -> Bool {
+        let dateTokens: Set<String> = [
+            "jan", "january", "feb", "february", "mar", "march", "apr", "april", "may", "jun",
+            "june", "jul", "july", "aug", "august", "sep", "sept", "september", "oct", "october",
+            "nov", "november", "dec", "december", "today", "yesterday", "current", "previous"
+        ]
+        if dateTokens.contains(token) {
+            return true
+        }
+        return token.range(of: "^\\d{4}$", options: .regularExpression) != nil
+    }
+
+    private func metricSpecificityScore(
+        metric: HomeQueryMetric,
+        hasScopedTarget: Bool
+    ) -> Int {
+        switch metric {
+        case .spendTotal, .monthComparison:
+            return 1
+        case .merchantSpendTotal, .merchantMonthComparison,
+            .categorySpendTotal, .categoryMonthComparison,
+            .cardSpendTotal, .cardMonthComparison,
+            .incomeSourceMonthComparison:
+            return hasScopedTarget ? 3 : 1
+        default:
+            return 2
+        }
+    }
+
+    private func metricsConflict(
+        current: HomeQueryMetric,
+        candidate: HomeQueryMetric
+    ) -> Bool {
+        let comparisonMetrics: Set<HomeQueryMetric> = [
+            .monthComparison, .categoryMonthComparison, .cardMonthComparison,
+            .incomeSourceMonthComparison, .merchantMonthComparison
+        ]
+        let spendMetrics: Set<HomeQueryMetric> = [
+            .spendTotal, .categorySpendTotal, .cardSpendTotal, .merchantSpendTotal
+        ]
+
+        if comparisonMetrics.contains(current) && spendMetrics.contains(candidate) {
+            return true
+        }
+
+        if spendMetrics.contains(current) && comparisonMetrics.contains(candidate) {
+            return false
+        }
+
+        return false
     }
 
     private func normalizedPrompt(_ rawPrompt: String) -> String {

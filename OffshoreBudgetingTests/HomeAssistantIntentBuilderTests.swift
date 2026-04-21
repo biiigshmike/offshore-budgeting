@@ -331,6 +331,322 @@ struct HomeAssistantIntentBuilderTests {
         #expect(plan.confidenceBand == .high)
     }
 
+    @Test func buildPlan_compareMerchantComparedToPrompt_preservesMerchantTargetAndDateRanges() throws {
+        let builder = makeBuilder()
+        let fallbackPlan = HomeQueryPlan(
+            metric: .spendTotal,
+            dateRange: nil,
+            resultLimit: nil,
+            confidenceBand: .medium
+        )
+
+        let april = monthRange(2026, 4)
+        let march = monthRange(2026, 3)
+        let plan = builder.buildPlan(
+            from: HomeAssistantParsedSignals(
+                metric: .merchantMonthComparison,
+                targetName: "Starbucks",
+                targetSource: .merchantPhrase,
+                dateRange: april,
+                comparisonDateRange: march,
+                comparisonDetected: true,
+                rawPrompt: "What have I spent on Starbucks this month compared to last month?"
+            ),
+            fallbackPlan: fallbackPlan
+        )
+
+        #expect(plan.metric == .merchantMonthComparison)
+        #expect(plan.targetName == "Starbucks")
+        #expect(plan.dateRange == april)
+        #expect(plan.comparisonDateRange == march)
+    }
+
+    @Test func buildPlan_compareMerchantPeriodComparedToLastPeriod_preservesMerchantTargetAndDateRanges() throws {
+        let builder = makeBuilder()
+        let fallbackPlan = HomeQueryPlan(
+            metric: .spendTotal,
+            dateRange: nil,
+            resultLimit: nil,
+            confidenceBand: .medium
+        )
+
+        let april = monthRange(2026, 4)
+        let march = monthRange(2026, 3)
+        let plan = builder.buildPlan(
+            from: HomeAssistantParsedSignals(
+                metric: .merchantMonthComparison,
+                targetName: "Starbucks",
+                targetSource: .merchantPhrase,
+                dateRange: april,
+                comparisonDateRange: march,
+                comparisonDetected: true,
+                rawPrompt: "What have I spent on Starbucks this period compared to last period?"
+            ),
+            fallbackPlan: fallbackPlan
+        )
+
+        #expect(plan.metric == .merchantMonthComparison)
+        #expect(plan.targetName == "Starbucks")
+        #expect(plan.dateRange == april)
+        #expect(plan.comparisonDateRange == march)
+    }
+
+    @Test func buildPlan_compareMerchantInMarchToFebruary_preservesMerchantTargetAndDateRanges() throws {
+        let builder = makeBuilder()
+        let fallbackPlan = HomeQueryPlan(
+            metric: .monthComparison,
+            dateRange: nil,
+            resultLimit: nil,
+            confidenceBand: .medium
+        )
+
+        let march = monthRange(2026, 3)
+        let february = monthRange(2026, 2)
+        let plan = builder.buildPlan(
+            from: HomeAssistantParsedSignals(
+                metric: .merchantMonthComparison,
+                targetName: "Starbucks",
+                targetSource: .merchantPhrase,
+                dateRange: march,
+                comparisonDateRange: february,
+                comparisonDetected: true,
+                rawPrompt: "Compare Starbucks in March to February"
+            ),
+            fallbackPlan: fallbackPlan
+        )
+
+        #expect(plan.metric == .merchantMonthComparison)
+        #expect(plan.targetName == "Starbucks")
+        #expect(plan.dateRange == march)
+        #expect(plan.comparisonDateRange == february)
+    }
+
+    @Test func buildPlan_compareMerchantFromMarch2026ToFebruary2026_preservesMerchantTargetAndDateRanges() throws {
+        let builder = makeBuilder()
+        let fallbackPlan = HomeQueryPlan(
+            metric: .monthComparison,
+            dateRange: nil,
+            resultLimit: nil,
+            confidenceBand: .medium
+        )
+
+        let march = monthRange(2026, 3)
+        let february = monthRange(2026, 2)
+        let plan = builder.buildPlan(
+            from: HomeAssistantParsedSignals(
+                metric: .merchantMonthComparison,
+                targetName: "Starbucks",
+                targetSource: .merchantPhrase,
+                dateRange: march,
+                comparisonDateRange: february,
+                comparisonDetected: true,
+                rawPrompt: "Compare Starbucks from March 2026 to February 2026"
+            ),
+            fallbackPlan: fallbackPlan
+        )
+
+        #expect(plan.metric == .merchantMonthComparison)
+        #expect(plan.targetName == "Starbucks")
+        #expect(plan.dateRange == march)
+        #expect(plan.comparisonDateRange == february)
+    }
+
+    @Test func buildPlan_rejectsFillerTargetFragmentForCurrentSpendPrompt() throws {
+        let builder = makeBuilder()
+        let fallbackPlan = HomeQueryPlan(
+            metric: .spendTotal,
+            dateRange: monthRange(2026, 4),
+            resultLimit: nil,
+            confidenceBand: .medium
+        )
+
+        let plan = builder.buildPlan(
+            from: HomeAssistantParsedSignals(
+                metric: .merchantSpendTotal,
+                targetName: "WHAT IS MY Current",
+                targetSource: .merchantPhrase,
+                dateRange: monthRange(2026, 4),
+                comparisonDateRange: nil,
+                comparisonDetected: false,
+                rawPrompt: "What is my current spend this month?"
+            ),
+            fallbackPlan: fallbackPlan
+        )
+
+        #expect(plan.targetName == nil)
+        #expect(plan.metric == .spendTotal)
+    }
+
+    @Test func buildPlan_rejectsDateFragmentTargetForTopMerchantPrompt() throws {
+        let builder = makeBuilder()
+        let fallbackPlan = HomeQueryPlan(
+            metric: .topMerchants,
+            dateRange: monthRange(2026, 3),
+            resultLimit: 3,
+            confidenceBand: .medium
+        )
+
+        let plan = builder.buildPlan(
+            from: HomeAssistantParsedSignals(
+                metric: .merchantSpendTotal,
+                targetName: "IN March",
+                targetSource: .merchantPhrase,
+                dateRange: monthRange(2026, 3),
+                comparisonDateRange: nil,
+                comparisonDetected: false,
+                rawPrompt: "What was my top merchant in march 2026?"
+            ),
+            fallbackPlan: fallbackPlan
+        )
+
+        #expect(plan.targetName == nil)
+        #expect(plan.metric == .topMerchants)
+    }
+
+    @Test func buildPlan_rejectsAllTimeTargetFragmentForTopMerchantPrompt() throws {
+        let builder = makeBuilder()
+        let allTimeRange = HomeQueryDateRange(
+            startDate: date(2000, 1, 1, 0, 0, 0),
+            endDate: date(2026, 4, 21, 23, 59, 59)
+        )
+        let fallbackPlan = HomeQueryPlan(
+            metric: .topMerchants,
+            dateRange: allTimeRange,
+            resultLimit: 3,
+            confidenceBand: .medium
+        )
+
+        let plan = builder.buildPlan(
+            from: HomeAssistantParsedSignals(
+                metric: .merchantSpendTotal,
+                targetName: "OF ALL TIME",
+                targetSource: .merchantPhrase,
+                dateRange: allTimeRange,
+                comparisonDateRange: nil,
+                comparisonDetected: false,
+                rawPrompt: "Who is my top merchant of all time?"
+            ),
+            fallbackPlan: fallbackPlan
+        )
+
+        #expect(plan.targetName == nil)
+        #expect(plan.metric == .topMerchants)
+    }
+
+    @Test func buildPlan_rejectsEverTargetFragmentForTopExpensePrompt() throws {
+        let builder = makeBuilder()
+        let allTimeRange = HomeQueryDateRange(
+            startDate: date(2000, 1, 1, 0, 0, 0),
+            endDate: date(2026, 4, 21, 23, 59, 59)
+        )
+        let fallbackPlan = HomeQueryPlan(
+            metric: .largestTransactions,
+            dateRange: allTimeRange,
+            resultLimit: 3,
+            confidenceBand: .medium
+        )
+
+        let plan = builder.buildPlan(
+            from: HomeAssistantParsedSignals(
+                metric: .merchantSpendTotal,
+                targetName: "EVER",
+                targetSource: .merchantPhrase,
+                dateRange: allTimeRange,
+                comparisonDateRange: nil,
+                comparisonDetected: false,
+                rawPrompt: "What is my top expense ever?"
+            ),
+            fallbackPlan: fallbackPlan
+        )
+
+        #expect(plan.targetName == nil)
+        #expect(plan.metric == .largestTransactions)
+    }
+
+    @Test func buildPlan_rejectsAllTimeTargetFragmentWithoutPrefix() throws {
+        let builder = makeBuilder()
+        let allTimeRange = HomeQueryDateRange(
+            startDate: date(2000, 1, 1, 0, 0, 0),
+            endDate: date(2026, 4, 21, 23, 59, 59)
+        )
+        let fallbackPlan = HomeQueryPlan(
+            metric: .topMerchants,
+            dateRange: allTimeRange,
+            resultLimit: 3,
+            confidenceBand: .medium
+        )
+
+        let plan = builder.buildPlan(
+            from: HomeAssistantParsedSignals(
+                metric: .merchantSpendTotal,
+                targetName: "ALL TIME",
+                targetSource: .merchantPhrase,
+                dateRange: allTimeRange,
+                comparisonDateRange: nil,
+                comparisonDetected: false,
+                rawPrompt: "Who is my top merchant all time?"
+            ),
+            fallbackPlan: fallbackPlan
+        )
+
+        #expect(plan.targetName == nil)
+        #expect(plan.metric == .topMerchants)
+    }
+
+    @Test func buildPlan_merchantPromptInFebruary_keepsCleanMerchantTarget() throws {
+        let builder = makeBuilder()
+        let fallbackPlan = HomeQueryPlan(
+            metric: .spendTotal,
+            dateRange: nil,
+            resultLimit: nil,
+            confidenceBand: .medium
+        )
+
+        let february = monthRange(2026, 2)
+        let plan = builder.buildPlan(
+            from: HomeAssistantParsedSignals(
+                metric: .merchantSpendTotal,
+                targetName: "Starbucks",
+                targetSource: .merchantPhrase,
+                dateRange: february,
+                comparisonDateRange: nil,
+                comparisonDetected: false,
+                rawPrompt: "What did I spend on Starbucks in February?"
+            ),
+            fallbackPlan: fallbackPlan
+        )
+
+        #expect(plan.metric == .merchantSpendTotal)
+        #expect(plan.targetName == "Starbucks")
+        #expect(plan.dateRange == february)
+    }
+
+    @Test func buildPlan_keepsFallbackMetricWhenSignalStrengthIsTied() throws {
+        let builder = makeBuilder()
+        let fallbackPlan = HomeQueryPlan(
+            metric: .spendTotal,
+            dateRange: monthRange(2026, 2),
+            resultLimit: nil,
+            confidenceBand: .medium
+        )
+
+        let plan = builder.buildPlan(
+            from: HomeAssistantParsedSignals(
+                metric: .merchantSpendTotal,
+                targetName: "LAST",
+                targetSource: .merchantPhrase,
+                dateRange: monthRange(2026, 2),
+                comparisonDateRange: nil,
+                comparisonDetected: false,
+                rawPrompt: "How much did I spend"
+            ),
+            fallbackPlan: fallbackPlan
+        )
+
+        #expect(plan.metric == .spendTotal)
+        #expect(plan.targetName == nil)
+    }
+
     @Test func buildPlan_compareWeakMerchantPrompt_requestsClarification() throws {
         let builder = makeBuilder()
         let fallbackPlan = HomeQueryPlan(

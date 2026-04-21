@@ -63,7 +63,7 @@ struct HomeAssistantTextParser {
                 confidenceBand: confidenceBand,
                 periodUnit: periodUnit
             )
-        case .topCategoriesThisMonth, .largestRecentTransactions, .cardVariableSpendingHabits, .presetDueSoon, .presetHighestCost, .presetTopCategory, .categoryPotentialSavings, .categoryReallocationGuidance, .topMerchantsThisMonth, .topCategoryChangesThisMonth, .topCardChangesThisMonth:
+        case .topCategoriesThisMonth, .largestRecentTransactions, .mostFrequentTransactions, .cardVariableSpendingHabits, .presetDueSoon, .presetHighestCost, .presetTopCategory, .categoryPotentialSavings, .categoryReallocationGuidance, .topMerchantsThisMonth, .topCategoryChangesThisMonth, .topCardChangesThisMonth:
             return HomeQueryPlan(
                 metric: metric,
                 dateRange: dateRange,
@@ -205,6 +205,10 @@ struct HomeAssistantTextParser {
 
         if matchesLargestTransactionsIntent(in: text) {
             return .largestRecentTransactions
+        }
+
+        if matchesMostFrequentTransactionsIntent(in: text) {
+            return .mostFrequentTransactions
         }
 
         if matchesExpenseListIntent(in: text) {
@@ -538,6 +542,21 @@ struct HomeAssistantTextParser {
             && containsAny(text, keywords: transactionKeywords)
     }
 
+    private func matchesMostFrequentTransactionsIntent(in text: String) -> Bool {
+        let transactionKeywords = [
+            "transaction", "transactions", "purchase", "purchases",
+            "charge", "charges", "expense", "expenses"
+        ]
+
+        let hasFrequencyPhrase = text.contains("most frequent")
+            || text.contains("most often")
+            || text.contains("least frequent")
+            || text.contains("least often")
+        guard hasFrequencyPhrase else { return false }
+
+        return containsAny(text, keywords: transactionKeywords)
+    }
+
     private func matchesExpenseListIntent(in text: String) -> Bool {
         let transactionKeywords = [
             "transaction", "transactions", "purchase", "purchases",
@@ -738,7 +757,7 @@ struct HomeAssistantTextParser {
         case .periodOverview:
             // Broad overview prompts are inherently less specific than direct metric requests.
             return .medium
-        case .spendThisMonth, .categorySpendTotal, .spendAveragePerPeriod, .topCategoriesThisMonth, .compareThisMonthToPreviousMonth, .compareCategoryThisMonthToPreviousMonth, .compareCardThisMonthToPreviousMonth, .compareIncomeSourceThisMonthToPreviousMonth, .compareMerchantThisMonthToPreviousMonth, .largestRecentTransactions, .cardSpendTotal, .cardVariableSpendingHabits, .incomeAverageActual, .savingsStatus, .savingsAverageRecentPeriods, .incomeSourceShare, .categorySpendShare, .incomeSourceShareTrend, .categorySpendShareTrend, .presetDueSoon, .presetHighestCost, .presetTopCategory, .presetCategorySpend, .categoryPotentialSavings, .categoryReallocationGuidance, .safeSpendToday, .forecastSavings, .nextPlannedExpense, .spendTrendsSummary, .cardSnapshotSummary, .merchantSpendTotal, .merchantSpendSummary, .topMerchantsThisMonth, .topCategoryChangesThisMonth, .topCardChangesThisMonth:
+        case .spendThisMonth, .categorySpendTotal, .spendAveragePerPeriod, .topCategoriesThisMonth, .compareThisMonthToPreviousMonth, .compareCategoryThisMonthToPreviousMonth, .compareCardThisMonthToPreviousMonth, .compareIncomeSourceThisMonthToPreviousMonth, .compareMerchantThisMonthToPreviousMonth, .largestRecentTransactions, .mostFrequentTransactions, .cardSpendTotal, .cardVariableSpendingHabits, .incomeAverageActual, .savingsStatus, .savingsAverageRecentPeriods, .incomeSourceShare, .categorySpendShare, .incomeSourceShareTrend, .categorySpendShareTrend, .presetDueSoon, .presetHighestCost, .presetTopCategory, .presetCategorySpend, .categoryPotentialSavings, .categoryReallocationGuidance, .safeSpendToday, .forecastSavings, .nextPlannedExpense, .spendTrendsSummary, .cardSnapshotSummary, .merchantSpendTotal, .merchantSpendSummary, .topMerchantsThisMonth, .topCategoryChangesThisMonth, .topCardChangesThisMonth:
             return .high
         }
     }
@@ -787,13 +806,38 @@ struct HomeAssistantTextParser {
         from text: String,
         defaultPeriodUnit: HomeQueryPeriodUnit
     ) -> HomeQueryDateRange? {
-        MarinaDateResolver(
+        if let allTimeRange = explicitAllTimeDateRange(in: text) {
+            return allTimeRange
+        }
+
+        return MarinaDateResolver(
             calendar: calendar,
             nowProvider: nowProvider
         ).resolveTextRange(
             text,
             defaultPeriodUnit: defaultPeriodUnit
         )?.queryDateRange
+    }
+
+    private func explicitAllTimeDateRange(in text: String) -> HomeQueryDateRange? {
+        guard text.contains("all time")
+            || text.contains("all-time")
+            || text.contains(" ever ")
+            || text.hasPrefix("ever ")
+            || text.hasSuffix(" ever") else {
+            return nil
+        }
+
+        var components = DateComponents()
+        var utcCalendar = Calendar(identifier: .gregorian)
+        utcCalendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .gmt
+        components.calendar = utcCalendar
+        components.timeZone = utcCalendar.timeZone
+        components.year = 2000
+        components.month = 1
+        components.day = 1
+        let start = utcCalendar.startOfDay(for: components.date ?? Date(timeIntervalSince1970: 0))
+        return HomeQueryDateRange(startDate: start, endDate: nowProvider())
     }
 
     private func extractedExplicitDateRange(from text: String) -> HomeQueryDateRange? {

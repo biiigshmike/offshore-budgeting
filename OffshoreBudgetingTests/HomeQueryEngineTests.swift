@@ -1271,6 +1271,58 @@ struct HomeQueryEngineTests {
         #expect(starbucksRow?.value.filter(\.isNumber) == "2000")
     }
 
+    @Test func mostFrequentTransactions_ranksByOccurrenceThenAmountThenLabel() throws {
+        let engine = makeEngine()
+        let range = HomeQueryDateRange(startDate: date(2026, 4, 1), endDate: date(2026, 4, 30))
+        let query = HomeQuery(intent: .mostFrequentTransactions, dateRange: range, resultLimit: 3)
+
+        let groceries = Category(name: "Groceries", hexColor: "#00AA00")
+        let planned = [
+            PlannedExpense(title: "Gym Membership", plannedAmount: 45, expenseDate: date(2026, 4, 3), category: groceries),
+            PlannedExpense(title: "Gym Membership", plannedAmount: 45, expenseDate: date(2026, 4, 17), category: groceries)
+        ]
+        let variable = [
+            VariableExpense(descriptionText: "Target #1234", amount: 20, transactionDate: date(2026, 4, 4), category: groceries),
+            VariableExpense(descriptionText: "Target #5678", amount: 30, transactionDate: date(2026, 4, 11), category: groceries),
+            VariableExpense(descriptionText: "Trader Joe's", amount: 40, transactionDate: date(2026, 4, 6), category: groceries),
+            VariableExpense(descriptionText: "Trader Joe's", amount: 15, transactionDate: date(2026, 4, 13), category: groceries),
+            VariableExpense(descriptionText: "Amazon", amount: 100, transactionDate: date(2026, 4, 20), category: groceries)
+        ]
+
+        let answer = engine.execute(
+            query: query,
+            categories: [groceries],
+            plannedExpenses: planned,
+            variableExpenses: variable,
+            now: date(2026, 4, 21)
+        )
+
+        #expect(answer.kind == .list)
+        #expect(answer.title == "Most Frequent Expenses")
+        #expect(answer.rows.count == 3)
+        #expect(answer.rows[0].title == "Gym Membership")
+        #expect(answer.rows[0].value.contains("2x"))
+        #expect(answer.rows[1].title.lowercased().contains("trader joe"))
+        #expect(answer.rows[2].title == "Target")
+    }
+
+    @Test func mostFrequentTransactions_returnsEmptyStateWhenNoExpensesExist() throws {
+        let engine = makeEngine()
+        let range = HomeQueryDateRange(startDate: date(2026, 4, 1), endDate: date(2026, 4, 30))
+        let query = HomeQuery(intent: .mostFrequentTransactions, dateRange: range, resultLimit: 3)
+
+        let answer = engine.execute(
+            query: query,
+            categories: [],
+            plannedExpenses: [],
+            variableExpenses: [],
+            now: date(2026, 4, 21)
+        )
+
+        #expect(answer.kind == .message)
+        #expect(answer.title == "Most Frequent Expenses")
+    }
+
     @Test func topCategoryChangesThisMonth_ranksLargestCategoryDeltas() throws {
         let engine = makeEngine()
         let query = HomeQuery(intent: .topCategoryChangesThisMonth, resultLimit: 2)

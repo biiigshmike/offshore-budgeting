@@ -74,6 +74,10 @@
             isEnabled = "NO">
          </CommandLineArgument>
          <CommandLineArgument
+            argument = "-debug_marina_nlq_v1_enabled"
+            isEnabled = "YES">
+         </CommandLineArgument>
+         <CommandLineArgument
             argument = "-resetSeed"
             isEnabled = "NO">
          </CommandLineArgument>

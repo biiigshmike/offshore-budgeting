@@ -123,6 +123,13 @@ struct HomeQueryEngine {
                 variableExpenses: variableExpenses,
                 now: now
             )
+        case .mostFrequentTransactions:
+            return mostFrequentTransactionsAnswer(
+                query: query,
+                plannedExpenses: plannedExpenses,
+                variableExpenses: variableExpenses,
+                now: now
+            )
 
         case .cardSpendTotal:
             return cardSpendTotalAnswer(
@@ -822,6 +829,78 @@ struct HomeQueryEngine {
             title: "Largest Recent Expenses",
             subtitle: rangeLabel(for: range),
             primaryValue: nil,
+            rows: rows
+        )
+    }
+
+    private func mostFrequentTransactionsAnswer(
+        query: HomeQuery,
+        plannedExpenses: [PlannedExpense],
+        variableExpenses: [VariableExpense],
+        now: Date
+    ) -> HomeAnswer {
+        let range = query.dateRange ?? monthRange(containing: now)
+
+        var countByLabel: [String: Int] = [:]
+        var totalByLabel: [String: Double] = [:]
+
+        for expense in plannedExpenses {
+            guard expense.expenseDate >= range.startDate, expense.expenseDate <= range.endDate else { continue }
+            let label = merchantPresentationName(expense.title)
+            guard label.isEmpty == false else { continue }
+            countByLabel[label, default: 0] += 1
+            totalByLabel[label, default: 0] += expense.effectiveAmount()
+        }
+
+        for expense in variableExpenses {
+            guard expense.transactionDate >= range.startDate, expense.transactionDate <= range.endDate else { continue }
+            let label = normalizedFrequencyLabel(expense.descriptionText)
+            guard label.isEmpty == false else { continue }
+            countByLabel[label, default: 0] += 1
+            totalByLabel[label, default: 0] += expense.ledgerSignedAmount()
+        }
+
+        let rows = countByLabel.keys
+            .sorted { lhs, rhs in
+                let lhsCount = countByLabel[lhs, default: 0]
+                let rhsCount = countByLabel[rhs, default: 0]
+                if lhsCount != rhsCount {
+                    return lhsCount > rhsCount
+                }
+
+                let lhsTotal = totalByLabel[lhs, default: 0]
+                let rhsTotal = totalByLabel[rhs, default: 0]
+                if lhsTotal != rhsTotal {
+                    return lhsTotal > rhsTotal
+                }
+
+                return lhs.localizedCaseInsensitiveCompare(rhs) == .orderedAscending
+            }
+            .prefix(query.resultLimit)
+            .map { label in
+                HomeAnswerRow(
+                    title: label,
+                    value: "\(countByLabel[label, default: 0])x | \(currency(totalByLabel[label, default: 0]))"
+                )
+            }
+
+        guard rows.isEmpty == false else {
+            return HomeAnswer(
+                queryID: query.id,
+                kind: .message,
+                title: "Most Frequent Expenses",
+                subtitle: "No expenses found in this range.",
+                primaryValue: nil,
+                rows: []
+            )
+        }
+
+        return HomeAnswer(
+            queryID: query.id,
+            kind: .list,
+            title: "Most Frequent Expenses",
+            subtitle: rangeLabel(for: range),
+            primaryValue: rows.first?.value,
             rows: rows
         )
     }
@@ -2717,6 +2796,12 @@ struct HomeQueryEngine {
         if trimmed.rangeOfCharacter(from: CharacterSet.lowercaseLetters) != nil || trimmed.contains("'") {
             return trimmed
         }
+        return MerchantNormalizer.displayName(trimmed)
+    }
+
+    private func normalizedFrequencyLabel(_ raw: String) -> String {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.isEmpty == false else { return "" }
         return MerchantNormalizer.displayName(trimmed)
     }
 

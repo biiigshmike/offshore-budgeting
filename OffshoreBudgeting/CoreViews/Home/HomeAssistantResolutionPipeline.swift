@@ -381,7 +381,7 @@ struct HomeAssistantPlanReconciler {
             return .incomeAverage
         case .incomeSourceShare, .incomeSourceShareTrend:
             return .incomeShare
-        case .topCategories, .largestTransactions, .spendAveragePerPeriod, .cardVariableSpendingHabits, .savingsStatus, .savingsAverageRecentPeriods, .categorySpendShare, .categorySpendShareTrend, .presetDueSoon, .presetHighestCost, .presetTopCategory, .presetCategorySpend, .categoryPotentialSavings, .categoryReallocationGuidance, .safeSpendToday, .forecastSavings, .nextPlannedExpense, .spendTrendsSummary, .cardSnapshotSummary, .merchantSpendSummary, .topMerchants, .topCategoryChanges, .topCardChanges:
+        case .topCategories, .largestTransactions, .mostFrequentTransactions, .spendAveragePerPeriod, .cardVariableSpendingHabits, .savingsStatus, .savingsAverageRecentPeriods, .categorySpendShare, .categorySpendShareTrend, .presetDueSoon, .presetHighestCost, .presetTopCategory, .presetCategorySpend, .categoryPotentialSavings, .categoryReallocationGuidance, .safeSpendToday, .forecastSavings, .nextPlannedExpense, .spendTrendsSummary, .cardSnapshotSummary, .merchantSpendSummary, .topMerchants, .topCategoryChanges, .topCardChanges:
             return .passthrough
         }
     }
