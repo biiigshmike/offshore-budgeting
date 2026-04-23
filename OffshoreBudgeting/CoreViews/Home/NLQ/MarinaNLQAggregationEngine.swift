@@ -92,7 +92,7 @@ struct MarinaNLQAggregationEngine {
         switch metric {
         case .spendTotal:
             if intent.modifiers.contains("breakdown_by_category"), resolvedTargetType == nil {
-                homeMetric = .topCategories
+                homeMetric = .categorySpendShare
             } else if intent.modifiers.contains("breakdown_by_merchant"), resolvedTargetType == nil {
                 homeMetric = .topMerchants
             } else if intent.modifiers.contains("breakdown_by_card"), resolvedTargetType == nil {
@@ -111,6 +111,8 @@ struct MarinaNLQAggregationEngine {
             }
         case .categorySpendTotal:
             homeMetric = .categorySpendTotal
+        case .categorySpendShare:
+            homeMetric = .categorySpendShare
         case .merchantSpendTotal:
             homeMetric = .merchantSpendTotal
         case .topCategories:
@@ -210,14 +212,18 @@ struct MarinaNLQAggregationEngine {
 
         let breakdown = perTarget.compactMap { pair -> MarinaNLQBreakdownItem? in
             guard let amount = extractAmount(from: pair.answer.primaryValue) else { return nil }
-            return MarinaNLQBreakdownItem(label: pair.query.targetName ?? "Target", value: amount)
+            return MarinaNLQBreakdownItem(
+                label: pair.query.targetName ?? "Target",
+                value: amount,
+                renderedValue: nil
+            )
         }
 
         if breakdown.isEmpty {
             return .unresolved("I couldn't safely aggregate those targets.", warnings: warnings)
         }
 
-        let total = breakdown.reduce(0) { $0 + $1.value }
+        let total = breakdown.reduce(0) { $0 + ($1.value ?? 0) }
         return MarinaNLQAggregationResult(
             value: total,
             breakdown: breakdown,
@@ -293,8 +299,11 @@ struct MarinaNLQAggregationEngine {
 
         let value = extractAmount(from: answer.primaryValue)
         let breakdown: [MarinaNLQBreakdownItem]? = answer.rows.isEmpty ? nil : answer.rows.compactMap { row in
-            guard let amount = extractAmount(from: row.value) else { return nil }
-            return MarinaNLQBreakdownItem(label: row.title, value: amount)
+            MarinaNLQBreakdownItem(
+                label: row.title,
+                value: extractAmount(from: row.value),
+                renderedValue: row.value
+            )
         }
 
         return MarinaNLQAggregationResult(

@@ -184,6 +184,37 @@ struct HomeQueryEngineTests {
         #expect((answer.primaryValue ?? "").contains("30"))
     }
 
+    @Test func categorySpendShare_withoutTarget_returnsAmountAndPercentageRows() throws {
+        let engine = makeEngine()
+        let range = HomeQueryDateRange(startDate: date(2026, 2, 1), endDate: date(2026, 2, 28))
+        let query = HomeQuery(intent: .categorySpendShare, dateRange: range)
+
+        let groceries = Category(name: "Groceries", hexColor: "#00AA00")
+        let travel = Category(name: "Travel", hexColor: "#0000AA")
+
+        let planned: [PlannedExpense] = [
+            PlannedExpense(title: "Groceries Plan", plannedAmount: 250, expenseDate: date(2026, 2, 5), category: groceries),
+            PlannedExpense(title: "Travel Plan", plannedAmount: 150, expenseDate: date(2026, 2, 7), category: travel)
+        ]
+        let variable: [VariableExpense] = [
+            VariableExpense(descriptionText: "Groceries Variable", amount: 50, transactionDate: date(2026, 2, 10), category: groceries),
+            VariableExpense(descriptionText: "Travel Variable", amount: 150, transactionDate: date(2026, 2, 12), category: travel)
+        ]
+
+        let answer = engine.execute(
+            query: query,
+            categories: [groceries, travel],
+            plannedExpenses: planned,
+            variableExpenses: variable,
+            now: date(2026, 2, 20)
+        )
+
+        #expect(answer.kind == .list)
+        #expect(answer.title == "Category Spend Share")
+        #expect(answer.rows.first(where: { $0.title == "Groceries" })?.value.contains("%") == true)
+        #expect(answer.rows.first(where: { $0.title == "Groceries" })?.value.contains("$") == true)
+    }
+
     @Test func incomeSourceShareTrend_forSpecificSource_returnsAverageShare() throws {
         let engine = makeEngine()
         let query = HomeQuery(intent: .incomeSourceShareTrend, resultLimit: 3, targetName: "Salary")

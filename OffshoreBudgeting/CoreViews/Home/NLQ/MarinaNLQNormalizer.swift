@@ -26,6 +26,7 @@ struct MarinaNLQNormalizer {
         let dateRange = comparisonRanges?.primaryRange ?? explicitDateRange
         let comparisonDateRange: HomeQueryDateRange? = comparisonRanges?.comparisonRange
         let resultLimit = parser.parseLimit(prompt)
+        let parserPlan = parser.parsePlan(prompt, defaultPeriodUnit: defaultPeriodUnit)
         let modifiers = modifiers(from: normalizedPrompt)
         let queryShape = intentInterpreter.interpretQueryShape(
             rawPrompt: prompt,
@@ -48,7 +49,7 @@ struct MarinaNLQNormalizer {
             unsupportedShapeReason = reason
         case .unresolved:
             metric = normalizedMetric(from: normalizedPrompt)
-                ?? parserInferredMetric(from: prompt)
+                ?? parserInferredMetric(from: parserPlan)
             unsupportedShapeReason = nil
         }
 
@@ -57,6 +58,7 @@ struct MarinaNLQNormalizer {
             normalizedPrompt: normalizedPrompt,
             comparisonPrimarySnippet: comparisonRanges?.primarySnippet
         )
+            ?? parserInferredTarget(from: parserPlan)
 
         return NormalizedQueryIntent(
             rawPrompt: prompt,
@@ -77,14 +79,17 @@ struct MarinaNLQNormalizer {
         )
     }
 
-    private func parserInferredMetric(from prompt: String) -> MarinaNormalizedMetric? {
-        guard let plan = parser.parsePlan(prompt, defaultPeriodUnit: defaultPeriodUnit) else {
-            return nil
-        }
-
+    private func parserInferredMetric(from plan: HomeQueryPlan?) -> MarinaNormalizedMetric? {
+        guard let plan else { return nil }
         switch plan.metric {
-        case .spendTotal, .categorySpendTotal, .merchantSpendTotal, .cardSpendTotal:
+        case .spendTotal, .cardSpendTotal:
             return .spendTotal
+        case .categorySpendTotal:
+            return .categorySpendTotal
+        case .merchantSpendTotal:
+            return .merchantSpendTotal
+        case .categorySpendShare:
+            return .categorySpendShare
         case .monthComparison, .categoryMonthComparison, .merchantMonthComparison, .cardMonthComparison, .incomeSourceMonthComparison:
             return .monthComparison
         case .topCategories:
@@ -106,6 +111,17 @@ struct MarinaNLQNormalizer {
         }
     }
 
+    private func parserInferredTarget(from plan: HomeQueryPlan?) -> String? {
+        guard let plan else { return nil }
+
+        switch plan.metric {
+        case .categorySpendTotal, .categorySpendShare, .merchantSpendTotal:
+            return sanitizedTargetCandidate(plan.targetName ?? "")
+        default:
+            return nil
+        }
+    }
+
     private func normalizedMetric(from normalizedPrompt: String) -> MarinaNormalizedMetric? {
         if normalizedPrompt.contains("preset") && (normalizedPrompt.contains("due soon") || normalizedPrompt.contains("upcoming")) {
             return .presetDueSoon
@@ -121,6 +137,19 @@ struct MarinaNLQNormalizer {
 
         if normalizedPrompt.contains("top categories") {
             return .topCategories
+        }
+
+        if normalizedPrompt.contains("category breakdown")
+            || normalizedPrompt.contains("categories breakdown") {
+            return .categorySpendShare
+        }
+
+        if normalizedPrompt.contains("share of my spending")
+            || normalizedPrompt.contains("share of spending")
+            || normalizedPrompt.contains("percent of my spending")
+            || normalizedPrompt.contains("percentage of my spending")
+            || normalizedPrompt.contains("portion of my spending") {
+            return .categorySpendShare
         }
 
         if normalizedPrompt.contains("average") {
@@ -179,6 +208,10 @@ struct MarinaNLQNormalizer {
             return nil
         }
 
+        if let shareTarget = sharePromptTarget(in: stripped) {
+            return shareTarget
+        }
+
         let cleanedPromptSegment = sanitizedTargetCandidate(stripped)
         if isLikelyUnscopedMetricPhrase(cleanedPromptSegment) == false,
            isStrongTarget(cleanedPromptSegment) {
@@ -200,6 +233,33 @@ struct MarinaNLQNormalizer {
                 if isStrongTarget(cleaned) {
                     return cleaned
                 }
+            }
+        }
+
+        return nil
+    }
+
+    private func sharePromptTarget(in text: String) -> String? {
+        let normalized = normalizeText(text)
+        let shareSignals = ["share", "percent", "percentage", "portion"]
+        guard shareSignals.contains(where: normalized.contains) else { return nil }
+
+        let patterns = [
+            #"\b(?:is|was)\s+([a-z0-9 '&-]+?)(?=\s+(?:this|last|in|for|from|over|during)\b|$)"#
+        ]
+
+        for pattern in patterns {
+            guard let regex = try? NSRegularExpression(pattern: pattern) else { continue }
+            let range = NSRange(normalized.startIndex..., in: normalized)
+            guard let match = regex.firstMatch(in: normalized, options: [], range: range),
+                  match.numberOfRanges >= 2,
+                  let captureRange = Range(match.range(at: 1), in: normalized) else {
+                continue
+            }
+
+            let candidate = sanitizedTargetCandidate(String(normalized[captureRange]))
+            if isStrongTarget(candidate) {
+                return candidate
             }
         }
 
@@ -408,9 +468,20 @@ struct MarinaNLQNormalizer {
         if normalizedPrompt.contains("compare") || normalizedPrompt.contains("versus") || normalizedPrompt.contains(" vs ") {
             values.append("comparison")
         }
-        if normalizedPrompt.contains("by category") { values.append("breakdown_by_category") }
+        if normalizedPrompt.contains("by category")
+            || normalizedPrompt.contains("category breakdown")
+            || normalizedPrompt.contains("categories breakdown") {
+            values.append("breakdown_by_category")
+        }
         if normalizedPrompt.contains("by merchant") { values.append("breakdown_by_merchant") }
         if normalizedPrompt.contains("by card") { values.append("breakdown_by_card") }
+        if normalizedPrompt.contains("share of my spending")
+            || normalizedPrompt.contains("share of spending")
+            || normalizedPrompt.contains("percent of my spending")
+            || normalizedPrompt.contains("percentage of my spending")
+            || normalizedPrompt.contains("portion of my spending") {
+            values.append("share_of_total")
+        }
         return values
     }
 

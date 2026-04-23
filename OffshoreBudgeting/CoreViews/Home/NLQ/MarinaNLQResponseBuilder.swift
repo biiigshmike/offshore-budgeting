@@ -34,7 +34,10 @@ struct MarinaNLQResponseBuilder {
 
         if let value = aggregation.value {
             let breakdownRows = (aggregation.breakdown ?? []).map {
-                HomeAnswerRow(title: $0.label, value: CurrencyFormatter.string(from: $0.value))
+                HomeAnswerRow(
+                    title: $0.label,
+                    value: $0.renderedValue ?? CurrencyFormatter.string(from: $0.value ?? 0)
+                )
             }
 
             return HomeAnswer(

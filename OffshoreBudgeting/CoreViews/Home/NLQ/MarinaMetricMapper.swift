@@ -17,7 +17,14 @@ struct MarinaMetricMapper {
             return .metric(.topCategories)
 
         case (.spendTotal, .category, nil, false):
+            if shape.modifiers.contains("breakdown_by_category")
+                || shape.modifiers.contains("share_of_total") {
+                return .metric(.categorySpendShare)
+            }
             return .metric(.topCategories)
+
+        case (.spendTotal, .category, nil, true) where shape.modifiers.contains("share_of_total"):
+            return .metric(.categorySpendShare)
 
         case (.spendTotal, .transaction, .largest, false),
              (.spendTotal, .transaction, .top, false):

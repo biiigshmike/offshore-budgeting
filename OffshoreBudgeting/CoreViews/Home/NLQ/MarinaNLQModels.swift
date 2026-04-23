@@ -162,6 +162,7 @@ struct MarinaIntentSignals: Equatable {
 enum MarinaNormalizedMetric: String, Equatable, CaseIterable {
     case spendTotal
     case categorySpendTotal
+    case categorySpendShare
     case merchantSpendTotal
     case topCategories
     case topMerchants
@@ -196,6 +197,14 @@ extension MarinaNormalizedMetric {
         case .categorySpendTotal:
             return MarinaNormalizedMetricDefinition(
                 requiresTarget: true,
+                allowedTargetTypes: [.category],
+                withinTypeAggregationPolicy: .aggregateDistinct,
+                dateFallbackPolicy: .userThenActiveBudgetThenCurrentMonth,
+                isFamilyMetric: false
+            )
+        case .categorySpendShare:
+            return MarinaNormalizedMetricDefinition(
+                requiresTarget: false,
                 allowedTargetTypes: [.category],
                 withinTypeAggregationPolicy: .aggregateDistinct,
                 dateFallbackPolicy: .userThenActiveBudgetThenCurrentMonth,
@@ -392,7 +401,8 @@ enum MarinaNLQResolutionOutcome: Equatable {
 
 struct MarinaNLQBreakdownItem: Equatable {
     let label: String
-    let value: Double
+    let value: Double?
+    let renderedValue: String?
 }
 
 struct MarinaNLQComparisonResult: Equatable {

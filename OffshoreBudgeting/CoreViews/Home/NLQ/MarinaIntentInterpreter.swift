@@ -151,6 +151,10 @@ struct MarinaIntentInterpreter {
             return .merchant
         }
 
+        if measure == .spendTotal, targetHint != nil, normalizedPrompt.contains(" on ") {
+            return .category
+        }
+
         if comparisonDateRange != nil, targetHint != nil {
             return .category
         }
@@ -308,6 +312,7 @@ struct MarinaIntentInterpreter {
 
     private func scopedTargetHint(in normalizedPrompt: String) -> String? {
         let markerPatterns = [
+            #"\bon\s+([a-z0-9 '&\.-]+?)(?=\s+(?:today|yesterday|this|last|in|from|vs|versus|to|so|current|all time|ever)\b|$)"#,
             #"\bat\s+([a-z0-9 '&\.-]+?)(?=\s+(?:today|yesterday|this|last|in|from|vs|versus|to|so|current|all time|ever)\b|$)"#,
             #"\bwith\s+([a-z0-9 '&\.-]+?)(?=\s+(?:today|yesterday|this|last|in|from|vs|versus|to|so|current|all time|ever)\b|$)"#,
             #"\bto\s+([a-z0-9 '&\.-]+?)(?=\s+(?:today|yesterday|this|last|in|from|vs|versus|so|current|all time|ever)\b|$)"#

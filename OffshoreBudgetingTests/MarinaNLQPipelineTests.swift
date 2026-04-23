@@ -7,6 +7,7 @@ import Testing
 struct MarinaNLQPipelineTests {
     @Test func normalizedMetricDefinitions_controlRequiresTarget() {
         #expect(MarinaNormalizedMetric.merchantSpendTotal.definition.requiresTarget == true)
+        #expect(MarinaNormalizedMetric.categorySpendShare.definition.requiresTarget == false)
         #expect(MarinaNormalizedMetric.spendTotal.definition.requiresTarget == false)
         #expect(MarinaNormalizedMetric.monthComparison.definition.isFamilyMetric == true)
     }
@@ -173,7 +174,8 @@ struct MarinaNLQPipelineTests {
             mapper.resolve(shape: MarinaQueryShape(
                 measure: .spendTotal,
                 grouping: .category,
-                ranking: .top
+                ranking: .top,
+                modifiers: ["breakdown_by_category"]
             )) == .metric(.topCategories)
         )
 
@@ -183,6 +185,25 @@ struct MarinaNLQPipelineTests {
                 grouping: .transaction,
                 ranking: .largest
             )) == .metric(.largestTransactions)
+        )
+
+        #expect(
+            mapper.resolve(shape: MarinaQueryShape(
+                measure: .spendTotal,
+                grouping: .category,
+                ranking: nil,
+                modifiers: ["breakdown_by_category"]
+            )) == .metric(.categorySpendShare)
+        )
+
+        #expect(
+            mapper.resolve(shape: MarinaQueryShape(
+                measure: .spendTotal,
+                grouping: .category,
+                ranking: nil,
+                targetHint: "groceries",
+                modifiers: ["share_of_total"]
+            )) == .metric(.categorySpendShare)
         )
 
         #expect(
@@ -285,10 +306,12 @@ struct MarinaNLQPipelineTests {
 
         for prompt in [
             "spending by category for this period",
-            "show spending by category this month"
+            "show spending by category this month",
+            "show me my category breakdown",
+            "break down my spending by category"
         ] {
             let intent = normalizer.normalize(prompt: prompt)
-            #expect(intent.normalizedMetric == .topCategories)
+            #expect(intent.normalizedMetric == .categorySpendShare)
             #expect(intent.queryShape.grouping == .category)
             #expect(intent.queryShape.ranking == nil)
             #expect(intent.modifiers.contains("breakdown_by_category"))
@@ -321,6 +344,28 @@ struct MarinaNLQPipelineTests {
         #expect(intent.normalizedMetric == .merchantSpendTotal)
         #expect(intent.rawTargetText == "target")
         #expect(intent.dateRange == expectedRange)
+    }
+
+    @Test func normalizer_percentOfSpendingForCategory_routesToCategorySpendShare() {
+        let normalizer = MarinaNLQNormalizer(defaultPeriodUnit: .month)
+        let intent = normalizer.normalize(prompt: "what percent of my spending was groceries this month")
+
+        #expect(intent.normalizedMetric == .categorySpendShare)
+        #expect(intent.rawTargetText == "groceries")
+        #expect(intent.modifiers.contains("share_of_total"))
+    }
+
+    @Test func normalizer_targetedTotalsAndRanking_doNotDriftIntoShareRouting() {
+        let normalizer = MarinaNLQNormalizer(defaultPeriodUnit: .month)
+
+        let merchantTotal = normalizer.normalize(prompt: "how much did i spend at target this month")
+        #expect(merchantTotal.normalizedMetric == .merchantSpendTotal)
+
+        let categoryTotal = normalizer.normalize(prompt: "how much did i spend on groceries this month")
+        #expect(categoryTotal.normalizedMetric == .categorySpendTotal)
+
+        let ranking = normalizer.normalize(prompt: "what do i spend the most money on")
+        #expect(ranking.normalizedMetric == .topCategories)
     }
 
     @Test func normalizer_unsupportedRecognizedShape_blocksCompatibilityFallback() {
@@ -357,6 +402,46 @@ struct MarinaNLQPipelineTests {
 
         #expect(payload.message.contains("top merchant"))
         #expect(payload.options.isEmpty)
+    }
+
+    @Test func pipeline_broadCategoryBreakdown_preservesShareRowsVerbatim() throws {
+        let seeded = try makePipelineWithCategorySpendData()
+        let prompt = "show me my category breakdown in february 2026"
+        let result = seeded.pipeline.run(
+            prompt: prompt,
+            activeBudgetPeriod: nil as HomeQueryDateRange?,
+            now: date(2026, 2, 20)
+        )
+
+        guard case let .answer(answer, execution) = result else {
+            Issue.record("Expected broad category breakdown answer")
+            return
+        }
+
+        #expect(execution.metric == MarinaNormalizedMetric.categorySpendShare)
+        #expect(answer.kind == HomeAnswerKind.list)
+
+        let expected = seeded.engine.execute(
+            query: HomeQuery(
+                intent: .categorySpendShare,
+                dateRange: HomeQueryDateRange(
+                    startDate: date(2026, 2, 1, 0, 0, 0),
+                    endDate: date(2026, 2, 28, 23, 59, 59)
+                )
+            ),
+            categories: seeded.categories,
+            plannedExpenses: seeded.plannedExpenses,
+            variableExpenses: seeded.variableExpenses,
+            now: date(2026, 2, 20)
+        )
+
+        let expectedGroceries = expected.rows.first(where: { $0.title == "Groceries" })?.value
+        let actualGroceries = answer.rows.first(where: { $0.title == "Groceries" })?.value
+
+        #expect(expectedGroceries != nil)
+        #expect(actualGroceries == expectedGroceries)
+        #expect(actualGroceries?.contains("%") == true)
+        #expect(actualGroceries?.contains("$") == true)
     }
 
     @Test func normalizer_topExpenseAllTimeVariants_stayLargestTransactions() {
@@ -528,6 +613,90 @@ struct MarinaNLQPipelineTests {
 
         let provider = MarinaDataProvider(modelContext: context, workspaceID: workspace.id)
         return MarinaNLQPipeline(provider: provider, defaultPeriodUnit: .month)
+    }
+
+    private func makePipelineWithCategorySpendData() throws -> (
+        pipeline: MarinaNLQPipeline,
+        engine: HomeQueryEngine,
+        categories: [Offshore.Category],
+        plannedExpenses: [PlannedExpense],
+        variableExpenses: [VariableExpense]
+    ) {
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(
+            for: Workspace.self,
+            Budget.self,
+            Offshore.Category.self,
+            PlannedExpense.self,
+            VariableExpense.self,
+            Card.self,
+            Preset.self,
+            Income.self,
+            AllocationAccount.self,
+            SavingsAccount.self,
+            configurations: config
+        )
+        let context = ModelContext(container)
+        let workspace = Workspace(name: "Seeded Workspace", hexColor: "#3B82F6")
+        context.insert(workspace)
+
+        let groceries = Offshore.Category(name: "Groceries", hexColor: "#00AA00", workspace: workspace)
+        let travel = Offshore.Category(name: "Travel", hexColor: "#0000AA", workspace: workspace)
+        context.insert(groceries)
+        context.insert(travel)
+
+        let plannedExpenses = [
+            PlannedExpense(
+                title: "Groceries Plan",
+                plannedAmount: 250,
+                expenseDate: date(2026, 2, 5),
+                workspace: workspace,
+                category: groceries
+            ),
+            PlannedExpense(
+                title: "Travel Plan",
+                plannedAmount: 150,
+                expenseDate: date(2026, 2, 7),
+                workspace: workspace,
+                category: travel
+            )
+        ]
+
+        for expense in plannedExpenses {
+            context.insert(expense)
+        }
+
+        let variableExpenses = [
+            VariableExpense(
+                descriptionText: "Groceries Variable",
+                amount: 50,
+                transactionDate: date(2026, 2, 10),
+                workspace: workspace,
+                category: groceries
+            ),
+            VariableExpense(
+                descriptionText: "Travel Variable",
+                amount: 150,
+                transactionDate: date(2026, 2, 12),
+                workspace: workspace,
+                category: travel
+            )
+        ]
+
+        for expense in variableExpenses {
+            context.insert(expense)
+        }
+
+        try context.save()
+
+        let provider = MarinaDataProvider(modelContext: context, workspaceID: workspace.id)
+        return (
+            pipeline: MarinaNLQPipeline(provider: provider, defaultPeriodUnit: .month),
+            engine: HomeQueryEngine(),
+            categories: [groceries, travel],
+            plannedExpenses: plannedExpenses,
+            variableExpenses: variableExpenses
+        )
     }
 
     private func normalize(_ raw: String) -> String {
