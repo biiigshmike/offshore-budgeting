@@ -96,6 +96,7 @@ struct HomeAssistantClarificationResolver {
             suggestions: suggestions,
             shouldRunBestEffort: plan.confidenceBand == .medium
                 && reasons.contains(.missingComparisonDate) == false
+                && blocksBestEffortWhenMissingTarget(plan.metric, reasons: reasons) == false
                 && reasons.contains(.missingMerchantTarget) == false
         )
     }
@@ -489,6 +490,40 @@ struct HomeAssistantClarificationResolver {
         ]
 
         return broadOverviewPhrases.contains { normalizedPrompt.contains($0) }
+    }
+
+    private func blocksBestEffortWhenMissingTarget(
+        _ metric: HomeQueryMetric,
+        reasons: [HomeAssistantClarificationReason]
+    ) -> Bool {
+        if reasons.contains(.missingCategoryTarget) {
+            switch metric {
+            case .categoryMonthComparison:
+                return true
+            default:
+                break
+            }
+        }
+
+        if reasons.contains(.missingCardTarget) {
+            switch metric {
+            case .cardMonthComparison:
+                return true
+            default:
+                break
+            }
+        }
+
+        if reasons.contains(.missingIncomeSourceTarget) {
+            switch metric {
+            case .incomeSourceMonthComparison:
+                return true
+            default:
+                break
+            }
+        }
+
+        return false
     }
 
     private func requiresCategoryTarget(_ metric: HomeQueryMetric) -> Bool {

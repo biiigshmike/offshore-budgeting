@@ -141,7 +141,17 @@ struct MarinaLanguageRouter {
         failureReason: String
     ) -> MarinaInterpretedRequest {
         switch fallback {
-        case .query, .clarification:
+        case .query(let plan, _):
+            if shouldPreserveClarificationOverFallback(
+                prompt: prompt,
+                fallbackPlan: plan,
+                failureReason: failureReason
+            ) {
+                break
+            }
+            MarinaDebugLogger.log("query-like fallback prompt='\(prompt)' reason=\(failureReason) fallback=\(fallback)")
+            return fallback
+        case .clarification:
             MarinaDebugLogger.log("query-like fallback prompt='\(prompt)' reason=\(failureReason) fallback=\(fallback)")
             return fallback
         default:
@@ -201,8 +211,25 @@ struct MarinaLanguageRouter {
     ) -> Bool {
         guard case .query(let fallbackPlan, _) = fallback else { return false }
 
-        if fallbackPlan.metric != modelPlan.metric {
+        if priorQueryContext.hasContext,
+           let priorMetric = priorQueryContext.lastQueryPlan?.metric ?? priorQueryContext.lastMetric,
+           fallbackPlan.metric == priorMetric,
+           modelPlan.metric != priorMetric,
+           modelPlan.metric == .overview {
             return true
+        }
+
+        if fallbackPlan.metric != modelPlan.metric {
+            let fallbackStrength = querySpecificityScore(for: fallbackPlan)
+            let modelStrength = querySpecificityScore(for: modelPlan)
+
+            if fallbackStrength > modelStrength {
+                return true
+            }
+
+            if fallbackStrength < modelStrength {
+                return false
+            }
         }
 
         if fallbackPlan.dateRange != nil, modelPlan.dateRange == nil {
@@ -223,6 +250,53 @@ struct MarinaLanguageRouter {
         }
 
         return false
+    }
+
+    private func shouldPreserveClarificationOverFallback(
+        prompt: String,
+        fallbackPlan: HomeQueryPlan,
+        failureReason: String
+    ) -> Bool {
+        guard failureReason.hasPrefix("model_") else { return false }
+        guard fallbackPlan.metric == .spendTotal || fallbackPlan.metric == .monthComparison else {
+            return false
+        }
+
+        let normalized = prompt
+            .lowercased()
+            .replacingOccurrences(of: "[^a-z0-9\\s]", with: " ", options: .regularExpression)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let groupedPrompt = normalized.contains("by category")
+            || normalized.contains("by merchant")
+            || normalized.contains("by card")
+        let rankedPrompt = normalized.contains("top ")
+            || normalized.contains("largest")
+            || normalized.contains("biggest")
+            || normalized.contains("most money on")
+            || normalized.contains("spend the most on")
+            || normalized.contains("spend the most money on")
+            || normalized.contains("most of my money go")
+        let unsupportedAverageRanking = normalized.contains("average")
+            && (normalized.contains("top ") || normalized.contains("largest") || normalized.contains("biggest") || normalized.contains("most expensive"))
+
+        return groupedPrompt || rankedPrompt || unsupportedAverageRanking
+    }
+
+    private func querySpecificityScore(for plan: HomeQueryPlan) -> Int {
+        switch plan.metric {
+        case .spendTotal, .monthComparison:
+            return 1
+        case .categorySpendTotal, .cardSpendTotal, .merchantSpendTotal,
+             .categoryMonthComparison, .cardMonthComparison, .incomeSourceMonthComparison, .merchantMonthComparison:
+            return 2
+        case .topCategories, .topMerchants, .largestTransactions, .mostFrequentTransactions,
+             .cardVariableSpendingHabits, .merchantSpendSummary, .topCategoryChanges, .topCardChanges:
+            return 3
+        default:
+            return 2
+        }
     }
 
     private func queryClarification(

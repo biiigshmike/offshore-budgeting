@@ -119,6 +119,7 @@ struct HomeAssistantClarificationResolverTests {
         )
 
         #expect(decision?.reasons.contains(.missingCategoryTarget) == true)
+        #expect(decision?.shouldRunBestEffort == false)
     }
 
     @Test func resolve_cardComparisonWithoutTarget_requestsCardTarget() throws {
@@ -140,6 +141,7 @@ struct HomeAssistantClarificationResolverTests {
         )
 
         #expect(decision?.reasons.contains(.missingCardTarget) == true)
+        #expect(decision?.shouldRunBestEffort == false)
     }
 
     @Test func resolve_incomeComparisonWithoutTarget_requestsIncomeTarget() throws {
@@ -161,6 +163,7 @@ struct HomeAssistantClarificationResolverTests {
         )
 
         #expect(decision?.reasons.contains(.missingIncomeSourceTarget) == true)
+        #expect(decision?.shouldRunBestEffort == false)
     }
 
     @Test func resolve_merchantComparisonWithoutTarget_requestsMerchantTarget() throws {

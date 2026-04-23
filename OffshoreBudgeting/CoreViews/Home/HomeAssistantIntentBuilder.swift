@@ -215,6 +215,7 @@ struct HomeAssistantIntentBuilder {
         signalTarget: String?
     ) -> Bool {
         let protectedRankingMetrics: Set<HomeQueryMetric> = [
+            .topCategories,
             .topMerchants,
             .largestTransactions
         ]

@@ -155,7 +155,7 @@ struct MarinaIntentInterpreter {
             return .category
         }
 
-        return measure == .incomeAverage ? .none : nil
+        return measure == .incomeAverage ? .some(.none) : nil
     }
 
     private func ranking(
@@ -231,22 +231,20 @@ struct MarinaIntentInterpreter {
 
     private func subject(from shape: MarinaQueryShape) -> MarinaIntentSubject? {
         switch shape.grouping {
-        case .transaction:
+        case .some(.transaction):
             return .transaction
-        case .category:
+        case .some(.category):
             return .category
-        case .merchant:
+        case .some(.merchant):
             return .merchant
-        case .preset:
+        case .some(.preset):
             return .preset
-        case .incomeSource:
+        case .some(.incomeSource):
             return .income
-        case .none:
+        case .some(.none):
             if shape.measure == .spendTotal || shape.measure == .spendAverage {
                 return .spend
             }
-            return nil
-        case .none?:
             return nil
         case nil:
             if shape.measure == .spendTotal || shape.measure == .spendAverage {

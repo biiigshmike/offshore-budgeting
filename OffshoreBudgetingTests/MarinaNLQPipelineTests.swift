@@ -280,12 +280,28 @@ struct MarinaNLQPipelineTests {
         #expect(intent.dateRange == expectedRange)
     }
 
+    @Test func normalizer_groupedCategoryPrompts_preserveGroupedIntent() {
+        let normalizer = MarinaNLQNormalizer(defaultPeriodUnit: .month)
+
+        for prompt in [
+            "spending by category for this period",
+            "show spending by category this month"
+        ] {
+            let intent = normalizer.normalize(prompt: prompt)
+            #expect(intent.normalizedMetric == .topCategories)
+            #expect(intent.queryShape.grouping == .category)
+            #expect(intent.queryShape.ranking == nil)
+            #expect(intent.modifiers.contains("breakdown_by_category"))
+        }
+    }
+
     @Test func normalizer_groupedSpendRankingVariants_resolveToTopCategories() {
         let normalizer = MarinaNLQNormalizer(defaultPeriodUnit: .month)
 
         for prompt in [
             "what do i spend the most on",
             "what do i spend the most money on",
+            "what category do i spend the most on",
             "where does most of my money go"
         ] {
             let intent = normalizer.normalize(prompt: prompt)
@@ -295,6 +311,18 @@ struct MarinaNLQPipelineTests {
         }
     }
 
+    @Test func normalizer_spendAtTargetInMarch_preservesNamedTargetAndDateRange() {
+        let normalizer = MarinaNLQNormalizer(defaultPeriodUnit: .month)
+        let parser = HomeAssistantTextParser()
+        let prompt = "what did i spend at target in march"
+        let intent = normalizer.normalize(prompt: prompt)
+        let expectedRange = parser.parseDateRange(prompt, defaultPeriodUnit: .month)
+
+        #expect(intent.normalizedMetric == .merchantSpendTotal)
+        #expect(intent.rawTargetText == "target")
+        #expect(intent.dateRange == expectedRange)
+    }
+
     @Test func normalizer_unsupportedRecognizedShape_blocksCompatibilityFallback() {
         let normalizer = MarinaNLQNormalizer(defaultPeriodUnit: .month)
         let intent = normalizer.normalize(prompt: "what is my most expensive merchant by average")
@@ -302,6 +330,16 @@ struct MarinaNLQPipelineTests {
         #expect(intent.queryShape.measure == .spendAverage)
         #expect(intent.queryShape.grouping == .merchant)
         #expect(intent.unsupportedShapeReason == .rankedAverage(grouping: .merchant))
+        #expect(intent.normalizedMetric == nil)
+    }
+
+    @Test func normalizer_unsupportedCategoryAverageRanking_blocksCompatibilityFallback() {
+        let normalizer = MarinaNLQNormalizer(defaultPeriodUnit: .month)
+        let intent = normalizer.normalize(prompt: "top category by average spend")
+
+        #expect(intent.queryShape.measure == .spendAverage)
+        #expect(intent.queryShape.grouping == .category)
+        #expect(intent.unsupportedShapeReason == .rankedAverage(grouping: .category))
         #expect(intent.normalizedMetric == nil)
     }
 
@@ -319,6 +357,22 @@ struct MarinaNLQPipelineTests {
 
         #expect(payload.message.contains("top merchant"))
         #expect(payload.options.isEmpty)
+    }
+
+    @Test func normalizer_topExpenseAllTimeVariants_stayLargestTransactions() {
+        let normalizer = MarinaNLQNormalizer(defaultPeriodUnit: .month)
+
+        for prompt in [
+            "top expense of all time",
+            "largest expense ever",
+            "biggest expense all time"
+        ] {
+            let intent = normalizer.normalize(prompt: prompt)
+            #expect(intent.normalizedMetric == .largestTransactions)
+            #expect(intent.queryShape.grouping == .transaction)
+            #expect(intent.rawTargetText == nil)
+            #expect(intent.dateRange?.startDate == date(2000, 1, 1, 0, 0, 0))
+        }
     }
 
     @Test func resolver_sameTypeDistinct_aggregatesWhenMetricAllows() {

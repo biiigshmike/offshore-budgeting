@@ -593,6 +593,62 @@ struct HomeAssistantIntentBuilderTests {
         #expect(plan.metric == .topMerchants)
     }
 
+    @Test func buildPlan_keepsFallbackTopCategoriesOverWeakScopedSignal() throws {
+        let builder = makeBuilder()
+        let fallbackPlan = HomeQueryPlan(
+            metric: .topCategories,
+            dateRange: monthRange(2026, 4),
+            resultLimit: 3,
+            confidenceBand: .medium
+        )
+
+        let plan = builder.buildPlan(
+            from: HomeAssistantParsedSignals(
+                metric: .categorySpendTotal,
+                targetName: nil,
+                targetSource: .merchantPhrase,
+                dateRange: monthRange(2026, 4),
+                comparisonDateRange: nil,
+                comparisonDetected: false,
+                rawPrompt: "Spending by category this month"
+            ),
+            fallbackPlan: fallbackPlan
+        )
+
+        #expect(plan.metric == .topCategories)
+        #expect(plan.targetName == nil)
+    }
+
+    @Test func buildPlan_rejectsAllTimeTargetFragmentForTopExpenseAllTimePrompt() throws {
+        let builder = makeBuilder()
+        let allTimeRange = HomeQueryDateRange(
+            startDate: date(2000, 1, 1, 0, 0, 0),
+            endDate: date(2026, 4, 21, 23, 59, 59)
+        )
+        let fallbackPlan = HomeQueryPlan(
+            metric: .largestTransactions,
+            dateRange: allTimeRange,
+            resultLimit: 3,
+            confidenceBand: .medium
+        )
+
+        let plan = builder.buildPlan(
+            from: HomeAssistantParsedSignals(
+                metric: .merchantSpendTotal,
+                targetName: "ALL TIME",
+                targetSource: .merchantPhrase,
+                dateRange: allTimeRange,
+                comparisonDateRange: nil,
+                comparisonDetected: false,
+                rawPrompt: "Top expense of all time?"
+            ),
+            fallbackPlan: fallbackPlan
+        )
+
+        #expect(plan.targetName == nil)
+        #expect(plan.metric == .largestTransactions)
+    }
+
     @Test func buildPlan_merchantPromptInFebruary_keepsCleanMerchantTarget() throws {
         let builder = makeBuilder()
         let fallbackPlan = HomeQueryPlan(

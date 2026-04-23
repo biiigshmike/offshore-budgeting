@@ -521,6 +521,16 @@ struct MarinaStructuredIntentPlanBuilder {
         switch normalized {
         case "total_spent", "spend_total", "spending", "spent":
             return .spendTotal
+        case "merchant_spend_total", "merchant_total", "spend_at_merchant", "merchant_spending":
+            return .merchantSpendTotal
+        case "top_expense", "largest_expense", "biggest_expense", "top_transaction", "largest_transaction":
+            return .largestTransactions
+        case "top_merchants", "merchant_breakdown", "spending_by_merchant", "merchant_spend_breakdown":
+            return .topMerchants
+        case "spending_by_category", "category_breakdown":
+            // Offshore does not yet have a dedicated grouped-category breakdown metric.
+            // Route to the closest existing grouped-category metric instead of flattening to spendTotal.
+            return .topCategories
         default:
             return nil
         }

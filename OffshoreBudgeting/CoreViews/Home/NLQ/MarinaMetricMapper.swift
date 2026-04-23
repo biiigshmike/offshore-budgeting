@@ -16,6 +16,9 @@ struct MarinaMetricMapper {
         case (.spendTotal, .category, .top, false):
             return .metric(.topCategories)
 
+        case (.spendTotal, .category, nil, false):
+            return .metric(.topCategories)
+
         case (.spendTotal, .transaction, .largest, false),
              (.spendTotal, .transaction, .top, false):
             return .metric(.largestTransactions)
@@ -26,10 +29,10 @@ struct MarinaMetricMapper {
         case (.spendTotal, .category, nil, true):
             return .metric(.categorySpendTotal)
 
-        case (.spendAverage, .none, nil, _):
+        case (.spendAverage, .some(.none), nil, _):
             return .metric(.spendAveragePerPeriod)
 
-        case (.incomeAverage, .none, nil, _),
+        case (.incomeAverage, .some(.none), nil, _),
              (.incomeAverage, .incomeSource, nil, _):
             return .metric(.incomeAverageActual)
 
@@ -45,13 +48,17 @@ struct MarinaMetricMapper {
              (.spendAverage, .category, .largest, _):
             return .unsupported(reason: .rankedAverage(grouping: .category))
 
-        case let (measure?, grouping?, ranking?, _):
-            if measure == .spendAverage || measure == .incomeAverage {
-                return .unsupported(reason: .unsupportedCombination)
-            }
-            if ranking != nil, grouping != nil {
-                return .unsupported(reason: .unsupportedCombination)
-            }
+        case (_?, _?, _?, _):
+            return .unsupported(reason: .unsupportedCombination)
+
+        case (.spendAverage, _?, nil, _),
+             (.incomeAverage, _?, nil, _):
+            return .unsupported(reason: .unsupportedCombination)
+
+        case (.transactionFrequency, _?, nil, _):
+            return .unsupported(reason: .unsupportedCombination)
+
+        case (.presetStatus, _?, nil, _):
             return .unresolved
 
         case let (measure?, grouping?, nil, hasTarget):
@@ -109,7 +116,7 @@ struct MarinaMetricMapper {
         case .income, .incomeSource:
             return .incomeSource
         case .spend:
-            return .none
+            return MarinaQueryGrouping.none
         default:
             return nil
         }

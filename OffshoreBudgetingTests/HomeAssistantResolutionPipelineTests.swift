@@ -186,6 +186,37 @@ struct HomeAssistantResolutionPipelineTests {
         #expect(reconciler.reconcile(plan: plan, resolution: fuzzyResolution).explanation == "Using merchant Starbucks")
     }
 
+    @Test func reconciler_preservesMerchantMetricWhenMerchantMatchExists() throws {
+        let reconciler = HomeAssistantPlanReconciler()
+        let plan = HomeQueryPlan(
+            metric: .merchantSpendTotal,
+            dateRange: monthRange(2026, 4),
+            resultLimit: nil,
+            confidenceBand: .high,
+            targetName: "Target",
+            targetTypeRaw: MarinaStructuredTargetType.category.rawValue,
+            periodUnit: .month
+        )
+        let resolution = HomeAssistantEntityResolution(
+            resolvedPhrase: "Target",
+            bestMatch: HomeAssistantEntityMatch(
+                name: "Target",
+                entityType: .merchant,
+                confidence: .high,
+                source: .exact,
+                score: 1
+            ),
+            rankedCandidates: [],
+            confidence: .high
+        )
+
+        let reconciled = reconciler.reconcile(plan: plan, resolution: resolution)
+
+        #expect(reconciled.plan.metric == .merchantSpendTotal)
+        #expect(reconciled.plan.targetTypeRaw == HomeAssistantResolvedEntityType.merchant.rawValue)
+        #expect(reconciled.didOverrideMetric == false)
+    }
+
     @Test func personaFollowUpsUseExecutedQueryWhenProvided() throws {
         let formatter = HomeAssistantPersonaFormatter(variantIndexPicker: { _, _ in 0 })
         let answer = HomeAnswer(

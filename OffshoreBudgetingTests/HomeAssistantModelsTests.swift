@@ -177,6 +177,49 @@ struct HomeAssistantModelsTests {
         }
     }
 
+    @Test func marinaStructuredIntentPlanBuilder_analyticalMetricAliases_resolveToSpecificMetrics() throws {
+        let builder = makeBuilder()
+        let aliases: [(raw: String, expected: HomeQueryMetric, prompt: String, targetName: String?, targetTypeRaw: String?)] = [
+            ("spending_by_category", .topCategories, "Show spending by category this month", nil, nil),
+            ("category_breakdown", .topCategories, "Show spending by category this month", nil, nil),
+            ("top_expense", .largestTransactions, "Top expense of all time", nil, nil),
+            ("largest_expense", .largestTransactions, "Largest expense this month", nil, nil),
+            ("merchant_spend_total", .merchantSpendTotal, "How much did I spend at Target this month?", "Target", MarinaStructuredTargetType.merchant.rawValue)
+        ]
+
+        for alias in aliases {
+            let structuredIntent = MarinaStructuredIntent.query(
+                MarinaStructuredQueryIntent(
+                    metricRaw: alias.raw,
+                    targetName: alias.targetName,
+                    targetTypeRaw: alias.targetTypeRaw,
+                    dateStartISO8601: "2026-04-01",
+                    dateEndISO8601: "2026-04-30",
+                    comparisonDateStartISO8601: nil,
+                    comparisonDateEndISO8601: nil,
+                    resultLimit: nil,
+                    periodUnitRaw: HomeQueryPeriodUnit.month.rawValue,
+                    confidenceRaw: HomeQueryConfidenceBand.high.rawValue,
+                    clarification: nil
+                )
+            )
+
+            let result = builder.buildRequest(
+                from: structuredIntent,
+                prompt: alias.prompt,
+                defaultPeriodUnit: .month
+            )
+
+            guard case let .query(plan, source) = result else {
+                Issue.record("Expected alias \(alias.raw) to build a valid analytical query")
+                continue
+            }
+
+            #expect(source == .model)
+            #expect(plan.metric == alias.expected)
+        }
+    }
+
     @Test func marinaStructuredIntentPlanBuilder_executableQueryIgnoresModelClarification() throws {
         let builder = makeBuilder()
         let structuredIntent = MarinaStructuredIntent.query(
@@ -797,6 +840,160 @@ struct HomeAssistantModelsTests {
                 shouldRecover: false
             ) == .answer
         )
+    }
+
+    @Test func marinaLanguageRouter_strongerGroupedModelPlanBeatsGenericFallback() async throws {
+        let router = MarinaLanguageRouter(
+            availability: StubAvailability(status: .available),
+            modelService: StubStructuredInterpreter(
+                result: .success(
+                    .query(
+                        MarinaStructuredQueryIntent(
+                            metricRaw: "spending_by_category",
+                            targetName: nil,
+                            targetTypeRaw: nil,
+                            dateStartISO8601: "2026-03-01",
+                            dateEndISO8601: "2026-03-31",
+                            comparisonDateStartISO8601: nil,
+                            comparisonDateEndISO8601: nil,
+                            resultLimit: 3,
+                            periodUnitRaw: HomeQueryPeriodUnit.month.rawValue,
+                            confidenceRaw: HomeQueryConfidenceBand.high.rawValue,
+                            clarification: nil
+                        )
+                    )
+                )
+            ),
+            planBuilder: makeBuilder()
+        )
+
+        let fallbackPlan = HomeQueryPlan(
+            metric: .spendTotal,
+            dateRange: monthRange(2026, 3),
+            resultLimit: nil,
+            confidenceBand: .medium,
+            periodUnit: .month
+        )
+
+        let result = await router.interpret(
+            prompt: "Spending by category for this period",
+            context: makeRouterContext(priorQueryContext: emptyPriorQueryContext()),
+            heuristicFallback: {
+                .query(fallbackPlan, source: .contextual)
+            }
+        )
+
+        guard case let .query(plan, source) = result else {
+            Issue.record("Expected grouped model plan to remain executable")
+            return
+        }
+
+        #expect(source == .model)
+        #expect(plan.metric == HomeQueryMetric.topCategories)
+        #expect(plan.dateRange == monthRange(2026, 3))
+    }
+
+    @Test func marinaLanguageRouter_rankingModelPlanBeatsGenericFallback() async throws {
+        let router = MarinaLanguageRouter(
+            availability: StubAvailability(status: .available),
+            modelService: StubStructuredInterpreter(
+                result: .success(
+                    .query(
+                        MarinaStructuredQueryIntent(
+                            metricRaw: "top_expense",
+                            targetName: nil,
+                            targetTypeRaw: nil,
+                            dateStartISO8601: "2000-01-01",
+                            dateEndISO8601: "2026-04-21",
+                            comparisonDateStartISO8601: nil,
+                            comparisonDateEndISO8601: nil,
+                            resultLimit: 3,
+                            periodUnitRaw: HomeQueryPeriodUnit.year.rawValue,
+                            confidenceRaw: HomeQueryConfidenceBand.high.rawValue,
+                            clarification: nil
+                        )
+                    )
+                )
+            ),
+            planBuilder: makeBuilder()
+        )
+
+        let fallbackPlan = HomeQueryPlan(
+            metric: .spendTotal,
+            dateRange: HomeQueryDateRange(
+                startDate: date(2026, 1, 1, 0, 0, 0),
+                endDate: date(2026, 12, 31, 23, 59, 59)
+            ),
+            resultLimit: nil,
+            confidenceBand: .medium,
+            periodUnit: .year
+        )
+
+        let result = await router.interpret(
+            prompt: "Top expense of all time",
+            context: makeRouterContext(priorQueryContext: emptyPriorQueryContext()),
+            heuristicFallback: {
+                .query(fallbackPlan, source: .contextual)
+            }
+        )
+
+        guard case let .query(plan, source) = result else {
+            Issue.record("Expected ranking model plan to remain executable")
+            return
+        }
+
+        #expect(source == .model)
+        #expect(plan.metric == HomeQueryMetric.largestTransactions)
+    }
+
+    @Test func marinaLanguageRouter_recognizedUnsupportedAnalyticalPrompt_clarifiesInsteadOfExecutingFallback() async throws {
+        let router = MarinaLanguageRouter(
+            availability: StubAvailability(status: .available),
+            modelService: StubStructuredInterpreter(
+                result: .success(
+                    .query(
+                        MarinaStructuredQueryIntent(
+                            metricRaw: "merchant_average_ranking",
+                            targetName: nil,
+                            targetTypeRaw: nil,
+                            dateStartISO8601: "2026-04-01",
+                            dateEndISO8601: "2026-04-30",
+                            comparisonDateStartISO8601: nil,
+                            comparisonDateEndISO8601: nil,
+                            resultLimit: nil,
+                            periodUnitRaw: HomeQueryPeriodUnit.month.rawValue,
+                            confidenceRaw: HomeQueryConfidenceBand.high.rawValue,
+                            clarification: nil
+                        )
+                    )
+                )
+            ),
+            planBuilder: makeBuilder()
+        )
+
+        let fallbackPlan = HomeQueryPlan(
+            metric: .spendTotal,
+            dateRange: monthRange(2026, 4),
+            resultLimit: nil,
+            confidenceBand: .medium,
+            periodUnit: .month
+        )
+
+        let result = await router.interpret(
+            prompt: "What is my most expensive merchant by average?",
+            context: makeRouterContext(priorQueryContext: emptyPriorQueryContext()),
+            heuristicFallback: {
+                .query(fallbackPlan, source: .contextual)
+            }
+        )
+
+        guard case let .clarification(request, source) = result else {
+            Issue.record("Expected clarification for recognized but unsupported analytical prompt")
+            return
+        }
+
+        #expect(source == .model)
+        #expect(request.shouldRunBestEffort == false)
     }
 
     @Test func marinaLanguageRouter_actionableClarificationWithoutExecutableFallback_remainsClarification() async throws {
