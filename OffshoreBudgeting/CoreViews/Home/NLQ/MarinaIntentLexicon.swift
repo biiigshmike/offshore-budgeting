@@ -19,6 +19,7 @@ struct MarinaIntentLexicon {
     static let transactionTerms: Set<String> = ["expense", "expenses", "transaction", "transactions", "purchase", "purchases"]
     static let incomeTerms: Set<String> = ["income", "paycheck", "paychecks", "deposit", "deposits"]
     static let presetTerms: Set<String> = ["preset", "bill", "bills", "upcoming"]
+    static let cardTerms: Set<String> = ["card", "visa", "mastercard", "amex", "discover"]
 
     static let targetMarkers: Set<String> = ["at", "on", "for", "with", "to"]
 

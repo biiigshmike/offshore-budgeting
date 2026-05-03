@@ -96,6 +96,10 @@ struct MarinaIntentInterpreter {
             return .spendAverage
         }
 
+        if normalizedPrompt.contains("usually spend") {
+            return .spendAverage
+        }
+
         if tokens.intersection(MarinaIntentLexicon.presetTerms).isEmpty == false,
            normalizedPrompt.contains("due soon") || normalizedPrompt.contains("upcoming")
         {
@@ -123,8 +127,16 @@ struct MarinaIntentInterpreter {
         targetHint: String?,
         comparisonDateRange: HomeQueryDateRange?
     ) -> MarinaQueryGrouping? {
+        if merchantRankingCueDetected(in: normalizedPrompt, tokens: tokens, ranking: ranking) {
+            return .merchant
+        }
+
         if isGroupedSpendRankingPrompt(normalizedPrompt, ranking: ranking) {
             return .category
+        }
+
+        if tokens.intersection(MarinaIntentLexicon.cardTerms).isEmpty == false {
+            return .some(.none)
         }
 
         if tokens.intersection(MarinaIntentLexicon.categoryTerms).isEmpty == false {
@@ -149,6 +161,10 @@ struct MarinaIntentInterpreter {
 
         if measure == .spendTotal, targetHint != nil, merchantTargetPatternDetected(in: normalizedPrompt) {
             return .merchant
+        }
+
+        if measure == .spendTotal, targetHint != nil, cardTargetPatternDetected(in: normalizedPrompt) {
+            return .some(.none)
         }
 
         if measure == .spendTotal, targetHint != nil, normalizedPrompt.contains(" on ") {
@@ -194,6 +210,10 @@ struct MarinaIntentInterpreter {
         in normalizedPrompt: String,
         ranking: MarinaQueryRanking?
     ) -> String? {
+        if ranking != nil, isPluralRankingPromptWithoutTarget(in: normalizedPrompt) {
+            return nil
+        }
+
         if ranking != nil, explicitTargetMarkerDetected(in: normalizedPrompt) == false {
             return nil
         }
@@ -339,9 +359,25 @@ struct MarinaIntentInterpreter {
     private func cleanedTargetHint(_ text: String) -> String? {
         let stripped = dropTrailingParsedDatePhrase(from: text)
         let trimmed = stripped.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmed.isEmpty == false else { return nil }
-        guard trimmed.contains(" and ") == false, trimmed.contains(",") == false else { return nil }
-        return trimmed
+        let deowned = trimmed.replacingOccurrences(
+            of: #"^(?:my|the)\s+"#,
+            with: "",
+            options: [.regularExpression, .caseInsensitive]
+        )
+        let unprefixed = deowned.replacingOccurrences(
+            of: #"^(?:on|at|for)\s+"#,
+            with: "",
+            options: [.regularExpression, .caseInsensitive]
+        )
+        let withoutPeriodUnit = unprefixed.replacingOccurrences(
+            of: #"\s+per\s+(month|week|year)\b"#,
+            with: "",
+            options: [.regularExpression, .caseInsensitive]
+        )
+        let finalTrimmed = withoutPeriodUnit.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard finalTrimmed.isEmpty == false else { return nil }
+        guard finalTrimmed.contains(" and ") == false, finalTrimmed.contains(",") == false else { return nil }
+        return finalTrimmed
     }
 
     private func dropTrailingParsedDatePhrase(from text: String) -> String {
@@ -375,6 +411,24 @@ struct MarinaIntentInterpreter {
             || normalizedPrompt.contains(" to ")
     }
 
+    private func cardTargetPatternDetected(in normalizedPrompt: String) -> Bool {
+        MarinaIntentLexicon.cardTerms.contains { normalizedPrompt.contains(" \($0)") }
+    }
+
+    private func merchantRankingCueDetected(
+        in normalizedPrompt: String,
+        tokens: Set<String>,
+        ranking: MarinaQueryRanking?
+    ) -> Bool {
+        guard ranking != nil else { return false }
+        guard tokens.intersection(MarinaIntentLexicon.merchantTerms).isEmpty == false else { return false }
+        return normalizedPrompt.contains("spend the most at")
+            || normalizedPrompt.contains("spent the most at")
+            || normalizedPrompt.contains("top merchant")
+            || normalizedPrompt.contains("top merchants")
+            || (normalizedPrompt.contains("spend") && normalizedPrompt.contains("most"))
+    }
+
     private func isGroupedSpendRankingPrompt(_ normalizedPrompt: String, ranking: MarinaQueryRanking?) -> Bool {
         guard ranking == .top else { return false }
 
@@ -397,5 +451,14 @@ struct MarinaIntentInterpreter {
         let tokens = Set(normalizedPrompt.split(separator: " ").map(String.init))
         return tokens.intersection(MarinaIntentLexicon.spendMoneyTerms).isEmpty == false
             && tokens.intersection(MarinaIntentLexicon.movementTerms).isEmpty == false
+    }
+
+    private func isPluralRankingPromptWithoutTarget(in normalizedPrompt: String) -> Bool {
+        normalizedPrompt.hasPrefix("what merchants ")
+            || normalizedPrompt.hasPrefix("which merchants ")
+            || normalizedPrompt.contains(" top merchants ")
+            || normalizedPrompt.hasPrefix("what categories ")
+            || normalizedPrompt.hasPrefix("which categories ")
+            || normalizedPrompt.contains(" top categories ")
     }
 }

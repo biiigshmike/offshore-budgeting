@@ -15,6 +15,7 @@ struct MarinaNLQAggregationEngine {
         activeBudgetPeriod: HomeQueryDateRange?,
         now: Date = Date()
     ) -> MarinaNLQAggregationResult {
+        MarinaTraceRecorder.shared.recordAggregation(path: "marina_nlq_aggregation_engine", summary: nil)
         let warnings = prefixWarnings(for: resolvedTargets)
         guard let mapping = mappedQuery(
             intent: intent,
@@ -24,6 +25,10 @@ struct MarinaNLQAggregationEngine {
             now: now
         ) else {
             MarinaDebugLogger.log("[MarinaNLQ] aggregation unsupported metric=\(metric.rawValue)")
+            MarinaTraceRecorder.shared.recordAggregation(
+                path: "marina_nlq_aggregation_engine",
+                summary: "unsupported metric=\(metric.rawValue)"
+            )
             return .unresolved("That query metric isn't implemented yet.", warnings: warnings)
         }
 
@@ -35,6 +40,10 @@ struct MarinaNLQAggregationEngine {
         switch mapping {
         case .single(let query):
             MarinaDebugLogger.log("[MarinaNLQ] aggregation executing single query intent=\(query.intent.rawValue) target=\(query.targetName ?? "nil")")
+            MarinaTraceRecorder.shared.recordAggregation(
+                path: "single_home_query_engine",
+                summary: "intent=\(query.intent.rawValue),target=\(query.targetName ?? "nil")"
+            )
             let answer = queryEngine.execute(
                 query: query,
                 categories: categories,
@@ -48,6 +57,10 @@ struct MarinaNLQAggregationEngine {
 
         case .multi(let queries):
             MarinaDebugLogger.log("[MarinaNLQ] aggregation executing multi-target query count=\(queries.count)")
+            MarinaTraceRecorder.shared.recordAggregation(
+                path: "multi_home_query_engine",
+                summary: "count=\(queries.count),intent=\(queries.first?.intent.rawValue ?? "nil")"
+            )
             let perTarget: [(query: HomeQuery, answer: HomeAnswer)] = queries.map { query in
                 let answer = queryEngine.execute(
                     query: query,
@@ -85,7 +98,7 @@ struct MarinaNLQAggregationEngine {
         )
 
         let targetNames = resolvedTargets.matches.map(\.displayValue)
-        let resolvedTargetType = resolvedTargets.targetType
+        let resolvedTargetType = resolvedTargets.targetType ?? inferredTargetType(from: intent)
         let comparisonDateRange = intent.comparisonDateRange
 
         let homeMetric: HomeQueryMetric
@@ -174,6 +187,22 @@ struct MarinaNLQAggregationEngine {
                 )
             }
             return .multi(queries)
+        }
+    }
+
+    private func inferredTargetType(from intent: NormalizedQueryIntent) -> MarinaNLQTargetType? {
+        switch intent.queryShape.grouping {
+        case .category:
+            return .category
+        case .merchant:
+            return .merchant
+        case .some(.none):
+            if intent.rawPrompt.lowercased().contains(" card") {
+                return .card
+            }
+            return nil
+        case .transaction, .preset, .incomeSource, nil:
+            return nil
         }
     }
 

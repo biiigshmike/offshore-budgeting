@@ -33,14 +33,30 @@ struct MarinaLanguageRouter {
         context: MarinaLanguageRouterContext,
         heuristicFallback: () -> MarinaInterpretedRequest
     ) async -> MarinaInterpretedRequest {
-        guard availability.currentStatus() == .available else {
+        MarinaTraceRecorder.shared.ensure(
+            prompt: prompt,
+            routingMode: .modelRouter,
+            marinaNLQv1Enabled: false
+        )
+
+        let availabilityStatus = availability.currentStatus()
+        MarinaTraceRecorder.shared.recordModelAvailability(availabilityStatus)
+
+        guard availabilityStatus == .available else {
             let fallback = heuristicFallback()
+            MarinaTraceRecorder.shared.recordFallbackAttempt(outputSummary: fallback.traceSummary)
+            MarinaTraceRecorder.shared.recordFallbackSelection(
+                reason: .modelUnavailable,
+                replacedModelOutput: false
+            )
+            MarinaTraceRecorder.shared.recordSelectedRoute(.fallback, reason: "model unavailable")
             MarinaDebugLogger.log("model unavailable prompt='\(prompt)' fallback=\(fallback)")
             return fallback
         }
 
         do {
             let structuredIntent = try await modelService.interpret(prompt: prompt, context: context)
+            MarinaTraceRecorder.shared.recordModelOutputSummary("\(structuredIntent)")
             MarinaDebugLogger.log("model structured output prompt='\(prompt)' intent=\(structuredIntent)")
             let interpreted = planBuilder.buildRequest(
                 from: structuredIntent,
@@ -52,6 +68,7 @@ struct MarinaLanguageRouter {
 
             switch interpreted {
             case .query(let plan, .model):
+                MarinaTraceRecorder.shared.recordModelPlanSummary(plan.traceSummary)
                 return resolveModelQuery(
                     plan,
                     prompt: prompt,
@@ -59,6 +76,7 @@ struct MarinaLanguageRouter {
                     heuristicFallback: heuristicFallback
                 )
             case .unresolved:
+                MarinaTraceRecorder.shared.recordModelValidationSummary("unresolved")
                 return resolveQueryLikeFailure(
                     prompt: prompt,
                     context: context,
@@ -66,7 +84,9 @@ struct MarinaLanguageRouter {
                     failureReason: "model_unresolved"
                 )
             case .clarification(let clarification, _):
+                MarinaTraceRecorder.shared.recordModelValidationSummary("clarification actionable=\(clarification.isActionable)")
                 let fallback = heuristicFallback()
+                MarinaTraceRecorder.shared.recordFallbackAttempt(outputSummary: fallback.traceSummary)
                 MarinaDebugLogger.log(
                     "model clarification prompt='\(prompt)' actionable=\(clarification.isActionable) fallbackQueryExists=\(fallback.executableQueryPlan != nil)"
                 )
@@ -76,17 +96,26 @@ struct MarinaLanguageRouter {
                     prompt: prompt,
                     priorQueryContext: context.priorQueryContext
                 ) {
+                    MarinaTraceRecorder.shared.recordFallbackSelection(
+                        reason: .preferHeuristicClarificationBypass,
+                        replacedModelOutput: true
+                    )
+                    MarinaTraceRecorder.shared.recordSelectedRoute(.fallback, reason: "heuristic preferred over model clarification")
                     MarinaDebugLogger.log("clarification preferred parser fallback prompt='\(prompt)' clarification=\(clarification) fallback=\(fallback)")
                     return fallback
                 }
+                MarinaTraceRecorder.shared.recordSelectedRoute(.clarification, reason: "model clarification")
                 MarinaDebugLogger.log("final clarification prompt='\(prompt)' clarification=\(clarification)")
                 return interpreted
             default:
+                MarinaTraceRecorder.shared.recordSelectedRoute(.model, reason: "model interpretation")
                 MarinaDebugLogger.log("final interpreted request prompt='\(prompt)' request=\(interpreted)")
                 return interpreted
             }
         } catch {
             let fallback = heuristicFallback()
+            MarinaTraceRecorder.shared.recordFallbackAttempt(outputSummary: fallback.traceSummary)
+            MarinaTraceRecorder.shared.recordFallbackSelection(reason: .modelError, replacedModelOutput: false)
             MarinaDebugLogger.log("model error prompt='\(prompt)' error=\(error) fallback=\(fallback)")
             if isLikelyQueryPrompt(prompt, context: context) {
                 return resolveQueryLikeFailure(
@@ -96,6 +125,7 @@ struct MarinaLanguageRouter {
                     failureReason: "model_error"
                 )
             }
+            MarinaTraceRecorder.shared.recordSelectedRoute(.fallback, reason: "model error fallback")
             return fallback
         }
     }
@@ -107,10 +137,13 @@ struct MarinaLanguageRouter {
         heuristicFallback: () -> MarinaInterpretedRequest
     ) -> MarinaInterpretedRequest {
         if let failure = planBuilder.validationFailure(for: plan, prompt: prompt) {
+            MarinaTraceRecorder.shared.recordModelValidationSummary("invalid: \(failure.rawValue)")
             MarinaDebugLogger.log("model query invalid prompt='\(prompt)' reason=\(failure.rawValue) plan=\(plan)")
             if let clarification = queryClarification(for: failure, plan: plan) {
+                MarinaTraceRecorder.shared.recordSelectedRoute(.clarification, reason: "model query invalid")
                 return clarification
             }
+            MarinaTraceRecorder.shared.recordFallbackSelection(reason: .modelQueryInvalid, replacedModelOutput: true)
             return resolveQueryLikeFailure(
                 prompt: prompt,
                 context: context,
@@ -120,16 +153,21 @@ struct MarinaLanguageRouter {
         }
 
         let fallback = heuristicFallback()
+        MarinaTraceRecorder.shared.recordFallbackAttempt(outputSummary: fallback.traceSummary)
         if shouldPreferHeuristicQuery(
             fallback,
             over: plan,
             prompt: prompt,
             priorQueryContext: context.priorQueryContext
         ) {
+            MarinaTraceRecorder.shared.recordFallbackSelection(reason: .preferHeuristicQuery, replacedModelOutput: true)
+            MarinaTraceRecorder.shared.recordSelectedRoute(.fallback, reason: "heuristic query specificity")
             MarinaDebugLogger.log("model query fallback prompt='\(prompt)' modelPlan=\(plan) fallback=\(fallback)")
             return fallback
         }
 
+        MarinaTraceRecorder.shared.recordModelValidationSummary("accepted")
+        MarinaTraceRecorder.shared.recordSelectedRoute(.model, reason: "model query accepted")
         MarinaDebugLogger.log("final query plan prompt='\(prompt)' plan=\(plan)")
         return .query(plan, source: .model)
     }
@@ -149,10 +187,19 @@ struct MarinaLanguageRouter {
             ) {
                 break
             }
+            if failureReason == "model_unresolved" {
+                MarinaTraceRecorder.shared.recordFallbackSelection(reason: .modelUnresolved, replacedModelOutput: true)
+            } else if failureReason == "model_error" {
+                MarinaTraceRecorder.shared.recordFallbackSelection(reason: .modelError, replacedModelOutput: true)
+            } else if failureReason.hasPrefix("model_query_invalid_") {
+                MarinaTraceRecorder.shared.recordFallbackSelection(reason: .modelQueryInvalid, replacedModelOutput: true)
+            }
             MarinaDebugLogger.log("query-like fallback prompt='\(prompt)' reason=\(failureReason) fallback=\(fallback)")
+            MarinaTraceRecorder.shared.recordSelectedRoute(.fallback, reason: failureReason)
             return fallback
         case .clarification:
             MarinaDebugLogger.log("query-like fallback prompt='\(prompt)' reason=\(failureReason) fallback=\(fallback)")
+            MarinaTraceRecorder.shared.recordSelectedRoute(.clarification, reason: failureReason)
             return fallback
         default:
             break
@@ -160,6 +207,7 @@ struct MarinaLanguageRouter {
 
         guard isLikelyQueryPrompt(prompt, context: context) else {
             MarinaDebugLogger.log("non-query fallback prompt='\(prompt)' reason=\(failureReason) fallback=\(fallback)")
+            MarinaTraceRecorder.shared.recordSelectedRoute(.fallback, reason: failureReason)
             return fallback
         }
 
@@ -172,6 +220,7 @@ struct MarinaLanguageRouter {
             isActionable: false
         )
         MarinaDebugLogger.log("query-like clarification prompt='\(prompt)' reason=\(failureReason)")
+        MarinaTraceRecorder.shared.recordSelectedRoute(.clarification, reason: failureReason)
         return .clarification(clarification, source: .model)
     }
 
@@ -184,6 +233,10 @@ struct MarinaLanguageRouter {
         guard case .query = fallback else { return false }
         guard clarification.shouldRunBestEffort == false else { return false }
         guard clarification.commandPlan == nil else { return false }
+        let subtitle = clarification.subtitle.lowercased()
+        if subtitle.contains("isn't supported yet") || subtitle.contains("not supported") {
+            return false
+        }
 
         if clarification.isActionable == false {
             MarinaDebugLogger.log(

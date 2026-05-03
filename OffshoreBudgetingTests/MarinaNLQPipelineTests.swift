@@ -289,6 +289,31 @@ struct MarinaNLQPipelineTests {
         #expect(intent.rawTargetText == "target")
     }
 
+    @Test func normalizer_foodDrinkPeriod_preservesCategoryTarget() {
+        let normalizer = MarinaNLQNormalizer(defaultPeriodUnit: .month)
+        let intent = normalizer.normalize(prompt: "How much did I spend on Food & Drink this period?")
+
+        #expect(intent.normalizedMetric == .categorySpendTotal)
+        #expect(intent.rawTargetText == "food & drink")
+    }
+
+    @Test func normalizer_appleCardMonth_mapsToUnscopedSpendWithCardTargetHint() {
+        let normalizer = MarinaNLQNormalizer(defaultPeriodUnit: .month)
+        let intent = normalizer.normalize(prompt: "What did I spend on my Apple Card this month?")
+
+        #expect(intent.normalizedMetric == .spendTotal)
+        #expect(intent.rawTargetText == "apple card")
+        #expect(intent.queryShape.grouping == .some(.none))
+    }
+
+    @Test func normalizer_targetedComparison_preservesCategoryTargetHint() {
+        let normalizer = MarinaNLQNormalizer(defaultPeriodUnit: .month)
+        let intent = normalizer.normalize(prompt: "How much did I spend on Food & Drink this period compared to last period?")
+
+        #expect(intent.normalizedMetric == .monthComparison)
+        #expect(intent.rawTargetText == "food & drink")
+    }
+
     @Test func normalizer_spendAtTargetLastMonth_preservesNamedTargetAndDateRange() {
         let normalizer = MarinaNLQNormalizer(defaultPeriodUnit: .month)
         let parser = HomeAssistantTextParser()
@@ -353,6 +378,40 @@ struct MarinaNLQPipelineTests {
         #expect(intent.normalizedMetric == .categorySpendShare)
         #expect(intent.rawTargetText == "groceries")
         #expect(intent.modifiers.contains("share_of_total"))
+    }
+
+    @Test func normalizer_targetedAverage_promptsAreExplicitlyUnsupported() {
+        let normalizer = MarinaNLQNormalizer(defaultPeriodUnit: .month)
+
+        let groceryAverage = normalizer.normalize(prompt: "What is my average grocery spending?")
+        #expect(groceryAverage.normalizedMetric == nil)
+        #expect(groceryAverage.unsupportedShapeReason == .targetedAverage)
+
+        let foodDrinkMonthlyAverage = normalizer.normalize(prompt: "What do I usually spend on Food & Drink per month?")
+        #expect(foodDrinkMonthlyAverage.normalizedMetric == nil)
+        #expect(foodDrinkMonthlyAverage.unsupportedShapeReason == .targetedAverage)
+        #expect(foodDrinkMonthlyAverage.rawTargetText == "food & drink")
+    }
+
+    @Test func normalizer_merchantsSpendMostAt_mapsToTopMerchants() {
+        let normalizer = MarinaNLQNormalizer(defaultPeriodUnit: .month)
+        let intent = normalizer.normalize(prompt: "What merchants did I spend the most at?")
+
+        #expect(intent.normalizedMetric == .topMerchants || intent.normalizedMetric == .spendTotal)
+        #expect(intent.queryShape.grouping == .merchant || intent.queryShape.grouping == nil)
+        #expect(intent.queryShape.ranking == .top)
+    }
+
+    @Test func normalizer_whatIfPrompts_areExplicitlyUnsupported() {
+        let normalizer = MarinaNLQNormalizer(defaultPeriodUnit: .month)
+
+        let first = normalizer.normalize(prompt: "If I spend $50 on Food & Drink, how will that affect my budget?")
+        #expect(first.normalizedMetric == nil)
+        #expect(first.unsupportedShapeReason == .whatIfSimulation)
+
+        let second = normalizer.normalize(prompt: "If I buy something for $120 today, can I still stay within my safe spend?")
+        #expect(second.normalizedMetric == nil)
+        #expect(second.unsupportedShapeReason == .whatIfSimulation)
     }
 
     @Test func normalizer_targetedTotalsAndRanking_doNotDriftIntoShareRouting() {
@@ -442,6 +501,34 @@ struct MarinaNLQPipelineTests {
         #expect(actualGroceries == expectedGroceries)
         #expect(actualGroceries?.contains("%") == true)
         #expect(actualGroceries?.contains("$") == true)
+    }
+
+    @Test func pipeline_targetedCategoryComparison_usesCategoryComparisonAggregationPath() throws {
+        let seeded = try makePipelineWithCategorySpendData()
+        MarinaTraceRecorder.shared.begin(
+            prompt: "Compare groceries this month to last month.",
+            routingMode: .nlqAuthoritative,
+            marinaNLQv1Enabled: true
+        )
+
+        let result = seeded.pipeline.run(
+            prompt: "Compare groceries this month to last month.",
+            activeBudgetPeriod: nil,
+            now: date(2026, 2, 20)
+        )
+        let trace = MarinaTraceRecorder.shared.finish()
+
+        if case let .answer(_, executionContext) = result {
+            #expect(executionContext.metric == .monthComparison)
+            #expect(executionContext.resolvedTargetType == .category)
+            #expect(trace?.aggregationPath == "single_home_query_engine")
+        } else if case .clarification = result {
+            #expect(trace?.selectedRoute == .clarification)
+        } else {
+            Issue.record("Expected answer or clarification for targeted category comparison")
+        }
+        #expect(trace?.normalizedMetric == "monthComparison")
+        #expect(trace?.targetText?.contains("groceries") == true)
     }
 
     @Test func normalizer_topExpenseAllTimeVariants_stayLargestTransactions() {

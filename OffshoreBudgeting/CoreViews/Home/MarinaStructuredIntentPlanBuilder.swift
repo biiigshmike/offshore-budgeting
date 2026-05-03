@@ -51,6 +51,7 @@ struct MarinaStructuredIntentPlanBuilder {
             lastPeriodUnit: nil
         )
     ) -> MarinaInterpretedRequest {
+        MarinaTraceRecorder.shared.recordModelOutputSummary("\(structuredIntent)")
         switch structuredIntent {
         case .query(let queryIntent):
             return buildQueryRequest(
@@ -99,6 +100,21 @@ struct MarinaStructuredIntentPlanBuilder {
         )
 
         guard let metric else {
+            if let unsupportedMessage = unsupportedMetricClarificationMessage(for: queryIntent.metricRaw) {
+                MarinaTraceRecorder.shared.recordModelValidationSummary("unsupported metric alias")
+                return .clarification(
+                    MarinaClarificationRequest(
+                        subtitle: unsupportedMessage,
+                        reasons: [.lowConfidenceLanguage],
+                        shouldRunBestEffort: false,
+                        queryPlan: nil,
+                        commandPlan: nil,
+                        isActionable: false
+                    ),
+                    source: .model
+                )
+            }
+            MarinaTraceRecorder.shared.recordModelValidationSummary("missing metric")
             MarinaDebugLogger.log("query build failed: missing metric for prompt='\(prompt)' prior=\(priorQueryContext)")
             if let clarification = queryIntent.clarification, clarification.isActionable {
                 return .clarification(
@@ -150,8 +166,24 @@ struct MarinaStructuredIntentPlanBuilder {
             priorQueryContext: priorQueryContext
         )
         MarinaDebugLogger.log("query merge result prompt='\(prompt)' plan=\(plan)")
+        MarinaTraceRecorder.shared.recordModelPlanSummary(plan.traceSummary)
+        MarinaTraceRecorder.shared.recordNormalized(
+            metric: plan.metric.rawValue,
+            operation: plan.metric.traceOperation,
+            presentationIntent: plan.metric.intent.rawValue
+        )
+        MarinaTraceRecorder.shared.recordTarget(
+            targetText: queryIntent.targetName,
+            targetType: queryIntent.targetTypeRaw,
+            resolvedTargetSummary: plan.targetName
+        )
+        MarinaTraceRecorder.shared.recordDateRanges(
+            primary: plan.dateRange,
+            comparison: plan.comparisonDateRange
+        )
 
         if let failure = validationFailure(for: plan, prompt: prompt) {
+            MarinaTraceRecorder.shared.recordModelValidationSummary("invalid: \(failure.rawValue)")
             MarinaDebugLogger.log("query validation failed prompt='\(prompt)' reason=\(failure.rawValue) plan=\(plan)")
             if let clarification = clarificationRequest(for: failure, plan: plan) {
                 return .clarification(clarification, source: .model)
@@ -163,6 +195,7 @@ struct MarinaStructuredIntentPlanBuilder {
             MarinaDebugLogger.log("ignoring model clarification for executable query prompt='\(prompt)' clarification=\(clarification)")
         }
 
+        MarinaTraceRecorder.shared.recordModelValidationSummary("accepted")
         return .query(plan, source: .model)
     }
 
@@ -485,7 +518,7 @@ struct MarinaStructuredIntentPlanBuilder {
         let metricRaw = queryIntent.metricRaw?.trimmingCharacters(in: .whitespacesAndNewlines)
         MarinaDebugLogger.log("metric normalization raw='\(metricRaw ?? "nil")'")
 
-        if let metric = normalizedMetric(from: metricRaw) {
+        if let metric = normalizedMetric(from: metricRaw, queryIntent: queryIntent) {
             MarinaDebugLogger.log("metric normalization resolved='\(metric.rawValue)'")
             return metric
         }
@@ -502,7 +535,7 @@ struct MarinaStructuredIntentPlanBuilder {
         return inheritedMetric
     }
 
-    private func normalizedMetric(from rawValue: String?) -> HomeQueryMetric? {
+    private func normalizedMetric(from rawValue: String?, queryIntent: MarinaStructuredQueryIntent) -> HomeQueryMetric? {
         guard let rawValue, rawValue.isEmpty == false else { return nil }
 
         if let metric = HomeQueryMetric(rawValue: rawValue) {
@@ -514,12 +547,19 @@ struct MarinaStructuredIntentPlanBuilder {
             .replacingOccurrences(of: "[^a-z0-9]+", with: "_", options: .regularExpression)
             .trimmingCharacters(in: CharacterSet(charactersIn: "_"))
 
+        let normalizedTargetType = queryIntent.targetTypeRaw?.lowercased()
+
         if let metric = HomeQueryMetric(rawValue: normalized) {
             return metric
         }
 
         switch normalized {
         case "total_spent", "spend_total", "spending", "spent":
+            return .spendTotal
+        case "total_spent_on_groceries", "expenses_groceries_total":
+            if normalizedTargetType == MarinaStructuredTargetType.category.rawValue {
+                return .categorySpendTotal
+            }
             return .spendTotal
         case "merchant_spend_total", "merchant_total", "spend_at_merchant", "merchant_spending":
             return .merchantSpendTotal
@@ -531,6 +571,20 @@ struct MarinaStructuredIntentPlanBuilder {
             // Offshore does not yet have a dedicated grouped-category breakdown metric.
             // Route to the closest existing grouped-category metric instead of flattening to spendTotal.
             return .topCategories
+        default:
+            return nil
+        }
+    }
+
+    private func unsupportedMetricClarificationMessage(for metricRaw: String?) -> String? {
+        guard let metricRaw else { return nil }
+        let normalized = metricRaw
+            .lowercased()
+            .replacingOccurrences(of: "[^a-z0-9]+", with: "_", options: .regularExpression)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "_"))
+        switch normalized {
+        case "merchant_average_ranking":
+            return "That merchant average ranking shape isn't supported yet. I can rank merchants by total spend or show overall spending averages."
         default:
             return nil
         }

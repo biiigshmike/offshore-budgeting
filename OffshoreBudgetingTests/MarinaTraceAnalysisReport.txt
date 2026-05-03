@@ -1,0 +1,16 @@
+Marina Trace Analysis Report Snapshot
+
+This checked-in file is a placeholder snapshot.
+
+Runtime-populated artifacts are emitted automatically by:
+- MarinaTraceAnalysisTests.matrixAnalysis_generatesDeterministicRowsForBothModes
+
+Output paths printed during test run:
+- <temp>/OffshoreBudgetingTestArtifacts/MarinaTraceAnalysis/MarinaTraceAnalysisReport.json
+- <temp>/OffshoreBudgetingTestArtifacts/MarinaTraceAnalysis/MarinaTraceAnalysisReport.txt
+
+The runtime files contain:
+- all 38 populated rows (19 prompts x 2 modes)
+- failuresByBucket
+- failuresByRootCauseFamily
+- nextPhaseRecommendation

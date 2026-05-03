@@ -29,7 +29,27 @@ struct MarinaNLQPipeline {
         priorContext: MarinaNLQExecutionContext? = nil,
         now: Date = Date()
     ) -> MarinaNLQPipelineResult {
+        MarinaTraceRecorder.shared.ensure(
+            prompt: prompt,
+            routingMode: .nlqAuthoritative,
+            marinaNLQv1Enabled: true
+        )
+        MarinaTraceRecorder.shared.recordSelectedRoute(.nlq, reason: "nlq pipeline")
         let normalizedIntent = normalizer.normalize(prompt: prompt)
+        MarinaTraceRecorder.shared.recordNormalized(
+            metric: normalizedIntent.normalizedMetric?.rawValue,
+            operation: normalizedIntent.normalizedMetric?.traceOperation,
+            presentationIntent: normalizedIntent.queryShape.grouping.map { "\($0)" }
+        )
+        MarinaTraceRecorder.shared.recordTarget(
+            targetText: normalizedIntent.rawTargetText,
+            targetType: nil,
+            resolvedTargetSummary: nil
+        )
+        MarinaTraceRecorder.shared.recordDateRanges(
+            primary: normalizedIntent.dateRange,
+            comparison: normalizedIntent.comparisonDateRange
+        )
         let mergedIntentResult = mergedIntent(
             from: normalizedIntent,
             priorContext: priorContext
@@ -37,15 +57,18 @@ struct MarinaNLQPipeline {
 
         switch mergedIntentResult {
         case .clarification(let payload):
+            MarinaTraceRecorder.shared.recordSelectedRoute(.clarification, reason: "nlq merged intent clarification")
             return .clarification(payload)
         case .intent(let intent):
             if let unsupportedReason = intent.unsupportedShapeReason {
                 MarinaDebugLogger.log("[MarinaNLQ] unsupported query shape prompt='\(prompt)'")
+                MarinaTraceRecorder.shared.recordSelectedRoute(.clarification, reason: "unsupported shape")
                 return .clarification(unsupportedShapeClarification(for: intent, reason: unsupportedReason))
             }
 
             guard let metric = intent.normalizedMetric else {
                 MarinaDebugLogger.log("[MarinaNLQ] recovery: unresolved metric for prompt='\(prompt)'")
+                MarinaTraceRecorder.shared.recordSelectedRoute(.recovery, reason: "unresolved metric")
                 return .recovery("I couldn't confidently map that request yet.")
             }
 
@@ -58,11 +81,18 @@ struct MarinaNLQPipeline {
             switch resolution {
             case .clarifyAmbiguous(let payload):
                 MarinaDebugLogger.log("[MarinaNLQ] ambiguity clarification presented")
+                MarinaTraceRecorder.shared.recordSelectedRoute(.clarification, reason: "nlq ambiguity")
                 return .clarification(payload)
             case .clarifyNoMatch(let payload):
                 MarinaDebugLogger.log("[MarinaNLQ] no-match clarification presented")
+                MarinaTraceRecorder.shared.recordSelectedRoute(.clarification, reason: "nlq no-match")
                 return .clarification(payload)
             case .execute(let resolvedTargets):
+                MarinaTraceRecorder.shared.recordTarget(
+                    targetText: intent.rawTargetText,
+                    targetType: resolvedTargets.targetType?.rawValue,
+                    resolvedTargetSummary: resolvedTargets.resolvedTargetNames.joined(separator: ", ")
+                )
                 let aggregation = aggregationEngine.aggregate(
                     intent: intent,
                     metric: metric,
@@ -72,6 +102,10 @@ struct MarinaNLQPipeline {
                     now: now
                 )
                 let answer = responseBuilder.build(from: aggregation, userPrompt: prompt)
+                MarinaTraceRecorder.shared.recordResponse(
+                    type: answer.kind.rawValue,
+                    finalAnswerSummary: answer.traceSummary
+                )
                 return .answer(answer, executionContext(intent: intent, metric: metric, resolvedTargets: resolvedTargets))
             }
         }
@@ -89,8 +123,10 @@ struct MarinaNLQPipeline {
 
         switch outcome {
         case .clarifyAmbiguous(let nextPayload):
+            MarinaTraceRecorder.shared.recordSelectedRoute(.clarification, reason: "nlq typed clarification ambiguous")
             return .clarification(nextPayload)
         case .clarifyNoMatch(let nextPayload):
+            MarinaTraceRecorder.shared.recordSelectedRoute(.clarification, reason: "nlq typed clarification no-match")
             return .clarification(nextPayload)
         case .execute(let resolvedTargets):
             let normalizedIntent = normalizer.normalize(prompt: prompt)
@@ -101,13 +137,16 @@ struct MarinaNLQPipeline {
 
             switch mergedIntentResult {
             case .clarification(let clarificationPayload):
+                MarinaTraceRecorder.shared.recordSelectedRoute(.clarification, reason: "nlq merged intent clarification")
                 return .clarification(clarificationPayload)
             case .intent(let intent):
                 if let unsupportedReason = intent.unsupportedShapeReason {
+                    MarinaTraceRecorder.shared.recordSelectedRoute(.clarification, reason: "unsupported shape")
                     return .clarification(unsupportedShapeClarification(for: intent, reason: unsupportedReason))
                 }
 
                 guard let metric = intent.normalizedMetric else {
+                    MarinaTraceRecorder.shared.recordSelectedRoute(.recovery, reason: "unresolved metric")
                     return .recovery("I couldn't complete that clarification safely.")
                 }
 
@@ -119,8 +158,13 @@ struct MarinaNLQPipeline {
                     activeBudgetPeriod: activeBudgetPeriod,
                     now: now
                 )
+                let answer = responseBuilder.build(from: aggregation, userPrompt: prompt)
+                MarinaTraceRecorder.shared.recordResponse(
+                    type: answer.kind.rawValue,
+                    finalAnswerSummary: answer.traceSummary
+                )
                 return .answer(
-                    responseBuilder.build(from: aggregation, userPrompt: prompt),
+                    answer,
                     executionContext(intent: intent, metric: metric, resolvedTargets: resolvedTargets)
                 )
             }

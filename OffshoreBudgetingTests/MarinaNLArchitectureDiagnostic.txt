@@ -1,0 +1,188 @@
+# Marina Natural Language Architecture Diagnostic
+
+Date: 2026-04-29
+Scope: Inspection-only. No business math or route behavior changed.
+
+## 1. End-to-End Architecture Map
+
+### User text entry points
+- Main assistant input: `HomeAssistantFoundation.interpretPrompt(_:)` in `OffshoreBudgeting/CoreViews/Home/HomeAssistantFoundation.swift`.
+- Clarification response input (deterministic NLQ mode): `handleNLQClarificationInput(_:payload:)`.
+- Suggestion tap replay path: `handleSuggestionTap(_:)` -> `runQuery(...)` or NLQ clarification branch.
+
+### Primary orchestration switch
+- `interpretPrompt(_:)` checks `marinaNLQv1Enabled`.
+- If `true`: deterministic Marina NLQ path (`MarinaNLQPipeline`) is authoritative.
+- If `false`: router/model path (`MarinaLanguageRouter`) runs, with heuristic parser fallback closure.
+
+### Interpretation layers
+- Foundation model path:
+  - `MarinaLanguageRouter.interpret(...)`
+  - `MarinaFoundationModelsService.interpret(...)` (schema-driven structured output)
+  - `MarinaStructuredIntentPlanBuilder.buildRequest(...)`
+- Deterministic Marina NLQ path:
+  - `MarinaNLQPipeline.run(...)`
+  - `MarinaNLQNormalizer` -> `MarinaIntentInterpreter` / `MarinaMetricMapper`
+  - `MarinaNLQCandidateExtractor` + `MarinaNLQResolver`
+- Classic assistant fallback path:
+  - `heuristicInterpretedRequest(for:)`
+  - `HomeAssistantCommandParser` / `resolvedPlan(for:)`
+  - `HomeAssistantTextParser`, `HomeAssistantIntentBuilder`, `HomeAssistantResolutionPipeline`
+
+### Execution/math layers
+- Main deterministic financial execution engine: `HomeQueryEngine.execute(...)`.
+- Marina NLQ execution adapter: `MarinaNLQAggregationEngine.aggregate(...)` (maps NLQ metric -> `HomeQuery` and calls `HomeQueryEngine`).
+- Additional path-specific builders (presentation and certain diagnostics) in `HomeAssistantFoundation`, but math source-of-truth remains `HomeQueryEngine`.
+
+### Response + clarification layers
+- Router/model mode:
+  - `handleInterpretedRequest(...)`
+  - `handleResolvedPlan(...)`, `handleMarinaClarification(...)`
+  - clarification chips via `presentClarification(...)` and `clarificationSuggestions(...)`
+- NLQ mode:
+  - `MarinaNLQPipelineResult` (`answer` / `clarification` / `recovery`)
+  - `handleNLQPipelineResult(...)`
+  - final answer text through `MarinaNLQResponseBuilder` then persona formatting.
+
+## 2. Routing Decision Table
+
+| Condition | Selected route | Notes |
+|---|---|---|
+| `marinaNLQv1Enabled == true` | Deterministic NLQ (`MarinaNLQPipeline`) | Router/model query and model clarification are explicitly blocked in `handleInterpretedRequest` for NLQ-authoritative mode. |
+| `marinaNLQv1Enabled == false` + model unavailable | Heuristic fallback | `MarinaLanguageRouter`: immediate `heuristicFallback()`.
+| Model returns valid query | Model query, unless overridden | `resolveModelQuery(...)` may prefer heuristic query via `shouldPreferHeuristicQuery(...)`.
+| Model returns clarification | Clarification, unless overridden | `shouldPreferHeuristicFallback(...)` can choose executable fallback query.
+| Model unresolved or throws error | Fallback or clarification | Query-like prompts go through `resolveQueryLikeFailure(...)` to fallback query/clarification.
+| Query-like model failure + fallback broad generic plan | Clarification can be preserved | `shouldPreserveClarificationOverFallback(...)` prevents silent broad fallback for grouped/ranked/unsupported-average prompts.
+
+Key finding: fallback can replace model output in multiple branches (`model clarification`, `model query`, `model error/unresolved`) based on specificity and follow-up heuristics.
+
+## 3. Capability Table (Requested Operations)
+
+| Operation | Current representation | Model path support | Fallback parser support | Execution support | Gap |
+|---|---|---|---|---|---|
+| Sum | `spendTotal`, `categorySpendTotal`, `cardSpendTotal`, `merchantSpendTotal` | Yes (metricRaw normalized/mapped) | Yes | Yes (`HomeQueryEngine`) | None for core totals |
+| Average | `spendAveragePerPeriod`, `incomeAverageActual` | Partial (depends on metric mapping) | Yes | Yes | Ranked-average combos unsupported in routing/NLQ shape mapping |
+| Count | `mostFrequentTransactions` (frequency proxy) | Partial | Yes for frequency phrasing | Partial | No explicit general count metric |
+| Difference | Comparison metrics (`monthComparison`, `category/card/income/merchantMonthComparison`) | Yes | Yes | Yes | Mostly presentation-level, not always explicit “difference” row |
+| Percentage change | Derived from comparison responses | Partial | Partial | Partial | No dedicated percent-change metric contract |
+| Share of total | `categorySpendShare`, `incomeSourceShare` | Partial (metric normalization required) | Yes | Yes | Adapter can mis-scope target if target extraction weak |
+| Ranked list | `topCategories`, `topMerchants`, `largestTransactions`, `mostFrequentTransactions` | Yes | Yes | Yes | Some prompts can fall back to broad spendTotal if parsing/model uncertain |
+| Overview | `overview` | Yes | Yes (`how am I doing`, etc.) | Yes | None |
+| What-if simulation | Separate flow in `HomeAssistantWhatIf` | Not in model metric contract | Parser avoids generic query parse for what-if | Deterministic simulation path exists | Not represented by Marina structured query metric model |
+
+## 4. Model->Executable Adapter Fidelity
+
+Observed fidelity risk points:
+- `targetTypeRaw` exists in structured output but execution mostly depends on normalized metric + `targetName` + later canonicalization.
+- `periodUnitRaw` is preserved on `HomeQueryPlan`, but NLQ aggregation path currently sets `periodUnit: nil` on mapped queries.
+- Presentation style is not a first-class structured query field in `MarinaStructuredQueryIntent`.
+- Comparison range parsing can be inferred from prompt even when model omits explicit comparison dates.
+- Heuristic fallback can replace valid model output if fallback is deemed more specific.
+
+Fields requested for inspection status:
+- target: represented (`targetName`, optional `targetTypeRaw`) -> can be canonicalized later.
+- entity type: represented but weakly enforced across all branches.
+- date range: represented + parser-derived fallback.
+- comparison date range: represented + parser-derived fallback.
+- operation: represented by metric mapping.
+- presentation style: not explicitly represented in model intent schema.
+
+## 5. 19-Prompt Diagnostic Matrix (Code/Tests Grounded)
+
+Legend:
+- model output column is inferred from schema+mapper unless explicit test exists.
+- final executable request is the expected `HomeQueryPlan`/`HomeQuery` family under default router mode (`marinaNLQv1Enabled == false`) unless otherwise noted.
+
+| Prompt | Selected route | Model output (if any) | Fallback output | Final executable request | Date range | Comparison range | Target | Operation | Engine | Response type | Verdict |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| What did I spend this month? | Model or fallback query | likely `spendTotal` | `spendThisMonth` | `spendTotal` | this month | none | none | sum | `HomeQueryEngine` | metric | correct |
+| How much did I spend last week? | Model or fallback query | likely `spendTotal` | `spendTotal` + week range | `spendTotal` | last week | none | none | sum | `HomeQueryEngine` | metric | correct |
+| How much did I spend on Food & Drink this period? | Model/fallback with entity resolution | likely `categorySpendTotal` target=Food & Drink | category total parse/resolution | `categorySpendTotal` | contextual/current period | none | Food & Drink | sum | `HomeQueryEngine` | metric | mostly correct |
+| What did I spend on my Apple Card this month? | Model/fallback query | likely card spend | card spend parse | `cardSpendTotal` | this month | none | Apple Card | sum | `HomeQueryEngine` | metric | correct |
+| How much did I spend on Food & Drink this period compared to last period? | Model/fallback comparison | likely category month comparison | compare category parse | `categoryMonthComparison` | current period | previous period | Food & Drink | difference/comparison | `HomeQueryEngine` | comparison | correct |
+| Compare groceries this month to last month. | Model/fallback comparison | likely category compare | tested parse pattern | `categoryMonthComparison` | this month | last month | groceries | difference/comparison | `HomeQueryEngine` | comparison | correct |
+| Did I spend more on restaurants this month than last month? | Model/fallback comparison | likely category compare | compare intent | `categoryMonthComparison` | this month | last month | restaurants | difference/comparison | `HomeQueryEngine` | comparison | mostly correct |
+| How did my Apple Card spending change from March to April? | Model/fallback comparison | likely card compare w explicit ranges | compare parse | `cardMonthComparison` | April | March | Apple Card | difference/comparison | `HomeQueryEngine` | comparison | correct |
+| What is my average grocery spending? | Query with target inference risk | likely average+category target | average intent may be broad | often `spendAveragePerPeriod` (or unresolved target) | default/current | none | groceries (weak) | average | `HomeQueryEngine` | metric/message | incomplete |
+| What do I usually spend on Food & Drink per month? | Model/fallback | likely average+category | parser may map to average spend | often broad average vs category-specific expectation | monthly/default | none | Food & Drink | average | `HomeQueryEngine` | metric | incomplete |
+| What are my top categories this month? | Ranked query | likely `topCategories` | top categories parse | `topCategories` | this month | none | none | ranked list | `HomeQueryEngine` | list | correct |
+| Where is most of my money going? | Capability/fallback ranking-ish | may produce grouped intent | capability often routes broad | can end at `topCategories` or broad spend route depending branch | default/current | none | none | ranked/list or overview | `HomeQueryEngine` | list/metric | overbroad risk |
+| What merchants did I spend the most at? | Ranked merchants | likely `topMerchants` | merchant discovery parser | `topMerchants` | default/current | none | none | ranked list | `HomeQueryEngine` | list | correct |
+| What percent of my spending was Food & Drink? | Share query | likely category share | NLQ normalizer includes explicit mapping | `categorySpendShare` | default/current | none | Food & Drink | share of total | `HomeQueryEngine` | metric/list | correct |
+| Break down my spending by category this month. | Grouped breakdown | likely spending_by_category -> topCategories | parser may map top categories | `topCategories` (closest grouped metric) | this month | none | none | ranked/grouped | `HomeQueryEngine` | list | incomplete (not full exhaustive breakdown contract) |
+| How am I doing this month? | Overview | likely `overview` | tested overview parse | `overview` | this month/default | none | none | overview | `HomeQueryEngine` | metric/list | correct |
+| How is my budget looking? | Overview | likely `overview` | overview parse | `overview` | default/current | none | none | overview | `HomeQueryEngine` | metric/list | correct |
+| If I spend $50 on Food & Drink, how will that affect my budget? | What-if path | model query path not primary | parser excludes what-if from basic query parse | what-if planner/explainer flow | contextual | maybe none | Food & Drink | simulation | what-if services + deterministic math | message/planner | correct path, separate from query metrics |
+| If I buy something for $120 today, can I still stay within my safe spend? | What-if/affordability path | model query path not primary | parser marks affordability as special | affordability/safe-spend evaluation flow | today | none | optional | simulation + safe-spend | deterministic safe-spend/what-if path | message | correct path |
+
+## 6. Silent Override Risk Findings
+
+1. Valid model query can be replaced by fallback query.
+- In `MarinaLanguageRouter.shouldPreferHeuristicQuery(...)`, fallback wins for higher specificity, missing model date range, follow-up metric continuity, or follow-up target carryover.
+
+2. Model clarification can be replaced by fallback executable query.
+- In `shouldPreferHeuristicFallback(...)`, non-actionable or low-confidence-only clarifications can be bypassed.
+
+3. Model unresolved/error in query-like prompts may still execute fallback.
+- `resolveQueryLikeFailure(...)` can execute fallback query directly unless clarification-preservation guard applies.
+
+4. Preservation guard exists but is selective.
+- `shouldPreserveClarificationOverFallback(...)` blocks broad fallback for grouped/ranked/unsupported-average prompt patterns.
+
+## 7. Proposed Debug Trace Type (Design + Additive Type)
+
+A minimal additive trace schema is included in code as `MarinaExecutionTrace` with:
+- prompt/original + normalized
+- model availability
+- model output summary
+- model validation result
+- fallback usage + reason
+- normalized metric/operation
+- target raw/resolved
+- date/comparison ranges
+- aggregation path/result summary
+- response path + final outcome
+
+Insertion points (no behavior redesign):
+1. `MarinaLanguageRouter.interpret(...)`:
+- before availability check
+- after model response
+- after validation
+- on fallback preference decisions
+- on final route selection
+2. `MarinaNLQPipeline.run(...)` / `resolveClarificationResponse(...)`:
+- after normalization
+- after resolution outcome
+- after aggregation
+3. `HomeAssistantFoundation.handleInterpretedRequest(...)` and `handleMarinaClarification(...)`:
+- final presentation branch (answer/clarification/recovery/unresolved)
+
+## 8. Evidence Sources
+
+Primary files inspected:
+- `OffshoreBudgeting/CoreViews/Home/HomeAssistantFoundation.swift`
+- `OffshoreBudgeting/CoreViews/Home/MarinaLanguageRouter.swift`
+- `OffshoreBudgeting/CoreViews/Home/MarinaFoundationModelsService.swift`
+- `OffshoreBudgeting/CoreViews/Home/MarinaStructuredIntentPlanBuilder.swift`
+- `OffshoreBudgeting/CoreViews/Home/MarinaLanguageModels.swift`
+- `OffshoreBudgeting/CoreViews/Home/MarinaModelAvailability.swift`
+- `OffshoreBudgeting/CoreViews/Home/NLQ/MarinaNLQPipeline.swift`
+- `OffshoreBudgeting/CoreViews/Home/NLQ/MarinaNLQNormalizer.swift`
+- `OffshoreBudgeting/CoreViews/Home/NLQ/MarinaNLQCandidateExtractor.swift`
+- `OffshoreBudgeting/CoreViews/Home/NLQ/MarinaNLQResolution.swift`
+- `OffshoreBudgeting/CoreViews/Home/NLQ/MarinaNLQAggregationEngine.swift`
+- `OffshoreBudgeting/CoreViews/Home/NLQ/MarinaNLQResponseBuilder.swift`
+- `OffshoreBudgeting/CoreViews/Home/HomeAssistantTextParser.swift`
+- `OffshoreBudgeting/CoreViews/Home/HomeAssistantIntentBuilder.swift`
+- `OffshoreBudgeting/CoreViews/Home/HomeAssistantResolutionPipeline.swift`
+- `OffshoreBudgeting/CoreViews/Home/HomeAssistantExecutionPolicy.swift`
+- `OffshoreBudgeting/CoreViews/Home/HomeQueryEngine.swift`
+
+Tests referenced:
+- `OffshoreBudgetingTests/HomeAssistantModelsTests.swift`
+- `OffshoreBudgetingTests/MarinaNLQPipelineTests.swift`
+- `OffshoreBudgetingTests/HomeAssistantTextParserTests.swift`
+- `OffshoreBudgetingTests/HomeAssistantExecutionPolicyTests.swift`
+- `OffshoreBudgetingTests/HomeQueryEngineTests.swift`
+- `OffshoreBudgetingTests/MarinaTestMatrix.txt`

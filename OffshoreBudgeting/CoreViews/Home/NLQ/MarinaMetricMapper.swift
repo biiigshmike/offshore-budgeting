@@ -36,6 +36,14 @@ struct MarinaMetricMapper {
         case (.spendTotal, .category, nil, true):
             return .metric(.categorySpendTotal)
 
+        case (.spendTotal, .some(.none), nil, true):
+            return .metric(.spendTotal)
+
+        case (.spendAverage, .some(.none), nil, true),
+             (.spendAverage, .merchant, nil, true),
+             (.spendAverage, .category, nil, true):
+            return .unsupported(reason: .targetedAverage)
+
         case (.spendAverage, .some(.none), nil, _):
             return .metric(.spendAveragePerPeriod)
 

@@ -35,10 +35,13 @@ struct MarinaNLQNormalizer {
             dateRange: dateRange,
             comparisonDateRange: comparisonDateRange
         )
+        let isWhatIfPrompt = isWhatIfPrompt(normalizedPrompt)
         let intentSignals = intentInterpreter.deriveSignals(from: queryShape)
-        let shapeResolution = metricMapper.resolve(shape: queryShape)
-        let unsupportedShapeReason: MarinaUnsupportedShapeReason?
-        let metric: MarinaNormalizedMetric?
+        let shapeResolution: MarinaQueryShapeResolution = isWhatIfPrompt
+            ? .unsupported(reason: .whatIfSimulation)
+            : metricMapper.resolve(shape: queryShape)
+        var unsupportedShapeReason: MarinaUnsupportedShapeReason?
+        var metric: MarinaNormalizedMetric?
 
         switch shapeResolution {
         case .metric(let resolvedMetric):
@@ -59,6 +62,14 @@ struct MarinaNLQNormalizer {
             comparisonPrimarySnippet: comparisonRanges?.primarySnippet
         )
             ?? parserInferredTarget(from: parserPlan)
+
+        let usuallySpendTargetedPrompt = normalizedPrompt.contains("usually spend")
+            && (rawTargetText != nil || normalizedPrompt.contains(" on "))
+
+        if (metric == .spendAveragePerPeriod && rawTargetText != nil) || usuallySpendTargetedPrompt {
+            metric = nil
+            unsupportedShapeReason = .targetedAverage
+        }
 
         return NormalizedQueryIntent(
             rawPrompt: prompt,
@@ -306,7 +317,12 @@ struct MarinaNLQNormalizer {
     private func sanitizedTargetCandidate(_ text: String) -> String {
         let strippedDateTail = stripDateTail(text)
         let strippedTemporalFragments = stripExplicitTemporalFragments(strippedDateTail)
-        return dropTrailingParsedDatePhrase(from: strippedTemporalFragments)
+        let strippedPeriodUnit = strippedTemporalFragments.replacingOccurrences(
+            of: #"\s+per\s+(month|week|year)\b"#,
+            with: "",
+            options: [.regularExpression, .caseInsensitive]
+        )
+        return dropTrailingParsedDatePhrase(from: strippedPeriodUnit)
     }
 
     private func dropTrailingParsedDatePhrase(from text: String) -> String {
@@ -504,5 +520,16 @@ struct MarinaNLQNormalizer {
             .replacingOccurrences(of: "[^a-z0-9\\s&]", with: " ", options: .regularExpression)
             .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func isWhatIfPrompt(_ normalizedPrompt: String) -> Bool {
+        let whatIfPhrases = [
+            "if i spend",
+            "if i buy",
+            "how will that affect",
+            "can i still stay within",
+            "what if"
+        ]
+        return whatIfPhrases.contains(where: normalizedPrompt.contains)
     }
 }

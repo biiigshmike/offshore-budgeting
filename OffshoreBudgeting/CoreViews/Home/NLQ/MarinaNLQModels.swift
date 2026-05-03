@@ -97,6 +97,8 @@ enum MarinaQueryRanking: Equatable {
 
 enum MarinaUnsupportedShapeReason: Equatable {
     case rankedAverage(grouping: MarinaQueryGrouping)
+    case targetedAverage
+    case whatIfSimulation
     case unsupportedCombination
 
     var clarificationMessage: String {
@@ -110,6 +112,10 @@ enum MarinaUnsupportedShapeReason: Equatable {
             default:
                 return "I can answer total-spend rankings and overall averages today, but not that average-based ranking yet."
             }
+        case .targetedAverage:
+            return "I can show your overall spending average, but targeted averages by category, merchant, or card aren't supported in this path yet."
+        case .whatIfSimulation:
+            return "What-if simulation isn't supported in this query path yet. Try a spend total, comparison, or ranking question."
         case .unsupportedCombination:
             return "I recognized that kind of question, but I can't answer that shape safely yet. Try a total-spend ranking, a spend total for one target, or an average over time."
         }

@@ -830,8 +830,12 @@ struct HomeAssistantModelsTests {
             return
         }
 
-        #expect(source == .contextual)
-        #expect(plan == fallbackPlan)
+        #expect(source == .model)
+        #expect(plan.metric == .categorySpendTotal)
+        #expect(plan.targetName == "Groceries")
+        #expect(plan.targetTypeRaw == MarinaStructuredTargetType.category.rawValue)
+        #expect(plan.periodUnit == .month)
+        #expect(plan.dateRange == monthRange(2026, 3))
         #expect(
             MarinaTurnOutcomeEvaluator.outcome(
                 hasExecutableQuery: true,
@@ -994,6 +998,89 @@ struct HomeAssistantModelsTests {
 
         #expect(source == .model)
         #expect(request.shouldRunBestEffort == false)
+        #expect(request.subtitle.contains("isn't supported yet"))
+    }
+
+    @Test func marinaLanguageRouter_categoryAliasMetric_totalSpentOnGroceries_mapsToCategorySpendTotal() async throws {
+        let router = MarinaLanguageRouter(
+            availability: StubAvailability(status: .available),
+            modelService: StubStructuredInterpreter(
+                result: .success(
+                    .query(
+                        MarinaStructuredQueryIntent(
+                            metricRaw: "total_spent_on_groceries",
+                            targetName: "Groceries",
+                            targetTypeRaw: MarinaStructuredTargetType.category.rawValue,
+                            dateStartISO8601: "2026-03-01",
+                            dateEndISO8601: "2026-03-31",
+                            comparisonDateStartISO8601: nil,
+                            comparisonDateEndISO8601: nil,
+                            resultLimit: nil,
+                            periodUnitRaw: HomeQueryPeriodUnit.month.rawValue,
+                            confidenceRaw: HomeQueryConfidenceBand.high.rawValue,
+                            clarification: nil
+                        )
+                    )
+                )
+            ),
+            planBuilder: makeBuilder()
+        )
+
+        let result = await router.interpret(
+            prompt: "What did I spend on groceries last month?",
+            context: makeRouterContext(priorQueryContext: emptyPriorQueryContext()),
+            heuristicFallback: { .unresolved }
+        )
+
+        guard case let .query(plan, source) = result else {
+            Issue.record("Expected query response")
+            return
+        }
+
+        #expect(source == .model)
+        #expect(plan.metric == .categorySpendTotal)
+        #expect(plan.targetName == "Groceries")
+    }
+
+    @Test func marinaLanguageRouter_categoryAliasMetric_expensesGroceriesTotal_mapsToCategorySpendTotal() async throws {
+        let router = MarinaLanguageRouter(
+            availability: StubAvailability(status: .available),
+            modelService: StubStructuredInterpreter(
+                result: .success(
+                    .query(
+                        MarinaStructuredQueryIntent(
+                            metricRaw: "expenses.groceries.total",
+                            targetName: "Groceries",
+                            targetTypeRaw: MarinaStructuredTargetType.category.rawValue,
+                            dateStartISO8601: "2026-03-01",
+                            dateEndISO8601: "2026-03-31",
+                            comparisonDateStartISO8601: nil,
+                            comparisonDateEndISO8601: nil,
+                            resultLimit: nil,
+                            periodUnitRaw: HomeQueryPeriodUnit.month.rawValue,
+                            confidenceRaw: HomeQueryConfidenceBand.high.rawValue,
+                            clarification: nil
+                        )
+                    )
+                )
+            ),
+            planBuilder: makeBuilder()
+        )
+
+        let result = await router.interpret(
+            prompt: "What did I spend on groceries last month?",
+            context: makeRouterContext(priorQueryContext: emptyPriorQueryContext()),
+            heuristicFallback: { .unresolved }
+        )
+
+        guard case let .query(plan, source) = result else {
+            Issue.record("Expected query response")
+            return
+        }
+
+        #expect(source == .model)
+        #expect(plan.metric == .categorySpendTotal)
+        #expect(plan.targetName == "Groceries")
     }
 
     @Test func marinaLanguageRouter_actionableClarificationWithoutExecutableFallback_remainsClarification() async throws {
@@ -1107,10 +1194,10 @@ struct HomeAssistantModelsTests {
             return
         }
 
-        #expect(firstSource == .contextual)
-        #expect(secondSource == .contextual)
-        #expect(firstPlan == fallbackPlan)
-        #expect(secondPlan == fallbackPlan)
+        #expect(firstSource == secondSource)
+        #expect(firstPlan == secondPlan)
+        #expect(firstPlan.metric == .categorySpendTotal)
+        #expect(firstPlan.targetName == "Groceries")
         #expect(
             MarinaTurnOutcomeEvaluator.outcome(
                 hasExecutableQuery: true,

@@ -20,6 +20,8 @@ enum HomeAssistantPlanResolutionSource: String {
     case parser
     case contextual
     case entityAware
+    case sharedHeuristic
+    case sharedFoundationModels
 }
 
 // MARK: - Presented Panel
@@ -184,6 +186,10 @@ struct HomeAssistantPanelView: View {
     private var confirmBeforeDeleting: Bool = true
     @AppStorage("debug_marina_nlq_v1_enabled")
     private var marinaNLQv1Enabled: Bool = false
+    @AppStorage("debug_marina_shared_pipeline_enabled")
+    private var marinaSharedPipelineEnabled: Bool = false
+    @AppStorage("marina_ai_opt_in_enabled")
+    private var marinaAIOptInEnabled: Bool = false
     
     @Environment(\.modelContext) private var modelContext
     private let engine = HomeQueryEngine()
@@ -1428,6 +1434,49 @@ struct HomeAssistantPanelView: View {
             userPrompt: userPrompt
         )
         appendAnswer(answer)
+    }
+
+    private func handleSharedPipelineAnswer(
+        _ answer: HomeAnswer,
+        rawPrompt: String,
+        homeQueryPlan: HomeQueryPlan?,
+        source: HomeAssistantPlanResolutionSource
+    ) {
+        clarificationSuggestions = []
+        recoverySuggestions = []
+        lastClarificationReasons = []
+        activeClarificationContext = nil
+        clearNLQClarificationState()
+
+        let query = homeQueryPlan?.query
+        let normalizedAnswer = query.map {
+            executedQueryAnswerNormalizer.normalize(answer, for: $0)
+        } ?? answer
+        let styled = personaFormatter.styledAnswer(
+            from: normalizedAnswer,
+            userPrompt: rawPrompt,
+            personaID: selectedPersonaID
+        )
+
+        if let homeQueryPlan, let query {
+            updateSessionContext(after: homeQueryPlan)
+            rememberAnswerContext(
+                for: query,
+                executedPlan: homeQueryPlan,
+                rawAnswer: normalizedAnswer,
+                presentedAnswer: styled,
+                userPrompt: rawPrompt
+            )
+        }
+
+        recordTelemetry(
+            for: rawPrompt,
+            outcome: .resolved,
+            source: source,
+            plan: homeQueryPlan,
+            notes: "shared_pipeline"
+        )
+        appendAnswer(styled)
     }
     
     private func submitPrompt() {
@@ -4369,6 +4418,10 @@ struct HomeAssistantPanelView: View {
             explanation: answer.explanation,
             generatedAt: answer.generatedAt
         )
+        MarinaTraceRecorder.shared.recordResponse(
+            type: answerToAppend.kind.rawValue,
+            finalAnswerSummary: answerToAppend.traceSummary
+        )
         
         pendingUserPromptForNextAnswer = nil
         followUpsCollapsed = false
@@ -5423,6 +5476,50 @@ struct HomeAssistantPanelView: View {
 
     @MainActor
     private func interpretPrompt(_ prompt: String) async {
+        MarinaTraceRecorder.shared.begin(
+            prompt: prompt,
+            routingMode: marinaSharedPipelineEnabled ? .sharedPipeline : (marinaNLQv1Enabled ? .nlqAuthoritative : .modelRouter),
+            marinaNLQv1Enabled: marinaNLQv1Enabled
+        )
+        if marinaSharedPipelineEnabled {
+            let provider = MarinaDataProvider(modelContext: modelContext, workspaceID: workspace.id)
+            let coordinator = MarinaSharedPipelineCoordinator()
+            let result = await coordinator.run(
+                prompt: prompt,
+                context: MarinaSharedPipelineContext(
+                    provider: provider,
+                    routerContext: makeMarinaRouterContext(),
+                    defaultPeriodUnit: defaultQueryPeriodUnit,
+                    sharedPipelineEnabled: marinaSharedPipelineEnabled,
+                    aiOptInEnabled: marinaAIOptInEnabled,
+                    now: Date()
+                )
+            )
+            MarinaTraceRecorder.shared.recordSharedPipelineTrace(result.trace)
+
+            switch result {
+            case .handled(let answer, _, let homeQueryPlan, let trace):
+                MarinaTraceRecorder.shared.recordSelectedRoute(
+                    trace.selectedPath == .sharedFoundationModels ? .sharedFoundationModels : .sharedHeuristic,
+                    reason: trace.compactSummary
+                )
+                MarinaTraceRecorder.shared.recordAggregation(
+                    path: "marina_shared_pipeline",
+                    summary: trace.executorResultSummary
+                )
+                handleSharedPipelineAnswer(
+                    answer,
+                    rawPrompt: prompt,
+                    homeQueryPlan: homeQueryPlan,
+                    source: trace.interpreterSource == .foundationModels ? .sharedFoundationModels : .sharedHeuristic
+                )
+                _ = MarinaTraceRecorder.shared.finish()
+                return
+            case .fallbackToLegacy(let trace):
+                MarinaTraceRecorder.shared.recordSelectedRoute(.sharedFallback, reason: trace.compactSummary)
+            }
+        }
+
         if marinaNLQv1Enabled {
             let provider = MarinaDataProvider(modelContext: modelContext, workspaceID: workspace.id)
             let pipeline = MarinaNLQPipeline(provider: provider, defaultPeriodUnit: defaultQueryPeriodUnit)
@@ -5434,6 +5531,7 @@ struct HomeAssistantPanelView: View {
                 now: Date()
             )
             _ = handleNLQPipelineResult(pipelineResult, originalPrompt: prompt)
+            _ = MarinaTraceRecorder.shared.finish()
             return
         }
 
@@ -5446,6 +5544,7 @@ struct HomeAssistantPanelView: View {
         )
 
         handleInterpretedRequest(interpreted, rawPrompt: prompt)
+        _ = MarinaTraceRecorder.shared.finish()
     }
 
     @MainActor
@@ -5455,6 +5554,21 @@ struct HomeAssistantPanelView: View {
     ) -> Bool {
         switch result {
         case .answer(let answer, let executionContext):
+            MarinaTraceRecorder.shared.recordSelectedRoute(.nlq, reason: "nlq answer")
+            MarinaTraceRecorder.shared.recordNormalized(
+                metric: executionContext.metric.rawValue,
+                operation: executionContext.metric.traceOperation,
+                presentationIntent: "answer"
+            )
+            MarinaTraceRecorder.shared.recordTarget(
+                targetText: nil,
+                targetType: executionContext.resolvedTargetType?.rawValue,
+                resolvedTargetSummary: executionContext.resolvedTargetNames.joined(separator: ", ")
+            )
+            MarinaTraceRecorder.shared.recordDateRanges(
+                primary: executionContext.dateRange,
+                comparison: executionContext.comparisonDateRange
+            )
             clearNLQClarificationState()
             nlqExecutionContext = executionContext
             clarificationSuggestions = []
@@ -5466,9 +5580,18 @@ struct HomeAssistantPanelView: View {
                 userPrompt: answer.userPrompt ?? originalPrompt,
                 personaID: selectedPersonaID
             )
+            MarinaTraceRecorder.shared.recordResponse(
+                type: styled.kind.rawValue,
+                finalAnswerSummary: styled.traceSummary
+            )
             appendAnswer(styled)
             return true
         case .clarification(let payload):
+            MarinaTraceRecorder.shared.recordSelectedRoute(.clarification, reason: "nlq clarification")
+            MarinaTraceRecorder.shared.recordResponse(
+                type: HomeAnswerKind.message.rawValue,
+                finalAnswerSummary: "nlq clarification"
+            )
             nlqClarificationPayload = payload
             nlqClarificationOriginalPrompt = originalPrompt
             clarificationSuggestions = payload.options.map { option in
@@ -5492,6 +5615,11 @@ struct HomeAssistantPanelView: View {
             )
             return true
         case .recovery(let message):
+            MarinaTraceRecorder.shared.recordSelectedRoute(.recovery, reason: "nlq recovery")
+            MarinaTraceRecorder.shared.recordResponse(
+                type: HomeAnswerKind.message.rawValue,
+                finalAnswerSummary: message
+            )
             clearNLQClarificationState()
             clarificationSuggestions = []
             recoverySuggestions = []
@@ -5540,13 +5668,18 @@ struct HomeAssistantPanelView: View {
 
     private func heuristicInterpretedRequest(for prompt: String) -> MarinaInterpretedRequest {
         if let command = commandParser.parse(prompt, defaultPeriodUnit: defaultQueryPeriodUnit) {
-            return .command(command, source: .parser)
+            let interpreted: MarinaInterpretedRequest = .command(command, source: .parser)
+            MarinaTraceRecorder.shared.recordFallbackAttempt(outputSummary: interpreted.traceSummary)
+            return interpreted
         }
 
         if let resolved = resolvedPlan(for: prompt) {
-            return .query(resolved.plan, source: resolved.source)
+            let interpreted: MarinaInterpretedRequest = .query(resolved.plan, source: resolved.source)
+            MarinaTraceRecorder.shared.recordFallbackAttempt(outputSummary: interpreted.traceSummary)
+            return interpreted
         }
 
+        MarinaTraceRecorder.shared.recordFallbackAttempt(outputSummary: MarinaInterpretedRequest.unresolved.traceSummary)
         return .unresolved
     }
 
@@ -5568,6 +5701,22 @@ struct HomeAssistantPanelView: View {
 
         switch interpreted {
         case .query(let plan, let source):
+            MarinaTraceRecorder.shared.recordSelectedRoute(source == .model ? .model : .fallback, reason: "query source=\(source.rawValue)")
+            MarinaTraceRecorder.shared.recordNormalized(
+                metric: plan.metric.rawValue,
+                operation: plan.metric.traceOperation,
+                presentationIntent: plan.metric.intent.rawValue
+            )
+            MarinaTraceRecorder.shared.recordTarget(
+                targetText: plan.targetName,
+                targetType: plan.targetTypeRaw,
+                resolvedTargetSummary: plan.targetName
+            )
+            MarinaTraceRecorder.shared.recordDateRanges(
+                primary: plan.dateRange,
+                comparison: plan.comparisonDateRange
+            )
+            MarinaTraceRecorder.shared.recordAggregation(path: "home_query_engine", summary: plan.traceSummary)
             let effectivePlan = source == .model
                 ? normalizedModelQueryPlan(plan, rawPrompt: rawPrompt)
                 : plan
@@ -5578,17 +5727,22 @@ struct HomeAssistantPanelView: View {
                 source: source
             )
         case .command(let command, let source):
+            MarinaTraceRecorder.shared.recordSelectedRoute(source == .model ? .model : .fallback, reason: "command source=\(source.rawValue)")
+            MarinaTraceRecorder.shared.recordResponse(type: "command", finalAnswerSummary: command.intent.rawValue)
             let effectiveCommand = source == .model
                 ? normalizedModelCommandPlan(command, rawPrompt: rawPrompt)
                 : command
             handleCommandPlan(effectiveCommand, rawPrompt: rawPrompt, source: source)
         case .clarification(let clarification, let source):
+            MarinaTraceRecorder.shared.recordSelectedRoute(.clarification, reason: "interpreted clarification source=\(source?.rawValue ?? "nil")")
             handleMarinaClarification(
                 clarification,
                 rawPrompt: rawPrompt,
                 source: source
             )
         case .unresolved:
+            MarinaTraceRecorder.shared.recordSelectedRoute(.unresolved, reason: "interpreted unresolved")
+            MarinaTraceRecorder.shared.recordResponse(type: HomeAnswerKind.message.rawValue, finalAnswerSummary: "unresolved")
             clarificationSuggestions = []
             recoverySuggestions = []
             lastClarificationReasons = []
@@ -5821,10 +5975,12 @@ struct HomeAssistantPanelView: View {
         rawPrompt: String,
         source: HomeAssistantPlanResolutionSource?
     ) {
+        MarinaTraceRecorder.shared.recordSelectedRoute(.clarification, reason: "handleMarinaClarification")
         if let commandPlan = clarification.commandPlan {
             let effectiveCommand = source == .model
                 ? normalizedModelCommandPlan(commandPlan, rawPrompt: rawPrompt)
                 : commandPlan
+            MarinaTraceRecorder.shared.recordResponse(type: "command", finalAnswerSummary: commandPlan.intent.rawValue)
             handleCommandPlan(effectiveCommand, rawPrompt: rawPrompt, source: source)
             return
         }
@@ -5860,6 +6016,10 @@ struct HomeAssistantPanelView: View {
         }
 
         let fallback = heuristicInterpretedRequest(for: rawPrompt)
+        MarinaTraceRecorder.shared.recordFallbackSelection(
+            reason: .manualClarificationFallback,
+            replacedModelOutput: true
+        )
         MarinaDebugLogger.log(
             "[MarinaFinalization] modelClarification queryPlanExists=false actionable=\(clarification.isActionable) fallbackQueryExists=\(fallback.executableQueryPlan != nil)"
         )
