@@ -92,11 +92,31 @@ struct MarinaAggregationResponseBridgeTests {
             message: "Not supported in Phase 5."
         )
 
-        let bridged = bridge.responseCompatibleAnswer(from: .unsupported(unsupported))
+        let bridged = bridge.responseCompatibleAnswer(from: MarinaAggregationResult.unsupported(unsupported))
         let summary = bridge.summary(from: .unsupported(unsupported))
 
         #expect(bridged.kind == .message)
         #expect(bridged.subtitle == "Not supported in Phase 5.")
         #expect(summary.contains("Unsupported Marina Query"))
+    }
+
+    @Test func responseBridge_clarificationProducesNonExecutingMessage() {
+        let clarification = MarinaTypedClarification(
+            kind: .missingTarget,
+            message: "Which target did you mean?",
+            choices: [
+                MarinaClarificationChoice(title: "Groceries", entityTypeHint: .category, rawValue: "Groceries")
+            ]
+        )
+
+        let bridged = bridge.responseCompatibleAnswer(from: clarification)
+        let outcomeAnswer = bridge.responseCompatibleAnswer(from: MarinaPlanValidationOutcome.clarification(clarification))
+
+        #expect(bridged.kind == .message)
+        #expect(bridged.title == "Marina Needs Clarification")
+        #expect(bridged.subtitle == "Which target did you mean?")
+        #expect(bridged.rows.map(\.title) == ["Groceries"])
+        #expect(outcomeAnswer?.title == bridged.title)
+        #expect(outcomeAnswer?.subtitle == bridged.subtitle)
     }
 }

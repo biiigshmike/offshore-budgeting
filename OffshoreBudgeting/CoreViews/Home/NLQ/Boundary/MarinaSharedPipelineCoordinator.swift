@@ -110,6 +110,25 @@ struct MarinaSharedPipelineCoordinator {
             )
         }
 
+        if let blocked = selectValidationBlocked(
+            modelEvaluation: modelEvaluation,
+            heuristicEvaluation: heuristicEvaluation
+        ) {
+            let trace = trace(
+                context: context,
+                modelAvailabilitySummary: modelAvailabilitySummary,
+                selectedPath: blocked.candidate.source == .foundationModels ? .sharedFoundationModels : .sharedHeuristic,
+                evaluation: blocked,
+                fallbackReason: nil,
+                disagreementSummary: disagreementSummary ?? modelFailureReason?.rawValue
+            )
+            return .validationBlocked(
+                answer: blocked.blockedAnswer!,
+                validationOutcome: blocked.validationOutcome,
+                trace: trace
+            )
+        }
+
         let fallbackReason = fallbackReason(
             modelFailureReason: modelFailureReason,
             modelEvaluation: modelEvaluation,
@@ -145,6 +164,7 @@ struct MarinaSharedPipelineCoordinator {
                 candidate: candidate,
                 resolved: resolved,
                 validationOutcome: outcome,
+                blockedAnswer: responseBridge.responseCompatibleAnswer(from: outcome),
                 runtimeFallbackReason: .clarificationBridgeUnavailable
             )
         case .unsupported:
@@ -152,6 +172,7 @@ struct MarinaSharedPipelineCoordinator {
                 candidate: candidate,
                 resolved: resolved,
                 validationOutcome: outcome,
+                blockedAnswer: responseBridge.responseCompatibleAnswer(from: outcome),
                 runtimeFallbackReason: .unsupportedBridgeUnavailable
             )
         case .executable:
@@ -207,6 +228,19 @@ struct MarinaSharedPipelineCoordinator {
         case (.none, .none):
             return nil
         }
+    }
+
+    private func selectValidationBlocked(
+        modelEvaluation: CandidateEvaluation?,
+        heuristicEvaluation: CandidateEvaluation?
+    ) -> CandidateEvaluation? {
+        let modelBlocked = modelEvaluation?.isValidationBlocked == true ? modelEvaluation : nil
+        let heuristicBlocked = heuristicEvaluation?.isValidationBlocked == true ? heuristicEvaluation : nil
+
+        if let modelBlocked {
+            return modelBlocked
+        }
+        return heuristicBlocked
     }
 
     private func fallback(
@@ -283,7 +317,7 @@ struct MarinaSharedPipelineCoordinator {
             resolverSummary: evaluation.map { resolverSummary($0.resolved) },
             validatorOutcomeSummary: evaluation.map { validatorSummary($0.validationOutcome) },
             executorResultSummary: evaluation?.aggregationResult.map(Self.aggregationResultSummary),
-            responseBridgeSummary: evaluation?.answer?.traceSummary,
+            responseBridgeSummary: (evaluation?.answer ?? evaluation?.blockedAnswer)?.traceSummary,
             fallbackReason: fallbackReason,
             disagreementSummary: disagreementSummary
         )
@@ -379,6 +413,7 @@ private struct CandidateEvaluation {
     let executablePlan: MarinaExecutableAggregationPlan?
     let aggregationResult: MarinaAggregationResult?
     let answer: HomeAnswer?
+    let blockedAnswer: HomeAnswer?
     let runtimeFallbackReason: MarinaSharedPipelineFallbackReason?
 
     init(
@@ -388,6 +423,7 @@ private struct CandidateEvaluation {
         executablePlan: MarinaExecutableAggregationPlan? = nil,
         aggregationResult: MarinaAggregationResult? = nil,
         answer: HomeAnswer? = nil,
+        blockedAnswer: HomeAnswer? = nil,
         runtimeFallbackReason: MarinaSharedPipelineFallbackReason? = nil
     ) {
         self.candidate = candidate
@@ -396,10 +432,15 @@ private struct CandidateEvaluation {
         self.executablePlan = executablePlan
         self.aggregationResult = aggregationResult
         self.answer = answer
+        self.blockedAnswer = blockedAnswer
         self.runtimeFallbackReason = runtimeFallbackReason
     }
 
     var isExecutableHandled: Bool {
         answer != nil && aggregationResult != nil && executablePlan != nil
+    }
+
+    var isValidationBlocked: Bool {
+        blockedAnswer != nil && executablePlan == nil && aggregationResult == nil
     }
 }

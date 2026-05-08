@@ -166,6 +166,9 @@ struct MarinaQueryValidator {
         case .compare:
             return .comparison
         case .rank:
+            if candidate.responseShapeHint == .groupedBreakdown {
+                return .groupedBreakdown
+            }
             return .rankedList
         case .sum where measure == .categoryShare:
             return .groupedBreakdown
@@ -186,6 +189,14 @@ struct MarinaQueryValidator {
             return .unsupportedTargetType
         case .unsupportedSimulation:
             return .unsupportedSimulation
+        case .unsupportedProjection:
+            return .unsupportedOperation
+        case .unsupportedExclusionFilter,
+             .unsupportedBudgetLimit,
+             .unsupportedFrequencyRanking,
+             .unsupportedCardRanking,
+             .unsupportedRankedComparison:
+            return .unsupportedCombination
         case .lowConfidence:
             return .unsupportedCombination
         }
@@ -201,6 +212,18 @@ struct MarinaQueryValidator {
             return "The candidate is missing a required target."
         case .unsupportedSimulation:
             return "Simulation plans are not validated in this phase."
+        case .unsupportedProjection:
+            return "Projection and forecast plans are not executable in this phase."
+        case .unsupportedExclusionFilter:
+            return "Exclusion filters are not executable in this phase."
+        case .unsupportedBudgetLimit:
+            return "Budget-limit availability checks are not executable in this phase."
+        case .unsupportedFrequencyRanking:
+            return "Frequency rankings are not executable in this phase."
+        case .unsupportedCardRanking:
+            return "Card rankings are not executable in this phase."
+        case .unsupportedRankedComparison:
+            return "Ranked comparison and delta plans are not executable in this phase."
         case .lowConfidence:
             return "That query is too uncertain to validate safely."
         }

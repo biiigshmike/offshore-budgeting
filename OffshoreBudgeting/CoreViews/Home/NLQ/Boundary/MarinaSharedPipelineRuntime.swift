@@ -113,13 +113,19 @@ enum MarinaSharedPipelineRuntimeResult: Equatable {
         homeQueryPlan: HomeQueryPlan?,
         trace: MarinaSharedPipelineTrace
     )
+    case validationBlocked(
+        answer: HomeAnswer,
+        validationOutcome: MarinaPlanValidationOutcome,
+        trace: MarinaSharedPipelineTrace
+    )
     case fallbackToLegacy(trace: MarinaSharedPipelineTrace)
 
     var trace: MarinaSharedPipelineTrace {
         switch self {
-        case .handled(_, _, _, let trace), .fallbackToLegacy(let trace):
+        case .handled(_, _, _, let trace),
+             .validationBlocked(_, _, let trace),
+             .fallbackToLegacy(let trace):
             return trace
         }
     }
 }
-

@@ -1,16 +1,2014 @@
-Marina Trace Analysis Report Snapshot
+Marina Trace Analysis Report
+GeneratedAtUTC: 2026-05-15T12:00:00Z
+Rows: 83
+JSON: MarinaTraceAnalysisReport.json
+TXT: MarinaTraceAnalysisReport.txt
 
-This checked-in file is a placeholder snapshot.
+mode: model_router
+- prompt: What did I spend this month?
+  group: core
+  expectedOperation: sum
+  expectedMeasure: spendTotal
+  expectedEntityScope: global
+  expectedTarget: nil
+  expectedPrimaryDateRange: this_month
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: metric
+  selectedRoute: fallback
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: query(source=parser,metric=spendTotal,target=nil)
+  actualMetricOperation: nil
+  actualTarget: nil
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: home_query_engine
+  responseType: query
+  verdictRaw: correct
+  likelySmallestFix: none
+- prompt: How much did I spend last week?
+  group: core
+  expectedOperation: sum
+  expectedMeasure: spendTotal
+  expectedEntityScope: global
+  expectedTarget: nil
+  expectedPrimaryDateRange: last_week
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: metric
+  selectedRoute: fallback
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: query(source=parser,metric=spendTotal,target=nil)
+  actualMetricOperation: nil
+  actualTarget: nil
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: home_query_engine
+  responseType: query
+  verdictRaw: correct
+  likelySmallestFix: none
+- prompt: How much did I spend on Food & Drink this period?
+  group: core
+  expectedOperation: sum
+  expectedMeasure: categorySpendTotal
+  expectedEntityScope: category
+  expectedTarget: Food & Drink
+  expectedPrimaryDateRange: current_period
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: metric
+  selectedRoute: fallback
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: query(source=parser,metric=merchantSpendTotal,target=nil)
+  actualMetricOperation: nil
+  actualTarget: nil
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: home_query_engine
+  responseType: query
+  verdictRaw: correct
+  likelySmallestFix: none
+- prompt: What did I spend on my Apple Card this month?
+  group: core
+  expectedOperation: sum
+  expectedMeasure: cardSpendTotal
+  expectedEntityScope: card
+  expectedTarget: Apple Card
+  expectedPrimaryDateRange: this_month
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: metric
+  selectedRoute: fallback
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: query(source=parser,metric=cardSpendTotal,target=nil)
+  actualMetricOperation: nil
+  actualTarget: nil
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: home_query_engine
+  responseType: query
+  verdictRaw: correct
+  likelySmallestFix: none
+- prompt: How much did I spend on Food & Drink this period compared to last period?
+  group: core
+  expectedOperation: difference
+  expectedMeasure: categoryMonthComparison
+  expectedEntityScope: category
+  expectedTarget: Food & Drink
+  expectedPrimaryDateRange: current_period
+  expectedComparisonDateRange: previous_period
+  expectedPresentationIntent: comparison
+  selectedRoute: fallback
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: query(source=parser,metric=merchantSpendTotal,target=nil)
+  actualMetricOperation: nil
+  actualTarget: nil
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: home_query_engine
+  responseType: query
+  verdictRaw: comparison range failure
+  likelySmallestFix: require secondary range synthesis for comparison prompts
+- prompt: Compare groceries this month to last month.
+  group: core
+  expectedOperation: difference
+  expectedMeasure: categoryMonthComparison
+  expectedEntityScope: category
+  expectedTarget: groceries
+  expectedPrimaryDateRange: this_month
+  expectedComparisonDateRange: last_month
+  expectedPresentationIntent: comparison
+  selectedRoute: fallback
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: query(source=parser,metric=monthComparison,target=nil)
+  actualMetricOperation: nil
+  actualTarget: nil
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: home_query_engine
+  responseType: query
+  verdictRaw: comparison range failure
+  likelySmallestFix: require secondary range synthesis for comparison prompts
+- prompt: Did I spend more on restaurants this month than last month?
+  group: core
+  expectedOperation: difference
+  expectedMeasure: categoryMonthComparison
+  expectedEntityScope: category
+  expectedTarget: restaurants
+  expectedPrimaryDateRange: this_month
+  expectedComparisonDateRange: last_month
+  expectedPresentationIntent: comparison
+  selectedRoute: fallback
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: query(source=parser,metric=spendTotal,target=nil)
+  actualMetricOperation: nil
+  actualTarget: nil
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: home_query_engine
+  responseType: query
+  verdictRaw: comparison range failure
+  likelySmallestFix: require secondary range synthesis for comparison prompts
+- prompt: How did my Apple Card spending change from March to April?
+  group: core
+  expectedOperation: difference
+  expectedMeasure: cardMonthComparison
+  expectedEntityScope: card
+  expectedTarget: Apple Card
+  expectedPrimaryDateRange: april
+  expectedComparisonDateRange: march
+  expectedPresentationIntent: comparison
+  selectedRoute: fallback
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: query(source=parser,metric=monthComparison,target=nil)
+  actualMetricOperation: nil
+  actualTarget: nil
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: home_query_engine
+  responseType: query
+  verdictRaw: comparison range failure
+  likelySmallestFix: require secondary range synthesis for comparison prompts
+- prompt: What is my average grocery spending?
+  group: core
+  expectedOperation: average
+  expectedMeasure: categoryAverageSpend
+  expectedEntityScope: category
+  expectedTarget: grocery
+  expectedPrimaryDateRange: default_period
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: metric
+  selectedRoute: fallback
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: query(source=parser,metric=spendAveragePerPeriod,target=nil)
+  actualMetricOperation: nil
+  actualTarget: nil
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: home_query_engine
+  responseType: query
+  verdictRaw: metric/operation mapping failure
+  likelySmallestFix: add explicit average-by-target mapping metric
+- prompt: What do I usually spend on Food & Drink per month?
+  group: core
+  expectedOperation: average
+  expectedMeasure: categoryAverageSpend
+  expectedEntityScope: category
+  expectedTarget: Food & Drink
+  expectedPrimaryDateRange: monthly
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: metric
+  selectedRoute: fallback
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: query(source=parser,metric=spendAveragePerPeriod,target=nil)
+  actualMetricOperation: nil
+  actualTarget: nil
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: home_query_engine
+  responseType: query
+  verdictRaw: metric/operation mapping failure
+  likelySmallestFix: add explicit average-by-target mapping metric
+- prompt: What are my top categories this month?
+  group: core
+  expectedOperation: ranked_list
+  expectedMeasure: topCategories
+  expectedEntityScope: global
+  expectedTarget: nil
+  expectedPrimaryDateRange: this_month
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: list
+  selectedRoute: fallback
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: query(source=parser,metric=topCategories,target=nil)
+  actualMetricOperation: nil
+  actualTarget: nil
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: home_query_engine
+  responseType: query
+  verdictRaw: correct
+  likelySmallestFix: none
+- prompt: Where is most of my money going?
+  group: core
+  expectedOperation: ranked_list
+  expectedMeasure: topCategories
+  expectedEntityScope: global
+  expectedTarget: nil
+  expectedPrimaryDateRange: default_period
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: list
+  selectedRoute: fallback
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: unresolved
+  actualMetricOperation: nil
+  actualTarget: nil
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: home_query_engine
+  responseType: unresolved
+  verdictRaw: aggregation execution failure
+  likelySmallestFix: add graceful execution fallback for unresolved mapped queries
+- prompt: What merchants did I spend the most at?
+  group: core
+  expectedOperation: ranked_list
+  expectedMeasure: topMerchants
+  expectedEntityScope: global
+  expectedTarget: nil
+  expectedPrimaryDateRange: default_period
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: list
+  selectedRoute: fallback
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: query(source=parser,metric=topMerchants,target=nil)
+  actualMetricOperation: nil
+  actualTarget: nil
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: home_query_engine
+  responseType: query
+  verdictRaw: correct
+  likelySmallestFix: none
+- prompt: What percent of my spending was Food & Drink?
+  group: core
+  expectedOperation: share_of_total
+  expectedMeasure: categorySpendShare
+  expectedEntityScope: category
+  expectedTarget: Food & Drink
+  expectedPrimaryDateRange: default_period
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: metric
+  selectedRoute: fallback
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: query(source=parser,metric=spendTotal,target=nil)
+  actualMetricOperation: nil
+  actualTarget: nil
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: home_query_engine
+  responseType: query
+  verdictRaw: correct
+  likelySmallestFix: none
+- prompt: Break down my spending by category this month.
+  group: core
+  expectedOperation: ranked_list
+  expectedMeasure: topCategories
+  expectedEntityScope: global
+  expectedTarget: nil
+  expectedPrimaryDateRange: this_month
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: list
+  selectedRoute: fallback
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: query(source=parser,metric=spendTotal,target=nil)
+  actualMetricOperation: nil
+  actualTarget: nil
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: home_query_engine
+  responseType: query
+  verdictRaw: correct
+  likelySmallestFix: none
+- prompt: How am I doing this month?
+  group: core
+  expectedOperation: overview
+  expectedMeasure: overview
+  expectedEntityScope: global
+  expectedTarget: nil
+  expectedPrimaryDateRange: this_month
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: overview
+  selectedRoute: fallback
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: query(source=parser,metric=overview,target=nil)
+  actualMetricOperation: nil
+  actualTarget: nil
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: home_query_engine
+  responseType: query
+  verdictRaw: correct
+  likelySmallestFix: none
+- prompt: How is my budget looking?
+  group: core
+  expectedOperation: overview
+  expectedMeasure: overview
+  expectedEntityScope: global
+  expectedTarget: nil
+  expectedPrimaryDateRange: default_period
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: overview
+  selectedRoute: fallback
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: query(source=parser,metric=overview,target=nil)
+  actualMetricOperation: nil
+  actualTarget: nil
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: home_query_engine
+  responseType: query
+  verdictRaw: correct
+  likelySmallestFix: none
+- prompt: If I spend $50 on Food & Drink, how will that affect my budget?
+  group: core
+  expectedOperation: what_if
+  expectedMeasure: simulation
+  expectedEntityScope: category
+  expectedTarget: Food & Drink
+  expectedPrimaryDateRange: current_period
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: what_if
+  selectedRoute: fallback
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: query(source=parser,metric=spendTotal,target=nil)
+  actualMetricOperation: nil
+  actualTarget: nil
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: home_query_engine
+  responseType: query
+  verdictRaw: unsupported capability
+  likelySmallestFix: add dedicated what-if trace path classification without execution
+- prompt: If I buy something for $120 today, can I still stay within my safe spend?
+  group: core
+  expectedOperation: what_if
+  expectedMeasure: safe_spend_simulation
+  expectedEntityScope: global
+  expectedTarget: nil
+  expectedPrimaryDateRange: today
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: what_if
+  selectedRoute: fallback
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: query(source=parser,metric=safeSpendToday,target=nil)
+  actualMetricOperation: nil
+  actualTarget: nil
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: home_query_engine
+  responseType: query
+  verdictRaw: unsupported capability
+  likelySmallestFix: add dedicated what-if trace path classification without execution
+- prompt: Am I spending more on food lately, or is it about normal?
+  group: stress_messy_manual_2026_05
+  expectedOperation: difference
+  expectedMeasure: categoryMonthComparison
+  expectedEntityScope: category
+  expectedTarget: food
+  expectedPrimaryDateRange: lately
+  expectedComparisonDateRange: normal_baseline
+  expectedPresentationIntent: comparison
+  selectedRoute: fallback
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: query(source=parser,metric=spendAveragePerPeriod,target=nil)
+  actualMetricOperation: nil
+  actualTarget: nil
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: home_query_engine
+  responseType: query
+  verdictRaw: comparison range failure
+  likelySmallestFix: require secondary range synthesis for comparison prompts
+- prompt: How bad was Food & Drink compared to last month?
+  group: stress_messy_manual_2026_05
+  expectedOperation: difference
+  expectedMeasure: categoryMonthComparison
+  expectedEntityScope: category
+  expectedTarget: Food & Drink
+  expectedPrimaryDateRange: default_period
+  expectedComparisonDateRange: last_month
+  expectedPresentationIntent: comparison
+  selectedRoute: fallback
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: query(source=parser,metric=monthComparison,target=nil)
+  actualMetricOperation: nil
+  actualTarget: nil
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: home_query_engine
+  responseType: query
+  verdictRaw: comparison range failure
+  likelySmallestFix: require secondary range synthesis for comparison prompts
+- prompt: Did groceries go up or down from March to April?
+  group: stress_messy_manual_2026_05
+  expectedOperation: difference
+  expectedMeasure: categoryMonthComparison
+  expectedEntityScope: category
+  expectedTarget: groceries
+  expectedPrimaryDateRange: april
+  expectedComparisonDateRange: march
+  expectedPresentationIntent: comparison
+  selectedRoute: fallback
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: unresolved
+  actualMetricOperation: nil
+  actualTarget: nil
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: home_query_engine
+  responseType: unresolved
+  verdictRaw: aggregation execution failure
+  likelySmallestFix: add graceful execution fallback for unresolved mapped queries
+- prompt: What card is eating most of my budget this period?
+  group: stress_messy_manual_2026_05
+  expectedOperation: ranked_list
+  expectedMeasure: topCards
+  expectedEntityScope: global
+  expectedTarget: nil
+  expectedPrimaryDateRange: current_period
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: list
+  selectedRoute: fallback
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: unresolved
+  actualMetricOperation: nil
+  actualTarget: nil
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: home_query_engine
+  responseType: unresolved
+  verdictRaw: aggregation execution failure
+  likelySmallestFix: add graceful execution fallback for unresolved mapped queries
+- prompt: Which category is hurting me the most right now?
+  group: stress_messy_manual_2026_05
+  expectedOperation: ranked_list
+  expectedMeasure: topCategories
+  expectedEntityScope: global
+  expectedTarget: nil
+  expectedPrimaryDateRange: current_period
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: list
+  selectedRoute: fallback
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: query(source=parser,metric=topCategories,target=nil)
+  actualMetricOperation: nil
+  actualTarget: nil
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: home_query_engine
+  responseType: query
+  verdictRaw: correct
+  likelySmallestFix: none
+- prompt: Break down where my money went this month, but don’t just give me the total.
+  group: stress_messy_manual_2026_05
+  expectedOperation: ranked_list
+  expectedMeasure: topCategories
+  expectedEntityScope: global
+  expectedTarget: nil
+  expectedPrimaryDateRange: this_month
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: list
+  selectedRoute: fallback
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: unresolved
+  actualMetricOperation: nil
+  actualTarget: nil
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: home_query_engine
+  responseType: unresolved
+  verdictRaw: aggregation execution failure
+  likelySmallestFix: add graceful execution fallback for unresolved mapped queries
+- prompt: What did I spend on Apple Card outside of Food & Drink?
+  group: stress_messy_manual_2026_05
+  expectedOperation: sum
+  expectedMeasure: cardSpendExcludingCategory
+  expectedEntityScope: card_and_category_filter
+  expectedTarget: Apple Card
+  expectedPrimaryDateRange: default_period
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: metric
+  selectedRoute: fallback
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: query(source=parser,metric=cardSpendTotal,target=nil)
+  actualMetricOperation: nil
+  actualTarget: nil
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: home_query_engine
+  responseType: query
+  verdictRaw: correct
+  likelySmallestFix: none
+- prompt: How much of my spending this month was Food & Drink?
+  group: stress_messy_manual_2026_05
+  expectedOperation: share_of_total
+  expectedMeasure: categorySpendShare
+  expectedEntityScope: category
+  expectedTarget: Food & Drink
+  expectedPrimaryDateRange: this_month
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: metric
+  selectedRoute: fallback
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: query(source=parser,metric=spendTotal,target=nil)
+  actualMetricOperation: nil
+  actualTarget: nil
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: home_query_engine
+  responseType: query
+  verdictRaw: correct
+  likelySmallestFix: none
+- prompt: Is Shopping over where it should be for this budget?
+  group: stress_messy_manual_2026_05
+  expectedOperation: compare_to_limit
+  expectedMeasure: categoryBudgetAvailability
+  expectedEntityScope: category
+  expectedTarget: Shopping
+  expectedPrimaryDateRange: current_budget
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: comparison
+  selectedRoute: fallback
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: unresolved
+  actualMetricOperation: nil
+  actualTarget: nil
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: home_query_engine
+  responseType: unresolved
+  verdictRaw: aggregation execution failure
+  likelySmallestFix: add graceful execution fallback for unresolved mapped queries
+- prompt: What category changed the most compared to last month?
+  group: stress_messy_manual_2026_05
+  expectedOperation: ranked_list
+  expectedMeasure: categoryMonthComparisonRanked
+  expectedEntityScope: global
+  expectedTarget: nil
+  expectedPrimaryDateRange: this_month
+  expectedComparisonDateRange: last_month
+  expectedPresentationIntent: list
+  selectedRoute: fallback
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: query(source=parser,metric=monthComparison,target=nil)
+  actualMetricOperation: nil
+  actualTarget: nil
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: home_query_engine
+  responseType: query
+  verdictRaw: comparison range failure
+  likelySmallestFix: require secondary range synthesis for comparison prompts
+- prompt: What was my average weekly spending on groceries over the last 3 months?
+  group: stress_messy_manual_2026_05
+  expectedOperation: average
+  expectedMeasure: categoryAverageSpend
+  expectedEntityScope: category
+  expectedTarget: groceries
+  expectedPrimaryDateRange: last_3_months
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: metric
+  selectedRoute: fallback
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: query(source=parser,metric=spendAveragePerPeriod,target=nil)
+  actualMetricOperation: nil
+  actualTarget: nil
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: home_query_engine
+  responseType: query
+  verdictRaw: metric/operation mapping failure
+  likelySmallestFix: add explicit average-by-target mapping metric
+- prompt: If I keep spending like this, how much will I have left by the end of the period?
+  group: stress_messy_manual_2026_05
+  expectedOperation: forecast
+  expectedMeasure: projectedRemainingBudget
+  expectedEntityScope: global
+  expectedTarget: nil
+  expectedPrimaryDateRange: current_period
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: forecast
+  selectedRoute: fallback
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: query(source=parser,metric=spendTotal,target=nil)
+  actualMetricOperation: nil
+  actualTarget: nil
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: home_query_engine
+  responseType: query
+  verdictRaw: correct
+  likelySmallestFix: none
+- prompt: If I add $75 to Shopping, does Transportation still have room?
+  group: stress_messy_manual_2026_05
+  expectedOperation: what_if
+  expectedMeasure: simulation
+  expectedEntityScope: category_pair
+  expectedTarget: Shopping
+  expectedPrimaryDateRange: current_period
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: what_if
+  selectedRoute: fallback
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: unresolved
+  actualMetricOperation: nil
+  actualTarget: nil
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: home_query_engine
+  responseType: unresolved
+  verdictRaw: unsupported capability
+  likelySmallestFix: add dedicated what-if trace path classification without execution
+- prompt: What expenses are making this month higher than last month?
+  group: stress_messy_manual_2026_05
+  expectedOperation: ranked_list
+  expectedMeasure: transactionDeltaDrivers
+  expectedEntityScope: global
+  expectedTarget: nil
+  expectedPrimaryDateRange: this_month
+  expectedComparisonDateRange: last_month
+  expectedPresentationIntent: list
+  selectedRoute: fallback
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: query(source=parser,metric=topCategoryChanges,target=nil)
+  actualMetricOperation: nil
+  actualTarget: nil
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: home_query_engine
+  responseType: query
+  verdictRaw: comparison range failure
+  likelySmallestFix: require secondary range synthesis for comparison prompts
+- prompt: Show me the stuff I’m spending on too often, not necessarily the most money.
+  group: stress_messy_manual_2026_05
+  expectedOperation: ranked_list
+  expectedMeasure: frequentMerchants
+  expectedEntityScope: global
+  expectedTarget: nil
+  expectedPrimaryDateRange: default_period
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: list
+  selectedRoute: fallback
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: query(source=parser,metric=merchantSpendTotal,target=nil)
+  actualMetricOperation: nil
+  actualTarget: nil
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: home_query_engine
+  responseType: query
+  verdictRaw: correct
+  likelySmallestFix: none
 
-Runtime-populated artifacts are emitted automatically by:
-- MarinaTraceAnalysisTests.matrixAnalysis_generatesDeterministicRowsForBothModes
+mode: nlq_authoritative
+- prompt: What did I spend this month?
+  group: core
+  expectedOperation: sum
+  expectedMeasure: spendTotal
+  expectedEntityScope: global
+  expectedTarget: nil
+  expectedPrimaryDateRange: this_month
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: metric
+  selectedRoute: nlq
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: nil
+  actualMetricOperation: spendTotal | sum
+  actualTarget: nil
+  actualPrimaryDateRange: 2026-05-01..2026-06-01
+  actualComparisonDateRange: nil
+  aggregationPath: single_home_query_engine
+  responseType: list
+  verdictRaw: correct
+  likelySmallestFix: none
+- prompt: How much did I spend last week?
+  group: core
+  expectedOperation: sum
+  expectedMeasure: spendTotal
+  expectedEntityScope: global
+  expectedTarget: nil
+  expectedPrimaryDateRange: last_week
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: metric
+  selectedRoute: nlq
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: nil
+  actualMetricOperation: spendTotal | sum
+  actualTarget: nil
+  actualPrimaryDateRange: 2026-04-26..2026-05-03
+  actualComparisonDateRange: nil
+  aggregationPath: single_home_query_engine
+  responseType: list
+  verdictRaw: correct
+  likelySmallestFix: none
+- prompt: How much did I spend on Food & Drink this period?
+  group: core
+  expectedOperation: sum
+  expectedMeasure: categorySpendTotal
+  expectedEntityScope: category
+  expectedTarget: Food & Drink
+  expectedPrimaryDateRange: current_period
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: metric
+  selectedRoute: nlq
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: nil
+  actualMetricOperation: categorySpendTotal | sum
+  actualTarget: Food & Drink
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: single_home_query_engine
+  responseType: message
+  verdictRaw: correct
+  likelySmallestFix: none
+- prompt: What did I spend on my Apple Card this month?
+  group: core
+  expectedOperation: sum
+  expectedMeasure: cardSpendTotal
+  expectedEntityScope: card
+  expectedTarget: Apple Card
+  expectedPrimaryDateRange: this_month
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: metric
+  selectedRoute: nlq
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: nil
+  actualMetricOperation: spendTotal | sum
+  actualTarget: Apple Card
+  actualPrimaryDateRange: 2026-05-01..2026-06-01
+  actualComparisonDateRange: nil
+  aggregationPath: single_home_query_engine
+  responseType: message
+  verdictRaw: correct
+  likelySmallestFix: none
+- prompt: How much did I spend on Food & Drink this period compared to last period?
+  group: core
+  expectedOperation: difference
+  expectedMeasure: categoryMonthComparison
+  expectedEntityScope: category
+  expectedTarget: Food & Drink
+  expectedPrimaryDateRange: current_period
+  expectedComparisonDateRange: previous_period
+  expectedPresentationIntent: comparison
+  selectedRoute: nlq
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: nil
+  actualMetricOperation: monthComparison | difference
+  actualTarget: Food & Drink
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: single_home_query_engine
+  responseType: message
+  verdictRaw: comparison range failure
+  likelySmallestFix: require secondary range synthesis for comparison prompts
+- prompt: Compare groceries this month to last month.
+  group: core
+  expectedOperation: difference
+  expectedMeasure: categoryMonthComparison
+  expectedEntityScope: category
+  expectedTarget: groceries
+  expectedPrimaryDateRange: this_month
+  expectedComparisonDateRange: last_month
+  expectedPresentationIntent: comparison
+  selectedRoute: nlq
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: nil
+  actualMetricOperation: monthComparison | difference
+  actualTarget: Groceries
+  actualPrimaryDateRange: 2026-05-01..2026-06-01
+  actualComparisonDateRange: 2026-04-01..2026-05-01
+  aggregationPath: single_home_query_engine
+  responseType: message
+  verdictRaw: correct
+  likelySmallestFix: none
+- prompt: Did I spend more on restaurants this month than last month?
+  group: core
+  expectedOperation: difference
+  expectedMeasure: categoryMonthComparison
+  expectedEntityScope: category
+  expectedTarget: restaurants
+  expectedPrimaryDateRange: this_month
+  expectedComparisonDateRange: last_month
+  expectedPresentationIntent: comparison
+  selectedRoute: nlq
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: nil
+  actualMetricOperation: categorySpendTotal | sum
+  actualTarget: Restaurants
+  actualPrimaryDateRange: 2026-04-01..2026-05-01
+  actualComparisonDateRange: nil
+  aggregationPath: single_home_query_engine
+  responseType: message
+  verdictRaw: comparison range failure
+  likelySmallestFix: require secondary range synthesis for comparison prompts
+- prompt: How did my Apple Card spending change from March to April?
+  group: core
+  expectedOperation: difference
+  expectedMeasure: cardMonthComparison
+  expectedEntityScope: card
+  expectedTarget: Apple Card
+  expectedPrimaryDateRange: april
+  expectedComparisonDateRange: march
+  expectedPresentationIntent: comparison
+  selectedRoute: nlq
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: nil
+  actualMetricOperation: monthComparison | difference
+  actualTarget: nil
+  actualPrimaryDateRange: 2026-03-01..2026-04-01
+  actualComparisonDateRange: 2026-04-01..2026-05-01
+  aggregationPath: single_home_query_engine
+  responseType: message
+  verdictRaw: correct
+  likelySmallestFix: none
+- prompt: What is my average grocery spending?
+  group: core
+  expectedOperation: average
+  expectedMeasure: categoryAverageSpend
+  expectedEntityScope: category
+  expectedTarget: grocery
+  expectedPrimaryDateRange: default_period
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: metric
+  selectedRoute: clarification
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: nil
+  actualMetricOperation: nil
+  actualTarget: average grocery spending
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: none
+  responseType: clarification
+  verdictRaw: metric/operation mapping failure
+  likelySmallestFix: add explicit average-by-target mapping metric
+- prompt: What do I usually spend on Food & Drink per month?
+  group: core
+  expectedOperation: average
+  expectedMeasure: categoryAverageSpend
+  expectedEntityScope: category
+  expectedTarget: Food & Drink
+  expectedPrimaryDateRange: monthly
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: metric
+  selectedRoute: clarification
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: nil
+  actualMetricOperation: nil
+  actualTarget: food & drink
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: none
+  responseType: clarification
+  verdictRaw: metric/operation mapping failure
+  likelySmallestFix: add explicit average-by-target mapping metric
+- prompt: What are my top categories this month?
+  group: core
+  expectedOperation: ranked_list
+  expectedMeasure: topCategories
+  expectedEntityScope: global
+  expectedTarget: nil
+  expectedPrimaryDateRange: this_month
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: list
+  selectedRoute: nlq
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: nil
+  actualMetricOperation: topCategories | ranked_list
+  actualTarget: nil
+  actualPrimaryDateRange: 2026-05-01..2026-06-01
+  actualComparisonDateRange: nil
+  aggregationPath: single_home_query_engine
+  responseType: message
+  verdictRaw: correct
+  likelySmallestFix: none
+- prompt: Where is most of my money going?
+  group: core
+  expectedOperation: ranked_list
+  expectedMeasure: topCategories
+  expectedEntityScope: global
+  expectedTarget: nil
+  expectedPrimaryDateRange: default_period
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: list
+  selectedRoute: recovery
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: nil
+  actualMetricOperation: nil
+  actualTarget: where is most of my money going
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: none
+  responseType: recovery
+  verdictRaw: aggregation execution failure
+  likelySmallestFix: add graceful execution fallback for unresolved mapped queries
+- prompt: What merchants did I spend the most at?
+  group: core
+  expectedOperation: ranked_list
+  expectedMeasure: topMerchants
+  expectedEntityScope: global
+  expectedTarget: nil
+  expectedPrimaryDateRange: default_period
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: list
+  selectedRoute: nlq
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: nil
+  actualMetricOperation: spendTotal | sum
+  actualTarget: nil
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: single_home_query_engine
+  responseType: list
+  verdictRaw: correct
+  likelySmallestFix: none
+- prompt: What percent of my spending was Food & Drink?
+  group: core
+  expectedOperation: share_of_total
+  expectedMeasure: categorySpendShare
+  expectedEntityScope: category
+  expectedTarget: Food & Drink
+  expectedPrimaryDateRange: default_period
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: metric
+  selectedRoute: nlq
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: nil
+  actualMetricOperation: categorySpendShare | share_of_total
+  actualTarget: Food & Drink
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: single_home_query_engine
+  responseType: message
+  verdictRaw: correct
+  likelySmallestFix: none
+- prompt: Break down my spending by category this month.
+  group: core
+  expectedOperation: ranked_list
+  expectedMeasure: topCategories
+  expectedEntityScope: global
+  expectedTarget: nil
+  expectedPrimaryDateRange: this_month
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: list
+  selectedRoute: nlq
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: nil
+  actualMetricOperation: categorySpendShare | share_of_total
+  actualTarget: nil
+  actualPrimaryDateRange: 2026-05-01..2026-06-01
+  actualComparisonDateRange: nil
+  aggregationPath: single_home_query_engine
+  responseType: message
+  verdictRaw: correct
+  likelySmallestFix: none
+- prompt: How am I doing this month?
+  group: core
+  expectedOperation: overview
+  expectedMeasure: overview
+  expectedEntityScope: global
+  expectedTarget: nil
+  expectedPrimaryDateRange: this_month
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: overview
+  selectedRoute: recovery
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: nil
+  actualMetricOperation: nil
+  actualTarget: how am i doing
+  actualPrimaryDateRange: 2026-05-01..2026-06-01
+  actualComparisonDateRange: nil
+  aggregationPath: none
+  responseType: recovery
+  verdictRaw: aggregation execution failure
+  likelySmallestFix: add graceful execution fallback for unresolved mapped queries
+- prompt: How is my budget looking?
+  group: core
+  expectedOperation: overview
+  expectedMeasure: overview
+  expectedEntityScope: global
+  expectedTarget: nil
+  expectedPrimaryDateRange: default_period
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: overview
+  selectedRoute: recovery
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: nil
+  actualMetricOperation: nil
+  actualTarget: how is my budget looking
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: none
+  responseType: recovery
+  verdictRaw: aggregation execution failure
+  likelySmallestFix: add graceful execution fallback for unresolved mapped queries
+- prompt: If I spend $50 on Food & Drink, how will that affect my budget?
+  group: core
+  expectedOperation: what_if
+  expectedMeasure: simulation
+  expectedEntityScope: category
+  expectedTarget: Food & Drink
+  expectedPrimaryDateRange: current_period
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: what_if
+  selectedRoute: clarification
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: nil
+  actualMetricOperation: nil
+  actualTarget: food & drink how will that affect my budget
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: none
+  responseType: clarification
+  verdictRaw: unsupported capability
+  likelySmallestFix: add dedicated what-if trace path classification without execution
+- prompt: If I buy something for $120 today, can I still stay within my safe spend?
+  group: core
+  expectedOperation: what_if
+  expectedMeasure: safe_spend_simulation
+  expectedEntityScope: global
+  expectedTarget: nil
+  expectedPrimaryDateRange: today
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: what_if
+  selectedRoute: clarification
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: nil
+  actualMetricOperation: nil
+  actualTarget: if i buy something for 120
+  actualPrimaryDateRange: 2026-05-07..2026-05-08
+  actualComparisonDateRange: nil
+  aggregationPath: none
+  responseType: clarification
+  verdictRaw: unsupported capability
+  likelySmallestFix: add dedicated what-if trace path classification without execution
+- prompt: Am I spending more on food lately, or is it about normal?
+  group: stress_messy_manual_2026_05
+  expectedOperation: difference
+  expectedMeasure: categoryMonthComparison
+  expectedEntityScope: category
+  expectedTarget: food
+  expectedPrimaryDateRange: lately
+  expectedComparisonDateRange: normal_baseline
+  expectedPresentationIntent: comparison
+  selectedRoute: clarification
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: nil
+  actualMetricOperation: categorySpendTotal | sum
+  actualTarget: food lately or is it about normal
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: none
+  responseType: clarification
+  verdictRaw: comparison range failure
+  likelySmallestFix: require secondary range synthesis for comparison prompts
+- prompt: How bad was Food & Drink compared to last month?
+  group: stress_messy_manual_2026_05
+  expectedOperation: difference
+  expectedMeasure: categoryMonthComparison
+  expectedEntityScope: category
+  expectedTarget: Food & Drink
+  expectedPrimaryDateRange: default_period
+  expectedComparisonDateRange: last_month
+  expectedPresentationIntent: comparison
+  selectedRoute: nlq
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: nil
+  actualMetricOperation: monthComparison | difference
+  actualTarget: nil
+  actualPrimaryDateRange: 2026-04-01..2026-05-01
+  actualComparisonDateRange: nil
+  aggregationPath: single_home_query_engine
+  responseType: message
+  verdictRaw: comparison range failure
+  likelySmallestFix: require secondary range synthesis for comparison prompts
+- prompt: Did groceries go up or down from March to April?
+  group: stress_messy_manual_2026_05
+  expectedOperation: difference
+  expectedMeasure: categoryMonthComparison
+  expectedEntityScope: category
+  expectedTarget: groceries
+  expectedPrimaryDateRange: april
+  expectedComparisonDateRange: march
+  expectedPresentationIntent: comparison
+  selectedRoute: nlq
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: nil
+  actualMetricOperation: monthComparison | difference
+  actualTarget: nil
+  actualPrimaryDateRange: 2026-03-01..2026-04-01
+  actualComparisonDateRange: 2026-04-01..2026-05-01
+  aggregationPath: single_home_query_engine
+  responseType: message
+  verdictRaw: correct
+  likelySmallestFix: none
+- prompt: What card is eating most of my budget this period?
+  group: stress_messy_manual_2026_05
+  expectedOperation: ranked_list
+  expectedMeasure: topCards
+  expectedEntityScope: global
+  expectedTarget: nil
+  expectedPrimaryDateRange: current_period
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: list
+  selectedRoute: clarification
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: nil
+  actualMetricOperation: nil
+  actualTarget: what card is eating most of my budget this period
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: none
+  responseType: clarification
+  verdictRaw: aggregation execution failure
+  likelySmallestFix: add graceful execution fallback for unresolved mapped queries
+- prompt: Which category is hurting me the most right now?
+  group: stress_messy_manual_2026_05
+  expectedOperation: ranked_list
+  expectedMeasure: topCategories
+  expectedEntityScope: global
+  expectedTarget: nil
+  expectedPrimaryDateRange: current_period
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: list
+  selectedRoute: nlq
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: nil
+  actualMetricOperation: topCategories | ranked_list
+  actualTarget: nil
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: single_home_query_engine
+  responseType: message
+  verdictRaw: correct
+  likelySmallestFix: none
+- prompt: Break down where my money went this month, but don’t just give me the total.
+  group: stress_messy_manual_2026_05
+  expectedOperation: ranked_list
+  expectedMeasure: topCategories
+  expectedEntityScope: global
+  expectedTarget: nil
+  expectedPrimaryDateRange: this_month
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: list
+  selectedRoute: recovery
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: nil
+  actualMetricOperation: nil
+  actualTarget: break down where my money went
+  actualPrimaryDateRange: 2026-05-01..2026-06-01
+  actualComparisonDateRange: nil
+  aggregationPath: none
+  responseType: recovery
+  verdictRaw: aggregation execution failure
+  likelySmallestFix: add graceful execution fallback for unresolved mapped queries
+- prompt: What did I spend on Apple Card outside of Food & Drink?
+  group: stress_messy_manual_2026_05
+  expectedOperation: sum
+  expectedMeasure: cardSpendExcludingCategory
+  expectedEntityScope: card_and_category_filter
+  expectedTarget: Apple Card
+  expectedPrimaryDateRange: default_period
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: metric
+  selectedRoute: nlq
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: nil
+  actualMetricOperation: spendTotal | sum
+  actualTarget: nil
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: single_home_query_engine
+  responseType: message
+  verdictRaw: correct
+  likelySmallestFix: none
+- prompt: How much of my spending this month was Food & Drink?
+  group: stress_messy_manual_2026_05
+  expectedOperation: share_of_total
+  expectedMeasure: categorySpendShare
+  expectedEntityScope: category
+  expectedTarget: Food & Drink
+  expectedPrimaryDateRange: this_month
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: metric
+  selectedRoute: nlq
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: nil
+  actualMetricOperation: spendTotal | sum
+  actualTarget: nil
+  actualPrimaryDateRange: 2026-05-01..2026-06-01
+  actualComparisonDateRange: nil
+  aggregationPath: single_home_query_engine
+  responseType: list
+  verdictRaw: correct
+  likelySmallestFix: none
+- prompt: Is Shopping over where it should be for this budget?
+  group: stress_messy_manual_2026_05
+  expectedOperation: compare_to_limit
+  expectedMeasure: categoryBudgetAvailability
+  expectedEntityScope: category
+  expectedTarget: Shopping
+  expectedPrimaryDateRange: current_budget
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: comparison
+  selectedRoute: recovery
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: nil
+  actualMetricOperation: nil
+  actualTarget: is shopping over where it should be for this budget
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: none
+  responseType: recovery
+  verdictRaw: aggregation execution failure
+  likelySmallestFix: add graceful execution fallback for unresolved mapped queries
+- prompt: What category changed the most compared to last month?
+  group: stress_messy_manual_2026_05
+  expectedOperation: ranked_list
+  expectedMeasure: categoryMonthComparisonRanked
+  expectedEntityScope: global
+  expectedTarget: nil
+  expectedPrimaryDateRange: this_month
+  expectedComparisonDateRange: last_month
+  expectedPresentationIntent: list
+  selectedRoute: nlq
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: nil
+  actualMetricOperation: monthComparison | difference
+  actualTarget: nil
+  actualPrimaryDateRange: 2026-04-01..2026-05-01
+  actualComparisonDateRange: nil
+  aggregationPath: single_home_query_engine
+  responseType: message
+  verdictRaw: comparison range failure
+  likelySmallestFix: require secondary range synthesis for comparison prompts
+- prompt: What was my average weekly spending on groceries over the last 3 months?
+  group: stress_messy_manual_2026_05
+  expectedOperation: average
+  expectedMeasure: categoryAverageSpend
+  expectedEntityScope: category
+  expectedTarget: groceries
+  expectedPrimaryDateRange: last_3_months
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: metric
+  selectedRoute: clarification
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: nil
+  actualMetricOperation: nil
+  actualTarget: groceries over the
+  actualPrimaryDateRange: 2026-02-07..2026-05-08
+  actualComparisonDateRange: nil
+  aggregationPath: none
+  responseType: clarification
+  verdictRaw: metric/operation mapping failure
+  likelySmallestFix: add explicit average-by-target mapping metric
+- prompt: If I keep spending like this, how much will I have left by the end of the period?
+  group: stress_messy_manual_2026_05
+  expectedOperation: forecast
+  expectedMeasure: projectedRemainingBudget
+  expectedEntityScope: global
+  expectedTarget: nil
+  expectedPrimaryDateRange: current_period
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: forecast
+  selectedRoute: nlq
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: nil
+  actualMetricOperation: spendTotal | sum
+  actualTarget: nil
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: single_home_query_engine
+  responseType: list
+  verdictRaw: correct
+  likelySmallestFix: none
+- prompt: If I add $75 to Shopping, does Transportation still have room?
+  group: stress_messy_manual_2026_05
+  expectedOperation: what_if
+  expectedMeasure: simulation
+  expectedEntityScope: category_pair
+  expectedTarget: Shopping
+  expectedPrimaryDateRange: current_period
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: what_if
+  selectedRoute: clarification
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: nil
+  actualMetricOperation: merchantSpendTotal | sum
+  actualTarget: shopping does transportation still have room
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: none
+  responseType: clarification
+  verdictRaw: unsupported capability
+  likelySmallestFix: add dedicated what-if trace path classification without execution
+- prompt: What expenses are making this month higher than last month?
+  group: stress_messy_manual_2026_05
+  expectedOperation: ranked_list
+  expectedMeasure: transactionDeltaDrivers
+  expectedEntityScope: global
+  expectedTarget: nil
+  expectedPrimaryDateRange: this_month
+  expectedComparisonDateRange: last_month
+  expectedPresentationIntent: list
+  selectedRoute: recovery
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: nil
+  actualMetricOperation: nil
+  actualTarget: what expenses are making
+  actualPrimaryDateRange: 2026-04-01..2026-05-01
+  actualComparisonDateRange: nil
+  aggregationPath: none
+  responseType: recovery
+  verdictRaw: aggregation execution failure
+  likelySmallestFix: add graceful execution fallback for unresolved mapped queries
+- prompt: Show me the stuff I’m spending on too often, not necessarily the most money.
+  group: stress_messy_manual_2026_05
+  expectedOperation: ranked_list
+  expectedMeasure: frequentMerchants
+  expectedEntityScope: global
+  expectedTarget: nil
+  expectedPrimaryDateRange: default_period
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: list
+  selectedRoute: nlq
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: nil
+  actualMetricOperation: spendTotal | sum
+  actualTarget: nil
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: single_home_query_engine
+  responseType: list
+  verdictRaw: correct
+  likelySmallestFix: none
 
-Output paths printed during test run:
-- <temp>/OffshoreBudgetingTestArtifacts/MarinaTraceAnalysis/MarinaTraceAnalysisReport.json
-- <temp>/OffshoreBudgetingTestArtifacts/MarinaTraceAnalysis/MarinaTraceAnalysisReport.txt
+mode: shared_pipeline_heuristic
+- prompt: Am I spending more on food lately, or is it about normal?
+  group: stress_messy_manual_2026_05
+  expectedOperation: difference
+  expectedMeasure: categoryMonthComparison
+  expectedEntityScope: category
+  expectedTarget: food
+  expectedPrimaryDateRange: lately
+  expectedComparisonDateRange: normal_baseline
+  expectedPresentationIntent: comparison
+  selectedRoute: sharedHeuristic
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: nil
+  actualMetricOperation: operation=compare | measure=spend
+  actualTarget: primaryTarget:category:Food & Drink:DD268CF1-CAB1-4508-9B61-12B8200465DF
+  actualPrimaryDateRange: 2026-05-01..2026-06-01
+  actualComparisonDateRange: 2026-04-01..2026-05-01
+  aggregationPath: shared_pipeline
+  responseType: kind=message,title=Category Comparison (Food & Drink),rows=0
+  verdictRaw: handled
+  likelySmallestFix: none
+  sharedPath: sharedHeuristic
+  sharedSelectedInterpreter: heuristic
+  sharedCandidateOperation: compare
+  sharedCandidateMeasure: spend
+  sharedCandidateSummary: source=heuristic,operation=compare,measure=spend,entities=primaryTarget:category:food:medium,timeScopes=primary:nil:month:2026-05-01...2026-06-01;comparison:nil:month:2026-04-01...2026-05-01,grouping=category:nil,responseHint=comparison
+  sharedUnresolvedEntityMentions: nil
+  sharedResolvedEntityStates: primaryTarget:category:Food & Drink:DD268CF1-CAB1-4508-9B61-12B8200465DF
+  sharedTimeScopes: primary:nil:month:2026-05-01..2026-06-01;comparison:nil:month:2026-04-01..2026-05-01
+  sharedValidatorOutcome: executable:compare:spend
+  sharedAggregationPlanSummary: operation=compare,measure=spend,targets=primaryTarget:category:Food & Drink,primary=2026-05-01..2026-06-01,comparison=2026-04-01..2026-05-01,grouping=category,ranking=nil,shape=comparison
+  sharedExecutorResultShape: message:Category Comparison (Food & Drink)
+  sharedResponseBridgeShape: kind=message,title=Category Comparison (Food & Drink),rows=0
+  sharedFallbackReason: nil
+  sharedFailureLayer: handled
+  sharedFailureBucket: handled
+- prompt: How bad was Food & Drink compared to last month?
+  group: stress_messy_manual_2026_05
+  expectedOperation: difference
+  expectedMeasure: categoryMonthComparison
+  expectedEntityScope: category
+  expectedTarget: Food & Drink
+  expectedPrimaryDateRange: default_period
+  expectedComparisonDateRange: last_month
+  expectedPresentationIntent: comparison
+  selectedRoute: sharedHeuristic
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: nil
+  actualMetricOperation: operation=compare | measure=spend
+  actualTarget: primaryTarget:category:Food & Drink:DD268CF1-CAB1-4508-9B61-12B8200465DF
+  actualPrimaryDateRange: 2026-05-01..2026-06-01
+  actualComparisonDateRange: 2026-04-01..2026-05-01
+  aggregationPath: shared_pipeline
+  responseType: kind=message,title=Category Comparison (Food & Drink),rows=0
+  verdictRaw: handled
+  likelySmallestFix: none
+  sharedPath: sharedHeuristic
+  sharedSelectedInterpreter: heuristic
+  sharedCandidateOperation: compare
+  sharedCandidateMeasure: spend
+  sharedCandidateSummary: source=heuristic,operation=compare,measure=spend,entities=primaryTarget:category:food & drink:medium,timeScopes=primary:nil:month:2026-05-01...2026-06-01;comparison:nil:month:2026-04-01...2026-05-01,grouping=category:nil,responseHint=comparison
+  sharedUnresolvedEntityMentions: nil
+  sharedResolvedEntityStates: primaryTarget:category:Food & Drink:DD268CF1-CAB1-4508-9B61-12B8200465DF
+  sharedTimeScopes: primary:nil:month:2026-05-01..2026-06-01;comparison:nil:month:2026-04-01..2026-05-01
+  sharedValidatorOutcome: executable:compare:spend
+  sharedAggregationPlanSummary: operation=compare,measure=spend,targets=primaryTarget:category:Food & Drink,primary=2026-05-01..2026-06-01,comparison=2026-04-01..2026-05-01,grouping=category,ranking=nil,shape=comparison
+  sharedExecutorResultShape: message:Category Comparison (Food & Drink)
+  sharedResponseBridgeShape: kind=message,title=Category Comparison (Food & Drink),rows=0
+  sharedFallbackReason: nil
+  sharedFailureLayer: handled
+  sharedFailureBucket: handled
+- prompt: Did groceries go up or down from March to April?
+  group: stress_messy_manual_2026_05
+  expectedOperation: difference
+  expectedMeasure: categoryMonthComparison
+  expectedEntityScope: category
+  expectedTarget: groceries
+  expectedPrimaryDateRange: april
+  expectedComparisonDateRange: march
+  expectedPresentationIntent: comparison
+  selectedRoute: sharedHeuristic
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: nil
+  actualMetricOperation: operation=compare | measure=spend
+  actualTarget: primaryTarget:category:Groceries:FC168895-FACE-43D4-A2AC-C10CE009293F
+  actualPrimaryDateRange: 2026-04-01..2026-05-01
+  actualComparisonDateRange: 2026-03-01..2026-04-01
+  aggregationPath: shared_pipeline
+  responseType: kind=message,title=Category Comparison (Groceries),rows=0
+  verdictRaw: handled
+  likelySmallestFix: none
+  sharedPath: sharedHeuristic
+  sharedSelectedInterpreter: heuristic
+  sharedCandidateOperation: compare
+  sharedCandidateMeasure: spend
+  sharedCandidateSummary: source=heuristic,operation=compare,measure=spend,entities=primaryTarget:category:groceries:medium,timeScopes=primary:nil:month:2026-04-01...2026-05-01;comparison:nil:month:2026-03-01...2026-04-01,grouping=category:nil,responseHint=comparison
+  sharedUnresolvedEntityMentions: nil
+  sharedResolvedEntityStates: primaryTarget:category:Groceries:FC168895-FACE-43D4-A2AC-C10CE009293F
+  sharedTimeScopes: primary:nil:month:2026-04-01..2026-05-01;comparison:nil:month:2026-03-01..2026-04-01
+  sharedValidatorOutcome: executable:compare:spend
+  sharedAggregationPlanSummary: operation=compare,measure=spend,targets=primaryTarget:category:Groceries,primary=2026-04-01..2026-05-01,comparison=2026-03-01..2026-04-01,grouping=category,ranking=nil,shape=comparison
+  sharedExecutorResultShape: message:Category Comparison (Groceries)
+  sharedResponseBridgeShape: kind=message,title=Category Comparison (Groceries),rows=0
+  sharedFallbackReason: nil
+  sharedFailureLayer: handled
+  sharedFailureBucket: handled
+- prompt: What card is eating most of my budget this period?
+  group: stress_messy_manual_2026_05
+  expectedOperation: ranked_list
+  expectedMeasure: topCards
+  expectedEntityScope: global
+  expectedTarget: nil
+  expectedPrimaryDateRange: current_period
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: list
+  selectedRoute: sharedHeuristic
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: nil
+  actualMetricOperation: operation=rank | measure=spend
+  actualTarget: nil
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: none
+  responseType: kind=message,title=Unsupported Marina Query,rows=1
+  verdictRaw: typed unsupported:unsupportedCardRanking
+  likelySmallestFix: classify unsupported or clarification outcomes without collapsing to scalar spend
+  sharedPath: sharedHeuristic
+  sharedSelectedInterpreter: heuristic
+  sharedCandidateOperation: rank
+  sharedCandidateMeasure: spend
+  sharedCandidateSummary: source=heuristic,operation=rank,measure=spend,grouping=card:nil,ranking=top:nil:nil,responseHint=rankedList
+  sharedUnresolvedEntityMentions: nil
+  sharedResolvedEntityStates: nil
+  sharedTimeScopes: nil
+  sharedValidatorOutcome: unsupported:unsupportedCombination
+  sharedAggregationPlanSummary: nil
+  sharedExecutorResultShape: nil
+  sharedResponseBridgeShape: kind=message,title=Unsupported Marina Query,rows=1
+  sharedFallbackReason: nil
+  sharedFailureLayer: validation
+  sharedFailureBucket: typed unsupported:unsupportedCardRanking
+- prompt: Which category is hurting me the most right now?
+  group: stress_messy_manual_2026_05
+  expectedOperation: ranked_list
+  expectedMeasure: topCategories
+  expectedEntityScope: global
+  expectedTarget: nil
+  expectedPrimaryDateRange: current_period
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: list
+  selectedRoute: sharedHeuristic
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: nil
+  actualMetricOperation: operation=rank | measure=spend
+  actualTarget: nil
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: shared_pipeline
+  responseType: kind=message,title=Top Categories This Month,rows=0
+  verdictRaw: handled
+  likelySmallestFix: none
+  sharedPath: sharedHeuristic
+  sharedSelectedInterpreter: heuristic
+  sharedCandidateOperation: rank
+  sharedCandidateMeasure: spend
+  sharedCandidateSummary: source=heuristic,operation=rank,measure=spend,grouping=category:nil,ranking=top:nil:nil,responseHint=rankedList
+  sharedUnresolvedEntityMentions: nil
+  sharedResolvedEntityStates: nil
+  sharedTimeScopes: nil
+  sharedValidatorOutcome: executable:rank:spend
+  sharedAggregationPlanSummary: operation=rank,measure=spend,targets=,primary=nil,comparison=nil,grouping=category,ranking=top,shape=rankedList
+  sharedExecutorResultShape: message:Top Categories This Month
+  sharedResponseBridgeShape: kind=message,title=Top Categories This Month,rows=0
+  sharedFallbackReason: nil
+  sharedFailureLayer: handled
+  sharedFailureBucket: handled
+- prompt: Break down where my money went this month, but don’t just give me the total.
+  group: stress_messy_manual_2026_05
+  expectedOperation: ranked_list
+  expectedMeasure: topCategories
+  expectedEntityScope: global
+  expectedTarget: nil
+  expectedPrimaryDateRange: this_month
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: list
+  selectedRoute: sharedHeuristic
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: nil
+  actualMetricOperation: operation=rank | measure=spend
+  actualTarget: nil
+  actualPrimaryDateRange: 2026-05-01..2026-06-01
+  actualComparisonDateRange: nil
+  aggregationPath: shared_pipeline
+  responseType: kind=message,title=Top Categories This Month,rows=0
+  verdictRaw: handled
+  likelySmallestFix: none
+  sharedPath: sharedHeuristic
+  sharedSelectedInterpreter: heuristic
+  sharedCandidateOperation: rank
+  sharedCandidateMeasure: spend
+  sharedCandidateSummary: source=heuristic,operation=rank,measure=spend,timeScopes=primary:nil:month:2026-05-01...2026-06-01,grouping=category:nil,ranking=top:nil:nil,responseHint=groupedBreakdown
+  sharedUnresolvedEntityMentions: nil
+  sharedResolvedEntityStates: nil
+  sharedTimeScopes: primary:nil:month:2026-05-01..2026-06-01
+  sharedValidatorOutcome: executable:rank:spend
+  sharedAggregationPlanSummary: operation=rank,measure=spend,targets=,primary=2026-05-01..2026-06-01,comparison=nil,grouping=category,ranking=top,shape=groupedBreakdown
+  sharedExecutorResultShape: message:Top Categories This Month
+  sharedResponseBridgeShape: kind=message,title=Top Categories This Month,rows=0
+  sharedFallbackReason: nil
+  sharedFailureLayer: handled
+  sharedFailureBucket: handled
+- prompt: What did I spend on Apple Card outside of Food & Drink?
+  group: stress_messy_manual_2026_05
+  expectedOperation: sum
+  expectedMeasure: cardSpendExcludingCategory
+  expectedEntityScope: card_and_category_filter
+  expectedTarget: Apple Card
+  expectedPrimaryDateRange: default_period
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: metric
+  selectedRoute: sharedHeuristic
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: nil
+  actualMetricOperation: operation=sum | measure=spend
+  actualTarget: filter:card:Apple Card:B0D28105-0D54-472E-80A8-55AAE0222DEC;filter:category:Food & Drink:DD268CF1-CAB1-4508-9B61-12B8200465DF
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: none
+  responseType: kind=message,title=Unsupported Marina Query,rows=1
+  verdictRaw: typed unsupported:unsupportedExclusionFilter
+  likelySmallestFix: classify unsupported or clarification outcomes without collapsing to scalar spend
+  sharedPath: sharedHeuristic
+  sharedSelectedInterpreter: heuristic
+  sharedCandidateOperation: sum
+  sharedCandidateMeasure: spend
+  sharedCandidateSummary: source=heuristic,operation=sum,measure=spend,entities=filter:card:apple card:medium;filter:category:food & drink:medium,responseHint=unsupported
+  sharedUnresolvedEntityMentions: nil
+  sharedResolvedEntityStates: filter:card:Apple Card:B0D28105-0D54-472E-80A8-55AAE0222DEC;filter:category:Food & Drink:DD268CF1-CAB1-4508-9B61-12B8200465DF
+  sharedTimeScopes: nil
+  sharedValidatorOutcome: unsupported:unsupportedCombination
+  sharedAggregationPlanSummary: nil
+  sharedExecutorResultShape: nil
+  sharedResponseBridgeShape: kind=message,title=Unsupported Marina Query,rows=1
+  sharedFallbackReason: nil
+  sharedFailureLayer: validation
+  sharedFailureBucket: typed unsupported:unsupportedExclusionFilter
+- prompt: How much of my spending this month was Food & Drink?
+  group: stress_messy_manual_2026_05
+  expectedOperation: share_of_total
+  expectedMeasure: categorySpendShare
+  expectedEntityScope: category
+  expectedTarget: Food & Drink
+  expectedPrimaryDateRange: this_month
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: metric
+  selectedRoute: sharedHeuristic
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: nil
+  actualMetricOperation: operation=sum | measure=categoryShare
+  actualTarget: primaryTarget:category:Food & Drink:DD268CF1-CAB1-4508-9B61-12B8200465DF
+  actualPrimaryDateRange: 2026-05-01..2026-06-01
+  actualComparisonDateRange: nil
+  aggregationPath: shared_pipeline
+  responseType: kind=message,title=Category Spend Share,rows=0
+  verdictRaw: handled
+  likelySmallestFix: none
+  sharedPath: sharedHeuristic
+  sharedSelectedInterpreter: heuristic
+  sharedCandidateOperation: sum
+  sharedCandidateMeasure: categoryShare
+  sharedCandidateSummary: source=heuristic,operation=sum,measure=categoryShare,entities=primaryTarget:category:food & drink:medium,timeScopes=primary:nil:month:2026-05-01...2026-06-01,grouping=category:nil,responseHint=groupedBreakdown
+  sharedUnresolvedEntityMentions: nil
+  sharedResolvedEntityStates: primaryTarget:category:Food & Drink:DD268CF1-CAB1-4508-9B61-12B8200465DF
+  sharedTimeScopes: primary:nil:month:2026-05-01..2026-06-01
+  sharedValidatorOutcome: executable:sum:categoryShare
+  sharedAggregationPlanSummary: operation=sum,measure=categoryShare,targets=primaryTarget:category:Food & Drink,primary=2026-05-01..2026-06-01,comparison=nil,grouping=category,ranking=nil,shape=groupedBreakdown
+  sharedExecutorResultShape: message:Category Spend Share
+  sharedResponseBridgeShape: kind=message,title=Category Spend Share,rows=0
+  sharedFallbackReason: nil
+  sharedFailureLayer: handled
+  sharedFailureBucket: handled
+- prompt: Is Shopping over where it should be for this budget?
+  group: stress_messy_manual_2026_05
+  expectedOperation: compare_to_limit
+  expectedMeasure: categoryBudgetAvailability
+  expectedEntityScope: category
+  expectedTarget: Shopping
+  expectedPrimaryDateRange: current_budget
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: comparison
+  selectedRoute: sharedHeuristic
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: nil
+  actualMetricOperation: operation=compare | measure=remainingBudget
+  actualTarget: primaryTarget:category:Shopping:FE432C84-A15A-46A1-B9DB-617A0C80E97D
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: none
+  responseType: kind=message,title=Unsupported Marina Query,rows=1
+  verdictRaw: typed unsupported:unsupportedBudgetLimit
+  likelySmallestFix: classify unsupported or clarification outcomes without collapsing to scalar spend
+  sharedPath: sharedHeuristic
+  sharedSelectedInterpreter: heuristic
+  sharedCandidateOperation: compare
+  sharedCandidateMeasure: remainingBudget
+  sharedCandidateSummary: source=heuristic,operation=compare,measure=remainingBudget,entities=primaryTarget:category:shopping:medium,responseHint=unsupported
+  sharedUnresolvedEntityMentions: nil
+  sharedResolvedEntityStates: primaryTarget:category:Shopping:FE432C84-A15A-46A1-B9DB-617A0C80E97D
+  sharedTimeScopes: nil
+  sharedValidatorOutcome: unsupported:unsupportedCombination
+  sharedAggregationPlanSummary: nil
+  sharedExecutorResultShape: nil
+  sharedResponseBridgeShape: kind=message,title=Unsupported Marina Query,rows=1
+  sharedFallbackReason: nil
+  sharedFailureLayer: validation
+  sharedFailureBucket: typed unsupported:unsupportedBudgetLimit
+- prompt: What category changed the most compared to last month?
+  group: stress_messy_manual_2026_05
+  expectedOperation: ranked_list
+  expectedMeasure: categoryMonthComparisonRanked
+  expectedEntityScope: global
+  expectedTarget: nil
+  expectedPrimaryDateRange: this_month
+  expectedComparisonDateRange: last_month
+  expectedPresentationIntent: list
+  selectedRoute: sharedHeuristic
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: nil
+  actualMetricOperation: operation=compare | measure=spend
+  actualTarget: nil
+  actualPrimaryDateRange: 2026-05-01..2026-06-01
+  actualComparisonDateRange: 2026-04-01..2026-05-01
+  aggregationPath: none
+  responseType: kind=message,title=Unsupported Marina Query,rows=1
+  verdictRaw: typed unsupported:unsupportedRankedComparison
+  likelySmallestFix: classify unsupported or clarification outcomes without collapsing to scalar spend
+  sharedPath: sharedHeuristic
+  sharedSelectedInterpreter: heuristic
+  sharedCandidateOperation: compare
+  sharedCandidateMeasure: spend
+  sharedCandidateSummary: source=heuristic,operation=compare,measure=spend,timeScopes=primary:nil:month:2026-05-01...2026-06-01;comparison:nil:month:2026-04-01...2026-05-01,grouping=category:nil,ranking=largest:nil:nil,responseHint=rankedList
+  sharedUnresolvedEntityMentions: nil
+  sharedResolvedEntityStates: nil
+  sharedTimeScopes: primary:nil:month:2026-05-01..2026-06-01;comparison:nil:month:2026-04-01..2026-05-01
+  sharedValidatorOutcome: unsupported:unsupportedCombination
+  sharedAggregationPlanSummary: nil
+  sharedExecutorResultShape: nil
+  sharedResponseBridgeShape: kind=message,title=Unsupported Marina Query,rows=1
+  sharedFallbackReason: nil
+  sharedFailureLayer: validation
+  sharedFailureBucket: typed unsupported:unsupportedRankedComparison
+- prompt: What was my average weekly spending on groceries over the last 3 months?
+  group: stress_messy_manual_2026_05
+  expectedOperation: average
+  expectedMeasure: categoryAverageSpend
+  expectedEntityScope: category
+  expectedTarget: groceries
+  expectedPrimaryDateRange: last_3_months
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: metric
+  selectedRoute: sharedHeuristic
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: nil
+  actualMetricOperation: operation=average | measure=spend
+  actualTarget: primaryTarget:category:Groceries:FC168895-FACE-43D4-A2AC-C10CE009293F
+  actualPrimaryDateRange: 2026-02-07..2026-05-08
+  actualComparisonDateRange: nil
+  aggregationPath: none
+  responseType: kind=message,title=Unsupported Marina Query,rows=1
+  verdictRaw: typed unsupported:unsupportedCombination
+  likelySmallestFix: classify unsupported or clarification outcomes without collapsing to scalar spend
+  sharedPath: sharedHeuristic
+  sharedSelectedInterpreter: heuristic
+  sharedCandidateOperation: average
+  sharedCandidateMeasure: spend
+  sharedCandidateSummary: source=heuristic,operation=average,measure=spend,entities=primaryTarget:unknown:groceries:low,timeScopes=lookbackWindow:nil:month:2026-02-07...2026-05-08,responseHint=unsupported
+  sharedUnresolvedEntityMentions: nil
+  sharedResolvedEntityStates: primaryTarget:category:Groceries:FC168895-FACE-43D4-A2AC-C10CE009293F
+  sharedTimeScopes: lookbackWindow:nil:month:2026-02-07..2026-05-08
+  sharedValidatorOutcome: unsupported:unsupportedCombination
+  sharedAggregationPlanSummary: nil
+  sharedExecutorResultShape: nil
+  sharedResponseBridgeShape: kind=message,title=Unsupported Marina Query,rows=1
+  sharedFallbackReason: nil
+  sharedFailureLayer: validation
+  sharedFailureBucket: typed unsupported:unsupportedCombination
+- prompt: If I keep spending like this, how much will I have left by the end of the period?
+  group: stress_messy_manual_2026_05
+  expectedOperation: forecast
+  expectedMeasure: projectedRemainingBudget
+  expectedEntityScope: global
+  expectedTarget: nil
+  expectedPrimaryDateRange: current_period
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: forecast
+  selectedRoute: sharedHeuristic
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: nil
+  actualMetricOperation: operation=forecast | measure=remainingBudget
+  actualTarget: nil
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: none
+  responseType: kind=message,title=Unsupported Marina Query,rows=1
+  verdictRaw: typed unsupported:unsupportedProjection
+  likelySmallestFix: classify unsupported or clarification outcomes without collapsing to scalar spend
+  sharedPath: sharedHeuristic
+  sharedSelectedInterpreter: heuristic
+  sharedCandidateOperation: forecast
+  sharedCandidateMeasure: remainingBudget
+  sharedCandidateSummary: source=heuristic,operation=forecast,measure=remainingBudget,responseHint=unsupported
+  sharedUnresolvedEntityMentions: nil
+  sharedResolvedEntityStates: nil
+  sharedTimeScopes: nil
+  sharedValidatorOutcome: unsupported:unsupportedOperation
+  sharedAggregationPlanSummary: nil
+  sharedExecutorResultShape: nil
+  sharedResponseBridgeShape: kind=message,title=Unsupported Marina Query,rows=1
+  sharedFallbackReason: nil
+  sharedFailureLayer: validation
+  sharedFailureBucket: typed unsupported:unsupportedProjection
+- prompt: If I add $75 to Shopping, does Transportation still have room?
+  group: stress_messy_manual_2026_05
+  expectedOperation: what_if
+  expectedMeasure: simulation
+  expectedEntityScope: category_pair
+  expectedTarget: Shopping
+  expectedPrimaryDateRange: current_period
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: what_if
+  selectedRoute: sharedHeuristic
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: nil
+  actualMetricOperation: operation=simulate | measure=remainingBudget
+  actualTarget: simulationInput:category:Shopping:FE432C84-A15A-46A1-B9DB-617A0C80E97D;simulationOutput:category:Transportation:FA9CDE83-7E4A-4DB6-845D-71A0B9FD6218
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: none
+  responseType: kind=message,title=Unsupported Marina Query,rows=1
+  verdictRaw: typed unsupported:unsupportedSimulation
+  likelySmallestFix: classify unsupported or clarification outcomes without collapsing to scalar spend
+  sharedPath: sharedHeuristic
+  sharedSelectedInterpreter: heuristic
+  sharedCandidateOperation: simulate
+  sharedCandidateMeasure: remainingBudget
+  sharedCandidateSummary: source=heuristic,operation=simulate,measure=remainingBudget,entities=simulationInput:category:shopping:medium;simulationOutput:category:transportation:medium,responseHint=unsupported
+  sharedUnresolvedEntityMentions: nil
+  sharedResolvedEntityStates: simulationInput:category:Shopping:FE432C84-A15A-46A1-B9DB-617A0C80E97D;simulationOutput:category:Transportation:FA9CDE83-7E4A-4DB6-845D-71A0B9FD6218
+  sharedTimeScopes: nil
+  sharedValidatorOutcome: unsupported:unsupportedSimulation
+  sharedAggregationPlanSummary: nil
+  sharedExecutorResultShape: nil
+  sharedResponseBridgeShape: kind=message,title=Unsupported Marina Query,rows=1
+  sharedFallbackReason: nil
+  sharedFailureLayer: validation
+  sharedFailureBucket: typed unsupported:unsupportedSimulation
+- prompt: What expenses are making this month higher than last month?
+  group: stress_messy_manual_2026_05
+  expectedOperation: ranked_list
+  expectedMeasure: transactionDeltaDrivers
+  expectedEntityScope: global
+  expectedTarget: nil
+  expectedPrimaryDateRange: this_month
+  expectedComparisonDateRange: last_month
+  expectedPresentationIntent: list
+  selectedRoute: sharedHeuristic
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: nil
+  actualMetricOperation: operation=compare | measure=spend
+  actualTarget: nil
+  actualPrimaryDateRange: 2026-05-01..2026-06-01
+  actualComparisonDateRange: 2026-04-01..2026-05-01
+  aggregationPath: none
+  responseType: kind=message,title=Unsupported Marina Query,rows=1
+  verdictRaw: typed unsupported:unsupportedRankedComparison
+  likelySmallestFix: classify unsupported or clarification outcomes without collapsing to scalar spend
+  sharedPath: sharedHeuristic
+  sharedSelectedInterpreter: heuristic
+  sharedCandidateOperation: compare
+  sharedCandidateMeasure: spend
+  sharedCandidateSummary: source=heuristic,operation=compare,measure=spend,timeScopes=primary:nil:month:2026-05-01...2026-06-01;comparison:nil:month:2026-04-01...2026-05-01,grouping=transaction:nil,ranking=largest:nil:nil,responseHint=rankedList
+  sharedUnresolvedEntityMentions: nil
+  sharedResolvedEntityStates: nil
+  sharedTimeScopes: primary:nil:month:2026-05-01..2026-06-01;comparison:nil:month:2026-04-01..2026-05-01
+  sharedValidatorOutcome: unsupported:unsupportedCombination
+  sharedAggregationPlanSummary: nil
+  sharedExecutorResultShape: nil
+  sharedResponseBridgeShape: kind=message,title=Unsupported Marina Query,rows=1
+  sharedFallbackReason: nil
+  sharedFailureLayer: validation
+  sharedFailureBucket: typed unsupported:unsupportedRankedComparison
+- prompt: Show me the stuff I’m spending on too often, not necessarily the most money.
+  group: stress_messy_manual_2026_05
+  expectedOperation: ranked_list
+  expectedMeasure: frequentMerchants
+  expectedEntityScope: global
+  expectedTarget: nil
+  expectedPrimaryDateRange: default_period
+  expectedComparisonDateRange: nil
+  expectedPresentationIntent: list
+  selectedRoute: sharedHeuristic
+  fallbackReplacedModelOutput: false
+  modelSummary: nil
+  fallbackSummary: nil
+  actualMetricOperation: operation=rank | measure=transactionFrequency
+  actualTarget: nil
+  actualPrimaryDateRange: nil
+  actualComparisonDateRange: nil
+  aggregationPath: shared_pipeline
+  responseType: kind=message,title=Most Frequent Expenses,rows=0
+  verdictRaw: handled
+  likelySmallestFix: none
+  sharedPath: sharedHeuristic
+  sharedSelectedInterpreter: heuristic
+  sharedCandidateOperation: rank
+  sharedCandidateMeasure: transactionFrequency
+  sharedCandidateSummary: source=heuristic,operation=rank,measure=transactionFrequency,grouping=transaction:nil,ranking=mostFrequent:nil:nil,responseHint=rankedList
+  sharedUnresolvedEntityMentions: nil
+  sharedResolvedEntityStates: nil
+  sharedTimeScopes: nil
+  sharedValidatorOutcome: executable:rank:transactionFrequency
+  sharedAggregationPlanSummary: operation=rank,measure=transactionFrequency,targets=,primary=nil,comparison=nil,grouping=transaction,ranking=mostFrequent,shape=rankedList
+  sharedExecutorResultShape: message:Most Frequent Expenses
+  sharedResponseBridgeShape: kind=message,title=Most Frequent Expenses,rows=0
+  sharedFallbackReason: nil
+  sharedFailureLayer: handled
+  sharedFailureBucket: handled
 
-The runtime files contain:
-- all 38 populated rows (19 prompts x 2 modes)
-- failuresByBucket
-- failuresByRootCauseFamily
-- nextPhaseRecommendation
+rowsByGroup
+- stress_messy_manual_2026_05: 45
+- core: 38
+
+failuresByBucket
+- correct: 31
+- comparison range failure: 13
+- aggregation execution failure: 12
+- metric/operation mapping failure: 6
+- unsupported capability: 6
+
+failuresByRootCauseFamily
+- correct: 31
+- entity_and_time_resolution: 13
+- execution: 12
+- capability_gap: 6
+- interpretation_and_mapping: 6
+
+sharedFailuresByBucket
+- handled: 7
+- typed unsupported:unsupportedRankedComparison: 2
+- typed unsupported:unsupportedBudgetLimit: 1
+- typed unsupported:unsupportedCardRanking: 1
+- typed unsupported:unsupportedCombination: 1
+- typed unsupported:unsupportedExclusionFilter: 1
+- typed unsupported:unsupportedProjection: 1
+- typed unsupported:unsupportedSimulation: 1
+
+sharedFailuresByLayer
+- validation: 8
+- handled: 7
+
+nextPhaseRecommendation
+- Phase 1: mapping hardening for average/targeted operations + explicit unsupported capability labels

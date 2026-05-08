@@ -189,11 +189,18 @@ struct MarinaSharedPipelineCoordinatorTests {
             context: sharedContext(fixture: fixture)
         )
 
-        guard case .fallbackToLegacy(let trace) = result else {
-            Issue.record("Unknown target should fall back to legacy.")
+        guard case .validationBlocked(let answer, let outcome, let trace) = result else {
+            Issue.record("Unknown target should be blocked by typed shared clarification.")
             return
         }
-        #expect(trace.fallbackReason == .clarificationBridgeUnavailable)
+        #expect(answer.kind == .message)
+        guard case .clarification(let clarification) = outcome else {
+            Issue.record("Expected typed clarification.")
+            return
+        }
+        #expect(clarification.kind == .missingTarget)
+        #expect(trace.selectedPath == .sharedHeuristic)
+        #expect(trace.fallbackReason == nil)
         #expect(trace.validatorOutcomeSummary?.contains("clarification") == true)
     }
 

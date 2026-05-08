@@ -234,6 +234,119 @@ struct MarinaQueryValidatorTests {
         #expect(simulationUnsupported.kind == .unsupportedSimulation)
     }
 
+    @Test func validator_phase6BUnsupportedHintsReturnTypedUnsupportedBeforeExecution() {
+        let cases: [(MarinaUnsupportedHint, MarinaCandidateOperation, MarinaCandidateMeasure, MarinaUnsupportedResponseKind)] = [
+            (.unsupportedProjection, .forecast, .remainingBudget, .unsupportedOperation),
+            (.unsupportedExclusionFilter, .sum, .spend, .unsupportedCombination),
+            (.unsupportedBudgetLimit, .compare, .remainingBudget, .unsupportedCombination),
+            (.unsupportedCardRanking, .rank, .spend, .unsupportedCombination),
+            (.unsupportedRankedComparison, .compare, .spend, .unsupportedCombination)
+        ]
+
+        for (hint, operation, measure, expectedKind) in cases {
+            let candidate = MarinaQueryPlanCandidate(
+                source: .heuristic,
+                rawPrompt: hint.rawValue,
+                operation: operation,
+                measure: measure,
+                unsupportedHint: hint
+            )
+
+            let outcome = MarinaQueryValidator().validate(resolvedCandidate(candidate))
+
+            guard case .unsupported(let unsupported) = outcome else {
+                Issue.record("Expected unsupported for \(hint.rawValue)")
+                continue
+            }
+            #expect(unsupported.kind == expectedKind)
+            #expect(unsupported.candidate?.operation == operation)
+            #expect(unsupported.candidate?.measure == measure)
+        }
+    }
+
+    @Test func validator_rankedComparisonUnsupportedDoesNotRequireAdapterEvenWithDateScopes() {
+        let primary = HomeQueryDateRange(startDate: date(2026, 5, 1), endDate: date(2026, 6, 1))
+        let comparison = HomeQueryDateRange(startDate: date(2026, 4, 1), endDate: date(2026, 5, 1))
+        let candidate = MarinaQueryPlanCandidate(
+            source: .heuristic,
+            rawPrompt: "What expenses are making this month higher than last month?",
+            operation: .compare,
+            measure: .spend,
+            timeScopes: [
+                MarinaUnresolvedTimeScope(role: .primary, rawText: "this month", resolvedRangeHint: primary, periodUnitHint: .month),
+                MarinaUnresolvedTimeScope(role: .comparison, rawText: "last month", resolvedRangeHint: comparison, periodUnitHint: .month)
+            ],
+            grouping: MarinaGroupingCandidate(dimension: .transaction),
+            ranking: MarinaRankingCandidate(direction: .largest),
+            responseShapeHint: .rankedList,
+            unsupportedHint: .unsupportedRankedComparison
+        )
+
+        let outcome = MarinaQueryValidator().validate(
+            resolvedCandidate(
+                candidate,
+                primaryDateRange: primary,
+                comparisonDateRange: comparison
+            )
+        )
+
+        guard case .unsupported(let unsupported) = outcome else {
+            Issue.record("Expected ranked delta comparison to stay typed unsupported")
+            return
+        }
+        #expect(unsupported.kind == .unsupportedCombination)
+        #expect(unsupported.candidate?.operation == .compare)
+        #expect(unsupported.candidate?.grouping?.dimension == .transaction)
+    }
+
+    @Test func validator_supportedPhase6ShapesStillPromoteToExecutablePlans() {
+        let shareMention = MarinaUnresolvedEntityMention(role: .primaryTarget, rawText: "Food & Drink", typeHint: .category)
+        let shareCandidate = MarinaQueryPlanCandidate(
+            source: .heuristic,
+            rawPrompt: "How much of my spending was Food & Drink?",
+            operation: .sum,
+            measure: .categoryShare,
+            entityMentions: [shareMention],
+            grouping: MarinaGroupingCandidate(dimension: .category),
+            responseShapeHint: .groupedBreakdown
+        )
+        let shareOutcome = MarinaQueryValidator().validate(
+            resolvedCandidate(
+                shareCandidate,
+                targets: [
+                    resolvedTarget(mention: shareMention, role: .primaryTarget, entityType: .category, displayName: "Food & Drink")
+                ]
+            )
+        )
+
+        guard case .executable(let sharePlan) = shareOutcome else {
+            Issue.record("Expected category share to remain executable")
+            return
+        }
+        #expect(sharePlan.operation == .sum)
+        #expect(sharePlan.measure == .categoryShare)
+        #expect(sharePlan.responseShape == .groupedBreakdown)
+
+        let frequencyCandidate = MarinaQueryPlanCandidate(
+            source: .heuristic,
+            rawPrompt: "spending too often",
+            operation: .rank,
+            measure: .transactionFrequency,
+            grouping: MarinaGroupingCandidate(dimension: .transaction),
+            ranking: MarinaRankingCandidate(direction: .mostFrequent),
+            responseShapeHint: .rankedList
+        )
+        let frequencyOutcome = MarinaQueryValidator().validate(resolvedCandidate(frequencyCandidate))
+
+        guard case .executable(let frequencyPlan) = frequencyOutcome else {
+            Issue.record("Expected transaction frequency ranking to remain executable")
+            return
+        }
+        #expect(frequencyPlan.operation == .rank)
+        #expect(frequencyPlan.measure == .transactionFrequency)
+        #expect(frequencyPlan.grouping?.dimension == .transaction)
+    }
+
     @Test func validator_responseShapeHintIsAdvisoryAndCanBeOverridden() {
         let candidate = MarinaQueryPlanCandidate(
             source: .heuristic,

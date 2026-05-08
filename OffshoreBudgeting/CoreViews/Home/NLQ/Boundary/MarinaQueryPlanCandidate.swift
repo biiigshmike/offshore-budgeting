@@ -173,6 +173,12 @@ enum MarinaUnsupportedHint: String, Codable, Equatable {
     case unsupportedCombination
     case missingRequiredTarget
     case unsupportedSimulation
+    case unsupportedProjection
+    case unsupportedExclusionFilter
+    case unsupportedBudgetLimit
+    case unsupportedFrequencyRanking
+    case unsupportedCardRanking
+    case unsupportedRankedComparison
     case lowConfidence
 }
 

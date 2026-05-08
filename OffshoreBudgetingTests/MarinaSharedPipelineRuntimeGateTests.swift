@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 import Testing
 @testable import Offshore
 
@@ -44,6 +45,84 @@ struct MarinaSharedPipelineRuntimeGateTests {
         #expect(list.rows.isEmpty == false)
     }
 
+    @Test func runtimeGate_phase6DHandledShapesExecuteThroughSharedPath() async throws {
+        let fixture = try makeFixture()
+        try fixture.seedSpendData()
+        try fixture.seedComparisonData()
+        try seedMarchAprilGroceries(fixture)
+
+        let examples: [(String, HomeQueryMetric, HomeAnswerKind, String)] = [
+            ("What did I spend this month?", .spendTotal, .metric, "scalar"),
+            ("What did I spend on groceries this month?", .categorySpendTotal, .metric, "scalar"),
+            ("What did I spend on my Apple Card this month?", .cardSpendTotal, .metric, "scalar"),
+            ("What percent of my spending was groceries this month?", .categorySpendShare, .metric, "scalar"),
+            ("Break down my spending by category this month.", .topCategories, .list, "groupedBreakdown"),
+            ("Compare groceries this month to last month.", .categoryMonthComparison, .comparison, "comparison"),
+            ("Did groceries go up or down from March to April?", .categoryMonthComparison, .comparison, "comparison")
+        ]
+
+        for example in examples {
+            let result = await MarinaSharedPipelineCoordinator().run(
+                prompt: example.0,
+                context: sharedContext(fixture: fixture)
+            )
+
+            guard case .handled(let answer, let aggregationResult, let homeQueryPlan, let trace) = result else {
+                Issue.record("Expected handled shared result for: \(example.0) | \(result.trace.compactSummary)")
+                continue
+            }
+            #expect(trace.selectedPath == .sharedHeuristic)
+            #expect(trace.interpreterSource == .heuristic)
+            #expect(trace.validatorOutcomeSummary?.contains("executable") == true)
+            #expect(trace.executorResultSummary != nil)
+            #expect(trace.responseBridgeSummary?.contains("kind=\(example.2.rawValue)") == true)
+            #expect(trace.fallbackReason == nil)
+            #expect(homeQueryPlan?.metric == example.1)
+            #expect(answer.kind == example.2)
+            assertAggregationResult(aggregationResult, shape: example.3, prompt: example.0)
+        }
+    }
+
+    @Test func runtimeGate_phase6DBlockedShapesDoNotExecuteOrFallback() async throws {
+        let fixture = try makeFixture()
+        try fixture.seedSpendData()
+
+        let prompts = [
+            "What card is eating most of my budget this period?",
+            "Is Shopping over where it should be for this budget?",
+            "What did I spend on Apple Card outside of Food & Drink?",
+            "If I keep spending like this, how much will I have left by the end of the period?",
+            "If I add $75 to Shopping, does Transportation still have room?",
+            "What category changed the most compared to last month?",
+            "What expenses are making this month higher than last month?",
+            "What was my average weekly spending on groceries over the last 3 months?"
+        ]
+
+        for prompt in prompts {
+            let result = await MarinaSharedPipelineCoordinator().run(
+                prompt: prompt,
+                context: sharedContext(fixture: fixture)
+            )
+
+            guard case .validationBlocked(let answer, let outcome, let trace) = result else {
+                Issue.record("Expected validation-blocked shared result for: \(prompt) | \(result.trace.compactSummary)")
+                continue
+            }
+            #expect(answer.kind == .message)
+            switch outcome {
+            case .clarification, .unsupported:
+                break
+            case .executable:
+                Issue.record("Blocked prompt unexpectedly validated as executable: \(prompt)")
+            }
+            #expect(trace.selectedPath == .sharedHeuristic)
+            #expect(trace.validatorOutcomeSummary?.contains("unsupported") == true || trace.validatorOutcomeSummary?.contains("clarification") == true)
+            #expect(trace.executorResultSummary == nil)
+            #expect(trace.responseBridgeSummary?.contains("kind=message") == true)
+            #expect(trace.fallbackReason == nil)
+        }
+    }
+
     @Test func runtimeGate_typedClarificationDoesNotExecute() async throws {
         let fixture = try makeFixture()
         let result = await MarinaSharedPipelineCoordinator().run(
@@ -51,11 +130,18 @@ struct MarinaSharedPipelineRuntimeGateTests {
             context: sharedContext(fixture: fixture)
         )
 
-        guard case .fallbackToLegacy(let trace) = result else {
+        guard case .validationBlocked(let answer, let outcome, let trace) = result else {
             Issue.record("Unresolved target should not execute.")
             return
         }
-        #expect(trace.fallbackReason == .clarificationBridgeUnavailable)
+        #expect(answer.kind == .message)
+        guard case .clarification(let clarification) = outcome else {
+            Issue.record("Expected typed clarification.")
+            return
+        }
+        #expect(clarification.kind == .missingTarget)
+        #expect(trace.selectedPath == .sharedHeuristic)
+        #expect(trace.fallbackReason == nil)
         #expect(trace.validatorOutcomeSummary?.contains("clarification") == true)
         #expect(trace.executorResultSummary == nil)
     }
@@ -67,26 +153,60 @@ struct MarinaSharedPipelineRuntimeGateTests {
             context: sharedContext(fixture: fixture)
         )
 
-        guard case .fallbackToLegacy(let trace) = result else {
+        guard case .validationBlocked(let answer, let outcome, let trace) = result else {
             Issue.record("Targeted average remains unsupported in shared executor.")
             return
         }
-        #expect(trace.fallbackReason == .adapterUnsupported || trace.fallbackReason == .unsupportedBridgeUnavailable)
+        #expect(answer.kind == .message)
+        guard case .unsupported = outcome else {
+            Issue.record("Expected typed unsupported.")
+            return
+        }
+        #expect(trace.selectedPath == .sharedHeuristic)
+        #expect(trace.fallbackReason == nil)
+        #expect(trace.executorResultSummary == nil)
     }
 
     @Test func runtimeGate_simulationDoesNotExecute() async throws {
         let fixture = try makeFixture()
         let result = await MarinaSharedPipelineCoordinator().run(
-            prompt: "If I increase Shopping by $100, what will I have left for Transportation?",
+            prompt: "If I add $75 to Shopping, does Transportation still have room?",
             context: sharedContext(fixture: fixture)
         )
 
-        guard case .fallbackToLegacy(let trace) = result else {
+        guard case .validationBlocked(_, let outcome, let trace) = result else {
             Issue.record("Simulation should not execute in Phase 6.")
             return
         }
-        #expect(trace.validatorOutcomeSummary?.contains("unsupported") == true || trace.fallbackReason != nil)
+        guard case .unsupported(let unsupported) = outcome else {
+            Issue.record("Expected typed unsupported.")
+            return
+        }
+        #expect(unsupported.kind == .unsupportedSimulation)
+        #expect(trace.validatorOutcomeSummary?.contains("unsupported") == true)
+        #expect(trace.fallbackReason == nil)
         #expect(trace.executorResultSummary == nil)
     }
-}
 
+    private func seedMarchAprilGroceries(_ fixture: MarinaPhase5Fixture) throws {
+        fixture.context.insert(PlannedExpense(title: "March Groceries", plannedAmount: 80, expenseDate: sharedPipelineDate(2026, 3, 5), workspace: fixture.workspace, card: fixture.appleCard, category: fixture.groceries))
+        fixture.context.insert(PlannedExpense(title: "April Groceries Again", plannedAmount: 120, expenseDate: sharedPipelineDate(2026, 4, 12), workspace: fixture.workspace, card: fixture.appleCard, category: fixture.groceries))
+        try fixture.context.save()
+    }
+
+    private func assertAggregationResult(
+        _ result: MarinaAggregationResult,
+        shape: String,
+        prompt: String
+    ) {
+        switch (shape, result) {
+        case ("scalar", .scalar),
+             ("comparison", .comparison),
+             ("rankedList", .rankedList),
+             ("groupedBreakdown", .groupedBreakdown):
+            break
+        default:
+            Issue.record("Unexpected aggregation shape for \(prompt): \(result)")
+        }
+    }
+}

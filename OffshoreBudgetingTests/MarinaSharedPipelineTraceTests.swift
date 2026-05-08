@@ -28,20 +28,22 @@ struct MarinaSharedPipelineTraceTests {
         #expect(trace.fallbackReason == nil)
     }
 
-    @Test func sharedTrace_recordsFallbackReason() async throws {
+    @Test func sharedTrace_recordsValidationBlockedReasonWithoutFallback() async throws {
         let fixture = try makeFixture()
         let result = await MarinaSharedPipelineCoordinator().run(
             prompt: "What did I spend on Unknown this month?",
             context: sharedContext(fixture: fixture)
         )
 
-        guard case .fallbackToLegacy(let trace) = result else {
-            Issue.record("Expected fallback trace.")
+        guard case .validationBlocked(_, _, let trace) = result else {
+            Issue.record("Expected validation-blocked trace.")
             return
         }
-        #expect(trace.selectedPath == .sharedAttemptedThenLegacyFallback)
-        #expect(trace.fallbackReason == .clarificationBridgeUnavailable)
-        #expect(trace.compactSummary.contains("fallback=clarificationBridgeUnavailable"))
+        #expect(trace.selectedPath == .sharedHeuristic)
+        #expect(trace.fallbackReason == nil)
+        #expect(trace.validatorOutcomeSummary?.contains("clarification") == true)
+        #expect(trace.responseBridgeSummary?.contains("kind=message") == true)
+        #expect(trace.executorResultSummary == nil)
     }
 
     @Test func executionTraceRecorderStoresSharedPipelineFields() {
@@ -80,4 +82,3 @@ struct MarinaSharedPipelineTraceTests {
         #expect(trace?.sharedPipelineResponseBridgeSummary == "bridge")
     }
 }
-

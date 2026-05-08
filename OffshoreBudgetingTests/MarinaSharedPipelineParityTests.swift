@@ -99,7 +99,7 @@ struct MarinaSharedPipelineParityTests {
         }
     }
 
-    @Test func parity_explicitUnsupportedPromptsFallbackInsteadOfApproximating() async throws {
+    @Test func parity_explicitUnsupportedPromptsBlockInsteadOfApproximating() async throws {
         let fixture = try makeFixture()
         try fixture.seedSpendData()
 
@@ -109,12 +109,20 @@ struct MarinaSharedPipelineParityTests {
             "What did I spend on Unknown this month?"
         ] {
             let result = await run(prompt, fixture: fixture)
-            guard case .fallbackToLegacy(let trace) = result else {
-                Issue.record("Expected unsupported prompt to fall back: \(prompt)")
+            guard case .validationBlocked(let answer, let outcome, let trace) = result else {
+                Issue.record("Expected unsupported prompt to be blocked: \(prompt)")
                 continue
             }
-            #expect(trace.fallbackReason != nil)
-            #expect(trace.executorResultSummary == nil || trace.executorResultSummary?.contains("unsupported") == true)
+            #expect(answer.kind == .message)
+            switch outcome {
+            case .clarification, .unsupported:
+                break
+            case .executable:
+                Issue.record("Blocked prompt should not carry an executable validation outcome: \(prompt)")
+            }
+            #expect(trace.selectedPath == .sharedHeuristic)
+            #expect(trace.fallbackReason == nil)
+            #expect(trace.executorResultSummary == nil)
         }
     }
 
@@ -150,11 +158,17 @@ struct MarinaSharedPipelineParityTests {
             context: sharedContext(fixture: fixture, aiOptInEnabled: true)
         )
 
-        guard case .fallbackToLegacy(let trace) = result else {
+        guard case .validationBlocked(_, let outcome, let trace) = result else {
             Issue.record("Ambiguous target should not execute: \(result.trace.compactSummary)")
             return
         }
-        #expect(trace.fallbackReason == .clarificationBridgeUnavailable)
+        guard case .clarification(let clarification) = outcome else {
+            Issue.record("Expected typed clarification.")
+            return
+        }
+        #expect(clarification.kind == .ambiguousTarget)
+        #expect(trace.selectedPath == .sharedFoundationModels)
+        #expect(trace.fallbackReason == nil)
         #expect(trace.validatorOutcomeSummary?.contains("clarification") == true)
     }
 

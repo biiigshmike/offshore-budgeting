@@ -5515,6 +5515,19 @@ struct HomeAssistantPanelView: View {
                 )
                 _ = MarinaTraceRecorder.shared.finish()
                 return
+            case .validationBlocked(let answer, _, let trace):
+                MarinaTraceRecorder.shared.recordSelectedRoute(
+                    trace.selectedPath == .sharedFoundationModels ? .sharedFoundationModels : .sharedHeuristic,
+                    reason: trace.compactSummary
+                )
+                handleSharedPipelineAnswer(
+                    answer,
+                    rawPrompt: prompt,
+                    homeQueryPlan: nil,
+                    source: trace.interpreterSource == .foundationModels ? .sharedFoundationModels : .sharedHeuristic
+                )
+                _ = MarinaTraceRecorder.shared.finish()
+                return
             case .fallbackToLegacy(let trace):
                 MarinaTraceRecorder.shared.recordSelectedRoute(.sharedFallback, reason: trace.compactSummary)
             }

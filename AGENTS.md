@@ -78,6 +78,16 @@ Common verification areas:
 
 If tests cannot be run in the current environment, say so clearly and explain what should be run locally.
 
+## Command Output
+
+Protect context usage. **Any command with unknown or potentially large output must be byte-capped.**
+
+Default pattern:
+
+```bash
+COMMAND 2>&1 | head -c 4000
+```
+
 ## SwiftData Model Map
 
 The confirmed model schema is:
