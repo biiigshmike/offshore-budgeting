@@ -99,6 +99,28 @@ struct MarinaSharedPipelineParityTests {
         }
     }
 
+    @Test func parity_largestTransactionsStaySharedPathWithoutLegacyFallback() async throws {
+        let fixture = try makeFixture()
+        try fixture.seedSpendData()
+
+        let cases: [(String, Int?)] = [
+            ("What were my biggest purchases this month?", nil)
+        ]
+
+        for (prompt, expectedLimit) in cases {
+            let result = await run(prompt, fixture: fixture)
+            guard case .handled(_, _, let plan, let trace) = result else {
+                Issue.record("Expected largest-transactions prompt to be handled: \(prompt)")
+                continue
+            }
+            #expect(trace.selectedPath != .sharedAttemptedThenLegacyFallback)
+            #expect(plan?.metric == .largestTransactions)
+            if let expectedLimit {
+                #expect(plan?.resultLimit == expectedLimit)
+            }
+        }
+    }
+
     @Test func parity_explicitUnsupportedPromptsBlockInsteadOfApproximating() async throws {
         let fixture = try makeFixture()
         try fixture.seedSpendData()

@@ -78,6 +78,84 @@ struct MarinaHeuristicInterpreterTests {
         #expect(candidate.responseShapeHint == .rankedList)
     }
 
+    @Test func heuristic_broadSpendAndRankingPrompts_doNotEmitSyntheticTargets() {
+        let prompts = [
+            "How much have I spent this month?",
+            "What’s my total spending so far this month?",
+            "How much money went out this month?",
+            "Show me what I spent for April.",
+            "Who did I pay the most this month?",
+            "What stores did I spend the most at?"
+        ]
+
+        for prompt in prompts {
+            let candidate = MarinaHeuristicInterpreter().interpret(
+                prompt: prompt,
+                defaultPeriodUnit: .month
+            )
+            #expect(candidate.entityMentions.isEmpty)
+        }
+    }
+
+    @Test func heuristic_targetedSpendPrompts_preserveTargetMentions() {
+        let prompts = [
+            "What did I spend at Starbucks this month?",
+            "What did I spend on Groceries this month?"
+        ]
+
+        for prompt in prompts {
+            let candidate = MarinaHeuristicInterpreter().interpret(
+                prompt: prompt,
+                defaultPeriodUnit: .month
+            )
+            #expect(candidate.entityMentions.count == 1)
+            #expect(candidate.entityMentions.first?.rawText?.isEmpty == false)
+        }
+    }
+
+    @Test func heuristic_higherOrLowerThisMonth_infersComparisonBaseline() {
+        let candidate = MarinaHeuristicInterpreter().interpret(
+            prompt: "Was I higher or lower on Transportation this month?",
+            defaultPeriodUnit: .month
+        )
+
+        #expect(candidate.operation == .compare)
+        #expect(candidate.timeScopes.contains { $0.role == .primary })
+        #expect(candidate.timeScopes.contains { $0.role == .comparison })
+        #expect(candidate.entityMentions.first?.typeHint == .category)
+    }
+
+    @Test func heuristic_phase2b_targetSpanAndShareCueCleanup() {
+        let groceries = MarinaHeuristicInterpreter().interpret(
+            prompt: "How much did groceries cost me last month?",
+            defaultPeriodUnit: .month
+        )
+        #expect(groceries.operation == .sum)
+        #expect(groceries.entityMentions.first?.rawText?.contains("grocer") == true)
+        #expect(groceries.entityMentions.first?.typeHint == .category)
+
+        let transportationTotal = MarinaHeuristicInterpreter().interpret(
+            prompt: "What did I spend in Transportation this period?",
+            defaultPeriodUnit: .month
+        )
+        #expect(transportationTotal.entityMentions.first?.rawText?.contains("transportation") == true)
+        #expect(transportationTotal.entityMentions.first?.typeHint == .category)
+
+        let transportationShare = MarinaHeuristicInterpreter().interpret(
+            prompt: "What portion of my money went to Transportation?",
+            defaultPeriodUnit: .month
+        )
+        #expect(transportationShare.measure == .categoryShare)
+        #expect(transportationShare.entityMentions.first?.typeHint == .category)
+
+        let shoppingShare = MarinaHeuristicInterpreter().interpret(
+            prompt: "How much of my money went to Shopping this month?",
+            defaultPeriodUnit: .month
+        )
+        #expect(shoppingShare.measure == .categoryShare)
+        #expect(shoppingShare.entityMentions.first?.typeHint == .category)
+    }
+
     @Test func heuristic_whatIfPromptDoesNotPretendToSolveMultiEntityExtraction() {
         let candidate = MarinaHeuristicInterpreter().interpret(
             prompt: "If I increase Shopping by $100, what will I have left for Transportation?",

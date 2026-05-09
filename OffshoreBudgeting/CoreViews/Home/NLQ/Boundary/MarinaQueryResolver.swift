@@ -113,9 +113,10 @@ struct MarinaQueryResolver {
     private func representativeMatches(from matches: [MarinaNLQCandidateMatch]) -> RepresentativeMatchSet {
         guard matches.isEmpty == false else { return .none }
 
+        let equivalenceCollapsed = collapseEquivalentMatches(matches)
         var bestByKey: [String: MarinaNLQCandidateMatch] = [:]
-        for match in matches {
-            let key = "\(match.entityType.rawValue)|\(match.normalizedValue)"
+        for match in equivalenceCollapsed {
+            let key = canonicalIdentityKey(for: match)
             if let existing = bestByKey[key] {
                 if existing.matchType == .prefix && match.matchType == .exact {
                     bestByKey[key] = match
@@ -133,6 +134,48 @@ struct MarinaQueryResolver {
         }
 
         return representatives.count == 1 ? .one(representatives[0]) : .many(representatives)
+    }
+
+    private func collapseEquivalentMatches(_ matches: [MarinaNLQCandidateMatch]) -> [MarinaNLQCandidateMatch] {
+        guard matches.count > 1 else { return matches }
+
+        // Merchant candidates are extracted from variable expense text and can duplicate
+        // the same visible target as expense candidates. Prefer merchant in those pairs.
+        let groupedByNormalizedDisplay = Dictionary(grouping: matches, by: {
+            normalizeDisplay($0.displayValue)
+        })
+        var collapsed: [MarinaNLQCandidateMatch] = []
+
+        for bucket in groupedByNormalizedDisplay.values {
+            let hasMerchant = bucket.contains(where: { $0.entityType == .merchant })
+            if hasMerchant {
+                let filtered = bucket.filter { $0.entityType != .expense }
+                collapsed.append(contentsOf: filtered.isEmpty ? bucket : filtered)
+            } else {
+                collapsed.append(contentsOf: bucket)
+            }
+        }
+
+        return collapsed
+    }
+
+    private func canonicalIdentityKey(for match: MarinaNLQCandidateMatch) -> String {
+        switch match.entityType {
+        case .merchant:
+            // Merchant source IDs are variable-expense row IDs, not stable merchant IDs.
+            return "\(match.entityType.rawValue)|\(match.normalizedValue)"
+        default:
+            let normalizedDisplay = normalizeDisplay(match.displayValue)
+            return "\(match.entityType.rawValue)|\(match.sourceID.uuidString.lowercased())|\(match.normalizedValue)|\(normalizedDisplay)"
+        }
+    }
+
+    private func normalizeDisplay(_ text: String) -> String {
+        text
+            .lowercased()
+            .replacingOccurrences(of: "[^a-z0-9\\s&]", with: " ", options: .regularExpression)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private func scopedMatches(

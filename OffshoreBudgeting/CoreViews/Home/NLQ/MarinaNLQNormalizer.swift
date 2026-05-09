@@ -71,6 +71,16 @@ struct MarinaNLQNormalizer {
             unsupportedShapeReason = .targetedAverage
         }
 
+        if shouldPromoteToCategorySpendTotalForCostMe(
+            normalizedPrompt: normalizedPrompt,
+            metric: metric,
+            rawTargetText: rawTargetText,
+            queryShape: queryShape
+        ) {
+            metric = .categorySpendTotal
+            unsupportedShapeReason = nil
+        }
+
         return NormalizedQueryIntent(
             rawPrompt: prompt,
             normalizedMetric: metric,
@@ -225,6 +235,7 @@ struct MarinaNLQNormalizer {
 
         let cleanedPromptSegment = sanitizedTargetCandidate(stripped)
         if isLikelyUnscopedMetricPhrase(cleanedPromptSegment) == false,
+           isBroadQueryScaffoldingPhrase(cleanedPromptSegment) == false,
            isStrongTarget(cleanedPromptSegment) {
             return cleanedPromptSegment
         }
@@ -241,7 +252,7 @@ struct MarinaNLQNormalizer {
             if let range = stripped.range(of: marker, options: .backwards) {
                 let suffix = stripped[range.upperBound...].trimmingCharacters(in: .whitespacesAndNewlines)
                 let cleaned = sanitizedTargetCandidate(String(suffix))
-                if isStrongTarget(cleaned) {
+                if isBroadQueryScaffoldingPhrase(cleaned) == false, isStrongTarget(cleaned) {
                     return cleaned
                 }
             }
@@ -476,6 +487,27 @@ struct MarinaNLQNormalizer {
         return rankingPhrases.contains { normalized.contains($0) }
     }
 
+    private func isBroadQueryScaffoldingPhrase(_ text: String) -> Bool {
+        let normalized = normalizeText(text)
+        guard normalized.isEmpty == false else { return false }
+
+        let broadPhrases = [
+            "how much have i spent",
+            "what s my total spending",
+            "what is my total spending",
+            "how much money went out",
+            "show me what i spent",
+            "where did most of my money go",
+            "where is most of my money going",
+            "who did i pay the most",
+            "what stores did i spend the most at"
+        ]
+
+        return broadPhrases.contains { phrase in
+            normalized == phrase || normalized.hasPrefix(phrase + " ")
+        }
+    }
+
     private func modifiers(from normalizedPrompt: String) -> [String] {
         var values: [String] = []
         if normalizedPrompt.contains("so far") { values.append("so_far") }
@@ -520,6 +552,37 @@ struct MarinaNLQNormalizer {
             .replacingOccurrences(of: "[^a-z0-9\\s&]", with: " ", options: .regularExpression)
             .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func shouldPromoteToCategorySpendTotalForCostMe(
+        normalizedPrompt: String,
+        metric: MarinaNormalizedMetric?,
+        rawTargetText: String?,
+        queryShape: MarinaQueryShape
+    ) -> Bool {
+        guard normalizedPrompt.contains("cost me"),
+              let rawTargetText,
+              rawTargetText.isEmpty == false else {
+            return false
+        }
+
+        guard metric == .spendTotal || metric == nil else { return false }
+        if queryShape.grouping == .merchant
+            || queryShape.grouping == .transaction
+            || queryShape.grouping == .some(.none) {
+            return false
+        }
+
+        let normalizedTarget = normalizeText(rawTargetText)
+        let merchantSignals = [" at ", " with ", "starbucks", "costco", "target", "merchant", "store", "vendor"]
+        if merchantSignals.contains(where: normalizedPrompt.contains) {
+            return false
+        }
+        if normalizedTarget.contains("card") || normalizedTarget.contains("merchant") || normalizedTarget.contains("store") {
+            return false
+        }
+
+        return true
     }
 
     private func isWhatIfPrompt(_ normalizedPrompt: String) -> Bool {

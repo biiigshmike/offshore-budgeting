@@ -45,7 +45,10 @@ struct MarinaHeuristicInterpreter {
             return .simulate
         }
 
-        if intent.comparisonDateRange != nil || intent.modifiers.contains("comparison") {
+        if intent.comparisonDateRange != nil
+            || intent.modifiers.contains("comparison")
+            || intent.normalizedMetric == .monthComparison
+            || intent.normalizedMetric == .categoryMonthComparison {
             return .compare
         }
 
@@ -121,16 +124,22 @@ struct MarinaHeuristicInterpreter {
             return []
         }
 
-        if shouldSuppressUnscopedRankingTarget(rawTargetText, intent: intent, operation: operation) {
+        if shouldSuppressUnscopedRankingTarget(rawTargetText, intent: intent, operation: operation)
+            || shouldSuppressSyntheticBroadTarget(rawTargetText, intent: intent, operation: operation) {
             return []
         }
 
-        let typeHint = entityTypeHint(from: intent)
+        let typeHint = entityTypeHint(from: intent, operation: operation, rawTargetText: rawTargetText)
         let cleanedRawText = cleanEntitySpan(
             rawTargetText,
             operation: operation,
-            typeHint: typeHint
+            typeHint: typeHint,
+            intent: intent
         )
+
+        if shouldDropEntityMentionAfterCleanup(cleanedRawText, intent: intent, operation: operation) {
+            return []
+        }
 
         return [
             MarinaUnresolvedEntityMention(
@@ -151,6 +160,33 @@ struct MarinaHeuristicInterpreter {
         return normalized(rawTargetText) == normalized(intent.rawPrompt)
     }
 
+    private func shouldSuppressSyntheticBroadTarget(
+        _ rawTargetText: String,
+        intent: NormalizedQueryIntent,
+        operation: MarinaCandidateOperation?
+    ) -> Bool {
+        guard operation == .sum || operation == .rank else { return false }
+        let normalizedTarget = normalized(rawTargetText)
+        let broadScaffoldingPrefixes = [
+            "how much have i spent",
+            "what s my total spending",
+            "what is my total spending",
+            "how much money went out",
+            "show me what i spent",
+            "where did most of my money go",
+            "where is most of my money going",
+            "who did i pay the most",
+            "what stores did i spend the most at"
+        ]
+        let orphanScaffoldingTokens: Set<String> = ["what", "who", "where", "how", "how much"]
+        if orphanScaffoldingTokens.contains(normalizedTarget) {
+            return true
+        }
+        return broadScaffoldingPrefixes.contains { prefix in
+            normalizedTarget == prefix || normalizedTarget.hasPrefix(prefix + " ")
+        }
+    }
+
     private func entityMentionRole(from intent: NormalizedQueryIntent) -> MarinaEntityMentionRole {
         if isCardSpendFilter(intent) {
             return .filter
@@ -158,7 +194,44 @@ struct MarinaHeuristicInterpreter {
         return .primaryTarget
     }
 
-    private func entityTypeHint(from intent: NormalizedQueryIntent) -> MarinaCandidateEntityTypeHint? {
+    private func entityTypeHint(
+        from intent: NormalizedQueryIntent,
+        operation: MarinaCandidateOperation?,
+        rawTargetText: String
+    ) -> MarinaCandidateEntityTypeHint? {
+        let normalizedPrompt = normalized(intent.rawPrompt)
+        if operation == .sum || operation == .compare {
+            let categoryLikePrompt =
+                normalizedPrompt.contains("went to ")
+                || normalizedPrompt.contains("spend in ")
+                || normalizedPrompt.contains("spent in ")
+                || normalizedPrompt.contains("cost me")
+                || normalizedPrompt.contains("higher or lower on ")
+                || normalizedPrompt.contains("portion of my money")
+                || normalizedPrompt.contains("how much of my money went to")
+            if categoryLikePrompt {
+                return .category
+            }
+        }
+
+        if operation == .compare,
+           intent.normalizedMetric == .monthComparison {
+            let prompt = normalizedPrompt
+            if prompt.hasPrefix("compare "),
+               prompt.contains("category") == false,
+               prompt.contains("grocer") == false,
+               prompt.contains("food & drink") == false,
+               prompt.contains("transportation") == false {
+                if prompt.contains(" at ") || prompt.contains(" with ") || prompt.contains("merchant") || prompt.contains("store") {
+                    return .merchant
+                }
+                if normalized(rawTargetText).contains("card") || prompt.contains(" card ") {
+                    return .card
+                }
+                return nil
+            }
+        }
+
         if intent.comparisonDateRange != nil,
            intent.normalizedMetric == .monthComparison,
            intent.queryShape.grouping == .some(.merchant) {
@@ -490,6 +563,28 @@ struct MarinaHeuristicInterpreter {
             )
         }
 
+        if isBroadMerchantRankingPrompt(prompt) {
+            return ProtectedShape(
+                operation: .rank,
+                measure: .spend,
+                entityMentions: [],
+                grouping: MarinaGroupingCandidate(dimension: .merchant),
+                ranking: MarinaRankingCandidate(direction: .top, limit: intent.resultLimit),
+                responseShapeHint: .rankedList
+            )
+        }
+
+        if isLargestTransactionsPhrasePrompt(prompt) {
+            return ProtectedShape(
+                operation: .rank,
+                measure: .transactionAmount,
+                entityMentions: [],
+                grouping: MarinaGroupingCandidate(dimension: .transaction),
+                ranking: MarinaRankingCandidate(direction: .largest, limit: intent.resultLimit),
+                responseShapeHint: .rankedList
+            )
+        }
+
         if isSharePrompt(prompt),
            let target = shareTarget(in: prompt) {
             return ProtectedShape(
@@ -512,7 +607,26 @@ struct MarinaHeuristicInterpreter {
             )
         }
 
-        if isMessyComparisonPrompt(prompt),
+        if isCardComparisonPrompt(prompt),
+           let target = cardComparisonTarget(in: prompt) {
+            return ProtectedShape(
+                operation: .compare,
+                measure: .spend,
+                entityMentions: [
+                    MarinaUnresolvedEntityMention(
+                        role: .primaryTarget,
+                        rawText: target,
+                        typeHint: .card,
+                        confidence: .medium
+                    )
+                ],
+                timeScopes: comparisonTimeScopes(from: prompt, intent: intent),
+                grouping: MarinaGroupingCandidate(dimension: .card),
+                responseShapeHint: .comparison
+            )
+        }
+
+        if isMessyCategoryComparisonPrompt(prompt),
            let target = comparisonTarget(in: prompt) {
             return ProtectedShape(
                 operation: .compare,
@@ -565,15 +679,22 @@ struct MarinaHeuristicInterpreter {
     }
 
     private func isBreakdownPrompt(_ prompt: String) -> Bool {
-        prompt.contains("break down")
-            && (prompt.contains("where my money went") || prompt.contains("by category"))
+        prompt.contains("by category")
+            || prompt.contains("down by category")
+            || prompt.contains("category breakdown")
+            || (prompt.contains("break down") && prompt.contains("by category"))
+            || (prompt.contains("break down") && prompt.contains("where my money went"))
     }
 
     private func isSharePrompt(_ prompt: String) -> Bool {
         prompt.contains("how much of my spending")
+            || prompt.contains("how much of my money went to")
+            || (prompt.contains("how much of") && prompt.contains("spending was"))
             || prompt.contains("share of my spending")
             || prompt.contains("percent of my spending")
             || prompt.contains("percentage of my spending")
+            || prompt.contains("portion of my money")
+            || prompt.contains("what part of")
     }
 
     private func isFrequencyRankingPrompt(_ prompt: String) -> Bool {
@@ -581,24 +702,60 @@ struct MarinaHeuristicInterpreter {
             || prompt.contains("not necessarily the most money")
     }
 
-    private func isMessyComparisonPrompt(_ prompt: String) -> Bool {
+    private func isBroadMerchantRankingPrompt(_ prompt: String) -> Bool {
+        prompt.contains("what stores did i spend the most at")
+            || prompt.contains("which stores did i spend the most at")
+            || prompt.contains("stores got the most money from me")
+            || prompt.contains("who did i pay the most")
+    }
+
+    private func isLargestTransactionsPhrasePrompt(_ prompt: String) -> Bool {
+        let hasThingPhrase = prompt.contains("things i paid for")
+            || prompt.contains("things i bought")
+            || prompt.contains("purchases")
+        let hasRankingPhrase = prompt.contains("top ")
+            || prompt.contains("biggest")
+            || prompt.contains("largest")
+            || prompt.contains("most")
+        return hasThingPhrase && hasRankingPhrase
+    }
+
+    private func isMessyCategoryComparisonPrompt(_ prompt: String) -> Bool {
         prompt.contains("spending more on")
-            || prompt.hasPrefix("compare ")
             || prompt.contains("compared to last month")
             || prompt.contains("go up or down from")
             || prompt.contains("this month than last month")
             || prompt.contains("this month vs last month")
+            || prompt.contains("higher or lower on")
+    }
+
+    private func isCardComparisonPrompt(_ prompt: String) -> Bool {
+        prompt.contains("card spending change from")
+            || (prompt.contains(" card ") && prompt.contains("change from") && prompt.contains(" to "))
+    }
+
+    private func cardComparisonTarget(in prompt: String) -> String? {
+        firstCapture(
+            in: prompt,
+            patterns: [
+                #"\bhow\s+did\s+my\s+(.+?)\s+spending\s+change\s+from\b"#,
+                #"\bhow\s+did\s+(.+?)\s+spending\s+change\s+from\b"#
+            ]
+        )
+        .map { cleanEntitySpan($0, operation: .compare, typeHint: .card) }
     }
 
     private func comparisonTarget(in prompt: String) -> String? {
         let patterns = [
+            #"\bhow\s+did\s+(.+?)\s+change\s+compared\s+to\b"#,
+            #"\bhow\s+did\s+my\s+(.+?)\s+spending\s+change\s+from\b"#,
             #"\bmore\s+on\s+(.+?)(?=\s+lately\b|\s+or\b|$)"#,
             #"\bwas\s+(.+?)(?=\s+compared\s+to\b|$)"#,
             #"\bdid\s+(.+?)\s+go\s+up\s+or\s+down\b"#,
-            #"^compare\s+(.+?)(?=\s+this\s+month\b|\s+to\s+last\s+month\b|$)"#
+            #"^compare\s+(.+?)(?=\s+in\s+[a-z]+\b|\s+this\s+month\b|\s+to\s+last\s+month\b|\s+to\s+[a-z]+\b|$)"#
         ]
         return firstCapture(in: prompt, patterns: patterns).map {
-            cleanEntitySpan($0, operation: .compare, typeHint: .category)
+            cleanEntitySpan($0, operation: .compare, typeHint: comparisonTypeHint(for: $0, prompt: prompt), intent: nil)
         }
     }
 
@@ -607,7 +764,8 @@ struct MarinaHeuristicInterpreter {
             in: prompt,
             patterns: [
                 #"\bwas\s+(.+?)$"#,
-                #"\bspending\s+was\s+(.+?)$"#
+                #"\bspending\s+was\s+(.+?)$"#,
+                #"\bwent\s+to\s+(.+?)(?=\s+(?:this|last|in|for|from|over|during)\b|$)"#
             ]
         )
         .map { cleanEntitySpan($0, operation: .sum, typeHint: .category) }
@@ -710,6 +868,7 @@ struct MarinaHeuristicInterpreter {
             || prompt.contains("this month vs last month")
             || prompt.contains("this month versus last month")
             || prompt.contains("higher than last month")
+            || prompt.contains("higher or lower on") && prompt.contains("this month")
     }
 
     private func isLatelyBaselineComparison(_ prompt: String) -> Bool {
@@ -754,9 +913,11 @@ struct MarinaHeuristicInterpreter {
     private func cleanEntitySpan(
         _ text: String,
         operation: MarinaCandidateOperation?,
-        typeHint: MarinaCandidateEntityTypeHint?
+        typeHint: MarinaCandidateEntityTypeHint?,
+        intent: NormalizedQueryIntent? = nil
     ) -> String {
         var cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        cleaned = stripKnownTargetWrappers(cleaned)
         let stopPatterns = [
             #"\s+or\s+is\s+it\s+about\s+normal\b.*$"#,
             #"\s+lately\b.*$"#,
@@ -764,11 +925,14 @@ struct MarinaHeuristicInterpreter {
             #"\s+still\s+have\s+room\b.*$"#,
             #"\s+outside\s+of\b.*$"#,
             #"\s+by\s+category\b.*$"#,
+            #"\s+cost\s+me\b.*$"#,
             #"\s+over\s+the\s+last\b.*$"#,
             #"\s+over\s+the\b.*$"#,
             #"\s+right\s+now\b.*$"#,
             #"\s+this\s+month\b.*$"#,
             #"\s+last\s+month\b.*$"#,
+            #"\s+this\s+period\b.*$"#,
+            #"\s+in\s+(january|february|march|april|may|june|july|august|september|october|november|december)\b.*$"#,
             #"\s+compared\s+to\b.*$"#,
             #"\s+than\b.*$"#,
             #"\s+from\b.*$"#,
@@ -788,9 +952,90 @@ struct MarinaHeuristicInterpreter {
             }
         }
 
+        if let intent, intent.comparisonDateRange != nil {
+            cleaned = stripConsumedComparisonDateTokens(cleaned)
+        }
+
         return cleaned
             .replacingOccurrences(of: #"^(?:my|the)\s+"#, with: "", options: [.regularExpression, .caseInsensitive])
             .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func stripKnownTargetWrappers(_ text: String) -> String {
+        var cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let wrappers = [
+            #"^how\s+much\s+did\s+"#,
+            #"^what\s+did\s+i\s+spend\s+(?:on|in)\s+"#,
+            #"^what\s+have\s+i\s+spent\s+(?:on|in)\s+"#,
+            #"^spend\s+in\s+"#,
+            #"^how\s+much\s+went\s+to\s+"#,
+            #"^how\s+much\s+of\s+my\s+money\s+went\s+to\s+"#,
+            #"^how\s+much\s+of\s+my\s+spending\s+was\s+"#,
+            #"^was\s+i\s+higher\s+or\s+lower\s+on\s+"#,
+            #"^i\s+higher\s+or\s+lower\s+on\s+"#,
+            #"^compare\s+"#
+        ]
+        for wrapper in wrappers {
+            cleaned = cleaned.replacingOccurrences(of: wrapper, with: "", options: [.regularExpression, .caseInsensitive])
+        }
+        return cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func stripConsumedComparisonDateTokens(_ text: String) -> String {
+        var cleaned = text
+        cleaned = cleaned.replacingOccurrences(
+            of: #"\bfrom\s+(january|february|march|april|may|june|july|august|september|october|november|december)\s+to\s+(january|february|march|april|may|june|july|august|september|october|november|december)\b"#,
+            with: "",
+            options: [.regularExpression, .caseInsensitive]
+        )
+        cleaned = cleaned.replacingOccurrences(
+            of: #"\b(january|february|march|april|may|june|july|august|september|october|november|december|this month|last month|this period)\b"#,
+            with: "",
+            options: [.regularExpression, .caseInsensitive]
+        )
+        return cleaned
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func shouldDropEntityMentionAfterCleanup(
+        _ cleaned: String,
+        intent: NormalizedQueryIntent,
+        operation: MarinaCandidateOperation?
+    ) -> Bool {
+        let normalizedCleaned = normalized(cleaned)
+        if normalizedCleaned.isEmpty {
+            return true
+        }
+
+        let scaffoldingTokens: Set<String> = [
+            "what", "who", "where", "how", "how much", "spend", "spending",
+            "where my money went", "my money went", "by category", "category breakdown"
+        ]
+        if scaffoldingTokens.contains(normalizedCleaned) {
+            return true
+        }
+
+        if operation == .rank, grouping(from: intent)?.dimension == .category, normalizedCleaned.contains("by category") {
+            return true
+        }
+
+        return false
+    }
+
+    private func comparisonTypeHint(for span: String, prompt: String) -> MarinaCandidateEntityTypeHint? {
+        let normalizedSpan = normalized(span)
+        let normalizedPrompt = normalized(prompt)
+        if normalizedSpan.contains("card") || normalizedPrompt.contains(" card ") || normalizedPrompt.contains(" my apple card") {
+            return .card
+        }
+        if normalizedPrompt.contains(" at ") || normalizedPrompt.contains(" with ") || normalizedPrompt.contains("merchant") || normalizedPrompt.contains("store") {
+            return .merchant
+        }
+        if normalizedPrompt.contains(" category ") || normalizedPrompt.contains("grocer") || normalizedPrompt.contains("transportation") || normalizedPrompt.contains("food & drink") {
+            return .category
+        }
+        return nil
     }
 
     private func firstCapture(in text: String, patterns: [String]) -> String? {

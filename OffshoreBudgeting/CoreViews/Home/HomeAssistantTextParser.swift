@@ -474,6 +474,11 @@ struct HomeAssistantTextParser {
             return false
         }
 
+        let genericSuperlatives: Set<String> = ["most", "the most", "least", "the least"]
+        if genericSuperlatives.contains(normalized) {
+            return false
+        }
+
         return normalized.contains(where: \.isLetter)
     }
 

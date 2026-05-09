@@ -167,7 +167,12 @@ struct MarinaIntentInterpreter {
             return .some(.none)
         }
 
-        if measure == .spendTotal, targetHint != nil, normalizedPrompt.contains(" on ") {
+        if measure == .spendTotal, targetHint != nil,
+           (normalizedPrompt.contains(" on ")
+               || normalizedPrompt.contains(" spent in ")
+               || normalizedPrompt.contains(" spending in ")
+               || normalizedPrompt.contains(" money went to ")
+               || normalizedPrompt.contains(" went to ")) {
             return .category
         }
 
@@ -406,9 +411,17 @@ struct MarinaIntentInterpreter {
     }
 
     private func merchantTargetPatternDetected(in normalizedPrompt: String) -> Bool {
-        normalizedPrompt.contains(" at ")
+        if normalizedPrompt.contains(" at ")
             || normalizedPrompt.contains(" with ")
-            || normalizedPrompt.contains(" to ")
+            || containsAnyPhrase(["merchant", "store", "vendor", "payee", "shop", "business"], in: normalizedPrompt) {
+            return true
+        }
+
+        guard normalizedPrompt.contains(" to ") else { return false }
+        return normalizedPrompt.range(
+            of: #"\b(?:pay|paid|give|gave|sent)\b.*\bto\s+[a-z0-9 '&\.-]+"#,
+            options: [.regularExpression, .caseInsensitive]
+        ) != nil
     }
 
     private func cardTargetPatternDetected(in normalizedPrompt: String) -> Bool {

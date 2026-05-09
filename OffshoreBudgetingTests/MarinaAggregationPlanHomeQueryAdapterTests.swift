@@ -76,6 +76,19 @@ struct MarinaAggregationPlanHomeQueryAdapterTests {
         #expect(try homeMetric(categoryShare).metric == .categorySpendShare)
     }
 
+    @Test func adapter_mapsTransactionAmountRanking_toLargestTransactions_andKeepsRankingLimit() throws {
+        let plan = MarinaAggregationPlan(
+            operation: .rank,
+            measure: .transactionAmount,
+            grouping: MarinaGroupingCandidate(dimension: .transaction),
+            ranking: MarinaRankingCandidate(direction: .largest, limit: 5)
+        )
+
+        let mapped = try homeMetric(plan)
+        #expect(mapped.metric == .largestTransactions)
+        #expect(mapped.resultLimit == 5)
+    }
+
     @Test func adapter_rejectsUnsupportedPlansInsteadOfApproximating() throws {
         let targetedAverage = MarinaAggregationPlan(operation: .average, measure: .spend, targets: [target(.category, "Groceries")])
         let cardRanking = MarinaAggregationPlan(

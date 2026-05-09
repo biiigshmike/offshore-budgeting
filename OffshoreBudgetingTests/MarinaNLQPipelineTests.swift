@@ -297,6 +297,14 @@ struct MarinaNLQPipelineTests {
         #expect(intent.rawTargetText == "food & drink")
     }
 
+    @Test func normalizer_costMeCategoryPrompt_promotesToCategorySpendTotal() {
+        let normalizer = MarinaNLQNormalizer(defaultPeriodUnit: .month)
+        let intent = normalizer.normalize(prompt: "How much did groceries cost me last month?")
+
+        #expect(intent.normalizedMetric == .categorySpendTotal)
+        #expect(intent.rawTargetText?.contains("grocer") == true)
+    }
+
     @Test func normalizer_appleCardMonth_mapsToUnscopedSpendWithCardTargetHint() {
         let normalizer = MarinaNLQNormalizer(defaultPeriodUnit: .month)
         let intent = normalizer.normalize(prompt: "What did I spend on my Apple Card this month?")

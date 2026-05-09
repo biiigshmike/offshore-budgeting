@@ -108,7 +108,7 @@ struct MarinaAggregationPlanHomeQueryAdapter {
                 return nil
             }
             return .incomeSourceMonthComparison
-        case (.rank, .spend):
+        case (.rank, .spend), (.rank, .transactionAmount):
             return spendRankingMetric(plan: plan)
         case (.rank, .transactionFrequency):
             guard plan.grouping?.dimension == .transaction,
