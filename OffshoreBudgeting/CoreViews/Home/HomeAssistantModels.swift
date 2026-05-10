@@ -9,7 +9,7 @@ import Foundation
 
 // MARK: - Query Models
 
-struct HomeQueryDateRange: Codable, Equatable {
+struct HomeQueryDateRange: Codable, Equatable, Sendable {
     let startDate: Date
     let endDate: Date
 
@@ -24,7 +24,7 @@ struct HomeQueryDateRange: Codable, Equatable {
     }
 }
 
-enum HomeQueryPeriodUnit: String, Codable, Equatable {
+enum HomeQueryPeriodUnit: String, Codable, Equatable, Sendable {
     case day
     case week
     case month

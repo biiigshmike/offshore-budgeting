@@ -9,7 +9,11 @@ struct MarinaSharedPipelineCoordinator {
     private let validator: MarinaQueryValidator
     private let adapter: MarinaAggregationPlanHomeQueryAdapter
     private let executor: MarinaAggregationExecutor
+    private let workspaceAggregationExecutor: MarinaWorkspaceAggregationExecutor
     private let responseBridge: MarinaAggregationResponseBridge
+    private let workspaceAggregationResponseBridge: MarinaWorkspaceAggregationResponseBridge
+    private let databaseLookupExecutor: MarinaDatabaseLookupExecutor
+    private let databaseLookupResponseBuilder: MarinaDatabaseLookupResponseBuilder
 
     init(
         availability: MarinaModelAvailabilityProviding? = nil,
@@ -19,7 +23,11 @@ struct MarinaSharedPipelineCoordinator {
         validator: MarinaQueryValidator? = nil,
         adapter: MarinaAggregationPlanHomeQueryAdapter? = nil,
         executor: MarinaAggregationExecutor? = nil,
-        responseBridge: MarinaAggregationResponseBridge? = nil
+        workspaceAggregationExecutor: MarinaWorkspaceAggregationExecutor? = nil,
+        responseBridge: MarinaAggregationResponseBridge? = nil,
+        workspaceAggregationResponseBridge: MarinaWorkspaceAggregationResponseBridge? = nil,
+        databaseLookupExecutor: MarinaDatabaseLookupExecutor? = nil,
+        databaseLookupResponseBuilder: MarinaDatabaseLookupResponseBuilder? = nil
     ) {
         self.availability = availability ?? MarinaModelAvailability()
         self.foundationModelsInterpreter = MarinaFoundationModelsInterpreter(
@@ -30,7 +38,11 @@ struct MarinaSharedPipelineCoordinator {
         self.validator = validator ?? MarinaQueryValidator()
         self.adapter = adapter ?? MarinaAggregationPlanHomeQueryAdapter()
         self.executor = executor ?? MarinaAggregationExecutor()
+        self.workspaceAggregationExecutor = workspaceAggregationExecutor ?? MarinaWorkspaceAggregationExecutor()
         self.responseBridge = responseBridge ?? MarinaAggregationResponseBridge()
+        self.workspaceAggregationResponseBridge = workspaceAggregationResponseBridge ?? MarinaWorkspaceAggregationResponseBridge()
+        self.databaseLookupExecutor = databaseLookupExecutor ?? MarinaDatabaseLookupExecutor()
+        self.databaseLookupResponseBuilder = databaseLookupResponseBuilder ?? MarinaDatabaseLookupResponseBuilder()
     }
 
     func run(
@@ -155,6 +167,39 @@ struct MarinaSharedPipelineCoordinator {
         provider: MarinaDataProvider,
         now: Date
     ) -> CandidateEvaluation {
+        if candidate.requestFamily == .databaseLookup,
+           let lookupRequest = candidate.databaseLookupRequest {
+            let lookupResponse = databaseLookupExecutor.execute(lookupRequest, provider: provider)
+            let answer = databaseLookupResponseBuilder.responseCompatibleAnswer(from: lookupResponse)
+            return CandidateEvaluation(
+                candidate: candidate,
+                resolved: MarinaResolvedQueryCandidate(
+                    candidate: candidate,
+                    resolvedTargets: [],
+                    unresolvedMentions: [],
+                    ambiguousMentions: [],
+                    primaryDateRange: lookupRequest.dateRange,
+                    comparisonDateRange: nil
+                ),
+                validationOutcome: .unsupported(
+                    MarinaTypedUnsupportedResponse(
+                        kind: .unsupportedOperation,
+                        message: "Database lookup bypassed analytics validation.",
+                        candidate: candidate
+                    )
+                ),
+                aggregationResult: .message(
+                    MarinaMessageAggregationResult(
+                        title: answer.title,
+                        message: answer.subtitle ?? lookupResponse.traceSummary,
+                        sourceAnswer: answer
+                    )
+                ),
+                answer: answer,
+                databaseLookupResponse: lookupResponse
+            )
+        }
+
         let resolved = resolver.resolve(candidate: candidate, provider: provider)
         let outcome = validator.validate(resolved)
 
@@ -175,9 +220,9 @@ struct MarinaSharedPipelineCoordinator {
                 blockedAnswer: responseBridge.responseCompatibleAnswer(from: outcome),
                 runtimeFallbackReason: .unsupportedBridgeUnavailable
             )
-        case .executable:
-            switch adapter.executablePlan(from: outcome) {
-            case .success(let executablePlan):
+            case .executable:
+                switch adapter.executablePlan(from: outcome) {
+                case .success(let executablePlan):
                 let result = executor.execute(executablePlan, provider: provider, now: now)
                 switch result {
                 case .unsupported:
@@ -201,6 +246,22 @@ struct MarinaSharedPipelineCoordinator {
                     )
                 }
             case .failure:
+                if case .executable(let plan) = outcome {
+                    switch workspaceAggregationExecutor.execute(plan: plan, provider: provider, now: now) {
+                    case .handled(let card):
+                        let answer = workspaceAggregationResponseBridge.responseCompatibleAnswer(from: card)
+                        return CandidateEvaluation(
+                            candidate: candidate,
+                            resolved: resolved,
+                            validationOutcome: outcome,
+                            aggregationResult: .workspaceCard(card),
+                            answer: answer,
+                            workspaceAggregationCard: card
+                        )
+                    case .unsupported:
+                        break
+                    }
+                }
                 return CandidateEvaluation(
                     candidate: candidate,
                     resolved: resolved,
@@ -315,8 +376,8 @@ struct MarinaSharedPipelineCoordinator {
             interpreterSource: evaluation?.candidate.source,
             candidateSummary: evaluation.map { MarinaCandidateTrace(candidate: $0.candidate).compactSummary },
             resolverSummary: evaluation.map { resolverSummary($0.resolved) },
-            validatorOutcomeSummary: evaluation.map { validatorSummary($0.validationOutcome) },
-            executorResultSummary: evaluation?.aggregationResult.map(Self.aggregationResultSummary),
+            validatorOutcomeSummary: evaluation.map { $0.databaseLookupResponse?.traceSummary ?? $0.workspaceAggregationCard?.traceSummary ?? validatorSummary($0.validationOutcome) },
+            executorResultSummary: evaluation?.databaseLookupResponse?.traceSummary ?? evaluation?.workspaceAggregationCard?.traceSummary ?? evaluation?.aggregationResult.map(Self.aggregationResultSummary),
             responseBridgeSummary: (evaluation?.answer ?? evaluation?.blockedAnswer)?.traceSummary,
             fallbackReason: fallbackReason,
             disagreementSummary: disagreementSummary
@@ -350,6 +411,9 @@ struct MarinaSharedPipelineCoordinator {
             evaluation.candidate.operation?.rawValue ?? "nil",
             evaluation.candidate.measure?.rawValue ?? "nil",
             evaluation.executablePlan?.homeQueryPlan.metric.rawValue ?? "nil",
+            evaluation.databaseLookupResponse?.request.objectTypes.map(\.rawValue).joined(separator: ",") ?? "nil",
+            evaluation.databaseLookupResponse?.request.searchText ?? "nil",
+            evaluation.workspaceAggregationCard?.traceSummary ?? "nil",
             evaluation.executablePlan?.homeQueryPlan.targetName ?? "nil",
             evaluation.executablePlan?.homeQueryPlan.dateRange?.traceSummary ?? "nil",
             evaluation.executablePlan?.homeQueryPlan.comparisonDateRange?.traceSummary ?? "nil",
@@ -389,6 +453,8 @@ struct MarinaSharedPipelineCoordinator {
             return "rankedList:rows=\(list.rows.count)"
         case .groupedBreakdown(let list):
             return "groupedBreakdown:rows=\(list.rows.count)"
+        case .workspaceCard(let card):
+            return card.traceSummary
         case .message(let message):
             return "message:\(message.title)"
         case .unsupported(let unsupported):
@@ -415,6 +481,8 @@ private struct CandidateEvaluation {
     let answer: HomeAnswer?
     let blockedAnswer: HomeAnswer?
     let runtimeFallbackReason: MarinaSharedPipelineFallbackReason?
+    let databaseLookupResponse: MarinaDatabaseLookupResponse?
+    let workspaceAggregationCard: MarinaWorkspaceAggregationCard?
 
     init(
         candidate: MarinaQueryPlanCandidate,
@@ -424,7 +492,9 @@ private struct CandidateEvaluation {
         aggregationResult: MarinaAggregationResult? = nil,
         answer: HomeAnswer? = nil,
         blockedAnswer: HomeAnswer? = nil,
-        runtimeFallbackReason: MarinaSharedPipelineFallbackReason? = nil
+        runtimeFallbackReason: MarinaSharedPipelineFallbackReason? = nil,
+        databaseLookupResponse: MarinaDatabaseLookupResponse? = nil,
+        workspaceAggregationCard: MarinaWorkspaceAggregationCard? = nil
     ) {
         self.candidate = candidate
         self.resolved = resolved
@@ -434,10 +504,12 @@ private struct CandidateEvaluation {
         self.answer = answer
         self.blockedAnswer = blockedAnswer
         self.runtimeFallbackReason = runtimeFallbackReason
+        self.databaseLookupResponse = databaseLookupResponse
+        self.workspaceAggregationCard = workspaceAggregationCard
     }
 
     var isExecutableHandled: Bool {
-        answer != nil && aggregationResult != nil && executablePlan != nil
+        answer != nil && aggregationResult != nil && (executablePlan != nil || databaseLookupResponse != nil || workspaceAggregationCard != nil)
     }
 
     var isValidationBlocked: Bool {

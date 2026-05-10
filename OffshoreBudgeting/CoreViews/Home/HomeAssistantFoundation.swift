@@ -190,6 +190,14 @@ struct HomeAssistantPanelView: View {
     private var marinaSharedPipelineEnabled: Bool = false
     @AppStorage("marina_ai_opt_in_enabled")
     private var marinaAIOptInEnabled: Bool = false
+
+    private var marinaRuntimeSettings: MarinaRuntimeSettings {
+        MarinaRuntimeSettings.resolve(
+            nlqV1Fallback: marinaNLQv1Enabled,
+            sharedPipelineFallback: marinaSharedPipelineEnabled,
+            aiOptInFallback: marinaAIOptInEnabled
+        )
+    }
     
     @Environment(\.modelContext) private var modelContext
     private let engine = HomeQueryEngine()
@@ -1490,7 +1498,9 @@ struct HomeAssistantPanelView: View {
             return
         }
 
-        if marinaNLQv1Enabled, let nlqPayload = nlqClarificationPayload {
+        let runtimeSettings = marinaRuntimeSettings
+
+        if runtimeSettings.nlqV1.isEnabled, let nlqPayload = nlqClarificationPayload {
             handleNLQClarificationInput(prompt, payload: nlqPayload)
             return
         }
@@ -1516,7 +1526,7 @@ struct HomeAssistantPanelView: View {
             return
         }
 
-        if marinaNLQv1Enabled == false {
+        if runtimeSettings.nlqV1.isEnabled == false {
             if handleAnchoredFollowUpPrompt(prompt) {
                 return
             }
@@ -5464,7 +5474,7 @@ struct HomeAssistantPanelView: View {
     }
 
     private func handleSuggestionTap(_ suggestion: HomeAssistantSuggestion) {
-        if marinaNLQv1Enabled, let payload = nlqClarificationPayload,
+        if marinaRuntimeSettings.nlqV1.isEnabled, let payload = nlqClarificationPayload,
            payload.options.contains(where: { $0.displayLabel == suggestion.title })
         {
             handleNLQClarificationInput(suggestion.title, payload: payload)
@@ -5476,12 +5486,16 @@ struct HomeAssistantPanelView: View {
 
     @MainActor
     private func interpretPrompt(_ prompt: String) async {
+        let runtimeSettings = marinaRuntimeSettings
         MarinaTraceRecorder.shared.begin(
             prompt: prompt,
-            routingMode: marinaSharedPipelineEnabled ? .sharedPipeline : (marinaNLQv1Enabled ? .nlqAuthoritative : .modelRouter),
-            marinaNLQv1Enabled: marinaNLQv1Enabled
+            routingMode: runtimeSettings.routingMode,
+            marinaNLQv1Enabled: runtimeSettings.nlqV1.isEnabled,
+            runtimeSettingsSummary: runtimeSettings.traceSummary
         )
-        if marinaSharedPipelineEnabled {
+        MarinaDebugLogger.log("[MarinaRuntime] \(runtimeSettings.traceSummary)")
+
+        if runtimeSettings.sharedPipeline.isEnabled {
             let provider = MarinaDataProvider(modelContext: modelContext, workspaceID: workspace.id)
             let coordinator = MarinaSharedPipelineCoordinator()
             let result = await coordinator.run(
@@ -5490,8 +5504,8 @@ struct HomeAssistantPanelView: View {
                     provider: provider,
                     routerContext: makeMarinaRouterContext(),
                     defaultPeriodUnit: defaultQueryPeriodUnit,
-                    sharedPipelineEnabled: marinaSharedPipelineEnabled,
-                    aiOptInEnabled: marinaAIOptInEnabled,
+                    sharedPipelineEnabled: runtimeSettings.sharedPipeline.isEnabled,
+                    aiOptInEnabled: runtimeSettings.aiOptIn.isEnabled,
                     now: Date()
                 )
             )
@@ -5533,7 +5547,7 @@ struct HomeAssistantPanelView: View {
             }
         }
 
-        if marinaNLQv1Enabled {
+        if runtimeSettings.nlqV1.isEnabled {
             let provider = MarinaDataProvider(modelContext: modelContext, workspaceID: workspace.id)
             let pipeline = MarinaNLQPipeline(provider: provider, defaultPeriodUnit: defaultQueryPeriodUnit)
 
@@ -5701,7 +5715,7 @@ struct HomeAssistantPanelView: View {
         _ interpreted: MarinaInterpretedRequest,
         rawPrompt: String
     ) {
-        if marinaNLQv1Enabled {
+        if marinaRuntimeSettings.nlqV1.isEnabled {
             if case .query(_, .model) = interpreted {
                 MarinaDebugLogger.log("[MarinaNLQ] blocked model query in NLQ-authoritative mode")
                 return

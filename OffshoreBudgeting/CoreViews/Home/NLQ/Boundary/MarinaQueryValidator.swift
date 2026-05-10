@@ -175,6 +175,9 @@ struct MarinaQueryValidator {
         case .trend:
             return .chartRows
         case .sum, .average, .count, .minimum, .maximum, .forecast, .simulate:
+            if candidate.responseShapeHint == .summaryCard {
+                return .summaryCard
+            }
             return candidate.responseShapeHint == .groupedBreakdown ? .groupedBreakdown : .scalarCurrency
         }
     }

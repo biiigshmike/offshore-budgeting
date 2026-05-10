@@ -91,6 +91,33 @@ struct MarinaDataProvider {
         )
     }
 
+    func fetchAllSavingsLedgerEntries() -> [SavingsLedgerEntry] {
+        fetch(
+            descriptor: FetchDescriptor<SavingsLedgerEntry>(
+                predicate: #Predicate { $0.workspace?.id == workspaceID },
+                sortBy: [SortDescriptor(\SavingsLedgerEntry.date, order: .reverse)]
+            )
+        )
+    }
+
+    func fetchAllAllocationSettlements() -> [AllocationSettlement] {
+        fetch(
+            descriptor: FetchDescriptor<AllocationSettlement>(
+                predicate: #Predicate { $0.workspace?.id == workspaceID },
+                sortBy: [SortDescriptor(\AllocationSettlement.date, order: .reverse)]
+            )
+        )
+    }
+
+    func fetchWorkspace() -> Workspace? {
+        fetch(
+            descriptor: FetchDescriptor<Workspace>(
+                predicate: #Predicate { $0.id == workspaceID },
+                sortBy: [SortDescriptor(\Workspace.name, order: .forward)]
+            )
+        ).first
+    }
+
     private func fetch<T>(descriptor: FetchDescriptor<T>) -> [T] where T: PersistentModel {
         (try? modelContext.fetch(descriptor)) ?? []
     }

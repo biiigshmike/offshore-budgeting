@@ -74,6 +74,53 @@ struct MarinaNaturalLanguageProbeTests {
             }
         }
     }
+
+    @Test func databaseLookupProbe_whenDidIPurchase_routesToLookup() async throws {
+        let fixture = try makeProbeFixture()
+        fixture.context.insert(VariableExpense(
+            descriptionText: "Litter Robot",
+            amount: 699,
+            transactionDate: sharedPipelineDate(2025, 1, 14),
+            workspace: fixture.workspace,
+            card: fixture.appleCard,
+            category: fixture.groceries
+        ))
+        try fixture.context.save()
+
+        let result = await MarinaSharedPipelineCoordinator().run(
+            prompt: "When did I purchase Litter Robot?",
+            context: probeContext(fixture: fixture)
+        )
+
+        #expect(result.trace.compactSummary.contains("family=databaseLookup"))
+        #expect(result.trace.compactSummary.contains("objectTypes=variableExpense,plannedExpense"))
+        #expect(result.trace.compactSummary.contains("searchText=\"Litter Robot\""))
+        if case .handled(let answer, _, let homeQueryPlan, _) = result {
+            #expect(homeQueryPlan == nil)
+            #expect(answer.title.contains("Litter Robot"))
+            #expect(answer.primaryValue?.contains("Jan") == true)
+        } else {
+            Issue.record("Expected database lookup to be handled.")
+        }
+    }
+
+    @Test func databaseLookupProbe_findAppleCard_routesToLookup() async throws {
+        let fixture = try makeProbeFixture()
+        let result = await MarinaSharedPipelineCoordinator().run(
+            prompt: "Find my Apple Card.",
+            context: probeContext(fixture: fixture)
+        )
+
+        #expect(result.trace.compactSummary.contains("family=databaseLookup"))
+        #expect(result.trace.compactSummary.contains("objectTypes=card"))
+        #expect(result.trace.compactSummary.contains("searchText=\"Apple Card\""))
+        if case .handled(let answer, _, let homeQueryPlan, _) = result {
+            #expect(homeQueryPlan == nil)
+            #expect(answer.title.contains("Apple Card"))
+        } else {
+            Issue.record("Expected card lookup to be handled.")
+        }
+    }
 }
 
 private extension MarinaNaturalLanguageProbeTests {
@@ -193,6 +240,13 @@ private extension MarinaNaturalLanguageProbeTests {
             .init(group: "Largest Transactions", prompt: "Show me the top 5 things I bought this month.", expectedOutcome: .executable, expectedMetric: .largestTransactions),
             .init(group: "Largest Transactions", prompt: "Which purchases cost me the most?", expectedOutcome: .executable, expectedMetric: .largestTransactions),
             .init(group: "Largest Transactions", prompt: "Show the biggest transactions from last month.", expectedOutcome: .executable, expectedMetric: .largestTransactions)
+        ]),
+        ProbeSection(title: "Workspace Aggregations", cases: [
+            .init(group: "Workspace Aggregations", prompt: "What income came in this month?", expectedOutcome: .executable),
+            .init(group: "Workspace Aggregations", prompt: "What paid me the most this month?", expectedOutcome: .executable),
+            .init(group: "Workspace Aggregations", prompt: "What are my biggest upcoming bills?", expectedOutcome: .executable),
+            .init(group: "Workspace Aggregations", prompt: "Largest savings movements this month.", expectedOutcome: .executable),
+            .init(group: "Workspace Aggregations", prompt: "Show shared balances.", expectedOutcome: .executable)
         ]),
         ProbeSection(title: "Intentional Unsupported And Clarification", cases: [
             .init(group: "Intentional Unsupported And Clarification", prompt: "Which card is eating most of my budget?", expectedOutcome: .unsupported, notes: "Card ranking is intentionally blocked; clarification is also acceptable diagnostically."),

@@ -60,6 +60,7 @@ enum MarinaAggregationResult: Codable, Equatable {
     case comparison(MarinaComparisonAggregationResult)
     case rankedList(MarinaListAggregationResult)
     case groupedBreakdown(MarinaListAggregationResult)
+    case workspaceCard(MarinaWorkspaceAggregationCard)
     case message(MarinaMessageAggregationResult)
     case unsupported(MarinaTypedUnsupportedResponse)
 
@@ -71,6 +72,8 @@ enum MarinaAggregationResult: Codable, Equatable {
             return result.sourceAnswer
         case .rankedList(let result), .groupedBreakdown(let result):
             return result.sourceAnswer
+        case .workspaceCard:
+            return nil
         case .message(let result):
             return result.sourceAnswer
         case .unsupported:

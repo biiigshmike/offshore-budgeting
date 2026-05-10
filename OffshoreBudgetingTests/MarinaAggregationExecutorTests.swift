@@ -113,6 +113,153 @@ struct MarinaAggregationExecutorTests {
         assertUnsupported(executor.execute(outcome: targetedAverage, provider: fixture.provider))
     }
 
+    @Test func workspaceExecutor_incomeSummaryRankingAndComparisonUseActualIncome() throws {
+        let fixture = try makeFixture()
+        fixture.context.insert(Income(source: "Salary", amount: 2_500, date: date(2026, 5, 5), isPlanned: false, workspace: fixture.workspace))
+        fixture.context.insert(Income(source: "Side Gig", amount: 700, date: date(2026, 5, 12), isPlanned: false, workspace: fixture.workspace))
+        fixture.context.insert(Income(source: "Salary", amount: 2_300, date: date(2026, 4, 5), isPlanned: false, workspace: fixture.workspace))
+        fixture.context.insert(Income(source: "Expected Bonus", amount: 900, date: date(2026, 5, 20), isPlanned: true, workspace: fixture.workspace))
+        try fixture.context.save()
+
+        let executor = MarinaWorkspaceAggregationExecutor(calendar: Calendar(identifier: .gregorian))
+        let may = monthRange()
+        let april = HomeQueryDateRange(startDate: date(2026, 4, 1), endDate: date(2026, 4, 30))
+
+        let summary = handledCard(executor.execute(
+            plan: MarinaAggregationPlan(operation: .sum, measure: .income, dateRange: may),
+            provider: fixture.provider,
+            now: date(2026, 5, 15)
+        ))
+        #expect(summary.primaryValue?.filter(\.isNumber).contains("3200") == true)
+        #expect(summary.rows.contains(where: { $0.label == "Planned income" && $0.value.filter(\.isNumber).contains("900") }))
+
+        let ranking = handledCard(executor.execute(
+            plan: MarinaAggregationPlan(
+                operation: .rank,
+                measure: .income,
+                dateRange: may,
+                grouping: MarinaGroupingCandidate(dimension: .incomeSource),
+                ranking: MarinaRankingCandidate(direction: .top, limit: 2)
+            ),
+            provider: fixture.provider,
+            now: date(2026, 5, 15)
+        ))
+        #expect(ranking.rows.first?.label == "Salary")
+
+        let comparison = handledCard(executor.execute(
+            plan: MarinaAggregationPlan(operation: .compare, measure: .income, dateRange: may, comparisonDateRange: april),
+            provider: fixture.provider,
+            now: date(2026, 5, 15)
+        ))
+        #expect(comparison.rows.contains(where: { $0.label == "Change" && $0.value.contains("Up") }))
+    }
+
+    @Test func workspaceExecutor_plannedExpenseAndPresetAggregationsReturnSummaryCards() throws {
+        let fixture = try makeFixture()
+        fixture.context.insert(Preset(title: "Rent", plannedAmount: 1_500, workspace: fixture.workspace, defaultCard: fixture.appleCard, defaultCategory: fixture.groceries))
+        fixture.context.insert(Preset(title: "Internet", plannedAmount: 90, workspace: fixture.workspace, defaultCard: fixture.backupCard, defaultCategory: fixture.travel))
+        fixture.context.insert(PlannedExpense(title: "Rent", plannedAmount: 1_500, expenseDate: date(2026, 5, 20), workspace: fixture.workspace, card: fixture.appleCard, category: fixture.groceries))
+        fixture.context.insert(PlannedExpense(title: "Internet", plannedAmount: 90, expenseDate: date(2026, 5, 22), workspace: fixture.workspace, card: fixture.backupCard, category: fixture.travel))
+        try fixture.context.save()
+
+        let executor = MarinaWorkspaceAggregationExecutor(calendar: Calendar(identifier: .gregorian))
+        let upcoming = handledCard(executor.execute(
+            plan: MarinaAggregationPlan(
+                operation: .rank,
+                measure: .presetAmount,
+                grouping: MarinaGroupingCandidate(dimension: .transaction),
+                ranking: MarinaRankingCandidate(direction: .largest, limit: 2)
+            ),
+            provider: fixture.provider,
+            now: date(2026, 5, 15)
+        ))
+        #expect(upcoming.rows.first?.label == "Rent")
+
+        let byCategory = handledCard(executor.execute(
+            plan: MarinaAggregationPlan(
+                operation: .sum,
+                measure: .presetAmount,
+                dateRange: monthRange(),
+                grouping: MarinaGroupingCandidate(dimension: .category)
+            ),
+            provider: fixture.provider,
+            now: date(2026, 5, 15)
+        ))
+        #expect(byCategory.rows.contains(where: { $0.label == "Groceries" && $0.value.filter(\.isNumber).contains("1500") }))
+
+        let presets = handledCard(executor.execute(
+            plan: MarinaAggregationPlan(
+                operation: .rank,
+                measure: .presetAmount,
+                grouping: MarinaGroupingCandidate(dimension: .preset),
+                ranking: MarinaRankingCandidate(direction: .largest)
+            ),
+            provider: fixture.provider,
+            now: date(2026, 5, 15)
+        ))
+        #expect(presets.rows.first?.label == "Rent")
+    }
+
+    @Test func workspaceExecutor_savingsMovementsAndSharedBalancesReturnRankedCards() throws {
+        let fixture = try makeFixture()
+        let savings = SavingsAccount(name: "True Savings", total: 0, workspace: fixture.workspace)
+        let shared = AllocationAccount(name: "Roommate", workspace: fixture.workspace)
+        let allocation = ExpenseAllocation(allocatedAmount: 225, workspace: fixture.workspace, account: shared)
+        let settlement = AllocationSettlement(date: date(2026, 5, 8), note: "Paid back", amount: -25, workspace: fixture.workspace, account: shared)
+        fixture.context.insert(savings)
+        fixture.context.insert(SavingsLedgerEntry(date: date(2026, 5, 3), amount: 400, note: "Period close", kindRaw: SavingsLedgerEntryKind.periodClose.rawValue, workspace: fixture.workspace, account: savings))
+        fixture.context.insert(SavingsLedgerEntry(date: date(2026, 5, 10), amount: -125, note: "Manual adjustment", kindRaw: SavingsLedgerEntryKind.manualAdjustment.rawValue, workspace: fixture.workspace, account: savings))
+        fixture.context.insert(shared)
+        fixture.context.insert(allocation)
+        fixture.context.insert(settlement)
+        try fixture.context.save()
+
+        let executor = MarinaWorkspaceAggregationExecutor(calendar: Calendar(identifier: .gregorian))
+        let savingsCard = handledCard(executor.execute(
+            plan: MarinaAggregationPlan(
+                operation: .rank,
+                measure: .savingsMovement,
+                dateRange: monthRange(),
+                grouping: MarinaGroupingCandidate(dimension: .savingsLedgerEntry),
+                ranking: MarinaRankingCandidate(direction: .largest)
+            ),
+            provider: fixture.provider,
+            now: date(2026, 5, 15)
+        ))
+        #expect(savingsCard.rows.first?.label == "Period close")
+
+        let sharedCard = handledCard(executor.execute(
+            plan: MarinaAggregationPlan(
+                operation: .rank,
+                measure: .reconciliationBalance,
+                grouping: MarinaGroupingCandidate(dimension: .allocationAccount),
+                ranking: MarinaRankingCandidate(direction: .largest)
+            ),
+            provider: fixture.provider,
+            now: date(2026, 5, 15)
+        ))
+        #expect(sharedCard.rows.first?.label == "Roommate")
+        #expect(sharedCard.rows.first?.value.filter(\.isNumber).contains("200") == true)
+    }
+
+    @Test func workspaceAggregationResponseBridge_mapsSummaryCardToHomeAnswerRows() {
+        let card = MarinaWorkspaceAggregationCard(
+            title: "Top Income Sources",
+            subtitle: "May",
+            primaryValue: "$2,500.00",
+            rows: [
+                .init(label: "Salary", value: "$2,500.00", amount: 2_500, sortValue: 2_500)
+            ],
+            traceSummary: "workspaceAggregation=topIncomeSources,resultCount=1"
+        )
+
+        let answer = MarinaWorkspaceAggregationResponseBridge().responseCompatibleAnswer(from: card)
+
+        #expect(answer.title == "Top Income Sources")
+        #expect(answer.primaryValue == "$2,500.00")
+        #expect(answer.rows.first?.title == "Salary")
+    }
+
     private func executable(_ plan: MarinaAggregationPlan) throws -> MarinaExecutableAggregationPlan {
         switch MarinaAggregationPlanHomeQueryAdapter().executablePlan(from: plan) {
         case .success(let executable):
@@ -135,6 +282,14 @@ struct MarinaAggregationExecutorTests {
             Issue.record("Expected unsupported result.")
             return
         }
+    }
+
+    private func handledCard(_ result: MarinaWorkspaceAggregationExecutionResult) -> MarinaWorkspaceAggregationCard {
+        guard case .handled(let card) = result else {
+            Issue.record("Expected workspace aggregation card.")
+            return MarinaWorkspaceAggregationCard(title: "Missing", traceSummary: "missing")
+        }
+        return card
     }
 
     private func target(_ type: MarinaCandidateEntityTypeHint, _ name: String) -> MarinaResolvedAggregationTarget {

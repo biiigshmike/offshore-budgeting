@@ -1,17 +1,17 @@
 import Foundation
 
-enum MarinaInterpreterSource: String, Codable, Equatable {
+enum MarinaInterpreterSource: String, Codable, Equatable, Sendable {
     case heuristic
     case foundationModels
 }
 
-enum MarinaCandidateConfidence: String, Codable, Equatable {
+enum MarinaCandidateConfidence: String, Codable, Equatable, Sendable {
     case high
     case medium
     case low
 }
 
-enum MarinaCandidateOperation: String, Codable, Equatable {
+enum MarinaCandidateOperation: String, Codable, Equatable, Sendable {
     case sum
     case average
     case count
@@ -24,18 +24,20 @@ enum MarinaCandidateOperation: String, Codable, Equatable {
     case simulate
 }
 
-enum MarinaCandidateMeasure: String, Codable, Equatable {
+enum MarinaCandidateMeasure: String, Codable, Equatable, Sendable {
     case spend
     case income
     case savings
     case remainingBudget
+    case reconciliationBalance
     case categoryShare
     case transactionAmount
     case transactionFrequency
     case presetAmount
+    case savingsMovement
 }
 
-enum MarinaCandidateEntityTypeHint: String, Codable, Equatable, CaseIterable {
+enum MarinaCandidateEntityTypeHint: String, Codable, Equatable, CaseIterable, Sendable {
     case category
     case merchant
     case expense
@@ -49,7 +51,7 @@ enum MarinaCandidateEntityTypeHint: String, Codable, Equatable, CaseIterable {
     case workspace
 }
 
-enum MarinaEntityMentionRole: String, Codable, Equatable, CaseIterable {
+enum MarinaEntityMentionRole: String, Codable, Equatable, CaseIterable, Sendable {
     case filter
     case primaryTarget
     case comparisonTarget
@@ -58,7 +60,7 @@ enum MarinaEntityMentionRole: String, Codable, Equatable, CaseIterable {
     case simulationOutput
 }
 
-struct MarinaUnresolvedEntityMention: Codable, Equatable, Identifiable {
+struct MarinaUnresolvedEntityMention: Codable, Equatable, Identifiable, Sendable {
     let id: UUID
     let role: MarinaEntityMentionRole
     let rawText: String?
@@ -80,14 +82,14 @@ struct MarinaUnresolvedEntityMention: Codable, Equatable, Identifiable {
     }
 }
 
-enum MarinaTimeScopeRole: String, Codable, Equatable, CaseIterable {
+enum MarinaTimeScopeRole: String, Codable, Equatable, CaseIterable, Sendable {
     case primary
     case comparison
     case lookbackWindow
     case simulationHorizon
 }
 
-struct MarinaUnresolvedTimeScope: Codable, Equatable, Identifiable {
+struct MarinaUnresolvedTimeScope: Codable, Equatable, Identifiable, Sendable {
     let id: UUID
     let role: MarinaTimeScopeRole
     let rawText: String?
@@ -109,19 +111,21 @@ struct MarinaUnresolvedTimeScope: Codable, Equatable, Identifiable {
     }
 }
 
-enum MarinaGroupingDimensionCandidate: String, Codable, Equatable {
+enum MarinaGroupingDimensionCandidate: String, Codable, Equatable, Sendable {
     case category
     case merchant
     case card
     case transaction
     case incomeSource
     case preset
+    case savingsLedgerEntry
+    case allocationAccount
     case day
     case week
     case month
 }
 
-struct MarinaGroupingCandidate: Codable, Equatable {
+struct MarinaGroupingCandidate: Codable, Equatable, Sendable {
     let dimension: MarinaGroupingDimensionCandidate
     let rawText: String?
 
@@ -131,7 +135,7 @@ struct MarinaGroupingCandidate: Codable, Equatable {
     }
 }
 
-enum MarinaRankingDirectionCandidate: String, Codable, Equatable {
+enum MarinaRankingDirectionCandidate: String, Codable, Equatable, Sendable {
     case top
     case bottom
     case largest
@@ -140,7 +144,7 @@ enum MarinaRankingDirectionCandidate: String, Codable, Equatable {
     case leastFrequent
 }
 
-struct MarinaRankingCandidate: Codable, Equatable {
+struct MarinaRankingCandidate: Codable, Equatable, Sendable {
     let direction: MarinaRankingDirectionCandidate
     let limit: Int?
     let rawText: String?
@@ -156,8 +160,9 @@ struct MarinaRankingCandidate: Codable, Equatable {
     }
 }
 
-enum MarinaResponseShapeHint: String, Codable, Equatable {
+enum MarinaResponseShapeHint: String, Codable, Equatable, Sendable {
     case scalarCurrency
+    case summaryCard
     case comparison
     case rankedList
     case groupedBreakdown
@@ -168,7 +173,16 @@ enum MarinaResponseShapeHint: String, Codable, Equatable {
     var isAdvisory: Bool { true }
 }
 
-enum MarinaUnsupportedHint: String, Codable, Equatable {
+enum MarinaRequestFamily: String, Codable, Sendable, Equatable {
+    case analytics
+    case databaseLookup
+    case command
+    case help
+    case planning
+    case unsupported
+}
+
+enum MarinaUnsupportedHint: String, Codable, Equatable, Sendable {
     case unsupportedOperation
     case unsupportedCombination
     case missingRequiredTarget
@@ -182,7 +196,15 @@ enum MarinaUnsupportedHint: String, Codable, Equatable {
     case lowConfidence
 }
 
-struct MarinaQueryPlanCandidate: Codable, Equatable {
+struct MarinaResolvedRequest: Codable, Sendable, Equatable {
+    var family: MarinaRequestFamily
+    var analyticsCandidate: MarinaQueryPlanCandidate?
+    var databaseLookupRequest: MarinaDatabaseLookupRequest?
+    var unsupportedReason: MarinaUnsupportedHint?
+}
+
+struct MarinaQueryPlanCandidate: Codable, Equatable, Sendable {
+    let requestFamily: MarinaRequestFamily
     let source: MarinaInterpreterSource
     let rawPrompt: String
     let operation: MarinaCandidateOperation?
@@ -195,8 +217,10 @@ struct MarinaQueryPlanCandidate: Codable, Equatable {
     let responseShapeHint: MarinaResponseShapeHint?
     let confidence: MarinaCandidateConfidence
     let unsupportedHint: MarinaUnsupportedHint?
+    let databaseLookupRequest: MarinaDatabaseLookupRequest?
 
     init(
+        requestFamily: MarinaRequestFamily = .analytics,
         source: MarinaInterpreterSource,
         rawPrompt: String,
         operation: MarinaCandidateOperation? = nil,
@@ -208,8 +232,10 @@ struct MarinaQueryPlanCandidate: Codable, Equatable {
         limit: Int? = nil,
         responseShapeHint: MarinaResponseShapeHint? = nil,
         confidence: MarinaCandidateConfidence = .medium,
-        unsupportedHint: MarinaUnsupportedHint? = nil
+        unsupportedHint: MarinaUnsupportedHint? = nil,
+        databaseLookupRequest: MarinaDatabaseLookupRequest? = nil
     ) {
+        self.requestFamily = requestFamily
         self.source = source
         self.rawPrompt = rawPrompt
         self.operation = operation
@@ -222,5 +248,6 @@ struct MarinaQueryPlanCandidate: Codable, Equatable {
         self.responseShapeHint = responseShapeHint
         self.confidence = confidence
         self.unsupportedHint = unsupportedHint
+        self.databaseLookupRequest = databaseLookupRequest
     }
 }

@@ -19,6 +19,21 @@ struct MarinaHeuristicInterpreter {
         defaultPeriodUnit: HomeQueryPeriodUnit
     ) -> MarinaQueryPlanCandidate {
         let intent = normalize(prompt, defaultPeriodUnit)
+        if shouldPreferAnalyticsOverLookup(prompt) == false,
+           let lookupRequest = MarinaDatabaseLookupDetector().detect(
+            prompt: prompt,
+            defaultPeriodUnit: defaultPeriodUnit
+        ) {
+            return MarinaQueryPlanCandidate(
+                requestFamily: .databaseLookup,
+                source: .heuristic,
+                rawPrompt: prompt,
+                limit: lookupRequest.limit,
+                confidence: .high,
+                databaseLookupRequest: lookupRequest
+            )
+        }
+
         let protectedShape = protectedShape(from: intent)
         let unsupportedHint = protectedShape?.unsupportedHint ?? unsupportedHint(from: intent.unsupportedShapeReason)
         let operation = protectedShape?.operation ?? operation(from: intent)
@@ -470,6 +485,24 @@ struct MarinaHeuristicInterpreter {
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    private func shouldPreferAnalyticsOverLookup(_ prompt: String) -> Bool {
+        let prompt = normalized(prompt)
+        return prompt.contains(" by source")
+            || prompt.contains(" by category")
+            || prompt.contains(" by card")
+            || prompt.contains("top ")
+            || prompt.contains("biggest")
+            || prompt.contains("largest")
+            || prompt.contains("most expensive")
+            || prompt.contains("cost the most")
+            || prompt.contains("compare ")
+            || prompt.contains("total income")
+            || prompt.contains("income came in")
+            || prompt.contains("paid me the most")
+            || prompt.contains("shared balances")
+            || prompt.contains("savings movements")
+    }
+
     private func protectedShape(from intent: NormalizedQueryIntent) -> ProtectedShape? {
         let prompt = normalized(intent.rawPrompt)
 
@@ -490,6 +523,106 @@ struct MarinaHeuristicInterpreter {
                 entityMentions: simulationMentions(from: prompt),
                 responseShapeHint: .unsupported,
                 unsupportedHint: .unsupportedSimulation
+            )
+        }
+
+        if isBroadIncomeComparisonPrompt(prompt) {
+            return ProtectedShape(
+                operation: .compare,
+                measure: .income,
+                entityMentions: [],
+                timeScopes: comparisonTimeScopes(from: prompt, intent: intent),
+                responseShapeHint: .comparison
+            )
+        }
+
+        if isIncomeSourceRankingPrompt(prompt) {
+            return ProtectedShape(
+                operation: .rank,
+                measure: .income,
+                entityMentions: [],
+                timeScopes: baseTimeScopes(from: intent, defaultPeriodUnit: .month),
+                grouping: MarinaGroupingCandidate(dimension: .incomeSource),
+                ranking: MarinaRankingCandidate(direction: .top, limit: intent.resultLimit),
+                responseShapeHint: .summaryCard
+            )
+        }
+
+        if isIncomeSummaryPrompt(prompt) {
+            return ProtectedShape(
+                operation: .sum,
+                measure: .income,
+                entityMentions: [],
+                timeScopes: baseTimeScopes(from: intent, defaultPeriodUnit: .month),
+                responseShapeHint: .summaryCard
+            )
+        }
+
+        if isPlannedExpensesByCategoryPrompt(prompt) {
+            return ProtectedShape(
+                operation: .sum,
+                measure: .presetAmount,
+                entityMentions: [],
+                timeScopes: baseTimeScopes(from: intent, defaultPeriodUnit: .month),
+                grouping: MarinaGroupingCandidate(dimension: .category),
+                responseShapeHint: .summaryCard
+            )
+        }
+
+        if isPlannedExpensesByCardPrompt(prompt) {
+            return ProtectedShape(
+                operation: .sum,
+                measure: .presetAmount,
+                entityMentions: [],
+                timeScopes: baseTimeScopes(from: intent, defaultPeriodUnit: .month),
+                grouping: MarinaGroupingCandidate(dimension: .card),
+                responseShapeHint: .summaryCard
+            )
+        }
+
+        if isHighestCostPresetPrompt(prompt) {
+            return ProtectedShape(
+                operation: .rank,
+                measure: .presetAmount,
+                entityMentions: [],
+                grouping: MarinaGroupingCandidate(dimension: .preset),
+                ranking: MarinaRankingCandidate(direction: .largest, limit: intent.resultLimit),
+                responseShapeHint: .summaryCard
+            )
+        }
+
+        if isUpcomingBillRankingPrompt(prompt) {
+            return ProtectedShape(
+                operation: .rank,
+                measure: .presetAmount,
+                entityMentions: [],
+                timeScopes: baseTimeScopes(from: intent, defaultPeriodUnit: .month),
+                grouping: MarinaGroupingCandidate(dimension: .transaction),
+                ranking: MarinaRankingCandidate(direction: .largest, limit: intent.resultLimit),
+                responseShapeHint: .summaryCard
+            )
+        }
+
+        if isSavingsMovementPrompt(prompt) {
+            return ProtectedShape(
+                operation: .rank,
+                measure: .savingsMovement,
+                entityMentions: [],
+                timeScopes: baseTimeScopes(from: intent, defaultPeriodUnit: .month),
+                grouping: MarinaGroupingCandidate(dimension: .savingsLedgerEntry),
+                ranking: MarinaRankingCandidate(direction: .largest, limit: intent.resultLimit),
+                responseShapeHint: .summaryCard
+            )
+        }
+
+        if isSharedBalancePrompt(prompt) {
+            return ProtectedShape(
+                operation: .rank,
+                measure: .reconciliationBalance,
+                entityMentions: [],
+                grouping: MarinaGroupingCandidate(dimension: .allocationAccount),
+                ranking: MarinaRankingCandidate(direction: .largest, limit: intent.resultLimit),
+                responseShapeHint: .summaryCard
             )
         }
 
@@ -655,6 +788,64 @@ struct MarinaHeuristicInterpreter {
 
     private func isExclusionPrompt(_ prompt: String) -> Bool {
         prompt.contains(" outside of ")
+    }
+
+    private func isIncomeSummaryPrompt(_ prompt: String) -> Bool {
+        prompt.contains("income came in")
+            || prompt.contains("what income")
+            || prompt.contains("income did i get")
+            || prompt.contains("got paid")
+            || prompt.contains("deposited")
+    }
+
+    private func isIncomeSourceRankingPrompt(_ prompt: String) -> Bool {
+        (prompt.contains("paid me") && (prompt.contains("most") || prompt.contains("top")))
+            || prompt.contains("income by source")
+            || prompt.contains("income coming from")
+            || prompt.contains("top income")
+    }
+
+    private func isBroadIncomeComparisonPrompt(_ prompt: String) -> Bool {
+        (prompt.contains("compare income") || prompt.contains("income change") || prompt.contains("income this month"))
+            && (prompt.contains("last month") || prompt.contains("compare"))
+    }
+
+    private func isUpcomingBillRankingPrompt(_ prompt: String) -> Bool {
+        (prompt.contains("upcoming") || prompt.contains("due soon") || prompt.contains("coming up"))
+            && (prompt.contains("bill") || prompt.contains("bills") || prompt.contains("planned expense") || prompt.contains("planned expenses"))
+            || ((prompt.contains("biggest") || prompt.contains("largest")) && (prompt.contains("bill") || prompt.contains("planned expense")))
+    }
+
+    private func isHighestCostPresetPrompt(_ prompt: String) -> Bool {
+        (prompt.contains("preset") || prompt.contains("recurring payment"))
+            && (prompt.contains("cost the most") || prompt.contains("most expensive") || prompt.contains("highest"))
+    }
+
+    private func isPlannedExpensesByCategoryPrompt(_ prompt: String) -> Bool {
+        prompt.contains("planned expenses by category")
+            || prompt.contains("planned expense by category")
+            || ((prompt.contains("bills by category") || prompt.contains("bill by category")) && prompt.contains("category"))
+    }
+
+    private func isPlannedExpensesByCardPrompt(_ prompt: String) -> Bool {
+        prompt.contains("planned expenses by card")
+            || prompt.contains("planned expense by card")
+            || prompt.contains("bills by card")
+    }
+
+    private func isSavingsMovementPrompt(_ prompt: String) -> Bool {
+        prompt.contains("largest savings movement")
+            || prompt.contains("biggest savings movement")
+            || prompt.contains("savings movements")
+            || (prompt.contains("what changed") && prompt.contains("savings"))
+            || (prompt.contains("savings") && prompt.contains("activity"))
+    }
+
+    private func isSharedBalancePrompt(_ prompt: String) -> Bool {
+        prompt.contains("shared balances")
+            || prompt.contains("reconciliation balances")
+            || (prompt.contains("reconciliation account") && prompt.contains("largest balance"))
+            || (prompt.contains("shared balance") && (prompt.contains("largest") || prompt.contains("show")))
     }
 
     private func isBudgetLimitPrompt(_ prompt: String) -> Bool {

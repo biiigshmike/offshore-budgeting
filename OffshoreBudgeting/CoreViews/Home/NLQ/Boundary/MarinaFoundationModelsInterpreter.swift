@@ -26,6 +26,21 @@ struct MarinaFoundationModelsInterpreter {
         prompt: String,
         defaultPeriodUnit: HomeQueryPeriodUnit
     ) -> MarinaQueryPlanCandidate {
+        if shouldPreferAnalyticsOverLookup(prompt) == false,
+           let lookupRequest = MarinaDatabaseLookupDetector().detect(
+            prompt: prompt,
+            defaultPeriodUnit: defaultPeriodUnit
+        ) {
+            return MarinaQueryPlanCandidate(
+                requestFamily: .databaseLookup,
+                source: .foundationModels,
+                rawPrompt: prompt,
+                limit: lookupRequest.limit,
+                confidence: .high,
+                databaseLookupRequest: lookupRequest
+            )
+        }
+
         switch structuredIntent {
         case .query(let queryIntent):
             return candidate(
@@ -104,6 +119,28 @@ struct MarinaFoundationModelsInterpreter {
             confidence: confidence,
             unsupportedHint: unsupportedHint
         )
+    }
+
+    private func shouldPreferAnalyticsOverLookup(_ prompt: String) -> Bool {
+        let prompt = prompt
+            .lowercased()
+            .replacingOccurrences(of: "[^a-z0-9\\s&]", with: " ", options: .regularExpression)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return prompt.contains(" by source")
+            || prompt.contains(" by category")
+            || prompt.contains(" by card")
+            || prompt.contains("top ")
+            || prompt.contains("biggest")
+            || prompt.contains("largest")
+            || prompt.contains("most expensive")
+            || prompt.contains("cost the most")
+            || prompt.contains("compare ")
+            || prompt.contains("total income")
+            || prompt.contains("income came in")
+            || prompt.contains("paid me the most")
+            || prompt.contains("shared balances")
+            || prompt.contains("savings movements")
     }
 
     private func normalizedMetric(

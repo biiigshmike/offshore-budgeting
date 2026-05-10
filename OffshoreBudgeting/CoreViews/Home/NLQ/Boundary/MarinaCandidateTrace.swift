@@ -1,6 +1,7 @@
 import Foundation
 
 struct MarinaCandidateTrace: Codable, Equatable {
+    let requestFamily: MarinaRequestFamily?
     let interpreterSource: MarinaInterpreterSource?
     let operation: MarinaCandidateOperation?
     let measure: MarinaCandidateMeasure?
@@ -17,6 +18,7 @@ struct MarinaCandidateTrace: Codable, Equatable {
         validatorOutcomeSummary: String? = nil,
         executablePlanSummary: String? = nil
     ) {
+        self.requestFamily = candidate?.requestFamily
         self.interpreterSource = candidate?.source
         self.operation = candidate?.operation
         self.measure = candidate?.measure
@@ -31,6 +33,7 @@ struct MarinaCandidateTrace: Codable, Equatable {
 
     var compactSummary: String {
         [
+            requestFamily.map { "family=\($0.rawValue)" },
             interpreterSource.map { "source=\($0.rawValue)" },
             operation.map { "operation=\($0.rawValue)" },
             measure.map { "measure=\($0.rawValue)" },

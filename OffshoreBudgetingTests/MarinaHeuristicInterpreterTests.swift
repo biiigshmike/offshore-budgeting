@@ -3,6 +3,92 @@ import Testing
 @testable import Offshore
 
 struct MarinaHeuristicInterpreterTests {
+    @Test func databaseLookup_whenDidIPurchase_extractsSearchTextAndDateDetail() {
+        let candidate = MarinaHeuristicInterpreter().interpret(
+            prompt: "When did I purchase Litter Robot?",
+            defaultPeriodUnit: .month
+        )
+
+        #expect(candidate.requestFamily == .databaseLookup)
+        #expect(candidate.databaseLookupRequest?.objectTypes == [.variableExpense, .plannedExpense])
+        #expect(candidate.databaseLookupRequest?.searchText == "Litter Robot")
+        #expect(candidate.databaseLookupRequest?.requestedDetail == .date)
+    }
+
+    @Test func databaseLookup_commonDetailPrompts_extractObjectTypesAndDetails() {
+        let cases: [(String, String, [MarinaLookupObjectType], MarinaDatabaseLookupRequest.RequestedDetail)] = [
+            ("How much was Litter Robot?", "Litter Robot", [.variableExpense, .plannedExpense], .amount),
+            ("What card did I use for Litter Robot?", "Litter Robot", [.variableExpense, .plannedExpense], .card),
+            ("Find my Litter Robot expense.", "Litter Robot", [.variableExpense, .plannedExpense], .general),
+            ("Show me the Litter Robot transaction.", "Litter Robot", [.variableExpense, .plannedExpense], .general),
+            ("Show me my March budget.", "March", [.budget], .general),
+            ("Find my Apple Card.", "Apple Card", [.card], .general),
+            ("Tell me about Food & Drink category.", "Food & Drink", [.category], .general),
+            ("Find my paycheck income.", "paycheck", [.income], .general),
+            ("Show my rent preset.", "rent", [.preset], .general),
+            ("Find my savings account.", "savings account", [.savingsAccount], .general),
+            ("Show my reconciliation account.", "reconciliation account", [.reconciliationAccount, .reconciliationItem], .general)
+        ]
+
+        for testCase in cases {
+            let candidate = MarinaHeuristicInterpreter().interpret(
+                prompt: testCase.0,
+                defaultPeriodUnit: .month
+            )
+            #expect(candidate.requestFamily == .databaseLookup)
+            #expect(candidate.databaseLookupRequest?.searchText == testCase.1)
+            #expect(candidate.databaseLookupRequest?.objectTypes == testCase.2)
+            #expect(candidate.databaseLookupRequest?.requestedDetail == testCase.3)
+        }
+    }
+
+    @Test func databaseLookup_regression_analyticsPromptsStayAnalytics() {
+        let prompts = [
+            "What did I spend this month?",
+            "What did I spend on groceries this month?",
+            "Compare groceries this month to last month.",
+            "Top categories this month.",
+            "Top merchants this month.",
+            "Largest purchases this month.",
+            "What percent of my spending was groceries this month?"
+        ]
+
+        for prompt in prompts {
+            let candidate = MarinaHeuristicInterpreter().interpret(
+                prompt: prompt,
+                defaultPeriodUnit: .month
+            )
+            #expect(candidate.requestFamily == .analytics)
+        }
+    }
+
+    @Test func heuristic_workspaceAggregationPrompts_emitSummaryCardCandidates() {
+        let cases: [(String, MarinaCandidateOperation, MarinaCandidateMeasure, MarinaGroupingDimensionCandidate?)] = [
+            ("What income came in this month?", .sum, .income, nil),
+            ("What paid me the most this month?", .rank, .income, .incomeSource),
+            ("Show income by source.", .rank, .income, .incomeSource),
+            ("Compare income this month to last month.", .compare, .income, nil),
+            ("What are my biggest upcoming bills?", .rank, .presetAmount, .transaction),
+            ("Which presets cost the most?", .rank, .presetAmount, .preset),
+            ("Show planned expenses by category.", .sum, .presetAmount, .category),
+            ("Show planned expenses by card.", .sum, .presetAmount, .card),
+            ("Largest savings movements this month.", .rank, .savingsMovement, .savingsLedgerEntry),
+            ("Show shared balances.", .rank, .reconciliationBalance, .allocationAccount)
+        ]
+
+        for testCase in cases {
+            let candidate = MarinaHeuristicInterpreter().interpret(
+                prompt: testCase.0,
+                defaultPeriodUnit: .month
+            )
+            #expect(candidate.requestFamily == .analytics)
+            #expect(candidate.operation == testCase.1)
+            #expect(candidate.measure == testCase.2)
+            #expect(candidate.grouping?.dimension == testCase.3)
+            #expect(candidate.responseShapeHint == .summaryCard || candidate.responseShapeHint == .comparison)
+        }
+    }
+
     @Test func heuristic_totalSpendOnAppleCard_emitsUnresolvedCardFilterCandidate() {
         let candidate = MarinaHeuristicInterpreter().interpret(
             prompt: "total spend on my Apple Card",

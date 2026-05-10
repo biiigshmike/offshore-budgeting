@@ -21,6 +21,7 @@ struct MarinaAggregationExecutor {
             plannedExpenses: expenses.planned,
             variableExpenses: expenses.variable,
             incomes: provider.fetchAllIncomes(),
+            savingsEntries: provider.fetchAllSavingsLedgerEntries(),
             now: now
         )
 

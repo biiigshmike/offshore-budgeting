@@ -33,6 +33,8 @@ struct MarinaAggregationResponseBridge {
             return result.sourceAnswer
         case .rankedList(let result), .groupedBreakdown(let result):
             return result.sourceAnswer
+        case .workspaceCard(let card):
+            return MarinaWorkspaceAggregationResponseBridge().responseCompatibleAnswer(from: card)
         case .message(let result):
             return result.sourceAnswer
         case .unsupported(let unsupported):

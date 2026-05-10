@@ -623,6 +623,8 @@ private struct MarinaTraceAnalyzer {
             return "rankedList:rows=\(list.rows.count)"
         case .groupedBreakdown(let list):
             return "groupedBreakdown:rows=\(list.rows.count)"
+        case .workspaceCard(let card):
+            return card.traceSummary
         case .message(let message):
             return "message:\(message.title)"
         case .unsupported(let unsupported):

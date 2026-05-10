@@ -4,6 +4,7 @@ struct MarinaExecutionTrace: Equatable {
     let originalPrompt: String
     let routingMode: MarinaExecutionRoutingMode
     let marinaNLQv1Enabled: Bool
+    let runtimeSettingsSummary: String?
 
     let modelWasAvailable: Bool
     let modelAvailabilityReason: String?
@@ -101,7 +102,8 @@ final class MarinaTraceRecorder {
     func begin(
         prompt: String,
         routingMode: MarinaExecutionRoutingMode,
-        marinaNLQv1Enabled: Bool
+        marinaNLQv1Enabled: Bool,
+        runtimeSettingsSummary: String? = nil
     ) {
         guard isEnabled else { return }
         lock.lock()
@@ -109,11 +111,17 @@ final class MarinaTraceRecorder {
         currentDraft = MarinaExecutionTraceDraft(
             originalPrompt: prompt,
             routingMode: routingMode,
-            marinaNLQv1Enabled: marinaNLQv1Enabled
+            marinaNLQv1Enabled: marinaNLQv1Enabled,
+            runtimeSettingsSummary: runtimeSettingsSummary
         )
     }
 
-    func ensure(prompt: String, routingMode: MarinaExecutionRoutingMode, marinaNLQv1Enabled: Bool) {
+    func ensure(
+        prompt: String,
+        routingMode: MarinaExecutionRoutingMode,
+        marinaNLQv1Enabled: Bool,
+        runtimeSettingsSummary: String? = nil
+    ) {
         guard isEnabled else { return }
         lock.lock()
         defer { lock.unlock() }
@@ -121,7 +129,8 @@ final class MarinaTraceRecorder {
             currentDraft = MarinaExecutionTraceDraft(
                 originalPrompt: prompt,
                 routingMode: routingMode,
-                marinaNLQv1Enabled: marinaNLQv1Enabled
+                marinaNLQv1Enabled: marinaNLQv1Enabled,
+                runtimeSettingsSummary: runtimeSettingsSummary
             )
         }
     }
@@ -280,6 +289,7 @@ private struct MarinaExecutionTraceDraft {
     let originalPrompt: String
     let routingMode: MarinaExecutionRoutingMode
     let marinaNLQv1Enabled: Bool
+    let runtimeSettingsSummary: String?
 
     var modelWasAvailable: Bool = false
     var modelAvailabilityReason: String?
@@ -326,6 +336,7 @@ private struct MarinaExecutionTraceDraft {
             originalPrompt: originalPrompt,
             routingMode: routingMode,
             marinaNLQv1Enabled: marinaNLQv1Enabled,
+            runtimeSettingsSummary: runtimeSettingsSummary,
             modelWasAvailable: modelWasAvailable,
             modelAvailabilityReason: modelAvailabilityReason,
             modelOutputSummary: modelOutputSummary,
@@ -367,6 +378,7 @@ extension MarinaExecutionTrace {
         [
             "prompt=\(originalPrompt)",
             "mode=\(routingMode.rawValue)",
+            runtimeSettingsSummary.map { "runtime=\($0)" },
             "route=\(selectedRoute.rawValue)",
             "fallback=\(fallbackWasAttempted)",
             "fallbackReason=\(fallbackSelectionReason?.rawValue ?? "none")",
@@ -374,7 +386,9 @@ extension MarinaExecutionTrace {
             "sharedFallback=\(sharedPipelineFallbackReason?.rawValue ?? "none")",
             "metric=\(normalizedMetric ?? "nil")",
             "response=\(responseType ?? "nil")"
-        ].joined(separator: " | ")
+        ]
+        .compactMap { $0 }
+        .joined(separator: " | ")
     }
 }
 

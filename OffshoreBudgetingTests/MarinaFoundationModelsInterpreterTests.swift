@@ -4,6 +4,33 @@ import Testing
 
 @MainActor
 struct MarinaFoundationModelsInterpreterTests {
+    @Test func modelLookupPrompt_badMetricIsMappedToDatabaseLookup() {
+        let candidate = MarinaFoundationModelsInterpreter().candidate(
+            from: .query(
+                MarinaStructuredQueryIntent(
+                    metricRaw: "card_name",
+                    targetName: "Litter Robot",
+                    targetTypeRaw: "entity",
+                    dateStartISO8601: nil,
+                    dateEndISO8601: nil,
+                    comparisonDateStartISO8601: nil,
+                    comparisonDateEndISO8601: nil,
+                    resultLimit: nil,
+                    periodUnitRaw: nil,
+                    confidenceRaw: "medium",
+                    clarification: nil
+                )
+            ),
+            prompt: "When did I purchase Litter Robot",
+            defaultPeriodUnit: .month
+        )
+
+        #expect(candidate.requestFamily == .databaseLookup)
+        #expect(candidate.databaseLookupRequest?.searchText == "Litter Robot")
+        #expect(candidate.databaseLookupRequest?.objectTypes == [.variableExpense, .plannedExpense])
+        #expect(candidate.databaseLookupRequest?.requestedDetail == .date)
+    }
+
     @Test func foundationModels_totalSpendOnAppleCard_emitsUnresolvedCardCandidate() {
         let candidate = MarinaFoundationModelsInterpreter().candidate(
             from: .query(

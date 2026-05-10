@@ -36,6 +36,7 @@ struct MarinaNLQAggregationEngine {
         let categories = provider.fetchAllCategories()
         let presets = provider.fetchAllPresets()
         let incomes = provider.fetchAllIncomes()
+        let savingsEntries = provider.fetchAllSavingsLedgerEntries()
 
         switch mapping {
         case .single(let query):
@@ -51,6 +52,7 @@ struct MarinaNLQAggregationEngine {
                 plannedExpenses: inputs.planned,
                 variableExpenses: inputs.variable,
                 incomes: incomes,
+                savingsEntries: savingsEntries,
                 now: now
             )
             return convert(answer: answer, warnings: warnings)
@@ -69,6 +71,7 @@ struct MarinaNLQAggregationEngine {
                     plannedExpenses: inputs.planned,
                     variableExpenses: inputs.variable,
                     incomes: incomes,
+                    savingsEntries: savingsEntries,
                     now: now
                 )
                 return (query: query, answer: answer)
