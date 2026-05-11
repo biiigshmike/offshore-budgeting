@@ -63,7 +63,7 @@ struct MarinaQueryResolver {
                 mention: mention
             )
 
-            switch representativeMatches(from: matches) {
+            switch representativeMatches(from: matches, mention: mention) {
             case .none:
                 unresolvedMentions.append(mention)
             case .one(let match):
@@ -110,7 +110,10 @@ struct MarinaQueryResolver {
         case many([MarinaNLQCandidateMatch])
     }
 
-    private func representativeMatches(from matches: [MarinaNLQCandidateMatch]) -> RepresentativeMatchSet {
+    private func representativeMatches(
+        from matches: [MarinaNLQCandidateMatch],
+        mention: MarinaUnresolvedEntityMention
+    ) -> RepresentativeMatchSet {
         guard matches.isEmpty == false else { return .none }
 
         let exactMatches = matches.filter { $0.matchType == .exact }
@@ -122,7 +125,17 @@ struct MarinaQueryResolver {
                 return true
             }
         }
-        let preferredMatches = storedExactMatches.isEmpty == false ? storedExactMatches : matches
+        let hasSingleTypeHint = mention.typeHint != nil || mention.allowedTypeHints?.count == 1
+        let exactEntityTypes = Set(exactMatches.map(\.entityType))
+        let shouldPreferExactCategory = hasSingleTypeHint == false
+            && Set(storedExactMatches.map(\.entityType)) == [.category]
+            && exactEntityTypes.isSubset(of: [.category, .merchant, .expense])
+        let shouldPreserveCrossFamilyExactMatches = hasSingleTypeHint == false
+            && exactEntityTypes.count > 1
+            && shouldPreferExactCategory == false
+        let preferredMatches = shouldPreserveCrossFamilyExactMatches
+            ? matches
+            : (storedExactMatches.isEmpty == false ? storedExactMatches : matches)
         let equivalenceCollapsed = collapseEquivalentMatches(preferredMatches)
         var bestByKey: [String: MarinaNLQCandidateMatch] = [:]
         for match in equivalenceCollapsed {

@@ -204,12 +204,16 @@ enum MarinaSemanticCommandDataset: String, Codable, Equatable, Sendable {
     case variableExpenses
     case plannedExpenses
     case income
+    case incomeSeries
     case cards
     case categories
     case presets
     case budgets
     case savingsLedger
     case reconciliation
+    case expenseAllocations
+    case importMerchantRules
+    case assistantAliasRules
 }
 
 enum MarinaSemanticCommandSort: String, Codable, Equatable, Sendable {
@@ -273,6 +277,47 @@ struct MarinaResolvedRequest: Codable, Sendable, Equatable {
     var analyticsCandidate: MarinaQueryPlanCandidate?
     var databaseLookupRequest: MarinaDatabaseLookupRequest?
     var unsupportedReason: MarinaUnsupportedHint?
+}
+
+typealias MarinaQueryCandidate = MarinaQueryPlanCandidate
+
+struct MarinaPromptNormalization: Codable, Equatable, Sendable {
+    let originalText: String
+    let normalizedText: String
+    let defaultPeriodUnit: HomeQueryPeriodUnit
+    let completedMonthDefaultWindow: HomeQueryDateRange
+}
+
+struct MarinaPromptNormalizer {
+    private let calendar: Calendar
+
+    init(calendar: Calendar = Calendar(identifier: .gregorian)) {
+        self.calendar = calendar
+    }
+
+    func normalize(
+        prompt: String,
+        defaultPeriodUnit: HomeQueryPeriodUnit,
+        now: Date
+    ) -> MarinaPromptNormalization {
+        MarinaPromptNormalization(
+            originalText: prompt,
+            normalizedText: prompt
+                .lowercased()
+                .replacingOccurrences(of: "[^a-z0-9\\s&]", with: " ", options: .regularExpression)
+                .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+            defaultPeriodUnit: defaultPeriodUnit,
+            completedMonthDefaultWindow: completedMonthLookbackRange(endingBefore: now, months: 3)
+        )
+    }
+
+    func completedMonthLookbackRange(endingBefore date: Date, months: Int) -> HomeQueryDateRange {
+        let currentMonthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: date)) ?? date
+        let start = calendar.date(byAdding: .month, value: -max(months, 1), to: currentMonthStart) ?? currentMonthStart
+        let end = calendar.date(byAdding: .second, value: -1, to: currentMonthStart) ?? currentMonthStart
+        return HomeQueryDateRange(startDate: start, endDate: end)
+    }
 }
 
 struct MarinaQueryPlanCandidate: Codable, Equatable, Sendable {

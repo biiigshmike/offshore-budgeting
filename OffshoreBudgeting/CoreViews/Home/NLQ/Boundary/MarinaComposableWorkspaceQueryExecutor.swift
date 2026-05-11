@@ -55,6 +55,11 @@ struct MarinaComposableWorkspaceQueryExecutor {
             return simulate(candidate: candidate, resolved: resolved, plan: plan, provider: provider, now: now)
         }
 
+        if let budget = resolvedBudgetTarget(in: resolved, provider: provider),
+           plan.measure == .spend || candidate.semanticCommand?.requestedDetail == .linkedObjects {
+            return .handled(budgetLinkedSummary(budget: budget, plan: plan, provider: provider))
+        }
+
         if hasAllocationAccountTarget(plan) {
             return allocatedSpend(resolved: resolved, plan: plan, provider: provider, now: now)
         }
@@ -63,12 +68,12 @@ struct MarinaComposableWorkspaceQueryExecutor {
         case (.rank, .spend, .card):
             return .handled(cardBudgetImpactRanking(plan: plan, provider: provider, now: now))
         case (.sum, .spend, _):
-            guard hasExclusionCue(candidate.rawPrompt) else { return .unsupported }
+            guard resolved.resolvedTargets.isEmpty == false else { return .unsupported }
             return .handled(filteredSpend(candidate: candidate, resolved: resolved, plan: plan, provider: provider, now: now))
         case (.rank, .transactionAmount, .transaction), (.listRows, .transactionAmount, .transaction):
             guard plan.operation == .listRows || plan.ranking?.direction == .newest else { return .unsupported }
             return .handled(recentFilteredTransactions(resolved: resolved, plan: plan, provider: provider, now: now))
-        case (.average, .spend, .week), (.average, .spend, .month):
+        case (.average, .spend, nil), (.average, .spend, .week), (.average, .spend, .month):
             return .handled(targetedPeriodicAverage(resolved: resolved, plan: plan, provider: provider, now: now))
         case (.compare, .spend, .category), (.compare, .spend, .transaction):
             guard plan.ranking != nil else { return .unsupported }
@@ -76,6 +81,68 @@ struct MarinaComposableWorkspaceQueryExecutor {
         default:
             return .unsupported
         }
+    }
+
+    // MARK: - Budgets
+
+    private func budgetLinkedSummary(
+        budget: Budget,
+        plan: MarinaAggregationPlan,
+        provider: MarinaDataProvider
+    ) -> MarinaWorkspaceAggregationCard {
+        let range = plan.dateRange ?? HomeQueryDateRange(startDate: budget.startDate, endDate: budget.endDate)
+        let linkedCardIDs = Set((budget.cardLinks ?? []).compactMap { $0.card?.id })
+        let linkedPresetIDs = Set((budget.presetLinks ?? []).compactMap { $0.preset?.id })
+        let linkedCardNames = (budget.cardLinks ?? []).compactMap { $0.card?.name }.sorted()
+        let linkedPresetNames = (budget.presetLinks ?? []).compactMap { $0.preset?.title }.sorted()
+
+        let variableSpend = provider.fetchAllVariableExpenses()
+            .filter { contains($0.transactionDate, in: range) }
+            .filter { expense in
+                linkedCardIDs.isEmpty || expense.card.map { linkedCardIDs.contains($0.id) } == true
+            }
+            .reduce(0.0) { $0 + SavingsMathService.variableBudgetImpactAmount(for: $1) }
+
+        let plannedSpend = provider.fetchAllPlannedExpenses()
+            .filter { contains($0.expenseDate, in: range) }
+            .filter { expense in
+                expense.sourceBudgetID == budget.id
+                    || expense.sourcePresetID.map { linkedPresetIDs.contains($0) } == true
+                    || (linkedCardIDs.isEmpty == false && expense.card.map { linkedCardIDs.contains($0.id) } == true)
+            }
+            .reduce(0.0) { $0 + SavingsMathService.plannedBudgetImpactAmount(for: $1) }
+
+        let limitRows = (budget.categoryLimits ?? []).compactMap { limit -> MarinaWorkspaceAggregationCard.Row? in
+            guard let category = limit.category else { return nil }
+            let parts = [
+                limit.minAmount.map { "min \(currency($0))" },
+                limit.maxAmount.map { "max \(currency($0))" }
+            ].compactMap { $0 }
+            return MarinaWorkspaceAggregationCard.Row(
+                label: category.name,
+                value: parts.isEmpty ? "Limit" : parts.joined(separator: " • "),
+                objectType: .category,
+                sourceID: category.id
+            )
+        }
+
+        var rows: [MarinaWorkspaceAggregationCard.Row] = [
+            .init(label: "Budget period", value: rangeLabel(range), date: range.startDate),
+            .init(label: "Linked cards", value: linkedCardNames.isEmpty ? "None" : linkedCardNames.joined(separator: ", ")),
+            .init(label: "Linked presets", value: linkedPresetNames.isEmpty ? "None" : linkedPresetNames.joined(separator: ", ")),
+            .init(label: "Variable spend", value: currency(variableSpend), amount: variableSpend, sortValue: variableSpend),
+            .init(label: "Planned spend", value: currency(plannedSpend), amount: plannedSpend, sortValue: plannedSpend)
+        ]
+        rows.append(contentsOf: limitRows)
+
+        let total = variableSpend + plannedSpend
+        return MarinaWorkspaceAggregationCard(
+            title: "\(budget.name) Budget Summary",
+            subtitle: rangeLabel(range),
+            primaryValue: currency(total),
+            rows: rows,
+            traceSummary: "composableWorkspace=budgetLinkedSummary,linkedCards=\(linkedCardIDs.count),linkedPresets=\(linkedPresetIDs.count),total=\(total)"
+        )
     }
 
     // MARK: - Cards
@@ -421,7 +488,10 @@ struct MarinaComposableWorkspaceQueryExecutor {
             return row.categoryID == target.sourceID || normalized(row.categoryName) == normalized(target.displayName)
         case .merchant, .expense, .transaction:
             return normalized(row.title).contains(normalized(target.displayName))
-        case .allocationAccount, .budget, .preset, .incomeSource, .savingsAccount, .workspace:
+        case .preset:
+            return normalized(row.title) == normalized(target.displayName)
+                || normalized(row.title).contains(normalized(target.displayName))
+        case .allocationAccount, .budget, .incomeSource, .savingsAccount, .workspace:
             return false
         }
     }
@@ -430,6 +500,18 @@ struct MarinaComposableWorkspaceQueryExecutor {
 
     private func hasAllocationAccountTarget(_ plan: MarinaAggregationPlan) -> Bool {
         plan.targets.contains { $0.entityType == .allocationAccount }
+    }
+
+    private func resolvedBudgetTarget(
+        in resolved: MarinaResolvedQueryCandidate,
+        provider: MarinaDataProvider
+    ) -> Budget? {
+        guard let target = resolved.resolvedTargets.first(where: { $0.entityType == .budget }) else {
+            return nil
+        }
+        return provider.fetchAllBudgets().first { budget in
+            budget.id == target.sourceID || normalized(budget.name) == normalized(target.displayName)
+        }
     }
 
     private func hasExclusionCue(_ prompt: String) -> Bool {

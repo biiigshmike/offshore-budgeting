@@ -260,3 +260,5 @@ struct MarinaQueryValidator {
         )
     }
 }
+
+typealias MarinaPlanValidator = MarinaQueryValidator

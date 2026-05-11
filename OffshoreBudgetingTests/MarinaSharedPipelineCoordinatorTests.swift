@@ -113,7 +113,7 @@ struct MarinaSharedPipelineCoordinatorTests {
         #expect(homeQueryPlan?.metric == .cardSpendTotal)
     }
 
-    @Test func coordinator_litterRobotBadModelMetricRoutesToDatabaseLookupInsteadOfLegacyUnresolved() async throws {
+    @Test func coordinator_litterRobotBadModelMetricBlocksWithoutDatabaseBypassOrLegacyFallback() async throws {
         let fixture = try makeFixture()
         fixture.context.insert(VariableExpense(
             descriptionText: "Litter Robot",
@@ -151,16 +151,20 @@ struct MarinaSharedPipelineCoordinatorTests {
             context: sharedContext(fixture: fixture, aiOptInEnabled: true)
         )
 
-        guard case .handled(let answer, _, let homeQueryPlan, let trace) = result else {
-            Issue.record("Expected Litter Robot lookup to be handled by shared pipeline.")
+        guard case .validationBlocked(let answer, let outcome, let trace) = result else {
+            Issue.record("Expected Litter Robot lookupDetails shape to block inside shared pipeline.")
             return
         }
 
-        #expect(homeQueryPlan == nil)
         #expect(trace.selectedPath == .sharedFoundationModels || trace.selectedPath == .sharedHeuristic)
+        #expect(trace.selectedPath != .sharedAttemptedThenLegacyFallback)
         #expect(trace.compactSummary.contains("family=databaseLookup"))
-        #expect(trace.compactSummary.contains("searchText=\"Litter Robot\""))
-        #expect(answer.title.contains("Litter Robot"))
+        #expect(trace.executorResultSummary == nil)
+        #expect(answer.kind == .message)
+        guard case .unsupported = outcome else {
+            Issue.record("Expected typed unsupported for lookupDetails without database bypass.")
+            return
+        }
     }
 
     @Test func coordinator_workspaceAggregationPromptsUseSharedHeuristicWithoutLegacyFallback() async throws {
@@ -268,7 +272,7 @@ struct MarinaSharedPipelineCoordinatorTests {
             return
         }
         #expect(trace.selectedPath == .sharedFoundationModels)
-        #expect(trace.disagreementSummary?.contains("model[") == true)
+        #expect(trace.disagreementSummary == nil)
         #expect(homeQueryPlan?.metric == .spendTotal)
     }
 
@@ -316,6 +320,55 @@ struct MarinaSharedPipelineCoordinatorTests {
         #expect(answer.title.contains("Recent Purchases"))
         guard case .workspaceCard(let card) = aggregationResult else {
             Issue.record("Expected workspace card")
+            return
+        }
+        #expect(card.rows.map(\.label) == ["Cannabis Purchase 2", "Cannabis Purchase 1"])
+    }
+
+    @Test func coordinator_preservesRecentListWhenModelReturnsGenericRanking() async throws {
+        let fixture = try makeFixture()
+        let cannabis = Offshore.Category(name: "Cannabis", hexColor: "#225522", workspace: fixture.workspace)
+        fixture.context.insert(cannabis)
+        fixture.context.insert(VariableExpense(descriptionText: "Cannabis Purchase 1", amount: 40, transactionDate: sharedPipelineDate(2026, 5, 9), workspace: fixture.workspace, card: fixture.appleCard, category: cannabis))
+        fixture.context.insert(VariableExpense(descriptionText: "Cannabis Purchase 2", amount: 50, transactionDate: sharedPipelineDate(2026, 5, 10), workspace: fixture.workspace, card: fixture.appleCard, category: cannabis))
+        try fixture.context.save()
+
+        let model = SharedPipelineStubStructuredInterpreter(
+            structuredIntent: .query(
+                MarinaStructuredQueryIntent(
+                    metricRaw: "topCategories",
+                    targetName: nil,
+                    targetTypeRaw: nil,
+                    dateStartISO8601: "2026-05-01",
+                    dateEndISO8601: "2026-05-31",
+                    comparisonDateStartISO8601: nil,
+                    comparisonDateEndISO8601: nil,
+                    resultLimit: nil,
+                    periodUnitRaw: "month",
+                    confidenceRaw: "low",
+                    clarification: nil
+                )
+            )
+        )
+
+        let result = await coordinator(structuredInterpreter: model).run(
+            prompt: "Most recent expenses in Cannabis category",
+            context: sharedContext(fixture: fixture, aiOptInEnabled: true)
+        )
+
+        guard case .handled(let answer, let aggregationResult, let homeQueryPlan, let trace) = result else {
+            Issue.record("Expected heuristic recent-list answer to beat generic model ranking: \(workspaceAggregationDebugSummary(result))")
+            return
+        }
+
+        #expect(trace.selectedPath == .sharedHeuristic)
+        #expect(trace.operationPreserved == true)
+        #expect(trace.rejectedReason == nil)
+        #expect(trace.disagreementSummary == MarinaSharedPipelineFallbackReason.validationDidNotProduceExecutablePlan.rawValue)
+        #expect(homeQueryPlan == nil)
+        #expect(answer.title == "Recent Purchases")
+        guard case .workspaceCard(let card) = aggregationResult else {
+            Issue.record("Expected workspace-card recent list.")
             return
         }
         #expect(card.rows.map(\.label) == ["Cannabis Purchase 2", "Cannabis Purchase 1"])

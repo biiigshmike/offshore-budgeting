@@ -73,6 +73,15 @@ struct MarinaDataProvider {
         )
     }
 
+    func fetchAllIncomeSeries() -> [IncomeSeries] {
+        fetch(
+            descriptor: FetchDescriptor<IncomeSeries>(
+                predicate: #Predicate { $0.workspace?.id == workspaceID },
+                sortBy: [SortDescriptor(\IncomeSeries.startDate, order: .forward)]
+            )
+        )
+    }
+
     func fetchAllAllocationAccounts() -> [AllocationAccount] {
         fetch(
             descriptor: FetchDescriptor<AllocationAccount>(
@@ -114,6 +123,24 @@ struct MarinaDataProvider {
             descriptor: FetchDescriptor<AllocationSettlement>(
                 predicate: #Predicate { $0.workspace?.id == workspaceID },
                 sortBy: [SortDescriptor(\AllocationSettlement.date, order: .reverse)]
+            )
+        )
+    }
+
+    func fetchAllImportMerchantRules() -> [ImportMerchantRule] {
+        fetch(
+            descriptor: FetchDescriptor<ImportMerchantRule>(
+                predicate: #Predicate { $0.workspace?.id == workspaceID },
+                sortBy: [SortDescriptor(\ImportMerchantRule.merchantKey, order: .forward)]
+            )
+        )
+    }
+
+    func fetchAllAssistantAliasRules() -> [AssistantAliasRule] {
+        fetch(
+            descriptor: FetchDescriptor<AssistantAliasRule>(
+                predicate: #Predicate { $0.workspace?.id == workspaceID },
+                sortBy: [SortDescriptor(\AssistantAliasRule.aliasKey, order: .forward)]
             )
         )
     }

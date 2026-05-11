@@ -3,6 +3,7 @@ import Foundation
 enum MarinaLookupObjectType: String, Codable, Sendable, Equatable, CaseIterable {
     case budget
     case income
+    case incomeSeries
     case variableExpense
     case plannedExpense
     case category
@@ -12,6 +13,9 @@ enum MarinaLookupObjectType: String, Codable, Sendable, Equatable, CaseIterable 
     case savingsLedgerEntry
     case reconciliationAccount
     case reconciliationItem
+    case expenseAllocation
+    case importMerchantRule
+    case assistantAliasRule
     case workspace
     case unknown
 }

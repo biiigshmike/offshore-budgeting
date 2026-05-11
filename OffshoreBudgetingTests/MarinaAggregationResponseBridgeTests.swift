@@ -97,7 +97,7 @@ struct MarinaAggregationResponseBridgeTests {
 
         #expect(bridged.kind == .message)
         #expect(bridged.subtitle == "Not supported in Phase 5.")
-        #expect(summary.contains("Unsupported Marina Query"))
+        #expect(summary.contains("I can answer this a different way"))
     }
 
     @Test func responseBridge_clarificationProducesNonExecutingMessage() {
@@ -113,9 +113,9 @@ struct MarinaAggregationResponseBridgeTests {
         let outcomeAnswer = bridge.responseCompatibleAnswer(from: MarinaPlanValidationOutcome.clarification(clarification))
 
         #expect(bridged.kind == .message)
-        #expect(bridged.title == "Marina Needs Clarification")
+        #expect(bridged.title == "I need one choice first")
         #expect(bridged.subtitle == "Which target did you mean?")
-        #expect(bridged.rows.map(\.title) == ["Groceries"])
+        #expect(bridged.rows.map(\.title) == ["Groceries (category)"])
         #expect(outcomeAnswer?.title == bridged.title)
         #expect(outcomeAnswer?.subtitle == bridged.subtitle)
     }

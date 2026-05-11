@@ -50,7 +50,7 @@ struct MarinaHeuristicInterpreter {
             timeScopes: timeScopes(from: intent, defaultPeriodUnit: defaultPeriodUnit, protectedShape: protectedShape),
             grouping: protectedShape != nil ? protectedShape?.grouping : grouping(from: intent),
             ranking: protectedShape != nil ? protectedShape?.ranking : ranking(from: intent, operation: operation),
-            limit: intent.resultLimit,
+            limit: protectedShape?.limit ?? intent.resultLimit,
             responseShapeHint: protectedShape?.responseShapeHint ?? responseShapeHint(from: intent, operation: operation),
             confidence: confidence(from: intent, protectedShape: protectedShape),
             unsupportedHint: unsupportedHint
@@ -326,6 +326,19 @@ struct MarinaHeuristicInterpreter {
             )
         }
 
+        if scopes.isEmpty,
+           isDefaultCompletedMonthAveragePrompt(intent) {
+            scopes.append(
+                MarinaUnresolvedTimeScope(
+                    role: .lookbackWindow,
+                    rawText: "last 3 completed months",
+                    resolvedRangeHint: MarinaPromptNormalizer()
+                        .completedMonthLookbackRange(endingBefore: now(), months: 3),
+                    periodUnitHint: .month
+                )
+            )
+        }
+
         if let comparisonDateRange = intent.comparisonDateRange {
             scopes.append(
                 MarinaUnresolvedTimeScope(
@@ -348,6 +361,17 @@ struct MarinaHeuristicInterpreter {
         }
 
         return scopes
+    }
+
+    private func isDefaultCompletedMonthAveragePrompt(_ intent: NormalizedQueryIntent) -> Bool {
+        guard isLookbackWindow(intent) else { return false }
+        let prompt = normalized(intent.rawPrompt)
+        return prompt.contains("normally")
+            || prompt.contains("typical")
+            || prompt.contains("usually")
+            || prompt.contains("each month")
+            || prompt.contains("per month")
+            || prompt.contains("monthly")
     }
 
     private func isLookbackWindow(_ intent: NormalizedQueryIntent) -> Bool {
@@ -497,6 +521,14 @@ struct MarinaHeuristicInterpreter {
             || prompt.contains(" outside of ")
             || prompt.contains("if i spend")
             || prompt.contains("list my last")
+            || prompt.contains(" my last ")
+            || prompt.contains(" last ")
+            || prompt.hasPrefix("most recent")
+            || prompt.hasPrefix("latest")
+            || prompt.hasPrefix("newest")
+            || prompt.contains("most recent")
+            || prompt.contains("latest")
+            || prompt.contains("newest")
             || prompt.contains("last 5")
             || prompt.contains("last five")
             || prompt.contains("top ")
@@ -637,13 +669,15 @@ struct MarinaHeuristicInterpreter {
         }
 
         if isRecentFilteredPurchaseListPrompt(prompt) {
+            let limit = intent.resultLimit ?? explicitLimit(in: prompt) ?? defaultRecentListLimit(in: prompt)
             return ProtectedShape(
-                operation: .rank,
+                operation: .listRows,
                 measure: .transactionAmount,
                 entityMentions: filteredPurchaseMentions(from: prompt),
                 timeScopes: baseTimeScopes(from: intent, defaultPeriodUnit: .month),
                 grouping: MarinaGroupingCandidate(dimension: .transaction),
-                ranking: MarinaRankingCandidate(direction: .newest, limit: intent.resultLimit ?? explicitLimit(in: prompt)),
+                ranking: MarinaRankingCandidate(direction: .newest, limit: limit),
+                limit: limit,
                 responseShapeHint: .rankedList
             )
         }
@@ -653,7 +687,7 @@ struct MarinaHeuristicInterpreter {
                 operation: .average,
                 measure: .spend,
                 entityMentions: targetedAverageMentions(from: prompt),
-                timeScopes: baseTimeScopes(from: intent, defaultPeriodUnit: .month),
+                timeScopes: averageTimeScopes(from: intent),
                 grouping: MarinaGroupingCandidate(dimension: targetAverageGroupingDimension(from: prompt)),
                 responseShapeHint: .summaryCard
             )
@@ -731,6 +765,7 @@ struct MarinaHeuristicInterpreter {
                 operation: .rank,
                 measure: .spend,
                 entityMentions: [],
+                timeScopes: baseTimeScopes(from: intent, defaultPeriodUnit: .month),
                 grouping: MarinaGroupingCandidate(dimension: .category),
                 ranking: MarinaRankingCandidate(direction: .top),
                 responseShapeHint: .groupedBreakdown
@@ -765,6 +800,7 @@ struct MarinaHeuristicInterpreter {
                 operation: .sum,
                 measure: .categoryShare,
                 entityMentions: categoryMention(from: target),
+                timeScopes: baseTimeScopes(from: intent, defaultPeriodUnit: .month),
                 grouping: MarinaGroupingCandidate(dimension: .category),
                 responseShapeHint: .groupedBreakdown
             )
@@ -833,14 +869,49 @@ struct MarinaHeuristicInterpreter {
     }
 
     private func isRecentFilteredPurchaseListPrompt(_ prompt: String) -> Bool {
-        (prompt.hasPrefix("list my last") || prompt.hasPrefix("show my last"))
+        (prompt.hasPrefix("list my last")
+            || prompt.hasPrefix("show my last")
+            || prompt.hasPrefix("what was my last")
+            || prompt.hasPrefix("what were my last")
+            || prompt.hasPrefix("list most recent")
+            || prompt.hasPrefix("show most recent")
+            || prompt.hasPrefix("list my most recent")
+            || prompt.hasPrefix("show my most recent")
+            || prompt.hasPrefix("most recent")
+            || prompt.hasPrefix("latest")
+            || prompt.hasPrefix("newest")
+            || prompt.contains(" my last ")
+            || prompt.contains(" most recent ")
+            || prompt.contains(" latest ")
+            || prompt.contains(" newest "))
             && (prompt.contains("purchase") || prompt.contains("transaction") || prompt.contains("expense"))
     }
 
     private func isTargetedPeriodicAveragePrompt(_ prompt: String) -> Bool {
-        prompt.contains("average")
-            && (prompt.contains("weekly") || prompt.contains("per week") || prompt.contains("monthly") || prompt.contains("per month"))
-            && (prompt.contains("last ") || prompt.contains("over the last"))
+        (prompt.contains("average") || prompt.contains("normally") || prompt.contains("usually") || prompt.contains("typical"))
+            && (prompt.contains("weekly")
+                || prompt.contains("per week")
+                || prompt.contains("monthly")
+                || prompt.contains("per month")
+                || prompt.contains("each month")
+                || prompt.contains("spend on")
+                || prompt.contains("spending on"))
+    }
+
+    private func averageTimeScopes(from intent: NormalizedQueryIntent) -> [MarinaUnresolvedTimeScope] {
+        let scopes = baseTimeScopes(from: intent, defaultPeriodUnit: .month)
+        if scopes.isEmpty == false {
+            return scopes
+        }
+        return [
+            MarinaUnresolvedTimeScope(
+                role: .lookbackWindow,
+                rawText: "last 3 completed months",
+                resolvedRangeHint: MarinaPromptNormalizer()
+                    .completedMonthLookbackRange(endingBefore: now(), months: 3),
+                periodUnitHint: .month
+            )
+        ]
     }
 
     private func targetAverageGroupingDimension(from prompt: String) -> MarinaGroupingDimensionCandidate {
@@ -1074,7 +1145,11 @@ struct MarinaHeuristicInterpreter {
         guard let target = firstCapture(
             in: prompt,
             patterns: [
-                #"\b(?:list|show)\s+my\s+last\s+(?:[0-9]+|one|two|three|four|five|six|seven|eight|nine|ten)\s+(.+?)\s+(?:purchase|purchases|transaction|transactions|expense|expenses)\b"#
+                #"\b(?:list|show)\s+my\s+last\s+(?:[0-9]+|one|two|three|four|five|six|seven|eight|nine|ten)\s+(.+?)\s+(?:purchase|purchases|transaction|transactions|expense|expenses)\b"#,
+                #"\bwhat\s+(?:was|were)\s+my\s+last\s+(.+?)\s+(?:purchase|purchases|transaction|transactions|expense|expenses)\b"#,
+                #"\b(?:list|show)(?:\s+my)?\s+(?:most\s+recent|latest|newest)\s+(.+?)\s+(?:purchase|purchases|transaction|transactions|expense|expenses)\b"#,
+                #"\b(?:list|show)\s+my\s+(?:most\s+recent|latest|newest)\s+(.+?)\s+(?:purchase|purchases|transaction|transactions|expense|expenses)\b"#,
+                #"\b(?:purchase|purchases|transaction|transactions|expense|expenses)\s+in\s+(.+?)\s+category\b"#
             ]
         ) else {
             return []
@@ -1082,7 +1157,7 @@ struct MarinaHeuristicInterpreter {
         return [
             MarinaUnresolvedEntityMention(
                 role: .filter,
-                rawText: cleanEntitySpan(target, operation: .rank, typeHint: nil),
+                rawText: cleanEntitySpan(target, operation: .listRows, typeHint: nil),
                 typeHint: .category,
                 confidence: .medium
             )
@@ -1092,13 +1167,24 @@ struct MarinaHeuristicInterpreter {
     private func targetedAverageMentions(from prompt: String) -> [MarinaUnresolvedEntityMention] {
         let patterns = [
             #"\baverage\s+(?:weekly|monthly)?\s*(.+?)\s+spending\b"#,
+            #"\baverage\s+spend\s+on\s+(.+?)(?:\s+over\b|\s+for\b|\s+last\b|\s+this\b|$)"#,
             #"\baverage\s+(?:weekly|monthly)?\s*spending\s+on\s+(.+?)\s+over\b"#,
-            #"\baverage\s+(?:weekly|monthly)?\s*(.+?)\s+over\b"#
+            #"\baverage\s+(?:weekly|monthly)?\s*(.+?)\s+over\b"#,
+            #"\bnormally\s+spend\s+on\s+(.+?)(?:\s+each\s+month|\s+per\s+month|\s+monthly|$)"#,
+            #"\busually\s+spend\s+on\s+(.+?)(?:\s+each\s+month|\s+per\s+month|\s+monthly|$)"#
         ]
         guard let target = firstCapture(in: prompt, patterns: patterns) else {
             return []
         }
-        return categoryMention(from: cleanEntitySpan(target, operation: .average, typeHint: .category))
+        let cleaned = cleanEntitySpan(target, operation: .average, typeHint: nil)
+        return [
+            MarinaUnresolvedEntityMention(
+                role: .primaryTarget,
+                rawText: cleaned,
+                typeHint: nil,
+                confidence: .medium
+            )
+        ]
     }
 
     private func reconciliationSpendMentions(from prompt: String) -> [MarinaUnresolvedEntityMention] {
@@ -1165,6 +1251,17 @@ struct MarinaHeuristicInterpreter {
         if prompt.contains("last five") { return 5 }
         if prompt.contains("last ten") { return 10 }
         return nil
+    }
+
+    private func defaultRecentListLimit(in prompt: String) -> Int {
+        if prompt.contains("what was my last")
+            || prompt.contains("what were my last")
+            || prompt.contains(" last purchase")
+            || prompt.contains(" last transaction")
+            || prompt.contains(" last expense") {
+            return 1
+        }
+        return 5
     }
 
     private func comparisonTimeScopes(
@@ -1393,6 +1490,7 @@ private struct ProtectedShape {
     let timeScopes: [MarinaUnresolvedTimeScope]?
     let grouping: MarinaGroupingCandidate?
     let ranking: MarinaRankingCandidate?
+    let limit: Int?
     let responseShapeHint: MarinaResponseShapeHint
     let unsupportedHint: MarinaUnsupportedHint?
 
@@ -1403,6 +1501,7 @@ private struct ProtectedShape {
         timeScopes: [MarinaUnresolvedTimeScope]? = nil,
         grouping: MarinaGroupingCandidate? = nil,
         ranking: MarinaRankingCandidate? = nil,
+        limit: Int? = nil,
         responseShapeHint: MarinaResponseShapeHint,
         unsupportedHint: MarinaUnsupportedHint? = nil
     ) {
@@ -1412,6 +1511,7 @@ private struct ProtectedShape {
         self.timeScopes = timeScopes
         self.grouping = grouping
         self.ranking = ranking
+        self.limit = limit
         self.responseShapeHint = responseShapeHint
         self.unsupportedHint = unsupportedHint
     }

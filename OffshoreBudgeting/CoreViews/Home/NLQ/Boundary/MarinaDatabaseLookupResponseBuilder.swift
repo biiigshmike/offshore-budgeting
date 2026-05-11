@@ -150,6 +150,8 @@ private extension MarinaLookupObjectType {
             return "Budget"
         case .income:
             return "Income"
+        case .incomeSeries:
+            return "Income series"
         case .variableExpense:
             return "Expense"
         case .plannedExpense:
@@ -168,6 +170,12 @@ private extension MarinaLookupObjectType {
             return "Reconciliation account"
         case .reconciliationItem:
             return "Reconciliation item"
+        case .expenseAllocation:
+            return "Expense allocation"
+        case .importMerchantRule:
+            return "Import merchant rule"
+        case .assistantAliasRule:
+            return "Assistant alias"
         case .workspace:
             return "Workspace"
         case .unknown:

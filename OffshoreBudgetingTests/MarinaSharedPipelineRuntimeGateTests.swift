@@ -141,25 +141,29 @@ struct MarinaSharedPipelineRuntimeGateTests {
         #expect(trace.executorResultSummary == nil)
     }
 
-    @Test func runtimeGate_typedUnsupportedDoesNotExecute() async throws {
+    @Test func runtimeGate_targetedAverageExecutesThroughSharedWorkspaceQuery() async throws {
         let fixture = try makeFixture()
+        fixture.context.insert(VariableExpense(descriptionText: "March Groceries", amount: 90, transactionDate: sharedPipelineDate(2026, 3, 10), workspace: fixture.workspace, card: fixture.appleCard, category: fixture.groceries))
+        fixture.context.insert(VariableExpense(descriptionText: "April Groceries", amount: 120, transactionDate: sharedPipelineDate(2026, 4, 10), workspace: fixture.workspace, card: fixture.appleCard, category: fixture.groceries))
+        try fixture.context.save()
         let result = await MarinaSharedPipelineCoordinator().run(
-            prompt: "average Groceries for the last 3 months",
+            prompt: "What do I normally spend on Groceries each month?",
             context: sharedContext(fixture: fixture)
         )
 
-        guard case .validationBlocked(let answer, let outcome, let trace) = result else {
-            Issue.record("Targeted average remains unsupported in shared executor.")
+        guard case .handled(let answer, let aggregationResult, let homeQueryPlan, let trace) = result else {
+            Issue.record("Targeted average should execute through the shared workspace executor.")
             return
         }
-        #expect(answer.kind == .message)
-        guard case .unsupported = outcome else {
-            Issue.record("Expected typed unsupported.")
+        #expect(answer.title.contains("Average"))
+        #expect(homeQueryPlan == nil)
+        guard case .workspaceCard = aggregationResult else {
+            Issue.record("Expected targeted average workspace-card result.")
             return
         }
         #expect(trace.selectedPath == .sharedHeuristic)
         #expect(trace.fallbackReason == nil)
-        #expect(trace.executorResultSummary == nil)
+        #expect(trace.executorResultSummary?.contains("targetedPeriodicAverage") == true)
     }
 
     @Test func runtimeGate_simulationExecutesThroughComposableWorkspaceQuery() async throws {

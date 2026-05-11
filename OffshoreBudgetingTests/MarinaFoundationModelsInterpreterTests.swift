@@ -4,7 +4,7 @@ import Testing
 
 @MainActor
 struct MarinaFoundationModelsInterpreterTests {
-    @Test func modelLookupPrompt_badMetricIsMappedToDatabaseLookup() {
+    @Test func modelLookupPrompt_badMetricStaysTypedCandidateWithoutDatabaseBypass() {
         let candidate = MarinaFoundationModelsInterpreter().candidate(
             from: .query(
                 MarinaStructuredQueryIntent(
@@ -25,10 +25,10 @@ struct MarinaFoundationModelsInterpreterTests {
             defaultPeriodUnit: .month
         )
 
-        #expect(candidate.requestFamily == .databaseLookup)
-        #expect(candidate.databaseLookupRequest?.searchText == "Litter Robot")
-        #expect(candidate.databaseLookupRequest?.objectTypes == [.variableExpense, .plannedExpense])
-        #expect(candidate.databaseLookupRequest?.requestedDetail == .date)
+        #expect(candidate.requestFamily == .analytics)
+        #expect(candidate.databaseLookupRequest == nil)
+        #expect(candidate.rawPrompt == "When did I purchase Litter Robot")
+        #expect(candidate.source == .foundationModels)
     }
 
     @Test func foundationModels_totalSpendOnAppleCard_emitsUnresolvedCardCandidate() {
@@ -278,6 +278,54 @@ struct MarinaFoundationModelsInterpreterTests {
         #expect(candidate.measure == .remainingBudget)
         #expect(candidate.entityMentions.first?.role == .simulationInput)
         #expect(candidate.responseShapeHint == .summaryCard)
+    }
+
+    @Test func semanticCommand_lookupDetails_remainsTypedCandidateWithoutDatabaseBypass() {
+        let cases: [(MarinaSemanticCommandDataset, MarinaLookupObjectType, String)] = [
+            (.budgets, .budget, "May"),
+            (.cards, .card, "Apple Card"),
+            (.categories, .category, "Groceries"),
+            (.presets, .preset, "Rent"),
+            (.income, .income, "Salary"),
+            (.incomeSeries, .incomeSeries, "Salary"),
+            (.savingsLedger, .savingsLedgerEntry, "Manual adjustment"),
+            (.reconciliation, .reconciliationAccount, "Roommate"),
+            (.expenseAllocations, .expenseAllocation, "Dinner"),
+            (.importMerchantRules, .importMerchantRule, "amzn"),
+            (.assistantAliasRules, .assistantAliasRule, "groc")
+        ]
+
+        for (dataset, _, searchText) in cases {
+            let command = MarinaSemanticCommand(
+                family: .databaseLookup,
+                action: .lookupDetails,
+                datasets: [dataset],
+                measure: nil,
+                includeFilters: [
+                    MarinaSemanticCommandFilter(rawText: searchText, allowedTypes: [])
+                ],
+                excludeFilters: [],
+                grouping: nil,
+                sort: nil,
+                dateRange: nil,
+                comparisonDateRange: nil,
+                periodUnit: nil,
+                limit: 5,
+                requestedDetail: .general
+            )
+
+            let candidate = MarinaFoundationModelsInterpreter().candidate(
+                from: .semanticCommand(command),
+                prompt: "show \(searchText)",
+                defaultPeriodUnit: .month
+            )
+
+            #expect(candidate.requestFamily == .databaseLookup)
+            #expect(candidate.operation == .lookupDetails)
+            #expect(candidate.databaseLookupRequest == nil)
+            #expect(candidate.entityMentions.first?.rawText == searchText)
+            #expect(candidate.semanticCommand == command)
+        }
     }
 
     @Test func foundationModels_whatIfPromptDoesNotSolveMultiEntityExtraction() {

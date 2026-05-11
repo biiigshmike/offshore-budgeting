@@ -113,6 +113,41 @@ struct MarinaQueryResolverTests {
         #expect(choiceTypes == ["card", "category"])
     }
 
+    @Test func resolver_reportsCardVersusMerchantAmbiguityWhenTypeHintIsAbsent() throws {
+        let fixture = try makeFixture()
+        let appleCard = Card(name: "Apple", workspace: fixture.workspace)
+        fixture.context.insert(appleCard)
+        fixture.context.insert(VariableExpense(
+            descriptionText: "Apple",
+            amount: 9.99,
+            transactionDate: Date(),
+            workspace: fixture.workspace,
+            card: appleCard
+        ))
+        try fixture.context.save()
+
+        let candidate = MarinaQueryPlanCandidate(
+            source: .foundationModels,
+            rawPrompt: "What was my spend on Apple last period?",
+            operation: .sum,
+            measure: .spend,
+            entityMentions: [
+                MarinaUnresolvedEntityMention(role: .filter, rawText: "Apple", typeHint: nil)
+            ],
+            confidence: .high
+        )
+
+        let resolved = MarinaQueryResolver().resolve(candidate: candidate, provider: fixture.provider)
+
+        #expect(resolved.resolvedTargets.isEmpty)
+        #expect(resolved.unresolvedMentions.isEmpty)
+        #expect(resolved.ambiguousMentions.count == 1)
+        let choiceTypes = resolved.ambiguousMentions[0].choices
+            .compactMap(\.entityTypeHint?.rawValue)
+            .sorted()
+        #expect(choiceTypes == ["card", "merchant"])
+    }
+
     @Test func resolver_allowedTypesPreferExactCategoryOverExpensePrefixes() throws {
         let fixture = try makeFixture()
         let cannabis = Category(name: "Cannabis", hexColor: "#225522", workspace: fixture.workspace)

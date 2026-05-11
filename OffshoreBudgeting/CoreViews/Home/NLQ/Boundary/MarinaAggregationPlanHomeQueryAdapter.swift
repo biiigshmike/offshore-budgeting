@@ -18,6 +18,8 @@ struct MarinaExecutableAggregationPlan: Codable, Equatable, Identifiable {
     }
 }
 
+typealias ExecutableMarinaPlan = MarinaExecutableAggregationPlan
+
 struct MarinaAggregationPlanHomeQueryAdapter {
     func executablePlan(from outcome: MarinaPlanValidationOutcome) -> Result<MarinaExecutableAggregationPlan, MarinaTypedUnsupportedResponse> {
         switch outcome {

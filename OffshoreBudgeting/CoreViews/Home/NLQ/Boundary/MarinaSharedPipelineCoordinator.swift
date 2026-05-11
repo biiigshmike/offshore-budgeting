@@ -15,6 +15,8 @@ struct MarinaSharedPipelineCoordinator {
     private let workspaceAggregationResponseBridge: MarinaWorkspaceAggregationResponseBridge
     private let databaseLookupExecutor: MarinaDatabaseLookupExecutor
     private let databaseLookupResponseBuilder: MarinaDatabaseLookupResponseBuilder
+    private let promptNormalizer = MarinaPromptNormalizer()
+    private let recoveryPolicy = MarinaQueryRecoveryPolicy()
 
     init(
         availability: MarinaModelAvailabilityProviding? = nil,
@@ -60,109 +62,131 @@ struct MarinaSharedPipelineCoordinator {
             )
         }
 
+        let normalization = promptNormalizer.normalize(
+            prompt: prompt,
+            defaultPeriodUnit: context.defaultPeriodUnit,
+            now: context.now
+        )
         let modelAvailability = context.aiOptInEnabled ? availability.currentStatus() : nil
         let modelAvailabilitySummary = modelAvailability.map(Self.modelAvailabilitySummary)
-        var modelEvaluation: CandidateEvaluation?
         var modelFailureReason: MarinaSharedPipelineFallbackReason?
+        let candidate: MarinaQueryPlanCandidate
 
         if context.aiOptInEnabled, modelAvailability == .available {
             do {
-                let candidate = try await foundationModelsInterpreter.interpret(
-                    prompt: prompt,
+                let modelCandidate = try await foundationModelsInterpreter.interpret(
+                    prompt: normalization.originalText,
                     context: context.routerContext
                 )
-                modelEvaluation = evaluate(
-                    candidate,
-                    provider: context.provider,
-                    now: context.now
-                )
+                if shouldUseDeterministicFallback(for: modelCandidate) {
+                    modelFailureReason = .validationDidNotProduceExecutablePlan
+                    candidate = heuristicInterpreter.interpret(
+                        prompt: normalization.originalText,
+                        defaultPeriodUnit: normalization.defaultPeriodUnit
+                    )
+                } else {
+                    candidate = modelCandidate
+                }
             } catch {
                 modelFailureReason = .modelServiceFailed
+                candidate = heuristicInterpreter.interpret(
+                    prompt: normalization.originalText,
+                    defaultPeriodUnit: normalization.defaultPeriodUnit
+                )
             }
         } else if context.aiOptInEnabled {
             modelFailureReason = .modelUnavailable
+            candidate = heuristicInterpreter.interpret(
+                prompt: normalization.originalText,
+                defaultPeriodUnit: normalization.defaultPeriodUnit
+            )
+        } else {
+            candidate = heuristicInterpreter.interpret(
+                prompt: normalization.originalText,
+                defaultPeriodUnit: normalization.defaultPeriodUnit
+            )
         }
 
-        let shouldEvaluateHeuristic = modelEvaluation == nil
-            || context.aiOptInEnabled
-            || modelEvaluation?.isExecutableHandled == false
-            || modelEvaluation?.candidate.confidence == .low
-            || modelEvaluation?.candidate.unsupportedHint != nil
-
-        let heuristicEvaluation = shouldEvaluateHeuristic
-            ? evaluate(
-                heuristicInterpreter.interpret(
-                    prompt: prompt,
-                    defaultPeriodUnit: context.defaultPeriodUnit
-                ),
-                provider: context.provider,
-                now: context.now
-            )
-            : nil
-
-        let disagreementSummary = disagreementSummary(
-            modelEvaluation: modelEvaluation,
-            heuristicEvaluation: heuristicEvaluation
+        let evaluation = evaluate(
+            candidate,
+            provider: context.provider,
+            now: context.now
         )
 
-        if let selected = selectExecutable(
-            modelEvaluation: modelEvaluation,
-            heuristicEvaluation: heuristicEvaluation,
-            preferModelWhenAvailable: context.aiOptInEnabled && modelAvailability == .available
-        ) {
+        if evaluation.isExecutableHandled {
             let trace = trace(
                 context: context,
                 modelAvailabilitySummary: modelAvailabilitySummary,
-                selectedPath: selected.candidate.source == .foundationModels ? .sharedFoundationModels : .sharedHeuristic,
-                evaluation: selected,
+                selectedPath: evaluation.candidate.source == .foundationModels ? .sharedFoundationModels : .sharedHeuristic,
+                evaluation: evaluation,
                 fallbackReason: nil,
-                disagreementSummary: disagreementSummary ?? modelFailureReason?.rawValue
+                disagreementSummary: modelFailureReason?.rawValue
             )
             return .handled(
-                answer: selected.answer!,
-                aggregationResult: selected.aggregationResult!,
-                homeQueryPlan: selected.executablePlan?.homeQueryPlan,
+                answer: evaluation.answer!,
+                aggregationResult: evaluation.aggregationResult!,
+                homeQueryPlan: evaluation.executablePlan?.homeQueryPlan,
                 trace: trace
             )
         }
 
-        if let blocked = selectValidationBlocked(
-            modelEvaluation: modelEvaluation,
-            heuristicEvaluation: heuristicEvaluation
-        ) {
+        if evaluation.isValidationBlocked {
             let trace = trace(
                 context: context,
                 modelAvailabilitySummary: modelAvailabilitySummary,
-                selectedPath: blocked.candidate.source == .foundationModels ? .sharedFoundationModels : .sharedHeuristic,
-                evaluation: blocked,
+                selectedPath: evaluation.candidate.source == .foundationModels ? .sharedFoundationModels : .sharedHeuristic,
+                evaluation: evaluation,
                 fallbackReason: nil,
-                disagreementSummary: disagreementSummary ?? modelFailureReason?.rawValue
+                disagreementSummary: modelFailureReason?.rawValue
             )
             return .validationBlocked(
-                answer: blocked.blockedAnswer!,
-                validationOutcome: blocked.validationOutcome,
+                answer: evaluation.blockedAnswer!,
+                validationOutcome: evaluation.validationOutcome,
                 trace: trace
             )
         }
 
-        let fallbackReason = fallbackReason(
-            modelFailureReason: modelFailureReason,
-            modelEvaluation: modelEvaluation,
-            heuristicEvaluation: heuristicEvaluation
+        let blocked = unsupportedEvaluation(
+            candidate: evaluation.candidate,
+            resolved: evaluation.resolved,
+            reason: evaluation.runtimeFallbackReason ?? modelFailureReason ?? .validationDidNotProduceExecutablePlan
         )
-        let traceEvaluation = fallbackTraceEvaluation(
-            modelEvaluation: modelEvaluation,
-            heuristicEvaluation: heuristicEvaluation
+        let trace = trace(
+            context: context,
+            modelAvailabilitySummary: modelAvailabilitySummary,
+            selectedPath: blocked.candidate.source == .foundationModels ? .sharedFoundationModels : .sharedHeuristic,
+            evaluation: blocked,
+            fallbackReason: nil,
+            disagreementSummary: modelFailureReason?.rawValue
         )
-        return .fallbackToLegacy(
-            trace: trace(
-                context: context,
-                modelAvailabilitySummary: modelAvailabilitySummary,
-                selectedPath: .sharedAttemptedThenLegacyFallback,
-                evaluation: traceEvaluation,
-                fallbackReason: fallbackReason,
-                disagreementSummary: disagreementSummary
-            )
+        return .validationBlocked(
+            answer: blocked.blockedAnswer!,
+            validationOutcome: blocked.validationOutcome,
+            trace: trace
+        )
+    }
+
+    private func shouldUseDeterministicFallback(for candidate: MarinaQueryPlanCandidate) -> Bool {
+        candidate.confidence == .low || candidate.unsupportedHint != nil
+    }
+
+    private func unsupportedEvaluation(
+        candidate: MarinaQueryPlanCandidate,
+        resolved: MarinaResolvedQueryCandidate,
+        reason: MarinaSharedPipelineFallbackReason
+    ) -> CandidateEvaluation {
+        let unsupported = MarinaTypedUnsupportedResponse(
+            kind: .unsupportedCombination,
+            message: "The shared Marina pipeline could not execute this validated shape: \(reason.rawValue).",
+            candidate: candidate
+        )
+        let outcome = MarinaPlanValidationOutcome.unsupported(unsupported)
+        return CandidateEvaluation(
+            candidate: candidate,
+            resolved: resolved,
+            validationOutcome: outcome,
+            blockedAnswer: MarinaResponseBuilder().responseCompatibleAnswer(from: outcome),
+            runtimeFallbackReason: reason
         )
     }
 
@@ -171,41 +195,12 @@ struct MarinaSharedPipelineCoordinator {
         provider: MarinaDataProvider,
         now: Date
     ) -> CandidateEvaluation {
-        if candidate.requestFamily == .databaseLookup,
-           let lookupRequest = candidate.databaseLookupRequest {
-            let lookupResponse = databaseLookupExecutor.execute(lookupRequest, provider: provider)
-            let answer = databaseLookupResponseBuilder.responseCompatibleAnswer(from: lookupResponse)
-            return CandidateEvaluation(
-                candidate: candidate,
-                resolved: MarinaResolvedQueryCandidate(
-                    candidate: candidate,
-                    resolvedTargets: [],
-                    unresolvedMentions: [],
-                    ambiguousMentions: [],
-                    primaryDateRange: lookupRequest.dateRange,
-                    comparisonDateRange: nil
-                ),
-                validationOutcome: .unsupported(
-                    MarinaTypedUnsupportedResponse(
-                        kind: .unsupportedOperation,
-                        message: "Database lookup bypassed analytics validation.",
-                        candidate: candidate
-                    )
-                ),
-                aggregationResult: .message(
-                    MarinaMessageAggregationResult(
-                        title: answer.title,
-                        message: answer.subtitle ?? lookupResponse.traceSummary,
-                        sourceAnswer: answer
-                    )
-                ),
-                answer: answer,
-                databaseLookupResponse: lookupResponse
-            )
-        }
-
         let resolved = resolver.resolve(candidate: candidate, provider: provider)
         let outcome = validator.validate(resolved)
+        let responseBuilder = MarinaResponseBuilder(
+            aggregationBridge: responseBridge,
+            workspaceBridge: workspaceAggregationResponseBridge
+        )
 
         switch outcome {
         case .clarification:
@@ -213,7 +208,7 @@ struct MarinaSharedPipelineCoordinator {
                 candidate: candidate,
                 resolved: resolved,
                 validationOutcome: outcome,
-                blockedAnswer: responseBridge.responseCompatibleAnswer(from: outcome),
+                blockedAnswer: responseBuilder.responseCompatibleAnswer(from: outcome),
                 runtimeFallbackReason: .clarificationBridgeUnavailable
             )
         case .unsupported:
@@ -221,77 +216,49 @@ struct MarinaSharedPipelineCoordinator {
                 candidate: candidate,
                 resolved: resolved,
                 validationOutcome: outcome,
-                blockedAnswer: responseBridge.responseCompatibleAnswer(from: outcome),
+                blockedAnswer: responseBuilder.responseCompatibleAnswer(from: outcome),
                 runtimeFallbackReason: .unsupportedBridgeUnavailable
             )
-            case .executable:
-                switch adapter.executablePlan(from: outcome) {
-                case .success(let executablePlan):
-                let result = executor.execute(executablePlan, provider: provider, now: now)
-                switch result {
-                case .unsupported:
-                    return CandidateEvaluation(
-                        candidate: candidate,
-                        resolved: resolved,
-                        validationOutcome: outcome,
-                        executablePlan: executablePlan,
-                        aggregationResult: result,
-                        runtimeFallbackReason: .executorUnsupported
-                    )
-                default:
-                    let answer = responseBridge.responseCompatibleAnswer(from: result)
-                    return CandidateEvaluation(
-                        candidate: candidate,
-                        resolved: resolved,
-                        validationOutcome: outcome,
-                        executablePlan: executablePlan,
-                        aggregationResult: result,
-                        answer: answer
-                    )
-                }
-            case .failure:
-                if case .executable(let plan) = outcome {
-                    switch composableWorkspaceQueryExecutor.execute(
-                        candidate: candidate,
-                        resolved: resolved,
-                        plan: plan,
-                        provider: provider,
-                        now: now
-                    ) {
-                    case .handled(let card):
-                        let answer = workspaceAggregationResponseBridge.responseCompatibleAnswer(from: card)
-                        return CandidateEvaluation(
-                            candidate: candidate,
-                            resolved: resolved,
-                            validationOutcome: outcome,
-                            aggregationResult: .workspaceCard(card),
-                            answer: answer,
-                            workspaceAggregationCard: card
-                        )
-                    case .unsupported:
-                        break
-                    }
-
-                    switch workspaceAggregationExecutor.execute(plan: plan, provider: provider, now: now) {
-                    case .handled(let card):
-                        let answer = workspaceAggregationResponseBridge.responseCompatibleAnswer(from: card)
-                        return CandidateEvaluation(
-                            candidate: candidate,
-                            resolved: resolved,
-                            validationOutcome: outcome,
-                            aggregationResult: .workspaceCard(card),
-                            answer: answer,
-                            workspaceAggregationCard: card
-                        )
-                    case .unsupported:
-                        break
-                    }
-                }
+        case .executable:
+            let queryExecutor = MarinaQueryExecutor(
+                adapter: adapter,
+                executor: executor,
+                composableWorkspaceQueryExecutor: composableWorkspaceQueryExecutor,
+                workspaceAggregationExecutor: workspaceAggregationExecutor
+            )
+            switch queryExecutor.execute(
+                candidate: candidate,
+                resolved: resolved,
+                validationOutcome: outcome,
+                provider: provider,
+                now: now
+            ) {
+            case .handled(let execution):
+                let answer = responseBuilder.responseCompatibleAnswer(from: execution.aggregationResult)
+                let suggestions = MarinaSuggestionBuilder().suggestions(
+                    candidate: candidate,
+                    executablePlan: execution.executablePlan,
+                    result: execution.aggregationResult,
+                    answer: answer
+                )
                 return CandidateEvaluation(
                     candidate: candidate,
                     resolved: resolved,
                     validationOutcome: outcome,
-                    runtimeFallbackReason: .adapterUnsupported
+                    executablePlan: execution.executablePlan,
+                    aggregationResult: execution.aggregationResult,
+                    answer: answer,
+                    suggestionCount: suggestions.count,
+                    workspaceAggregationCard: execution.workspaceAggregationCard
+                )
+            case .unsupported(let unsupported):
+                let unsupportedOutcome = MarinaPlanValidationOutcome.unsupported(unsupported)
+                return CandidateEvaluation(
+                    candidate: candidate,
+                    resolved: resolved,
+                    validationOutcome: unsupportedOutcome,
+                    blockedAnswer: responseBuilder.responseCompatibleAnswer(from: unsupportedOutcome),
+                    runtimeFallbackReason: .executorUnsupported
                 )
             }
         }
@@ -307,6 +274,12 @@ struct MarinaSharedPipelineCoordinator {
 
         switch (modelExecutable, heuristicExecutable) {
         case (.some(let model), .some(let heuristic)):
+            if model.candidate.semanticCommand != nil, heuristic.candidate.semanticCommand == nil {
+                return model
+            }
+            if model.operationPreserved != heuristic.operationPreserved {
+                return model.operationPreserved ? model : heuristic
+            }
             if materiallyDiffer(model: model, heuristic: heuristic) {
                 return preferModelWhenAvailable ? model : heuristic
             }
@@ -327,10 +300,27 @@ struct MarinaSharedPipelineCoordinator {
         let modelBlocked = modelEvaluation?.isValidationBlocked == true ? modelEvaluation : nil
         let heuristicBlocked = heuristicEvaluation?.isValidationBlocked == true ? heuristicEvaluation : nil
 
-        if let modelBlocked {
+        switch (modelBlocked, heuristicBlocked) {
+        case (.some(let model), .some(let heuristic)):
+            if isClarification(model), isClarification(heuristic) == false {
+                return model
+            }
+            if isClarification(heuristic), isClarification(model) == false {
+                return heuristic
+            }
+            if model.operationPreserved != heuristic.operationPreserved {
+                return model.operationPreserved ? model : heuristic
+            }
+            return recoveryPolicy.selectionRank(for: model) <= recoveryPolicy.selectionRank(for: heuristic)
+                ? model
+                : heuristic
+        case (.some(let modelBlocked), .none):
             return modelBlocked
+        case (.none, .some(let heuristicBlocked)):
+            return heuristicBlocked
+        case (.none, .none):
+            return nil
         }
-        return heuristicBlocked
     }
 
     private func fallback(
@@ -394,6 +384,7 @@ struct MarinaSharedPipelineCoordinator {
         modelAvailabilitySummary: String?,
         selectedPath: MarinaSharedPipelineRuntimePath,
         evaluation: CandidateEvaluation?,
+        competingEvaluation: CandidateEvaluation? = nil,
         fallbackReason: MarinaSharedPipelineFallbackReason?,
         disagreementSummary: String?
     ) -> MarinaSharedPipelineTrace {
@@ -403,14 +394,43 @@ struct MarinaSharedPipelineCoordinator {
             modelAvailabilitySummary: modelAvailabilitySummary,
             selectedPath: selectedPath,
             interpreterSource: evaluation?.candidate.source,
-            candidateSummary: evaluation.map { MarinaCandidateTrace(candidate: $0.candidate).compactSummary },
+            candidateSummary: evaluation.map {
+                MarinaCandidateTrace(
+                    candidate: $0.candidate,
+                    validatorOutcomeSummary: validatorSummary($0.validationOutcome),
+                    executablePlanSummary: executablePlanSummary($0),
+                    selectionRank: recoveryPolicy.selectionRank(for: $0),
+                    rejectedReason: recoveryPolicy.rejectedReason(selected: $0, other: competingEvaluation),
+                    operationPreserved: $0.operationPreserved
+                ).compactSummary
+            },
             resolverSummary: evaluation.map { resolverSummary($0.resolved) },
-            validatorOutcomeSummary: evaluation.map { $0.databaseLookupResponse?.traceSummary ?? $0.workspaceAggregationCard?.traceSummary ?? validatorSummary($0.validationOutcome) },
+            validatorOutcomeSummary: evaluation.map { validatorSummary($0.validationOutcome) },
             executorResultSummary: evaluation?.databaseLookupResponse?.traceSummary ?? evaluation?.workspaceAggregationCard?.traceSummary ?? evaluation?.aggregationResult.map(Self.aggregationResultSummary),
-            responseBridgeSummary: (evaluation?.answer ?? evaluation?.blockedAnswer)?.traceSummary,
+            responseBridgeSummary: responseBridgeSummary(evaluation),
             fallbackReason: fallbackReason,
-            disagreementSummary: disagreementSummary
+            disagreementSummary: disagreementSummary,
+            selectionRank: evaluation.map(recoveryPolicy.selectionRank),
+            rejectedReason: evaluation.flatMap {
+                recoveryPolicy.rejectedReason(selected: $0, other: competingEvaluation)
+            },
+            operationPreserved: evaluation?.operationPreserved
         )
+    }
+
+    private func otherEvaluation(
+        selected: CandidateEvaluation,
+        modelEvaluation: CandidateEvaluation?,
+        heuristicEvaluation: CandidateEvaluation?
+    ) -> CandidateEvaluation? {
+        selected.candidate.source == .foundationModels ? heuristicEvaluation : modelEvaluation
+    }
+
+    private func isClarification(_ evaluation: CandidateEvaluation) -> Bool {
+        if case .clarification = evaluation.validationOutcome {
+            return true
+        }
+        return false
     }
 
     private func disagreementSummary(
@@ -464,11 +484,51 @@ struct MarinaSharedPipelineCoordinator {
     private func validatorSummary(_ outcome: MarinaPlanValidationOutcome) -> String {
         switch outcome {
         case .executable(let plan):
-            return "executable:\(plan.operation.rawValue):\(plan.measure.rawValue)"
+            return "executable:\(plan.operation.rawValue):\(plan.measure.rawValue):shape=\(plan.responseShape?.rawValue ?? "nil")"
         case .clarification(let clarification):
             return "clarification:\(clarification.kind.rawValue)"
         case .unsupported(let unsupported):
             return "unsupported:\(unsupported.kind.rawValue)"
+        }
+    }
+
+    private func executablePlanSummary(_ evaluation: CandidateEvaluation) -> String? {
+        if let homeQueryPlan = evaluation.executablePlan?.homeQueryPlan {
+            return homeQueryPlan.traceSummary
+        }
+        guard case .executable(let plan) = evaluation.validationOutcome else {
+            return nil
+        }
+        return [
+            "operation=\(plan.operation.rawValue)",
+            "measure=\(plan.measure.rawValue)",
+            "targets=\(plan.targets.count)",
+            "date=\(plan.dateRange?.traceSummary ?? "nil")",
+            "comparison=\(plan.comparisonDateRange?.traceSummary ?? "nil")",
+            "shape=\(plan.responseShape?.rawValue ?? "nil")"
+        ].joined(separator: ",")
+    }
+
+    private func responseBridgeSummary(_ evaluation: CandidateEvaluation?) -> String? {
+        guard let evaluation,
+              let answer = evaluation.answer ?? evaluation.blockedAnswer else {
+            return nil
+        }
+        return [
+            answer.traceSummary,
+            "responseShape=\(responseShapeSummary(evaluation))",
+            "suggestions=\(evaluation.suggestionCount)"
+        ].joined(separator: ",")
+    }
+
+    private func responseShapeSummary(_ evaluation: CandidateEvaluation) -> String {
+        switch evaluation.validationOutcome {
+        case .executable(let plan):
+            return plan.responseShape?.rawValue ?? "nil"
+        case .clarification:
+            return MarinaResponseShapeHint.clarification.rawValue
+        case .unsupported:
+            return MarinaResponseShapeHint.unsupported.rawValue
         }
     }
 
@@ -501,7 +561,7 @@ struct MarinaSharedPipelineCoordinator {
     }
 }
 
-private struct CandidateEvaluation {
+struct CandidateEvaluation {
     let candidate: MarinaQueryPlanCandidate
     let resolved: MarinaResolvedQueryCandidate
     let validationOutcome: MarinaPlanValidationOutcome
@@ -509,6 +569,7 @@ private struct CandidateEvaluation {
     let aggregationResult: MarinaAggregationResult?
     let answer: HomeAnswer?
     let blockedAnswer: HomeAnswer?
+    let suggestionCount: Int
     let runtimeFallbackReason: MarinaSharedPipelineFallbackReason?
     let databaseLookupResponse: MarinaDatabaseLookupResponse?
     let workspaceAggregationCard: MarinaWorkspaceAggregationCard?
@@ -521,6 +582,7 @@ private struct CandidateEvaluation {
         aggregationResult: MarinaAggregationResult? = nil,
         answer: HomeAnswer? = nil,
         blockedAnswer: HomeAnswer? = nil,
+        suggestionCount: Int = 0,
         runtimeFallbackReason: MarinaSharedPipelineFallbackReason? = nil,
         databaseLookupResponse: MarinaDatabaseLookupResponse? = nil,
         workspaceAggregationCard: MarinaWorkspaceAggregationCard? = nil
@@ -532,6 +594,7 @@ private struct CandidateEvaluation {
         self.aggregationResult = aggregationResult
         self.answer = answer
         self.blockedAnswer = blockedAnswer
+        self.suggestionCount = suggestionCount
         self.runtimeFallbackReason = runtimeFallbackReason
         self.databaseLookupResponse = databaseLookupResponse
         self.workspaceAggregationCard = workspaceAggregationCard
@@ -542,6 +605,160 @@ private struct CandidateEvaluation {
     }
 
     var isValidationBlocked: Bool {
-        blockedAnswer != nil && executablePlan == nil && aggregationResult == nil
+        blockedAnswer != nil && answer == nil && aggregationResult == nil
+    }
+
+    var operationPreserved: Bool {
+        MarinaQueryRecoveryPolicy().operationPreserved(candidate: candidate)
+    }
+}
+
+struct MarinaQueryExecution {
+    let executablePlan: MarinaExecutableAggregationPlan?
+    let aggregationResult: MarinaAggregationResult
+    let workspaceAggregationCard: MarinaWorkspaceAggregationCard?
+}
+
+enum MarinaQueryExecutionResult {
+    case handled(MarinaQueryExecution)
+    case unsupported(MarinaTypedUnsupportedResponse)
+}
+
+@MainActor
+struct MarinaQueryExecutor {
+    let adapter: MarinaAggregationPlanHomeQueryAdapter
+    let executor: MarinaAggregationExecutor
+    let composableWorkspaceQueryExecutor: MarinaComposableWorkspaceQueryExecutor
+    let workspaceAggregationExecutor: MarinaWorkspaceAggregationExecutor
+
+    func execute(
+        candidate: MarinaQueryPlanCandidate,
+        resolved: MarinaResolvedQueryCandidate,
+        validationOutcome: MarinaPlanValidationOutcome,
+        provider: MarinaDataProvider,
+        now: Date
+    ) -> MarinaQueryExecutionResult {
+        guard case .executable(let plan) = validationOutcome else {
+            return .unsupported(
+                MarinaTypedUnsupportedResponse(
+                    kind: .unsupportedCombination,
+                    message: "Only executable validation outcomes can run.",
+                    candidate: candidate
+                )
+            )
+        }
+
+        if case .success(let executablePlan) = adapter.executablePlan(from: validationOutcome) {
+            let result = executor.execute(executablePlan, provider: provider, now: now)
+            if case .unsupported(let unsupported) = result {
+                return .unsupported(unsupported)
+            }
+            return .handled(
+                MarinaQueryExecution(
+                    executablePlan: executablePlan,
+                    aggregationResult: result,
+                    workspaceAggregationCard: nil
+                )
+            )
+        }
+
+        switch composableWorkspaceQueryExecutor.execute(
+            candidate: candidate,
+            resolved: resolved,
+            plan: plan,
+            provider: provider,
+            now: now
+        ) {
+        case .handled(let card):
+            return .handled(
+                MarinaQueryExecution(
+                    executablePlan: nil,
+                    aggregationResult: .workspaceCard(card),
+                    workspaceAggregationCard: card
+                )
+            )
+        case .unsupported:
+            break
+        }
+
+        switch workspaceAggregationExecutor.execute(plan: plan, provider: provider, now: now) {
+        case .handled(let card):
+            return .handled(
+                MarinaQueryExecution(
+                    executablePlan: nil,
+                    aggregationResult: .workspaceCard(card),
+                    workspaceAggregationCard: card
+                )
+            )
+        case .unsupported:
+            return .unsupported(
+                MarinaTypedUnsupportedResponse(
+                    kind: .unsupportedCombination,
+                    message: "No shared Marina executor supports this plan shape.",
+                    candidate: candidate
+                )
+            )
+        }
+    }
+}
+
+struct MarinaResponseBuilder {
+    let aggregationBridge: MarinaAggregationResponseBridge
+    let workspaceBridge: MarinaWorkspaceAggregationResponseBridge
+
+    init(
+        aggregationBridge: MarinaAggregationResponseBridge = MarinaAggregationResponseBridge(),
+        workspaceBridge: MarinaWorkspaceAggregationResponseBridge = MarinaWorkspaceAggregationResponseBridge()
+    ) {
+        self.aggregationBridge = aggregationBridge
+        self.workspaceBridge = workspaceBridge
+    }
+
+    func responseCompatibleAnswer(from outcome: MarinaPlanValidationOutcome) -> HomeAnswer? {
+        aggregationBridge.responseCompatibleAnswer(from: outcome)
+    }
+
+    func responseCompatibleAnswer(from result: MarinaAggregationResult) -> HomeAnswer {
+        switch result {
+        case .workspaceCard(let card):
+            return workspaceBridge.responseCompatibleAnswer(from: card)
+        default:
+            return aggregationBridge.responseCompatibleAnswer(from: result)
+        }
+    }
+}
+
+struct MarinaSuggestionContext {
+    let candidate: MarinaQueryPlanCandidate
+    let executablePlan: MarinaExecutableAggregationPlan?
+    let result: MarinaAggregationResult
+    let answerKind: HomeAnswerKind
+}
+
+struct MarinaSuggestionBuilder {
+    func suggestions(
+        candidate: MarinaQueryPlanCandidate,
+        executablePlan: MarinaExecutableAggregationPlan?,
+        result: MarinaAggregationResult,
+        answer: HomeAnswer
+    ) -> [HomeAssistantSuggestion] {
+        let context = MarinaSuggestionContext(
+            candidate: candidate,
+            executablePlan: executablePlan,
+            result: result,
+            answerKind: answer.kind
+        )
+        return suggestions(context: context, answer: answer)
+    }
+
+    func suggestions(
+        context: MarinaSuggestionContext,
+        answer: HomeAnswer
+    ) -> [HomeAssistantSuggestion] {
+        HomeAssistantPersonaFormatter().followUpSuggestions(
+            after: answer,
+            executedQuery: context.executablePlan?.homeQueryPlan.query,
+            personaID: .marina
+        )
     }
 }

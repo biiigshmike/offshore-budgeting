@@ -13,11 +13,17 @@ struct MarinaCandidateTrace: Codable, Equatable {
     let responseShapeHint: MarinaResponseShapeHint?
     let validatorOutcomeSummary: String?
     let executablePlanSummary: String?
+    let selectionRank: Int?
+    let rejectedReason: String?
+    let operationPreserved: Bool?
 
     init(
         candidate: MarinaQueryPlanCandidate? = nil,
         validatorOutcomeSummary: String? = nil,
-        executablePlanSummary: String? = nil
+        executablePlanSummary: String? = nil,
+        selectionRank: Int? = nil,
+        rejectedReason: String? = nil,
+        operationPreserved: Bool? = nil
     ) {
         self.requestFamily = candidate?.requestFamily
         self.interpreterSource = candidate?.source
@@ -31,6 +37,9 @@ struct MarinaCandidateTrace: Codable, Equatable {
         self.responseShapeHint = candidate?.responseShapeHint
         self.validatorOutcomeSummary = validatorOutcomeSummary
         self.executablePlanSummary = executablePlanSummary
+        self.selectionRank = selectionRank
+        self.rejectedReason = rejectedReason
+        self.operationPreserved = operationPreserved
     }
 
     var compactSummary: String {
@@ -46,7 +55,10 @@ struct MarinaCandidateTrace: Codable, Equatable {
             semanticCommandSummary.map { "semantic=\($0)" },
             responseShapeHint.map { "responseHint=\($0.rawValue)" },
             validatorOutcomeSummary.map { "validator=\($0)" },
-            executablePlanSummary.map { "plan=\($0)" }
+            executablePlanSummary.map { "plan=\($0)" },
+            selectionRank.map { "selectionRank=\($0)" },
+            rejectedReason.map { "rejected=\($0)" },
+            operationPreserved.map { "operationPreserved=\($0)" }
         ]
         .compactMap { $0 }
         .joined(separator: ",")

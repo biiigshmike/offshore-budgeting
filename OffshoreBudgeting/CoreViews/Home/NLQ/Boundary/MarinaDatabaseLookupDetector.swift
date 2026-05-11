@@ -263,6 +263,7 @@ private extension MarinaLookupObjectType {
         [
             .budget,
             .income,
+            .incomeSeries,
             .variableExpense,
             .plannedExpense,
             .category,
@@ -275,9 +276,11 @@ private extension MarinaLookupObjectType {
 
     var allowsEmptySearchListing: Bool {
         switch self {
-        case .budget, .card, .category, .preset, .savingsAccount, .reconciliationAccount, .workspace:
+        case .budget, .card, .category, .preset, .incomeSeries, .savingsAccount,
+             .reconciliationAccount, .importMerchantRule, .assistantAliasRule, .workspace:
             return true
-        case .income, .variableExpense, .plannedExpense, .savingsLedgerEntry, .reconciliationItem, .unknown:
+        case .income, .variableExpense, .plannedExpense, .savingsLedgerEntry,
+             .reconciliationItem, .expenseAllocation, .unknown:
             return false
         }
     }

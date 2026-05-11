@@ -1,6 +1,8 @@
 import Foundation
 
 struct MarinaAggregationResponseBridge {
+    private let recoveryPolicy = MarinaQueryRecoveryPolicy()
+
     func responseCompatibleAnswer(from outcome: MarinaPlanValidationOutcome) -> HomeAnswer? {
         switch outcome {
         case .executable:
@@ -16,11 +18,14 @@ struct MarinaAggregationResponseBridge {
         HomeAnswer(
             queryID: clarification.id,
             kind: .message,
-            title: "Marina Needs Clarification",
+            title: "I need one choice first",
             subtitle: clarification.message,
             primaryValue: nil,
             rows: clarification.choices.map { choice in
-                HomeAnswerRow(title: choice.title, value: choice.rawValue ?? choice.entityTypeHint?.rawValue ?? "")
+                HomeAnswerRow(
+                    title: typedChoiceTitle(choice),
+                    value: choice.rawValue ?? choice.entityTypeHint?.rawValue ?? ""
+                )
             }
         )
     }
@@ -41,7 +46,7 @@ struct MarinaAggregationResponseBridge {
             return HomeAnswer(
                 queryID: unsupported.id,
                 kind: .message,
-                title: "Unsupported Marina Query",
+                title: recoveryPolicy.unsupportedTitle(for: unsupported),
                 subtitle: unsupported.message,
                 primaryValue: nil,
                 rows: [
@@ -56,5 +61,10 @@ struct MarinaAggregationResponseBridge {
         let primary = answer.primaryValue.map { " primary=\($0)" } ?? ""
         let rows = answer.rows.isEmpty ? "" : " rows=\(answer.rows.count)"
         return "\(answer.kind.rawValue): \(answer.title)\(primary)\(rows)"
+    }
+
+    private func typedChoiceTitle(_ choice: MarinaClarificationChoice) -> String {
+        guard let type = choice.entityTypeHint else { return choice.title }
+        return "\(choice.title) (\(type.rawValue))"
     }
 }

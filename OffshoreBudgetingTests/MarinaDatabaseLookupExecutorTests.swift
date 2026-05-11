@@ -129,6 +129,26 @@ struct MarinaDatabaseLookupExecutorTests {
         #expect(answer.subtitle?.contains("more than one kind") == true)
     }
 
+    @Test func supportObjectLookup_returnsRulesAliasesSeriesAndAllocations() throws {
+        let fixture = try makeLookupFixture()
+
+        let cases: [(String, [MarinaLookupObjectType], MarinaLookupObjectType)] = [
+            ("Paycheck Series", [.incomeSeries], .incomeSeries),
+            ("litter", [.importMerchantRule], .importMerchantRule),
+            ("pets", [.assistantAliasRule], .assistantAliasRule),
+            ("Litter Robot", [.expenseAllocation], .expenseAllocation)
+        ]
+
+        for (searchText, objectTypes, expectedType) in cases {
+            let response = MarinaDatabaseLookupExecutor().execute(
+                request(searchText: searchText, objectTypes: objectTypes),
+                provider: fixture.provider
+            )
+
+            #expect(response.results.first?.objectType == expectedType)
+        }
+    }
+
     private func request(
         searchText: String,
         objectTypes: [MarinaLookupObjectType],
@@ -166,6 +186,7 @@ struct MarinaDatabaseLookupExecutorTests {
             AllocationSettlement.self,
             IncomeSeries.self,
             ImportMerchantRule.self,
+            AssistantAliasRule.self,
             Income.self,
             SavingsAccount.self,
             SavingsLedgerEntry.self
@@ -220,6 +241,39 @@ struct MarinaDatabaseLookupExecutorTests {
         )
         let savings = SavingsAccount(name: "True Savings", total: 500, workspace: workspace)
         let reconciliation = AllocationAccount(name: "Roommate Reconciliation", workspace: workspace)
+        let incomeSeries = IncomeSeries(
+            source: "Paycheck Series",
+            amount: 3000,
+            isPlanned: true,
+            frequencyRaw: RecurrenceFrequency.monthly.rawValue,
+            interval: 1,
+            weeklyWeekday: 6,
+            monthlyDayOfMonth: 1,
+            monthlyIsLastDay: false,
+            yearlyMonth: 1,
+            yearlyDayOfMonth: 1,
+            startDate: date(2026, 1, 1),
+            endDate: date(2026, 12, 31),
+            workspace: workspace
+        )
+        let importRule = ImportMerchantRule(
+            merchantKey: "litter",
+            preferredName: "Litter Robot",
+            preferredCategory: pets,
+            workspace: workspace
+        )
+        let aliasRule = AssistantAliasRule(
+            aliasKey: "pets",
+            targetValue: "Pets",
+            entityType: .category,
+            workspace: workspace
+        )
+        let allocation = ExpenseAllocation(
+            allocatedAmount: 100,
+            workspace: workspace,
+            account: reconciliation,
+            expense: litterRobot
+        )
 
         context.insert(workspace)
         context.insert(appleCard)
@@ -232,6 +286,10 @@ struct MarinaDatabaseLookupExecutorTests {
         context.insert(rent)
         context.insert(savings)
         context.insert(reconciliation)
+        context.insert(incomeSeries)
+        context.insert(importRule)
+        context.insert(aliasRule)
+        context.insert(allocation)
         try context.save()
 
         return Fixture(

@@ -33,21 +33,6 @@ struct MarinaFoundationModelsInterpreter {
             )
         }
 
-        if shouldPreferAnalyticsOverLookup(prompt) == false,
-           let lookupRequest = MarinaDatabaseLookupDetector().detect(
-            prompt: prompt,
-            defaultPeriodUnit: defaultPeriodUnit
-        ) {
-            return MarinaQueryPlanCandidate(
-                requestFamily: .databaseLookup,
-                source: .foundationModels,
-                rawPrompt: prompt,
-                limit: lookupRequest.limit,
-                confidence: .high,
-                databaseLookupRequest: lookupRequest
-            )
-        }
-
         switch structuredIntent {
         case .semanticCommand:
             return unsupportedCandidate(
@@ -91,19 +76,6 @@ struct MarinaFoundationModelsInterpreter {
         let operation = operation(from: command.action)
         let measure = command.measure ?? measure(from: command)
         let responseShape = responseShapeHint(from: command, operation: operation, measure: measure)
-
-        if command.family == .databaseLookup,
-           let lookupRequest = lookupRequest(from: command, prompt: prompt) {
-            return MarinaQueryPlanCandidate(
-                requestFamily: .databaseLookup,
-                source: .foundationModels,
-                rawPrompt: prompt,
-                limit: command.limit,
-                confidence: .high,
-                databaseLookupRequest: lookupRequest,
-                semanticCommand: command
-            )
-        }
 
         return MarinaQueryPlanCandidate(
             requestFamily: command.family,
@@ -156,7 +128,7 @@ struct MarinaFoundationModelsInterpreter {
             if command.datasets.contains(.savingsLedger) {
                 return .savingsMovement
             }
-            if command.datasets.contains(.reconciliation) {
+            if command.datasets.contains(.reconciliation) || command.datasets.contains(.expenseAllocations) {
                 return .reconciliationBalance
             }
             return .spend
@@ -281,6 +253,8 @@ struct MarinaFoundationModelsInterpreter {
             return .plannedExpense
         case .income:
             return .income
+        case .incomeSeries:
+            return .incomeSeries
         case .cards:
             return .card
         case .categories:
@@ -293,6 +267,12 @@ struct MarinaFoundationModelsInterpreter {
             return .savingsLedgerEntry
         case .reconciliation:
             return .reconciliationAccount
+        case .expenseAllocations:
+            return .expenseAllocation
+        case .importMerchantRules:
+            return .importMerchantRule
+        case .assistantAliasRules:
+            return .assistantAliasRule
         }
     }
 
@@ -382,6 +362,15 @@ struct MarinaFoundationModelsInterpreter {
         return prompt.contains(" by source")
             || prompt.contains(" by category")
             || prompt.contains(" by card")
+            || prompt.contains("list my last")
+            || prompt.contains(" my last ")
+            || prompt.contains(" last ")
+            || prompt.hasPrefix("most recent")
+            || prompt.hasPrefix("latest")
+            || prompt.hasPrefix("newest")
+            || prompt.contains("most recent")
+            || prompt.contains("latest")
+            || prompt.contains("newest")
             || prompt.contains("top ")
             || prompt.contains("biggest")
             || prompt.contains("largest")

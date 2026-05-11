@@ -233,6 +233,14 @@ struct MarinaNLQPipelineTests {
         #expect(
             mapper.resolve(shape: MarinaQueryShape(
                 measure: .spendAverage,
+                grouping: .category,
+                targetHint: "groceries"
+            )) == .metric(.spendAveragePerPeriod)
+        )
+
+        #expect(
+            mapper.resolve(shape: MarinaQueryShape(
+                measure: .spendAverage,
                 grouping: .merchant,
                 ranking: .largest
             )) == .unsupported(reason: .rankedAverage(grouping: .merchant))
@@ -388,16 +396,16 @@ struct MarinaNLQPipelineTests {
         #expect(intent.modifiers.contains("share_of_total"))
     }
 
-    @Test func normalizer_targetedAverage_promptsAreExplicitlyUnsupported() {
+    @Test func normalizer_targetedAverage_promptsRemainExecutableAverageQueries() {
         let normalizer = MarinaNLQNormalizer(defaultPeriodUnit: .month)
 
         let groceryAverage = normalizer.normalize(prompt: "What is my average grocery spending?")
-        #expect(groceryAverage.normalizedMetric == nil)
-        #expect(groceryAverage.unsupportedShapeReason == .targetedAverage)
+        #expect(groceryAverage.normalizedMetric == .spendAveragePerPeriod)
+        #expect(groceryAverage.unsupportedShapeReason == nil)
 
         let foodDrinkMonthlyAverage = normalizer.normalize(prompt: "What do I usually spend on Food & Drink per month?")
-        #expect(foodDrinkMonthlyAverage.normalizedMetric == nil)
-        #expect(foodDrinkMonthlyAverage.unsupportedShapeReason == .targetedAverage)
+        #expect(foodDrinkMonthlyAverage.normalizedMetric == .spendAveragePerPeriod)
+        #expect(foodDrinkMonthlyAverage.unsupportedShapeReason == nil)
         #expect(foodDrinkMonthlyAverage.rawTargetText == "food & drink")
     }
 

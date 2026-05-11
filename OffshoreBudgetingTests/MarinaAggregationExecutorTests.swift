@@ -376,6 +376,92 @@ struct MarinaAggregationExecutorTests {
         #expect(average.primaryValue != nil)
     }
 
+    @Test func composableExecutor_recentGroceriesTransactionsAndMultiFilterSpend() throws {
+        let fixture = try makeFixture()
+        fixture.context.insert(VariableExpense(descriptionText: "Groceries One", amount: 30, transactionDate: date(2026, 5, 1), workspace: fixture.workspace, card: fixture.appleCard, category: fixture.groceries))
+        fixture.context.insert(VariableExpense(descriptionText: "Groceries Two", amount: 40, transactionDate: date(2026, 5, 3), workspace: fixture.workspace, card: fixture.appleCard, category: fixture.groceries))
+        fixture.context.insert(VariableExpense(descriptionText: "Groceries Backup", amount: 50, transactionDate: date(2026, 5, 4), workspace: fixture.workspace, card: fixture.backupCard, category: fixture.groceries))
+        try fixture.context.save()
+
+        let executor = MarinaComposableWorkspaceQueryExecutor(calendar: Calendar(identifier: .gregorian))
+        let categoryMention = mention("groceries", .category)
+        let recent = handledCard(executor.execute(
+            candidate: candidate(prompt: "List my most recent Groceries transactions", operation: .listRows, measure: .transactionAmount, mentions: [categoryMention]),
+            resolved: resolvedCandidate(targets: [
+                resolvedTarget(mention: categoryMention, role: .filter, entityType: .category, displayName: "Groceries", sourceID: fixture.groceries.id)
+            ]),
+            plan: MarinaAggregationPlan(
+                operation: .listRows,
+                measure: .transactionAmount,
+                targets: [target(.category, "Groceries", sourceID: fixture.groceries.id)],
+                grouping: MarinaGroupingCandidate(dimension: .transaction),
+                ranking: MarinaRankingCandidate(direction: .newest, limit: 2),
+                limit: 2
+            ),
+            provider: fixture.provider,
+            now: date(2026, 5, 15)
+        ))
+        #expect(recent.rows.count == 2)
+        #expect(recent.rows.first?.label == "Groceries Backup")
+
+        let cardMention = mention("apple card", .card)
+        let multiFilter = handledCard(executor.execute(
+            candidate: candidate(prompt: "What did I spend on Groceries with Apple Card?", operation: .sum, measure: .spend, mentions: [categoryMention, cardMention]),
+            resolved: resolvedCandidate(targets: [
+                resolvedTarget(mention: categoryMention, role: .filter, entityType: .category, displayName: "Groceries", sourceID: fixture.groceries.id),
+                resolvedTarget(mention: cardMention, role: .filter, entityType: .card, displayName: "Apple Card", sourceID: fixture.appleCard.id)
+            ]),
+            plan: MarinaAggregationPlan(
+                operation: .sum,
+                measure: .spend,
+                targets: [
+                    target(.category, "Groceries", sourceID: fixture.groceries.id),
+                    target(.card, "Apple Card", sourceID: fixture.appleCard.id)
+                ],
+                dateRange: monthRange()
+            ),
+            provider: fixture.provider,
+            now: date(2026, 5, 15)
+        ))
+        #expect(multiFilter.primaryValue?.filter(\.isNumber).contains("70") == true)
+    }
+
+    @Test func composableExecutor_budgetLinkedSummaryUsesBudgetPeriodAndLinks() throws {
+        let fixture = try makeFixture()
+        let budget = Budget(name: "May", startDate: date(2026, 5, 1), endDate: date(2026, 5, 31), workspace: fixture.workspace)
+        let preset = Preset(title: "Rent", plannedAmount: 900, workspace: fixture.workspace, defaultCard: fixture.appleCard, defaultCategory: fixture.groceries)
+        fixture.context.insert(budget)
+        fixture.context.insert(preset)
+        fixture.context.insert(BudgetCardLink(budget: budget, card: fixture.appleCard))
+        fixture.context.insert(BudgetPresetLink(budget: budget, preset: preset))
+        fixture.context.insert(BudgetCategoryLimit(maxAmount: 500, budget: budget, category: fixture.groceries))
+        fixture.context.insert(VariableExpense(descriptionText: "Groceries", amount: 70, transactionDate: date(2026, 5, 3), workspace: fixture.workspace, card: fixture.appleCard, category: fixture.groceries))
+        fixture.context.insert(VariableExpense(descriptionText: "Backup Groceries", amount: 80, transactionDate: date(2026, 5, 4), workspace: fixture.workspace, card: fixture.backupCard, category: fixture.groceries))
+        fixture.context.insert(PlannedExpense(title: "Rent", plannedAmount: 900, expenseDate: date(2026, 5, 5), workspace: fixture.workspace, card: fixture.appleCard, category: fixture.groceries, sourcePresetID: preset.id, sourceBudgetID: budget.id))
+        try fixture.context.save()
+
+        let budgetMention = mention("may", .budget)
+        let result = handledCard(MarinaComposableWorkspaceQueryExecutor(calendar: Calendar(identifier: .gregorian)).execute(
+            candidate: candidate(prompt: "Show May budget linked objects", operation: .sum, measure: .spend, mentions: [budgetMention]),
+            resolved: resolvedCandidate(targets: [
+                resolvedTarget(mention: budgetMention, role: .primaryTarget, entityType: .budget, displayName: "May", sourceID: budget.id)
+            ]),
+            plan: MarinaAggregationPlan(
+                operation: .sum,
+                measure: .spend,
+                targets: [target(.budget, "May", sourceID: budget.id)]
+            ),
+            provider: fixture.provider,
+            now: date(2026, 5, 15)
+        ))
+
+        #expect(result.title == "May Budget Summary")
+        #expect(result.primaryValue?.filter(\.isNumber).contains("970") == true)
+        #expect(result.rows.contains(where: { $0.label == "Linked cards" && $0.value.contains("Apple Card") }))
+        #expect(result.rows.contains(where: { $0.label == "Linked presets" && $0.value.contains("Rent") }))
+        #expect(result.rows.contains(where: { $0.label == "Groceries" && $0.value.contains("max") }))
+    }
+
     @Test func composableExecutor_deltaReconciliationAndSimulationReturnCards() throws {
         let fixture = try makeFixture()
         let food = fixture.groceries
@@ -621,11 +707,12 @@ func makeFixture() throws -> MarinaPhase5Fixture {
         AllocationSettlement.self,
         IncomeSeries.self,
         ImportMerchantRule.self,
+        AssistantAliasRule.self,
         Income.self,
         SavingsAccount.self,
         SavingsLedgerEntry.self
     ])
-    let config = ModelConfiguration(isStoredInMemoryOnly: true)
+    let config = ModelConfiguration(UUID().uuidString, isStoredInMemoryOnly: true)
     let container = try ModelContainer(for: schema, configurations: config)
     let context = ModelContext(container)
     let workspace = Workspace(name: "Phase 5 Workspace", hexColor: "#3B82F6")

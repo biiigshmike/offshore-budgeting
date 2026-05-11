@@ -56,20 +56,20 @@ struct MarinaNLQNormalizer {
             unsupportedShapeReason = nil
         }
 
+        if normalizedPrompt.contains("usually spend")
+            || ((normalizedPrompt.contains("average spend")
+                || normalizedPrompt.contains("average spending"))
+                && queryShape.ranking == nil) {
+            metric = .spendAveragePerPeriod
+            unsupportedShapeReason = nil
+        }
+
         let rawTargetText = queryShape.targetHint ?? extractRawTargetText(
             from: prompt,
             normalizedPrompt: normalizedPrompt,
             comparisonPrimarySnippet: comparisonRanges?.primarySnippet
         )
             ?? parserInferredTarget(from: parserPlan)
-
-        let usuallySpendTargetedPrompt = normalizedPrompt.contains("usually spend")
-            && (rawTargetText != nil || normalizedPrompt.contains(" on "))
-
-        if (metric == .spendAveragePerPeriod && rawTargetText != nil) || usuallySpendTargetedPrompt {
-            metric = nil
-            unsupportedShapeReason = .targetedAverage
-        }
 
         if shouldPromoteToCategorySpendTotalForCostMe(
             normalizedPrompt: normalizedPrompt,

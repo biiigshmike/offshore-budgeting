@@ -32,6 +32,9 @@ struct MarinaSharedPipelineTrace: Codable, Equatable {
     let responseBridgeSummary: String?
     let fallbackReason: MarinaSharedPipelineFallbackReason?
     let disagreementSummary: String?
+    let selectionRank: Int?
+    let rejectedReason: String?
+    let operationPreserved: Bool?
 
     init(
         sharedPipelineEnabled: Bool,
@@ -45,7 +48,10 @@ struct MarinaSharedPipelineTrace: Codable, Equatable {
         executorResultSummary: String? = nil,
         responseBridgeSummary: String? = nil,
         fallbackReason: MarinaSharedPipelineFallbackReason? = nil,
-        disagreementSummary: String? = nil
+        disagreementSummary: String? = nil,
+        selectionRank: Int? = nil,
+        rejectedReason: String? = nil,
+        operationPreserved: Bool? = nil
     ) {
         self.sharedPipelineEnabled = sharedPipelineEnabled
         self.aiOptInEnabled = aiOptInEnabled
@@ -59,6 +65,9 @@ struct MarinaSharedPipelineTrace: Codable, Equatable {
         self.responseBridgeSummary = responseBridgeSummary
         self.fallbackReason = fallbackReason
         self.disagreementSummary = disagreementSummary
+        self.selectionRank = selectionRank
+        self.rejectedReason = rejectedReason
+        self.operationPreserved = operationPreserved
     }
 
     var compactSummary: String {
@@ -74,7 +83,10 @@ struct MarinaSharedPipelineTrace: Codable, Equatable {
             executorResultSummary.map { "executor=\($0)" },
             responseBridgeSummary.map { "bridge=\($0)" },
             fallbackReason.map { "fallback=\($0.rawValue)" },
-            disagreementSummary.map { "disagreement=\($0)" }
+            disagreementSummary.map { "disagreement=\($0)" },
+            selectionRank.map { "selectionRank=\($0)" },
+            rejectedReason.map { "rejected=\($0)" },
+            operationPreserved.map { "operationPreserved=\($0)" }
         ]
         .compactMap { $0 }
         .joined(separator: " | ")

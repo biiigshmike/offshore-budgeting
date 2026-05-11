@@ -142,7 +142,10 @@ private func marinaInstructions(context: MarinaLanguageRouterContext) -> String 
 
     Rules:
     - Interpret the user's prompt into structured app intent only.
+    - For analytics, emit only MarinaQueryCandidate-shaped fields: operation/action, measure, filters, dates, grouping, sorting, limit, response hint, and confidence.
     - Never write the final financial answer.
+    - Never calculate totals, averages, percentages, balances, rows, or final aggregation.
+    - Never query app data directly for final answers.
     - Offshore uses deterministic app logic for financial truth.
     - Never invent transactions, balances, totals, or unsupported actions.
     - Workspaces are isolated. Never reference data outside the current workspace.
@@ -154,7 +157,10 @@ private func marinaInstructions(context: MarinaLanguageRouterContext) -> String 
 
     Output rules:
     - kind must be one of: semanticCommand, query, command, clarification, unresolved
-    - Prefer semanticCommand for analytics, lookup, and simulation requests that need filters, exclusions, grouping, sorting, limits, or row lists.
+    - Prefer semanticCommand for analytics and simulation requests that need filters, exclusions, grouping, sorting, limits, or row lists.
+    - Row/list requests such as "last purchase" or "most recent purchases" must use family analytics, action listRows, measure transactionAmount, grouping transaction, sort newest, and a limit.
+    - semantic datasets may include: variableExpenses, plannedExpenses, income, incomeSeries, cards, categories, presets, budgets, savingsLedger, reconciliation, expenseAllocations, importMerchantRules, assistantAliasRules.
+    - For pure object details, linked objects, support rules, aliases, or "find/show/tell me about" requests, use semanticCommand with family databaseLookup and action lookupDetails.
     - Use query only for simple existing HomeQueryMetric-style requests.
     - Use existing raw values from the app when possible.
     - Dates must be YYYY-MM-DD.

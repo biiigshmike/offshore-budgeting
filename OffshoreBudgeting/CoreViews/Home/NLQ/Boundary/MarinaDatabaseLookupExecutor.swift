@@ -95,6 +95,25 @@ struct MarinaDatabaseLookupExecutor {
             ))
         }
 
+        for series in provider.fetchAllIncomeSeries() {
+            results.append(result(
+                id: series.id,
+                objectType: .incomeSeries,
+                title: series.source,
+                subtitle: series.isPlanned ? "Planned income series" : "Income series",
+                date: series.startDate,
+                amount: series.amount,
+                workspaceName: workspaceName,
+                details: [
+                    ("Type", series.isPlanned ? "Planned income series" : "Income series"),
+                    ("Amount", CurrencyFormatter.string(from: series.amount)),
+                    ("Schedule", series.frequency.rawValue),
+                    ("Starts", formatDate(series.startDate)),
+                    ("Ends", formatDate(series.endDate))
+                ]
+            ))
+        }
+
         for expense in provider.fetchAllVariableExpenses() {
             results.append(result(
                 id: expense.id,
@@ -253,6 +272,60 @@ struct MarinaDatabaseLookupExecutor {
                     ("Date", formatDate(settlement.date)),
                     ("Amount", CurrencyFormatter.string(from: settlement.amount)),
                     ("Account", settlement.account?.name ?? "Unassigned")
+                ]
+            ))
+        }
+
+        for allocation in provider.fetchAllExpenseAllocations() {
+            let linkedExpense = allocation.expense?.descriptionText ?? allocation.plannedExpense?.title ?? "Unlinked allocation"
+            let linkedDate = allocation.expense?.transactionDate ?? allocation.plannedExpense?.expenseDate
+            results.append(result(
+                id: allocation.id,
+                objectType: .expenseAllocation,
+                title: linkedExpense,
+                subtitle: "Expense allocation",
+                date: linkedDate,
+                amount: allocation.allocatedAmount,
+                accountName: allocation.account?.name,
+                workspaceName: workspaceName,
+                details: [
+                    ("Type", "Expense allocation"),
+                    ("Amount", CurrencyFormatter.string(from: allocation.allocatedAmount)),
+                    ("Account", allocation.account?.name ?? "Unassigned"),
+                    ("Expense", linkedExpense)
+                ]
+            ))
+        }
+
+        for rule in provider.fetchAllImportMerchantRules() {
+            results.append(result(
+                id: rule.id,
+                objectType: .importMerchantRule,
+                title: rule.preferredName ?? rule.merchantKey,
+                subtitle: "Import merchant rule",
+                categoryName: rule.preferredCategory?.name,
+                workspaceName: workspaceName,
+                details: [
+                    ("Type", "Import merchant rule"),
+                    ("Merchant key", rule.merchantKey),
+                    ("Preferred name", rule.preferredName ?? "None"),
+                    ("Preferred category", rule.preferredCategory?.name ?? "None")
+                ]
+            ))
+        }
+
+        for rule in provider.fetchAllAssistantAliasRules() {
+            results.append(result(
+                id: rule.id,
+                objectType: .assistantAliasRule,
+                title: rule.aliasKey,
+                subtitle: "Assistant alias",
+                workspaceName: workspaceName,
+                details: [
+                    ("Type", "Assistant alias"),
+                    ("Alias", rule.aliasKey),
+                    ("Target", rule.targetValue),
+                    ("Entity type", rule.entityType.rawValue)
                 ]
             ))
         }
