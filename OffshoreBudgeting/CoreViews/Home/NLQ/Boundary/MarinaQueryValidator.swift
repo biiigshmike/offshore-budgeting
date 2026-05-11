@@ -36,14 +36,6 @@ struct MarinaQueryValidator {
             )
         }
 
-        if operation == .simulate {
-            return unsupported(
-                .unsupportedSimulation,
-                message: "Simulation plans are not validated in this phase.",
-                candidate: candidate
-            )
-        }
-
         if operation == .trend || operation == .forecast {
             return unsupported(
                 .unsupportedOperation,
@@ -128,7 +120,7 @@ struct MarinaQueryValidator {
     private func requiresResolvedTarget(_ candidate: MarinaQueryPlanCandidate) -> Bool {
         candidate.entityMentions.contains { mention in
             switch mention.role {
-            case .filter, .primaryTarget, .comparisonTarget, .simulationInput, .simulationOutput:
+            case .filter, .excludeFilter, .primaryTarget, .comparisonTarget, .simulationInput, .simulationOutput:
                 return true
             case .groupingDimension:
                 return false
@@ -150,9 +142,13 @@ struct MarinaQueryValidator {
             return measure == .transactionFrequency
         case .rank:
             return candidate.grouping != nil || candidate.ranking != nil
+        case .listRows:
+            return measure == .transactionAmount
         case .compare:
             return [.spend, .income, .savings, .categoryShare].contains(measure)
-        case .minimum, .maximum, .trend, .forecast, .simulate:
+        case .simulate:
+            return measure == .remainingBudget
+        case .lookupDetails, .minimum, .maximum, .trend, .forecast:
             return false
         }
     }
@@ -170,11 +166,13 @@ struct MarinaQueryValidator {
                 return .groupedBreakdown
             }
             return .rankedList
+        case .listRows:
+            return .rankedList
         case .sum where measure == .categoryShare:
             return .groupedBreakdown
         case .trend:
             return .chartRows
-        case .sum, .average, .count, .minimum, .maximum, .forecast, .simulate:
+        case .sum, .average, .count, .minimum, .maximum, .forecast, .simulate, .lookupDetails:
             if candidate.responseShapeHint == .summaryCard {
                 return .summaryCard
             }

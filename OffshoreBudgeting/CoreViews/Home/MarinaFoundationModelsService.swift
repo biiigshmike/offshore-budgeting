@@ -42,6 +42,17 @@ import FoundationModels
 @available(iOS 26.0, macOS 26.0, *)
 private struct MarinaFoundationModelsFlatResponse {
     let kindRaw: String?
+    let semanticFamilyRaw: String?
+    let semanticActionRaw: String?
+    let semanticDatasetsRaw: [String]
+    let semanticMeasureRaw: String?
+    let semanticIncludeFilterTexts: [String]
+    let semanticIncludeFilterTypeRaws: [String]
+    let semanticExcludeFilterTexts: [String]
+    let semanticExcludeFilterTypeRaws: [String]
+    let semanticGroupingRaw: String?
+    let semanticSortRaw: String?
+    let semanticRequestedDetailRaw: String?
     let queryMetricRaw: String?
     let queryTargetName: String?
     let queryTargetTypeRaw: String?
@@ -142,7 +153,9 @@ private func marinaInstructions(context: MarinaLanguageRouterContext) -> String 
     - Be concise and grounded.
 
     Output rules:
-    - kind must be one of: query, command, clarification, unresolved
+    - kind must be one of: semanticCommand, query, command, clarification, unresolved
+    - Prefer semanticCommand for analytics, lookup, and simulation requests that need filters, exclusions, grouping, sorting, limits, or row lists.
+    - Use query only for simple existing HomeQueryMetric-style requests.
     - Use existing raw values from the app when possible.
     - Dates must be YYYY-MM-DD.
     - If a field is not known, return null.
@@ -206,6 +219,17 @@ private func marinaResponseSchema() -> GenerationSchema {
         description: "Marina structured interpretation output.",
         properties: [
             .init(name: "kind", description: "query, command, clarification, or unresolved", type: String.self),
+            .init(name: "semanticFamilyRaw", type: String?.self),
+            .init(name: "semanticActionRaw", type: String?.self),
+            .init(name: "semanticDatasetsRaw", type: [String].self),
+            .init(name: "semanticMeasureRaw", type: String?.self),
+            .init(name: "semanticIncludeFilterTexts", type: [String].self),
+            .init(name: "semanticIncludeFilterTypeRaws", type: [String].self),
+            .init(name: "semanticExcludeFilterTexts", type: [String].self),
+            .init(name: "semanticExcludeFilterTypeRaws", type: [String].self),
+            .init(name: "semanticGroupingRaw", type: String?.self),
+            .init(name: "semanticSortRaw", type: String?.self),
+            .init(name: "semanticRequestedDetailRaw", type: String?.self),
             .init(name: "queryMetricRaw", type: String?.self),
             .init(name: "queryTargetName", type: String?.self),
             .init(name: "queryTargetTypeRaw", type: String?.self),
@@ -259,6 +283,17 @@ private func marinaResponseSchema() -> GenerationSchema {
 private func makeFlatResponse(from content: GeneratedContent) throws -> MarinaFoundationModelsFlatResponse {
     MarinaFoundationModelsFlatResponse(
         kindRaw: try content.value(String?.self, forProperty: "kind"),
+        semanticFamilyRaw: try content.value(String?.self, forProperty: "semanticFamilyRaw"),
+        semanticActionRaw: try content.value(String?.self, forProperty: "semanticActionRaw"),
+        semanticDatasetsRaw: (try? content.value([String].self, forProperty: "semanticDatasetsRaw")) ?? [],
+        semanticMeasureRaw: try content.value(String?.self, forProperty: "semanticMeasureRaw"),
+        semanticIncludeFilterTexts: (try? content.value([String].self, forProperty: "semanticIncludeFilterTexts")) ?? [],
+        semanticIncludeFilterTypeRaws: (try? content.value([String].self, forProperty: "semanticIncludeFilterTypeRaws")) ?? [],
+        semanticExcludeFilterTexts: (try? content.value([String].self, forProperty: "semanticExcludeFilterTexts")) ?? [],
+        semanticExcludeFilterTypeRaws: (try? content.value([String].self, forProperty: "semanticExcludeFilterTypeRaws")) ?? [],
+        semanticGroupingRaw: try content.value(String?.self, forProperty: "semanticGroupingRaw"),
+        semanticSortRaw: try content.value(String?.self, forProperty: "semanticSortRaw"),
+        semanticRequestedDetailRaw: try content.value(String?.self, forProperty: "semanticRequestedDetailRaw"),
         queryMetricRaw: try content.value(String?.self, forProperty: "queryMetricRaw"),
         queryTargetName: try content.value(String?.self, forProperty: "queryTargetName"),
         queryTargetTypeRaw: try content.value(String?.self, forProperty: "queryTargetTypeRaw"),
@@ -319,7 +354,13 @@ private func makeStructuredIntent(from flat: MarinaFoundationModelsFlatResponse)
         shouldRunBestEffort: flat.clarificationShouldRunBestEffort
     )
 
-    switch MarinaStructuredIntentKind(rawValue: flat.kindRaw?.lowercased() ?? "") {
+    let kindRaw = flat.kindRaw?.nilIfBlank
+    let structuredKind = kindRaw.flatMap(MarinaStructuredIntentKind.init(rawValue:))
+        ?? (kindRaw?.lowercased()).flatMap(MarinaStructuredIntentKind.init(rawValue:))
+    switch structuredKind {
+    case .semanticCommand:
+        guard let command = makeSemanticCommand(from: flat) else { return .unresolved }
+        return .semanticCommand(command)
     case .query:
         return .query(
             MarinaStructuredQueryIntent(
@@ -376,8 +417,73 @@ private func makeStructuredIntent(from flat: MarinaFoundationModelsFlatResponse)
     case .clarification:
         return .clarification(clarification)
     case .unresolved, .none:
+        if let command = makeSemanticCommand(from: flat) {
+            return .semanticCommand(command)
+        }
         return .unresolved
     }
+}
+
+@available(iOS 26.0, macOS 26.0, *)
+private func makeSemanticCommand(from flat: MarinaFoundationModelsFlatResponse) -> MarinaSemanticCommand? {
+    guard let action = MarinaSemanticCommandAction(rawValue: flat.semanticActionRaw?.nilIfBlank ?? ""),
+          let family = MarinaRequestFamily(rawValue: flat.semanticFamilyRaw?.nilIfBlank ?? MarinaRequestFamily.analytics.rawValue) else {
+        return nil
+    }
+
+    let datasets = flat.semanticDatasetsRaw.compactMap { MarinaSemanticCommandDataset(rawValue: $0) }
+    let periodUnit = HomeQueryPeriodUnit(rawValue: flat.queryPeriodUnitRaw ?? "")
+    return MarinaSemanticCommand(
+        family: family,
+        action: action,
+        datasets: datasets,
+        measure: flat.semanticMeasureRaw.flatMap(MarinaCandidateMeasure.init(rawValue:)),
+        includeFilters: semanticFilters(texts: flat.semanticIncludeFilterTexts, types: flat.semanticIncludeFilterTypeRaws),
+        excludeFilters: semanticFilters(texts: flat.semanticExcludeFilterTexts, types: flat.semanticExcludeFilterTypeRaws),
+        grouping: flat.semanticGroupingRaw.flatMap(MarinaGroupingDimensionCandidate.init(rawValue:)),
+        sort: flat.semanticSortRaw.flatMap(MarinaSemanticCommandSort.init(rawValue:)),
+        dateRange: makeDateRange(start: flat.queryDateStart, end: flat.queryDateEnd),
+        comparisonDateRange: makeDateRange(start: flat.queryComparisonDateStart, end: flat.queryComparisonDateEnd),
+        periodUnit: periodUnit,
+        limit: flat.queryResultLimit,
+        requestedDetail: flat.semanticRequestedDetailRaw.flatMap(MarinaSemanticRequestedDetail.init(rawValue:))
+    )
+}
+
+@available(iOS 26.0, macOS 26.0, *)
+private func semanticFilters(texts: [String], types: [String]) -> [MarinaSemanticCommandFilter] {
+    texts.enumerated().compactMap { index, rawText in
+        let trimmed = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.isEmpty == false else { return nil }
+        let rawTypes = types.indices.contains(index) ? types[index] : ""
+        let allowed = rawTypes
+            .split(separator: "|")
+            .compactMap { MarinaCandidateEntityTypeHint(rawValue: String($0)) }
+        return MarinaSemanticCommandFilter(rawText: trimmed, allowedTypes: allowed)
+    }
+}
+
+@available(iOS 26.0, macOS 26.0, *)
+private func makeDateRange(start: String?, end: String?) -> HomeQueryDateRange? {
+    guard let startDate = makeDate(start),
+          let endDate = makeDate(end) else {
+        return nil
+    }
+    return HomeQueryDateRange(startDate: startDate, endDate: endDate)
+}
+
+@available(iOS 26.0, macOS 26.0, *)
+private func makeDate(_ value: String?) -> Date? {
+    guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+          value.isEmpty == false else {
+        return nil
+    }
+
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+    let parts = value.split(separator: "-").compactMap { Int($0) }
+    guard parts.count == 3 else { return nil }
+    return calendar.date(from: DateComponents(year: parts[0], month: parts[1], day: parts[2]))
 }
 
 @available(iOS 26.0, macOS 26.0, *)

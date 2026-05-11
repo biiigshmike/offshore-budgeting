@@ -114,6 +114,21 @@ struct MarinaDatabaseLookupExecutorTests {
         #expect(answer.rows.contains { $0.title == "Card" && $0.value == "Apple Card" })
     }
 
+    @Test func ambiguousLookup_acrossObjectTypesAsksForClarification() throws {
+        let fixture = try makeLookupFixture()
+        let response = MarinaDatabaseLookupExecutor().execute(
+            request(searchText: "Rent", objectTypes: [.unknown]),
+            provider: fixture.provider
+        )
+        let answer = MarinaDatabaseLookupResponseBuilder().responseCompatibleAnswer(from: response)
+
+        #expect(response.needsClarification)
+        #expect(response.ambiguityChoices.map(\.objectType).contains(.preset))
+        #expect(response.ambiguityChoices.map(\.objectType).contains(.plannedExpense))
+        #expect(answer.title.contains("Rent"))
+        #expect(answer.subtitle?.contains("more than one kind") == true)
+    }
+
     private func request(
         searchText: String,
         objectTypes: [MarinaLookupObjectType],

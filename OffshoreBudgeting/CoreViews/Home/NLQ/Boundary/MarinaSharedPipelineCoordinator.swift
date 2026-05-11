@@ -9,6 +9,7 @@ struct MarinaSharedPipelineCoordinator {
     private let validator: MarinaQueryValidator
     private let adapter: MarinaAggregationPlanHomeQueryAdapter
     private let executor: MarinaAggregationExecutor
+    private let composableWorkspaceQueryExecutor: MarinaComposableWorkspaceQueryExecutor
     private let workspaceAggregationExecutor: MarinaWorkspaceAggregationExecutor
     private let responseBridge: MarinaAggregationResponseBridge
     private let workspaceAggregationResponseBridge: MarinaWorkspaceAggregationResponseBridge
@@ -23,6 +24,7 @@ struct MarinaSharedPipelineCoordinator {
         validator: MarinaQueryValidator? = nil,
         adapter: MarinaAggregationPlanHomeQueryAdapter? = nil,
         executor: MarinaAggregationExecutor? = nil,
+        composableWorkspaceQueryExecutor: MarinaComposableWorkspaceQueryExecutor? = nil,
         workspaceAggregationExecutor: MarinaWorkspaceAggregationExecutor? = nil,
         responseBridge: MarinaAggregationResponseBridge? = nil,
         workspaceAggregationResponseBridge: MarinaWorkspaceAggregationResponseBridge? = nil,
@@ -38,6 +40,7 @@ struct MarinaSharedPipelineCoordinator {
         self.validator = validator ?? MarinaQueryValidator()
         self.adapter = adapter ?? MarinaAggregationPlanHomeQueryAdapter()
         self.executor = executor ?? MarinaAggregationExecutor()
+        self.composableWorkspaceQueryExecutor = composableWorkspaceQueryExecutor ?? MarinaComposableWorkspaceQueryExecutor()
         self.workspaceAggregationExecutor = workspaceAggregationExecutor ?? MarinaWorkspaceAggregationExecutor()
         self.responseBridge = responseBridge ?? MarinaAggregationResponseBridge()
         self.workspaceAggregationResponseBridge = workspaceAggregationResponseBridge ?? MarinaWorkspaceAggregationResponseBridge()
@@ -104,7 +107,8 @@ struct MarinaSharedPipelineCoordinator {
 
         if let selected = selectExecutable(
             modelEvaluation: modelEvaluation,
-            heuristicEvaluation: heuristicEvaluation
+            heuristicEvaluation: heuristicEvaluation,
+            preferModelWhenAvailable: context.aiOptInEnabled && modelAvailability == .available
         ) {
             let trace = trace(
                 context: context,
@@ -247,6 +251,27 @@ struct MarinaSharedPipelineCoordinator {
                 }
             case .failure:
                 if case .executable(let plan) = outcome {
+                    switch composableWorkspaceQueryExecutor.execute(
+                        candidate: candidate,
+                        resolved: resolved,
+                        plan: plan,
+                        provider: provider,
+                        now: now
+                    ) {
+                    case .handled(let card):
+                        let answer = workspaceAggregationResponseBridge.responseCompatibleAnswer(from: card)
+                        return CandidateEvaluation(
+                            candidate: candidate,
+                            resolved: resolved,
+                            validationOutcome: outcome,
+                            aggregationResult: .workspaceCard(card),
+                            answer: answer,
+                            workspaceAggregationCard: card
+                        )
+                    case .unsupported:
+                        break
+                    }
+
                     switch workspaceAggregationExecutor.execute(plan: plan, provider: provider, now: now) {
                     case .handled(let card):
                         let answer = workspaceAggregationResponseBridge.responseCompatibleAnswer(from: card)
@@ -274,14 +299,18 @@ struct MarinaSharedPipelineCoordinator {
 
     private func selectExecutable(
         modelEvaluation: CandidateEvaluation?,
-        heuristicEvaluation: CandidateEvaluation?
+        heuristicEvaluation: CandidateEvaluation?,
+        preferModelWhenAvailable: Bool
     ) -> CandidateEvaluation? {
         let modelExecutable = modelEvaluation?.isExecutableHandled == true ? modelEvaluation : nil
         let heuristicExecutable = heuristicEvaluation?.isExecutableHandled == true ? heuristicEvaluation : nil
 
         switch (modelExecutable, heuristicExecutable) {
         case (.some(let model), .some(let heuristic)):
-            return materiallyDiffer(model: model, heuristic: heuristic) ? heuristic : model
+            if materiallyDiffer(model: model, heuristic: heuristic) {
+                return preferModelWhenAvailable ? model : heuristic
+            }
+            return model
         case (.some(let model), .none):
             return model
         case (.none, .some(let heuristic)):

@@ -193,7 +193,7 @@ private extension MarinaNaturalLanguageProbeTests {
         .init(group: "Favorite Mini Pack", prompt: "Where did most of my money go this month?", expectedOutcome: .executable, expectedMetric: .topCategories),
         .init(group: "Favorite Mini Pack", prompt: "What stores got the most money from me?", expectedOutcome: .executable, expectedMetric: .topMerchants),
         .init(group: "Favorite Mini Pack", prompt: "Which purchases cost me the most?", expectedOutcome: .executable, expectedMetric: .largestTransactions),
-        .init(group: "Favorite Mini Pack", prompt: "If I spend $50 on Food & Drink, how will that affect my budget?", expectedOutcome: .unsupported, notes: "Simulation is intentionally blocked.")
+        .init(group: "Favorite Mini Pack", prompt: "If I spend $50 on Food & Drink, how will that affect my budget?", expectedOutcome: .executable, notes: "Simulation executes through composable workspace query when the category resolves.")
     ]
 
     static let phase2Sections: [ProbeSection] = [
@@ -249,11 +249,11 @@ private extension MarinaNaturalLanguageProbeTests {
             .init(group: "Workspace Aggregations", prompt: "Show shared balances.", expectedOutcome: .executable)
         ]),
         ProbeSection(title: "Intentional Unsupported And Clarification", cases: [
-            .init(group: "Intentional Unsupported And Clarification", prompt: "Which card is eating most of my budget?", expectedOutcome: .unsupported, notes: "Card ranking is intentionally blocked; clarification is also acceptable diagnostically."),
-            .init(group: "Intentional Unsupported And Clarification", prompt: "What did I spend on Apple Card outside of Food & Drink?", expectedOutcome: .unsupported, notes: "Exclusion filters are intentionally blocked."),
-            .init(group: "Intentional Unsupported And Clarification", prompt: "If I spend $50 on Food & Drink, how will that affect my budget?", expectedOutcome: .unsupported, notes: "Simulation is intentionally blocked."),
-            .init(group: "Intentional Unsupported And Clarification", prompt: "What expenses made this month higher than last month?", expectedOutcome: .unsupported, notes: "Transaction delta drivers are intentionally blocked."),
-            .init(group: "Intentional Unsupported And Clarification", prompt: "What was my average weekly grocery spending over the last 3 months?", expectedOutcome: .unsupported, notes: "Targeted weekly average combinations are intentionally blocked.")
+            .init(group: "Composable Workspace Queries", prompt: "Which card is eating most of my budget?", expectedOutcome: .executable, notes: "Card ranking executes through composable workspace query."),
+            .init(group: "Composable Workspace Queries", prompt: "What did I spend on Apple Card outside of Food & Drink?", expectedOutcome: .executable, notes: "Exclusion filters execute through composable workspace query."),
+            .init(group: "Composable Workspace Queries", prompt: "If I spend $50 on Food & Drink, how will that affect my budget?", expectedOutcome: .executable, notes: "Simulation executes through composable workspace query."),
+            .init(group: "Composable Workspace Queries", prompt: "What expenses made this month higher than last month?", expectedOutcome: .executable, notes: "Delta drivers execute through composable workspace query."),
+            .init(group: "Composable Workspace Queries", prompt: "What was my average weekly grocery spending over the last 3 months?", expectedOutcome: .executable, notes: "Targeted weekly average executes through composable workspace query.")
         ])
     ]
 

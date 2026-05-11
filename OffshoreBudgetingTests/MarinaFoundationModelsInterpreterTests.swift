@@ -175,6 +175,111 @@ struct MarinaFoundationModelsInterpreterTests {
         #expect(candidate.responseShapeHint == .rankedList)
     }
 
+    @Test func semanticCommand_listLastFiveCannabisPurchases_buildsFilteredRowList() {
+        let command = MarinaSemanticCommand(
+            family: .analytics,
+            action: .listRows,
+            datasets: [.variableExpenses, .plannedExpenses],
+            measure: nil,
+            includeFilters: [
+                MarinaSemanticCommandFilter(
+                    rawText: "Cannabis",
+                    allowedTypes: [.category, .merchant, .expense]
+                )
+            ],
+            excludeFilters: [],
+            grouping: .transaction,
+            sort: .newest,
+            dateRange: nil,
+            comparisonDateRange: nil,
+            periodUnit: nil,
+            limit: 5,
+            requestedDetail: nil
+        )
+
+        let candidate = MarinaFoundationModelsInterpreter().candidate(
+            from: .semanticCommand(command),
+            prompt: "List my last 5 Cannabis purchases",
+            defaultPeriodUnit: .month
+        )
+
+        #expect(candidate.semanticCommand == command)
+        #expect(candidate.operation == .listRows)
+        #expect(candidate.measure == .transactionAmount)
+        #expect(candidate.grouping?.dimension == .transaction)
+        #expect(candidate.ranking?.direction == .newest)
+        #expect(candidate.limit == 5)
+        #expect(candidate.entityMentions.first?.rawText == "Cannabis")
+        #expect(candidate.entityMentions.first?.allowedTypeHints == [.category, .merchant, .expense])
+    }
+
+    @Test func semanticCommand_exclusionFilter_buildsIncludeAndExcludeMentions() {
+        let command = MarinaSemanticCommand(
+            family: .analytics,
+            action: .total,
+            datasets: [.variableExpenses, .plannedExpenses],
+            measure: .spend,
+            includeFilters: [
+                MarinaSemanticCommandFilter(rawText: "Apple Card", allowedTypes: [.card])
+            ],
+            excludeFilters: [
+                MarinaSemanticCommandFilter(rawText: "Food & Drink", allowedTypes: [.category])
+            ],
+            grouping: nil,
+            sort: nil,
+            dateRange: nil,
+            comparisonDateRange: nil,
+            periodUnit: .month,
+            limit: nil,
+            requestedDetail: nil
+        )
+
+        let candidate = MarinaFoundationModelsInterpreter().candidate(
+            from: .semanticCommand(command),
+            prompt: "What did I spend on Apple Card outside of Food & Drink?",
+            defaultPeriodUnit: .month
+        )
+
+        #expect(candidate.operation == .sum)
+        #expect(candidate.measure == .spend)
+        #expect(candidate.entityMentions.map(\.role) == [.filter, .excludeFilter])
+        #expect(candidate.entityMentions.map(\.rawText) == ["Apple Card", "Food & Drink"])
+        #expect(candidate.entityMentions[0].typeHint == .card)
+        #expect(candidate.entityMentions[1].typeHint == .category)
+    }
+
+    @Test func semanticCommand_simulation_buildsDeterministicSimulationCandidate() {
+        let command = MarinaSemanticCommand(
+            family: .planning,
+            action: .simulate,
+            datasets: [.variableExpenses],
+            measure: nil,
+            includeFilters: [
+                MarinaSemanticCommandFilter(rawText: "Groceries", allowedTypes: [.category])
+            ],
+            excludeFilters: [],
+            grouping: nil,
+            sort: nil,
+            dateRange: nil,
+            comparisonDateRange: nil,
+            periodUnit: .month,
+            limit: nil,
+            requestedDetail: nil
+        )
+
+        let candidate = MarinaFoundationModelsInterpreter().candidate(
+            from: .semanticCommand(command),
+            prompt: "If I spend $50 on Groceries, how will that affect my budget?",
+            defaultPeriodUnit: .month
+        )
+
+        #expect(candidate.requestFamily == .planning)
+        #expect(candidate.operation == .simulate)
+        #expect(candidate.measure == .remainingBudget)
+        #expect(candidate.entityMentions.first?.role == .simulationInput)
+        #expect(candidate.responseShapeHint == .summaryCard)
+    }
+
     @Test func foundationModels_whatIfPromptDoesNotSolveMultiEntityExtraction() {
         let candidate = MarinaFoundationModelsInterpreter().candidate(
             from: .query(

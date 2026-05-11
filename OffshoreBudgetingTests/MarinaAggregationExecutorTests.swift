@@ -260,6 +260,200 @@ struct MarinaAggregationExecutorTests {
         #expect(answer.rows.first?.title == "Salary")
     }
 
+    @Test func composableExecutor_cardRankingAndExclusionUseBudgetImpactRows() throws {
+        let fixture = try makeFixture()
+        try fixture.seedSpendData()
+        let executor = MarinaComposableWorkspaceQueryExecutor(calendar: Calendar(identifier: .gregorian))
+        let range = monthRange()
+
+        let cardRanking = handledCard(executor.execute(
+            candidate: candidate(
+                prompt: "Which card is eating the most of my budget?",
+                operation: .rank,
+                measure: .spend
+            ),
+            resolved: resolvedCandidate(),
+            plan: MarinaAggregationPlan(
+                operation: .rank,
+                measure: .spend,
+                dateRange: range,
+                grouping: MarinaGroupingCandidate(dimension: .card),
+                ranking: MarinaRankingCandidate(direction: .top)
+            ),
+            provider: fixture.provider,
+            now: date(2026, 5, 15)
+        ))
+        #expect(cardRanking.title == "Cards by Budget Impact")
+        #expect(cardRanking.rows.first?.label == "Apple Card")
+        #expect(cardRanking.rows.first?.value.filter(\.isNumber).contains("500") == true)
+
+        let cardMention = mention("apple card", .card)
+        let categoryMention = mention("groceries", .category)
+        let filtered = handledCard(executor.execute(
+            candidate: candidate(
+                prompt: "What did I spend on Apple Card outside of Groceries?",
+                operation: .sum,
+                measure: .spend,
+                mentions: [cardMention, categoryMention]
+            ),
+            resolved: resolvedCandidate(targets: [
+                resolvedTarget(mention: cardMention, role: .filter, entityType: .card, displayName: "Apple Card", sourceID: fixture.appleCard.id),
+                resolvedTarget(mention: categoryMention, role: .filter, entityType: .category, displayName: "Groceries", sourceID: fixture.groceries.id)
+            ]),
+            plan: MarinaAggregationPlan(
+                operation: .sum,
+                measure: .spend,
+                targets: [
+                    target(.card, "Apple Card", sourceID: fixture.appleCard.id),
+                    target(.category, "Groceries", sourceID: fixture.groceries.id)
+                ],
+                dateRange: range
+            ),
+            provider: fixture.provider,
+            now: date(2026, 5, 15)
+        ))
+        #expect(filtered.primaryValue?.filter(\.isNumber).contains("200") == true)
+        #expect(filtered.rows.allSatisfy { $0.label.contains("Travel") })
+    }
+
+    @Test func composableExecutor_recentFilteredPurchasesAndTargetedAverages() throws {
+        let fixture = try makeFixture()
+        let cannabis = Offshore.Category(name: "Cannabis", hexColor: "#225522", workspace: fixture.workspace)
+        fixture.context.insert(cannabis)
+        for day in 1...6 {
+            fixture.context.insert(VariableExpense(
+                descriptionText: "Cannabis Purchase \(day)",
+                amount: Double(day * 10),
+                transactionDate: date(2026, 5, day),
+                workspace: fixture.workspace,
+                card: fixture.appleCard,
+                category: cannabis
+            ))
+        }
+        fixture.context.insert(VariableExpense(descriptionText: "Groceries Week 1", amount: 70, transactionDate: date(2026, 5, 1), workspace: fixture.workspace, card: fixture.appleCard, category: fixture.groceries))
+        fixture.context.insert(VariableExpense(descriptionText: "Groceries Week 2", amount: 140, transactionDate: date(2026, 5, 8), workspace: fixture.workspace, card: fixture.appleCard, category: fixture.groceries))
+        try fixture.context.save()
+
+        let executor = MarinaComposableWorkspaceQueryExecutor(calendar: Calendar(identifier: .gregorian))
+        let categoryMention = mention("cannabis", .category)
+        let recent = handledCard(executor.execute(
+            candidate: candidate(prompt: "List my last 5 Cannabis purchases", operation: .rank, measure: .transactionAmount, mentions: [categoryMention]),
+            resolved: resolvedCandidate(targets: [
+                resolvedTarget(mention: categoryMention, role: .filter, entityType: .category, displayName: "Cannabis", sourceID: cannabis.id)
+            ]),
+            plan: MarinaAggregationPlan(
+                operation: .rank,
+                measure: .transactionAmount,
+                targets: [target(.category, "Cannabis", sourceID: cannabis.id)],
+                grouping: MarinaGroupingCandidate(dimension: .transaction),
+                ranking: MarinaRankingCandidate(direction: .newest, limit: 5),
+                limit: 5
+            ),
+            provider: fixture.provider,
+            now: date(2026, 5, 15)
+        ))
+        #expect(recent.rows.count == 5)
+        #expect(recent.rows.first?.label == "Cannabis Purchase 6")
+
+        let groceriesMention = mention("groceries", .category)
+        let average = handledCard(executor.execute(
+            candidate: candidate(prompt: "What was my average weekly Groceries spending over the last 3 months?", operation: .average, measure: .spend, mentions: [groceriesMention]),
+            resolved: resolvedCandidate(targets: [
+                resolvedTarget(mention: groceriesMention, role: .primaryTarget, entityType: .category, displayName: "Groceries", sourceID: fixture.groceries.id)
+            ]),
+            plan: MarinaAggregationPlan(
+                operation: .average,
+                measure: .spend,
+                targets: [target(.category, "Groceries", sourceID: fixture.groceries.id)],
+                dateRange: monthRange(),
+                grouping: MarinaGroupingCandidate(dimension: .week)
+            ),
+            provider: fixture.provider,
+            now: date(2026, 5, 15)
+        ))
+        #expect(average.title == "Average Weekly Spending")
+        #expect(average.rows.isEmpty == false)
+        #expect(average.primaryValue != nil)
+    }
+
+    @Test func composableExecutor_deltaReconciliationAndSimulationReturnCards() throws {
+        let fixture = try makeFixture()
+        let food = fixture.groceries
+        let shared = AllocationAccount(name: "Roommate", workspace: fixture.workspace)
+        let allocatedExpense = VariableExpense(descriptionText: "Dinner", amount: 120, transactionDate: date(2026, 5, 5), workspace: fixture.workspace, card: fixture.appleCard, category: food)
+        fixture.context.insert(shared)
+        fixture.context.insert(allocatedExpense)
+        fixture.context.insert(ExpenseAllocation(allocatedAmount: 60, workspace: fixture.workspace, account: shared, expense: allocatedExpense))
+        fixture.context.insert(VariableExpense(descriptionText: "May Groceries", amount: 300, transactionDate: date(2026, 5, 8), workspace: fixture.workspace, card: fixture.appleCard, category: food))
+        fixture.context.insert(VariableExpense(descriptionText: "April Groceries", amount: 100, transactionDate: date(2026, 4, 8), workspace: fixture.workspace, card: fixture.appleCard, category: food))
+        let budget = Budget(name: "May", startDate: date(2026, 5, 1), endDate: date(2026, 5, 31), workspace: fixture.workspace)
+        fixture.context.insert(budget)
+        fixture.context.insert(BudgetCategoryLimit(maxAmount: 350, budget: budget, category: food))
+        fixture.context.insert(Income(source: "Planned", amount: 1_000, date: date(2026, 5, 1), isPlanned: true, workspace: fixture.workspace))
+        try fixture.context.save()
+
+        let executor = MarinaComposableWorkspaceQueryExecutor(calendar: Calendar(identifier: .gregorian))
+        let primary = monthRange()
+        let comparison = HomeQueryDateRange(startDate: date(2026, 4, 1), endDate: date(2026, 4, 30))
+
+        let delta = handledCard(executor.execute(
+            candidate: candidate(prompt: "Which expenses made this month higher than last month?", operation: .compare, measure: .spend),
+            resolved: resolvedCandidate(),
+            plan: MarinaAggregationPlan(
+                operation: .compare,
+                measure: .spend,
+                dateRange: primary,
+                comparisonDateRange: comparison,
+                grouping: MarinaGroupingCandidate(dimension: .category),
+                ranking: MarinaRankingCandidate(direction: .largest)
+            ),
+            provider: fixture.provider,
+            now: date(2026, 5, 15)
+        ))
+        #expect(delta.title == "Spending Increase Drivers")
+        #expect(delta.rows.first?.label == "Groceries")
+
+        let accountMention = mention("roommate", .allocationAccount)
+        let categoryMention = mention("groceries", .category)
+        let allocated = handledCard(executor.execute(
+            candidate: candidate(prompt: "How much did Roommate spend on Groceries?", operation: .sum, measure: .spend, mentions: [accountMention, categoryMention]),
+            resolved: resolvedCandidate(targets: [
+                resolvedTarget(mention: accountMention, role: .filter, entityType: .allocationAccount, displayName: "Roommate", sourceID: shared.id),
+                resolvedTarget(mention: categoryMention, role: .filter, entityType: .category, displayName: "Groceries", sourceID: food.id)
+            ]),
+            plan: MarinaAggregationPlan(
+                operation: .sum,
+                measure: .spend,
+                targets: [
+                    target(.allocationAccount, "Roommate", sourceID: shared.id),
+                    target(.category, "Groceries", sourceID: food.id)
+                ],
+                dateRange: primary
+            ),
+            provider: fixture.provider,
+            now: date(2026, 5, 15)
+        ))
+        #expect(allocated.primaryValue?.filter(\.isNumber).contains("60") == true)
+
+        let simulationMention = mention("groceries", .category, role: .simulationInput)
+        let simulation = handledCard(executor.execute(
+            candidate: candidate(prompt: "If I spend $50 on Groceries, how will that affect my budget?", operation: .simulate, measure: .remainingBudget, mentions: [simulationMention]),
+            resolved: resolvedCandidate(targets: [
+                resolvedTarget(mention: simulationMention, role: .simulationInput, entityType: .category, displayName: "Groceries", sourceID: food.id)
+            ]),
+            plan: MarinaAggregationPlan(
+                operation: .simulate,
+                measure: .remainingBudget,
+                targets: [target(.category, "Groceries", role: .simulationInput, sourceID: food.id)],
+                dateRange: primary
+            ),
+            provider: fixture.provider,
+            now: date(2026, 5, 15)
+        ))
+        #expect(simulation.title == "What-If Budget Impact")
+        #expect(simulation.rows.contains(where: { $0.label == "Category limit" }))
+    }
+
     private func executable(_ plan: MarinaAggregationPlan) throws -> MarinaExecutableAggregationPlan {
         switch MarinaAggregationPlanHomeQueryAdapter().executablePlan(from: plan) {
         case .success(let executable):
@@ -292,8 +486,72 @@ struct MarinaAggregationExecutorTests {
         return card
     }
 
-    private func target(_ type: MarinaCandidateEntityTypeHint, _ name: String) -> MarinaResolvedAggregationTarget {
-        MarinaResolvedAggregationTarget(role: .primaryTarget, entityType: type, displayName: name)
+    private func handledCard(_ result: MarinaComposableWorkspaceQueryExecutionResult) -> MarinaWorkspaceAggregationCard {
+        guard case .handled(let card) = result else {
+            Issue.record("Expected composable workspace card.")
+            return MarinaWorkspaceAggregationCard(title: "Missing", traceSummary: "missing")
+        }
+        return card
+    }
+
+    private func target(
+        _ type: MarinaCandidateEntityTypeHint,
+        _ name: String,
+        role: MarinaResolvedTargetRole = .primaryTarget,
+        sourceID: UUID? = nil
+    ) -> MarinaResolvedAggregationTarget {
+        MarinaResolvedAggregationTarget(role: role, entityType: type, displayName: name, sourceID: sourceID)
+    }
+
+    private func candidate(
+        prompt: String,
+        operation: MarinaCandidateOperation,
+        measure: MarinaCandidateMeasure,
+        mentions: [MarinaUnresolvedEntityMention] = []
+    ) -> MarinaQueryPlanCandidate {
+        MarinaQueryPlanCandidate(
+            source: .heuristic,
+            rawPrompt: prompt,
+            operation: operation,
+            measure: measure,
+            entityMentions: mentions
+        )
+    }
+
+    private func mention(
+        _ rawText: String,
+        _ type: MarinaCandidateEntityTypeHint,
+        role: MarinaEntityMentionRole = .filter
+    ) -> MarinaUnresolvedEntityMention {
+        MarinaUnresolvedEntityMention(role: role, rawText: rawText, typeHint: type)
+    }
+
+    private func resolvedCandidate(targets: [MarinaResolvedEntityMention] = []) -> MarinaResolvedQueryCandidate {
+        MarinaResolvedQueryCandidate(
+            candidate: candidate(prompt: "test", operation: .sum, measure: .spend),
+            resolvedTargets: targets,
+            unresolvedMentions: [],
+            ambiguousMentions: [],
+            primaryDateRange: nil,
+            comparisonDateRange: nil
+        )
+    }
+
+    private func resolvedTarget(
+        mention: MarinaUnresolvedEntityMention,
+        role: MarinaResolvedTargetRole,
+        entityType: MarinaCandidateEntityTypeHint,
+        displayName: String,
+        sourceID: UUID? = nil
+    ) -> MarinaResolvedEntityMention {
+        MarinaResolvedEntityMention(
+            id: mention.id,
+            mention: mention,
+            role: role,
+            entityType: entityType,
+            displayName: displayName,
+            sourceID: sourceID
+        )
     }
 
     private func monthRange() -> HomeQueryDateRange {

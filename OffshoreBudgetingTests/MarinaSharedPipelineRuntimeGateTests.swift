@@ -83,19 +83,14 @@ struct MarinaSharedPipelineRuntimeGateTests {
         }
     }
 
-    @Test func runtimeGate_phase6DBlockedShapesDoNotExecuteOrFallback() async throws {
+    @Test func runtimeGate_remainingBlockedShapesDoNotExecuteOrFallback() async throws {
         let fixture = try makeFixture()
         try fixture.seedSpendData()
 
         let prompts = [
-            "What card is eating most of my budget this period?",
             "Is Shopping over where it should be for this budget?",
-            "What did I spend on Apple Card outside of Food & Drink?",
             "If I keep spending like this, how much will I have left by the end of the period?",
-            "If I add $75 to Shopping, does Transportation still have room?",
-            "What category changed the most compared to last month?",
-            "What expenses are making this month higher than last month?",
-            "What was my average weekly spending on groceries over the last 3 months?"
+            "If I add $75 to Shopping, does Transportation still have room?"
         ]
 
         for prompt in prompts {
@@ -167,25 +162,31 @@ struct MarinaSharedPipelineRuntimeGateTests {
         #expect(trace.executorResultSummary == nil)
     }
 
-    @Test func runtimeGate_simulationDoesNotExecute() async throws {
+    @Test func runtimeGate_simulationExecutesThroughComposableWorkspaceQuery() async throws {
         let fixture = try makeFixture()
+        let budget = Budget(name: "May", startDate: sharedPipelineDate(2026, 5, 1), endDate: sharedPipelineDate(2026, 5, 31), workspace: fixture.workspace)
+        fixture.context.insert(budget)
+        fixture.context.insert(BudgetCategoryLimit(maxAmount: 500, budget: budget, category: fixture.groceries))
+        fixture.context.insert(Income(source: "Planned", amount: 1_000, date: sharedPipelineDate(2026, 5, 1), isPlanned: true, workspace: fixture.workspace))
+        try fixture.context.save()
+
         let result = await MarinaSharedPipelineCoordinator().run(
-            prompt: "If I add $75 to Shopping, does Transportation still have room?",
+            prompt: "If I spend $50 on Groceries, how will that affect my budget?",
             context: sharedContext(fixture: fixture)
         )
 
-        guard case .validationBlocked(_, let outcome, let trace) = result else {
-            Issue.record("Simulation should not execute in Phase 6.")
+        guard case .handled(let answer, let aggregationResult, let homeQueryPlan, let trace) = result else {
+            Issue.record("Simulation should execute through composable workspace query.")
             return
         }
-        guard case .unsupported(let unsupported) = outcome else {
-            Issue.record("Expected typed unsupported.")
+        #expect(answer.title == "What-If Budget Impact")
+        #expect(homeQueryPlan == nil)
+        guard case .workspaceCard = aggregationResult else {
+            Issue.record("Expected simulation workspace card.")
             return
         }
-        #expect(unsupported.kind == .unsupportedSimulation)
-        #expect(trace.validatorOutcomeSummary?.contains("unsupported") == true)
+        #expect(trace.executorResultSummary?.contains("composableWorkspace=simulation") == true)
         #expect(trace.fallbackReason == nil)
-        #expect(trace.executorResultSummary == nil)
     }
 
     private func seedMarchAprilGroceries(_ fixture: MarinaPhase5Fixture) throws {

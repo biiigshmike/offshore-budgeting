@@ -22,6 +22,8 @@ enum MarinaCandidateOperation: String, Codable, Equatable, Sendable {
     case trend
     case forecast
     case simulate
+    case listRows
+    case lookupDetails
 }
 
 enum MarinaCandidateMeasure: String, Codable, Equatable, Sendable {
@@ -53,6 +55,7 @@ enum MarinaCandidateEntityTypeHint: String, Codable, Equatable, CaseIterable, Se
 
 enum MarinaEntityMentionRole: String, Codable, Equatable, CaseIterable, Sendable {
     case filter
+    case excludeFilter
     case primaryTarget
     case comparisonTarget
     case groupingDimension
@@ -65,6 +68,7 @@ struct MarinaUnresolvedEntityMention: Codable, Equatable, Identifiable, Sendable
     let role: MarinaEntityMentionRole
     let rawText: String?
     let typeHint: MarinaCandidateEntityTypeHint?
+    let allowedTypeHints: [MarinaCandidateEntityTypeHint]?
     let confidence: MarinaCandidateConfidence
 
     init(
@@ -72,12 +76,14 @@ struct MarinaUnresolvedEntityMention: Codable, Equatable, Identifiable, Sendable
         role: MarinaEntityMentionRole,
         rawText: String?,
         typeHint: MarinaCandidateEntityTypeHint?,
+        allowedTypeHints: [MarinaCandidateEntityTypeHint]? = nil,
         confidence: MarinaCandidateConfidence = .medium
     ) {
         self.id = id
         self.role = role
         self.rawText = rawText
         self.typeHint = typeHint
+        self.allowedTypeHints = allowedTypeHints
         self.confidence = confidence
     }
 }
@@ -142,6 +148,7 @@ enum MarinaRankingDirectionCandidate: String, Codable, Equatable, Sendable {
     case smallest
     case mostFrequent
     case leastFrequent
+    case newest
 }
 
 struct MarinaRankingCandidate: Codable, Equatable, Sendable {
@@ -182,6 +189,71 @@ enum MarinaRequestFamily: String, Codable, Sendable, Equatable {
     case unsupported
 }
 
+enum MarinaSemanticCommandAction: String, Codable, Equatable, Sendable {
+    case total
+    case listRows
+    case rank
+    case group
+    case compare
+    case average
+    case simulate
+    case lookupDetails
+}
+
+enum MarinaSemanticCommandDataset: String, Codable, Equatable, Sendable {
+    case variableExpenses
+    case plannedExpenses
+    case income
+    case cards
+    case categories
+    case presets
+    case budgets
+    case savingsLedger
+    case reconciliation
+}
+
+enum MarinaSemanticCommandSort: String, Codable, Equatable, Sendable {
+    case newest
+    case largest
+    case deltaDescending
+    case groupedTotalDescending
+}
+
+enum MarinaSemanticRequestedDetail: String, Codable, Equatable, Sendable {
+    case general
+    case date
+    case amount
+    case card
+    case category
+    case status
+    case schedule
+    case recurrence
+    case account
+    case balance
+    case linkedObjects
+}
+
+struct MarinaSemanticCommandFilter: Codable, Equatable, Sendable {
+    let rawText: String
+    let allowedTypes: [MarinaCandidateEntityTypeHint]
+}
+
+struct MarinaSemanticCommand: Codable, Equatable, Sendable {
+    let family: MarinaRequestFamily
+    let action: MarinaSemanticCommandAction
+    let datasets: [MarinaSemanticCommandDataset]
+    let measure: MarinaCandidateMeasure?
+    let includeFilters: [MarinaSemanticCommandFilter]
+    let excludeFilters: [MarinaSemanticCommandFilter]
+    let grouping: MarinaGroupingDimensionCandidate?
+    let sort: MarinaSemanticCommandSort?
+    let dateRange: HomeQueryDateRange?
+    let comparisonDateRange: HomeQueryDateRange?
+    let periodUnit: HomeQueryPeriodUnit?
+    let limit: Int?
+    let requestedDetail: MarinaSemanticRequestedDetail?
+}
+
 enum MarinaUnsupportedHint: String, Codable, Equatable, Sendable {
     case unsupportedOperation
     case unsupportedCombination
@@ -218,6 +290,7 @@ struct MarinaQueryPlanCandidate: Codable, Equatable, Sendable {
     let confidence: MarinaCandidateConfidence
     let unsupportedHint: MarinaUnsupportedHint?
     let databaseLookupRequest: MarinaDatabaseLookupRequest?
+    let semanticCommand: MarinaSemanticCommand?
 
     init(
         requestFamily: MarinaRequestFamily = .analytics,
@@ -233,7 +306,8 @@ struct MarinaQueryPlanCandidate: Codable, Equatable, Sendable {
         responseShapeHint: MarinaResponseShapeHint? = nil,
         confidence: MarinaCandidateConfidence = .medium,
         unsupportedHint: MarinaUnsupportedHint? = nil,
-        databaseLookupRequest: MarinaDatabaseLookupRequest? = nil
+        databaseLookupRequest: MarinaDatabaseLookupRequest? = nil,
+        semanticCommand: MarinaSemanticCommand? = nil
     ) {
         self.requestFamily = requestFamily
         self.source = source
@@ -249,5 +323,6 @@ struct MarinaQueryPlanCandidate: Codable, Equatable, Sendable {
         self.confidence = confidence
         self.unsupportedHint = unsupportedHint
         self.databaseLookupRequest = databaseLookupRequest
+        self.semanticCommand = semanticCommand
     }
 }

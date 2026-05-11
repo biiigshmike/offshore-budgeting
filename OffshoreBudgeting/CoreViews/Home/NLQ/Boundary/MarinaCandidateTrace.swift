@@ -9,6 +9,7 @@ struct MarinaCandidateTrace: Codable, Equatable {
     let timeScopeSummaries: [String]
     let groupingSummary: String?
     let rankingSummary: String?
+    let semanticCommandSummary: String?
     let responseShapeHint: MarinaResponseShapeHint?
     let validatorOutcomeSummary: String?
     let executablePlanSummary: String?
@@ -26,6 +27,7 @@ struct MarinaCandidateTrace: Codable, Equatable {
         self.timeScopeSummaries = candidate?.timeScopes.map(Self.timeScopeSummary) ?? []
         self.groupingSummary = candidate?.grouping.map(Self.groupingSummary)
         self.rankingSummary = candidate?.ranking.map(Self.rankingSummary)
+        self.semanticCommandSummary = candidate?.semanticCommand.map(Self.semanticCommandSummary)
         self.responseShapeHint = candidate?.responseShapeHint
         self.validatorOutcomeSummary = validatorOutcomeSummary
         self.executablePlanSummary = executablePlanSummary
@@ -41,6 +43,7 @@ struct MarinaCandidateTrace: Codable, Equatable {
             timeScopeSummaries.isEmpty ? nil : "timeScopes=\(timeScopeSummaries.joined(separator: ";"))",
             groupingSummary.map { "grouping=\($0)" },
             rankingSummary.map { "ranking=\($0)" },
+            semanticCommandSummary.map { "semantic=\($0)" },
             responseShapeHint.map { "responseHint=\($0.rawValue)" },
             validatorOutcomeSummary.map { "validator=\($0)" },
             executablePlanSummary.map { "plan=\($0)" }
@@ -52,7 +55,7 @@ struct MarinaCandidateTrace: Codable, Equatable {
     nonisolated private static func entityMentionSummary(_ mention: MarinaUnresolvedEntityMention) -> String {
         [
             mention.role.rawValue,
-            mention.typeHint?.rawValue ?? "unknown",
+            mention.allowedTypeHints?.map(\.rawValue).joined(separator: "|") ?? mention.typeHint?.rawValue ?? "unknown",
             mention.rawText ?? "nil",
             mention.confidence.rawValue
         ].joined(separator: ":")
@@ -82,6 +85,15 @@ struct MarinaCandidateTrace: Codable, Equatable {
             ranking.direction.rawValue,
             ranking.limit.map(String.init) ?? "nil",
             ranking.rawText ?? "nil"
+        ].joined(separator: ":")
+    }
+
+    nonisolated private static func semanticCommandSummary(_ command: MarinaSemanticCommand) -> String {
+        [
+            command.action.rawValue,
+            command.datasets.map(\.rawValue).joined(separator: "|"),
+            command.sort?.rawValue ?? "nil",
+            command.limit.map(String.init) ?? "nil"
         ].joined(separator: ":")
     }
 }

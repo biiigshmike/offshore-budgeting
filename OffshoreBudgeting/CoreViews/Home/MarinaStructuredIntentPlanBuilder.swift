@@ -53,6 +53,8 @@ struct MarinaStructuredIntentPlanBuilder {
     ) -> MarinaInterpretedRequest {
         MarinaTraceRecorder.shared.recordModelOutputSummary("\(structuredIntent)")
         switch structuredIntent {
+        case .semanticCommand:
+            return .unresolved
         case .query(let queryIntent):
             return buildQueryRequest(
                 from: queryIntent,

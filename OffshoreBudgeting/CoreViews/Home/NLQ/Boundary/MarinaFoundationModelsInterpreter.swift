@@ -26,6 +26,13 @@ struct MarinaFoundationModelsInterpreter {
         prompt: String,
         defaultPeriodUnit: HomeQueryPeriodUnit
     ) -> MarinaQueryPlanCandidate {
+        if case .semanticCommand(let command) = structuredIntent {
+            return candidate(
+                from: command,
+                prompt: prompt
+            )
+        }
+
         if shouldPreferAnalyticsOverLookup(prompt) == false,
            let lookupRequest = MarinaDatabaseLookupDetector().detect(
             prompt: prompt,
@@ -42,6 +49,12 @@ struct MarinaFoundationModelsInterpreter {
         }
 
         switch structuredIntent {
+        case .semanticCommand:
+            return unsupportedCandidate(
+                prompt: prompt,
+                confidence: .low,
+                unsupportedHint: .lowConfidence
+            )
         case .query(let queryIntent):
             return candidate(
                 from: queryIntent,
@@ -68,6 +81,245 @@ struct MarinaFoundationModelsInterpreter {
                 confidence: .low,
                 unsupportedHint: .lowConfidence
             )
+        }
+    }
+
+    private func candidate(
+        from command: MarinaSemanticCommand,
+        prompt: String
+    ) -> MarinaQueryPlanCandidate {
+        let operation = operation(from: command.action)
+        let measure = command.measure ?? measure(from: command)
+        let responseShape = responseShapeHint(from: command, operation: operation, measure: measure)
+
+        if command.family == .databaseLookup,
+           let lookupRequest = lookupRequest(from: command, prompt: prompt) {
+            return MarinaQueryPlanCandidate(
+                requestFamily: .databaseLookup,
+                source: .foundationModels,
+                rawPrompt: prompt,
+                limit: command.limit,
+                confidence: .high,
+                databaseLookupRequest: lookupRequest,
+                semanticCommand: command
+            )
+        }
+
+        return MarinaQueryPlanCandidate(
+            requestFamily: command.family,
+            source: .foundationModels,
+            rawPrompt: prompt,
+            operation: operation,
+            measure: measure,
+            entityMentions: entityMentions(from: command),
+            timeScopes: timeScopes(from: command),
+            grouping: command.grouping.map { MarinaGroupingCandidate(dimension: $0) },
+            ranking: ranking(from: command),
+            limit: command.limit,
+            responseShapeHint: responseShape,
+            confidence: .high,
+            semanticCommand: command
+        )
+    }
+
+    private func operation(from action: MarinaSemanticCommandAction) -> MarinaCandidateOperation {
+        switch action {
+        case .total:
+            return .sum
+        case .listRows:
+            return .listRows
+        case .rank:
+            return .rank
+        case .group:
+            return .sum
+        case .compare:
+            return .compare
+        case .average:
+            return .average
+        case .simulate:
+            return .simulate
+        case .lookupDetails:
+            return .lookupDetails
+        }
+    }
+
+    private func measure(from command: MarinaSemanticCommand) -> MarinaCandidateMeasure? {
+        switch command.action {
+        case .listRows:
+            return .transactionAmount
+        case .simulate:
+            return .remainingBudget
+        case .rank, .group, .total, .compare, .average:
+            if command.datasets.contains(.income) {
+                return .income
+            }
+            if command.datasets.contains(.savingsLedger) {
+                return .savingsMovement
+            }
+            if command.datasets.contains(.reconciliation) {
+                return .reconciliationBalance
+            }
+            return .spend
+        case .lookupDetails:
+            return nil
+        }
+    }
+
+    private func entityMentions(from command: MarinaSemanticCommand) -> [MarinaUnresolvedEntityMention] {
+        let includeMentions = command.includeFilters.map { filter in
+            MarinaUnresolvedEntityMention(
+                role: command.action == .simulate ? .simulationInput : .filter,
+                rawText: filter.rawText,
+                typeHint: filter.allowedTypes.count == 1 ? filter.allowedTypes[0] : nil,
+                allowedTypeHints: filter.allowedTypes.isEmpty ? nil : filter.allowedTypes,
+                confidence: .high
+            )
+        }
+        let excludeMentions = command.excludeFilters.map { filter in
+            MarinaUnresolvedEntityMention(
+                role: .excludeFilter,
+                rawText: filter.rawText,
+                typeHint: filter.allowedTypes.count == 1 ? filter.allowedTypes[0] : nil,
+                allowedTypeHints: filter.allowedTypes.isEmpty ? nil : filter.allowedTypes,
+                confidence: .high
+            )
+        }
+        return includeMentions + excludeMentions
+    }
+
+    private func timeScopes(from command: MarinaSemanticCommand) -> [MarinaUnresolvedTimeScope] {
+        var scopes: [MarinaUnresolvedTimeScope] = []
+        if let dateRange = command.dateRange {
+            scopes.append(
+                MarinaUnresolvedTimeScope(
+                    role: command.action == .average ? .lookbackWindow : .primary,
+                    rawText: nil,
+                    resolvedRangeHint: dateRange,
+                    periodUnitHint: command.periodUnit
+                )
+            )
+        }
+        if let comparisonDateRange = command.comparisonDateRange {
+            scopes.append(
+                MarinaUnresolvedTimeScope(
+                    role: .comparison,
+                    rawText: nil,
+                    resolvedRangeHint: comparisonDateRange,
+                    periodUnitHint: command.periodUnit
+                )
+            )
+        }
+        return scopes
+    }
+
+    private func ranking(from command: MarinaSemanticCommand) -> MarinaRankingCandidate? {
+        switch command.action {
+        case .rank:
+            return MarinaRankingCandidate(
+                direction: rankingDirection(from: command.sort) ?? .top,
+                limit: command.limit
+            )
+        case .listRows:
+            return MarinaRankingCandidate(direction: .newest, limit: command.limit)
+        default:
+            return nil
+        }
+    }
+
+    private func rankingDirection(from sort: MarinaSemanticCommandSort?) -> MarinaRankingDirectionCandidate? {
+        switch sort {
+        case .newest:
+            return .newest
+        case .largest:
+            return .largest
+        case .deltaDescending, .groupedTotalDescending:
+            return .top
+        case nil:
+            return nil
+        }
+    }
+
+    private func responseShapeHint(
+        from command: MarinaSemanticCommand,
+        operation: MarinaCandidateOperation,
+        measure: MarinaCandidateMeasure?
+    ) -> MarinaResponseShapeHint? {
+        switch command.action {
+        case .listRows, .rank:
+            return .rankedList
+        case .group:
+            return .groupedBreakdown
+        case .compare:
+            return .comparison
+        case .simulate:
+            return .summaryCard
+        case .lookupDetails:
+            return .summaryCard
+        case .total, .average:
+            return measure == .categoryShare ? .groupedBreakdown : .scalarCurrency
+        }
+    }
+
+    private func lookupRequest(from command: MarinaSemanticCommand, prompt: String) -> MarinaDatabaseLookupRequest? {
+        guard let filter = command.includeFilters.first else { return nil }
+        let objectTypes = command.datasets.compactMap(lookupObjectType)
+        return MarinaDatabaseLookupRequest(
+            rawPrompt: prompt,
+            searchText: filter.rawText,
+            objectTypes: objectTypes.isEmpty ? [.unknown] : objectTypes,
+            dateRange: command.dateRange,
+            limit: min(max(command.limit ?? 5, 1), 10),
+            requestedDetail: lookupRequestedDetail(from: command.requestedDetail)
+        )
+    }
+
+    private func lookupObjectType(from dataset: MarinaSemanticCommandDataset) -> MarinaLookupObjectType? {
+        switch dataset {
+        case .variableExpenses:
+            return .variableExpense
+        case .plannedExpenses:
+            return .plannedExpense
+        case .income:
+            return .income
+        case .cards:
+            return .card
+        case .categories:
+            return .category
+        case .presets:
+            return .preset
+        case .budgets:
+            return .budget
+        case .savingsLedger:
+            return .savingsLedgerEntry
+        case .reconciliation:
+            return .reconciliationAccount
+        }
+    }
+
+    private func lookupRequestedDetail(from detail: MarinaSemanticRequestedDetail?) -> MarinaDatabaseLookupRequest.RequestedDetail {
+        switch detail {
+        case .date:
+            return .date
+        case .amount:
+            return .amount
+        case .card:
+            return .card
+        case .category:
+            return .category
+        case .status:
+            return .status
+        case .schedule:
+            return .schedule
+        case .recurrence:
+            return .recurrence
+        case .account:
+            return .account
+        case .balance:
+            return .balance
+        case .linkedObjects:
+            return .linkedObjects
+        case .general, nil:
+            return .general
         }
     }
 
@@ -457,13 +709,15 @@ struct MarinaFoundationModelsInterpreter {
             return .comparison
         case .rank:
             return .rankedList
+        case .listRows:
+            return .rankedList
         case .trend:
             return .chartRows
         case .sum:
             return measure == .categoryShare ? .groupedBreakdown : .scalarCurrency
         case .average, .count, .minimum, .maximum, .forecast:
             return .scalarCurrency
-        case .simulate, nil:
+        case .lookupDetails, .simulate, nil:
             return nil
         }
     }

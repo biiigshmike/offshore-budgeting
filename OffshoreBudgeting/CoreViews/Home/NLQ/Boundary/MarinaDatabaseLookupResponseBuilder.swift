@@ -5,6 +5,19 @@ struct MarinaDatabaseLookupResponseBuilder {
         let request = response.request
         let queryID = UUID()
 
+        if response.needsClarification {
+            return HomeAnswer(
+                queryID: queryID,
+                kind: .message,
+                userPrompt: request.rawPrompt,
+                title: "Which \(request.searchText) do you mean?",
+                subtitle: "I found more than one kind of Offshore data with that name. Pick the object type and I can show the details.",
+                rows: response.ambiguityChoices.map { result in
+                    HomeAnswerRow(title: result.title, value: compactValue(for: result))
+                }
+            )
+        }
+
         guard response.results.isEmpty == false else {
             return HomeAnswer(
                 queryID: queryID,

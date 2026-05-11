@@ -237,7 +237,7 @@ struct MarinaSharedPipelineCoordinatorTests {
         #expect(homeQueryPlan?.metric == .cardSpendTotal)
     }
 
-    @Test func coordinator_modelHeuristicDisagreementIsTracedAndNotMerged() async throws {
+    @Test func coordinator_aiAvailableModelHeuristicDisagreementPrefersModelAndTraces() async throws {
         let fixture = try makeFixture()
         try fixture.seedSpendData()
         let model = SharedPipelineStubStructuredInterpreter(
@@ -264,12 +264,111 @@ struct MarinaSharedPipelineCoordinatorTests {
         )
 
         guard case .handled(_, _, let homeQueryPlan, let trace) = result else {
-            Issue.record("Expected disagreement to still produce the conservative heuristic answer.")
+            Issue.record("Expected disagreement to produce the model answer when AI is available.")
             return
         }
-        #expect(trace.selectedPath == .sharedHeuristic)
+        #expect(trace.selectedPath == .sharedFoundationModels)
         #expect(trace.disagreementSummary?.contains("model[") == true)
-        #expect(homeQueryPlan?.metric == .cardSpendTotal)
+        #expect(homeQueryPlan?.metric == .spendTotal)
+    }
+
+    @Test func coordinator_semanticCommandBeatsWrongExecutableMetricForRecentCategoryList() async throws {
+        let fixture = try makeFixture()
+        let cannabis = Offshore.Category(name: "Cannabis", hexColor: "#225522", workspace: fixture.workspace)
+        fixture.context.insert(cannabis)
+        fixture.context.insert(VariableExpense(descriptionText: "Cannabis Purchase 1", amount: 40, transactionDate: sharedPipelineDate(2026, 5, 9), workspace: fixture.workspace, card: fixture.appleCard, category: cannabis))
+        fixture.context.insert(VariableExpense(descriptionText: "Cannabis Purchase 2", amount: 50, transactionDate: sharedPipelineDate(2026, 5, 10), workspace: fixture.workspace, card: fixture.appleCard, category: cannabis))
+        try fixture.context.save()
+
+        let semanticCommand = MarinaSemanticCommand(
+            family: .analytics,
+            action: .listRows,
+            datasets: [.variableExpenses, .plannedExpenses],
+            measure: nil,
+            includeFilters: [
+                MarinaSemanticCommandFilter(rawText: "Cannabis", allowedTypes: [.category, .merchant, .expense])
+            ],
+            excludeFilters: [],
+            grouping: .transaction,
+            sort: .newest,
+            dateRange: nil,
+            comparisonDateRange: nil,
+            periodUnit: nil,
+            limit: 5,
+            requestedDetail: nil
+        )
+        let model = SharedPipelineStubStructuredInterpreter(structuredIntent: .semanticCommand(semanticCommand))
+
+        let result = await coordinator(structuredInterpreter: model).run(
+            prompt: "List my last 5 Cannabis purchases",
+            context: sharedContext(fixture: fixture, aiOptInEnabled: true)
+        )
+
+        guard case .handled(let answer, let aggregationResult, let homeQueryPlan, let trace) = result else {
+            Issue.record("Expected semantic command to produce a filtered recent list: \(workspaceAggregationDebugSummary(result))")
+            return
+        }
+
+        #expect(trace.selectedPath == .sharedFoundationModels)
+        #expect(homeQueryPlan == nil)
+        #expect(trace.candidateSummary?.contains("semantic=listRows") == true)
+        #expect(trace.executorResultSummary?.contains("recentFilteredTransactions") == true)
+        #expect(answer.title.contains("Recent Purchases"))
+        guard case .workspaceCard(let card) = aggregationResult else {
+            Issue.record("Expected workspace card")
+            return
+        }
+        #expect(card.rows.map(\.label) == ["Cannabis Purchase 2", "Cannabis Purchase 1"])
+    }
+
+    @Test func coordinator_composableWorkspacePromptsUseSharedHeuristicWithoutLegacyFallback() async throws {
+        let fixture = try makeFixture()
+        try fixture.seedSpendData()
+        let cannabis = Offshore.Category(name: "Cannabis", hexColor: "#225522", workspace: fixture.workspace)
+        let roommate = AllocationAccount(name: "Roommate", workspace: fixture.workspace)
+        let allocated = VariableExpense(descriptionText: "Dinner", amount: 120, transactionDate: sharedPipelineDate(2026, 5, 5), workspace: fixture.workspace, card: fixture.appleCard, category: fixture.groceries)
+        fixture.context.insert(cannabis)
+        fixture.context.insert(roommate)
+        fixture.context.insert(allocated)
+        fixture.context.insert(ExpenseAllocation(allocatedAmount: 60, workspace: fixture.workspace, account: roommate, expense: allocated))
+        fixture.context.insert(VariableExpense(descriptionText: "Cannabis Purchase 1", amount: 40, transactionDate: sharedPipelineDate(2026, 5, 9), workspace: fixture.workspace, card: fixture.appleCard, category: cannabis))
+        fixture.context.insert(VariableExpense(descriptionText: "Cannabis Purchase 2", amount: 50, transactionDate: sharedPipelineDate(2026, 5, 10), workspace: fixture.workspace, card: fixture.appleCard, category: cannabis))
+        fixture.context.insert(VariableExpense(descriptionText: "April Groceries", amount: 75, transactionDate: sharedPipelineDate(2026, 4, 8), workspace: fixture.workspace, card: fixture.appleCard, category: fixture.groceries))
+        let budget = Budget(name: "May", startDate: sharedPipelineDate(2026, 5, 1), endDate: sharedPipelineDate(2026, 5, 31), workspace: fixture.workspace)
+        fixture.context.insert(budget)
+        fixture.context.insert(BudgetCategoryLimit(maxAmount: 700, budget: budget, category: fixture.groceries))
+        fixture.context.insert(Income(source: "Planned", amount: 2_000, date: sharedPipelineDate(2026, 5, 1), isPlanned: true, workspace: fixture.workspace))
+        try fixture.context.save()
+
+        let prompts = [
+            "Which card is eating the most of my budget?",
+            "What did I spend on Apple Card outside of Groceries?",
+            "List my last 5 Cannabis purchases",
+            "What was my average weekly Groceries spending over the last 3 months?",
+            "Which expenses made this month higher than last month?",
+            "How much did Roommate spend on Groceries?",
+            "If I spend $50 on Groceries, how will that affect my budget?"
+        ]
+
+        for prompt in prompts {
+            let result = await coordinator().run(
+                prompt: prompt,
+                context: sharedContext(fixture: fixture, aiOptInEnabled: false)
+            )
+
+            guard case .handled(let answer, let aggregationResult, let homeQueryPlan, let trace) = result else {
+                Issue.record("Expected composable workspace prompt to be handled: \(prompt), actual=\(workspaceAggregationDebugSummary(result))")
+                continue
+            }
+            #expect(homeQueryPlan == nil)
+            #expect(trace.selectedPath == .sharedHeuristic)
+            #expect(trace.executorResultSummary?.contains("composableWorkspace=") == true)
+            #expect(answer.kind == .list)
+            guard case .workspaceCard = aggregationResult else {
+                Issue.record("Expected workspace card result for \(prompt)")
+                continue
+            }
+        }
     }
 
     @Test func coordinator_invalidSharedResultFallsBackToLegacyWithReason() async throws {

@@ -69,6 +69,11 @@ struct MarinaDatabaseLookupResult: Codable, Sendable, Equatable, Identifiable {
 struct MarinaDatabaseLookupResponse: Codable, Sendable, Equatable {
     var request: MarinaDatabaseLookupRequest
     var results: [MarinaDatabaseLookupResult]
+    var ambiguityChoices: [MarinaDatabaseLookupResult] = []
+
+    var needsClarification: Bool {
+        ambiguityChoices.isEmpty == false
+    }
 
     var traceSummary: String {
         let objectTypes = request.objectTypes.map(\.rawValue).joined(separator: ",")
@@ -77,7 +82,8 @@ struct MarinaDatabaseLookupResponse: Codable, Sendable, Equatable {
             "objectTypes=\(objectTypes)",
             "searchText=\"\(request.searchText)\"",
             "requestedDetail=\(request.requestedDetail.rawValue)",
-            "resultCount=\(results.count)"
+            "resultCount=\(results.count)",
+            "ambiguityCount=\(ambiguityChoices.count)"
         ].joined(separator: ",")
     }
 }

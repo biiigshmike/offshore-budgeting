@@ -7,6 +7,7 @@ enum MarinaAggregationPlanStatus: String, Codable, Equatable {
 
 enum MarinaResolvedTargetRole: String, Codable, Equatable, CaseIterable {
     case filter
+    case excludeFilter
     case primaryTarget
     case comparisonTarget
     case groupingDimension

@@ -60,7 +60,7 @@ struct MarinaQueryResolver {
             let extraction = extractor.extractCandidates(from: rawText, provider: provider)
             let matches = scopedMatches(
                 extraction.matchesByType.flatMap(\.value),
-                typeHint: mention.typeHint
+                mention: mention
             )
 
             switch representativeMatches(from: matches) {
@@ -113,7 +113,17 @@ struct MarinaQueryResolver {
     private func representativeMatches(from matches: [MarinaNLQCandidateMatch]) -> RepresentativeMatchSet {
         guard matches.isEmpty == false else { return .none }
 
-        let equivalenceCollapsed = collapseEquivalentMatches(matches)
+        let exactMatches = matches.filter { $0.matchType == .exact }
+        let storedExactMatches = exactMatches.filter { match in
+            switch match.entityType {
+            case .merchant, .expense:
+                return false
+            case .category, .card, .budget, .preset, .incomeSource, .allocationAccount, .savingsAccount:
+                return true
+            }
+        }
+        let preferredMatches = storedExactMatches.isEmpty == false ? storedExactMatches : matches
+        let equivalenceCollapsed = collapseEquivalentMatches(preferredMatches)
         var bestByKey: [String: MarinaNLQCandidateMatch] = [:]
         for match in equivalenceCollapsed {
             let key = canonicalIdentityKey(for: match)
@@ -180,13 +190,18 @@ struct MarinaQueryResolver {
 
     private func scopedMatches(
         _ matches: [MarinaNLQCandidateMatch],
-        typeHint: MarinaCandidateEntityTypeHint?
+        mention: MarinaUnresolvedEntityMention
     ) -> [MarinaNLQCandidateMatch] {
-        guard let typeHint,
-              let nlqType = nlqType(from: typeHint) else {
+        let allowedTypes = mention.allowedTypeHints?.isEmpty == false
+            ? mention.allowedTypeHints
+            : mention.typeHint.map { [$0] }
+
+        guard let allowedTypes else {
             return matches
         }
-        return matches.filter { $0.entityType == nlqType }
+        let nlqTypes = allowedTypes.compactMap(nlqType)
+        guard nlqTypes.isEmpty == false else { return matches }
+        return matches.filter { nlqTypes.contains($0.entityType) }
     }
 
     private func nlqType(from hint: MarinaCandidateEntityTypeHint) -> MarinaNLQTargetType? {
@@ -241,6 +256,8 @@ struct MarinaQueryResolver {
         switch role {
         case .filter:
             return .filter
+        case .excludeFilter:
+            return .excludeFilter
         case .primaryTarget:
             return .primaryTarget
         case .comparisonTarget:

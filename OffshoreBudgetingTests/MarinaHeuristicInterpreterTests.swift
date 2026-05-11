@@ -89,6 +89,31 @@ struct MarinaHeuristicInterpreterTests {
         }
     }
 
+    @Test func heuristic_composableWorkspacePrompts_emitExecutableCandidateShapes() {
+        let cases: [(String, MarinaCandidateOperation, MarinaCandidateMeasure, MarinaGroupingDimensionCandidate?, MarinaRankingDirectionCandidate?)] = [
+            ("Which card is eating the most of my budget?", .rank, .spend, .card, .top),
+            ("What did I spend on Apple Card outside of Food & Drink?", .sum, .spend, nil, nil),
+            ("List my last 5 Cannabis purchases", .rank, .transactionAmount, .transaction, .newest),
+            ("What was my average weekly Shopping spending over the last 3 months?", .average, .spend, .week, nil),
+            ("Which expenses made this month higher than last month?", .compare, .spend, .transaction, .largest),
+            ("How much did Roommate spend on Food & Drink?", .sum, .spend, nil, nil),
+            ("If I spend $50 on Groceries, how will that affect my budget?", .simulate, .remainingBudget, nil, nil)
+        ]
+
+        for testCase in cases {
+            let candidate = MarinaHeuristicInterpreter().interpret(
+                prompt: testCase.0,
+                defaultPeriodUnit: .month
+            )
+            #expect(candidate.requestFamily == .analytics)
+            #expect(candidate.operation == testCase.1)
+            #expect(candidate.measure == testCase.2)
+            #expect(candidate.grouping?.dimension == testCase.3)
+            #expect(candidate.ranking?.direction == testCase.4)
+            #expect(candidate.unsupportedHint == nil)
+        }
+    }
+
     @Test func heuristic_totalSpendOnAppleCard_emitsUnresolvedCardFilterCandidate() {
         let candidate = MarinaHeuristicInterpreter().interpret(
             prompt: "total spend on my Apple Card",
@@ -277,7 +302,7 @@ struct MarinaHeuristicInterpreterTests {
 
         #expect(candidate.operation == .simulate)
         #expect(candidate.measure == .remainingBudget)
-        #expect(candidate.unsupportedHint == .unsupportedSimulation)
+        #expect(candidate.unsupportedHint == nil)
         #expect(candidate.entityMentions.map(\.role) == [.simulationInput, .simulationOutput])
         #expect(candidate.entityMentions.map(\.rawText) == ["shopping", "transportation"])
         #expect(candidate.entityMentions.allSatisfy { $0.typeHint == .category })
@@ -335,7 +360,7 @@ struct MarinaHeuristicInterpreterTests {
         #expect(candidate.entityMentions.isEmpty)
     }
 
-    @Test func heuristic_exclusionPromptPreservesUnsupportedFilterShape() {
+    @Test func heuristic_exclusionPromptPreservesComposableFilterShape() {
         let candidate = MarinaHeuristicInterpreter().interpret(
             prompt: "What did I spend on Apple Card outside of Food & Drink?",
             defaultPeriodUnit: .month
@@ -343,7 +368,8 @@ struct MarinaHeuristicInterpreterTests {
 
         #expect(candidate.operation == .sum)
         #expect(candidate.measure == .spend)
-        #expect(candidate.unsupportedHint == .unsupportedExclusionFilter)
+        #expect(candidate.unsupportedHint == nil)
+        #expect(candidate.responseShapeHint == .summaryCard)
         #expect(candidate.entityMentions.map(\.rawText) == ["apple card", "food & drink"])
         #expect(candidate.entityMentions.map(\.typeHint) == [.card, .category])
     }
@@ -361,7 +387,7 @@ struct MarinaHeuristicInterpreterTests {
         #expect(candidate.entityMentions.first?.typeHint == .category)
     }
 
-    @Test func heuristic_cardRankingPromptPreservesUnsupportedCardRankingShape() {
+    @Test func heuristic_cardRankingPromptPreservesComposableCardRankingShape() {
         let candidate = MarinaHeuristicInterpreter().interpret(
             prompt: "What card is eating most of my budget this period?",
             defaultPeriodUnit: .month
@@ -371,11 +397,11 @@ struct MarinaHeuristicInterpreterTests {
         #expect(candidate.measure == .spend)
         #expect(candidate.grouping?.dimension == .card)
         #expect(candidate.ranking?.direction == .top)
-        #expect(candidate.unsupportedHint == .unsupportedCardRanking)
+        #expect(candidate.unsupportedHint == nil)
         #expect(candidate.entityMentions.isEmpty)
     }
 
-    @Test func heuristic_categoryDeltaRankingPreservesUnsupportedRankedComparisonShape() {
+    @Test func heuristic_categoryDeltaRankingPreservesComposableRankedComparisonShape() {
         let candidate = MarinaHeuristicInterpreter().interpret(
             prompt: "What category changed the most compared to last month?",
             defaultPeriodUnit: .month
@@ -385,7 +411,7 @@ struct MarinaHeuristicInterpreterTests {
         #expect(candidate.measure == .spend)
         #expect(candidate.grouping?.dimension == .category)
         #expect(candidate.ranking?.direction == .largest)
-        #expect(candidate.unsupportedHint == .unsupportedRankedComparison)
+        #expect(candidate.unsupportedHint == nil)
         #expect(candidate.entityMentions.isEmpty)
     }
 
@@ -437,7 +463,7 @@ struct MarinaHeuristicInterpreterTests {
         assertMonthScopes(candidate, primaryMonth: 4, comparisonMonth: 3)
     }
 
-    @Test func heuristic_transactionDeltaDriversPreservesUnsupportedRankedComparisonShape() {
+    @Test func heuristic_transactionDeltaDriversPreservesComposableRankedComparisonShape() {
         let candidate = fixedNowInterpreter().interpret(
             prompt: "What expenses are making this month higher than last month?",
             defaultPeriodUnit: .month
@@ -447,7 +473,7 @@ struct MarinaHeuristicInterpreterTests {
         #expect(candidate.measure == .spend)
         #expect(candidate.grouping?.dimension == .transaction)
         #expect(candidate.ranking?.direction == .largest)
-        #expect(candidate.unsupportedHint == .unsupportedRankedComparison)
+        #expect(candidate.unsupportedHint == nil)
         #expect(candidate.entityMentions.isEmpty)
         assertMonthScopes(candidate, primaryMonth: 5, comparisonMonth: 4)
     }

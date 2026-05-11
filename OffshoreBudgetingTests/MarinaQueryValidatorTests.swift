@@ -202,7 +202,7 @@ struct MarinaQueryValidatorTests {
         #expect(measureUnsupported.kind == .unsupportedOperation)
     }
 
-    @Test func validator_lowConfidenceAndSimulationReturnUnsupportedResponses() {
+    @Test func validator_lowConfidenceReturnsUnsupportedAndSimulationCanValidate() {
         let lowConfidence = MarinaQueryPlanCandidate(
             source: .foundationModels,
             rawPrompt: "maybe groceries?",
@@ -225,13 +225,14 @@ struct MarinaQueryValidatorTests {
             Issue.record("Expected low confidence unsupported")
             return
         }
-        guard case .unsupported(let simulationUnsupported) = simulationOutcome else {
-            Issue.record("Expected simulation unsupported")
+        guard case .executable(let simulationPlan) = simulationOutcome else {
+            Issue.record("Expected simulation to validate for composable execution")
             return
         }
 
         #expect(lowUnsupported.kind == .unsupportedCombination)
-        #expect(simulationUnsupported.kind == .unsupportedSimulation)
+        #expect(simulationPlan.operation == .simulate)
+        #expect(simulationPlan.measure == .remainingBudget)
     }
 
     @Test func validator_phase6BUnsupportedHintsReturnTypedUnsupportedBeforeExecution() {

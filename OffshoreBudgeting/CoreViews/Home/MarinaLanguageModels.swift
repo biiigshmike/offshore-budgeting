@@ -22,6 +22,7 @@ extension MarinaInterpretedRequest {
 }
 
 enum MarinaStructuredIntentKind: String, Equatable {
+    case semanticCommand
     case query
     case command
     case clarification
@@ -130,6 +131,7 @@ struct MarinaStructuredCommandIntent: Equatable {
 }
 
 enum MarinaStructuredIntent: Equatable {
+    case semanticCommand(MarinaSemanticCommand)
     case query(MarinaStructuredQueryIntent)
     case command(MarinaStructuredCommandIntent)
     case clarification(MarinaStructuredClarification)

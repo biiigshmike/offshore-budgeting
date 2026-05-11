@@ -4,6 +4,7 @@ import Testing
 @testable import Offshore
 
 @MainActor
+@Suite(.serialized)
 struct MarinaQueryResolverTests {
     @Test func resolver_resolvesCategoryMentionAgainstCurrentWorkspace() throws {
         let fixture = try makeFixture()
@@ -105,6 +106,83 @@ struct MarinaQueryResolverTests {
 
         #expect(resolved.resolvedTargets.isEmpty)
         #expect(resolved.unresolvedMentions.isEmpty)
+        #expect(resolved.ambiguousMentions.count == 1)
+        let choiceTypes = resolved.ambiguousMentions[0].choices
+            .compactMap(\.entityTypeHint?.rawValue)
+            .sorted()
+        #expect(choiceTypes == ["card", "category"])
+    }
+
+    @Test func resolver_allowedTypesPreferExactCategoryOverExpensePrefixes() throws {
+        let fixture = try makeFixture()
+        let cannabis = Category(name: "Cannabis", hexColor: "#225522", workspace: fixture.workspace)
+        let card = Card(name: "Apple Card", workspace: fixture.workspace)
+        fixture.context.insert(cannabis)
+        fixture.context.insert(card)
+        fixture.context.insert(VariableExpense(
+            descriptionText: "Cannabis Purchase 1",
+            amount: 40,
+            transactionDate: Date(),
+            workspace: fixture.workspace,
+            card: card,
+            category: cannabis
+        ))
+        try fixture.context.save()
+
+        let candidate = MarinaQueryPlanCandidate(
+            source: .foundationModels,
+            rawPrompt: "List my last 5 Cannabis purchases",
+            operation: .listRows,
+            measure: .transactionAmount,
+            entityMentions: [
+                MarinaUnresolvedEntityMention(
+                    role: .filter,
+                    rawText: "Cannabis",
+                    typeHint: nil,
+                    allowedTypeHints: [.category, .merchant, .expense],
+                    confidence: .high
+                )
+            ],
+            grouping: MarinaGroupingCandidate(dimension: .transaction),
+            ranking: MarinaRankingCandidate(direction: .newest, limit: 5),
+            limit: 5,
+            confidence: .high
+        )
+
+        let resolved = MarinaQueryResolver().resolve(candidate: candidate, provider: fixture.provider)
+
+        #expect(resolved.resolvedTargets.count == 1)
+        #expect(resolved.resolvedTargets.first?.entityType == .category)
+        #expect(resolved.resolvedTargets.first?.displayName == "Cannabis")
+        #expect(resolved.ambiguousMentions.isEmpty)
+    }
+
+    @Test func resolver_allowedTypesStillClarifiesMultipleExactEntityTypes() throws {
+        let fixture = try makeFixture()
+        fixture.context.insert(Category(name: "Apple", hexColor: "#225522", workspace: fixture.workspace))
+        fixture.context.insert(Card(name: "Apple", workspace: fixture.workspace))
+        try fixture.context.save()
+
+        let candidate = MarinaQueryPlanCandidate(
+            source: .foundationModels,
+            rawPrompt: "spend on Apple",
+            operation: .sum,
+            measure: .spend,
+            entityMentions: [
+                MarinaUnresolvedEntityMention(
+                    role: .filter,
+                    rawText: "Apple",
+                    typeHint: nil,
+                    allowedTypeHints: [.category, .card, .merchant],
+                    confidence: .high
+                )
+            ],
+            confidence: .high
+        )
+
+        let resolved = MarinaQueryResolver().resolve(candidate: candidate, provider: fixture.provider)
+
+        #expect(resolved.resolvedTargets.isEmpty)
         #expect(resolved.ambiguousMentions.count == 1)
         let choiceTypes = resolved.ambiguousMentions[0].choices
             .compactMap(\.entityTypeHint?.rawValue)
@@ -289,8 +367,11 @@ struct MarinaQueryResolverTests {
             AllocationAccount.self,
             ExpenseAllocation.self,
             AllocationSettlement.self,
+            SavingsAccount.self,
+            SavingsLedgerEntry.self,
             IncomeSeries.self,
             ImportMerchantRule.self,
+            AssistantAliasRule.self,
             Income.self
         ])
 

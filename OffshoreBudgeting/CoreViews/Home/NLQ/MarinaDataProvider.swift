@@ -82,6 +82,15 @@ struct MarinaDataProvider {
         )
     }
 
+    func fetchAllExpenseAllocations() -> [ExpenseAllocation] {
+        fetch(
+            descriptor: FetchDescriptor<ExpenseAllocation>(
+                predicate: #Predicate { $0.workspace?.id == workspaceID },
+                sortBy: [SortDescriptor(\ExpenseAllocation.createdAt, order: .reverse)]
+            )
+        )
+    }
+
     func fetchAllSavingsAccounts() -> [SavingsAccount] {
         fetch(
             descriptor: FetchDescriptor<SavingsAccount>(

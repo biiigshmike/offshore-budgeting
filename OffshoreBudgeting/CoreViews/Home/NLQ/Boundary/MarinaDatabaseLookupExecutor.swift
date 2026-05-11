@@ -37,6 +37,20 @@ struct MarinaDatabaseLookupExecutor {
             bestResults = scoredResults.map(\.0)
         }
 
+        let exactTypeMatches = scoredResults
+            .filter { $0.1 == 100 }
+            .map(\.0)
+        let exactObjectTypes = Set(exactTypeMatches.map(\.objectType))
+        if request.objectTypes.contains(.unknown),
+           request.requestedDetail == .general,
+           exactObjectTypes.count > 1 {
+            return MarinaDatabaseLookupResponse(
+                request: request,
+                results: [],
+                ambiguityChoices: Array(exactTypeMatches.prefix(request.limit))
+            )
+        }
+
         return MarinaDatabaseLookupResponse(
             request: request,
             results: Array(bestResults.prefix(request.limit))

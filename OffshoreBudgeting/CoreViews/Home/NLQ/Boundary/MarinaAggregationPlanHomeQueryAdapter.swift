@@ -59,6 +59,10 @@ struct MarinaAggregationPlanHomeQueryAdapter {
             return .failure(unsupported(.unsupportedSimulation, "Simulation plans are not executable through the aggregation bridge."))
         }
 
+        guard plan.operation != .compare || plan.ranking == nil else {
+            return .failure(unsupported(.unsupportedCombination, "Ranked comparison plans are handled by Marina workspace query executors."))
+        }
+
         let filterTargets = executableFilterTargets(in: plan)
         guard filterTargets.count <= 1 else {
             return .failure(unsupported(.unsupportedCombination, "Multiple executable targets cannot be adapted without dropping filters."))
@@ -175,7 +179,7 @@ struct MarinaAggregationPlanHomeQueryAdapter {
             switch target.role {
             case .filter, .primaryTarget, .comparisonTarget:
                 return true
-            case .groupingDimension, .simulationInput, .simulationOutput:
+            case .excludeFilter, .groupingDimension, .simulationInput, .simulationOutput:
                 return false
             }
         }
