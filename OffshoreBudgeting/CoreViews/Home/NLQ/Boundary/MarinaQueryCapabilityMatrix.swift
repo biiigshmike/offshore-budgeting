@@ -86,52 +86,15 @@ struct MarinaAppSurfaceMetricRecord: Codable, Equatable, Identifiable, Sendable 
 }
 
 struct MarinaQueryCapabilityMatrix {
-    static let modelEntityNames: Set<String> = [
-        "Workspace",
-        "Budget",
-        "BudgetCategoryLimit",
-        "Card",
-        "BudgetCardLink",
-        "BudgetPresetLink",
-        "Category",
-        "Preset",
-        "PlannedExpense",
-        "VariableExpense",
-        "AllocationAccount",
-        "ExpenseAllocation",
-        "AllocationSettlement",
-        "SavingsAccount",
-        "SavingsLedgerEntry",
-        "ImportMerchantRule",
-        "AssistantAliasRule",
-        "IncomeSeries",
-        "Income"
-    ]
+    static var catalog: MarinaEntityCatalog { .current }
 
-    static let records: [MarinaEntityCapabilityRecord] = [
-        record("Workspace", display: ["name", "hexColor"], scope: "self.id", relationships: ["owns workspace graph"], searchable: true, queryable: true, aggregatable: false, target: false, relationship: true, derived: true, supported: ["lookupDetails", "linkedObjectSummary"], missing: ["crossWorkspaceComparison"], unsupported: ["total", "average", "rank"]),
-        record("Budget", display: ["name"], dates: ["startDate", "endDate"], scope: "workspace", relationships: ["cardLinks", "presetLinks", "categoryLimits"], searchable: true, queryable: true, aggregatable: false, target: true, relationship: true, derived: true, supported: ["lookupDetails", "linkedObjectSummary", "derivedSpendSummary"], missing: ["remainingAvailable", "plannedActualProjected"], unsupported: ["directAmountAggregation"]),
-        record("BudgetCategoryLimit", display: ["category.name"], amounts: ["minAmount", "maxAmount"], scope: "budget.workspace/category.workspace", relationships: ["budget", "category"], searchable: false, queryable: true, aggregatable: false, target: false, relationship: true, derived: true, supported: ["linkedObjectSummary"], missing: ["remainingAvailable"], unsupported: ["spendAggregation"]),
-        record("Card", display: ["name", "theme", "effect"], scope: "workspace", relationships: ["budgetLinks", "plannedExpenses", "variableExpenses", "income", "preset defaults"], searchable: true, queryable: true, aggregatable: false, target: true, relationship: true, derived: true, supported: ["lookupDetails", "total", "average", "compare", "rank", "filter"], missing: ["balanceStatus"], unsupported: ["directAmountAggregation"]),
-        record("BudgetCardLink", display: ["budget.name", "card.name"], scope: "budget.workspace/card.workspace", relationships: ["budget", "card"], searchable: false, queryable: false, aggregatable: false, target: false, relationship: true, derived: true, supported: ["linkedObjectSummary"], missing: [], unsupported: ["standaloneLookup", "aggregation"]),
-        record("BudgetPresetLink", display: ["budget.name", "preset.title"], scope: "budget.workspace/preset.workspace", relationships: ["budget", "preset"], searchable: false, queryable: false, aggregatable: false, target: false, relationship: true, derived: true, supported: ["linkedObjectSummary"], missing: [], unsupported: ["standaloneLookup", "aggregation"]),
-        record("Category", display: ["name", "hexColor"], scope: "workspace", relationships: ["expenses", "presets", "limits", "importRules"], searchable: true, queryable: true, aggregatable: false, target: true, relationship: true, derived: true, supported: ["lookupDetails", "total", "average", "compare", "rank", "share", "filter"], missing: ["remainingAvailable"], unsupported: ["directAmountAggregation"]),
-        record("Preset", display: ["title"], amounts: ["plannedAmount"], dates: ["schedule fields", "archivedAt"], scope: "workspace", relationships: ["defaultCard", "defaultCategory", "budgetLinks"], searchable: true, queryable: true, aggregatable: false, target: true, relationship: true, derived: true, supported: ["lookupDetails", "rank", "plannedSummary"], missing: ["nextOccurrence"], unsupported: ["actualSpendWithoutMaterializedRows"]),
-        record("PlannedExpense", display: ["title"], amounts: ["plannedAmount", "actualAmount"], dates: ["expenseDate"], scope: "workspace", relationships: ["card", "category", "allocation", "settlement", "savingsLedgerEntry"], searchable: true, queryable: true, aggregatable: true, target: true, relationship: true, derived: true, supported: ["lookupDetails", "listRows", "rank", "plannedAggregation"], missing: ["nextLatestPrevious"], unsupported: ["actualAmountZeroAsActualZero"]),
-        record("VariableExpense", display: ["descriptionText"], amounts: ["amount", "spendingAmount", "ledgerSignedAmount", "budgetImpact"], dates: ["transactionDate"], scope: "workspace", relationships: ["card", "category", "allocation", "settlement", "savingsLedgerEntry"], searchable: true, queryable: true, aggregatable: true, target: true, relationship: true, derived: true, supported: ["lookupDetails", "total", "listRows", "rank", "filter"], missing: ["minMax", "countByObject"], unsupported: ["usingLedgerAmountForBudgetImpact"]),
-        record("AllocationAccount", display: ["name", "hexColor"], dates: ["archivedAt"], scope: "workspace", relationships: ["allocations", "settlements"], searchable: true, queryable: true, aggregatable: false, target: true, relationship: true, derived: true, supported: ["lookupDetails", "rank", "allocatedSpend"], missing: ["accountBalanceRoute"], unsupported: ["savingsTreatment"]),
-        record("ExpenseAllocation", display: ["linked expense title"], amounts: ["allocatedAmount"], dates: ["createdAt", "updatedAt", "linked expense date"], scope: "workspace", relationships: ["account", "expense", "plannedExpense"], searchable: true, queryable: true, aggregatable: true, target: false, relationship: true, derived: true, supported: ["lookupDetails", "allocatedSpendSource"], missing: ["directTotals"], unsupported: ["standalonePrimaryTarget"]),
-        record("AllocationSettlement", display: ["note"], amounts: ["amount"], dates: ["date"], scope: "workspace", relationships: ["account", "expense", "plannedExpense"], searchable: true, queryable: true, aggregatable: true, target: false, relationship: true, derived: true, supported: ["lookupDetails"], missing: ["settlementTotals"], unsupported: ["savingsMirrorBehavior"]),
-        record("IncomeSeries", display: ["source"], amounts: ["amount"], dates: ["startDate", "endDate", "schedule fields"], scope: "workspace", relationships: ["incomes"], searchable: true, queryable: true, aggregatable: false, target: true, relationship: true, derived: true, supported: ["lookupDetails"], missing: ["recurrenceExplanation"], unsupported: ["receivedIncomeAggregation"]),
-        record("SavingsAccount", display: ["name"], amounts: ["total"], dates: ["createdAt", "updatedAt", "autoCaptureThroughDate"], scope: "workspace", relationships: ["ledgerEntries"], searchable: true, queryable: true, aggregatable: false, target: true, relationship: true, derived: true, supported: ["lookupDetails", "balance"], missing: ["firstClassBalanceStatus", "projectedActual"], unsupported: ["mutatingFromStoredTotalOnly"]),
-        record("SavingsLedgerEntry", display: ["note", "kindRaw"], amounts: ["amount"], dates: ["date", "periodStartDate", "periodEndDate"], scope: "workspace", relationships: ["account", "expense", "plannedExpense"], searchable: true, queryable: true, aggregatable: true, target: true, relationship: true, derived: true, supported: ["lookupDetails", "rank"], missing: ["sumAverageCompareByAccount"], unsupported: ["legacyReconciliationSavingsMirror"]),
-        record("ImportMerchantRule", display: ["merchantKey", "preferredName"], dates: ["createdAt", "updatedAt"], scope: "workspace", relationships: ["preferredCategory"], searchable: true, queryable: true, aggregatable: false, target: false, relationship: false, derived: true, supported: ["lookupDetails"], missing: ["ruleManagementParity"], unsupported: ["financialAggregation"]),
-        record("AssistantAliasRule", display: ["aliasKey", "targetValue", "entityTypeRaw"], dates: ["createdAt", "updatedAt"], scope: "workspace", relationships: [], searchable: true, queryable: true, aggregatable: false, target: false, relationship: false, derived: true, supported: ["lookupDetails"], missing: ["staleAliasDiagnostics"], unsupported: ["financialAggregation"]),
-        record("Income", display: ["source"], amounts: ["amount"], dates: ["date"], scope: "workspace", relationships: ["series", "card"], searchable: true, queryable: true, aggregatable: true, target: true, relationship: true, derived: true, supported: ["lookupDetails", "total", "average", "compare", "rank"], missing: ["plannedVsActualSummary"], unsupported: ["spendingTreatment"]),
-        record("Virtual: Merchant", display: ["normalized expense/import text"], amounts: ["expense amount"], dates: ["expense date"], scope: "source expense workspace", relationships: ["variable expenses", "import rules"], searchable: true, queryable: true, aggregatable: false, target: true, relationship: true, derived: true, supported: ["lookupDetails", "total", "compare", "rank", "filter"], missing: ["average", "count"], unsupported: ["storedIdentityAssumption"]),
-        record("Virtual: IncomeSource", display: ["Income.source", "IncomeSeries.source"], amounts: ["income amount"], dates: ["income/series dates"], scope: "source workspace", relationships: ["income", "incomeSeries"], searchable: true, queryable: true, aggregatable: false, target: true, relationship: true, derived: true, supported: ["lookupDetails", "total", "average", "compare", "rank"], missing: ["plannedVsActualSourceSummary"], unsupported: ["seriesAsReceivedIncome"]),
-        record("Virtual: Uncategorized", display: ["nil category label"], amounts: ["expense amount"], dates: ["expense date"], scope: "source expense workspace", relationships: ["nil category expenses"], searchable: true, queryable: true, aggregatable: false, target: true, relationship: true, derived: true, supported: ["category bucket summaries"], missing: ["explicitTargetedFilter"], unsupported: ["assumingStoredCategory"])
-    ]
+    static var modelEntityNames: Set<String> {
+        catalog.persistentModelEntityNames
+    }
+
+    static var records: [MarinaEntityCapabilityRecord] {
+        catalog.capabilityRecords()
+    }
 
     static let appSurfaceMetrics: [MarinaAppSurfaceMetricRecord] = [
         surface(
@@ -415,56 +378,6 @@ struct MarinaQueryCapabilityMatrix {
         case .unknown:
             return [.unsupportedWithClarification]
         }
-    }
-
-    private static func record(
-        _ entityName: String,
-        display: [String],
-        amounts: [String] = [],
-        dates: [String] = [],
-        scope: String,
-        relationships: [String],
-        searchable: Bool,
-        queryable: Bool,
-        aggregatable: Bool,
-        target: Bool,
-        relationship: Bool,
-        derived: Bool,
-        supported: [String],
-        missing: [String],
-        unsupported: [String]
-    ) -> MarinaEntityCapabilityRecord {
-        MarinaEntityCapabilityRecord(
-            id: entityName,
-            entityName: entityName,
-            displayFields: display,
-            amountFields: amounts,
-            dateFields: dates,
-            workspaceScope: scope,
-            relationships: relationships,
-            isSearchable: searchable,
-            isQueryable: queryable,
-            isAggregatable: aggregatable,
-            canBeTargetFilter: target,
-            canBeRelationshipFilter: relationship,
-            contributesToDerivedMetrics: derived,
-            supportedOperations: supported,
-            missingOperations: missing,
-            intentionallyUnsupportedOperations: unsupported,
-            questionCapabilities: MarinaEntityQuestionCapabilities(
-                find: searchable ? .supported : .intentionallyUnsupported,
-                summarize: queryable ? .supported : (derived ? .derived : .intentionallyUnsupported),
-                aggregate: aggregatable ? .supported : (derived ? .derived : .intentionallyUnsupported),
-                filterBy: target ? .supported : .intentionallyUnsupported,
-                compareOverTime: supported.contains("compare") ? .supported : (missing.contains { $0.lowercased().contains("compare") } ? .gap : .intentionallyUnsupported),
-                rank: supported.contains("rank") ? .supported : .intentionallyUnsupported,
-                nextLatestPrevious: supported.contains("nextLatestPrevious") ? .supported : (missing.contains { $0.lowercased().contains("next") } ? .gap : .intentionallyUnsupported),
-                explainDerivedValues: derived ? .derived : .intentionallyUnsupported,
-                balanceStatus: supported.contains("balance") ? .supported : (missing.contains { $0.lowercased().contains("balance") || $0.lowercased().contains("status") } ? .gap : .intentionallyUnsupported),
-                remainingAvailable: missing.contains { $0.lowercased().contains("remaining") || $0.lowercased().contains("available") } ? .gap : .intentionallyUnsupported,
-                projectedActualPlanned: supported.contains { $0.lowercased().contains("planned") || $0.lowercased().contains("actual") || $0.lowercased().contains("projected") } ? .supported : (missing.contains { $0.lowercased().contains("planned") || $0.lowercased().contains("actual") || $0.lowercased().contains("projected") } ? .gap : .intentionallyUnsupported)
-            )
-        )
     }
 
     private static func surface(

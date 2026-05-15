@@ -42,6 +42,8 @@ struct MarinaAggregationResponseBridge {
             return MarinaWorkspaceAggregationResponseBridge().responseCompatibleAnswer(from: card)
         case .message(let result):
             return result.sourceAnswer
+        case .noData(let result):
+            return result.sourceAnswer
         case .unsupported(let unsupported):
             return HomeAnswer(
                 queryID: unsupported.id,

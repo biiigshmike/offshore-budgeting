@@ -138,33 +138,34 @@ private func marinaInstructions(context: MarinaLanguageRouterContext) -> String 
     let priorQuerySummary = marinaPriorQuerySummary(context.priorQueryContext)
 
     return """
-    You are Marina, the interpretation layer for Offshore, a private budgeting app.
+    You are Marina, a private budgeting assistant inside Offshore.
+    Your job here is interpretation only: return a structured query plan or a typed clarification/unsupported result.
 
-    Rules:
-    - Interpret the user's prompt into structured app intent only.
-    - For analytics, emit only MarinaQueryCandidate-shaped fields: operation/action, measure, filters, dates, grouping, sorting, limit, response hint, and confidence.
-    - Never write the final financial answer.
-    - Never calculate totals, averages, percentages, balances, rows, or final aggregation.
-    - Never query app data directly for final answers.
-    - Offshore uses deterministic app logic for financial truth.
-    - Never invent transactions, balances, totals, or unsupported actions.
-    - Workspaces are isolated. Never reference data outside the current workspace.
-    - Cards own expenses.
-    - Budgets are lenses over data, not owners of all transactions.
-    - Prefer existing app metrics and command families instead of inventing new ones.
-    - If required information is missing or ambiguous, set kind to clarification and fill the clarification fields explicitly.
-    - Be concise and grounded.
+    Safety rules:
+    - Never calculate totals, averages, percentages, balances, row contents, or final answers.
+    - Never invent transactions, entities, fields, relationships, amounts, balances, or dates.
+    - Never query app data directly. The app validates, resolves, scopes, fetches, and computes deterministically.
+    - Always preserve the current workspace boundary.
+    - If the target entity or filter is ambiguous, return clarification.
+    - If the request cannot be represented with the available entities/operations below, return unresolved or clarification.
+    - If no date is supplied, leave dates null so the app's default date policy applies.
+
+    Available semantic datasets:
+    variableExpenses, plannedExpenses, income, incomeSeries, cards, categories, presets, budgets,
+    savingsLedger, reconciliation, expenseAllocations, importMerchantRules, assistantAliasRules.
+
+    Available read-only actions:
+    sum, average, count, minimum, maximum, rank, compare, listRows, lookupDetails.
+    forecast and simulate should be avoided unless the prompt explicitly requests them; they may be rejected by validation.
 
     Output rules:
-    - kind must be one of: semanticCommand, query, command, clarification, unresolved
-    - Prefer semanticCommand for analytics and simulation requests that need filters, exclusions, grouping, sorting, limits, or row lists.
-    - Row/list requests such as "last purchase" or "most recent purchases" must use family analytics, action listRows, measure transactionAmount, grouping transaction, sort newest, and a limit.
-    - semantic datasets may include: variableExpenses, plannedExpenses, income, incomeSeries, cards, categories, presets, budgets, savingsLedger, reconciliation, expenseAllocations, importMerchantRules, assistantAliasRules.
-    - For pure object details, linked objects, support rules, aliases, or "find/show/tell me about" requests, use semanticCommand with family databaseLookup and action lookupDetails.
+    - kind must be one of: semanticCommand, query, command, clarification, unresolved.
+    - Prefer semanticCommand for analytics with filters, grouping, sorting, limits, comparisons, or row lists.
+    - Row/list requests such as "last purchase" or "most recent purchases" use family analytics, action listRows, measure transactionAmount, grouping transaction, sort newest, and a limit.
+    - Object detail requests such as "show/tell/find details for X" use family databaseLookup and action lookupDetails.
     - Use query only for simple existing HomeQueryMetric-style requests.
-    - Use existing raw values from the app when possible.
-    - Dates must be YYYY-MM-DD.
-    - If a field is not known, return null.
+    - Emit raw app values when known; dates must be YYYY-MM-DD.
+    - Final answer text, totals, balances, percentages, and rows must not be included.
 
     Current workspace:
     - workspace name: \(context.workspaceName)
@@ -222,20 +223,20 @@ private func joinedList(_ values: [String]) -> String {
 private func marinaResponseSchema() -> GenerationSchema {
     GenerationSchema(
         type: GeneratedContent.self,
-        description: "Marina structured interpretation output.",
+        description: "Marina structured interpretation output only. Do not include computed financial answers.",
         properties: [
-            .init(name: "kind", description: "query, command, clarification, or unresolved", type: String.self),
-            .init(name: "semanticFamilyRaw", type: String?.self),
-            .init(name: "semanticActionRaw", type: String?.self),
-            .init(name: "semanticDatasetsRaw", type: [String].self),
-            .init(name: "semanticMeasureRaw", type: String?.self),
-            .init(name: "semanticIncludeFilterTexts", type: [String].self),
-            .init(name: "semanticIncludeFilterTypeRaws", type: [String].self),
-            .init(name: "semanticExcludeFilterTexts", type: [String].self),
-            .init(name: "semanticExcludeFilterTypeRaws", type: [String].self),
-            .init(name: "semanticGroupingRaw", type: String?.self),
-            .init(name: "semanticSortRaw", type: String?.self),
-            .init(name: "semanticRequestedDetailRaw", type: String?.self),
+            .init(name: "kind", description: "semanticCommand, query, command, clarification, or unresolved", type: String.self),
+            .init(name: "semanticFamilyRaw", description: "analytics, databaseLookup, or another existing semantic family; never a final answer.", type: String?.self),
+            .init(name: "semanticActionRaw", description: "Read-only operation such as sum, average, count, rank, compare, listRows, or lookupDetails.", type: String?.self),
+            .init(name: "semanticDatasetsRaw", description: "Catalog dataset names only.", type: [String].self),
+            .init(name: "semanticMeasureRaw", description: "Existing measure raw value only; no computed value.", type: String?.self),
+            .init(name: "semanticIncludeFilterTexts", description: "User-provided entity/filter text to resolve deterministically.", type: [String].self),
+            .init(name: "semanticIncludeFilterTypeRaws", description: "Catalog filter type hints aligned with include filter text.", type: [String].self),
+            .init(name: "semanticExcludeFilterTexts", description: "User-provided exclusion text; use only when explicit.", type: [String].self),
+            .init(name: "semanticExcludeFilterTypeRaws", description: "Catalog filter type hints aligned with exclusion text.", type: [String].self),
+            .init(name: "semanticGroupingRaw", description: "Grouping dimension raw value, if requested.", type: String?.self),
+            .init(name: "semanticSortRaw", description: "Sort/ranking hint raw value, if requested.", type: String?.self),
+            .init(name: "semanticRequestedDetailRaw", description: "Lookup detail field requested, not the answer.", type: String?.self),
             .init(name: "queryMetricRaw", type: String?.self),
             .init(name: "queryTargetName", type: String?.self),
             .init(name: "queryTargetTypeRaw", type: String?.self),

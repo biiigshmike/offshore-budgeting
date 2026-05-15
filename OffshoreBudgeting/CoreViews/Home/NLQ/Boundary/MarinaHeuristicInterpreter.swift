@@ -926,7 +926,13 @@ struct MarinaHeuristicInterpreter {
     }
 
     private func isNextPlannedExpensePrompt(_ prompt: String) -> Bool {
-        (prompt.contains("next") || prompt.contains("upcoming"))
+        if prompt.contains("biggest")
+            || prompt.contains("largest")
+            || prompt.contains("most expensive")
+            || prompt.contains("cost the most") {
+            return false
+        }
+        return (prompt.contains("next") || prompt.contains("upcoming"))
             && (prompt.contains("planned expense")
                 || prompt.contains("planned expenses")
                 || prompt.contains("bill")

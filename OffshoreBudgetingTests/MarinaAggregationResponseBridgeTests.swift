@@ -89,15 +89,39 @@ struct MarinaAggregationResponseBridgeTests {
     @Test func responseBridge_unsupportedProducesNonCrashingMessage() {
         let unsupported = MarinaTypedUnsupportedResponse(
             kind: .unsupportedOperation,
-            message: "Not supported in Phase 5."
+            message: "That operation is not supported for safe Marina queries yet."
         )
 
         let bridged = bridge.responseCompatibleAnswer(from: MarinaAggregationResult.unsupported(unsupported))
         let summary = bridge.summary(from: .unsupported(unsupported))
 
         #expect(bridged.kind == .message)
-        #expect(bridged.subtitle == "Not supported in Phase 5.")
+        #expect(bridged.subtitle == "That operation is not supported for safe Marina queries yet.")
         #expect(summary.contains("I can answer this a different way"))
+    }
+
+    @Test func responseBridge_noDataPreservesTypedMessage() {
+        let answer = HomeAnswer(
+            queryID: UUID(),
+            kind: .message,
+            title: "No data found",
+            subtitle: "No data available for that range."
+        )
+        let result = MarinaAggregationResult.noData(
+            MarinaNoDataAggregationResult(
+                title: answer.title,
+                message: answer.subtitle ?? "",
+                sourceAnswer: answer
+            )
+        )
+
+        let bridged = bridge.responseCompatibleAnswer(from: result)
+        let summary = bridge.summary(from: result)
+
+        #expect(bridged.kind == .message)
+        #expect(bridged.title == "No data found")
+        #expect(bridged.subtitle == "No data available for that range.")
+        #expect(summary.contains("No data found"))
     }
 
     @Test func responseBridge_clarificationProducesNonExecutingMessage() {

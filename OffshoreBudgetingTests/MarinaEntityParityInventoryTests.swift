@@ -5,6 +5,94 @@ import Testing
 
 @MainActor
 struct MarinaEntityParityInventoryTests {
+    @Test func entityCatalog_coversEveryAppSchemaModel() {
+        let expectedModels: Set<String> = [
+            "Workspace",
+            "Budget",
+            "BudgetCategoryLimit",
+            "Card",
+            "BudgetCardLink",
+            "BudgetPresetLink",
+            "Category",
+            "Preset",
+            "PlannedExpense",
+            "VariableExpense",
+            "AllocationAccount",
+            "ExpenseAllocation",
+            "AllocationSettlement",
+            "SavingsAccount",
+            "SavingsLedgerEntry",
+            "ImportMerchantRule",
+            "AssistantAliasRule",
+            "IncomeSeries",
+            "Income"
+        ]
+
+        #expect(MarinaEntityCatalog.current.persistentModelEntityNames == expectedModels)
+
+        for entityName in expectedModels {
+            guard let descriptor = MarinaEntityCatalog.current.descriptor(for: entityName) else {
+                Issue.record("Missing Marina entity descriptor for \(entityName)")
+                continue
+            }
+            #expect(descriptor.kind == .persistentModel)
+            #expect(descriptor.workspaceScope.path.isEmpty == false)
+            #expect(descriptor.operations.isEmpty == false)
+        }
+    }
+
+    @Test func entityCatalog_virtualEntitiesAreExplicitlyNonPersistent() {
+        let virtualNames = Set(MarinaEntityCatalog.current.virtualDescriptors.map(\.entityName))
+
+        #expect(virtualNames.contains("Virtual: Merchant"))
+        #expect(virtualNames.contains("Virtual: IncomeSource"))
+        #expect(virtualNames.contains("Virtual: Uncategorized"))
+        #expect(virtualNames.contains("Virtual: EffectivePlannedExpenseAmount"))
+        #expect(virtualNames.contains("Virtual: ActualSavings"))
+        #expect(virtualNames.isDisjoint(with: MarinaEntityCatalog.current.persistentModelEntityNames))
+    }
+
+    @Test func entityCatalog_fieldDescriptorsMatchCapabilityMatrixRecords() {
+        for descriptor in MarinaEntityCatalog.current.descriptors {
+            guard let record = MarinaQueryCapabilityMatrix.record(for: descriptor.entityName) else {
+                Issue.record("Missing compatibility record for \(descriptor.entityName)")
+                continue
+            }
+
+            #expect(record.displayFields == descriptor.displayFields)
+            #expect(record.amountFields == descriptor.amountFields)
+            #expect(record.dateFields == descriptor.dateFields)
+            #expect(record.workspaceScope == descriptor.workspaceScope.path)
+            #expect(record.relationships == descriptor.relationships.map(\.name))
+        }
+    }
+
+    @Test func entityCatalog_operationDescriptorsRoundTripToCapabilityRecords() {
+        for descriptor in MarinaEntityCatalog.current.descriptors {
+            guard let record = MarinaQueryCapabilityMatrix.record(for: descriptor.entityName) else {
+                Issue.record("Missing compatibility record for \(descriptor.entityName)")
+                continue
+            }
+
+            #expect(record.supportedOperations == descriptor.supportedOperations)
+            #expect(record.missingOperations == descriptor.missingOperations)
+            #expect(record.intentionallyUnsupportedOperations == descriptor.unsupportedOperations)
+        }
+    }
+
+    @Test func capabilityMatrix_derivesModelEntityNamesFromCatalog() {
+        #expect(MarinaQueryCapabilityMatrix.modelEntityNames == MarinaEntityCatalog.current.persistentModelEntityNames)
+    }
+
+    @Test func capabilityMatrix_lookupObjectTypesHaveCatalogCompatibility() {
+        let supportedLookupTypes = Set(MarinaEntityCatalog.current.descriptors.compactMap(\.lookupObjectType))
+        let expectedLookupTypes = Set(MarinaLookupObjectType.allCases).subtracting([.unknown])
+
+        #expect(supportedLookupTypes == expectedLookupTypes)
+        #expect(MarinaEntityCatalog.current.descriptor(for: .reconciliationAccount)?.entityName == "AllocationAccount")
+        #expect(MarinaEntityCatalog.current.descriptor(for: .reconciliationItem)?.entityName == "AllocationSettlement")
+    }
+
     @Test func capabilityRegistry_coversEveryModelsSwiftEntity() {
         let expectedModels: Set<String> = [
             "Workspace",

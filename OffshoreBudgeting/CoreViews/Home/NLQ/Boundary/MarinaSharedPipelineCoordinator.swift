@@ -17,6 +17,7 @@ struct MarinaSharedPipelineCoordinator {
     private let databaseLookupResponseBuilder: MarinaDatabaseLookupResponseBuilder
     private let promptNormalizer = MarinaPromptNormalizer()
     private let recoveryPolicy = MarinaQueryRecoveryPolicy()
+    private let semanticAdapter = MarinaSemanticQueryAdapter()
 
     init(
         availability: MarinaModelAvailabilityProviding? = nil,
@@ -252,8 +253,28 @@ struct MarinaSharedPipelineCoordinator {
         provider: MarinaDataProvider,
         now: Date
     ) -> CandidateEvaluation {
+        let interpretation = semanticAdapter.interpretationResult(from: candidate)
         let resolved = resolver.resolve(candidate: candidate, provider: provider)
-        let outcome = validator.validate(resolved)
+        let semanticResolved: MarinaResolvedSemanticQuery?
+        let outcome: MarinaPlanValidationOutcome
+
+        switch interpretation {
+        case .query(let query):
+            let resolvedQuery = resolver.resolve(
+                query: query,
+                provider: provider,
+                candidate: candidate
+            )
+            semanticResolved = resolvedQuery
+            outcome = validator.validate(resolvedQuery)
+        case .clarification(let clarification):
+            semanticResolved = nil
+            outcome = .clarification(clarification)
+        case .unsupported(let unsupported):
+            semanticResolved = nil
+            outcome = .unsupported(unsupported)
+        }
+
         let responseBuilder = MarinaResponseBuilder(
             aggregationBridge: responseBridge,
             workspaceBridge: workspaceAggregationResponseBridge
@@ -266,7 +287,9 @@ struct MarinaSharedPipelineCoordinator {
                 resolved: resolved,
                 validationOutcome: outcome,
                 blockedAnswer: responseBuilder.responseCompatibleAnswer(from: outcome),
-                runtimeFallbackReason: .clarificationBridgeUnavailable
+                runtimeFallbackReason: .clarificationBridgeUnavailable,
+                interpretationResult: interpretation,
+                semanticResolved: semanticResolved
             )
         case .unsupported:
             return CandidateEvaluation(
@@ -274,24 +297,30 @@ struct MarinaSharedPipelineCoordinator {
                 resolved: resolved,
                 validationOutcome: outcome,
                 blockedAnswer: responseBuilder.responseCompatibleAnswer(from: outcome),
-                runtimeFallbackReason: .unsupportedBridgeUnavailable
+                runtimeFallbackReason: .unsupportedBridgeUnavailable,
+                interpretationResult: interpretation,
+                semanticResolved: semanticResolved
             )
         case .executable:
             let queryExecutor = MarinaQueryExecutor(
                 adapter: adapter,
                 executor: executor,
                 composableWorkspaceQueryExecutor: composableWorkspaceQueryExecutor,
-                workspaceAggregationExecutor: workspaceAggregationExecutor
+                workspaceAggregationExecutor: workspaceAggregationExecutor,
+                databaseLookupExecutor: databaseLookupExecutor,
+                databaseLookupResponseBuilder: databaseLookupResponseBuilder
             )
             switch queryExecutor.execute(
                 candidate: candidate,
                 resolved: resolved,
+                semanticResolved: semanticResolved,
                 validationOutcome: outcome,
                 provider: provider,
                 now: now
             ) {
             case .handled(let execution):
-                let answer = responseBuilder.responseCompatibleAnswer(from: execution.aggregationResult)
+                let answer = execution.databaseLookupResponse.map(databaseLookupResponseBuilder.responseCompatibleAnswer)
+                    ?? responseBuilder.responseCompatibleAnswer(from: execution.aggregationResult)
                 let suggestions = MarinaSuggestionBuilder().suggestions(
                     candidate: candidate,
                     executablePlan: execution.executablePlan,
@@ -306,7 +335,10 @@ struct MarinaSharedPipelineCoordinator {
                     aggregationResult: execution.aggregationResult,
                     answer: answer,
                     suggestionCount: suggestions.count,
-                    workspaceAggregationCard: execution.workspaceAggregationCard
+                    databaseLookupResponse: execution.databaseLookupResponse,
+                    workspaceAggregationCard: execution.workspaceAggregationCard,
+                    interpretationResult: interpretation,
+                    semanticResolved: semanticResolved
                 )
             case .unsupported(let unsupported):
                 let unsupportedOutcome = MarinaPlanValidationOutcome.unsupported(unsupported)
@@ -315,7 +347,9 @@ struct MarinaSharedPipelineCoordinator {
                     resolved: resolved,
                     validationOutcome: unsupportedOutcome,
                     blockedAnswer: responseBuilder.responseCompatibleAnswer(from: unsupportedOutcome),
-                    runtimeFallbackReason: .executorUnsupported
+                    runtimeFallbackReason: .executorUnsupported,
+                    interpretationResult: interpretation,
+                    semanticResolved: semanticResolved
                 )
             }
         }
@@ -462,9 +496,13 @@ struct MarinaSharedPipelineCoordinator {
                 ).compactSummary
             },
             resolverSummary: evaluation.map { resolverSummary($0.resolved) },
+            semanticInterpretationSummary: evaluation.flatMap { semanticInterpretationSummary($0.interpretationResult) },
+            semanticResolverSummary: evaluation?.semanticResolved.map(semanticResolverSummary),
             validatorOutcomeSummary: evaluation.map { validatorSummary($0.validationOutcome) },
+            semanticValidationSummary: evaluation.map { validatorSummary($0.validationOutcome) },
             executorResultSummary: evaluation?.databaseLookupResponse?.traceSummary ?? evaluation?.workspaceAggregationCard?.traceSummary ?? evaluation?.aggregationResult.map(Self.aggregationResultSummary),
             responseBridgeSummary: responseBridgeSummary(evaluation),
+            responseShapeSummary: evaluation.map(responseShapeSummary),
             fallbackReason: fallbackReason,
             disagreementSummary: disagreementSummary,
             selectionRank: evaluation.map(recoveryPolicy.selectionRank),
@@ -538,6 +576,34 @@ struct MarinaSharedPipelineCoordinator {
         ].joined(separator: ",")
     }
 
+    private func semanticInterpretationSummary(_ result: MarinaInterpretationResult?) -> String? {
+        guard let result else { return nil }
+        switch result {
+        case .query(let query):
+            return [
+                "query",
+                "subject=\(query.subject.rawValue)",
+                "operation=\(query.operation.rawValue)",
+                "filters=\(query.filters.count)",
+                "shape=\(query.responseShape?.rawValue ?? "nil")"
+            ].joined(separator: ",")
+        case .clarification(let clarification):
+            return "clarification:\(clarification.kind.rawValue)"
+        case .unsupported(let unsupported):
+            return "unsupported:\(unsupported.kind.rawValue)"
+        }
+    }
+
+    private func semanticResolverSummary(_ resolved: MarinaResolvedSemanticQuery) -> String {
+        [
+            "resolved=\(resolved.resolvedFilters.count)",
+            "unresolved=\(resolved.unresolvedFilters.count)",
+            "ambiguous=\(resolved.ambiguousFilters.count)",
+            "primary=\(resolved.primaryDateRange?.traceSummary ?? "nil")",
+            "comparison=\(resolved.comparisonDateRange?.traceSummary ?? "nil")"
+        ].joined(separator: ",")
+    }
+
     private func validatorSummary(_ outcome: MarinaPlanValidationOutcome) -> String {
         switch outcome {
         case .executable(let plan):
@@ -603,6 +669,8 @@ struct MarinaSharedPipelineCoordinator {
             return card.traceSummary
         case .message(let message):
             return "message:\(message.title)"
+        case .noData(let result):
+            return "noData:\(result.title)"
         case .unsupported(let unsupported):
             return "unsupported:\(unsupported.kind.rawValue)"
         }
@@ -630,6 +698,8 @@ struct CandidateEvaluation {
     let runtimeFallbackReason: MarinaSharedPipelineFallbackReason?
     let databaseLookupResponse: MarinaDatabaseLookupResponse?
     let workspaceAggregationCard: MarinaWorkspaceAggregationCard?
+    let interpretationResult: MarinaInterpretationResult?
+    let semanticResolved: MarinaResolvedSemanticQuery?
 
     init(
         candidate: MarinaQueryPlanCandidate,
@@ -642,7 +712,9 @@ struct CandidateEvaluation {
         suggestionCount: Int = 0,
         runtimeFallbackReason: MarinaSharedPipelineFallbackReason? = nil,
         databaseLookupResponse: MarinaDatabaseLookupResponse? = nil,
-        workspaceAggregationCard: MarinaWorkspaceAggregationCard? = nil
+        workspaceAggregationCard: MarinaWorkspaceAggregationCard? = nil,
+        interpretationResult: MarinaInterpretationResult? = nil,
+        semanticResolved: MarinaResolvedSemanticQuery? = nil
     ) {
         self.candidate = candidate
         self.resolved = resolved
@@ -655,6 +727,8 @@ struct CandidateEvaluation {
         self.runtimeFallbackReason = runtimeFallbackReason
         self.databaseLookupResponse = databaseLookupResponse
         self.workspaceAggregationCard = workspaceAggregationCard
+        self.interpretationResult = interpretationResult
+        self.semanticResolved = semanticResolved
     }
 
     var isExecutableHandled: Bool {
@@ -673,6 +747,7 @@ struct CandidateEvaluation {
 struct MarinaQueryExecution {
     let executablePlan: MarinaExecutableAggregationPlan?
     let aggregationResult: MarinaAggregationResult
+    let databaseLookupResponse: MarinaDatabaseLookupResponse?
     let workspaceAggregationCard: MarinaWorkspaceAggregationCard?
 }
 
@@ -687,10 +762,13 @@ struct MarinaQueryExecutor {
     let executor: MarinaAggregationExecutor
     let composableWorkspaceQueryExecutor: MarinaComposableWorkspaceQueryExecutor
     let workspaceAggregationExecutor: MarinaWorkspaceAggregationExecutor
+    let databaseLookupExecutor: MarinaDatabaseLookupExecutor
+    let databaseLookupResponseBuilder: MarinaDatabaseLookupResponseBuilder
 
     func execute(
         candidate: MarinaQueryPlanCandidate,
         resolved: MarinaResolvedQueryCandidate,
+        semanticResolved: MarinaResolvedSemanticQuery?,
         validationOutcome: MarinaPlanValidationOutcome,
         provider: MarinaDataProvider,
         now: Date
@@ -705,8 +783,37 @@ struct MarinaQueryExecutor {
             )
         }
 
+        if plan.operation == .lookupDetails,
+           let request = semanticResolved?.databaseLookupRequest ?? candidate.databaseLookupRequest {
+            let response = databaseLookupExecutor.execute(request, provider: provider)
+            let answer = databaseLookupResponseBuilder.responseCompatibleAnswer(from: response)
+            let result: MarinaAggregationResult = response.results.isEmpty && response.ambiguityChoices.isEmpty
+                ? .noData(
+                    MarinaNoDataAggregationResult(
+                        title: answer.title,
+                        message: answer.subtitle ?? "No matching data found.",
+                        sourceAnswer: answer
+                    )
+                )
+                : .message(
+                    MarinaMessageAggregationResult(
+                        title: answer.title,
+                        message: answer.subtitle,
+                        sourceAnswer: answer
+                    )
+                )
+            return .handled(
+                MarinaQueryExecution(
+                    executablePlan: nil,
+                    aggregationResult: result,
+                    databaseLookupResponse: response,
+                    workspaceAggregationCard: nil
+                )
+            )
+        }
+
         if case .success(let executablePlan) = adapter.executablePlan(from: validationOutcome) {
-            let result = executor.execute(executablePlan, provider: provider, now: now)
+            let result = noDataIfNeeded(executor.execute(executablePlan, provider: provider, now: now))
             if case .unsupported(let unsupported) = result {
                 return .unsupported(unsupported)
             }
@@ -714,6 +821,7 @@ struct MarinaQueryExecutor {
                 MarinaQueryExecution(
                     executablePlan: executablePlan,
                     aggregationResult: result,
+                    databaseLookupResponse: nil,
                     workspaceAggregationCard: nil
                 )
             )
@@ -731,6 +839,7 @@ struct MarinaQueryExecutor {
                 MarinaQueryExecution(
                     executablePlan: nil,
                     aggregationResult: .workspaceCard(card),
+                    databaseLookupResponse: nil,
                     workspaceAggregationCard: card
                 )
             )
@@ -744,6 +853,7 @@ struct MarinaQueryExecutor {
                 MarinaQueryExecution(
                     executablePlan: nil,
                     aggregationResult: .workspaceCard(card),
+                    databaseLookupResponse: nil,
                     workspaceAggregationCard: card
                 )
             )
@@ -755,6 +865,29 @@ struct MarinaQueryExecutor {
                     candidate: candidate
                 )
             )
+        }
+    }
+
+    private func noDataIfNeeded(_ result: MarinaAggregationResult) -> MarinaAggregationResult {
+        switch result {
+        case .rankedList(let list) where list.rows.isEmpty:
+            return .noData(
+                MarinaNoDataAggregationResult(
+                    title: list.title,
+                    message: "No data available for that range.",
+                    sourceAnswer: list.sourceAnswer
+                )
+            )
+        case .groupedBreakdown(let list) where list.rows.isEmpty:
+            return .noData(
+                MarinaNoDataAggregationResult(
+                    title: list.title,
+                    message: "No data available for that range.",
+                    sourceAnswer: list.sourceAnswer
+                )
+            )
+        default:
+            return result
         }
     }
 }

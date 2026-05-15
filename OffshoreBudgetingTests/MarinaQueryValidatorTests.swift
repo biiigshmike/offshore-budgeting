@@ -367,6 +367,81 @@ struct MarinaQueryValidatorTests {
         #expect(plan.responseShape == .scalarCurrency)
     }
 
+    @Test func semanticValidator_usesCatalogAndResolvedFiltersForExecutablePlan() {
+        let categoryID = UUID()
+        let filter = MarinaFilter(
+            role: .primaryTarget,
+            relationship: .category,
+            value: "groceries",
+            entityTypeHint: .category
+        )
+        let query = MarinaSemanticQuery(
+            subject: .variableExpenses,
+            operation: .average,
+            filters: [filter],
+            amountField: .budgetImpactAmount,
+            averageBasis: .perTransaction,
+            responseShape: .scalarCurrency
+        )
+        let resolved = MarinaResolvedSemanticQuery(
+            query: query,
+            candidate: nil,
+            resolvedFilters: [
+                MarinaResolvedFilter(
+                    id: filter.id,
+                    filter: filter,
+                    role: .primaryTarget,
+                    relationship: .category,
+                    entityType: .category,
+                    displayName: "Groceries",
+                    sourceID: categoryID
+                )
+            ],
+            unresolvedFilters: [],
+            ambiguousFilters: [],
+            primaryDateRange: nil,
+            comparisonDateRange: nil,
+            databaseLookupRequest: nil
+        )
+
+        let outcome = MarinaQueryValidator().validate(resolved)
+
+        guard case .executable(let plan) = outcome else {
+            Issue.record("Expected semantic query to validate")
+            return
+        }
+        #expect(plan.operation == .average)
+        #expect(plan.measure == .spend)
+        #expect(plan.targets.first?.displayName == "Groceries")
+        #expect(plan.targets.first?.sourceID == categoryID)
+    }
+
+    @Test func semanticValidator_rejectsUnsupportedCatalogOperation() {
+        let query = MarinaSemanticQuery(
+            subject: .cards,
+            operation: .median,
+            amountField: .budgetImpactAmount
+        )
+        let resolved = MarinaResolvedSemanticQuery(
+            query: query,
+            candidate: nil,
+            resolvedFilters: [],
+            unresolvedFilters: [],
+            ambiguousFilters: [],
+            primaryDateRange: nil,
+            comparisonDateRange: nil,
+            databaseLookupRequest: nil
+        )
+
+        let outcome = MarinaQueryValidator().validate(resolved)
+
+        guard case .unsupported(let unsupported) = outcome else {
+            Issue.record("Expected unsupported semantic operation")
+            return
+        }
+        #expect(unsupported.kind == .unsupportedOperation)
+    }
+
     private func resolvedCandidate(
         _ candidate: MarinaQueryPlanCandidate,
         targets: [MarinaResolvedEntityMention] = [],

@@ -55,6 +55,12 @@ struct MarinaMessageAggregationResult: Codable, Equatable {
     let sourceAnswer: HomeAnswer
 }
 
+struct MarinaNoDataAggregationResult: Codable, Equatable {
+    let title: String
+    let message: String
+    let sourceAnswer: HomeAnswer
+}
+
 enum MarinaAggregationResult: Codable, Equatable {
     case scalar(MarinaScalarAggregationResult)
     case comparison(MarinaComparisonAggregationResult)
@@ -62,6 +68,7 @@ enum MarinaAggregationResult: Codable, Equatable {
     case groupedBreakdown(MarinaListAggregationResult)
     case workspaceCard(MarinaWorkspaceAggregationCard)
     case message(MarinaMessageAggregationResult)
+    case noData(MarinaNoDataAggregationResult)
     case unsupported(MarinaTypedUnsupportedResponse)
 
     var sourceAnswer: HomeAnswer? {
@@ -75,6 +82,8 @@ enum MarinaAggregationResult: Codable, Equatable {
         case .workspaceCard:
             return nil
         case .message(let result):
+            return result.sourceAnswer
+        case .noData(let result):
             return result.sourceAnswer
         case .unsupported:
             return nil

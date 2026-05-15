@@ -22,9 +22,13 @@ struct MarinaSharedPipelineTraceTests {
         #expect(trace.interpreterSource == .heuristic)
         #expect(trace.candidateSummary?.contains("source=heuristic") == true)
         #expect(trace.resolverSummary?.contains("resolved=1") == true)
+        #expect(trace.semanticInterpretationSummary?.contains("subject=variableExpenses") == true)
+        #expect(trace.semanticResolverSummary?.contains("resolved=1") == true)
         #expect(trace.validatorOutcomeSummary?.contains("executable") == true)
+        #expect(trace.semanticValidationSummary?.contains("executable") == true)
         #expect(trace.executorResultSummary?.contains("scalar") == true)
         #expect(trace.responseBridgeSummary?.contains("kind=metric") == true)
+        #expect(trace.responseShapeSummary == "scalarCurrency")
         #expect(trace.fallbackReason == nil)
     }
 
@@ -61,9 +65,13 @@ struct MarinaSharedPipelineTraceTests {
                 interpreterSource: .heuristic,
                 candidateSummary: "candidate",
                 resolverSummary: "resolver",
+                semanticInterpretationSummary: "semanticInterpretation",
+                semanticResolverSummary: "semanticResolver",
                 validatorOutcomeSummary: "validator",
+                semanticValidationSummary: "semanticValidation",
                 executorResultSummary: "executor",
                 responseBridgeSummary: "bridge",
+                responseShapeSummary: "responseShape",
                 fallbackReason: nil,
                 disagreementSummary: nil
             )

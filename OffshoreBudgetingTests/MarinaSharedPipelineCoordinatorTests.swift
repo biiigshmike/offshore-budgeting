@@ -151,18 +151,22 @@ struct MarinaSharedPipelineCoordinatorTests {
             context: sharedContext(fixture: fixture, aiOptInEnabled: true)
         )
 
-        guard case .validationBlocked(let answer, let outcome, let trace) = result else {
-            Issue.record("Expected Litter Robot lookupDetails shape to block inside shared pipeline.")
+        guard case .handled(let answer, let aggregationResult, let homeQueryPlan, let trace) = result else {
+            Issue.record("Expected Litter Robot lookupDetails shape to use the shared database lookup path.")
             return
         }
 
         #expect(trace.selectedPath == .sharedFoundationModels || trace.selectedPath == .sharedHeuristic)
         #expect(trace.selectedPath != .sharedAttemptedThenLegacyFallback)
         #expect(trace.compactSummary.contains("family=databaseLookup"))
-        #expect(trace.executorResultSummary == nil)
+        #expect(trace.executorResultSummary?.contains("requestFamily=databaseLookup") == true)
+        #expect(homeQueryPlan == nil)
         #expect(answer.kind == .message)
-        guard case .unsupported = outcome else {
-            Issue.record("Expected typed unsupported for lookupDetails without database bypass.")
+        switch aggregationResult {
+        case .message, .noData:
+            break
+        default:
+            Issue.record("Expected typed lookup message or no-data result.")
             return
         }
     }

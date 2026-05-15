@@ -627,6 +627,8 @@ private struct MarinaTraceAnalyzer {
             return card.traceSummary
         case .message(let message):
             return "message:\(message.title)"
+        case .noData(let result):
+            return "noData:\(result.title)"
         case .unsupported(let unsupported):
             return "unsupported:\(unsupported.kind.rawValue)"
         }

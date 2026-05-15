@@ -369,6 +369,63 @@ struct MarinaQueryResolverTests {
         #expect(resolved.resolvedTargets.first?.entityType == .merchant)
     }
 
+    @Test func semanticResolver_uncategorizedMapsToNilCategoryFilter() throws {
+        let fixture = try makeFixture()
+        let query = MarinaSemanticQuery(
+            subject: .variableExpenses,
+            operation: .list,
+            filters: [
+                MarinaFilter(
+                    role: .filter,
+                    relationship: .uncategorized,
+                    value: "uncategorized",
+                    entityTypeHint: .category
+                )
+            ],
+            amountField: .budgetImpactAmount
+        )
+
+        let resolved = MarinaQueryResolver().resolve(query: query, provider: fixture.provider)
+
+        #expect(resolved.resolvedFilters.count == 1)
+        #expect(resolved.resolvedFilters.first?.relationship == .uncategorized)
+        #expect(resolved.resolvedFilters.first?.entityType == .category)
+        #expect(resolved.resolvedFilters.first?.displayName == "Uncategorized")
+        #expect(resolved.resolvedFilters.first?.sourceID == nil)
+        #expect(resolved.hasResolutionProblems == false)
+    }
+
+    @Test func semanticResolver_categoryStaysWorkspaceScoped() throws {
+        let fixture = try makeFixture()
+        let groceries = Category(name: "Groceries", hexColor: "#00AA00", workspace: fixture.workspace)
+        let otherWorkspace = Workspace(name: "Other", hexColor: "#111111")
+        let otherGroceries = Category(name: "Groceries", hexColor: "#FF0000", workspace: otherWorkspace)
+        fixture.context.insert(groceries)
+        fixture.context.insert(otherWorkspace)
+        fixture.context.insert(otherGroceries)
+        try fixture.context.save()
+
+        let query = MarinaSemanticQuery(
+            subject: .variableExpenses,
+            operation: .sum,
+            filters: [
+                MarinaFilter(
+                    role: .primaryTarget,
+                    relationship: .category,
+                    value: "groceries",
+                    entityTypeHint: .category
+                )
+            ],
+            amountField: .budgetImpactAmount
+        )
+
+        let resolved = MarinaQueryResolver().resolve(query: query, provider: fixture.provider)
+
+        #expect(resolved.resolvedFilters.count == 1)
+        #expect(resolved.resolvedFilters.first?.sourceID == groceries.id)
+        #expect(resolved.resolvedFilters.first?.sourceID != otherGroceries.id)
+    }
+
     private struct Fixture {
         let context: ModelContext
         let workspace: Workspace

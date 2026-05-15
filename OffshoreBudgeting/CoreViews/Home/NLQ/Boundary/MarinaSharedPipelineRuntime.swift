@@ -27,9 +27,13 @@ struct MarinaSharedPipelineTrace: Codable, Equatable {
     let interpreterSource: MarinaInterpreterSource?
     let candidateSummary: String?
     let resolverSummary: String?
+    let semanticInterpretationSummary: String?
+    let semanticResolverSummary: String?
     let validatorOutcomeSummary: String?
+    let semanticValidationSummary: String?
     let executorResultSummary: String?
     let responseBridgeSummary: String?
+    let responseShapeSummary: String?
     let fallbackReason: MarinaSharedPipelineFallbackReason?
     let disagreementSummary: String?
     let selectionRank: Int?
@@ -44,9 +48,13 @@ struct MarinaSharedPipelineTrace: Codable, Equatable {
         interpreterSource: MarinaInterpreterSource? = nil,
         candidateSummary: String? = nil,
         resolverSummary: String? = nil,
+        semanticInterpretationSummary: String? = nil,
+        semanticResolverSummary: String? = nil,
         validatorOutcomeSummary: String? = nil,
+        semanticValidationSummary: String? = nil,
         executorResultSummary: String? = nil,
         responseBridgeSummary: String? = nil,
+        responseShapeSummary: String? = nil,
         fallbackReason: MarinaSharedPipelineFallbackReason? = nil,
         disagreementSummary: String? = nil,
         selectionRank: Int? = nil,
@@ -60,9 +68,13 @@ struct MarinaSharedPipelineTrace: Codable, Equatable {
         self.interpreterSource = interpreterSource
         self.candidateSummary = candidateSummary
         self.resolverSummary = resolverSummary
+        self.semanticInterpretationSummary = semanticInterpretationSummary
+        self.semanticResolverSummary = semanticResolverSummary
         self.validatorOutcomeSummary = validatorOutcomeSummary
+        self.semanticValidationSummary = semanticValidationSummary
         self.executorResultSummary = executorResultSummary
         self.responseBridgeSummary = responseBridgeSummary
+        self.responseShapeSummary = responseShapeSummary
         self.fallbackReason = fallbackReason
         self.disagreementSummary = disagreementSummary
         self.selectionRank = selectionRank
@@ -79,9 +91,13 @@ struct MarinaSharedPipelineTrace: Codable, Equatable {
             interpreterSource.map { "source=\($0.rawValue)" },
             candidateSummary.map { "candidate=\($0)" },
             resolverSummary.map { "resolver=\($0)" },
+            semanticInterpretationSummary.map { "semanticInterpretation=\($0)" },
+            semanticResolverSummary.map { "semanticResolver=\($0)" },
             validatorOutcomeSummary.map { "validator=\($0)" },
+            semanticValidationSummary.map { "semanticValidation=\($0)" },
             executorResultSummary.map { "executor=\($0)" },
             responseBridgeSummary.map { "bridge=\($0)" },
+            responseShapeSummary.map { "responseShape=\($0)" },
             fallbackReason.map { "fallback=\($0.rawValue)" },
             disagreementSummary.map { "disagreement=\($0)" },
             selectionRank.map { "selectionRank=\($0)" },

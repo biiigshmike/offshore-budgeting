@@ -38,6 +38,47 @@ struct MarinaResolvedQueryCandidate: Equatable {
     }
 }
 
+struct MarinaResolvedFilter: Equatable, Identifiable {
+    let id: UUID
+    let filter: MarinaFilter
+    let role: MarinaResolvedTargetRole
+    let relationship: MarinaRelationshipField
+    let entityType: MarinaCandidateEntityTypeHint
+    let displayName: String
+    let sourceID: UUID?
+}
+
+struct MarinaAmbiguousFilter: Equatable, Identifiable {
+    let id: UUID
+    let filter: MarinaFilter
+    let choices: [MarinaClarificationChoice]
+
+    init(
+        id: UUID = UUID(),
+        filter: MarinaFilter,
+        choices: [MarinaClarificationChoice]
+    ) {
+        self.id = id
+        self.filter = filter
+        self.choices = choices
+    }
+}
+
+struct MarinaResolvedSemanticQuery: Equatable {
+    let query: MarinaSemanticQuery
+    let candidate: MarinaQueryPlanCandidate?
+    let resolvedFilters: [MarinaResolvedFilter]
+    let unresolvedFilters: [MarinaFilter]
+    let ambiguousFilters: [MarinaAmbiguousFilter]
+    let primaryDateRange: HomeQueryDateRange?
+    let comparisonDateRange: HomeQueryDateRange?
+    let databaseLookupRequest: MarinaDatabaseLookupRequest?
+
+    var hasResolutionProblems: Bool {
+        unresolvedFilters.isEmpty == false || ambiguousFilters.isEmpty == false
+    }
+}
+
 @MainActor
 struct MarinaQueryResolver {
     private let extractor = MarinaNLQCandidateExtractor()
@@ -104,6 +145,114 @@ struct MarinaQueryResolver {
             ambiguousMentions: ambiguousMentions,
             primaryDateRange: candidate.timeScopes.first(where: { $0.role == .primary || $0.role == .lookbackWindow })?.resolvedRangeHint,
             comparisonDateRange: candidate.timeScopes.first(where: { $0.role == .comparison })?.resolvedRangeHint
+        )
+    }
+
+    func resolve(
+        query: MarinaSemanticQuery,
+        provider: MarinaDataProvider,
+        candidate: MarinaQueryPlanCandidate? = nil
+    ) -> MarinaResolvedSemanticQuery {
+        var resolvedFilters: [MarinaResolvedFilter] = []
+        var unresolvedFilters: [MarinaFilter] = []
+        var ambiguousFilters: [MarinaAmbiguousFilter] = []
+
+        for filter in query.filters {
+            let trimmedValue = filter.value.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard trimmedValue.isEmpty == false else {
+                unresolvedFilters.append(filter)
+                continue
+            }
+
+            if isUncategorizedFilter(filter) {
+                resolvedFilters.append(
+                    MarinaResolvedFilter(
+                        id: filter.id,
+                        filter: filter,
+                        role: filter.role,
+                        relationship: .uncategorized,
+                        entityType: .category,
+                        displayName: "Uncategorized",
+                        sourceID: nil
+                    )
+                )
+                continue
+            }
+
+            if let sourceID = filter.sourceID,
+               let entityType = filter.entityTypeHint {
+                resolvedFilters.append(
+                    MarinaResolvedFilter(
+                        id: filter.id,
+                        filter: filter,
+                        role: filter.role,
+                        relationship: filter.relationship,
+                        entityType: entityType,
+                        displayName: trimmedValue,
+                        sourceID: sourceID
+                    )
+                )
+                continue
+            }
+
+            let mention = MarinaUnresolvedEntityMention(
+                id: filter.id,
+                role: mentionRole(from: filter.role),
+                rawText: trimmedValue,
+                typeHint: filter.entityTypeHint ?? entityTypeHint(from: filter.relationship),
+                allowedTypeHints: allowedTypeHints(from: filter.relationship, explicit: filter.entityTypeHint),
+                confidence: filter.matchMode == .exact ? .high : .medium
+            )
+            let extraction = extractor.extractCandidates(from: trimmedValue, provider: provider)
+            let matches = scopedMatches(
+                extraction.matchesByType.flatMap(\.value),
+                mention: mention
+            )
+
+            switch representativeMatches(from: matches, mention: mention) {
+            case .none:
+                unresolvedFilters.append(filter)
+            case .one(let match):
+                resolvedFilters.append(
+                    MarinaResolvedFilter(
+                        id: filter.id,
+                        filter: filter,
+                        role: filter.role,
+                        relationship: relationship(from: match.entityType),
+                        entityType: candidateType(from: match.entityType),
+                        displayName: match.displayValue,
+                        sourceID: match.sourceID
+                    )
+                )
+            case .many(let matches):
+                ambiguousFilters.append(
+                    MarinaAmbiguousFilter(
+                        filter: filter,
+                        choices: matches.map { match in
+                            MarinaClarificationChoice(
+                                title: match.displayValue,
+                                subtitle: match.entityType.rawValue,
+                                entityRole: mention.role,
+                                entityTypeHint: candidateType(from: match.entityType),
+                                rawValue: match.displayValue,
+                                sourceID: match.sourceID,
+                                mentionID: filter.id
+                            )
+                        }
+                    )
+                )
+            }
+        }
+
+        return MarinaResolvedSemanticQuery(
+            query: query,
+            candidate: candidate,
+            resolvedFilters: resolvedFilters,
+            unresolvedFilters: unresolvedFilters,
+            ambiguousFilters: ambiguousFilters,
+            primaryDateRange: query.dateRange?.resolvedRange,
+            comparisonDateRange: query.comparisonDateRange?.resolvedRange,
+            databaseLookupRequest: candidate?.databaseLookupRequest
         )
     }
 
@@ -245,6 +394,29 @@ struct MarinaQueryResolver {
         }
     }
 
+    private func relationship(from targetType: MarinaNLQTargetType) -> MarinaRelationshipField {
+        switch targetType {
+        case .category:
+            return .category
+        case .merchant:
+            return .merchant
+        case .expense:
+            return .transaction
+        case .card:
+            return .card
+        case .budget:
+            return .budget
+        case .preset:
+            return .preset
+        case .incomeSource:
+            return .incomeSource
+        case .allocationAccount:
+            return .allocationAccount
+        case .savingsAccount:
+            return .savingsAccount
+        }
+    }
+
     private func candidateType(from targetType: MarinaNLQTargetType) -> MarinaCandidateEntityTypeHint {
         switch targetType {
         case .category:
@@ -285,5 +457,68 @@ struct MarinaQueryResolver {
         case .simulationOutput:
             return .simulationOutput
         }
+    }
+
+    private func mentionRole(from role: MarinaResolvedTargetRole) -> MarinaEntityMentionRole {
+        switch role {
+        case .filter:
+            return .filter
+        case .excludeFilter:
+            return .excludeFilter
+        case .primaryTarget:
+            return .primaryTarget
+        case .comparisonTarget:
+            return .comparisonTarget
+        case .groupingDimension:
+            return .groupingDimension
+        case .simulationInput:
+            return .simulationInput
+        case .simulationOutput:
+            return .simulationOutput
+        }
+    }
+
+    private func entityTypeHint(from relationship: MarinaRelationshipField) -> MarinaCandidateEntityTypeHint? {
+        switch relationship {
+        case .category, .uncategorized:
+            return .category
+        case .merchant:
+            return .merchant
+        case .card:
+            return .card
+        case .budget:
+            return .budget
+        case .preset:
+            return .preset
+        case .incomeSource:
+            return .incomeSource
+        case .allocationAccount:
+            return .allocationAccount
+        case .savingsAccount:
+            return .savingsAccount
+        case .transaction:
+            return .transaction
+        case .workspace:
+            return .workspace
+        case .unknown:
+            return nil
+        }
+    }
+
+    private func allowedTypeHints(
+        from relationship: MarinaRelationshipField,
+        explicit: MarinaCandidateEntityTypeHint?
+    ) -> [MarinaCandidateEntityTypeHint]? {
+        if let explicit {
+            return [explicit]
+        }
+        return entityTypeHint(from: relationship).map { [$0] }
+    }
+
+    private func isUncategorizedFilter(_ filter: MarinaFilter) -> Bool {
+        filter.relationship == .uncategorized
+            || filter.value
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .localizedCaseInsensitiveCompare("uncategorized") == .orderedSame
     }
 }
