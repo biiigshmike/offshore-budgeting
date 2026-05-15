@@ -74,6 +74,7 @@ struct MarinaComposableWorkspaceQueryExecutor {
             guard plan.operation == .listRows || plan.ranking?.direction == .newest else { return .unsupported }
             return .handled(recentFilteredTransactions(resolved: resolved, plan: plan, provider: provider, now: now))
         case (.average, .spend, nil), (.average, .spend, .week), (.average, .spend, .month):
+            guard plan.targets.isEmpty || resolved.resolvedTargets.isEmpty == false else { return .unsupported }
             return .handled(targetedPeriodicAverage(resolved: resolved, plan: plan, provider: provider, now: now))
         case (.compare, .spend, .category), (.compare, .spend, .transaction):
             guard plan.ranking != nil else { return .unsupported }
@@ -273,13 +274,28 @@ struct MarinaComposableWorkspaceQueryExecutor {
                 sortValue: total
             )
         }
+        let resolvedEntityTypes = filters.map { $0.entityType.rawValue }.joined(separator: "+")
+        let resolvedObjectIDs = filters.compactMap { $0.sourceID?.uuidString }.joined(separator: "+")
+        let resolvedObjectNames = filters.map(\.displayName).joined(separator: "+")
 
         return MarinaWorkspaceAggregationCard(
             title: "Average \(periodLabel(plan.grouping?.dimension ?? .week)) Spending",
             subtitle: filterSummary(include: filters, exclude: [], range: range),
             primaryValue: currency(average),
             rows: cardRows,
-            traceSummary: "composableWorkspace=targetedPeriodicAverage,buckets=\(buckets.count),average=\(average)"
+            traceSummary: [
+                "composableWorkspace=targetedPeriodicAverage",
+                "targetFilterApplied=\(filters.isEmpty == false)",
+                "resolvedEntityType=\(resolvedEntityTypes)",
+                "resolvedObjectID=\(resolvedObjectIDs)",
+                "resolvedObjectName=\(resolvedObjectNames)",
+                "dateRange=\(rangeLabel(range))",
+                "aggregationDenominator=\(buckets.count)",
+                "aggregationRowCount=\(rows.count)",
+                "aggregationSourceEntity=spendingRows",
+                "responseScope=\(filters.isEmpty ? "broad" : "targeted")",
+                "average=\(average)"
+            ].joined(separator: ",")
         )
     }
 

@@ -105,6 +105,14 @@ struct MarinaAggregationPlanHomeQueryAdapter {
             return .spendAveragePerPeriod
         case (.average, .income):
             return .incomeAverageActual
+        case (.lookupDetails, .savings):
+            return .savingsStatus
+        case (.forecast, .savings):
+            return .forecastSavings
+        case (.lookupDetails, .presetAmount):
+            return .nextPlannedExpense
+        case (.lookupDetails, .remainingBudget):
+            return .safeSpendToday
         case (.compare, .spend):
             guard plan.comparisonDateRange != nil else { return nil }
             return spendComparisonMetric(target: target)

@@ -132,6 +132,7 @@ struct HomeAssistantPanelView: View {
     @State private var recoverySuggestions: [HomeAssistantRecoverySuggestion] = []
     @State private var lastClarificationReasons: [HomeAssistantClarificationReason] = []
     @State private var activeClarificationContext: HomeAssistantClarificationContext? = nil
+    @State private var sharedPipelineClarification: MarinaTypedClarification? = nil
     @State private var selectedEmptySuggestionGroup: EmptySuggestionGroup?
     @State private var personaSessionSeed: UInt64 = UInt64.random(in: UInt64.min...UInt64.max)
     @State private var personaCooldownSessionID: String = UUID().uuidString
@@ -1393,6 +1394,7 @@ struct HomeAssistantPanelView: View {
         recoverySuggestions = []
         lastClarificationReasons = []
         activeClarificationContext = nil
+        sharedPipelineClarification = nil
         clearNLQClarificationState()
         
         let baseAnswer = engine.execute(
@@ -5474,6 +5476,14 @@ struct HomeAssistantPanelView: View {
     }
 
     private func handleSuggestionTap(_ suggestion: HomeAssistantSuggestion) {
+        if let clarification = sharedPipelineClarification,
+           let choice = clarification.choices.first(where: { sharedPipelineChoiceTitle($0) == suggestion.title }) {
+            Task {
+                await handleSharedPipelineClarificationChoice(choice, clarification: clarification)
+            }
+            return
+        }
+
         if marinaRuntimeSettings.nlqV1.isEnabled, let payload = nlqClarificationPayload,
            payload.options.contains(where: { $0.displayLabel == suggestion.title })
         {
@@ -5529,11 +5539,21 @@ struct HomeAssistantPanelView: View {
                 )
                 _ = MarinaTraceRecorder.shared.finish()
                 return
-            case .validationBlocked(let answer, _, let trace):
+            case .validationBlocked(let answer, let outcome, let trace):
                 MarinaTraceRecorder.shared.recordSelectedRoute(
                     trace.selectedPath == .sharedFoundationModels ? .sharedFoundationModels : .sharedHeuristic,
                     reason: trace.compactSummary
                 )
+                if case .clarification(let clarification) = outcome {
+                    handleSharedPipelineClarification(
+                        answer,
+                        clarification: clarification,
+                        rawPrompt: prompt,
+                        source: trace.interpreterSource == .foundationModels ? .sharedFoundationModels : .sharedHeuristic
+                    )
+                    _ = MarinaTraceRecorder.shared.finish()
+                    return
+                }
                 handleSharedPipelineAnswer(
                     answer,
                     rawPrompt: prompt,
@@ -5662,6 +5682,91 @@ struct HomeAssistantPanelView: View {
             )
             return true
         }
+    }
+
+    @MainActor
+    private func handleSharedPipelineClarification(
+        _ answer: HomeAnswer,
+        clarification: MarinaTypedClarification,
+        rawPrompt: String,
+        source: HomeAssistantPlanResolutionSource
+    ) {
+        sharedPipelineClarification = clarification
+        clarificationSuggestions = clarification.choices.map { choice in
+            HomeAssistantSuggestion(
+                title: sharedPipelineChoiceTitle(choice),
+                query: HomeQuery(intent: .spendThisMonth)
+            )
+        }
+        recoverySuggestions = []
+        lastClarificationReasons = [.lowConfidenceLanguage]
+        activeClarificationContext = nil
+        clearNLQClarificationState()
+
+        recordTelemetry(
+            for: rawPrompt,
+            outcome: .clarification,
+            source: source,
+            plan: nil,
+            notes: "shared_pipeline_clarification"
+        )
+        appendAnswer(answer)
+    }
+
+    @MainActor
+    private func handleSharedPipelineClarificationChoice(
+        _ choice: MarinaClarificationChoice,
+        clarification: MarinaTypedClarification
+    ) async {
+        let provider = MarinaDataProvider(modelContext: modelContext, workspaceID: workspace.id)
+        let coordinator = MarinaSharedPipelineCoordinator()
+        let result = await coordinator.resume(
+            clarification: clarification,
+            choice: choice,
+            context: MarinaSharedPipelineContext(
+                provider: provider,
+                routerContext: makeMarinaRouterContext(),
+                defaultPeriodUnit: defaultQueryPeriodUnit,
+                sharedPipelineEnabled: marinaRuntimeSettings.sharedPipeline.isEnabled,
+                aiOptInEnabled: marinaRuntimeSettings.aiOptIn.isEnabled,
+                now: Date()
+            )
+        )
+        MarinaTraceRecorder.shared.recordSharedPipelineTrace(result.trace)
+        sharedPipelineClarification = nil
+
+        switch result {
+        case .handled(let answer, _, let homeQueryPlan, let trace):
+            handleSharedPipelineAnswer(
+                answer,
+                rawPrompt: clarification.candidate?.rawPrompt ?? choice.title,
+                homeQueryPlan: homeQueryPlan,
+                source: trace.interpreterSource == .foundationModels ? .sharedFoundationModels : .sharedHeuristic
+            )
+        case .validationBlocked(let answer, let outcome, let trace):
+            if case .clarification(let nextClarification) = outcome {
+                handleSharedPipelineClarification(
+                    answer,
+                    clarification: nextClarification,
+                    rawPrompt: clarification.candidate?.rawPrompt ?? choice.title,
+                    source: trace.interpreterSource == .foundationModels ? .sharedFoundationModels : .sharedHeuristic
+                )
+            } else {
+                handleSharedPipelineAnswer(
+                    answer,
+                    rawPrompt: clarification.candidate?.rawPrompt ?? choice.title,
+                    homeQueryPlan: nil,
+                    source: trace.interpreterSource == .foundationModels ? .sharedFoundationModels : .sharedHeuristic
+                )
+            }
+        case .fallbackToLegacy(let trace):
+            MarinaTraceRecorder.shared.recordSelectedRoute(.sharedFallback, reason: trace.compactSummary)
+        }
+    }
+
+    private func sharedPipelineChoiceTitle(_ choice: MarinaClarificationChoice) -> String {
+        guard let type = choice.entityTypeHint else { return choice.title }
+        return "\(choice.title) (\(type.rawValue))"
     }
 
     @MainActor

@@ -36,10 +36,10 @@ struct MarinaQueryValidator {
             )
         }
 
-        if operation == .trend || operation == .forecast {
+        if operation == .trend {
             return unsupported(
                 .unsupportedOperation,
-                message: "Trend and forecast plans are not validated in this phase.",
+                message: "Trend plans are not validated in this phase.",
                 candidate: candidate
             )
         }
@@ -63,7 +63,8 @@ struct MarinaQueryValidator {
                         title: unresolvedMention.rawText ?? "Target",
                         entityRole: unresolvedMention.role,
                         entityTypeHint: unresolvedMention.typeHint,
-                        rawValue: unresolvedMention.rawText
+                        rawValue: unresolvedMention.rawText,
+                        mentionID: unresolvedMention.id
                     )
                 ]
             )
@@ -85,10 +86,15 @@ struct MarinaQueryValidator {
             )
         }
 
-        guard isSupportedCombination(operation: operation, measure: measure, candidate: candidate) else {
+        guard MarinaQueryCapabilityMatrix.supports(
+            operation: operation,
+            measure: measure,
+            targetTypes: resolved.resolvedTargets.map(\.entityType),
+            grouping: candidate.grouping?.dimension
+        ) else {
             return unsupported(
                 .unsupportedCombination,
-                message: "That operation and measure combination is not supported in this validation shell.",
+                message: "That operation and measure combination is not supported by Marina's entity capability matrix.",
                 candidate: candidate
             )
         }
@@ -125,31 +131,6 @@ struct MarinaQueryValidator {
             case .groupingDimension:
                 return false
             }
-        }
-    }
-
-    private func isSupportedCombination(
-        operation: MarinaCandidateOperation,
-        measure: MarinaCandidateMeasure,
-        candidate: MarinaQueryPlanCandidate
-    ) -> Bool {
-        switch operation {
-        case .sum:
-            return [.spend, .income, .categoryShare, .presetAmount, .transactionAmount].contains(measure)
-        case .average:
-            return [.spend, .income, .savings].contains(measure)
-        case .count:
-            return measure == .transactionFrequency
-        case .rank:
-            return candidate.grouping != nil || candidate.ranking != nil
-        case .listRows:
-            return measure == .transactionAmount
-        case .compare:
-            return [.spend, .income, .savings, .categoryShare].contains(measure)
-        case .simulate:
-            return measure == .remainingBudget
-        case .lookupDetails, .minimum, .maximum, .trend, .forecast:
-            return false
         }
     }
 

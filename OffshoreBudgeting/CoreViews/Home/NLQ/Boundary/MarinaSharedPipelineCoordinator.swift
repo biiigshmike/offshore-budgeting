@@ -166,6 +166,63 @@ struct MarinaSharedPipelineCoordinator {
         )
     }
 
+    func resume(
+        clarification: MarinaTypedClarification,
+        choice: MarinaClarificationChoice,
+        context: MarinaSharedPipelineContext
+    ) async -> MarinaSharedPipelineRuntimeResult {
+        guard let candidate = clarification.candidate else {
+            return fallback(
+                context: context,
+                modelAvailabilitySummary: nil,
+                reason: .validationDidNotProduceExecutablePlan
+            )
+        }
+
+        let resumedCandidate = candidate.replacingClarifiedMention(with: choice)
+        let evaluation = evaluate(
+            resumedCandidate,
+            provider: context.provider,
+            now: context.now
+        )
+        let trace = trace(
+            context: context,
+            modelAvailabilitySummary: nil,
+            selectedPath: resumedCandidate.source == .foundationModels ? .sharedFoundationModels : .sharedHeuristic,
+            evaluation: evaluation,
+            fallbackReason: nil,
+            disagreementSummary: "clarificationChoice=\(choice.entityTypeHint?.rawValue ?? "unknown"):\(choice.title)"
+        )
+
+        if evaluation.isExecutableHandled {
+            return .handled(
+                answer: evaluation.answer!,
+                aggregationResult: evaluation.aggregationResult!,
+                homeQueryPlan: evaluation.executablePlan?.homeQueryPlan,
+                trace: trace
+            )
+        }
+
+        if evaluation.isValidationBlocked {
+            return .validationBlocked(
+                answer: evaluation.blockedAnswer!,
+                validationOutcome: evaluation.validationOutcome,
+                trace: trace
+            )
+        }
+
+        let blocked = unsupportedEvaluation(
+            candidate: resumedCandidate,
+            resolved: evaluation.resolved,
+            reason: evaluation.runtimeFallbackReason ?? .validationDidNotProduceExecutablePlan
+        )
+        return .validationBlocked(
+            answer: blocked.blockedAnswer!,
+            validationOutcome: blocked.validationOutcome,
+            trace: trace
+        )
+    }
+
     private func shouldUseDeterministicFallback(for candidate: MarinaQueryPlanCandidate) -> Bool {
         candidate.confidence == .low || candidate.unsupportedHint != nil
     }
@@ -759,6 +816,48 @@ struct MarinaSuggestionBuilder {
             after: answer,
             executedQuery: context.executablePlan?.homeQueryPlan.query,
             personaID: .marina
+        )
+    }
+}
+
+private extension MarinaQueryPlanCandidate {
+    func replacingClarifiedMention(with choice: MarinaClarificationChoice) -> MarinaQueryPlanCandidate {
+        let replacementRole = choice.entityRole ?? .filter
+        let replacement = MarinaUnresolvedEntityMention(
+            id: choice.mentionID ?? UUID(),
+            role: replacementRole,
+            rawText: choice.rawValue ?? choice.title,
+            typeHint: choice.entityTypeHint,
+            allowedTypeHints: choice.entityTypeHint.map { [$0] },
+            confidence: .high
+        )
+
+        let mentions: [MarinaUnresolvedEntityMention]
+        if let mentionID = choice.mentionID,
+           entityMentions.contains(where: { $0.id == mentionID }) {
+            mentions = entityMentions.map { $0.id == mentionID ? replacement : $0 }
+        } else if entityMentions.isEmpty {
+            mentions = [replacement]
+        } else {
+            mentions = [replacement] + entityMentions.dropFirst()
+        }
+
+        return MarinaQueryPlanCandidate(
+            requestFamily: requestFamily,
+            source: source,
+            rawPrompt: rawPrompt,
+            operation: operation,
+            measure: measure,
+            entityMentions: mentions,
+            timeScopes: timeScopes,
+            grouping: grouping,
+            ranking: ranking,
+            limit: limit,
+            responseShapeHint: responseShapeHint,
+            confidence: .high,
+            unsupportedHint: unsupportedHint,
+            databaseLookupRequest: databaseLookupRequest,
+            semanticCommand: semanticCommand
         )
     }
 }

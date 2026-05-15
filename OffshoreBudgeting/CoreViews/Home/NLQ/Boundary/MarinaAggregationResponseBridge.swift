@@ -24,7 +24,7 @@ struct MarinaAggregationResponseBridge {
             rows: clarification.choices.map { choice in
                 HomeAnswerRow(
                     title: typedChoiceTitle(choice),
-                    value: choice.rawValue ?? choice.entityTypeHint?.rawValue ?? ""
+                    value: choice.subtitle ?? choice.rawValue ?? choice.entityTypeHint?.rawValue ?? ""
                 )
             }
         )

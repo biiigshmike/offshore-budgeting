@@ -84,9 +84,12 @@ struct MarinaQueryResolver {
                         choices: matches.map { match in
                             MarinaClarificationChoice(
                                 title: match.displayValue,
+                                subtitle: match.entityType.rawValue,
                                 entityRole: mention.role,
                                 entityTypeHint: candidateType(from: match.entityType),
-                                rawValue: match.displayValue
+                                rawValue: match.displayValue,
+                                sourceID: match.sourceID,
+                                mentionID: mention.id
                             )
                         }
                     )

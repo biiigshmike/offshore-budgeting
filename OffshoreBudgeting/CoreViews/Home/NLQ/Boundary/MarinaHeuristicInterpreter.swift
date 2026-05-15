@@ -543,10 +543,54 @@ struct MarinaHeuristicInterpreter {
             || prompt.contains("paid me the most")
             || prompt.contains("shared balances")
             || prompt.contains("savings movements")
+            || isActualSavingsStatusPrompt(prompt)
+            || isProjectedSavingsPrompt(prompt)
+            || isSafeSpendPrompt(prompt)
+            || isNextPlannedExpensePrompt(prompt)
     }
 
     private func protectedShape(from intent: NormalizedQueryIntent) -> ProtectedShape? {
         let prompt = normalized(intent.rawPrompt)
+
+        if isActualSavingsStatusPrompt(prompt) {
+            return ProtectedShape(
+                operation: .lookupDetails,
+                measure: .savings,
+                entityMentions: [],
+                timeScopes: baseTimeScopes(from: intent, defaultPeriodUnit: .month),
+                responseShapeHint: .summaryCard
+            )
+        }
+
+        if isProjectedSavingsPrompt(prompt) {
+            return ProtectedShape(
+                operation: .forecast,
+                measure: .savings,
+                entityMentions: [],
+                timeScopes: baseTimeScopes(from: intent, defaultPeriodUnit: .month),
+                responseShapeHint: .summaryCard
+            )
+        }
+
+        if isSafeSpendPrompt(prompt) {
+            return ProtectedShape(
+                operation: .lookupDetails,
+                measure: .remainingBudget,
+                entityMentions: [],
+                timeScopes: baseTimeScopes(from: intent, defaultPeriodUnit: .month),
+                responseShapeHint: .summaryCard
+            )
+        }
+
+        if isNextPlannedExpensePrompt(prompt) {
+            return ProtectedShape(
+                operation: .lookupDetails,
+                measure: .presetAmount,
+                entityMentions: [],
+                timeScopes: baseTimeScopes(from: intent, defaultPeriodUnit: .month),
+                responseShapeHint: .summaryCard
+            )
+        }
 
         if isProjectionPrompt(prompt) {
             return ProtectedShape(
@@ -855,6 +899,38 @@ struct MarinaHeuristicInterpreter {
         prompt.contains("keep spending like this")
             && prompt.contains("left")
             && prompt.contains("end of the period")
+    }
+
+    private func isActualSavingsStatusPrompt(_ prompt: String) -> Bool {
+        prompt.contains("savings")
+            && (prompt.contains("actual")
+                || prompt.contains("so far")
+                || prompt.contains("status")
+                || prompt.contains("saved"))
+            && prompt.contains("projected") == false
+            && prompt.contains("forecast") == false
+    }
+
+    private func isProjectedSavingsPrompt(_ prompt: String) -> Bool {
+        prompt.contains("savings")
+            && (prompt.contains("projected")
+                || prompt.contains("projection")
+                || prompt.contains("forecast")
+                || prompt.contains("expected"))
+    }
+
+    private func isSafeSpendPrompt(_ prompt: String) -> Bool {
+        prompt.contains("safe spend")
+            || prompt.contains("safe-spend")
+            || prompt.contains("safe to spend")
+    }
+
+    private func isNextPlannedExpensePrompt(_ prompt: String) -> Bool {
+        (prompt.contains("next") || prompt.contains("upcoming"))
+            && (prompt.contains("planned expense")
+                || prompt.contains("planned expenses")
+                || prompt.contains("bill")
+                || prompt.contains("bills"))
     }
 
     private func isSimulationPrompt(_ prompt: String) -> Bool {

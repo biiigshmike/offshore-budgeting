@@ -12,22 +12,31 @@ enum MarinaClarificationKind: String, Codable, Equatable {
 struct MarinaClarificationChoice: Codable, Equatable, Identifiable {
     let id: UUID
     let title: String
+    let subtitle: String?
     let entityRole: MarinaEntityMentionRole?
     let entityTypeHint: MarinaCandidateEntityTypeHint?
     let rawValue: String?
+    let sourceID: UUID?
+    let mentionID: UUID?
 
     init(
         id: UUID = UUID(),
         title: String,
+        subtitle: String? = nil,
         entityRole: MarinaEntityMentionRole? = nil,
         entityTypeHint: MarinaCandidateEntityTypeHint? = nil,
-        rawValue: String? = nil
+        rawValue: String? = nil,
+        sourceID: UUID? = nil,
+        mentionID: UUID? = nil
     ) {
         self.id = id
         self.title = title
+        self.subtitle = subtitle
         self.entityRole = entityRole
         self.entityTypeHint = entityTypeHint
         self.rawValue = rawValue
+        self.sourceID = sourceID
+        self.mentionID = mentionID
     }
 }
 

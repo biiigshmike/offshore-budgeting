@@ -456,9 +456,10 @@ struct MarinaFoundationModelsInterpreter {
             return .trend
         case .forecastSavings:
             return .forecast
-        case .safeSpendToday, .savingsStatus, .overview,
-            .cardVariableSpendingHabits, .categoryPotentialSavings, .categoryReallocationGuidance,
-            .nextPlannedExpense, .cardSnapshotSummary, .merchantSpendSummary, nil:
+        case .safeSpendToday, .savingsStatus, .nextPlannedExpense:
+            return .lookupDetails
+        case .overview, .cardVariableSpendingHabits, .categoryPotentialSavings, .categoryReallocationGuidance,
+            .cardSnapshotSummary, .merchantSpendSummary, nil:
             return nil
         }
     }
@@ -471,7 +472,9 @@ struct MarinaFoundationModelsInterpreter {
         case .incomeAverageActual, .incomeSourceShare, .incomeSourceShareTrend,
             .incomeSourceMonthComparison:
             return .income
-        case .savingsStatus, .savingsAverageRecentPeriods, .forecastSavings, .safeSpendToday:
+        case .safeSpendToday:
+            return .remainingBudget
+        case .savingsStatus, .savingsAverageRecentPeriods, .forecastSavings:
             return .savings
         case .categorySpendShare, .categorySpendShareTrend:
             return .categoryShare
