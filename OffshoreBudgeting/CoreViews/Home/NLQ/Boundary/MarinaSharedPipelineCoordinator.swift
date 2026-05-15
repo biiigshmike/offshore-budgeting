@@ -68,102 +68,122 @@ struct MarinaSharedPipelineCoordinator {
             defaultPeriodUnit: context.defaultPeriodUnit,
             now: context.now
         )
+        let explicitConstraints = MarinaExplicitConstraintDetector().constraints(
+            in: normalization.originalText,
+            context: context.routerContext
+        )
         let modelAvailability = context.aiOptInEnabled ? availability.currentStatus() : nil
         let modelAvailabilitySummary = modelAvailability.map(Self.modelAvailabilitySummary)
-        var modelFailureReason: MarinaSharedPipelineFallbackReason?
-        let candidate: MarinaQueryPlanCandidate
+        let aiAvailable = modelAvailability == .available
+        let aiRouteEligible = context.sharedPipelineEnabled && context.aiOptInEnabled && aiAvailable
+        var selection = MarinaInterpreterSelectionTrace(
+            aiAvailable: modelAvailability.map { $0 == .available },
+            aiOptIn: context.aiOptInEnabled,
+            aiRouteEligible: aiRouteEligible,
+            selectedInterpreter: nil,
+            interpreterSelectionReason: aiRouteEligible ? .modelEligible : (context.aiOptInEnabled ? .modelUnavailable : .aiOptOut),
+            modelAttempted: false,
+            heuristicAttempted: false,
+            heuristicUsedAsFallback: false,
+            fallbackReason: nil
+        )
 
-        if context.aiOptInEnabled, modelAvailability == .available {
+        if aiRouteEligible {
+            selection.modelAttempted = true
             do {
                 let modelCandidate = try await foundationModelsInterpreter.interpret(
                     prompt: normalization.originalText,
                     context: context.routerContext
                 )
-                if shouldUseDeterministicFallback(for: modelCandidate) {
-                    modelFailureReason = .validationDidNotProduceExecutablePlan
-                    candidate = heuristicInterpreter.interpret(
+                let modelEvaluation = evaluate(
+                    modelCandidate,
+                    provider: context.provider,
+                    now: context.now,
+                    explicitConstraints: explicitConstraints
+                )
+
+                if shouldUseDeterministicFallback(for: modelEvaluation) {
+                    selection.heuristicAttempted = true
+                    let heuristicCandidate = heuristicInterpreter.interpret(
                         prompt: normalization.originalText,
                         defaultPeriodUnit: normalization.defaultPeriodUnit
                     )
-                } else {
-                    candidate = modelCandidate
+                    let heuristicEvaluation = evaluate(
+                        heuristicCandidate,
+                        provider: context.provider,
+                        now: context.now,
+                        explicitConstraints: explicitConstraints
+                    )
+                    if isExactExecutableFallback(heuristicEvaluation) {
+                        selection.selectedInterpreter = .heuristic
+                        selection.heuristicUsedAsFallback = true
+                        selection.interpreterSelectionReason = .modelUnsupportedHeuristicExactMatch
+                        selection.fallbackReason = .modelUnsupportedHeuristicExactMatch
+                        return runtimeResult(
+                            evaluation: heuristicEvaluation,
+                            context: context,
+                            modelAvailabilitySummary: modelAvailabilitySummary,
+                            selection: selection,
+                            disagreementSummary: disagreementSummary(modelEvaluation: modelEvaluation, heuristicEvaluation: heuristicEvaluation)
+                        )
+                    }
                 }
+
+                selection.selectedInterpreter = .foundationModels
+                return runtimeResult(
+                    evaluation: modelEvaluation,
+                    context: context,
+                    modelAvailabilitySummary: modelAvailabilitySummary,
+                    selection: selection,
+                    disagreementSummary: nil
+                )
             } catch {
-                modelFailureReason = .modelServiceFailed
-                candidate = heuristicInterpreter.interpret(
+                let failureReason = fallbackReason(forModelError: error)
+                selection.modelAttempted = true
+                selection.heuristicAttempted = true
+                selection.heuristicUsedAsFallback = true
+                selection.selectedInterpreter = .heuristic
+                selection.interpreterSelectionReason = interpreterSelectionReason(for: failureReason)
+                selection.fallbackReason = failureReason
+                let candidate = heuristicInterpreter.interpret(
                     prompt: normalization.originalText,
                     defaultPeriodUnit: normalization.defaultPeriodUnit
                 )
+                let evaluation = evaluate(
+                    candidate,
+                    provider: context.provider,
+                    now: context.now,
+                    explicitConstraints: explicitConstraints
+                )
+                return runtimeResult(
+                    evaluation: evaluation,
+                    context: context,
+                    modelAvailabilitySummary: modelAvailabilitySummary,
+                    selection: selection,
+                    disagreementSummary: failureReason.rawValue
+                )
             }
-        } else if context.aiOptInEnabled {
-            modelFailureReason = .modelUnavailable
-            candidate = heuristicInterpreter.interpret(
-                prompt: normalization.originalText,
-                defaultPeriodUnit: normalization.defaultPeriodUnit
-            )
-        } else {
-            candidate = heuristicInterpreter.interpret(
-                prompt: normalization.originalText,
-                defaultPeriodUnit: normalization.defaultPeriodUnit
-            )
         }
 
+        selection.heuristicAttempted = true
+        selection.selectedInterpreter = .heuristic
+        selection.fallbackReason = context.aiOptInEnabled ? .modelUnavailable : .aiOptOut
+        let candidate = heuristicInterpreter.interpret(
+            prompt: normalization.originalText,
+            defaultPeriodUnit: normalization.defaultPeriodUnit
+        )
         let evaluation = evaluate(
             candidate,
             provider: context.provider,
-            now: context.now
+            now: context.now,
+            explicitConstraints: explicitConstraints
         )
-
-        if evaluation.isExecutableHandled {
-            let trace = trace(
-                context: context,
-                modelAvailabilitySummary: modelAvailabilitySummary,
-                selectedPath: evaluation.candidate.source == .foundationModels ? .sharedFoundationModels : .sharedHeuristic,
-                evaluation: evaluation,
-                fallbackReason: nil,
-                disagreementSummary: modelFailureReason?.rawValue
-            )
-            return .handled(
-                answer: evaluation.answer!,
-                aggregationResult: evaluation.aggregationResult!,
-                homeQueryPlan: evaluation.executablePlan?.homeQueryPlan,
-                trace: trace
-            )
-        }
-
-        if evaluation.isValidationBlocked {
-            let trace = trace(
-                context: context,
-                modelAvailabilitySummary: modelAvailabilitySummary,
-                selectedPath: evaluation.candidate.source == .foundationModels ? .sharedFoundationModels : .sharedHeuristic,
-                evaluation: evaluation,
-                fallbackReason: nil,
-                disagreementSummary: modelFailureReason?.rawValue
-            )
-            return .validationBlocked(
-                answer: evaluation.blockedAnswer!,
-                validationOutcome: evaluation.validationOutcome,
-                trace: trace
-            )
-        }
-
-        let blocked = unsupportedEvaluation(
-            candidate: evaluation.candidate,
-            resolved: evaluation.resolved,
-            reason: evaluation.runtimeFallbackReason ?? modelFailureReason ?? .validationDidNotProduceExecutablePlan
-        )
-        let trace = trace(
+        return runtimeResult(
+            evaluation: evaluation,
             context: context,
             modelAvailabilitySummary: modelAvailabilitySummary,
-            selectedPath: blocked.candidate.source == .foundationModels ? .sharedFoundationModels : .sharedHeuristic,
-            evaluation: blocked,
-            fallbackReason: nil,
-            disagreementSummary: modelFailureReason?.rawValue
-        )
-        return .validationBlocked(
-            answer: blocked.blockedAnswer!,
-            validationOutcome: blocked.validationOutcome,
-            trace: trace
+            selection: selection,
+            disagreementSummary: selection.fallbackReason?.rawValue
         )
     }
 
@@ -184,13 +204,26 @@ struct MarinaSharedPipelineCoordinator {
         let evaluation = evaluate(
             resumedCandidate,
             provider: context.provider,
-            now: context.now
+            now: context.now,
+            explicitConstraints: MarinaExplicitPromptConstraints()
+        )
+        let selection = MarinaInterpreterSelectionTrace(
+            aiAvailable: nil,
+            aiOptIn: context.aiOptInEnabled,
+            aiRouteEligible: false,
+            selectedInterpreter: resumedCandidate.source,
+            interpreterSelectionReason: .clarificationResume,
+            modelAttempted: resumedCandidate.source == .foundationModels,
+            heuristicAttempted: resumedCandidate.source == .heuristic,
+            heuristicUsedAsFallback: false,
+            fallbackReason: nil
         )
         let trace = trace(
             context: context,
             modelAvailabilitySummary: nil,
             selectedPath: resumedCandidate.source == .foundationModels ? .sharedFoundationModels : .sharedHeuristic,
             evaluation: evaluation,
+            selection: selection,
             fallbackReason: nil,
             disagreementSummary: "clarificationChoice=\(choice.entityTypeHint?.rawValue ?? "unknown"):\(choice.title)"
         )
@@ -224,8 +257,111 @@ struct MarinaSharedPipelineCoordinator {
         )
     }
 
-    private func shouldUseDeterministicFallback(for candidate: MarinaQueryPlanCandidate) -> Bool {
-        candidate.confidence == .low || candidate.unsupportedHint != nil
+    private func shouldUseDeterministicFallback(for evaluation: CandidateEvaluation) -> Bool {
+        if case .unsupported = evaluation.validationOutcome {
+            return true
+        }
+        return false
+    }
+
+    private func isExactExecutableFallback(_ evaluation: CandidateEvaluation) -> Bool {
+        evaluation.candidate.confidence == .high
+            && evaluation.candidate.unsupportedHint == nil
+            && evaluation.isExecutableHandled
+            && evaluation.runtimeFallbackReason != .droppedExplicitConstraint
+    }
+
+    private func fallbackReason(forModelError error: Error) -> MarinaSharedPipelineFallbackReason {
+        if let serviceError = error as? MarinaFoundationModelsServiceError {
+            switch serviceError {
+            case .malformedResponse:
+                return .modelInvalidStructuredOutput
+            case .unavailable:
+                return .modelUnavailable
+            }
+        }
+        if error is CancellationError {
+            return .modelTimedOut
+        }
+        return .modelServiceFailed
+    }
+
+    private func interpreterSelectionReason(
+        for fallbackReason: MarinaSharedPipelineFallbackReason
+    ) -> MarinaInterpreterSelectionReason {
+        switch fallbackReason {
+        case .modelInvalidStructuredOutput:
+            return .modelInvalidStructuredOutput
+        case .modelUnavailable:
+            return .modelUnavailable
+        case .modelTimedOut:
+            return .modelTimedOut
+        default:
+            return .modelServiceFailed
+        }
+    }
+
+    private func runtimeResult(
+        evaluation: CandidateEvaluation,
+        context: MarinaSharedPipelineContext,
+        modelAvailabilitySummary: String?,
+        selection: MarinaInterpreterSelectionTrace,
+        disagreementSummary: String?
+    ) -> MarinaSharedPipelineRuntimeResult {
+        if evaluation.isExecutableHandled {
+            let trace = trace(
+                context: context,
+                modelAvailabilitySummary: modelAvailabilitySummary,
+                selectedPath: evaluation.candidate.source == .foundationModels ? .sharedFoundationModels : .sharedHeuristic,
+                evaluation: evaluation,
+                selection: selection,
+                fallbackReason: selection.heuristicUsedAsFallback ? selection.fallbackReason : nil,
+                disagreementSummary: disagreementSummary
+            )
+            return .handled(
+                answer: evaluation.answer!,
+                aggregationResult: evaluation.aggregationResult!,
+                homeQueryPlan: evaluation.executablePlan?.homeQueryPlan,
+                trace: trace
+            )
+        }
+
+        if evaluation.isValidationBlocked {
+            let trace = trace(
+                context: context,
+                modelAvailabilitySummary: modelAvailabilitySummary,
+                selectedPath: evaluation.candidate.source == .foundationModels ? .sharedFoundationModels : .sharedHeuristic,
+                evaluation: evaluation,
+                selection: selection,
+                fallbackReason: selection.heuristicUsedAsFallback ? selection.fallbackReason : nil,
+                disagreementSummary: disagreementSummary
+            )
+            return .validationBlocked(
+                answer: evaluation.blockedAnswer!,
+                validationOutcome: evaluation.validationOutcome,
+                trace: trace
+            )
+        }
+
+        let blocked = unsupportedEvaluation(
+            candidate: evaluation.candidate,
+            resolved: evaluation.resolved,
+            reason: evaluation.runtimeFallbackReason ?? selection.fallbackReason ?? .validationDidNotProduceExecutablePlan
+        )
+        let trace = trace(
+            context: context,
+            modelAvailabilitySummary: modelAvailabilitySummary,
+            selectedPath: blocked.candidate.source == .foundationModels ? .sharedFoundationModels : .sharedHeuristic,
+            evaluation: blocked,
+            selection: selection,
+            fallbackReason: selection.heuristicUsedAsFallback ? selection.fallbackReason : nil,
+            disagreementSummary: disagreementSummary
+        )
+        return .validationBlocked(
+            answer: blocked.blockedAnswer!,
+            validationOutcome: blocked.validationOutcome,
+            trace: trace
+        )
     }
 
     private func unsupportedEvaluation(
@@ -251,7 +387,8 @@ struct MarinaSharedPipelineCoordinator {
     private func evaluate(
         _ candidate: MarinaQueryPlanCandidate,
         provider: MarinaDataProvider,
-        now: Date
+        now: Date,
+        explicitConstraints: MarinaExplicitPromptConstraints
     ) -> CandidateEvaluation {
         let interpretation = semanticAdapter.interpretationResult(from: candidate)
         let resolved = resolver.resolve(candidate: candidate, provider: provider)
@@ -302,6 +439,18 @@ struct MarinaSharedPipelineCoordinator {
                 semanticResolved: semanticResolved
             )
         case .executable:
+            if let unsupported = explicitConstraints.unsupportedIfDropped(by: candidate, resolvedQuery: semanticResolved, outcome: outcome) {
+                let unsupportedOutcome = MarinaPlanValidationOutcome.unsupported(unsupported)
+                return CandidateEvaluation(
+                    candidate: candidate,
+                    resolved: resolved,
+                    validationOutcome: unsupportedOutcome,
+                    blockedAnswer: responseBuilder.responseCompatibleAnswer(from: unsupportedOutcome),
+                    runtimeFallbackReason: .droppedExplicitConstraint,
+                    interpretationResult: interpretation,
+                    semanticResolved: semanticResolved
+                )
+            }
             let queryExecutor = MarinaQueryExecutor(
                 adapter: adapter,
                 executor: executor,
@@ -423,6 +572,14 @@ struct MarinaSharedPipelineCoordinator {
             trace: MarinaSharedPipelineTrace(
                 sharedPipelineEnabled: context.sharedPipelineEnabled,
                 aiOptInEnabled: context.aiOptInEnabled,
+                aiAvailable: nil,
+                aiOptIn: context.aiOptInEnabled,
+                aiRouteEligible: false,
+                selectedInterpreter: nil,
+                interpreterSelectionReason: .gateDisabled,
+                modelAttempted: false,
+                heuristicAttempted: false,
+                heuristicUsedAsFallback: false,
                 modelAvailabilitySummary: modelAvailabilitySummary,
                 selectedPath: .legacy,
                 fallbackReason: reason
@@ -476,12 +633,21 @@ struct MarinaSharedPipelineCoordinator {
         selectedPath: MarinaSharedPipelineRuntimePath,
         evaluation: CandidateEvaluation?,
         competingEvaluation: CandidateEvaluation? = nil,
+        selection: MarinaInterpreterSelectionTrace,
         fallbackReason: MarinaSharedPipelineFallbackReason?,
         disagreementSummary: String?
     ) -> MarinaSharedPipelineTrace {
         MarinaSharedPipelineTrace(
             sharedPipelineEnabled: context.sharedPipelineEnabled,
             aiOptInEnabled: context.aiOptInEnabled,
+            aiAvailable: selection.aiAvailable,
+            aiOptIn: selection.aiOptIn,
+            aiRouteEligible: selection.aiRouteEligible,
+            selectedInterpreter: selection.selectedInterpreter,
+            interpreterSelectionReason: selection.interpreterSelectionReason,
+            modelAttempted: selection.modelAttempted,
+            heuristicAttempted: selection.heuristicAttempted,
+            heuristicUsedAsFallback: selection.heuristicUsedAsFallback,
             modelAvailabilitySummary: modelAvailabilitySummary,
             selectedPath: selectedPath,
             interpreterSource: evaluation?.candidate.source,
@@ -749,6 +915,192 @@ struct MarinaQueryExecution {
     let aggregationResult: MarinaAggregationResult
     let databaseLookupResponse: MarinaDatabaseLookupResponse?
     let workspaceAggregationCard: MarinaWorkspaceAggregationCard?
+}
+
+private struct MarinaInterpreterSelectionTrace {
+    let aiAvailable: Bool?
+    let aiOptIn: Bool
+    let aiRouteEligible: Bool
+    var selectedInterpreter: MarinaInterpreterSource?
+    var interpreterSelectionReason: MarinaInterpreterSelectionReason?
+    var modelAttempted: Bool
+    var heuristicAttempted: Bool
+    var heuristicUsedAsFallback: Bool
+    var fallbackReason: MarinaSharedPipelineFallbackReason?
+}
+
+struct MarinaExplicitPromptConstraints: Equatable {
+    var categories: Set<String> = []
+    var cards: Set<String> = []
+    var hasDateConstraint = false
+    var limit: Int?
+    var sort: MarinaRankingDirectionCandidate?
+
+    var isEmpty: Bool {
+        categories.isEmpty && cards.isEmpty && hasDateConstraint == false && limit == nil && sort == nil
+    }
+
+    func unsupportedIfDropped(
+        by candidate: MarinaQueryPlanCandidate,
+        resolvedQuery: MarinaResolvedSemanticQuery?,
+        outcome: MarinaPlanValidationOutcome
+    ) -> MarinaTypedUnsupportedResponse? {
+        guard isEmpty == false,
+              case .executable(let plan) = outcome else {
+            return nil
+        }
+
+        var dropped: [String] = []
+        if categories.isEmpty == false,
+           preserves(names: categories, type: .category, plan: plan, resolvedQuery: resolvedQuery, candidate: candidate) == false {
+            dropped.append("category")
+        }
+        if cards.isEmpty == false,
+           preserves(names: cards, type: .card, plan: plan, resolvedQuery: resolvedQuery, candidate: candidate) == false {
+            dropped.append("card")
+        }
+        if hasDateConstraint,
+           plan.dateRange == nil,
+           resolvedQuery?.primaryDateRange == nil,
+           candidate.timeScopes.isEmpty,
+           usesAppSurfaceDefaultDatePolicy(plan) == false {
+            dropped.append("date")
+        }
+        if let limit,
+           plan.limit != limit,
+           candidate.limit != limit,
+           resolvedQuery?.query.limit != limit {
+            dropped.append("limit")
+        }
+        if let sort,
+           plan.ranking?.direction != sort,
+           candidate.ranking?.direction != sort,
+           resolvedQuery?.query.ranking?.direction != sort {
+            dropped.append("sort")
+        }
+
+        guard dropped.isEmpty == false else { return nil }
+        return MarinaTypedUnsupportedResponse(
+            kind: .unsupportedCombination,
+            message: "I found an explicit \(dropped.joined(separator: ", ")) constraint in your prompt, but the selected interpretation did not preserve it.",
+            candidate: candidate
+        )
+    }
+
+    private func preserves(
+        names: Set<String>,
+        type: MarinaCandidateEntityTypeHint,
+        plan: MarinaAggregationPlan,
+        resolvedQuery: MarinaResolvedSemanticQuery?,
+        candidate: MarinaQueryPlanCandidate
+    ) -> Bool {
+        let planNames = Set(plan.targets.filter { $0.entityType == type }.map { Self.normalized($0.displayName) })
+        let resolvedNames = Set((resolvedQuery?.resolvedFilters ?? []).filter { $0.entityType == type }.map { Self.normalized($0.displayName) })
+        let rawNames = Set(candidate.entityMentions.compactMap { mention -> String? in
+            let allowed = mention.typeHint == type || mention.allowedTypeHints?.contains(type) == true
+            guard allowed, let raw = mention.rawText else { return nil }
+            return Self.normalized(raw)
+        })
+        let semanticRawNames = Set((resolvedQuery?.query.filters ?? []).compactMap { filter -> String? in
+            guard filter.entityTypeHint == type else { return nil }
+            return Self.normalized(filter.value)
+        })
+        let preservedNames = planNames.union(resolvedNames).union(rawNames).union(semanticRawNames)
+        return names.allSatisfy { preservedNames.contains($0) }
+    }
+
+    private func usesAppSurfaceDefaultDatePolicy(_ plan: MarinaAggregationPlan) -> Bool {
+        switch (plan.operation, plan.measure) {
+        case (.lookupDetails, .savings),
+             (.lookupDetails, .remainingBudget),
+             (.lookupDetails, .presetAmount),
+             (.forecast, .savings):
+            return true
+        default:
+            return false
+        }
+    }
+
+    private static func normalized(_ value: String) -> String {
+        value
+            .lowercased()
+            .replacingOccurrences(of: "[^a-z0-9\\s&]", with: " ", options: .regularExpression)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+struct MarinaExplicitConstraintDetector {
+    func constraints(
+        in prompt: String,
+        context: MarinaLanguageRouterContext
+    ) -> MarinaExplicitPromptConstraints {
+        let normalizedPrompt = normalized(prompt)
+        return MarinaExplicitPromptConstraints(
+            categories: explicitNames(context.categoryNames, in: normalizedPrompt),
+            cards: explicitNames(context.cardNames, in: normalizedPrompt),
+            hasDateConstraint: hasDateConstraint(in: normalizedPrompt),
+            limit: explicitLimit(in: normalizedPrompt),
+            sort: explicitSort(in: normalizedPrompt)
+        )
+    }
+
+    private func explicitNames(_ names: [String], in normalizedPrompt: String) -> Set<String> {
+        Set(names.compactMap { name in
+            let normalizedName = normalized(name)
+            guard normalizedName.isEmpty == false else { return nil }
+            return containsWholePhrase(normalizedName, in: normalizedPrompt) ? normalizedName : nil
+        })
+    }
+
+    private func hasDateConstraint(in prompt: String) -> Bool {
+        let phrases = [
+            "today", "yesterday", "this week", "last week", "this month", "last month",
+            "this budget", "this period", "last period", "january", "february", "march",
+            "april", "may", "june", "july", "august", "september", "october",
+            "november", "december"
+        ]
+        return phrases.contains { containsWholePhrase($0, in: prompt) }
+    }
+
+    private func explicitLimit(in prompt: String) -> Int? {
+        let listWords = ["list", "show", "top", "largest", "biggest"]
+        guard listWords.contains(where: { containsWholePhrase($0, in: prompt) }) else { return nil }
+        return prompt
+            .split(separator: " ")
+            .compactMap { Int($0) }
+            .first
+    }
+
+    private func explicitSort(in prompt: String) -> MarinaRankingDirectionCandidate? {
+        if ["recent", "newest", "latest"].contains(where: { containsWholePhrase($0, in: prompt) }) {
+            return .newest
+        }
+        if containsWholePhrase("last", in: prompt),
+           ["list", "show"].contains(where: { containsWholePhrase($0, in: prompt) }),
+           containsWholePhrase("last month", in: prompt) == false,
+           containsWholePhrase("last week", in: prompt) == false,
+           containsWholePhrase("last period", in: prompt) == false {
+            return .newest
+        }
+        if ["largest", "biggest"].contains(where: { containsWholePhrase($0, in: prompt) }) {
+            return .largest
+        }
+        return nil
+    }
+
+    private func containsWholePhrase(_ phrase: String, in prompt: String) -> Bool {
+        let pattern = "(^|\\s)\(NSRegularExpression.escapedPattern(for: phrase))(\\s|$)"
+        return prompt.range(of: pattern, options: .regularExpression) != nil
+    }
+
+    private func normalized(_ value: String) -> String {
+        value
+            .lowercased()
+            .replacingOccurrences(of: "[^a-z0-9\\s&]", with: " ", options: .regularExpression)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 }
 
 enum MarinaQueryExecutionResult {

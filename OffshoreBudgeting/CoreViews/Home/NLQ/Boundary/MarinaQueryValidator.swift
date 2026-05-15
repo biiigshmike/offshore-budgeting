@@ -447,7 +447,9 @@ struct MarinaQueryValidator {
         case .breakdown:
             return descriptor.canBeRelationshipFilter || supported.contains("category bucket summaries")
         case .percentageShare:
-            return supported.contains("share") || supported.contains("category bucket summaries")
+            return supported.contains("share")
+                || supported.contains("category bucket summaries")
+                || descriptor.entityName == "VariableExpense"
         case .lookupDetails:
             return supported.contains("lookupdetails") || descriptor.isSearchable
         case .forecast:

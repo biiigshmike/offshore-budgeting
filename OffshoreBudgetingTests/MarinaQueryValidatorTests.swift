@@ -442,6 +442,54 @@ struct MarinaQueryValidatorTests {
         #expect(unsupported.kind == .unsupportedOperation)
     }
 
+    @Test func semanticValidator_allowsVariableExpenseCategoryPercentageShare() {
+        let filter = MarinaFilter(
+            role: .primaryTarget,
+            relationship: .category,
+            value: "groceries",
+            entityTypeHint: .category
+        )
+        let query = MarinaSemanticQuery(
+            subject: .variableExpenses,
+            operation: .percentageShare,
+            filters: [filter],
+            amountField: .budgetImpactAmount,
+            grouping: MarinaGrouping(dimension: .category, rawText: nil),
+            responseShape: .groupedBreakdown
+        )
+        let resolved = MarinaResolvedSemanticQuery(
+            query: query,
+            candidate: nil,
+            resolvedFilters: [
+                MarinaResolvedFilter(
+                    id: filter.id,
+                    filter: filter,
+                    role: .primaryTarget,
+                    relationship: .category,
+                    entityType: .category,
+                    displayName: "Groceries",
+                    sourceID: UUID()
+                )
+            ],
+            unresolvedFilters: [],
+            ambiguousFilters: [],
+            primaryDateRange: nil,
+            comparisonDateRange: nil,
+            databaseLookupRequest: nil
+        )
+
+        let outcome = MarinaQueryValidator().validate(resolved)
+
+        guard case .executable(let plan) = outcome else {
+            Issue.record("Expected category percentage share to validate")
+            return
+        }
+        #expect(plan.operation == .sum)
+        #expect(plan.measure == .categoryShare)
+        #expect(plan.grouping?.dimension == .category)
+        #expect(plan.responseShape == .groupedBreakdown)
+    }
+
     private func resolvedCandidate(
         _ candidate: MarinaQueryPlanCandidate,
         targets: [MarinaResolvedEntityMention] = [],

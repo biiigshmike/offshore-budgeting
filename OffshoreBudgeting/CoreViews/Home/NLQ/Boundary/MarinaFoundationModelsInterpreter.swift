@@ -720,10 +720,6 @@ struct MarinaFoundationModelsInterpreter {
         confidence: MarinaCandidateConfidence,
         clarification: MarinaStructuredClarification?
     ) -> MarinaUnsupportedHint? {
-        if confidence == .low {
-            return .lowConfidence
-        }
-
         if clarification?.isActionable == true {
             return .missingRequiredTarget
         }

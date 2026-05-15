@@ -210,7 +210,8 @@ enum MarinaResponseShape: String, Codable, Equatable, CaseIterable, Sendable {
 
 struct MarinaSemanticQueryAdapter {
     func interpretationResult(from candidate: MarinaQueryPlanCandidate) -> MarinaInterpretationResult {
-        if let hint = candidate.unsupportedHint {
+        if let hint = candidate.unsupportedHint,
+           hint != .lowConfidence {
             return .unsupported(
                 MarinaTypedUnsupportedResponse(
                     kind: unsupportedKind(from: hint),

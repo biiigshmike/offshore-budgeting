@@ -417,7 +417,7 @@ struct MarinaFoundationModelsInterpreterTests {
         #expect(candidate.measure == .spend)
     }
 
-    @Test func foundationModels_lowConfidenceModelOutput_returnsUnsupportedCandidate() async throws {
+    @Test func foundationModels_lowConfidenceModelOutput_preservesValidCandidate() async throws {
         let structuredIntent = MarinaStructuredIntent.query(
             MarinaStructuredQueryIntent(
                 metricRaw: "spendTotal",
@@ -438,8 +438,10 @@ struct MarinaFoundationModelsInterpreterTests {
         ).interpret(prompt: "maybe spending?", context: makeRouterContext())
 
         #expect(candidate.confidence == .low)
-        #expect(candidate.unsupportedHint == .lowConfidence)
-        #expect(candidate.responseShapeHint == .unsupported)
+        #expect(candidate.unsupportedHint == nil)
+        #expect(candidate.operation == .sum)
+        #expect(candidate.measure == .spend)
+        #expect(candidate.responseShapeHint == .scalarCurrency)
     }
 
     @Test func foundationModels_unresolvedModelOutput_returnsUnsupportedCandidate() async throws {
