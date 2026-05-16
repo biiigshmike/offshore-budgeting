@@ -39,9 +39,14 @@ struct MarinaComposableWorkspaceQuery: Codable, Equatable, Sendable {
 @MainActor
 struct MarinaComposableWorkspaceQueryExecutor {
     private let calendar: Calendar
+    private let amountBasisAdapter: MarinaAmountBasisAdapter
 
-    init(calendar: Calendar = .current) {
+    init(
+        calendar: Calendar = .current,
+        amountBasisAdapter: MarinaAmountBasisAdapter = MarinaAmountBasisAdapter()
+    ) {
         self.calendar = calendar
+        self.amountBasisAdapter = amountBasisAdapter
     }
 
     func execute(
@@ -49,8 +54,11 @@ struct MarinaComposableWorkspaceQueryExecutor {
         resolved: MarinaResolvedQueryCandidate,
         plan: MarinaAggregationPlan,
         provider: MarinaDataProvider,
-        now: Date = Date()
+        now: Date = Date(),
+        amountBasis: MarinaFinancialAmountBasis? = nil
     ) -> MarinaComposableWorkspaceQueryExecutionResult {
+        let amountBasis = amountBasis ?? amountBasisAdapter.basis(plan: plan, semanticQuery: nil)
+
         if plan.operation == .simulate {
             return simulate(candidate: candidate, resolved: resolved, plan: plan, provider: provider, now: now)
         }
@@ -65,20 +73,25 @@ struct MarinaComposableWorkspaceQueryExecutor {
         }
 
         switch (plan.operation, plan.measure, plan.grouping?.dimension) {
+        case (.lookupDetails, .remainingBudget, _):
+            guard let categoryTarget = resolved.resolvedTargets.first(where: { $0.entityType == .category }) else {
+                return .unsupported
+            }
+            return .handled(categoryAvailability(target: categoryTarget, plan: plan, provider: provider, now: now))
         case (.rank, .spend, .card):
-            return .handled(cardBudgetImpactRanking(plan: plan, provider: provider, now: now))
+            return .handled(cardBudgetImpactRanking(plan: plan, provider: provider, now: now, amountBasis: amountBasis))
         case (.sum, .spend, _):
             guard resolved.resolvedTargets.isEmpty == false else { return .unsupported }
-            return .handled(filteredSpend(candidate: candidate, resolved: resolved, plan: plan, provider: provider, now: now))
+            return .handled(filteredSpend(candidate: candidate, resolved: resolved, plan: plan, provider: provider, now: now, amountBasis: amountBasis))
         case (.rank, .transactionAmount, .transaction), (.listRows, .transactionAmount, .transaction):
             guard plan.operation == .listRows || plan.ranking?.direction == .newest else { return .unsupported }
-            return .handled(recentFilteredTransactions(resolved: resolved, plan: plan, provider: provider, now: now))
+            return .handled(recentFilteredTransactions(resolved: resolved, plan: plan, provider: provider, now: now, amountBasis: amountBasis))
         case (.average, .spend, nil), (.average, .spend, .week), (.average, .spend, .month):
             guard plan.targets.isEmpty || resolved.resolvedTargets.isEmpty == false else { return .unsupported }
-            return .handled(targetedPeriodicAverage(resolved: resolved, plan: plan, provider: provider, now: now))
+            return .handled(targetedPeriodicAverage(resolved: resolved, plan: plan, provider: provider, now: now, amountBasis: amountBasis))
         case (.compare, .spend, .category), (.compare, .spend, .transaction):
             guard plan.ranking != nil else { return .unsupported }
-            return .handled(categoryDeltaDrivers(plan: plan, provider: provider, now: now))
+            return .handled(categoryDeltaDrivers(plan: plan, provider: provider, now: now, amountBasis: amountBasis))
         default:
             return .unsupported
         }
@@ -151,7 +164,8 @@ struct MarinaComposableWorkspaceQueryExecutor {
     private func cardBudgetImpactRanking(
         plan: MarinaAggregationPlan,
         provider: MarinaDataProvider,
-        now: Date
+        now: Date,
+        amountBasis: MarinaFinancialAmountBasis
     ) -> MarinaWorkspaceAggregationCard {
         let range = plan.dateRange ?? monthRange(containing: now)
         var totals: [String: (amount: Double, id: UUID?)] = [:]
@@ -159,14 +173,14 @@ struct MarinaComposableWorkspaceQueryExecutor {
         for expense in provider.fetchAllVariableExpenses() where contains(expense.transactionDate, in: range) {
             let name = expense.card?.name ?? "No Card"
             let id = expense.card?.id
-            totals[name, default: (0, id)].amount += SavingsMathService.variableBudgetImpactAmount(for: expense)
+            totals[name, default: (0, id)].amount += amountBasisAdapter.variableAmount(for: expense, basis: amountBasis)
             totals[name]?.id = id
         }
 
         for expense in provider.fetchAllPlannedExpenses() where contains(expense.expenseDate, in: range) {
             let name = expense.card?.name ?? "No Card"
             let id = expense.card?.id
-            totals[name, default: (0, id)].amount += SavingsMathService.plannedBudgetImpactAmount(for: expense)
+            totals[name, default: (0, id)].amount += amountBasisAdapter.plannedAmount(for: expense, basis: amountBasis)
             totals[name]?.id = id
         }
 
@@ -202,7 +216,8 @@ struct MarinaComposableWorkspaceQueryExecutor {
         resolved: MarinaResolvedQueryCandidate,
         plan: MarinaAggregationPlan,
         provider: MarinaDataProvider,
-        now: Date
+        now: Date,
+        amountBasis: MarinaFinancialAmountBasis
     ) -> MarinaWorkspaceAggregationCard {
         let range = plan.dateRange ?? monthRange(containing: now)
         let excludedNames = exclusionNames(from: candidate.rawPrompt)
@@ -213,7 +228,7 @@ struct MarinaComposableWorkspaceQueryExecutor {
         let excludeFilters = explicitExcludeFilters.isEmpty
             ? resolved.resolvedTargets.filter { excludedNames.contains(normalized($0.displayName)) }
             : explicitExcludeFilters
-        let rows = spendingRows(provider: provider, range: range)
+        let rows = spendingRows(provider: provider, range: range, amountBasis: amountBasis)
             .filter { row in includeFilters.allSatisfy { matches(row: row, target: $0) } }
             .filter { row in excludeFilters.contains(where: { matches(row: row, target: $0) }) == false }
         let total = rows.reduce(0.0) { $0 + $1.amount }
@@ -231,11 +246,12 @@ struct MarinaComposableWorkspaceQueryExecutor {
         resolved: MarinaResolvedQueryCandidate,
         plan: MarinaAggregationPlan,
         provider: MarinaDataProvider,
-        now: Date
+        now: Date,
+        amountBasis: MarinaFinancialAmountBasis
     ) -> MarinaWorkspaceAggregationCard {
         let range = plan.dateRange ?? lookbackRange(from: now, months: 12)
         let filters = resolved.resolvedTargets.filter { $0.role != .excludeFilter }
-        let rows = spendingRows(provider: provider, range: range)
+        let rows = spendingRows(provider: provider, range: range, amountBasis: amountBasis)
             .filter { row in filters.isEmpty || filters.allSatisfy { matches(row: row, target: $0) } }
             .sorted { $0.date > $1.date }
         let shown = Array(rows.prefix(limit(for: plan)))
@@ -250,15 +266,91 @@ struct MarinaComposableWorkspaceQueryExecutor {
         )
     }
 
-    private func targetedPeriodicAverage(
-        resolved: MarinaResolvedQueryCandidate,
+    private func categoryAvailability(
+        target: MarinaResolvedEntityMention,
         plan: MarinaAggregationPlan,
         provider: MarinaDataProvider,
         now: Date
     ) -> MarinaWorkspaceAggregationCard {
+        let range = plan.dateRange ?? monthRange(containing: now)
+        let result = HomeCategoryLimitsAggregator.build(
+            budgets: provider.fetchAllBudgets(),
+            categories: provider.fetchAllCategories(),
+            plannedExpenses: provider.fetchAllPlannedExpenses(),
+            variableExpenses: provider.fetchAllVariableExpenses(),
+            rangeStart: range.startDate,
+            rangeEnd: range.endDate,
+            inclusionPolicy: .limitsOnly,
+            calendar: calendar
+        )
+        let metric = result.metrics.first { metric in
+            metric.categoryID == target.sourceID || normalized(metric.name) == normalized(target.displayName)
+        }
+
+        guard let metric else {
+            return MarinaWorkspaceAggregationCard(
+                title: "\(target.displayName) Availability",
+                subtitle: rangeLabel(range),
+                primaryValue: "No limit",
+                rows: [
+                    .init(label: "Status", value: "No category limit found"),
+                    .init(label: "Budget", value: result.activeBudget?.name ?? "No active budget")
+                ],
+                traceSummary: "composableWorkspace=categoryAvailability,result=missingLimit,target=\(target.displayName)"
+            )
+        }
+
+        let status = availabilityStatus(metric)
+        let available = metric.availableRaw(for: .all)
+        let budgetLimit = categoryLimit(for: target, budget: result.activeBudget)
+        var rows: [MarinaWorkspaceAggregationCard.Row] = [
+            .init(label: "Status", value: status),
+            .init(label: "Spent", value: currency(metric.spentTotal), amount: metric.spentTotal, sortValue: metric.spentTotal),
+            .init(label: "Planned", value: currency(metric.spentPlanned), amount: metric.spentPlanned, sortValue: metric.spentPlanned),
+            .init(label: "Actual", value: currency(metric.spentVariable), amount: metric.spentVariable, sortValue: metric.spentVariable),
+            .init(label: "Budget", value: result.activeBudget?.name ?? "No active budget")
+        ]
+        if let maxAmount = metric.maxAmount {
+            rows.insert(.init(label: "Max", value: currency(maxAmount), amount: maxAmount, sortValue: maxAmount), at: 2)
+        }
+        if let minAmount = budgetLimit?.minAmount {
+            rows.insert(.init(label: "Min", value: currency(minAmount), amount: minAmount, sortValue: minAmount), at: 2)
+        }
+        if let available {
+            rows.insert(.init(label: available >= 0 ? "Remaining" : "Over", value: currency(abs(available)), amount: available, sortValue: available), at: 1)
+        }
+
+        return MarinaWorkspaceAggregationCard(
+            title: "\(metric.name) Availability",
+            subtitle: rangeLabel(range),
+            primaryValue: available.map { currency(abs($0)) } ?? currency(metric.spentTotal),
+            rows: rows,
+            traceSummary: "composableWorkspace=categoryAvailability,target=\(metric.name),spent=\(metric.spentTotal),available=\(available ?? 0)"
+        )
+    }
+
+    private func availabilityStatus(_ metric: CategoryAvailabilityMetric) -> String {
+        guard metric.isLimited else { return "Unlimited" }
+        switch metric.status(for: .all, nearThreshold: HomeCategoryLimitsAggregator.defaultNearThreshold) {
+        case .over:
+            return "Over"
+        case .near:
+            return "Near"
+        case .ok:
+            return "Available"
+        }
+    }
+
+    private func targetedPeriodicAverage(
+        resolved: MarinaResolvedQueryCandidate,
+        plan: MarinaAggregationPlan,
+        provider: MarinaDataProvider,
+        now: Date,
+        amountBasis: MarinaFinancialAmountBasis
+    ) -> MarinaWorkspaceAggregationCard {
         let range = plan.dateRange ?? lookbackRange(from: now, months: 3)
         let filters = resolved.resolvedTargets
-        let rows = spendingRows(provider: provider, range: range)
+        let rows = spendingRows(provider: provider, range: range, amountBasis: amountBasis)
             .filter { row in filters.isEmpty || filters.allSatisfy { matches(row: row, target: $0) } }
         let buckets = bucketRanges(in: range, dimension: plan.grouping?.dimension ?? .week)
         let totals = buckets.map { bucket in
@@ -304,11 +396,12 @@ struct MarinaComposableWorkspaceQueryExecutor {
     private func categoryDeltaDrivers(
         plan: MarinaAggregationPlan,
         provider: MarinaDataProvider,
-        now: Date
+        now: Date,
+        amountBasis: MarinaFinancialAmountBasis
     ) -> MarinaWorkspaceAggregationCard {
         let ranges = comparisonRanges(for: plan, now: now)
-        let currentRows = spendingRows(provider: provider, range: ranges.current)
-        let previousRows = spendingRows(provider: provider, range: ranges.previous)
+        let currentRows = spendingRows(provider: provider, range: ranges.current, amountBasis: amountBasis)
+        let previousRows = spendingRows(provider: provider, range: ranges.previous, amountBasis: amountBasis)
         let currentTotals = groupedTotals(currentRows, by: \.categoryName)
         let previousTotals = groupedTotals(previousRows, by: \.categoryName)
         let labels = Set(currentTotals.keys).union(previousTotals.keys)
@@ -397,7 +490,7 @@ struct MarinaComposableWorkspaceQueryExecutor {
         }
 
         let range = plan.dateRange ?? monthRange(containing: now)
-        let rows = spendingRows(provider: provider, range: range)
+        let rows = spendingRows(provider: provider, range: range, amountBasis: .budgetImpact)
         let totalBefore = rows.reduce(0.0) { $0 + $1.amount }
         let categoryBefore = rows.filter { matches(row: $0, target: input) }.reduce(0.0) { $0 + $1.amount }
         let budget = activeBudget(provider: provider, now: now, range: range)
@@ -444,13 +537,17 @@ struct MarinaComposableWorkspaceQueryExecutor {
         let sourceID: UUID
     }
 
-    private func spendingRows(provider: MarinaDataProvider, range: HomeQueryDateRange) -> [SpendingRow] {
+    private func spendingRows(
+        provider: MarinaDataProvider,
+        range: HomeQueryDateRange,
+        amountBasis: MarinaFinancialAmountBasis
+    ) -> [SpendingRow] {
         let variable = provider.fetchAllVariableExpenses()
             .filter { contains($0.transactionDate, in: range) }
-            .map { row(for: $0, amount: SavingsMathService.variableBudgetImpactAmount(for: $0)) }
+            .map { row(for: $0, amount: amountBasisAdapter.variableAmount(for: $0, basis: amountBasis)) }
         let planned = provider.fetchAllPlannedExpenses()
             .filter { contains($0.expenseDate, in: range) }
-            .map { row(for: $0, amount: SavingsMathService.plannedBudgetImpactAmount(for: $0)) }
+            .map { row(for: $0, amount: amountBasisAdapter.plannedAmount(for: $0, basis: amountBasis)) }
         return variable + planned
     }
 

@@ -141,6 +141,73 @@ struct MarinaSharedPipelineRuntimeGateTests {
         #expect(trace.executorResultSummary == nil)
     }
 
+    @Test func runtimeGate_sharedSemanticRouteDoesNotStealCrudCommands() {
+        let command = HomeAssistantSharedPipelineCommandGuard().command(
+            for: "add expense $12 coffee on Apple Card",
+            defaultPeriodUnit: .month
+        )
+
+        #expect(command?.intent == .addExpense)
+        #expect(command?.amount == 12)
+        #expect(command?.rawPrompt == "add expense $12 coffee on Apple Card")
+    }
+
+    @Test func runtimeGate_clarificationInputClassifierLetsFreshPromptsEscapeSharedClarification() {
+        let classifier = HomeAssistantClarificationInputClassifier()
+
+        #expect(classifier.shouldTreatAsFreshPrompt("What did I spend last month?", defaultPeriodUnit: .month))
+        #expect(classifier.shouldTreatAsFreshPrompt("add expense $12 coffee on Apple Card", defaultPeriodUnit: .month))
+        #expect(classifier.shouldTreatAsFreshPrompt("Groceries", defaultPeriodUnit: .month) == false)
+        #expect(classifier.shouldTreatAsFreshPrompt("the category", defaultPeriodUnit: .month) == false)
+    }
+
+    @Test func runtimeGate_turnClassifierSeparatesFreshQuestionsFollowUpsClarificationsAndCommands() {
+        let classifier = MarinaPromptTurnClassifier()
+
+        #expect(classifier.classify("What did I spend last month?", defaultPeriodUnit: .month) == .freshQuestion)
+        #expect(classifier.classify("What did I spend this week?", defaultPeriodUnit: .month) == .freshQuestion)
+        #expect(classifier.classify("what about last month?", defaultPeriodUnit: .month) == .followUp)
+        #expect(classifier.classify("Groceries", defaultPeriodUnit: .month, hasActiveClarification: true) == .clarificationAnswer)
+        #expect(classifier.classify("add expense $12 coffee on Apple Card", defaultPeriodUnit: .month) == .command)
+    }
+
+    @Test func runtimeGate_recoveryPolicyTreatsTemporalLastAsDateNotRows() {
+        let policy = MarinaQueryRecoveryPolicy()
+        let sumLastMonth = MarinaQueryPlanCandidate(
+            source: .heuristic,
+            rawPrompt: "What did I spend last month?",
+            operation: .sum,
+            measure: .spend,
+            confidence: .high
+        )
+        let sumLastWeek = MarinaQueryPlanCandidate(
+            source: .heuristic,
+            rawPrompt: "What did I spend last week?",
+            operation: .sum,
+            measure: .spend,
+            confidence: .high
+        )
+        let listRows = MarinaQueryPlanCandidate(
+            source: .heuristic,
+            rawPrompt: "Show my last 10 expenses",
+            operation: .listRows,
+            measure: .transactionAmount,
+            confidence: .high
+        )
+        let sumRows = MarinaQueryPlanCandidate(
+            source: .heuristic,
+            rawPrompt: "Show my last 10 expenses",
+            operation: .sum,
+            measure: .spend,
+            confidence: .high
+        )
+
+        #expect(policy.operationPreserved(candidate: sumLastMonth))
+        #expect(policy.operationPreserved(candidate: sumLastWeek))
+        #expect(policy.operationPreserved(candidate: listRows))
+        #expect(policy.operationPreserved(candidate: sumRows) == false)
+    }
+
     @Test func runtimeGate_targetedAverageExecutesThroughSharedWorkspaceQuery() async throws {
         let fixture = try makeFixture()
         fixture.context.insert(VariableExpense(descriptionText: "March Groceries", amount: 90, transactionDate: sharedPipelineDate(2026, 3, 10), workspace: fixture.workspace, card: fixture.appleCard, category: fixture.groceries))

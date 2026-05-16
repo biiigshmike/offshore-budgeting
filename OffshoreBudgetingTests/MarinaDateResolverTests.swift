@@ -59,6 +59,46 @@ struct MarinaDateResolverTests {
         #expect(range?.end == date(2026, 4, 14, 23, 59, 59))
     }
 
+    @Test func resolve_namedMonthWithoutYearUsesCurrentOrPriorYear() throws {
+        let resolver = makeResolver(now: date(2026, 5, 15, 12, 0, 0))
+
+        let may = resolver.resolveTextRange("spend in May")
+        let december = resolver.resolveTextRange("spend in December")
+
+        #expect(may?.start == date(2026, 5, 1, 0, 0, 0))
+        #expect(may?.end == date(2026, 5, 31, 23, 59, 59))
+        #expect(december?.start == date(2025, 12, 1, 0, 0, 0))
+        #expect(december?.end == date(2025, 12, 31, 23, 59, 59))
+    }
+
+    @Test func resolve_currentPeriodUsesDefaultPeriodUnit() throws {
+        let resolver = makeResolver(now: date(2026, 5, 15, 12, 0, 0))
+
+        let range = resolver.resolve(
+            input: "active period",
+            modelStartISO8601: nil,
+            modelEndISO8601: nil,
+            defaultPeriodUnit: .quarter
+        )
+
+        #expect(range?.start == date(2026, 4, 1, 0, 0, 0))
+        #expect(range?.end == date(2026, 6, 30, 23, 59, 59))
+    }
+
+    @Test func resolve_explicitISODateTimeRangeReturnsInclusiveDays() throws {
+        let resolver = makeResolver(now: date(2026, 5, 15, 12, 0, 0))
+
+        let range = resolver.resolve(
+            input: "ignored",
+            modelStartISO8601: "2026-05-01T10:30:00Z",
+            modelEndISO8601: "2026-05-14T18:45:00Z",
+            defaultPeriodUnit: .month
+        )
+
+        #expect(range?.start == date(2026, 5, 1, 0, 0, 0))
+        #expect(range?.end == date(2026, 5, 14, 23, 59, 59))
+    }
+
     private func makeResolver(now: Date) -> MarinaDateResolver {
         MarinaDateResolver(
             calendar: calendar,

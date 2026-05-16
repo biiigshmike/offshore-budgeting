@@ -91,34 +91,41 @@ struct MarinaSharedPipelineCoordinator {
         if aiRouteEligible {
             selection.modelAttempted = true
             do {
-                let modelCandidate = try await foundationModelsInterpreter.interpret(
+                let modelInterpretation = try await foundationModelsInterpreter.interpretCanonical(
                     prompt: normalization.originalText,
                     context: context.routerContext
                 )
                 let modelEvaluation = evaluate(
-                    modelCandidate,
+                    modelInterpretation,
                     provider: context.provider,
                     now: context.now,
+                    defaultPeriodUnit: context.defaultPeriodUnit,
                     explicitConstraints: explicitConstraints
                 )
 
                 if shouldUseDeterministicFallback(for: modelEvaluation) {
                     selection.heuristicAttempted = true
-                    let heuristicCandidate = heuristicInterpreter.interpret(
+                    let heuristicInterpretation = heuristicInterpreter.interpretCanonical(
                         prompt: normalization.originalText,
                         defaultPeriodUnit: normalization.defaultPeriodUnit
                     )
                     let heuristicEvaluation = evaluate(
-                        heuristicCandidate,
+                        heuristicInterpretation,
                         provider: context.provider,
                         now: context.now,
+                        defaultPeriodUnit: context.defaultPeriodUnit,
                         explicitConstraints: explicitConstraints
                     )
-                    if isExactExecutableFallback(heuristicEvaluation) {
+                    if shouldSelectDeterministicFallback(
+                        heuristicEvaluation,
+                        over: modelEvaluation,
+                        turnClassification: context.turnClassification
+                    ) {
                         selection.selectedInterpreter = .heuristic
                         selection.heuristicUsedAsFallback = true
-                        selection.interpreterSelectionReason = .modelUnsupportedHeuristicExactMatch
-                        selection.fallbackReason = .modelUnsupportedHeuristicExactMatch
+                        let reason = deterministicFallbackReason(for: modelEvaluation)
+                        selection.interpreterSelectionReason = interpreterSelectionReason(forDeterministicFallback: reason)
+                        selection.fallbackReason = reason
                         return runtimeResult(
                             evaluation: heuristicEvaluation,
                             context: context,
@@ -145,14 +152,15 @@ struct MarinaSharedPipelineCoordinator {
                 selection.selectedInterpreter = .heuristic
                 selection.interpreterSelectionReason = interpreterSelectionReason(for: failureReason)
                 selection.fallbackReason = failureReason
-                let candidate = heuristicInterpreter.interpret(
+                let interpretation = heuristicInterpreter.interpretCanonical(
                     prompt: normalization.originalText,
                     defaultPeriodUnit: normalization.defaultPeriodUnit
                 )
                 let evaluation = evaluate(
-                    candidate,
+                    interpretation,
                     provider: context.provider,
                     now: context.now,
+                    defaultPeriodUnit: context.defaultPeriodUnit,
                     explicitConstraints: explicitConstraints
                 )
                 return runtimeResult(
@@ -168,14 +176,15 @@ struct MarinaSharedPipelineCoordinator {
         selection.heuristicAttempted = true
         selection.selectedInterpreter = .heuristic
         selection.fallbackReason = context.aiOptInEnabled ? .modelUnavailable : .aiOptOut
-        let candidate = heuristicInterpreter.interpret(
+        let interpretation = heuristicInterpreter.interpretCanonical(
             prompt: normalization.originalText,
             defaultPeriodUnit: normalization.defaultPeriodUnit
         )
         let evaluation = evaluate(
-            candidate,
+            interpretation,
             provider: context.provider,
             now: context.now,
+            defaultPeriodUnit: context.defaultPeriodUnit,
             explicitConstraints: explicitConstraints
         )
         return runtimeResult(
@@ -201,12 +210,31 @@ struct MarinaSharedPipelineCoordinator {
         }
 
         let resumedCandidate = candidate.replacingClarifiedMention(with: choice)
-        let evaluation = evaluate(
-            resumedCandidate,
-            provider: context.provider,
+        let evaluation: CandidateEvaluation
+        if let pendingSemanticQuery = clarification.pendingSemanticQuery,
+           let patchedQuery = pendingSemanticQuery.patching(
+            choice: choice,
+            fallbackSlot: clarification.patchSlot,
             now: context.now,
-            explicitConstraints: MarinaExplicitPromptConstraints()
-        )
+            defaultPeriodUnit: context.defaultPeriodUnit
+           ) {
+            evaluation = evaluate(
+                semanticQuery: patchedQuery,
+                candidate: resumedCandidate,
+                provider: context.provider,
+                now: context.now,
+                defaultPeriodUnit: context.defaultPeriodUnit,
+                explicitConstraints: MarinaExplicitPromptConstraints()
+            )
+        } else {
+            evaluation = evaluate(
+                resumedCandidate,
+                provider: context.provider,
+                now: context.now,
+                defaultPeriodUnit: context.defaultPeriodUnit,
+                explicitConstraints: MarinaExplicitPromptConstraints()
+            )
+        }
         let selection = MarinaInterpreterSelectionTrace(
             aiAvailable: nil,
             aiOptIn: context.aiOptInEnabled,
@@ -225,7 +253,7 @@ struct MarinaSharedPipelineCoordinator {
             evaluation: evaluation,
             selection: selection,
             fallbackReason: nil,
-            disagreementSummary: "clarificationChoice=\(choice.entityTypeHint?.rawValue ?? "unknown"):\(choice.title)"
+            disagreementSummary: "clarificationChoice=\(choice.patchSlot?.rawValue ?? clarification.patchSlot?.rawValue ?? choice.entityTypeHint?.rawValue ?? "unknown"):\(choice.title)"
         )
 
         if evaluation.isExecutableHandled {
@@ -261,7 +289,28 @@ struct MarinaSharedPipelineCoordinator {
         if case .unsupported = evaluation.validationOutcome {
             return true
         }
+        if case .clarification = evaluation.validationOutcome {
+            return true
+        }
         return false
+    }
+
+    private func deterministicFallbackReason(for evaluation: CandidateEvaluation) -> MarinaSharedPipelineFallbackReason {
+        if case .clarification = evaluation.validationOutcome {
+            return .modelClarificationHeuristicExactMatch
+        }
+        return .modelUnsupportedHeuristicExactMatch
+    }
+
+    private func interpreterSelectionReason(
+        forDeterministicFallback reason: MarinaSharedPipelineFallbackReason
+    ) -> MarinaInterpreterSelectionReason {
+        switch reason {
+        case .modelClarificationHeuristicExactMatch:
+            return .modelClarificationHeuristicExactMatch
+        default:
+            return .modelUnsupportedHeuristicExactMatch
+        }
     }
 
     private func isExactExecutableFallback(_ evaluation: CandidateEvaluation) -> Bool {
@@ -269,6 +318,22 @@ struct MarinaSharedPipelineCoordinator {
             && evaluation.candidate.unsupportedHint == nil
             && evaluation.isExecutableHandled
             && evaluation.runtimeFallbackReason != .droppedExplicitConstraint
+    }
+
+    private func shouldSelectDeterministicFallback(
+        _ heuristicEvaluation: CandidateEvaluation,
+        over modelEvaluation: CandidateEvaluation,
+        turnClassification: MarinaPromptTurnClassification
+    ) -> Bool {
+        if turnClassification == .freshQuestion || turnClassification == .followUp {
+            return heuristicEvaluation.isExecutableHandled
+                && heuristicEvaluation.runtimeFallbackReason != .droppedExplicitConstraint
+        }
+        if case .clarification = modelEvaluation.validationOutcome {
+            return heuristicEvaluation.isExecutableHandled
+                && heuristicEvaluation.runtimeFallbackReason != .droppedExplicitConstraint
+        }
+        return isExactExecutableFallback(heuristicEvaluation)
     }
 
     private func fallbackReason(forModelError error: Error) -> MarinaSharedPipelineFallbackReason {
@@ -388,19 +453,46 @@ struct MarinaSharedPipelineCoordinator {
         _ candidate: MarinaQueryPlanCandidate,
         provider: MarinaDataProvider,
         now: Date,
+        defaultPeriodUnit: HomeQueryPeriodUnit,
         explicitConstraints: MarinaExplicitPromptConstraints
     ) -> CandidateEvaluation {
-        let interpretation = semanticAdapter.interpretationResult(from: candidate)
-        let resolved = resolver.resolve(candidate: candidate, provider: provider)
+        evaluate(
+            MarinaCanonicalReadInterpretation(
+                result: semanticAdapter.interpretationResult(from: candidate),
+                compatibilityCandidate: candidate
+            ),
+            provider: provider,
+            now: now,
+            defaultPeriodUnit: defaultPeriodUnit,
+            explicitConstraints: explicitConstraints
+        )
+    }
+
+    private func evaluate(
+        _ interpretation: MarinaCanonicalReadInterpretation,
+        provider: MarinaDataProvider,
+        now: Date,
+        defaultPeriodUnit: HomeQueryPeriodUnit,
+        explicitConstraints: MarinaExplicitPromptConstraints
+    ) -> CandidateEvaluation {
+        let candidate = interpretation.compatibilityCandidate
+        let resolved = resolver.resolve(
+            candidate: candidate,
+            provider: provider,
+            now: now,
+            defaultPeriodUnit: defaultPeriodUnit
+        )
         let semanticResolved: MarinaResolvedSemanticQuery?
         let outcome: MarinaPlanValidationOutcome
 
-        switch interpretation {
+        switch interpretation.result {
         case .query(let query):
             let resolvedQuery = resolver.resolve(
                 query: query,
                 provider: provider,
-                candidate: candidate
+                candidate: candidate,
+                now: now,
+                defaultPeriodUnit: defaultPeriodUnit
             )
             semanticResolved = resolvedQuery
             outcome = validator.validate(resolvedQuery)
@@ -412,6 +504,123 @@ struct MarinaSharedPipelineCoordinator {
             outcome = .unsupported(unsupported)
         }
 
+        let responseBuilder = MarinaResponseBuilder(
+            aggregationBridge: responseBridge,
+            workspaceBridge: workspaceAggregationResponseBridge
+        )
+
+        switch outcome {
+        case .clarification:
+            return CandidateEvaluation(
+                candidate: candidate,
+                resolved: resolved,
+                validationOutcome: outcome,
+                blockedAnswer: responseBuilder.responseCompatibleAnswer(from: outcome),
+                runtimeFallbackReason: .clarificationBridgeUnavailable,
+                interpretationResult: interpretation.result,
+                semanticResolved: semanticResolved
+            )
+        case .unsupported:
+            return CandidateEvaluation(
+                candidate: candidate,
+                resolved: resolved,
+                validationOutcome: outcome,
+                blockedAnswer: responseBuilder.responseCompatibleAnswer(from: outcome),
+                runtimeFallbackReason: .unsupportedBridgeUnavailable,
+                interpretationResult: interpretation.result,
+                semanticResolved: semanticResolved
+            )
+        case .executable:
+            if let unsupported = explicitConstraints.unsupportedIfDropped(by: candidate, resolvedQuery: semanticResolved, outcome: outcome) {
+                let unsupportedOutcome = MarinaPlanValidationOutcome.unsupported(unsupported)
+                return CandidateEvaluation(
+                    candidate: candidate,
+                    resolved: resolved,
+                    validationOutcome: unsupportedOutcome,
+                    blockedAnswer: responseBuilder.responseCompatibleAnswer(from: unsupportedOutcome),
+                    runtimeFallbackReason: .droppedExplicitConstraint,
+                    interpretationResult: interpretation.result,
+                    semanticResolved: semanticResolved
+                )
+            }
+            let queryExecutor = MarinaQueryExecutor(
+                adapter: adapter,
+                executor: executor,
+                composableWorkspaceQueryExecutor: composableWorkspaceQueryExecutor,
+                workspaceAggregationExecutor: workspaceAggregationExecutor,
+                databaseLookupExecutor: databaseLookupExecutor,
+                databaseLookupResponseBuilder: databaseLookupResponseBuilder
+            )
+            switch queryExecutor.execute(
+                candidate: candidate,
+                resolved: resolved,
+                semanticResolved: semanticResolved,
+                validationOutcome: outcome,
+                provider: provider,
+                now: now
+            ) {
+            case .handled(let execution):
+                let answer = execution.databaseLookupResponse.map(databaseLookupResponseBuilder.responseCompatibleAnswer)
+                    ?? responseBuilder.responseCompatibleAnswer(from: execution.aggregationResult)
+                let suggestions = MarinaSuggestionBuilder().suggestions(
+                    candidate: candidate,
+                    executablePlan: execution.executablePlan,
+                    result: execution.aggregationResult,
+                    answer: answer
+                )
+                return CandidateEvaluation(
+                    candidate: candidate,
+                    resolved: resolved,
+                    validationOutcome: outcome,
+                    executablePlan: execution.executablePlan,
+                    aggregationResult: execution.aggregationResult,
+                    answer: answer,
+                    suggestionCount: suggestions.count,
+                    databaseLookupResponse: execution.databaseLookupResponse,
+                    workspaceAggregationCard: execution.workspaceAggregationCard,
+                    interpretationResult: interpretation.result,
+                    semanticResolved: semanticResolved,
+                    amountBasis: execution.amountBasis,
+                    executionRoute: execution.executionRoute
+                )
+            case .unsupported(let unsupported):
+                let unsupportedOutcome = MarinaPlanValidationOutcome.unsupported(unsupported)
+                return CandidateEvaluation(
+                    candidate: candidate,
+                    resolved: resolved,
+                    validationOutcome: unsupportedOutcome,
+                    blockedAnswer: responseBuilder.responseCompatibleAnswer(from: unsupportedOutcome),
+                    runtimeFallbackReason: .executorUnsupported,
+                    interpretationResult: interpretation.result,
+                    semanticResolved: semanticResolved
+                )
+            }
+        }
+    }
+
+    private func evaluate(
+        semanticQuery query: MarinaSemanticQuery,
+        candidate: MarinaQueryPlanCandidate,
+        provider: MarinaDataProvider,
+        now: Date,
+        defaultPeriodUnit: HomeQueryPeriodUnit,
+        explicitConstraints: MarinaExplicitPromptConstraints
+    ) -> CandidateEvaluation {
+        let interpretation = MarinaInterpretationResult.query(query)
+        let resolved = resolver.resolve(
+            candidate: candidate,
+            provider: provider,
+            now: now,
+            defaultPeriodUnit: defaultPeriodUnit
+        )
+        let semanticResolved = resolver.resolve(
+            query: query,
+            provider: provider,
+            candidate: candidate,
+            now: now,
+            defaultPeriodUnit: defaultPeriodUnit
+        )
+        let outcome = validator.validate(semanticResolved)
         let responseBuilder = MarinaResponseBuilder(
             aggregationBridge: responseBridge,
             workspaceBridge: workspaceAggregationResponseBridge
@@ -487,7 +696,9 @@ struct MarinaSharedPipelineCoordinator {
                     databaseLookupResponse: execution.databaseLookupResponse,
                     workspaceAggregationCard: execution.workspaceAggregationCard,
                     interpretationResult: interpretation,
-                    semanticResolved: semanticResolved
+                    semanticResolved: semanticResolved,
+                    amountBasis: execution.amountBasis,
+                    executionRoute: execution.executionRoute
                 )
             case .unsupported(let unsupported):
                 let unsupportedOutcome = MarinaPlanValidationOutcome.unsupported(unsupported)
@@ -582,7 +793,9 @@ struct MarinaSharedPipelineCoordinator {
                 heuristicUsedAsFallback: false,
                 modelAvailabilitySummary: modelAvailabilitySummary,
                 selectedPath: .legacy,
-                fallbackReason: reason
+                fallbackReason: reason,
+                turnClassification: context.turnClassification,
+                priorContextIncluded: context.routerContext.priorQueryContext.hasContext
             )
         )
     }
@@ -666,7 +879,7 @@ struct MarinaSharedPipelineCoordinator {
             semanticResolverSummary: evaluation?.semanticResolved.map(semanticResolverSummary),
             validatorOutcomeSummary: evaluation.map { validatorSummary($0.validationOutcome) },
             semanticValidationSummary: evaluation.map { validatorSummary($0.validationOutcome) },
-            executorResultSummary: evaluation?.databaseLookupResponse?.traceSummary ?? evaluation?.workspaceAggregationCard?.traceSummary ?? evaluation?.aggregationResult.map(Self.aggregationResultSummary),
+            executorResultSummary: Self.executorSummary(evaluation),
             responseBridgeSummary: responseBridgeSummary(evaluation),
             responseShapeSummary: evaluation.map(responseShapeSummary),
             fallbackReason: fallbackReason,
@@ -675,7 +888,9 @@ struct MarinaSharedPipelineCoordinator {
             rejectedReason: evaluation.flatMap {
                 recoveryPolicy.rejectedReason(selected: $0, other: competingEvaluation)
             },
-            operationPreserved: evaluation?.operationPreserved
+            operationPreserved: evaluation?.operationPreserved,
+            turnClassification: context.turnClassification,
+            priorContextIncluded: context.routerContext.priorQueryContext.hasContext
         )
     }
 
@@ -751,6 +966,7 @@ struct MarinaSharedPipelineCoordinator {
                 "subject=\(query.subject.rawValue)",
                 "operation=\(query.operation.rawValue)",
                 "filters=\(query.filters.count)",
+                "incomeStatus=\(query.incomeStatusScope?.rawValue ?? "nil")",
                 "shape=\(query.responseShape?.rawValue ?? "nil")"
             ].joined(separator: ",")
         case .clarification(let clarification):
@@ -773,7 +989,7 @@ struct MarinaSharedPipelineCoordinator {
     private func validatorSummary(_ outcome: MarinaPlanValidationOutcome) -> String {
         switch outcome {
         case .executable(let plan):
-            return "executable:\(plan.operation.rawValue):\(plan.measure.rawValue):shape=\(plan.responseShape?.rawValue ?? "nil")"
+            return "executable:\(plan.operation.rawValue):\(plan.measure.rawValue):incomeStatus=\(plan.incomeStatusScope?.rawValue ?? "nil"):shape=\(plan.responseShape?.rawValue ?? "nil")"
         case .clarification(let clarification):
             return "clarification:\(clarification.kind.rawValue)"
         case .unsupported(let unsupported):
@@ -842,6 +1058,19 @@ struct MarinaSharedPipelineCoordinator {
         }
     }
 
+    private static func executorSummary(_ evaluation: CandidateEvaluation?) -> String? {
+        guard let evaluation else { return nil }
+        let base = evaluation.databaseLookupResponse?.traceSummary
+            ?? evaluation.workspaceAggregationCard?.traceSummary
+            ?? evaluation.aggregationResult.map(Self.aggregationResultSummary)
+        let route = evaluation.executionRoute.map { "route=\($0.traceName)" }
+        let basis = evaluation.amountBasis.map { "amountBasis=\($0.rawValue)" }
+        let prefix = [route, basis].compactMap { $0 }.joined(separator: ";")
+        guard prefix.isEmpty == false else { return base }
+        guard let base else { return prefix }
+        return "\(prefix);\(base)"
+    }
+
     private static func modelAvailabilitySummary(_ status: MarinaModelAvailability.Status) -> String {
         switch status {
         case .available:
@@ -866,6 +1095,8 @@ struct CandidateEvaluation {
     let workspaceAggregationCard: MarinaWorkspaceAggregationCard?
     let interpretationResult: MarinaInterpretationResult?
     let semanticResolved: MarinaResolvedSemanticQuery?
+    let amountBasis: MarinaFinancialAmountBasis?
+    let executionRoute: MarinaSemanticExecutionRoute?
 
     init(
         candidate: MarinaQueryPlanCandidate,
@@ -880,7 +1111,9 @@ struct CandidateEvaluation {
         databaseLookupResponse: MarinaDatabaseLookupResponse? = nil,
         workspaceAggregationCard: MarinaWorkspaceAggregationCard? = nil,
         interpretationResult: MarinaInterpretationResult? = nil,
-        semanticResolved: MarinaResolvedSemanticQuery? = nil
+        semanticResolved: MarinaResolvedSemanticQuery? = nil,
+        amountBasis: MarinaFinancialAmountBasis? = nil,
+        executionRoute: MarinaSemanticExecutionRoute? = nil
     ) {
         self.candidate = candidate
         self.resolved = resolved
@@ -895,6 +1128,8 @@ struct CandidateEvaluation {
         self.workspaceAggregationCard = workspaceAggregationCard
         self.interpretationResult = interpretationResult
         self.semanticResolved = semanticResolved
+        self.amountBasis = amountBasis
+        self.executionRoute = executionRoute
     }
 
     var isExecutableHandled: Bool {
@@ -915,6 +1150,8 @@ struct MarinaQueryExecution {
     let aggregationResult: MarinaAggregationResult
     let databaseLookupResponse: MarinaDatabaseLookupResponse?
     let workspaceAggregationCard: MarinaWorkspaceAggregationCard?
+    let amountBasis: MarinaFinancialAmountBasis
+    let executionRoute: MarinaSemanticExecutionRoute
 }
 
 private struct MarinaInterpreterSelectionTrace {
@@ -1002,7 +1239,8 @@ struct MarinaExplicitPromptConstraints: Equatable {
             return Self.normalized(raw)
         })
         let semanticRawNames = Set((resolvedQuery?.query.filters ?? []).compactMap { filter -> String? in
-            guard filter.entityTypeHint == type else { return nil }
+            let allowed = filter.entityTypeHint == type || filter.allowedEntityTypeHints?.contains(type) == true
+            guard allowed else { return nil }
             return Self.normalized(filter.value)
         })
         let preservedNames = planNames.union(resolvedNames).union(rawNames).union(semanticRawNames)
@@ -1116,6 +1354,7 @@ struct MarinaQueryExecutor {
     let workspaceAggregationExecutor: MarinaWorkspaceAggregationExecutor
     let databaseLookupExecutor: MarinaDatabaseLookupExecutor
     let databaseLookupResponseBuilder: MarinaDatabaseLookupResponseBuilder
+    let router: MarinaSemanticExecutionRouter = MarinaSemanticExecutionRouter()
 
     func execute(
         candidate: MarinaQueryPlanCandidate,
@@ -1135,88 +1374,238 @@ struct MarinaQueryExecutor {
             )
         }
 
-        if plan.operation == .lookupDetails,
-           let request = semanticResolved?.databaseLookupRequest ?? candidate.databaseLookupRequest {
-            let response = databaseLookupExecutor.execute(request, provider: provider)
-            let answer = databaseLookupResponseBuilder.responseCompatibleAnswer(from: response)
-            let result: MarinaAggregationResult = response.results.isEmpty && response.ambiguityChoices.isEmpty
-                ? .noData(
-                    MarinaNoDataAggregationResult(
-                        title: answer.title,
-                        message: answer.subtitle ?? "No matching data found.",
-                        sourceAnswer: answer
-                    )
-                )
-                : .message(
-                    MarinaMessageAggregationResult(
-                        title: answer.title,
-                        message: answer.subtitle,
-                        sourceAnswer: answer
-                    )
-                )
-            return .handled(
-                MarinaQueryExecution(
-                    executablePlan: nil,
-                    aggregationResult: result,
-                    databaseLookupResponse: response,
-                    workspaceAggregationCard: nil
-                )
-            )
-        }
+        let decision = router.decision(validationOutcome: validationOutcome, semanticResolved: semanticResolved)
 
-        if case .success(let executablePlan) = adapter.executablePlan(from: validationOutcome) {
-            let result = noDataIfNeeded(executor.execute(executablePlan, provider: provider, now: now))
-            if case .unsupported(let unsupported) = result {
-                return .unsupported(unsupported)
+        switch decision.route {
+        case .lookupDetail:
+            guard let request = semanticResolved?.databaseLookupRequest ?? candidate.databaseLookupRequest else {
+                if let request = syntheticLookupRequest(for: plan, candidate: candidate) {
+                    return executeLookup(request, provider: provider, decision: decision)
+                }
+                if let handled = executeComposable(candidate: candidate, resolved: resolved, plan: plan, provider: provider, now: now, decision: decision) {
+                    return handled
+                }
+                if let handled = executeHomeAdapter(validationOutcome, provider: provider, now: now, decision: decision) {
+                    return handled
+                }
+                return unsupported(candidate: candidate)
             }
-            return .handled(
-                MarinaQueryExecution(
-                    executablePlan: executablePlan,
-                    aggregationResult: result,
-                    databaseLookupResponse: nil,
-                    workspaceAggregationCard: nil
+            return executeLookup(request, provider: provider, decision: decision)
+        case .aggregate:
+            if let handled = executeHomeAdapter(validationOutcome, provider: provider, now: now, decision: decision) {
+                return handled
+            }
+            if hasExecutableTarget(plan) || resolved.resolvedTargets.isEmpty == false {
+                if let handled = executeComposable(candidate: candidate, resolved: resolved, plan: plan, provider: provider, now: now, decision: decision) {
+                    return handled
+                }
+            }
+            if let handled = executeWorkspace(plan: plan, provider: provider, now: now, decision: decision) {
+                return handled
+            }
+            return unsupported(candidate: candidate)
+        case .comparison, .groupedRanked:
+            if let handled = executeHomeAdapter(validationOutcome, provider: provider, now: now, decision: decision) {
+                return handled
+            }
+            if let handled = executeComposable(candidate: candidate, resolved: resolved, plan: plan, provider: provider, now: now, decision: decision) {
+                return handled
+            }
+            if let handled = executeWorkspace(plan: plan, provider: provider, now: now, decision: decision) {
+                return handled
+            }
+            return unsupported(candidate: candidate)
+        case .list:
+            if let handled = executeComposable(candidate: candidate, resolved: resolved, plan: plan, provider: provider, now: now, decision: decision) {
+                return handled
+            }
+            if let handled = executeWorkspace(plan: plan, provider: provider, now: now, decision: decision) {
+                return handled
+            }
+            if let handled = executeHomeAdapter(validationOutcome, provider: provider, now: now, decision: decision) {
+                return handled
+            }
+            return unsupported(candidate: candidate)
+        case .scenario:
+            if let handled = executeHomeAdapter(validationOutcome, provider: provider, now: now, decision: decision) {
+                return handled
+            }
+            if let handled = executeComposable(candidate: candidate, resolved: resolved, plan: plan, provider: provider, now: now, decision: decision) {
+                return handled
+            }
+            if let handled = executeWorkspace(plan: plan, provider: provider, now: now, decision: decision) {
+                return handled
+            }
+            return unsupported(candidate: candidate)
+        case .unsupported(let kind):
+            return .unsupported(
+                MarinaTypedUnsupportedResponse(
+                    kind: kind,
+                    message: "No shared Marina executor supports this plan shape.",
+                    candidate: candidate
                 )
             )
         }
+    }
 
+    private func syntheticLookupRequest(
+        for plan: MarinaAggregationPlan,
+        candidate: MarinaQueryPlanCandidate
+    ) -> MarinaDatabaseLookupRequest? {
+        guard plan.operation == .lookupDetails,
+              let target = plan.targets.first else {
+            return nil
+        }
+
+        let objectTypes: [MarinaLookupObjectType]
+        switch target.entityType {
+        case .expense, .transaction:
+            objectTypes = [.variableExpense, .plannedExpense]
+        case .merchant:
+            objectTypes = [.variableExpense, .plannedExpense]
+        case .card, .category, .preset, .budget, .savingsAccount, .allocationAccount, .incomeSource, .workspace:
+            return nil
+        }
+
+        return MarinaDatabaseLookupRequest(
+            rawPrompt: candidate.rawPrompt,
+            searchText: target.displayName,
+            objectTypes: objectTypes,
+            dateRange: plan.dateRange,
+            limit: plan.limit ?? 1,
+            requestedDetail: .general
+        ).clamped
+    }
+
+    private func executeLookup(
+        _ request: MarinaDatabaseLookupRequest,
+        provider: MarinaDataProvider,
+        decision: MarinaSemanticExecutionDecision
+    ) -> MarinaQueryExecutionResult {
+        let response = databaseLookupExecutor.execute(request, provider: provider)
+        let answer = databaseLookupResponseBuilder.responseCompatibleAnswer(from: response)
+        let result: MarinaAggregationResult = response.results.isEmpty && response.ambiguityChoices.isEmpty
+            ? .noData(
+                MarinaNoDataAggregationResult(
+                    title: answer.title,
+                    message: answer.subtitle ?? "No matching data found.",
+                    sourceAnswer: answer
+                )
+            )
+            : .message(
+                MarinaMessageAggregationResult(
+                    title: answer.title,
+                    message: answer.subtitle,
+                    sourceAnswer: answer
+                )
+            )
+        return .handled(
+            MarinaQueryExecution(
+                executablePlan: nil,
+                aggregationResult: result,
+                databaseLookupResponse: response,
+                workspaceAggregationCard: nil,
+                amountBasis: decision.amountBasis,
+                executionRoute: decision.route
+            )
+        )
+    }
+
+    private func executeHomeAdapter(
+        _ validationOutcome: MarinaPlanValidationOutcome,
+        provider: MarinaDataProvider,
+        now: Date,
+        decision: MarinaSemanticExecutionDecision
+    ) -> MarinaQueryExecutionResult? {
+        guard case .success(let executablePlan) = adapter.executablePlan(from: validationOutcome) else {
+            return nil
+        }
+
+        let result = noDataIfNeeded(executor.execute(executablePlan, provider: provider, now: now))
+        if case .unsupported(let unsupported) = result {
+            return .unsupported(unsupported)
+        }
+        return .handled(
+            MarinaQueryExecution(
+                executablePlan: executablePlan,
+                aggregationResult: result,
+                databaseLookupResponse: nil,
+                workspaceAggregationCard: nil,
+                amountBasis: decision.amountBasis,
+                executionRoute: decision.route
+            )
+        )
+    }
+
+    private func executeComposable(
+        candidate: MarinaQueryPlanCandidate,
+        resolved: MarinaResolvedQueryCandidate,
+        plan: MarinaAggregationPlan,
+        provider: MarinaDataProvider,
+        now: Date,
+        decision: MarinaSemanticExecutionDecision
+    ) -> MarinaQueryExecutionResult? {
         switch composableWorkspaceQueryExecutor.execute(
             candidate: candidate,
             resolved: resolved,
             plan: plan,
             provider: provider,
-            now: now
+            now: now,
+            amountBasis: decision.amountBasis
         ) {
         case .handled(let card):
-            return .handled(
-                MarinaQueryExecution(
-                    executablePlan: nil,
-                    aggregationResult: .workspaceCard(card),
-                    databaseLookupResponse: nil,
-                    workspaceAggregationCard: card
-                )
-            )
+            return .handled(workspaceExecution(card, decision: decision))
         case .unsupported:
-            break
+            return nil
         }
+    }
 
+    private func executeWorkspace(
+        plan: MarinaAggregationPlan,
+        provider: MarinaDataProvider,
+        now: Date,
+        decision: MarinaSemanticExecutionDecision
+    ) -> MarinaQueryExecutionResult? {
         switch workspaceAggregationExecutor.execute(plan: plan, provider: provider, now: now) {
         case .handled(let card):
-            return .handled(
-                MarinaQueryExecution(
-                    executablePlan: nil,
-                    aggregationResult: .workspaceCard(card),
-                    databaseLookupResponse: nil,
-                    workspaceAggregationCard: card
-                )
-            )
+            return .handled(workspaceExecution(card, decision: decision))
         case .unsupported:
-            return .unsupported(
-                MarinaTypedUnsupportedResponse(
-                    kind: .unsupportedCombination,
-                    message: "No shared Marina executor supports this plan shape.",
-                    candidate: candidate
-                )
+            return nil
+        }
+    }
+
+    private func workspaceExecution(
+        _ card: MarinaWorkspaceAggregationCard,
+        decision: MarinaSemanticExecutionDecision
+    ) -> MarinaQueryExecution {
+        MarinaQueryExecution(
+            executablePlan: nil,
+            aggregationResult: .workspaceCard(card),
+            databaseLookupResponse: nil,
+            workspaceAggregationCard: card,
+            amountBasis: decision.amountBasis,
+            executionRoute: decision.route
+        )
+    }
+
+    private func unsupported(candidate: MarinaQueryPlanCandidate) -> MarinaQueryExecutionResult {
+        .unsupported(
+            MarinaTypedUnsupportedResponse(
+                kind: .unsupportedCombination,
+                message: "No shared Marina executor supports this plan shape.",
+                candidate: candidate
             )
+        )
+    }
+
+    private func hasExecutableTarget(_ plan: MarinaAggregationPlan) -> Bool {
+        plan.targets.contains { target in
+            switch target.role {
+            case .filter, .primaryTarget, .comparisonTarget, .simulationInput, .simulationOutput:
+                return true
+            case .excludeFilter, .groupingDimension:
+                return false
+            }
         }
     }
 
@@ -1344,5 +1733,199 @@ private extension MarinaQueryPlanCandidate {
             databaseLookupRequest: databaseLookupRequest,
             semanticCommand: semanticCommand
         )
+    }
+}
+
+private extension MarinaSemanticQuery {
+    func patching(
+        choice: MarinaClarificationChoice,
+        fallbackSlot: MarinaClarificationPatchSlot?,
+        now: Date,
+        defaultPeriodUnit: HomeQueryPeriodUnit
+    ) -> MarinaSemanticQuery? {
+        switch choice.patchSlot ?? fallbackSlot ?? inferredPatchSlot(from: choice) {
+        case .target:
+            return patchingTarget(choice)
+        case .date:
+            return patchingDate(choice, role: .primary, now: now, defaultPeriodUnit: defaultPeriodUnit)
+        case .comparison:
+            return patchingDate(choice, role: .comparison, now: now, defaultPeriodUnit: defaultPeriodUnit)
+        case .amount:
+            return patchingAmount()
+        case .simulation:
+            return patchingSimulation(choice)
+        case nil:
+            return nil
+        }
+    }
+
+    private func patchingTarget(_ choice: MarinaClarificationChoice) -> MarinaSemanticQuery {
+        let relationship = choice.entityTypeHint.map(Self.relationship) ?? filters.first?.relationship ?? .unknown
+        let entityTypeHint = choice.entityTypeHint
+        let shouldAdaptToLookup = operation != .lookupDetails
+            && (entityTypeHint == .expense || entityTypeHint == .transaction)
+        let patchedFilter = MarinaFilter(
+            id: choice.mentionID ?? filters.first?.id ?? UUID(),
+            role: resolvedRole(from: choice.entityRole) ?? filters.first?.role ?? .primaryTarget,
+            relationship: relationship,
+            value: choice.rawValue ?? choice.title,
+            matchMode: choice.sourceID == nil ? .semanticOrAlias : .exact,
+            entityTypeHint: choice.entityTypeHint,
+            sourceID: choice.sourceID
+        )
+
+        let patchedFilters: [MarinaFilter]
+        if let mentionID = choice.mentionID,
+           filters.contains(where: { $0.id == mentionID }) {
+            patchedFilters = filters.map { $0.id == mentionID ? patchedFilter : $0 }
+        } else if filters.isEmpty {
+            patchedFilters = [patchedFilter]
+        } else {
+            patchedFilters = [patchedFilter] + filters.dropFirst()
+        }
+
+        if shouldAdaptToLookup {
+            return replacing(
+                operation: .lookupDetails,
+                filters: patchedFilters,
+                clearAmountField: true,
+                responseShape: .summaryCard
+            )
+        }
+
+        return replacing(filters: patchedFilters)
+    }
+
+    private func patchingDate(
+        _ choice: MarinaClarificationChoice,
+        role: MarinaTimeScopeRole,
+        now: Date,
+        defaultPeriodUnit: HomeQueryPeriodUnit
+    ) -> MarinaSemanticQuery? {
+        let rawText = choice.rawValue ?? choice.title
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .gmt
+        let resolver = MarinaDateResolver(calendar: calendar, nowProvider: { now })
+        guard let resolved = resolver.resolve(
+            input: rawText,
+            modelStartISO8601: nil,
+            modelEndISO8601: nil,
+            defaultPeriodUnit: defaultPeriodUnit
+        ) else {
+            return nil
+        }
+
+        let request = MarinaDateRangeRequest(
+            role: role,
+            rawText: rawText,
+            resolvedRange: resolved.queryDateRange,
+            periodUnit: defaultPeriodUnit
+        )
+        return role == .comparison
+            ? replacing(comparisonDateRange: request)
+            : replacing(dateRange: request)
+    }
+
+    private func patchingAmount() -> MarinaSemanticQuery {
+        if amountField != nil { return self }
+        return replacing(amountField: .amount)
+    }
+
+    private func patchingSimulation(_ choice: MarinaClarificationChoice) -> MarinaSemanticQuery {
+        if filters.contains(where: { $0.role == .simulationInput }) {
+            return patchingAmount()
+        }
+        return patchingTarget(
+            MarinaClarificationChoice(
+                title: choice.title,
+                subtitle: choice.subtitle,
+                entityRole: .simulationInput,
+                entityTypeHint: choice.entityTypeHint ?? .category,
+                patchSlot: .target,
+                rawValue: choice.rawValue,
+                sourceID: choice.sourceID,
+                mentionID: choice.mentionID
+            )
+        )
+    }
+
+    private func inferredPatchSlot(from choice: MarinaClarificationChoice) -> MarinaClarificationPatchSlot? {
+        if choice.entityTypeHint != nil || choice.entityRole != nil || choice.sourceID != nil {
+            return .target
+        }
+        return nil
+    }
+
+    private func replacing(
+        subject: MarinaSubject? = nil,
+        operation: MarinaOperation? = nil,
+        filters: [MarinaFilter]? = nil,
+        amountField: MarinaAmountField? = nil,
+        clearAmountField: Bool = false,
+        dateRange: MarinaDateRangeRequest? = nil,
+        comparisonDateRange: MarinaDateRangeRequest? = nil,
+        responseShape: MarinaResponseShape? = nil
+    ) -> MarinaSemanticQuery {
+        MarinaSemanticQuery(
+            id: id,
+            subject: subject ?? self.subject,
+            operation: operation ?? self.operation,
+            filters: filters ?? self.filters,
+            amountField: clearAmountField ? nil : (amountField ?? self.amountField),
+            dateRange: dateRange ?? self.dateRange,
+            comparisonDateRange: comparisonDateRange ?? self.comparisonDateRange,
+            grouping: grouping,
+            ranking: ranking,
+            limit: limit,
+            averageBasis: averageBasis,
+            incomeStatusScope: incomeStatusScope,
+            responseShape: responseShape ?? self.responseShape
+        )
+    }
+
+    nonisolated private static func relationship(from typeHint: MarinaCandidateEntityTypeHint) -> MarinaRelationshipField {
+        switch typeHint {
+        case .category:
+            return .category
+        case .merchant:
+            return .merchant
+        case .expense, .transaction:
+            return .transaction
+        case .card:
+            return .card
+        case .budget:
+            return .budget
+        case .preset:
+            return .preset
+        case .incomeSource:
+            return .incomeSource
+        case .allocationAccount:
+            return .allocationAccount
+        case .savingsAccount:
+            return .savingsAccount
+        case .workspace:
+            return .workspace
+        }
+    }
+
+    private func resolvedRole(from role: MarinaEntityMentionRole?) -> MarinaResolvedTargetRole? {
+        switch role {
+        case .filter:
+            return .filter
+        case .excludeFilter:
+            return .excludeFilter
+        case .primaryTarget:
+            return .primaryTarget
+        case .comparisonTarget:
+            return .comparisonTarget
+        case .groupingDimension:
+            return .groupingDimension
+        case .simulationInput:
+            return .simulationInput
+        case .simulationOutput:
+            return .simulationOutput
+        case nil:
+            return nil
+        }
     }
 }

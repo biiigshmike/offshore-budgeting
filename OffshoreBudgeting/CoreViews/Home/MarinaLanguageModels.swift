@@ -164,6 +164,16 @@ struct MarinaPriorQueryContext: Equatable {
             || lastResultLimit != nil
             || lastPeriodUnit != nil
     }
+
+    static let empty = MarinaPriorQueryContext(
+        lastQueryPlan: nil,
+        lastMetric: nil,
+        lastTargetName: nil,
+        lastTargetType: nil,
+        lastDateRange: nil,
+        lastResultLimit: nil,
+        lastPeriodUnit: nil
+    )
 }
 
 struct MarinaLanguageRouterContext {

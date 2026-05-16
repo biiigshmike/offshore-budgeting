@@ -333,7 +333,7 @@ struct MarinaQueryCapabilityMatrix {
         case .rank:
             return grouping != nil || measure == .reconciliationBalance || measure == .savingsMovement
         case .listRows:
-            return measure == .transactionAmount
+            return measure == .transactionAmount || measure == .income
         case .compare:
             return [.spend, .income, .savings, .categoryShare].contains(measure)
         case .simulate:

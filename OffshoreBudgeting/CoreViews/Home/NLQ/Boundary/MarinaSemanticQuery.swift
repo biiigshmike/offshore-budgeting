@@ -12,6 +12,7 @@ struct MarinaSemanticQuery: Codable, Equatable, Identifiable, Sendable {
     let ranking: MarinaRanking?
     let limit: Int?
     let averageBasis: MarinaAverageBasis?
+    let incomeStatusScope: MarinaIncomeStatusScope?
     let responseShape: MarinaResponseShape?
 
     init(
@@ -26,6 +27,7 @@ struct MarinaSemanticQuery: Codable, Equatable, Identifiable, Sendable {
         ranking: MarinaRanking? = nil,
         limit: Int? = nil,
         averageBasis: MarinaAverageBasis? = nil,
+        incomeStatusScope: MarinaIncomeStatusScope? = nil,
         responseShape: MarinaResponseShape? = nil
     ) {
         self.id = id
@@ -39,6 +41,7 @@ struct MarinaSemanticQuery: Codable, Equatable, Identifiable, Sendable {
         self.ranking = ranking
         self.limit = limit
         self.averageBasis = averageBasis
+        self.incomeStatusScope = incomeStatusScope
         self.responseShape = responseShape
     }
 }
@@ -47,6 +50,11 @@ enum MarinaInterpretationResult: Codable, Equatable, Sendable {
     case query(MarinaSemanticQuery)
     case clarification(MarinaTypedClarification)
     case unsupported(MarinaTypedUnsupportedResponse)
+}
+
+struct MarinaCanonicalReadInterpretation: Equatable, Sendable {
+    let result: MarinaInterpretationResult
+    let compatibilityCandidate: MarinaQueryPlanCandidate
 }
 
 enum MarinaSubject: String, Codable, Equatable, CaseIterable, Sendable {
@@ -90,6 +98,12 @@ enum MarinaAverageBasis: String, Codable, Equatable, CaseIterable, Sendable {
     case perWeek
     case perMonth
     case perBudgetPeriod
+}
+
+enum MarinaIncomeStatusScope: String, Codable, Equatable, CaseIterable, Sendable {
+    case actual
+    case planned
+    case all
 }
 
 enum MarinaAmountField: String, Codable, Equatable, CaseIterable, Sendable {
@@ -150,6 +164,7 @@ struct MarinaFilter: Codable, Equatable, Identifiable, Sendable {
     let value: String
     let matchMode: MarinaFilterMatchMode
     let entityTypeHint: MarinaCandidateEntityTypeHint?
+    let allowedEntityTypeHints: [MarinaCandidateEntityTypeHint]?
     let sourceID: UUID?
 
     init(
@@ -159,6 +174,7 @@ struct MarinaFilter: Codable, Equatable, Identifiable, Sendable {
         value: String,
         matchMode: MarinaFilterMatchMode = .semanticOrAlias,
         entityTypeHint: MarinaCandidateEntityTypeHint? = nil,
+        allowedEntityTypeHints: [MarinaCandidateEntityTypeHint]? = nil,
         sourceID: UUID? = nil
     ) {
         self.id = id
@@ -167,6 +183,7 @@ struct MarinaFilter: Codable, Equatable, Identifiable, Sendable {
         self.value = value
         self.matchMode = matchMode
         self.entityTypeHint = entityTypeHint
+        self.allowedEntityTypeHints = allowedEntityTypeHints
         self.sourceID = sourceID
     }
 }
@@ -208,6 +225,116 @@ enum MarinaResponseShape: String, Codable, Equatable, CaseIterable, Sendable {
     case unsupported
 }
 
+enum MarinaSemanticExecutionRoute: Equatable, Sendable {
+    case lookupDetail
+    case list
+    case aggregate
+    case comparison
+    case groupedRanked
+    case scenario
+    case unsupported(MarinaUnsupportedResponseKind)
+
+    var traceName: String {
+        switch self {
+        case .lookupDetail:
+            return "lookupDetail"
+        case .list:
+            return "list"
+        case .aggregate:
+            return "aggregate"
+        case .comparison:
+            return "comparison"
+        case .groupedRanked:
+            return "groupedRanked"
+        case .scenario:
+            return "scenario"
+        case .unsupported(let kind):
+            return "unsupported:\(kind.rawValue)"
+        }
+    }
+}
+
+struct MarinaSemanticExecutionDecision: Equatable, Sendable {
+    let route: MarinaSemanticExecutionRoute
+    let amountBasis: MarinaFinancialAmountBasis
+}
+
+struct MarinaSemanticExecutionRouter {
+    func decision(
+        validationOutcome: MarinaPlanValidationOutcome,
+        semanticResolved: MarinaResolvedSemanticQuery?,
+        amountBasisAdapter: MarinaAmountBasisAdapter = MarinaAmountBasisAdapter()
+    ) -> MarinaSemanticExecutionDecision {
+        let route = route(validationOutcome: validationOutcome, semanticResolved: semanticResolved)
+        let basis: MarinaFinancialAmountBasis
+        if case .executable(let plan) = validationOutcome {
+            basis = amountBasisAdapter.basis(plan: plan, semanticQuery: semanticResolved?.query)
+        } else {
+            basis = .homeSpend
+        }
+        return MarinaSemanticExecutionDecision(route: route, amountBasis: basis)
+    }
+
+    func route(
+        validationOutcome: MarinaPlanValidationOutcome,
+        semanticResolved: MarinaResolvedSemanticQuery?
+    ) -> MarinaSemanticExecutionRoute {
+        guard case .executable(let plan) = validationOutcome else {
+            return .unsupported(.unsupportedCombination)
+        }
+
+        return route(plan: plan, semanticQuery: semanticResolved?.query)
+    }
+
+    func route(
+        plan: MarinaAggregationPlan,
+        semanticQuery: MarinaSemanticQuery? = nil
+    ) -> MarinaSemanticExecutionRoute {
+        if semanticQuery?.operation == .lookupDetails || plan.operation == .lookupDetails {
+            return .lookupDetail
+        }
+
+        if semanticQuery?.operation == .simulate || semanticQuery?.operation == .forecast ||
+            plan.operation == .simulate || plan.operation == .forecast {
+            return .scenario
+        }
+
+        if semanticQuery?.operation == .compare || plan.operation == .compare {
+            return .comparison
+        }
+
+        if semanticQuery?.operation == .list || plan.operation == .listRows {
+            return .list
+        }
+
+        if semanticQuery?.operation == .rank ||
+            semanticQuery?.operation == .breakdown ||
+            semanticQuery?.operation == .percentageShare ||
+            plan.operation == .rank ||
+            plan.operation == .trend ||
+            plan.measure == .categoryShare ||
+            plan.grouping != nil ||
+            plan.ranking != nil ||
+            plan.responseShape == .rankedList ||
+            plan.responseShape == .groupedBreakdown {
+            return .groupedRanked
+        }
+
+        switch plan.operation {
+        case .sum, .average, .count, .minimum, .maximum:
+            return .aggregate
+        case .lookupDetails:
+            return .lookupDetail
+        case .compare:
+            return .comparison
+        case .rank, .trend, .listRows:
+            return .groupedRanked
+        case .forecast, .simulate:
+            return .scenario
+        }
+    }
+}
+
 struct MarinaSemanticQueryAdapter {
     func interpretationResult(from candidate: MarinaQueryPlanCandidate) -> MarinaInterpretationResult {
         if let hint = candidate.unsupportedHint,
@@ -234,6 +361,7 @@ struct MarinaSemanticQueryAdapter {
                             value: lookupRequest.searchText,
                             matchMode: .semanticOrAlias,
                             entityTypeHint: entityTypeHint(from: lookupRequest.objectTypes.first ?? .unknown),
+                            allowedEntityTypeHints: lookupRequest.objectTypes.compactMap { entityTypeHint(from: $0) },
                             sourceID: nil
                         )
                     ],
@@ -246,6 +374,40 @@ struct MarinaSemanticQueryAdapter {
                     ranking: nil,
                     limit: lookupRequest.limit,
                     averageBasis: nil,
+                    incomeStatusScope: incomeStatusScope(from: candidate),
+                    responseShape: .summaryCard
+                )
+            )
+        }
+
+        if let command = candidate.semanticCommand,
+           command.action == .lookupDetails {
+            return .query(
+                MarinaSemanticQuery(
+                    subject: subject(from: command.datasets.first),
+                    operation: .lookupDetails,
+                    filters: command.includeFilters.map { filter in
+                        let typeHint = filter.allowedTypes.count == 1 ? filter.allowedTypes[0] : nil
+                        return MarinaFilter(
+                            role: .primaryTarget,
+                            relationship: relationship(from: typeHint),
+                            value: filter.rawText,
+                            matchMode: .semanticOrAlias,
+                            entityTypeHint: typeHint,
+                            allowedEntityTypeHints: filter.allowedTypes.isEmpty ? nil : filter.allowedTypes,
+                            sourceID: nil
+                        )
+                    },
+                    amountField: nil,
+                    dateRange: command.dateRange.map {
+                        MarinaDateRangeRequest(role: .primary, rawText: nil, resolvedRange: $0, periodUnit: command.periodUnit)
+                    },
+                    comparisonDateRange: nil,
+                    grouping: nil,
+                    ranking: nil,
+                    limit: command.limit,
+                    averageBasis: nil,
+                    incomeStatusScope: command.incomeStatusScope ?? incomeStatusScope(from: candidate),
                     responseShape: .summaryCard
                 )
             )
@@ -265,7 +427,10 @@ struct MarinaSemanticQueryAdapter {
         let semantic = MarinaSemanticQuery(
             subject: subject(from: measure, candidate: candidate),
             operation: semanticOperation(from: operation, measure: measure),
-            filters: filters(from: candidate.entityMentions),
+            filters: filters(
+                from: candidate.entityMentions,
+                subject: subject(from: measure, candidate: candidate)
+            ),
             amountField: amountField(from: measure),
             dateRange: dateRange(from: candidate.timeScopes, role: .primary)
                 ?? dateRange(from: candidate.timeScopes, role: .lookbackWindow),
@@ -274,6 +439,7 @@ struct MarinaSemanticQueryAdapter {
             ranking: candidate.ranking.map { MarinaRanking(direction: $0.direction, limit: $0.limit, rawText: $0.rawText) },
             limit: candidate.limit,
             averageBasis: averageBasis(from: candidate.grouping),
+            incomeStatusScope: incomeStatusScope(from: candidate),
             responseShape: candidate.responseShapeHint.flatMap(responseShape)
         )
         return .query(semantic)
@@ -290,38 +456,45 @@ struct MarinaSemanticQueryAdapter {
             grouping: semanticQuery.grouping.map { MarinaGroupingCandidate(dimension: $0.dimension, rawText: $0.rawText) },
             ranking: semanticQuery.ranking.map { MarinaRankingCandidate(direction: $0.direction, limit: $0.limit, rawText: $0.rawText) },
             limit: semanticQuery.limit,
+            incomeStatusScope: semanticQuery.incomeStatusScope,
             responseShape: semanticQuery.responseShape.flatMap(responseShapeHint)
         )
     }
 
+    private func subject(from dataset: MarinaSemanticCommandDataset?) -> MarinaSubject {
+        switch dataset {
+        case .variableExpenses:
+            return .variableExpenses
+        case .plannedExpenses:
+            return .plannedExpenses
+        case .income:
+            return .income
+        case .incomeSeries:
+            return .incomeSource
+        case .cards:
+            return .cards
+        case .categories:
+            return .categories
+        case .presets:
+            return .presets
+        case .budgets:
+            return .budgets
+        case .savingsLedger:
+            return .savingsLedgerEntries
+        case .reconciliation, .expenseAllocations:
+            return .reconciliationAccounts
+        case .importMerchantRules:
+            return .merchant
+        case .assistantAliasRules:
+            return .workspaces
+        case nil:
+            return .workspaces
+        }
+    }
+
     private func subject(from measure: MarinaCandidateMeasure, candidate: MarinaQueryPlanCandidate) -> MarinaSubject {
         if let dataset = candidate.semanticCommand?.datasets.first {
-            switch dataset {
-            case .variableExpenses:
-                return .variableExpenses
-            case .plannedExpenses:
-                return .plannedExpenses
-            case .income:
-                return .income
-            case .incomeSeries:
-                return .incomeSource
-            case .cards:
-                return .cards
-            case .categories:
-                return .categories
-            case .presets:
-                return .presets
-            case .budgets:
-                return .budgets
-            case .savingsLedger:
-                return .savingsLedgerEntries
-            case .reconciliation, .expenseAllocations:
-                return .reconciliationAccounts
-            case .importMerchantRules:
-                return .merchant
-            case .assistantAliasRules:
-                return .workspaces
-            }
+            return subject(from: dataset)
         }
 
         switch measure {
@@ -470,10 +643,14 @@ struct MarinaSemanticQueryAdapter {
         }
     }
 
-    private func filters(from mentions: [MarinaUnresolvedEntityMention]) -> [MarinaFilter] {
+    private func filters(from mentions: [MarinaUnresolvedEntityMention], subject: MarinaSubject) -> [MarinaFilter] {
         mentions.compactMap { mention in
             guard let rawText = mention.rawText?.trimmingCharacters(in: .whitespacesAndNewlines),
                   rawText.isEmpty == false else {
+                return nil
+            }
+            if subject == .income,
+               isReservedIncomeStatusWord(rawText) {
                 return nil
             }
             return MarinaFilter(
@@ -483,9 +660,48 @@ struct MarinaSemanticQueryAdapter {
                 value: rawText,
                 matchMode: .semanticOrAlias,
                 entityTypeHint: mention.typeHint,
+                allowedEntityTypeHints: mention.allowedTypeHints,
                 sourceID: nil
             )
         }
+    }
+
+    private func isReservedIncomeStatusWord(_ value: String) -> Bool {
+        let normalized = value
+            .lowercased()
+            .replacingOccurrences(of: "[^a-z0-9\\s]", with: " ", options: .regularExpression)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return ["actual", "planned", "received", "expected", "projected"].contains(normalized)
+    }
+
+    private func incomeStatusScope(from candidate: MarinaQueryPlanCandidate) -> MarinaIncomeStatusScope? {
+        if let commandScope = candidate.semanticCommand?.incomeStatusScope {
+            return commandScope
+        }
+        guard candidate.measure == .income || candidate.semanticCommand?.datasets.contains(.income) == true else {
+            return nil
+        }
+        return incomeStatusScope(from: candidate.rawPrompt)
+    }
+
+    private func incomeStatusScope(from rawText: String) -> MarinaIncomeStatusScope? {
+        let normalized = rawText
+            .lowercased()
+            .replacingOccurrences(of: "[^a-z0-9\\s]", with: " ", options: .regularExpression)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if normalized.contains("planned income")
+            || normalized.contains("expected income")
+            || normalized.contains("projected income") {
+            return .planned
+        }
+        if normalized.contains("actual income")
+            || normalized.contains("received income")
+            || normalized.contains("income received") {
+            return .actual
+        }
+        return normalized.contains("income") ? .all : nil
     }
 
     private func aggregationTarget(from filter: MarinaFilter) -> MarinaResolvedAggregationTarget {

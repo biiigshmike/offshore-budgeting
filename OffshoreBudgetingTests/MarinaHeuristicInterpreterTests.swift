@@ -65,6 +65,9 @@ struct MarinaHeuristicInterpreterTests {
     @Test func heuristic_workspaceAggregationPrompts_emitSummaryCardCandidates() {
         let cases: [(String, MarinaCandidateOperation, MarinaCandidateMeasure, MarinaGroupingDimensionCandidate?)] = [
             ("What income came in this month?", .sum, .income, nil),
+            ("What is my actual income this month?", .sum, .income, nil),
+            ("What is my planned income this month?", .sum, .income, nil),
+            ("What is my income so far this month?", .sum, .income, nil),
             ("What paid me the most this month?", .rank, .income, .incomeSource),
             ("Show income by source.", .rank, .income, .incomeSource),
             ("Compare income this month to last month.", .compare, .income, nil),

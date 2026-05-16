@@ -8,6 +8,7 @@ enum MarinaSharedPipelineFallbackReason: String, Codable, Equatable {
     case modelInvalidStructuredOutput
     case modelTimedOut
     case modelUnsupportedHeuristicExactMatch
+    case modelClarificationHeuristicExactMatch
     case droppedExplicitConstraint
     case validationDidNotProduceExecutablePlan
     case clarificationBridgeUnavailable
@@ -33,6 +34,7 @@ enum MarinaInterpreterSelectionReason: String, Codable, Equatable {
     case modelServiceFailed
     case modelTimedOut
     case modelUnsupportedHeuristicExactMatch
+    case modelClarificationHeuristicExactMatch
     case clarificationResume
 }
 
@@ -64,6 +66,8 @@ struct MarinaSharedPipelineTrace: Codable, Equatable {
     let selectionRank: Int?
     let rejectedReason: String?
     let operationPreserved: Bool?
+    let turnClassification: MarinaPromptTurnClassification
+    let priorContextIncluded: Bool
 
     init(
         sharedPipelineEnabled: Bool,
@@ -92,7 +96,9 @@ struct MarinaSharedPipelineTrace: Codable, Equatable {
         disagreementSummary: String? = nil,
         selectionRank: Int? = nil,
         rejectedReason: String? = nil,
-        operationPreserved: Bool? = nil
+        operationPreserved: Bool? = nil,
+        turnClassification: MarinaPromptTurnClassification = .freshQuestion,
+        priorContextIncluded: Bool = false
     ) {
         self.sharedPipelineEnabled = sharedPipelineEnabled
         self.aiOptInEnabled = aiOptInEnabled
@@ -121,6 +127,8 @@ struct MarinaSharedPipelineTrace: Codable, Equatable {
         self.selectionRank = selectionRank
         self.rejectedReason = rejectedReason
         self.operationPreserved = operationPreserved
+        self.turnClassification = turnClassification
+        self.priorContextIncluded = priorContextIncluded
     }
 
     var compactSummary: String {
@@ -150,7 +158,9 @@ struct MarinaSharedPipelineTrace: Codable, Equatable {
             disagreementSummary.map { "disagreement=\($0)" },
             selectionRank.map { "selectionRank=\($0)" },
             rejectedReason.map { "rejected=\($0)" },
-            operationPreserved.map { "operationPreserved=\($0)" }
+            operationPreserved.map { "operationPreserved=\($0)" },
+            "turn=\(turnClassification.rawValue)",
+            "priorContext=\(priorContextIncluded)"
         ]
         .compactMap { $0 }
         .joined(separator: " | ")
@@ -163,6 +173,7 @@ struct MarinaSharedPipelineContext {
     let defaultPeriodUnit: HomeQueryPeriodUnit
     let sharedPipelineEnabled: Bool
     let aiOptInEnabled: Bool
+    let turnClassification: MarinaPromptTurnClassification
     let now: Date
 
     init(
@@ -171,14 +182,35 @@ struct MarinaSharedPipelineContext {
         defaultPeriodUnit: HomeQueryPeriodUnit,
         sharedPipelineEnabled: Bool,
         aiOptInEnabled: Bool,
+        turnClassification: MarinaPromptTurnClassification = .freshQuestion,
         now: Date = Date()
     ) {
         self.provider = provider
-        self.routerContext = routerContext
+        self.routerContext = routerContext.sanitized(for: turnClassification)
         self.defaultPeriodUnit = defaultPeriodUnit
         self.sharedPipelineEnabled = sharedPipelineEnabled
         self.aiOptInEnabled = aiOptInEnabled
+        self.turnClassification = turnClassification
         self.now = now
+    }
+}
+
+extension MarinaLanguageRouterContext {
+    func sanitized(for turnClassification: MarinaPromptTurnClassification) -> MarinaLanguageRouterContext {
+        guard turnClassification != .followUp else { return self }
+        return MarinaLanguageRouterContext(
+            workspaceName: workspaceName,
+            defaultPeriodUnit: defaultPeriodUnit,
+            sessionContext: sessionContext,
+            priorQueryContext: .empty,
+            cardNames: cardNames,
+            categoryNames: categoryNames,
+            incomeSourceNames: incomeSourceNames,
+            presetTitles: presetTitles,
+            budgetNames: budgetNames,
+            aliasSummaries: aliasSummaries,
+            now: now
+        )
     }
 }
 

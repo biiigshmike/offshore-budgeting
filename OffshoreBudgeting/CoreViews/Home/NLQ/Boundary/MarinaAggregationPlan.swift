@@ -48,6 +48,7 @@ struct MarinaAggregationPlan: Codable, Equatable, Identifiable {
     let grouping: MarinaGroupingCandidate?
     let ranking: MarinaRankingCandidate?
     let limit: Int?
+    let incomeStatusScope: MarinaIncomeStatusScope?
     let responseShape: MarinaResponseShapeHint?
 
     init(
@@ -61,6 +62,7 @@ struct MarinaAggregationPlan: Codable, Equatable, Identifiable {
         grouping: MarinaGroupingCandidate? = nil,
         ranking: MarinaRankingCandidate? = nil,
         limit: Int? = nil,
+        incomeStatusScope: MarinaIncomeStatusScope? = nil,
         responseShape: MarinaResponseShapeHint? = nil
     ) {
         self.id = id
@@ -73,6 +75,7 @@ struct MarinaAggregationPlan: Codable, Equatable, Identifiable {
         self.grouping = grouping
         self.ranking = ranking
         self.limit = limit
+        self.incomeStatusScope = incomeStatusScope
         self.responseShape = responseShape
     }
 }

@@ -6,6 +6,8 @@ func sharedContext(
     fixture: MarinaPhase5Fixture,
     sharedPipelineEnabled: Bool = true,
     aiOptInEnabled: Bool = false,
+    turnClassification: MarinaPromptTurnClassification = .freshQuestion,
+    priorQueryContext: MarinaPriorQueryContext = .empty,
     now: Date = sharedPipelineDate(2026, 5, 15)
 ) -> MarinaSharedPipelineContext {
     MarinaSharedPipelineContext(
@@ -14,15 +16,7 @@ func sharedContext(
             workspaceName: fixture.workspace.name,
             defaultPeriodUnit: .month,
             sessionContext: HomeAssistantSessionContext(),
-            priorQueryContext: MarinaPriorQueryContext(
-                lastQueryPlan: nil,
-                lastMetric: nil,
-                lastTargetName: nil,
-                lastTargetType: nil,
-                lastDateRange: nil,
-                lastResultLimit: nil,
-                lastPeriodUnit: nil
-            ),
+            priorQueryContext: priorQueryContext,
             cardNames: ["Apple Card", "Backup Card"],
             categoryNames: ["Groceries", "Travel"],
             incomeSourceNames: ["Salary"],
@@ -34,6 +28,7 @@ func sharedContext(
         defaultPeriodUnit: .month,
         sharedPipelineEnabled: sharedPipelineEnabled,
         aiOptInEnabled: aiOptInEnabled,
+        turnClassification: turnClassification,
         now: now
     )
 }
@@ -69,4 +64,3 @@ struct SharedPipelineThrowingStructuredInterpreter: MarinaStructuredIntentInterp
         throw MarinaFoundationModelsServiceError.malformedResponse
     }
 }
-

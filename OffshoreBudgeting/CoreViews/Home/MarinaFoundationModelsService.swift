@@ -453,8 +453,31 @@ private func makeSemanticCommand(from flat: MarinaFoundationModelsFlatResponse) 
         comparisonDateRange: makeDateRange(start: flat.queryComparisonDateStart, end: flat.queryComparisonDateEnd),
         periodUnit: periodUnit,
         limit: flat.queryResultLimit,
+        incomeStatusScope: incomeStatusScope(from: flat),
         requestedDetail: flat.semanticRequestedDetailRaw.flatMap(MarinaSemanticRequestedDetail.init(rawValue:))
     )
+}
+
+@available(iOS 26.0, macOS 26.0, *)
+private func incomeStatusScope(from flat: MarinaFoundationModelsFlatResponse) -> MarinaIncomeStatusScope? {
+    guard flat.semanticDatasetsRaw.contains(MarinaSemanticCommandDataset.income.rawValue)
+        || flat.queryMetricRaw?.localizedCaseInsensitiveContains("income") == true else {
+        return nil
+    }
+    if let isPlannedIncome = flat.isPlannedIncome {
+        return isPlannedIncome ? .planned : .actual
+    }
+    let joined = ([flat.queryTargetName, flat.semanticMeasureRaw, flat.queryMetricRaw] + flat.semanticIncludeFilterTexts)
+        .compactMap { $0 }
+        .joined(separator: " ")
+        .lowercased()
+    if joined.contains("planned") || joined.contains("expected") || joined.contains("projected") {
+        return .planned
+    }
+    if joined.contains("actual") || joined.contains("received") {
+        return .actual
+    }
+    return nil
 }
 
 @available(iOS 26.0, macOS 26.0, *)
@@ -472,25 +495,12 @@ private func semanticFilters(texts: [String], types: [String]) -> [MarinaSemanti
 
 @available(iOS 26.0, macOS 26.0, *)
 private func makeDateRange(start: String?, end: String?) -> HomeQueryDateRange? {
-    guard let startDate = makeDate(start),
-          let endDate = makeDate(end) else {
-        return nil
-    }
-    return HomeQueryDateRange(startDate: startDate, endDate: endDate)
-}
-
-@available(iOS 26.0, macOS 26.0, *)
-private func makeDate(_ value: String?) -> Date? {
-    guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines),
-          value.isEmpty == false else {
-        return nil
-    }
-
     var calendar = Calendar(identifier: .gregorian)
     calendar.timeZone = TimeZone(secondsFromGMT: 0)!
-    let parts = value.split(separator: "-").compactMap { Int($0) }
-    guard parts.count == 3 else { return nil }
-    return calendar.date(from: DateComponents(year: parts[0], month: parts[1], day: parts[2]))
+    return MarinaDateResolver(calendar: calendar).resolveExplicitRange(
+        start: start,
+        end: end
+    )?.queryDateRange
 }
 
 @available(iOS 26.0, macOS 26.0, *)

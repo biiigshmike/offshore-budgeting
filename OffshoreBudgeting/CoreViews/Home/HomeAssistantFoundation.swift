@@ -188,7 +188,7 @@ struct HomeAssistantPanelView: View {
     @AppStorage("debug_marina_nlq_v1_enabled")
     private var marinaNLQv1Enabled: Bool = false
     @AppStorage("debug_marina_shared_pipeline_enabled")
-    private var marinaSharedPipelineEnabled: Bool = false
+    private var marinaSharedPipelineEnabled: Bool = true
     @AppStorage("marina_ai_opt_in_enabled")
     private var marinaAIOptInEnabled: Bool = false
 
@@ -1501,13 +1501,47 @@ struct HomeAssistantPanelView: View {
         }
 
         let runtimeSettings = marinaRuntimeSettings
+        let turnClassifier = MarinaPromptTurnClassifier(
+            commandGuard: HomeAssistantSharedPipelineCommandGuard(commandParser: commandParser)
+        )
+        let turnClassification = turnClassifier.classify(
+            prompt,
+            defaultPeriodUnit: defaultQueryPeriodUnit,
+            hasActiveClarification: sharedPipelineClarification != nil || nlqClarificationPayload != nil
+        )
 
-        if runtimeSettings.nlqV1.isEnabled, let nlqPayload = nlqClarificationPayload {
+        if runtimeSettings.sharedPipeline.isEnabled == false,
+           runtimeSettings.nlqV1.isEnabled,
+           let nlqPayload = nlqClarificationPayload {
             handleNLQClarificationInput(prompt, payload: nlqPayload)
             return
         }
 
         if handleClarificationRejection(prompt) {
+            return
+        }
+
+        if let clarification = sharedPipelineClarification {
+            if turnClassification == .freshQuestion || turnClassification == .command {
+                sharedPipelineClarification = nil
+            } else {
+                Task {
+                    await handleSharedPipelineClarificationChoice(
+                        sharedPipelineTypedChoice(from: prompt, clarification: clarification),
+                        clarification: clarification
+                    )
+                }
+                return
+            }
+        }
+
+        if let clarification = sharedPipelineClarification {
+            Task {
+                await handleSharedPipelineClarificationChoice(
+                    sharedPipelineTypedChoice(from: prompt, clarification: clarification),
+                    clarification: clarification
+                )
+            }
             return
         }
         
@@ -1520,15 +1554,26 @@ struct HomeAssistantPanelView: View {
             return
         }
 
-        if resolvePendingWhatIfFollowUp(with: prompt) {
+        if let command = HomeAssistantSharedPipelineCommandGuard(commandParser: commandParser).command(
+            for: prompt,
+            defaultPeriodUnit: defaultQueryPeriodUnit
+        ) {
+            handleInterpretedRequest(.command(command, source: .parser), rawPrompt: prompt)
             return
         }
 
-        if handleWhatIfPrompt(prompt) {
-            return
+        if runtimeSettings.sharedPipeline.isEnabled == false {
+            if resolvePendingWhatIfFollowUp(with: prompt) {
+                return
+            }
+
+            if handleWhatIfPrompt(prompt) {
+                return
+            }
         }
 
-        if runtimeSettings.nlqV1.isEnabled == false {
+        if runtimeSettings.sharedPipeline.isEnabled == false,
+           runtimeSettings.nlqV1.isEnabled == false {
             if handleAnchoredFollowUpPrompt(prompt) {
                 return
             }
@@ -1539,7 +1584,7 @@ struct HomeAssistantPanelView: View {
         }
 
         Task { @MainActor in
-            await interpretPrompt(prompt)
+            await interpretPrompt(prompt, turnClassification: turnClassification)
         }
     }
 
@@ -5495,7 +5540,10 @@ struct HomeAssistantPanelView: View {
     }
 
     @MainActor
-    private func interpretPrompt(_ prompt: String) async {
+    private func interpretPrompt(
+        _ prompt: String,
+        turnClassification: MarinaPromptTurnClassification
+    ) async {
         let runtimeSettings = marinaRuntimeSettings
         MarinaTraceRecorder.shared.begin(
             prompt: prompt,
@@ -5512,10 +5560,11 @@ struct HomeAssistantPanelView: View {
                 prompt: prompt,
                 context: MarinaSharedPipelineContext(
                     provider: provider,
-                    routerContext: makeMarinaRouterContext(),
+                    routerContext: makeMarinaRouterContext(turnClassification: turnClassification),
                     defaultPeriodUnit: defaultQueryPeriodUnit,
                     sharedPipelineEnabled: runtimeSettings.sharedPipeline.isEnabled,
                     aiOptInEnabled: runtimeSettings.aiOptIn.isEnabled,
+                    turnClassification: turnClassification,
                     now: Date()
                 )
             )
@@ -5584,7 +5633,7 @@ struct HomeAssistantPanelView: View {
 
         let interpreted = await languageRouter.interpret(
             prompt: prompt,
-            context: makeMarinaRouterContext(),
+            context: makeMarinaRouterContext(turnClassification: turnClassification),
             heuristicFallback: {
                 heuristicInterpretedRequest(for: prompt)
             }
@@ -5691,13 +5740,14 @@ struct HomeAssistantPanelView: View {
         rawPrompt: String,
         source: HomeAssistantPlanResolutionSource
     ) {
-        sharedPipelineClarification = clarification
-        clarificationSuggestions = clarification.choices.map { choice in
+        let actionable = clarification.isActionable(for: rawPrompt)
+        sharedPipelineClarification = actionable ? clarification : nil
+        clarificationSuggestions = actionable ? clarification.actionableChoices.map { choice in
             HomeAssistantSuggestion(
                 title: sharedPipelineChoiceTitle(choice),
                 query: HomeQuery(intent: .spendThisMonth)
             )
-        }
+        } : []
         recoverySuggestions = []
         lastClarificationReasons = [.lowConfidenceLanguage]
         activeClarificationContext = nil
@@ -5725,10 +5775,11 @@ struct HomeAssistantPanelView: View {
             choice: choice,
             context: MarinaSharedPipelineContext(
                 provider: provider,
-                routerContext: makeMarinaRouterContext(),
+                routerContext: makeMarinaRouterContext(turnClassification: .clarificationAnswer),
                 defaultPeriodUnit: defaultQueryPeriodUnit,
                 sharedPipelineEnabled: marinaRuntimeSettings.sharedPipeline.isEnabled,
                 aiOptInEnabled: marinaRuntimeSettings.aiOptIn.isEnabled,
+                turnClassification: .clarificationAnswer,
                 now: Date()
             )
         )
@@ -5767,6 +5818,20 @@ struct HomeAssistantPanelView: View {
     private func sharedPipelineChoiceTitle(_ choice: MarinaClarificationChoice) -> String {
         guard let type = choice.entityTypeHint else { return choice.title }
         return "\(choice.title) (\(type.rawValue))"
+    }
+
+    private func sharedPipelineTypedChoice(
+        from prompt: String,
+        clarification: MarinaTypedClarification
+    ) -> MarinaClarificationChoice {
+        MarinaClarificationChoice(
+            title: prompt,
+            entityRole: clarification.choices.first?.entityRole,
+            entityTypeHint: clarification.choices.first?.entityTypeHint,
+            patchSlot: clarification.patchSlot,
+            rawValue: prompt,
+            mentionID: clarification.choices.first?.mentionID
+        )
     }
 
     @MainActor
@@ -5890,21 +5955,24 @@ struct HomeAssistantPanelView: View {
         }
     }
 
-    private func makeMarinaRouterContext() -> MarinaLanguageRouterContext {
+    private func makeMarinaRouterContext(
+        turnClassification: MarinaPromptTurnClassification
+    ) -> MarinaLanguageRouterContext {
         let mostRecentAnswerContext = sessionContext.recentAnswerContexts.last
+        let priorQueryContext = MarinaPriorQueryContext(
+            lastQueryPlan: sessionContext.lastQueryPlan,
+            lastMetric: sessionContext.lastMetric,
+            lastTargetName: sessionContext.lastTargetName ?? mostRecentAnswerContext?.targetName,
+            lastTargetType: mostRecentAnswerContext?.targetType,
+            lastDateRange: sessionContext.lastDateRange,
+            lastResultLimit: sessionContext.lastResultLimit,
+            lastPeriodUnit: sessionContext.lastPeriodUnit
+        )
         return MarinaLanguageRouterContext(
             workspaceName: workspace.name,
             defaultPeriodUnit: defaultQueryPeriodUnit,
             sessionContext: sessionContext,
-            priorQueryContext: MarinaPriorQueryContext(
-                lastQueryPlan: sessionContext.lastQueryPlan,
-                lastMetric: sessionContext.lastMetric,
-                lastTargetName: sessionContext.lastTargetName ?? mostRecentAnswerContext?.targetName,
-                lastTargetType: mostRecentAnswerContext?.targetType,
-                lastDateRange: sessionContext.lastDateRange,
-                lastResultLimit: sessionContext.lastResultLimit,
-                lastPeriodUnit: sessionContext.lastPeriodUnit
-            ),
+            priorQueryContext: turnClassification == .followUp ? priorQueryContext : .empty,
             cardNames: cards.map(\.name).sorted(),
             categoryNames: categories.map(\.name).sorted(),
             incomeSourceNames: Array(Set(incomes.map(\.source))).sorted(),

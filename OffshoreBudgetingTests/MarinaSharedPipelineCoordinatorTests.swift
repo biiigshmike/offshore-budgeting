@@ -123,6 +123,144 @@ struct MarinaSharedPipelineCoordinatorTests {
         #expect(homeQueryPlan?.metric == .cardSpendTotal)
     }
 
+    @Test func coordinator_modelUnsupportedUsesHeuristicForFreshTemporalSpendPrompt() async throws {
+        let fixture = try makeFixture()
+        try fixture.seedSpendData()
+
+        for prompt in ["What did I spend last month?", "What did I spend last week?"] {
+            let result = await coordinator(
+                structuredInterpreter: SharedPipelineStubStructuredInterpreter(structuredIntent: .unresolved)
+            ).run(
+                prompt: prompt,
+                context: sharedContext(fixture: fixture, aiOptInEnabled: true)
+            )
+
+            guard case .handled(let answer, _, let homeQueryPlan, let trace) = result else {
+                Issue.record("Expected unsupported model output to use executable heuristic for \(prompt): \(workspaceAggregationDebugSummary(result))")
+                continue
+            }
+
+            #expect(answer.kind == .metric)
+            #expect(homeQueryPlan?.metric == .spendTotal)
+            #expect(trace.selectedPath == .sharedHeuristic)
+            #expect(trace.interpreterSelectionReason == .modelUnsupportedHeuristicExactMatch)
+            #expect(trace.turnClassification == .freshQuestion)
+            #expect(trace.priorContextIncluded == false)
+        }
+    }
+
+    @Test func coordinator_freshTurnSanitizesPriorContextBeforeFoundationModels() async throws {
+        let fixture = try makeFixture()
+        try fixture.seedSpendData()
+        let model = SharedPipelineCapturingStructuredInterpreter(structuredIntent: .unresolved)
+        let prior = MarinaPriorQueryContext(
+            lastQueryPlan: HomeQueryPlan(
+                metric: .spendTotal,
+                dateRange: nil,
+                resultLimit: nil,
+                confidenceBand: .high
+            ),
+            lastMetric: .spendTotal,
+            lastTargetName: "Groceries",
+            lastTargetType: .category,
+            lastDateRange: HomeQueryDateRange(
+                startDate: sharedPipelineDate(2026, 5, 1),
+                endDate: sharedPipelineDate(2026, 5, 31)
+            ),
+            lastResultLimit: 5,
+            lastPeriodUnit: .month
+        )
+
+        _ = await coordinator(structuredInterpreter: model).run(
+            prompt: "What did I spend last month?",
+            context: sharedContext(
+                fixture: fixture,
+                aiOptInEnabled: true,
+                turnClassification: .freshQuestion,
+                priorQueryContext: prior
+            )
+        )
+
+        #expect(model.observedPriorContext?.hasContext == false)
+    }
+
+    @Test func coordinator_modelClarificationUsesExecutableHeuristicForBroadSpendPrompt() async throws {
+        let fixture = try makeFixture()
+        try fixture.seedSpendData()
+        let prompt = "What did I spend this month?"
+        let model = SharedPipelineStubStructuredInterpreter(
+            structuredIntent: .query(
+                MarinaStructuredQueryIntent(
+                    metricRaw: "spendTotal",
+                    targetName: prompt,
+                    targetTypeRaw: "entity",
+                    dateStartISO8601: "2026-05-01",
+                    dateEndISO8601: "2026-05-31",
+                    comparisonDateStartISO8601: nil,
+                    comparisonDateEndISO8601: nil,
+                    resultLimit: nil,
+                    periodUnitRaw: "month",
+                    confidenceRaw: "high",
+                    clarification: nil
+                )
+            )
+        )
+
+        let result = await coordinator(structuredInterpreter: model).run(
+            prompt: prompt,
+            context: sharedContext(fixture: fixture, aiOptInEnabled: true)
+        )
+
+        guard case .handled(let answer, _, let homeQueryPlan, let trace) = result else {
+            Issue.record("Bad model clarification should be rescued by heuristic execution: \(workspaceAggregationDebugSummary(result))")
+            return
+        }
+        #expect(answer.kind == .metric)
+        #expect(homeQueryPlan?.metric == .spendTotal)
+        #expect(trace.selectedPath == .sharedHeuristic)
+        #expect(trace.selectedInterpreter == .heuristic)
+        #expect(trace.interpreterSelectionReason == .modelClarificationHeuristicExactMatch)
+        #expect(trace.modelAttempted == true)
+        #expect(trace.heuristicAttempted == true)
+        #expect(trace.heuristicUsedAsFallback == true)
+        #expect(trace.fallbackReason == .modelClarificationHeuristicExactMatch)
+    }
+
+    @Test func coordinator_echoedMissingTargetClarificationIsNotActionable() {
+        let prompt = "What did I spend last month?"
+        let clarification = MarinaTypedClarification(
+            kind: .missingTarget,
+            message: "I couldn't safely resolve that target.",
+            candidate: MarinaQueryPlanCandidate(source: .foundationModels, rawPrompt: prompt),
+            pendingSemanticQuery: MarinaSemanticQuery(
+                subject: .variableExpenses,
+                operation: .sum,
+                filters: [
+                    MarinaFilter(
+                        role: .filter,
+                        relationship: .unknown,
+                        value: prompt,
+                        entityTypeHint: .merchant
+                    )
+                ],
+                amountField: .spendingAmount
+            ),
+            patchSlot: .target,
+            choices: [
+                MarinaClarificationChoice(
+                    title: prompt,
+                    entityRole: .filter,
+                    entityTypeHint: .merchant,
+                    patchSlot: .target,
+                    rawValue: prompt
+                )
+            ]
+        )
+
+        #expect(clarification.isActionable(for: prompt) == false)
+        #expect(clarification.actionableChoices.isEmpty)
+    }
+
     @Test func coordinator_modelSelectedWhenOptedInAvailableAndExecutable() async throws {
         let fixture = try makeFixture()
         try fixture.seedSpendData()
@@ -468,7 +606,7 @@ struct MarinaSharedPipelineCoordinatorTests {
         #expect(card.rows.map(\.label) == ["Cannabis Purchase 2", "Cannabis Purchase 1"])
     }
 
-    @Test func coordinator_blocksBroaderQueryWhenModelAndFallbackDropExplicitConstraint() async throws {
+    @Test func coordinator_modelDroppingExplicitConstraintUsesHeuristicWhenHeuristicPreservesIt() async throws {
         let fixture = try makeFixture()
         fixture.context.insert(VariableExpense(descriptionText: "Groceries Purchase 1", amount: 40, transactionDate: sharedPipelineDate(2026, 5, 9), workspace: fixture.workspace, card: fixture.appleCard, category: fixture.groceries))
         fixture.context.insert(VariableExpense(descriptionText: "Groceries Purchase 2", amount: 50, transactionDate: sharedPipelineDate(2026, 5, 10), workspace: fixture.workspace, card: fixture.appleCard, category: fixture.groceries))
@@ -497,26 +635,26 @@ struct MarinaSharedPipelineCoordinatorTests {
             context: sharedContext(fixture: fixture, aiOptInEnabled: true)
         )
 
-        guard case .validationBlocked(let answer, let outcome, let trace) = result else {
-            Issue.record("Expected dropped explicit category constraint to block broad execution: \(workspaceAggregationDebugSummary(result))")
+        guard case .handled(let answer, let aggregationResult, let homeQueryPlan, let trace) = result else {
+            Issue.record("Expected heuristic to preserve explicit category constraint: \(workspaceAggregationDebugSummary(result))")
             return
         }
 
-        #expect(trace.selectedPath == .sharedFoundationModels)
-        #expect(trace.selectedInterpreter == .foundationModels)
-        #expect(trace.interpreterSelectionReason == .modelEligible)
+        #expect(trace.selectedPath == .sharedHeuristic)
+        #expect(trace.selectedInterpreter == .heuristic)
+        #expect(trace.interpreterSelectionReason == .modelUnsupportedHeuristicExactMatch)
         #expect(trace.modelAttempted == true)
         #expect(trace.heuristicAttempted == true)
-        #expect(trace.heuristicUsedAsFallback == false)
-        #expect(trace.fallbackReason == nil)
-        #expect(trace.validatorOutcomeSummary?.contains("unsupported") == true)
-        #expect(trace.responseShapeSummary == "unsupported")
-        #expect(answer.kind == .message)
-        guard case .unsupported(let unsupported) = outcome else {
-            Issue.record("Expected typed unsupported outcome.")
+        #expect(trace.heuristicUsedAsFallback == true)
+        #expect(trace.fallbackReason == .modelUnsupportedHeuristicExactMatch)
+        #expect(homeQueryPlan == nil)
+        #expect(answer.kind == .list)
+        #expect(trace.executorResultSummary?.contains("recentFilteredTransactions") == true)
+        guard case .workspaceCard(let card) = aggregationResult else {
+            Issue.record("Expected preserved category list result.")
             return
         }
-        #expect(unsupported.message.contains("category"))
+        #expect(card.rows.allSatisfy { $0.label.localizedCaseInsensitiveContains("Groceries") })
     }
 
     @Test func coordinator_constraintGuardBlocksBroaderExecutableInterpretation() async throws {
@@ -710,5 +848,22 @@ struct MarinaSharedPipelineCoordinatorTests {
         case .fallbackToLegacy(let trace):
             return "fallback trace=\(trace.compactSummary)"
         }
+    }
+}
+
+private final class SharedPipelineCapturingStructuredInterpreter: MarinaStructuredIntentInterpreting {
+    let structuredIntent: MarinaStructuredIntent
+    private(set) var observedPriorContext: MarinaPriorQueryContext?
+
+    init(structuredIntent: MarinaStructuredIntent) {
+        self.structuredIntent = structuredIntent
+    }
+
+    func interpret(
+        prompt: String,
+        context: MarinaLanguageRouterContext
+    ) async throws -> MarinaStructuredIntent {
+        observedPriorContext = context.priorQueryContext
+        return structuredIntent
     }
 }

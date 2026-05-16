@@ -472,7 +472,7 @@ struct HomeQueryEngine {
         return HomeAnswer(
             queryID: query.id,
             kind: .metric,
-            title: "Spend This Month",
+            title: spendTotalTitle(for: range, now: now),
             subtitle: rangeLabel(for: range),
             primaryValue: currency(total),
             rows: [
@@ -3316,6 +3316,34 @@ struct HomeQueryEngine {
         }
 
         return "\(shortDate(range.startDate)) - \(shortDate(range.endDate))"
+    }
+
+    private func spendTotalTitle(for range: HomeQueryDateRange, now: Date) -> String {
+        if isCurrentWeekToDate(range, now: now) {
+            return "Spend This Week"
+        }
+
+        if isFullMonth(range) {
+            let currentMonth = monthRange(containing: now)
+            if calendar.isDate(range.startDate, inSameDayAs: currentMonth.startDate) {
+                return "Spend This Month"
+            }
+
+            if let lastMonthDate = calendar.date(byAdding: .month, value: -1, to: now) {
+                let lastMonth = monthRange(containing: lastMonthDate)
+                if calendar.isDate(range.startDate, inSameDayAs: lastMonth.startDate) {
+                    return "Spend Last Month"
+                }
+            }
+        }
+
+        return "Spend Total"
+    }
+
+    private func isCurrentWeekToDate(_ range: HomeQueryDateRange, now: Date) -> Bool {
+        let currentWeek = weekRange(containing: now)
+        return calendar.isDate(range.startDate, inSameDayAs: currentWeek.startDate)
+            && range.endDate <= currentWeek.endDate
     }
 
     private func shortDate(_ date: Date) -> String {

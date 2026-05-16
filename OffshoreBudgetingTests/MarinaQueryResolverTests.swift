@@ -145,7 +145,7 @@ struct MarinaQueryResolverTests {
         let choiceTypes = resolved.ambiguousMentions[0].choices
             .compactMap(\.entityTypeHint?.rawValue)
             .sorted()
-        #expect(choiceTypes == ["card", "merchant"])
+        #expect(choiceTypes == ["card", "expense", "merchant"])
     }
 
     @Test func resolver_allowedTypesPreferExactCategoryOverExpensePrefixes() throws {
@@ -190,6 +190,49 @@ struct MarinaQueryResolverTests {
         #expect(resolved.resolvedTargets.first?.entityType == .category)
         #expect(resolved.resolvedTargets.first?.displayName == "Cannabis")
         #expect(resolved.ambiguousMentions.isEmpty)
+    }
+
+    @Test func semanticResolver_allowedTypesPreferExactCategoryOverExpensePrefixes() throws {
+        let fixture = try makeFixture()
+        let cannabis = Category(name: "Cannabis", hexColor: "#225522", workspace: fixture.workspace)
+        let card = Card(name: "Apple Card", workspace: fixture.workspace)
+        fixture.context.insert(cannabis)
+        fixture.context.insert(card)
+        fixture.context.insert(VariableExpense(
+            descriptionText: "Cannabis Purchase 1",
+            amount: 40,
+            transactionDate: Date(),
+            workspace: fixture.workspace,
+            card: card,
+            category: cannabis
+        ))
+        try fixture.context.save()
+
+        let query = MarinaSemanticQuery(
+            subject: .variableExpenses,
+            operation: .list,
+            filters: [
+                MarinaFilter(
+                    role: .filter,
+                    relationship: .unknown,
+                    value: "Cannabis",
+                    entityTypeHint: nil,
+                    allowedEntityTypeHints: [.category, .merchant, .expense]
+                )
+            ],
+            amountField: .budgetImpactAmount,
+            grouping: MarinaGrouping(dimension: .transaction, rawText: nil),
+            ranking: MarinaRanking(direction: .newest, limit: 5, rawText: nil),
+            limit: 5,
+            responseShape: .rankedList
+        )
+
+        let resolved = MarinaQueryResolver().resolve(query: query, provider: fixture.provider)
+
+        #expect(resolved.resolvedFilters.count == 1)
+        #expect(resolved.resolvedFilters.first?.entityType == .category)
+        #expect(resolved.resolvedFilters.first?.displayName == "Cannabis")
+        #expect(resolved.ambiguousFilters.isEmpty)
     }
 
     @Test func resolver_allowedTypesStillClarifiesMultipleExactEntityTypes() throws {
@@ -334,6 +377,39 @@ struct MarinaQueryResolverTests {
         #expect(titles.contains("target grocery"))
     }
 
+    @Test func resolver_crossFamilySpendTargetKeepsRepresentativeExpenseChoices() throws {
+        let fixture = try makeFixture()
+        let card = Card(name: "Apple Card", workspace: fixture.workspace)
+        fixture.context.insert(card)
+        fixture.context.insert(VariableExpense(
+            descriptionText: "Apple Watch",
+            amount: 25.0,
+            transactionDate: Date(),
+            workspace: fixture.workspace,
+            card: card,
+            category: nil
+        ))
+        try fixture.context.save()
+
+        let candidate = MarinaQueryPlanCandidate(
+            source: .heuristic,
+            rawPrompt: "What did I spend at Apple?",
+            operation: .sum,
+            measure: .spend,
+            entityMentions: [
+                MarinaUnresolvedEntityMention(role: .primaryTarget, rawText: "Apple", typeHint: nil)
+            ],
+            confidence: .high
+        )
+
+        let resolved = MarinaQueryResolver().resolve(candidate: candidate, provider: fixture.provider)
+        let choiceTypes = resolved.ambiguousMentions.first?.choices.compactMap(\.entityTypeHint) ?? []
+
+        #expect(choiceTypes.contains(.card))
+        #expect(choiceTypes.contains(.merchant))
+        #expect(choiceTypes.contains(.expense))
+    }
+
     @Test func resolver_typeHintMerchantResolvesCrossDomainName() throws {
         let fixture = try makeFixture()
         fixture.context.insert(Category(name: "Starbucks", hexColor: "#22AA44", workspace: fixture.workspace))
@@ -426,6 +502,29 @@ struct MarinaQueryResolverTests {
         #expect(resolved.resolvedFilters.first?.sourceID != otherGroceries.id)
     }
 
+    @Test func semanticResolver_resolvesRawDateTextCentrally() throws {
+        let fixture = try makeFixture()
+        let query = MarinaSemanticQuery(
+            subject: .variableExpenses,
+            operation: .compare,
+            amountField: .budgetImpactAmount,
+            dateRange: MarinaDateRangeRequest(role: .primary, rawText: "May 2026", periodUnit: .month),
+            comparisonDateRange: MarinaDateRangeRequest(role: .comparison, rawText: "last month", periodUnit: .month)
+        )
+
+        let resolved = MarinaQueryResolver().resolve(
+            query: query,
+            provider: fixture.provider,
+            now: date(2026, 5, 15),
+            defaultPeriodUnit: .month
+        )
+
+        #expect(resolved.primaryDateRange?.startDate == date(2026, 5, 1))
+        #expect(resolved.primaryDateRange?.endDate == date(2026, 5, 31, 23, 59, 59))
+        #expect(resolved.comparisonDateRange?.startDate == date(2026, 4, 1))
+        #expect(resolved.comparisonDateRange?.endDate == date(2026, 4, 30, 23, 59, 59))
+    }
+
     private struct Fixture {
         let context: ModelContext
         let workspace: Workspace
@@ -470,5 +569,26 @@ struct MarinaQueryResolverTests {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: schema, configurations: config)
         return ModelContext(container)
+    }
+
+    private func date(
+        _ year: Int,
+        _ month: Int,
+        _ day: Int,
+        _ hour: Int = 0,
+        _ minute: Int = 0,
+        _ second: Int = 0
+    ) -> Date {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .gmt
+        var components = DateComponents()
+        components.year = year
+        components.month = month
+        components.day = day
+        components.hour = hour
+        components.minute = minute
+        components.second = second
+        components.timeZone = calendar.timeZone
+        return calendar.date(from: components) ?? .distantPast
     }
 }

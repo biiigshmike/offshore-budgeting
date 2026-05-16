@@ -255,7 +255,40 @@ struct MarinaSemanticCommand: Codable, Equatable, Sendable {
     let comparisonDateRange: HomeQueryDateRange?
     let periodUnit: HomeQueryPeriodUnit?
     let limit: Int?
+    let incomeStatusScope: MarinaIncomeStatusScope?
     let requestedDetail: MarinaSemanticRequestedDetail?
+
+    init(
+        family: MarinaRequestFamily,
+        action: MarinaSemanticCommandAction,
+        datasets: [MarinaSemanticCommandDataset],
+        measure: MarinaCandidateMeasure? = nil,
+        includeFilters: [MarinaSemanticCommandFilter] = [],
+        excludeFilters: [MarinaSemanticCommandFilter] = [],
+        grouping: MarinaGroupingDimensionCandidate? = nil,
+        sort: MarinaSemanticCommandSort? = nil,
+        dateRange: HomeQueryDateRange? = nil,
+        comparisonDateRange: HomeQueryDateRange? = nil,
+        periodUnit: HomeQueryPeriodUnit? = nil,
+        limit: Int? = nil,
+        incomeStatusScope: MarinaIncomeStatusScope? = nil,
+        requestedDetail: MarinaSemanticRequestedDetail? = nil
+    ) {
+        self.family = family
+        self.action = action
+        self.datasets = datasets
+        self.measure = measure
+        self.includeFilters = includeFilters
+        self.excludeFilters = excludeFilters
+        self.grouping = grouping
+        self.sort = sort
+        self.dateRange = dateRange
+        self.comparisonDateRange = comparisonDateRange
+        self.periodUnit = periodUnit
+        self.limit = limit
+        self.incomeStatusScope = incomeStatusScope
+        self.requestedDetail = requestedDetail
+    }
 }
 
 enum MarinaUnsupportedHint: String, Codable, Equatable, Sendable {

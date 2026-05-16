@@ -51,6 +51,7 @@ struct MarinaQueryValidator {
                 .ambiguousTarget,
                 message: "I found multiple possible matches for that target.",
                 candidate: candidate,
+                patchSlot: .target,
                 choices: ambiguous.choices
             )
         }
@@ -65,6 +66,7 @@ struct MarinaQueryValidator {
                         title: unresolvedMention.rawText ?? "Target",
                         entityRole: unresolvedMention.role,
                         entityTypeHint: unresolvedMention.typeHint,
+                        patchSlot: .target,
                         rawValue: unresolvedMention.rawText,
                         mentionID: unresolvedMention.id
                     )
@@ -120,6 +122,7 @@ struct MarinaQueryValidator {
                 grouping: candidate.grouping,
                 ranking: candidate.ranking,
                 limit: candidate.limit,
+                incomeStatusScope: incomeStatusScope(from: candidate, measure: measure),
                 responseShape: responseShape(operation: operation, measure: measure, candidate: candidate)
             )
         )
@@ -154,6 +157,8 @@ struct MarinaQueryValidator {
                 .ambiguousTarget,
                 message: "I found multiple possible matches for that target.",
                 candidate: candidate,
+                pendingSemanticQuery: query,
+                patchSlot: .target,
                 choices: ambiguous.choices
             )
         }
@@ -164,11 +169,14 @@ struct MarinaQueryValidator {
                 .missingTarget,
                 message: "I couldn't safely resolve that target.",
                 candidate: candidate,
+                pendingSemanticQuery: query,
+                patchSlot: .target,
                 choices: [
                     MarinaClarificationChoice(
                         title: unresolved.value.isEmpty ? "Target" : unresolved.value,
                         entityRole: mentionRole(from: unresolved.role),
                         entityTypeHint: unresolved.entityTypeHint,
+                        patchSlot: .target,
                         rawValue: unresolved.value,
                         mentionID: unresolved.id
                     )
@@ -182,7 +190,9 @@ struct MarinaQueryValidator {
             return clarification(
                 .missingTarget,
                 message: "I need a target before I can answer that safely.",
-                candidate: candidate
+                candidate: candidate,
+                pendingSemanticQuery: query,
+                patchSlot: .target
             )
         }
 
@@ -217,7 +227,9 @@ struct MarinaQueryValidator {
             return clarification(
                 .missingDateRange,
                 message: "I need the comparison period before I can answer that safely.",
-                candidate: candidate
+                candidate: candidate,
+                pendingSemanticQuery: query,
+                patchSlot: .comparison
             )
         }
 
@@ -248,6 +260,7 @@ struct MarinaQueryValidator {
             grouping: basePlan.grouping,
             ranking: basePlan.ranking,
             limit: basePlan.limit,
+            incomeStatusScope: basePlan.incomeStatusScope,
             responseShape: basePlan.responseShape ?? responseShape(operation: basePlan.operation, measure: basePlan.measure, candidate: candidate)
         )
 
@@ -360,6 +373,8 @@ struct MarinaQueryValidator {
         _ kind: MarinaClarificationKind,
         message: String,
         candidate: MarinaQueryPlanCandidate,
+        pendingSemanticQuery: MarinaSemanticQuery? = nil,
+        patchSlot: MarinaClarificationPatchSlot? = nil,
         choices: [MarinaClarificationChoice] = []
     ) -> MarinaPlanValidationOutcome {
         .clarification(
@@ -367,6 +382,8 @@ struct MarinaQueryValidator {
                 kind: kind,
                 message: message,
                 candidate: candidate,
+                pendingSemanticQuery: pendingSemanticQuery,
+                patchSlot: patchSlot,
                 choices: choices
             )
         )
@@ -570,7 +587,7 @@ struct MarinaQueryValidator {
                     role: mentionRole(from: filter.role),
                     rawText: filter.value,
                     typeHint: filter.entityTypeHint,
-                    allowedTypeHints: filter.entityTypeHint.map { [$0] },
+                    allowedTypeHints: filter.allowedEntityTypeHints ?? filter.entityTypeHint.map { [$0] },
                     confidence: .medium
                 )
             },
@@ -604,6 +621,32 @@ struct MarinaQueryValidator {
         value
             .lowercased()
             .replacingOccurrences(of: "[^a-z0-9]", with: "", options: .regularExpression)
+    }
+
+    private func incomeStatusScope(
+        from candidate: MarinaQueryPlanCandidate,
+        measure: MarinaCandidateMeasure
+    ) -> MarinaIncomeStatusScope? {
+        if let semanticScope = candidate.semanticCommand?.incomeStatusScope {
+            return semanticScope
+        }
+        guard measure == .income else { return nil }
+        let normalized = candidate.rawPrompt
+            .lowercased()
+            .replacingOccurrences(of: "[^a-z0-9\\s]", with: " ", options: .regularExpression)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if normalized.contains("planned income")
+            || normalized.contains("expected income")
+            || normalized.contains("projected income") {
+            return .planned
+        }
+        if normalized.contains("actual income")
+            || normalized.contains("received income")
+            || normalized.contains("income received") {
+            return .actual
+        }
+        return normalized.contains("income") ? .all : nil
     }
 }
 

@@ -72,7 +72,7 @@
     },
     {
       "actualMetricOperation" : "spendTotal | sum",
-      "actualPrimaryDateRange" : "2026-04-26..2026-05-03",
+      "actualPrimaryDateRange" : "2026-05-03..2026-05-10",
       "actualTarget" : "",
       "aggregationPath" : "single_home_query_engine",
       "expectedEntityScope" : "global",
@@ -110,6 +110,7 @@
     },
     {
       "actualMetricOperation" : "categorySpendTotal | sum",
+      "actualPrimaryDateRange" : "2026-05-01..2026-06-01",
       "actualTarget" : "Food & Drink",
       "aggregationPath" : "single_home_query_engine",
       "expectedEntityScope" : "category",
@@ -188,6 +189,7 @@
     },
     {
       "actualMetricOperation" : "monthComparison | difference",
+      "actualPrimaryDateRange" : "2026-05-01..2026-06-01",
       "actualTarget" : "Food & Drink",
       "aggregationPath" : "single_home_query_engine",
       "expectedComparisonDateRange" : "previous_period",
@@ -351,9 +353,9 @@
       "verdictRaw" : "metric\/operation mapping failure"
     },
     {
-      "actualMetricOperation" : "",
-      "actualTarget" : "average grocery spending",
-      "aggregationPath" : "none",
+      "actualMetricOperation" : "spendAveragePerPeriod | average",
+      "actualTarget" : "",
+      "aggregationPath" : "single_home_query_engine",
       "expectedEntityScope" : "category",
       "expectedMeasure" : "categoryAverageSpend",
       "expectedOperation" : "average",
@@ -365,8 +367,8 @@
       "likelySmallestFix" : "add explicit average-by-target mapping metric",
       "mode" : "nlq_authoritative",
       "prompt" : "What is my average grocery spending?",
-      "responseType" : "clarification",
-      "selectedRoute" : "clarification",
+      "responseType" : "message",
+      "selectedRoute" : "nlq",
       "verdictRaw" : "metric\/operation mapping failure"
     },
     {
@@ -389,9 +391,9 @@
       "verdictRaw" : "metric\/operation mapping failure"
     },
     {
-      "actualMetricOperation" : "",
-      "actualTarget" : "food & drink",
-      "aggregationPath" : "none",
+      "actualMetricOperation" : "spendAveragePerPeriod | average",
+      "actualTarget" : "Food & Drink",
+      "aggregationPath" : "single_home_query_engine",
       "expectedEntityScope" : "category",
       "expectedMeasure" : "categoryAverageSpend",
       "expectedOperation" : "average",
@@ -403,8 +405,8 @@
       "likelySmallestFix" : "add explicit average-by-target mapping metric",
       "mode" : "nlq_authoritative",
       "prompt" : "What do I usually spend on Food & Drink per month?",
-      "responseType" : "clarification",
-      "selectedRoute" : "clarification",
+      "responseType" : "message",
+      "selectedRoute" : "nlq",
       "verdictRaw" : "metric\/operation mapping failure"
     },
     {
@@ -721,7 +723,7 @@
     },
     {
       "actualMetricOperation" : "",
-      "actualPrimaryDateRange" : "2026-05-08..2026-05-09",
+      "actualPrimaryDateRange" : "2026-05-15..2026-05-16",
       "actualTarget" : "if i buy something for 120",
       "aggregationPath" : "none",
       "expectedEntityScope" : "global",
@@ -782,7 +784,7 @@
       "actualComparisonDateRange" : "2026-04-01..2026-05-01",
       "actualMetricOperation" : "operation=compare | measure=spend",
       "actualPrimaryDateRange" : "2026-05-01..2026-06-01",
-      "actualTarget" : "primaryTarget:category:Food & Drink:84A5FCAC-151C-4E42-A433-E0FA20D22D72",
+      "actualTarget" : "primaryTarget:category:Food & Drink:52F56209-AEEB-4B78-B148-035ACE20F953",
       "aggregationPath" : "shared_pipeline",
       "expectedComparisonDateRange" : "normal_baseline",
       "expectedEntityScope" : "category",
@@ -796,20 +798,20 @@
       "likelySmallestFix" : "none",
       "mode" : "shared_pipeline_heuristic",
       "prompt" : "Am I spending more on food lately, or is it about normal?",
-      "responseType" : "kind=message,title=Category Comparison (Food & Drink),rows=0",
+      "responseType" : "kind=message,title=Category Comparison (Food & Drink),rows=0,responseShape=comparison,suggestions=2",
       "selectedRoute" : "sharedHeuristic",
       "sharedAggregationPlanSummary" : "operation=compare,measure=spend,targets=primaryTarget:category:Food & Drink,primary=2026-05-01..2026-06-01,comparison=2026-04-01..2026-05-01,grouping=category,ranking=nil,shape=comparison",
       "sharedCandidateMeasure" : "spend",
       "sharedCandidateOperation" : "compare",
-      "sharedCandidateSummary" : "family=analytics,source=heuristic,operation=compare,measure=spend,entities=primaryTarget:category:food:medium,timeScopes=primary:nil:month:2026-05-01...2026-06-01;comparison:nil:month:2026-04-01...2026-05-01,grouping=category:nil,responseHint=comparison",
-      "sharedExecutorResultShape" : "message:Category Comparison (Food & Drink)",
+      "sharedCandidateSummary" : "family=analytics,source=heuristic,operation=compare,measure=spend,entities=primaryTarget:category:food:medium,timeScopes=primary:nil:month:2026-05-01...2026-06-01;comparison:nil:month:2026-04-01...2026-05-01,grouping=category:nil,responseHint=comparison,validator=executable:compare:spend:shape=comparison,plan=metric=categoryMonthComparison,target=Food & Drink,date=2026-05-01..2026-06-01,comparison=2026-04-01..2026-05-01,selectionRank=1,operationPreserved=true",
+      "sharedExecutorResultShape" : "route=comparison;amountBasis=budgetImpact;message:Category Comparison (Food & Drink)",
       "sharedFailureBucket" : "handled",
       "sharedFailureLayer" : "handled",
       "sharedPath" : "sharedHeuristic",
       "sharedResolvedEntityStates" : [
-        "primaryTarget:category:Food & Drink:84A5FCAC-151C-4E42-A433-E0FA20D22D72"
+        "primaryTarget:category:Food & Drink:52F56209-AEEB-4B78-B148-035ACE20F953"
       ],
-      "sharedResponseBridgeShape" : "kind=message,title=Category Comparison (Food & Drink),rows=0",
+      "sharedResponseBridgeShape" : "kind=message,title=Category Comparison (Food & Drink),rows=0,responseShape=comparison,suggestions=2",
       "sharedSelectedInterpreter" : "heuristic",
       "sharedTimeScopes" : [
         "primary:nil:month:2026-05-01..2026-06-01",
@@ -866,7 +868,7 @@
       "actualComparisonDateRange" : "2026-04-01..2026-05-01",
       "actualMetricOperation" : "operation=compare | measure=spend",
       "actualPrimaryDateRange" : "2026-05-01..2026-06-01",
-      "actualTarget" : "primaryTarget:category:Food & Drink:84A5FCAC-151C-4E42-A433-E0FA20D22D72",
+      "actualTarget" : "primaryTarget:category:Food & Drink:52F56209-AEEB-4B78-B148-035ACE20F953",
       "aggregationPath" : "shared_pipeline",
       "expectedComparisonDateRange" : "last_month",
       "expectedEntityScope" : "category",
@@ -880,20 +882,20 @@
       "likelySmallestFix" : "none",
       "mode" : "shared_pipeline_heuristic",
       "prompt" : "How bad was Food & Drink compared to last month?",
-      "responseType" : "kind=message,title=Category Comparison (Food & Drink),rows=0",
+      "responseType" : "kind=message,title=Category Comparison (Food & Drink),rows=0,responseShape=comparison,suggestions=2",
       "selectedRoute" : "sharedHeuristic",
       "sharedAggregationPlanSummary" : "operation=compare,measure=spend,targets=primaryTarget:category:Food & Drink,primary=2026-05-01..2026-06-01,comparison=2026-04-01..2026-05-01,grouping=category,ranking=nil,shape=comparison",
       "sharedCandidateMeasure" : "spend",
       "sharedCandidateOperation" : "compare",
-      "sharedCandidateSummary" : "family=analytics,source=heuristic,operation=compare,measure=spend,entities=primaryTarget:category:food & drink:medium,timeScopes=primary:nil:month:2026-05-01...2026-06-01;comparison:nil:month:2026-04-01...2026-05-01,grouping=category:nil,responseHint=comparison",
-      "sharedExecutorResultShape" : "message:Category Comparison (Food & Drink)",
+      "sharedCandidateSummary" : "family=analytics,source=heuristic,operation=compare,measure=spend,entities=primaryTarget:category:food & drink:medium,timeScopes=primary:nil:month:2026-05-01...2026-06-01;comparison:nil:month:2026-04-01...2026-05-01,grouping=category:nil,responseHint=comparison,validator=executable:compare:spend:shape=comparison,plan=metric=categoryMonthComparison,target=Food & Drink,date=2026-05-01..2026-06-01,comparison=2026-04-01..2026-05-01,selectionRank=2,operationPreserved=false",
+      "sharedExecutorResultShape" : "route=comparison;amountBasis=budgetImpact;message:Category Comparison (Food & Drink)",
       "sharedFailureBucket" : "handled",
       "sharedFailureLayer" : "handled",
       "sharedPath" : "sharedHeuristic",
       "sharedResolvedEntityStates" : [
-        "primaryTarget:category:Food & Drink:84A5FCAC-151C-4E42-A433-E0FA20D22D72"
+        "primaryTarget:category:Food & Drink:52F56209-AEEB-4B78-B148-035ACE20F953"
       ],
-      "sharedResponseBridgeShape" : "kind=message,title=Category Comparison (Food & Drink),rows=0",
+      "sharedResponseBridgeShape" : "kind=message,title=Category Comparison (Food & Drink),rows=0,responseShape=comparison,suggestions=2",
       "sharedSelectedInterpreter" : "heuristic",
       "sharedTimeScopes" : [
         "primary:nil:month:2026-05-01..2026-06-01",
@@ -951,7 +953,7 @@
       "actualComparisonDateRange" : "2026-03-01..2026-04-01",
       "actualMetricOperation" : "operation=compare | measure=spend",
       "actualPrimaryDateRange" : "2026-04-01..2026-05-01",
-      "actualTarget" : "primaryTarget:category:Groceries:335ABB59-F059-4F62-AC1D-598C20F04C3F",
+      "actualTarget" : "primaryTarget:category:Groceries:A6DEA228-529D-407F-8F50-AB75606EFB4B",
       "aggregationPath" : "shared_pipeline",
       "expectedComparisonDateRange" : "march",
       "expectedEntityScope" : "category",
@@ -965,20 +967,20 @@
       "likelySmallestFix" : "none",
       "mode" : "shared_pipeline_heuristic",
       "prompt" : "Did groceries go up or down from March to April?",
-      "responseType" : "kind=message,title=Category Comparison (Groceries),rows=0",
+      "responseType" : "kind=message,title=Category Comparison (Groceries),rows=0,responseShape=comparison,suggestions=2",
       "selectedRoute" : "sharedHeuristic",
       "sharedAggregationPlanSummary" : "operation=compare,measure=spend,targets=primaryTarget:category:Groceries,primary=2026-04-01..2026-05-01,comparison=2026-03-01..2026-04-01,grouping=category,ranking=nil,shape=comparison",
       "sharedCandidateMeasure" : "spend",
       "sharedCandidateOperation" : "compare",
-      "sharedCandidateSummary" : "family=analytics,source=heuristic,operation=compare,measure=spend,entities=primaryTarget:category:groceries:medium,timeScopes=primary:nil:month:2026-04-01...2026-05-01;comparison:nil:month:2026-03-01...2026-04-01,grouping=category:nil,responseHint=comparison",
-      "sharedExecutorResultShape" : "message:Category Comparison (Groceries)",
+      "sharedCandidateSummary" : "family=analytics,source=heuristic,operation=compare,measure=spend,entities=primaryTarget:category:groceries:medium,timeScopes=primary:nil:month:2026-04-01...2026-05-01;comparison:nil:month:2026-03-01...2026-04-01,grouping=category:nil,responseHint=comparison,validator=executable:compare:spend:shape=comparison,plan=metric=categoryMonthComparison,target=Groceries,date=2026-04-01..2026-05-01,comparison=2026-03-01..2026-04-01,selectionRank=1,operationPreserved=true",
+      "sharedExecutorResultShape" : "route=comparison;amountBasis=budgetImpact;message:Category Comparison (Groceries)",
       "sharedFailureBucket" : "handled",
       "sharedFailureLayer" : "handled",
       "sharedPath" : "sharedHeuristic",
       "sharedResolvedEntityStates" : [
-        "primaryTarget:category:Groceries:335ABB59-F059-4F62-AC1D-598C20F04C3F"
+        "primaryTarget:category:Groceries:A6DEA228-529D-407F-8F50-AB75606EFB4B"
       ],
-      "sharedResponseBridgeShape" : "kind=message,title=Category Comparison (Groceries),rows=0",
+      "sharedResponseBridgeShape" : "kind=message,title=Category Comparison (Groceries),rows=0,responseShape=comparison,suggestions=2",
       "sharedSelectedInterpreter" : "heuristic",
       "sharedTimeScopes" : [
         "primary:nil:month:2026-04-01..2026-05-01",
@@ -1010,7 +1012,8 @@
     },
     {
       "actualMetricOperation" : "",
-      "actualTarget" : "what card is eating most of my budget this period",
+      "actualPrimaryDateRange" : "2026-05-01..2026-06-01",
+      "actualTarget" : "what",
       "aggregationPath" : "none",
       "expectedEntityScope" : "global",
       "expectedMeasure" : "topCards",
@@ -1028,7 +1031,8 @@
     },
     {
       "actualMetricOperation" : "operation=rank | measure=spend",
-      "aggregationPath" : "none",
+      "actualPrimaryDateRange" : "2026-05-01..2026-06-01",
+      "aggregationPath" : "shared_pipeline",
       "expectedEntityScope" : "global",
       "expectedMeasure" : "topCards",
       "expectedOperation" : "ranked_list",
@@ -1036,30 +1040,32 @@
       "expectedPrimaryDateRange" : "current_period",
       "fallbackReplacedModelOutput" : false,
       "group" : "stress_messy_manual_2026_05",
-      "likelySmallestFix" : "classify unsupported or clarification outcomes without collapsing to scalar spend",
+      "likelySmallestFix" : "none",
       "mode" : "shared_pipeline_heuristic",
       "prompt" : "What card is eating most of my budget this period?",
-      "responseType" : "kind=message,title=Unsupported Marina Query,rows=1",
+      "responseType" : "kind=message,title=Cards by Budget Impact,rows=0,responseShape=rankedList,suggestions=2",
       "selectedRoute" : "sharedHeuristic",
+      "sharedAggregationPlanSummary" : "operation=rank,measure=spend,targets=,primary=2026-05-01..2026-06-01,comparison=nil,grouping=card,ranking=top,shape=rankedList",
       "sharedCandidateMeasure" : "spend",
       "sharedCandidateOperation" : "rank",
-      "sharedCandidateSummary" : "family=analytics,source=heuristic,operation=rank,measure=spend,grouping=card:nil,ranking=top:nil:nil,responseHint=rankedList",
-      "sharedFailureBucket" : "typed unsupported:unsupportedCardRanking",
-      "sharedFailureLayer" : "validation",
+      "sharedCandidateSummary" : "family=analytics,source=heuristic,operation=rank,measure=spend,timeScopes=primary:nil:month:2026-05-01...2026-06-01,grouping=card:nil,ranking=top:nil:nil,responseHint=rankedList,validator=executable:rank:spend:shape=rankedList,plan=operation=rank,measure=spend,targets=0,date=2026-05-01..2026-06-01,comparison=nil,shape=rankedList,selectionRank=1,operationPreserved=true",
+      "sharedExecutorResultShape" : "route=groupedRanked;amountBasis=budgetImpact;composableWorkspace=cardBudgetImpactRanking,resultCount=0",
+      "sharedFailureBucket" : "handled",
+      "sharedFailureLayer" : "handled",
       "sharedPath" : "sharedHeuristic",
       "sharedResolvedEntityStates" : [
 
       ],
-      "sharedResponseBridgeShape" : "kind=message,title=Unsupported Marina Query,rows=1",
+      "sharedResponseBridgeShape" : "kind=message,title=Cards by Budget Impact,rows=0,responseShape=rankedList,suggestions=2",
       "sharedSelectedInterpreter" : "heuristic",
       "sharedTimeScopes" : [
-
+        "primary:nil:month:2026-05-01..2026-06-01"
       ],
       "sharedUnresolvedEntityMentions" : [
 
       ],
-      "sharedValidatorOutcome" : "unsupported:unsupportedCombination",
-      "verdictRaw" : "typed unsupported:unsupportedCardRanking"
+      "sharedValidatorOutcome" : "executable:rank:spend",
+      "verdictRaw" : "handled"
     },
     {
       "actualMetricOperation" : "",
@@ -1110,20 +1116,20 @@
       "likelySmallestFix" : "none",
       "mode" : "shared_pipeline_heuristic",
       "prompt" : "Which category is hurting me the most right now?",
-      "responseType" : "kind=message,title=Top Categories This Month,rows=0",
+      "responseType" : "kind=message,title=Top Categories This Month,rows=0,responseShape=rankedList,suggestions=2",
       "selectedRoute" : "sharedHeuristic",
       "sharedAggregationPlanSummary" : "operation=rank,measure=spend,targets=,primary=nil,comparison=nil,grouping=category,ranking=top,shape=rankedList",
       "sharedCandidateMeasure" : "spend",
       "sharedCandidateOperation" : "rank",
-      "sharedCandidateSummary" : "family=analytics,source=heuristic,operation=rank,measure=spend,grouping=category:nil,ranking=top:nil:nil,responseHint=rankedList",
-      "sharedExecutorResultShape" : "message:Top Categories This Month",
+      "sharedCandidateSummary" : "family=analytics,source=heuristic,operation=rank,measure=spend,grouping=category:nil,ranking=top:nil:nil,responseHint=rankedList,validator=executable:rank:spend:shape=rankedList,plan=metric=topCategories,target=nil,date=nil,comparison=nil,selectionRank=1,operationPreserved=true",
+      "sharedExecutorResultShape" : "route=groupedRanked;amountBasis=budgetImpact;message:Top Categories This Month",
       "sharedFailureBucket" : "handled",
       "sharedFailureLayer" : "handled",
       "sharedPath" : "sharedHeuristic",
       "sharedResolvedEntityStates" : [
 
       ],
-      "sharedResponseBridgeShape" : "kind=message,title=Top Categories This Month,rows=0",
+      "sharedResponseBridgeShape" : "kind=message,title=Top Categories This Month,rows=0,responseShape=rankedList,suggestions=2",
       "sharedSelectedInterpreter" : "heuristic",
       "sharedTimeScopes" : [
 
@@ -1185,20 +1191,20 @@
       "likelySmallestFix" : "none",
       "mode" : "shared_pipeline_heuristic",
       "prompt" : "Break down where my money went this month, but don’t just give me the total.",
-      "responseType" : "kind=message,title=Top Categories This Month,rows=0",
+      "responseType" : "kind=message,title=Top Categories This Month,rows=0,responseShape=groupedBreakdown,suggestions=2",
       "selectedRoute" : "sharedHeuristic",
       "sharedAggregationPlanSummary" : "operation=rank,measure=spend,targets=,primary=2026-05-01..2026-06-01,comparison=nil,grouping=category,ranking=top,shape=groupedBreakdown",
       "sharedCandidateMeasure" : "spend",
       "sharedCandidateOperation" : "rank",
-      "sharedCandidateSummary" : "family=analytics,source=heuristic,operation=rank,measure=spend,timeScopes=primary:nil:month:2026-05-01...2026-06-01,grouping=category:nil,ranking=top:nil:nil,responseHint=groupedBreakdown",
-      "sharedExecutorResultShape" : "message:Top Categories This Month",
+      "sharedCandidateSummary" : "family=analytics,source=heuristic,operation=rank,measure=spend,timeScopes=primary:nil:month:2026-05-01...2026-06-01,grouping=category:nil,ranking=top:nil:nil,responseHint=groupedBreakdown,validator=executable:rank:spend:shape=groupedBreakdown,plan=metric=topCategories,target=nil,date=2026-05-01..2026-06-01,comparison=nil,selectionRank=2,operationPreserved=false",
+      "sharedExecutorResultShape" : "route=groupedRanked;amountBasis=budgetImpact;message:Top Categories This Month",
       "sharedFailureBucket" : "handled",
       "sharedFailureLayer" : "handled",
       "sharedPath" : "sharedHeuristic",
       "sharedResolvedEntityStates" : [
 
       ],
-      "sharedResponseBridgeShape" : "kind=message,title=Top Categories This Month,rows=0",
+      "sharedResponseBridgeShape" : "kind=message,title=Top Categories This Month,rows=0,responseShape=groupedBreakdown,suggestions=2",
       "sharedSelectedInterpreter" : "heuristic",
       "sharedTimeScopes" : [
         "primary:nil:month:2026-05-01..2026-06-01"
@@ -1249,8 +1255,8 @@
     },
     {
       "actualMetricOperation" : "operation=sum | measure=spend",
-      "actualTarget" : "filter:card:Apple Card:6C8B92D1-B6D7-4B37-919D-100B74633AF7;filter:category:Food & Drink:84A5FCAC-151C-4E42-A433-E0FA20D22D72",
-      "aggregationPath" : "none",
+      "actualTarget" : "filter:card:Apple Card:9D1DE038-4094-4348-B257-FBF4A0FF1F3D;filter:category:Food & Drink:52F56209-AEEB-4B78-B148-035ACE20F953",
+      "aggregationPath" : "shared_pipeline",
       "expectedEntityScope" : "card_and_category_filter",
       "expectedMeasure" : "cardSpendExcludingCategory",
       "expectedOperation" : "sum",
@@ -1259,22 +1265,24 @@
       "expectedTarget" : "Apple Card",
       "fallbackReplacedModelOutput" : false,
       "group" : "stress_messy_manual_2026_05",
-      "likelySmallestFix" : "classify unsupported or clarification outcomes without collapsing to scalar spend",
+      "likelySmallestFix" : "none",
       "mode" : "shared_pipeline_heuristic",
       "prompt" : "What did I spend on Apple Card outside of Food & Drink?",
-      "responseType" : "kind=message,title=Unsupported Marina Query,rows=1",
+      "responseType" : "kind=message,title=Filtered Spending,rows=0,responseShape=summaryCard,suggestions=2",
       "selectedRoute" : "sharedHeuristic",
+      "sharedAggregationPlanSummary" : "operation=sum,measure=spend,targets=filter:card:Apple Card;filter:category:Food & Drink,primary=nil,comparison=nil,grouping=nil,ranking=nil,shape=summaryCard",
       "sharedCandidateMeasure" : "spend",
       "sharedCandidateOperation" : "sum",
-      "sharedCandidateSummary" : "family=analytics,source=heuristic,operation=sum,measure=spend,entities=filter:card:apple card:medium;filter:category:food & drink:medium,responseHint=unsupported",
-      "sharedFailureBucket" : "typed unsupported:unsupportedExclusionFilter",
-      "sharedFailureLayer" : "validation",
+      "sharedCandidateSummary" : "family=analytics,source=heuristic,operation=sum,measure=spend,entities=filter:card:apple card:medium;filter:category:food & drink:medium,responseHint=summaryCard,validator=executable:sum:spend:shape=summaryCard,plan=operation=sum,measure=spend,targets=2,date=nil,comparison=nil,shape=summaryCard,selectionRank=1,operationPreserved=true",
+      "sharedExecutorResultShape" : "route=aggregate;amountBasis=budgetImpact;composableWorkspace=filteredSpend,resultCount=0,total=0.0",
+      "sharedFailureBucket" : "handled",
+      "sharedFailureLayer" : "handled",
       "sharedPath" : "sharedHeuristic",
       "sharedResolvedEntityStates" : [
-        "filter:card:Apple Card:6C8B92D1-B6D7-4B37-919D-100B74633AF7",
-        "filter:category:Food & Drink:84A5FCAC-151C-4E42-A433-E0FA20D22D72"
+        "filter:card:Apple Card:9D1DE038-4094-4348-B257-FBF4A0FF1F3D",
+        "filter:category:Food & Drink:52F56209-AEEB-4B78-B148-035ACE20F953"
       ],
-      "sharedResponseBridgeShape" : "kind=message,title=Unsupported Marina Query,rows=1",
+      "sharedResponseBridgeShape" : "kind=message,title=Filtered Spending,rows=0,responseShape=summaryCard,suggestions=2",
       "sharedSelectedInterpreter" : "heuristic",
       "sharedTimeScopes" : [
 
@@ -1282,8 +1290,8 @@
       "sharedUnresolvedEntityMentions" : [
 
       ],
-      "sharedValidatorOutcome" : "unsupported:unsupportedCombination",
-      "verdictRaw" : "typed unsupported:unsupportedExclusionFilter"
+      "sharedValidatorOutcome" : "executable:sum:spend",
+      "verdictRaw" : "handled"
     },
     {
       "actualMetricOperation" : "",
@@ -1327,7 +1335,7 @@
     {
       "actualMetricOperation" : "operation=sum | measure=categoryShare",
       "actualPrimaryDateRange" : "2026-05-01..2026-06-01",
-      "actualTarget" : "primaryTarget:category:Food & Drink:84A5FCAC-151C-4E42-A433-E0FA20D22D72",
+      "actualTarget" : "primaryTarget:category:Food & Drink:52F56209-AEEB-4B78-B148-035ACE20F953",
       "aggregationPath" : "shared_pipeline",
       "expectedEntityScope" : "category",
       "expectedMeasure" : "categorySpendShare",
@@ -1340,20 +1348,20 @@
       "likelySmallestFix" : "none",
       "mode" : "shared_pipeline_heuristic",
       "prompt" : "How much of my spending this month was Food & Drink?",
-      "responseType" : "kind=message,title=Category Spend Share,rows=0",
+      "responseType" : "kind=message,title=Category Spend Share,rows=0,responseShape=groupedBreakdown,suggestions=2",
       "selectedRoute" : "sharedHeuristic",
       "sharedAggregationPlanSummary" : "operation=sum,measure=categoryShare,targets=primaryTarget:category:Food & Drink,primary=2026-05-01..2026-06-01,comparison=nil,grouping=category,ranking=nil,shape=groupedBreakdown",
       "sharedCandidateMeasure" : "categoryShare",
       "sharedCandidateOperation" : "sum",
-      "sharedCandidateSummary" : "family=analytics,source=heuristic,operation=sum,measure=categoryShare,entities=primaryTarget:category:food & drink:medium,timeScopes=primary:nil:month:2026-05-01...2026-06-01,grouping=category:nil,responseHint=groupedBreakdown",
-      "sharedExecutorResultShape" : "message:Category Spend Share",
+      "sharedCandidateSummary" : "family=analytics,source=heuristic,operation=sum,measure=categoryShare,entities=primaryTarget:category:food & drink:medium,timeScopes=primary:nil:month:2026-05-01...2026-06-01,grouping=category:nil,responseHint=groupedBreakdown,validator=executable:sum:categoryShare:shape=groupedBreakdown,plan=metric=categorySpendShare,target=Food & Drink,date=2026-05-01..2026-06-01,comparison=nil,selectionRank=1,operationPreserved=true",
+      "sharedExecutorResultShape" : "route=groupedRanked;amountBasis=budgetImpact;message:Category Spend Share",
       "sharedFailureBucket" : "handled",
       "sharedFailureLayer" : "handled",
       "sharedPath" : "sharedHeuristic",
       "sharedResolvedEntityStates" : [
-        "primaryTarget:category:Food & Drink:84A5FCAC-151C-4E42-A433-E0FA20D22D72"
+        "primaryTarget:category:Food & Drink:52F56209-AEEB-4B78-B148-035ACE20F953"
       ],
-      "sharedResponseBridgeShape" : "kind=message,title=Category Spend Share,rows=0",
+      "sharedResponseBridgeShape" : "kind=message,title=Category Spend Share,rows=0,responseShape=groupedBreakdown,suggestions=2",
       "sharedSelectedInterpreter" : "heuristic",
       "sharedTimeScopes" : [
         "primary:nil:month:2026-05-01..2026-06-01"
@@ -1404,7 +1412,7 @@
     },
     {
       "actualMetricOperation" : "operation=compare | measure=remainingBudget",
-      "actualTarget" : "primaryTarget:category:Shopping:0D6FCE13-9386-4383-8D53-403BA3FCA168",
+      "actualTarget" : "primaryTarget:category:Shopping:3543011E-06BD-49A9-82DA-E4F791556DF4",
       "aggregationPath" : "none",
       "expectedEntityScope" : "category",
       "expectedMeasure" : "categoryBudgetAvailability",
@@ -1417,18 +1425,18 @@
       "likelySmallestFix" : "classify unsupported or clarification outcomes without collapsing to scalar spend",
       "mode" : "shared_pipeline_heuristic",
       "prompt" : "Is Shopping over where it should be for this budget?",
-      "responseType" : "kind=message,title=Unsupported Marina Query,rows=1",
+      "responseType" : "kind=message,title=I need a narrower query,rows=1,responseShape=unsupported,suggestions=0",
       "selectedRoute" : "sharedHeuristic",
       "sharedCandidateMeasure" : "remainingBudget",
       "sharedCandidateOperation" : "compare",
-      "sharedCandidateSummary" : "family=analytics,source=heuristic,operation=compare,measure=remainingBudget,entities=primaryTarget:category:shopping:medium,responseHint=unsupported",
+      "sharedCandidateSummary" : "family=analytics,source=heuristic,operation=compare,measure=remainingBudget,entities=primaryTarget:category:shopping:medium,responseHint=unsupported,validator=unsupported:unsupportedCombination,selectionRank=5,operationPreserved=true",
       "sharedFailureBucket" : "typed unsupported:unsupportedBudgetLimit",
       "sharedFailureLayer" : "validation",
       "sharedPath" : "sharedHeuristic",
       "sharedResolvedEntityStates" : [
-        "primaryTarget:category:Shopping:0D6FCE13-9386-4383-8D53-403BA3FCA168"
+        "primaryTarget:category:Shopping:3543011E-06BD-49A9-82DA-E4F791556DF4"
       ],
-      "sharedResponseBridgeShape" : "kind=message,title=Unsupported Marina Query,rows=1",
+      "sharedResponseBridgeShape" : "kind=message,title=I need a narrower query,rows=1,responseShape=unsupported,suggestions=0",
       "sharedSelectedInterpreter" : "heuristic",
       "sharedTimeScopes" : [
 
@@ -1482,7 +1490,7 @@
       "actualComparisonDateRange" : "2026-04-01..2026-05-01",
       "actualMetricOperation" : "operation=compare | measure=spend",
       "actualPrimaryDateRange" : "2026-05-01..2026-06-01",
-      "aggregationPath" : "none",
+      "aggregationPath" : "shared_pipeline",
       "expectedComparisonDateRange" : "last_month",
       "expectedEntityScope" : "global",
       "expectedMeasure" : "categoryMonthComparisonRanked",
@@ -1491,21 +1499,23 @@
       "expectedPrimaryDateRange" : "this_month",
       "fallbackReplacedModelOutput" : false,
       "group" : "stress_messy_manual_2026_05",
-      "likelySmallestFix" : "classify unsupported or clarification outcomes without collapsing to scalar spend",
+      "likelySmallestFix" : "none",
       "mode" : "shared_pipeline_heuristic",
       "prompt" : "What category changed the most compared to last month?",
-      "responseType" : "kind=message,title=Unsupported Marina Query,rows=1",
+      "responseType" : "kind=message,title=Spending Increase Drivers,rows=0,responseShape=rankedList,suggestions=2",
       "selectedRoute" : "sharedHeuristic",
+      "sharedAggregationPlanSummary" : "operation=compare,measure=spend,targets=,primary=2026-05-01..2026-06-01,comparison=2026-04-01..2026-05-01,grouping=category,ranking=largest,shape=comparison",
       "sharedCandidateMeasure" : "spend",
       "sharedCandidateOperation" : "compare",
-      "sharedCandidateSummary" : "family=analytics,source=heuristic,operation=compare,measure=spend,timeScopes=primary:nil:month:2026-05-01...2026-06-01;comparison:nil:month:2026-04-01...2026-05-01,grouping=category:nil,ranking=largest:nil:nil,responseHint=rankedList",
-      "sharedFailureBucket" : "typed unsupported:unsupportedRankedComparison",
-      "sharedFailureLayer" : "validation",
+      "sharedCandidateSummary" : "family=analytics,source=heuristic,operation=compare,measure=spend,timeScopes=primary:nil:month:2026-05-01...2026-06-01;comparison:nil:month:2026-04-01...2026-05-01,grouping=category:nil,ranking=largest:nil:nil,responseHint=rankedList,validator=executable:compare:spend:shape=rankedList,plan=operation=compare,measure=spend,targets=0,date=2026-05-01..2026-06-01,comparison=2026-04-01..2026-05-01,shape=rankedList,selectionRank=2,operationPreserved=false",
+      "sharedExecutorResultShape" : "route=comparison;amountBasis=budgetImpact;composableWorkspace=categoryDeltaDrivers,resultCount=0",
+      "sharedFailureBucket" : "handled",
+      "sharedFailureLayer" : "handled",
       "sharedPath" : "sharedHeuristic",
       "sharedResolvedEntityStates" : [
 
       ],
-      "sharedResponseBridgeShape" : "kind=message,title=Unsupported Marina Query,rows=1",
+      "sharedResponseBridgeShape" : "kind=message,title=Spending Increase Drivers,rows=0,responseShape=rankedList,suggestions=2",
       "sharedSelectedInterpreter" : "heuristic",
       "sharedTimeScopes" : [
         "primary:nil:month:2026-05-01..2026-06-01",
@@ -1514,8 +1524,8 @@
       "sharedUnresolvedEntityMentions" : [
 
       ],
-      "sharedValidatorOutcome" : "unsupported:unsupportedCombination",
-      "verdictRaw" : "typed unsupported:unsupportedRankedComparison"
+      "sharedValidatorOutcome" : "executable:compare:spend",
+      "verdictRaw" : "handled"
     },
     {
       "actualMetricOperation" : "",
@@ -1537,10 +1547,10 @@
       "verdictRaw" : "metric\/operation mapping failure"
     },
     {
-      "actualMetricOperation" : "",
-      "actualPrimaryDateRange" : "2026-02-08..2026-05-09",
-      "actualTarget" : "groceries over the",
-      "aggregationPath" : "none",
+      "actualMetricOperation" : "spendAveragePerPeriod | average",
+      "actualPrimaryDateRange" : "2026-02-15..2026-05-15",
+      "actualTarget" : "",
+      "aggregationPath" : "single_home_query_engine",
       "expectedEntityScope" : "category",
       "expectedMeasure" : "categoryAverageSpend",
       "expectedOperation" : "average",
@@ -1552,14 +1562,13 @@
       "likelySmallestFix" : "add explicit average-by-target mapping metric",
       "mode" : "nlq_authoritative",
       "prompt" : "What was my average weekly spending on groceries over the last 3 months?",
-      "responseType" : "clarification",
-      "selectedRoute" : "clarification",
+      "responseType" : "message",
+      "selectedRoute" : "nlq",
       "verdictRaw" : "metric\/operation mapping failure"
     },
     {
       "actualMetricOperation" : "operation=average | measure=spend",
-      "actualPrimaryDateRange" : "2026-02-08..2026-05-09",
-      "actualTarget" : "primaryTarget:category:Groceries:335ABB59-F059-4F62-AC1D-598C20F04C3F",
+      "actualPrimaryDateRange" : "2026-02-15..2026-05-15",
       "aggregationPath" : "none",
       "expectedEntityScope" : "category",
       "expectedMeasure" : "categoryAverageSpend",
@@ -1569,30 +1578,30 @@
       "expectedTarget" : "groceries",
       "fallbackReplacedModelOutput" : false,
       "group" : "stress_messy_manual_2026_05",
-      "likelySmallestFix" : "classify unsupported or clarification outcomes without collapsing to scalar spend",
+      "likelySmallestFix" : "resolve card\/category mentions before adapter execution and keep unresolved spans explicit",
       "mode" : "shared_pipeline_heuristic",
       "prompt" : "What was my average weekly spending on groceries over the last 3 months?",
-      "responseType" : "kind=message,title=Unsupported Marina Query,rows=1",
+      "responseType" : "kind=message,title=I need one choice first,rows=1,responseShape=clarification,suggestions=0",
       "selectedRoute" : "sharedHeuristic",
       "sharedCandidateMeasure" : "spend",
       "sharedCandidateOperation" : "average",
-      "sharedCandidateSummary" : "family=analytics,source=heuristic,operation=average,measure=spend,entities=primaryTarget:unknown:groceries:low,timeScopes=lookbackWindow:nil:month:2026-02-08...2026-05-09,responseHint=unsupported",
-      "sharedFailureBucket" : "typed unsupported:unsupportedCombination",
-      "sharedFailureLayer" : "validation",
+      "sharedCandidateSummary" : "family=analytics,source=heuristic,operation=average,measure=spend,entities=primaryTarget:unknown:weekly:medium,timeScopes=lookbackWindow:nil:month:2026-02-15...2026-05-15,grouping=week:nil,responseHint=summaryCard,validator=clarification:missingTarget,selectionRank=3,operationPreserved=true",
+      "sharedFailureBucket" : "unresolved entity mention",
+      "sharedFailureLayer" : "entity resolution",
       "sharedPath" : "sharedHeuristic",
       "sharedResolvedEntityStates" : [
-        "primaryTarget:category:Groceries:335ABB59-F059-4F62-AC1D-598C20F04C3F"
-      ],
-      "sharedResponseBridgeShape" : "kind=message,title=Unsupported Marina Query,rows=1",
-      "sharedSelectedInterpreter" : "heuristic",
-      "sharedTimeScopes" : [
-        "lookbackWindow:nil:month:2026-02-08..2026-05-09"
-      ],
-      "sharedUnresolvedEntityMentions" : [
 
       ],
-      "sharedValidatorOutcome" : "unsupported:unsupportedCombination",
-      "verdictRaw" : "typed unsupported:unsupportedCombination"
+      "sharedResponseBridgeShape" : "kind=message,title=I need one choice first,rows=1,responseShape=clarification,suggestions=0",
+      "sharedSelectedInterpreter" : "heuristic",
+      "sharedTimeScopes" : [
+        "lookbackWindow:nil:month:2026-02-15..2026-05-15"
+      ],
+      "sharedUnresolvedEntityMentions" : [
+        "primaryTarget:unknown:weekly:medium"
+      ],
+      "sharedValidatorOutcome" : "clarification:missingTarget",
+      "verdictRaw" : "unresolved entity mention"
     },
     {
       "actualMetricOperation" : "",
@@ -1643,18 +1652,18 @@
       "likelySmallestFix" : "classify unsupported or clarification outcomes without collapsing to scalar spend",
       "mode" : "shared_pipeline_heuristic",
       "prompt" : "If I keep spending like this, how much will I have left by the end of the period?",
-      "responseType" : "kind=message,title=Unsupported Marina Query,rows=1",
+      "responseType" : "kind=message,title=I can answer this a different way,rows=1,responseShape=unsupported,suggestions=0",
       "selectedRoute" : "sharedHeuristic",
       "sharedCandidateMeasure" : "remainingBudget",
       "sharedCandidateOperation" : "forecast",
-      "sharedCandidateSummary" : "family=analytics,source=heuristic,operation=forecast,measure=remainingBudget,responseHint=unsupported",
+      "sharedCandidateSummary" : "family=analytics,source=heuristic,operation=forecast,measure=remainingBudget,responseHint=unsupported,validator=unsupported:unsupportedOperation,selectionRank=6,operationPreserved=false",
       "sharedFailureBucket" : "typed unsupported:unsupportedProjection",
       "sharedFailureLayer" : "validation",
       "sharedPath" : "sharedHeuristic",
       "sharedResolvedEntityStates" : [
 
       ],
-      "sharedResponseBridgeShape" : "kind=message,title=Unsupported Marina Query,rows=1",
+      "sharedResponseBridgeShape" : "kind=message,title=I can answer this a different way,rows=1,responseShape=unsupported,suggestions=0",
       "sharedSelectedInterpreter" : "heuristic",
       "sharedTimeScopes" : [
 
@@ -1705,8 +1714,8 @@
     },
     {
       "actualMetricOperation" : "operation=simulate | measure=remainingBudget",
-      "actualTarget" : "simulationInput:category:Shopping:0D6FCE13-9386-4383-8D53-403BA3FCA168;simulationOutput:category:Transportation:69B7A095-5A4E-4C9C-89C3-45B080F12390",
-      "aggregationPath" : "none",
+      "actualTarget" : "simulationInput:category:Shopping:3543011E-06BD-49A9-82DA-E4F791556DF4;simulationOutput:category:Transportation:F0AF1EEC-3C78-4B4B-8162-6BDBE365EF96",
+      "aggregationPath" : "shared_pipeline",
       "expectedEntityScope" : "category_pair",
       "expectedMeasure" : "simulation",
       "expectedOperation" : "what_if",
@@ -1715,22 +1724,24 @@
       "expectedTarget" : "Shopping",
       "fallbackReplacedModelOutput" : false,
       "group" : "stress_messy_manual_2026_05",
-      "likelySmallestFix" : "classify unsupported or clarification outcomes without collapsing to scalar spend",
+      "likelySmallestFix" : "none",
       "mode" : "shared_pipeline_heuristic",
       "prompt" : "If I add $75 to Shopping, does Transportation still have room?",
-      "responseType" : "kind=message,title=Unsupported Marina Query,rows=1",
+      "responseType" : "kind=list,title=What-If Budget Impact,rows=2,responseShape=summaryCard,suggestions=2",
       "selectedRoute" : "sharedHeuristic",
+      "sharedAggregationPlanSummary" : "operation=simulate,measure=remainingBudget,targets=simulationInput:category:Shopping;simulationOutput:category:Transportation,primary=nil,comparison=nil,grouping=nil,ranking=nil,shape=summaryCard",
       "sharedCandidateMeasure" : "remainingBudget",
       "sharedCandidateOperation" : "simulate",
-      "sharedCandidateSummary" : "family=analytics,source=heuristic,operation=simulate,measure=remainingBudget,entities=simulationInput:category:shopping:medium;simulationOutput:category:transportation:medium,responseHint=unsupported",
-      "sharedFailureBucket" : "typed unsupported:unsupportedSimulation",
-      "sharedFailureLayer" : "validation",
+      "sharedCandidateSummary" : "family=analytics,source=heuristic,operation=simulate,measure=remainingBudget,entities=simulationInput:category:shopping:medium;simulationOutput:category:transportation:medium,responseHint=summaryCard,validator=executable:simulate:remainingBudget:shape=summaryCard,plan=operation=simulate,measure=remainingBudget,targets=2,date=nil,comparison=nil,shape=summaryCard,selectionRank=1,operationPreserved=true",
+      "sharedExecutorResultShape" : "route=scenario;amountBasis=budgetImpact;composableWorkspace=simulation,amount=75.0,target=Shopping",
+      "sharedFailureBucket" : "handled",
+      "sharedFailureLayer" : "handled",
       "sharedPath" : "sharedHeuristic",
       "sharedResolvedEntityStates" : [
-        "simulationInput:category:Shopping:0D6FCE13-9386-4383-8D53-403BA3FCA168",
-        "simulationOutput:category:Transportation:69B7A095-5A4E-4C9C-89C3-45B080F12390"
+        "simulationInput:category:Shopping:3543011E-06BD-49A9-82DA-E4F791556DF4",
+        "simulationOutput:category:Transportation:F0AF1EEC-3C78-4B4B-8162-6BDBE365EF96"
       ],
-      "sharedResponseBridgeShape" : "kind=message,title=Unsupported Marina Query,rows=1",
+      "sharedResponseBridgeShape" : "kind=list,title=What-If Budget Impact,rows=2,responseShape=summaryCard,suggestions=2",
       "sharedSelectedInterpreter" : "heuristic",
       "sharedTimeScopes" : [
 
@@ -1738,8 +1749,8 @@
       "sharedUnresolvedEntityMentions" : [
 
       ],
-      "sharedValidatorOutcome" : "unsupported:unsupportedSimulation",
-      "verdictRaw" : "typed unsupported:unsupportedSimulation"
+      "sharedValidatorOutcome" : "executable:simulate:remainingBudget",
+      "verdictRaw" : "handled"
     },
     {
       "actualMetricOperation" : "",
@@ -1784,7 +1795,7 @@
       "actualComparisonDateRange" : "2026-04-01..2026-05-01",
       "actualMetricOperation" : "operation=compare | measure=spend",
       "actualPrimaryDateRange" : "2026-05-01..2026-06-01",
-      "aggregationPath" : "none",
+      "aggregationPath" : "shared_pipeline",
       "expectedComparisonDateRange" : "last_month",
       "expectedEntityScope" : "global",
       "expectedMeasure" : "transactionDeltaDrivers",
@@ -1793,21 +1804,23 @@
       "expectedPrimaryDateRange" : "this_month",
       "fallbackReplacedModelOutput" : false,
       "group" : "stress_messy_manual_2026_05",
-      "likelySmallestFix" : "classify unsupported or clarification outcomes without collapsing to scalar spend",
+      "likelySmallestFix" : "none",
       "mode" : "shared_pipeline_heuristic",
       "prompt" : "What expenses are making this month higher than last month?",
-      "responseType" : "kind=message,title=Unsupported Marina Query,rows=1",
+      "responseType" : "kind=message,title=Spending Increase Drivers,rows=0,responseShape=rankedList,suggestions=2",
       "selectedRoute" : "sharedHeuristic",
+      "sharedAggregationPlanSummary" : "operation=compare,measure=spend,targets=,primary=2026-05-01..2026-06-01,comparison=2026-04-01..2026-05-01,grouping=transaction,ranking=largest,shape=comparison",
       "sharedCandidateMeasure" : "spend",
       "sharedCandidateOperation" : "compare",
-      "sharedCandidateSummary" : "family=analytics,source=heuristic,operation=compare,measure=spend,timeScopes=primary:nil:month:2026-05-01...2026-06-01;comparison:nil:month:2026-04-01...2026-05-01,grouping=transaction:nil,ranking=largest:nil:nil,responseHint=rankedList",
-      "sharedFailureBucket" : "typed unsupported:unsupportedRankedComparison",
-      "sharedFailureLayer" : "validation",
+      "sharedCandidateSummary" : "family=analytics,source=heuristic,operation=compare,measure=spend,timeScopes=primary:nil:month:2026-05-01...2026-06-01;comparison:nil:month:2026-04-01...2026-05-01,grouping=transaction:nil,ranking=largest:nil:nil,responseHint=rankedList,validator=executable:compare:spend:shape=rankedList,plan=operation=compare,measure=spend,targets=0,date=2026-05-01..2026-06-01,comparison=2026-04-01..2026-05-01,shape=rankedList,selectionRank=2,operationPreserved=false",
+      "sharedExecutorResultShape" : "route=comparison;amountBasis=budgetImpact;composableWorkspace=categoryDeltaDrivers,resultCount=0",
+      "sharedFailureBucket" : "handled",
+      "sharedFailureLayer" : "handled",
       "sharedPath" : "sharedHeuristic",
       "sharedResolvedEntityStates" : [
 
       ],
-      "sharedResponseBridgeShape" : "kind=message,title=Unsupported Marina Query,rows=1",
+      "sharedResponseBridgeShape" : "kind=message,title=Spending Increase Drivers,rows=0,responseShape=rankedList,suggestions=2",
       "sharedSelectedInterpreter" : "heuristic",
       "sharedTimeScopes" : [
         "primary:nil:month:2026-05-01..2026-06-01",
@@ -1816,8 +1829,8 @@
       "sharedUnresolvedEntityMentions" : [
 
       ],
-      "sharedValidatorOutcome" : "unsupported:unsupportedCombination",
-      "verdictRaw" : "typed unsupported:unsupportedRankedComparison"
+      "sharedValidatorOutcome" : "executable:compare:spend",
+      "verdictRaw" : "handled"
     },
     {
       "actualMetricOperation" : "",
@@ -1868,20 +1881,19 @@
       "likelySmallestFix" : "none",
       "mode" : "shared_pipeline_heuristic",
       "prompt" : "Show me the stuff I’m spending on too often, not necessarily the most money.",
-      "responseType" : "kind=message,title=Most Frequent Expenses,rows=0",
+      "responseType" : "kind=message,title=I need a narrower query,rows=1,responseShape=unsupported,suggestions=0",
       "selectedRoute" : "sharedHeuristic",
       "sharedAggregationPlanSummary" : "operation=rank,measure=transactionFrequency,targets=,primary=nil,comparison=nil,grouping=transaction,ranking=mostFrequent,shape=rankedList",
       "sharedCandidateMeasure" : "transactionFrequency",
       "sharedCandidateOperation" : "rank",
-      "sharedCandidateSummary" : "family=analytics,source=heuristic,operation=rank,measure=transactionFrequency,grouping=transaction:nil,ranking=mostFrequent:nil:nil,responseHint=rankedList",
-      "sharedExecutorResultShape" : "message:Most Frequent Expenses",
+      "sharedCandidateSummary" : "family=analytics,source=heuristic,operation=rank,measure=transactionFrequency,grouping=transaction:nil,ranking=mostFrequent:nil:nil,responseHint=rankedList,validator=unsupported:unsupportedCombination,selectionRank=6,operationPreserved=false",
       "sharedFailureBucket" : "handled",
       "sharedFailureLayer" : "handled",
       "sharedPath" : "sharedHeuristic",
       "sharedResolvedEntityStates" : [
 
       ],
-      "sharedResponseBridgeShape" : "kind=message,title=Most Frequent Expenses,rows=0",
+      "sharedResponseBridgeShape" : "kind=message,title=I need a narrower query,rows=1,responseShape=unsupported,suggestions=0",
       "sharedSelectedInterpreter" : "heuristic",
       "sharedTimeScopes" : [
 
@@ -1898,17 +1910,14 @@
     "stress_messy_manual_2026_05" : 45
   },
   "sharedFailuresByBucket" : {
-    "handled" : 7,
+    "handled" : 12,
     "typed unsupported:unsupportedBudgetLimit" : 1,
-    "typed unsupported:unsupportedCardRanking" : 1,
-    "typed unsupported:unsupportedCombination" : 1,
-    "typed unsupported:unsupportedExclusionFilter" : 1,
     "typed unsupported:unsupportedProjection" : 1,
-    "typed unsupported:unsupportedRankedComparison" : 2,
-    "typed unsupported:unsupportedSimulation" : 1
+    "unresolved entity mention" : 1
   },
   "sharedFailuresByLayer" : {
-    "handled" : 7,
-    "validation" : 8
+    "entity resolution" : 1,
+    "handled" : 12,
+    "validation" : 2
   }
 }

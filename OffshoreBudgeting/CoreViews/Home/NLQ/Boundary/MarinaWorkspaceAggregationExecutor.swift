@@ -16,6 +16,8 @@ struct MarinaWorkspaceAggregationExecutor {
         switch (plan.operation, plan.measure, plan.grouping?.dimension) {
         case (.sum, .income, nil), (.sum, .income, .incomeSource):
             return .handled(incomeSummary(plan: plan, provider: provider, now: now))
+        case (.listRows, .income, nil), (.listRows, .income, .incomeSource):
+            return .handled(incomeRows(plan: plan, provider: provider, now: now))
         case (.rank, .income, .incomeSource):
             return .handled(topIncomeSources(plan: plan, provider: provider, now: now))
         case (.compare, .income, nil), (.compare, .income, .incomeSource):
@@ -46,22 +48,61 @@ struct MarinaWorkspaceAggregationExecutor {
         now: Date
     ) -> MarinaWorkspaceAggregationCard {
         let range = plan.dateRange ?? monthRange(containing: now)
-        let incomes = provider.fetchAllIncomes().filter { $0.date >= range.startDate && $0.date <= range.endDate }
+        let incomes = sourceScopedIncomes(plan: plan, provider: provider, range: range)
         let actual = incomes.filter { $0.isPlanned == false }.reduce(0.0) { $0 + $1.amount }
         let planned = incomes.filter(\.isPlanned).reduce(0.0) { $0 + $1.amount }
         let topSource = totalsByIncomeSource(incomes.filter { $0.isPlanned == false }).first
+        let primaryValue: String
+        switch plan.incomeStatusScope {
+        case .planned:
+            primaryValue = currency(planned)
+        case .actual, .all, nil:
+            primaryValue = currency(actual)
+        }
 
         return MarinaWorkspaceAggregationCard(
-            title: "Income Summary",
+            title: incomeSummaryTitle(for: plan.incomeStatusScope),
             subtitle: rangeLabel(range),
-            primaryValue: currency(actual),
+            primaryValue: primaryValue,
             rows: compactRows([
                 .init(label: "Actual income", value: currency(actual), amount: actual, sortValue: actual),
                 .init(label: "Planned income", value: currency(planned), amount: planned, sortValue: planned),
                 .init(label: "Gap vs planned", value: delta(actual - planned), amount: actual - planned, sortValue: actual - planned),
                 topSource.map { .init(label: "Top source", value: "\($0.source) (\(currency($0.total)))", amount: $0.total, sortValue: $0.total) }
             ]),
-            traceSummary: "workspaceAggregation=incomeSummary,resultCount=\(incomes.count)"
+            traceSummary: "workspaceAggregation=incomeSummary,resultCount=\(incomes.count),incomeStatus=\(plan.incomeStatusScope?.rawValue ?? "all")"
+        )
+    }
+
+    private func incomeRows(
+        plan: MarinaAggregationPlan,
+        provider: MarinaDataProvider,
+        now: Date
+    ) -> MarinaWorkspaceAggregationCard {
+        let range = plan.dateRange ?? monthRange(containing: now)
+        let incomes = filteredIncomes(plan: plan, provider: provider, range: range)
+            .sorted { lhs, rhs in
+                if lhs.date == rhs.date { return lhs.source.localizedCaseInsensitiveCompare(rhs.source) == .orderedAscending }
+                return lhs.date > rhs.date
+            }
+            .prefix(limit(for: plan))
+        let total = incomes.reduce(0.0) { $0 + $1.amount }
+        return MarinaWorkspaceAggregationCard(
+            title: incomeRowsTitle(for: plan.incomeStatusScope),
+            subtitle: rangeLabel(range),
+            primaryValue: currency(total),
+            rows: incomes.map { income in
+                MarinaWorkspaceAggregationCard.Row(
+                    label: income.source,
+                    value: "\(income.isPlanned ? "Planned income" : "Actual income") • \(shortDate(income.date)) • \(currency(income.amount))",
+                    amount: income.amount,
+                    date: income.date,
+                    objectType: .income,
+                    sourceID: income.id,
+                    sortValue: income.amount
+                )
+            },
+            traceSummary: "workspaceAggregation=incomeRows,resultCount=\(incomes.count),incomeStatus=\(plan.incomeStatusScope?.rawValue ?? "all")"
         )
     }
 
@@ -317,6 +358,71 @@ struct MarinaWorkspaceAggregationExecutor {
                 }
                 return lhs.total > rhs.total
             }
+    }
+
+    private func filteredIncomes(
+        plan: MarinaAggregationPlan,
+        provider: MarinaDataProvider,
+        range: HomeQueryDateRange
+    ) -> [Income] {
+        provider.fetchAllIncomes()
+            .filter { $0.date >= range.startDate && $0.date <= range.endDate }
+            .filter { income in
+                matchesIncomeStatus(income, scope: plan.incomeStatusScope)
+            }
+            .filter { matchesIncomeSource($0, plan: plan) }
+    }
+
+    private func sourceScopedIncomes(
+        plan: MarinaAggregationPlan,
+        provider: MarinaDataProvider,
+        range: HomeQueryDateRange
+    ) -> [Income] {
+        provider.fetchAllIncomes()
+            .filter { $0.date >= range.startDate && $0.date <= range.endDate }
+            .filter { matchesIncomeSource($0, plan: plan) }
+    }
+
+    private func matchesIncomeStatus(_ income: Income, scope: MarinaIncomeStatusScope?) -> Bool {
+        switch scope {
+        case .actual:
+            return income.isPlanned == false
+        case .planned:
+            return income.isPlanned
+        case .all, nil:
+            return true
+        }
+    }
+
+    private func matchesIncomeSource(_ income: Income, plan: MarinaAggregationPlan) -> Bool {
+        let sourceTargets = plan.targets.filter { $0.entityType == .incomeSource }
+        guard sourceTargets.isEmpty == false else { return true }
+        return sourceTargets.contains { target in
+            income.source.localizedCaseInsensitiveCompare(target.displayName) == .orderedSame
+                || income.source.localizedCaseInsensitiveContains(target.displayName)
+        }
+    }
+
+    private func incomeSummaryTitle(for scope: MarinaIncomeStatusScope?) -> String {
+        switch scope {
+        case .actual:
+            return "Actual Income"
+        case .planned:
+            return "Planned Income"
+        case .all, nil:
+            return "Income Summary"
+        }
+    }
+
+    private func incomeRowsTitle(for scope: MarinaIncomeStatusScope?) -> String {
+        switch scope {
+        case .actual:
+            return "Actual Income Entries"
+        case .planned:
+            return "Planned Income Entries"
+        case .all, nil:
+            return "Income Entries"
+        }
     }
 
     private func incomeTotal(_ incomes: [Income], in range: HomeQueryDateRange) -> Double {

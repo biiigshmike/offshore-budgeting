@@ -85,7 +85,9 @@ struct MarinaQueryResolver {
 
     func resolve(
         candidate: MarinaQueryPlanCandidate,
-        provider: MarinaDataProvider
+        provider: MarinaDataProvider,
+        now: Date = Date(),
+        defaultPeriodUnit: HomeQueryPeriodUnit = .month
     ) -> MarinaResolvedQueryCandidate {
         var resolvedTargets: [MarinaResolvedEntityMention] = []
         var unresolvedMentions: [MarinaUnresolvedEntityMention] = []
@@ -122,17 +124,18 @@ struct MarinaQueryResolver {
                 ambiguousMentions.append(
                     MarinaAmbiguousEntityMention(
                         mention: mention,
-                        choices: matches.map { match in
+                        choices: sortedClarificationChoices(matches.map { match in
                             MarinaClarificationChoice(
                                 title: match.displayValue,
                                 subtitle: match.entityType.rawValue,
                                 entityRole: mention.role,
                                 entityTypeHint: candidateType(from: match.entityType),
+                                patchSlot: .target,
                                 rawValue: match.displayValue,
                                 sourceID: match.sourceID,
                                 mentionID: mention.id
                             )
-                        }
+                        })
                     )
                 )
             }
@@ -143,15 +146,25 @@ struct MarinaQueryResolver {
             resolvedTargets: resolvedTargets,
             unresolvedMentions: unresolvedMentions,
             ambiguousMentions: ambiguousMentions,
-            primaryDateRange: candidate.timeScopes.first(where: { $0.role == .primary || $0.role == .lookbackWindow })?.resolvedRangeHint,
-            comparisonDateRange: candidate.timeScopes.first(where: { $0.role == .comparison })?.resolvedRangeHint
+            primaryDateRange: resolvedDateRange(
+                from: candidate.timeScopes.first(where: { $0.role == .primary || $0.role == .lookbackWindow }),
+                now: now,
+                defaultPeriodUnit: defaultPeriodUnit
+            ),
+            comparisonDateRange: resolvedDateRange(
+                from: candidate.timeScopes.first(where: { $0.role == .comparison }),
+                now: now,
+                defaultPeriodUnit: defaultPeriodUnit
+            )
         )
     }
 
     func resolve(
         query: MarinaSemanticQuery,
         provider: MarinaDataProvider,
-        candidate: MarinaQueryPlanCandidate? = nil
+        candidate: MarinaQueryPlanCandidate? = nil,
+        now: Date = Date(),
+        defaultPeriodUnit: HomeQueryPeriodUnit = .month
     ) -> MarinaResolvedSemanticQuery {
         var resolvedFilters: [MarinaResolvedFilter] = []
         var unresolvedFilters: [MarinaFilter] = []
@@ -199,8 +212,8 @@ struct MarinaQueryResolver {
                 id: filter.id,
                 role: mentionRole(from: filter.role),
                 rawText: trimmedValue,
-                typeHint: filter.entityTypeHint ?? entityTypeHint(from: filter.relationship),
-                allowedTypeHints: allowedTypeHints(from: filter.relationship, explicit: filter.entityTypeHint),
+                typeHint: filter.entityTypeHint ?? singleAllowedTypeHint(from: filter) ?? entityTypeHint(from: filter.relationship),
+                allowedTypeHints: allowedTypeHints(from: filter),
                 confidence: filter.matchMode == .exact ? .high : .medium
             )
             let extraction = extractor.extractCandidates(from: trimmedValue, provider: provider)
@@ -228,17 +241,18 @@ struct MarinaQueryResolver {
                 ambiguousFilters.append(
                     MarinaAmbiguousFilter(
                         filter: filter,
-                        choices: matches.map { match in
+                        choices: sortedClarificationChoices(matches.map { match in
                             MarinaClarificationChoice(
                                 title: match.displayValue,
                                 subtitle: match.entityType.rawValue,
                                 entityRole: mention.role,
                                 entityTypeHint: candidateType(from: match.entityType),
+                                patchSlot: .target,
                                 rawValue: match.displayValue,
                                 sourceID: match.sourceID,
                                 mentionID: filter.id
                             )
-                        }
+                        })
                     )
                 )
             }
@@ -250,10 +264,74 @@ struct MarinaQueryResolver {
             resolvedFilters: resolvedFilters,
             unresolvedFilters: unresolvedFilters,
             ambiguousFilters: ambiguousFilters,
-            primaryDateRange: query.dateRange?.resolvedRange,
-            comparisonDateRange: query.comparisonDateRange?.resolvedRange,
+            primaryDateRange: resolvedDateRange(
+                from: query.dateRange,
+                now: now,
+                defaultPeriodUnit: defaultPeriodUnit
+            ),
+            comparisonDateRange: resolvedDateRange(
+                from: query.comparisonDateRange,
+                now: now,
+                defaultPeriodUnit: defaultPeriodUnit
+            ),
             databaseLookupRequest: candidate?.databaseLookupRequest
         )
+    }
+
+    private func resolvedDateRange(
+        from scope: MarinaUnresolvedTimeScope?,
+        now: Date,
+        defaultPeriodUnit: HomeQueryPeriodUnit
+    ) -> HomeQueryDateRange? {
+        guard let scope else { return nil }
+        if let resolved = scope.resolvedRangeHint {
+            return resolved
+        }
+        return resolvedDateRange(
+            rawText: scope.rawText,
+            periodUnit: scope.periodUnitHint,
+            now: now,
+            defaultPeriodUnit: defaultPeriodUnit
+        )
+    }
+
+    private func resolvedDateRange(
+        from request: MarinaDateRangeRequest?,
+        now: Date,
+        defaultPeriodUnit: HomeQueryPeriodUnit
+    ) -> HomeQueryDateRange? {
+        guard let request else { return nil }
+        if let resolved = request.resolvedRange {
+            return resolved
+        }
+        return resolvedDateRange(
+            rawText: request.rawText,
+            periodUnit: request.periodUnit,
+            now: now,
+            defaultPeriodUnit: defaultPeriodUnit
+        )
+    }
+
+    private func resolvedDateRange(
+        rawText: String?,
+        periodUnit: HomeQueryPeriodUnit?,
+        now: Date,
+        defaultPeriodUnit: HomeQueryPeriodUnit
+    ) -> HomeQueryDateRange? {
+        guard let rawText = rawText?.trimmingCharacters(in: .whitespacesAndNewlines),
+              rawText.isEmpty == false else {
+            return nil
+        }
+
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .gmt
+        let resolver = MarinaDateResolver(calendar: calendar, nowProvider: { now })
+        return resolver.resolve(
+            input: rawText,
+            modelStartISO8601: nil,
+            modelEndISO8601: nil,
+            defaultPeriodUnit: periodUnit ?? defaultPeriodUnit
+        )?.queryDateRange
     }
 
     private enum RepresentativeMatchSet {
@@ -311,21 +389,61 @@ struct MarinaQueryResolver {
         return representatives.count == 1 ? .one(representatives[0]) : .many(representatives)
     }
 
+    private func sortedClarificationChoices(_ choices: [MarinaClarificationChoice]) -> [MarinaClarificationChoice] {
+        choices.sorted { lhs, rhs in
+            let lhsRank = clarificationTypeRank(lhs.entityTypeHint)
+            let rhsRank = clarificationTypeRank(rhs.entityTypeHint)
+            if lhsRank != rhsRank { return lhsRank < rhsRank }
+            return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
+        }
+    }
+
+    private func clarificationTypeRank(_ type: MarinaCandidateEntityTypeHint?) -> Int {
+        switch type {
+        case .card:
+            return 0
+        case .category:
+            return 1
+        case .merchant:
+            return 2
+        case .preset:
+            return 3
+        case .expense, .transaction:
+            return 4
+        case .budget:
+            return 5
+        case .incomeSource:
+            return 6
+        case .savingsAccount:
+            return 7
+        case .allocationAccount:
+            return 8
+        case .workspace, nil:
+            return 9
+        }
+    }
+
     private func collapseEquivalentMatches(_ matches: [MarinaNLQCandidateMatch]) -> [MarinaNLQCandidateMatch] {
         guard matches.count > 1 else { return matches }
 
-        // Merchant candidates are extracted from variable expense text and can duplicate
-        // the same visible target as expense candidates. Prefer merchant in those pairs.
+        let hasStoredEntityMatch = matches.contains { match in
+            switch match.entityType {
+            case .merchant, .expense:
+                return false
+            case .category, .card, .budget, .preset, .incomeSource, .allocationAccount, .savingsAccount:
+                return true
+            }
+        }
         let groupedByNormalizedDisplay = Dictionary(grouping: matches, by: {
             normalizeDisplay($0.displayValue)
         })
         var collapsed: [MarinaNLQCandidateMatch] = []
 
         for bucket in groupedByNormalizedDisplay.values {
-            let hasMerchant = bucket.contains(where: { $0.entityType == .merchant })
-            if hasMerchant {
-                let filtered = bucket.filter { $0.entityType != .expense }
-                collapsed.append(contentsOf: filtered.isEmpty ? bucket : filtered)
+            let hasMerchant = bucket.contains { $0.entityType == .merchant }
+            let hasExpense = bucket.contains { $0.entityType == .expense }
+            if hasMerchant, hasExpense, hasStoredEntityMatch == false {
+                collapsed.append(contentsOf: bucket.filter { $0.entityType != .expense })
             } else {
                 collapsed.append(contentsOf: bucket)
             }
@@ -505,14 +623,19 @@ struct MarinaQueryResolver {
         }
     }
 
-    private func allowedTypeHints(
-        from relationship: MarinaRelationshipField,
-        explicit: MarinaCandidateEntityTypeHint?
-    ) -> [MarinaCandidateEntityTypeHint]? {
-        if let explicit {
+    private func singleAllowedTypeHint(from filter: MarinaFilter) -> MarinaCandidateEntityTypeHint? {
+        guard filter.allowedEntityTypeHints?.count == 1 else { return nil }
+        return filter.allowedEntityTypeHints?.first
+    }
+
+    private func allowedTypeHints(from filter: MarinaFilter) -> [MarinaCandidateEntityTypeHint]? {
+        if filter.allowedEntityTypeHints?.isEmpty == false {
+            return filter.allowedEntityTypeHints
+        }
+        if let explicit = filter.entityTypeHint {
             return [explicit]
         }
-        return entityTypeHint(from: relationship).map { [$0] }
+        return entityTypeHint(from: filter.relationship).map { [$0] }
     }
 
     private func isUncategorizedFilter(_ filter: MarinaFilter) -> Bool {

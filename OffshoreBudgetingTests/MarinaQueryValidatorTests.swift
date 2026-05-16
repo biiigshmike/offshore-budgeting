@@ -442,6 +442,60 @@ struct MarinaQueryValidatorTests {
         #expect(unsupported.kind == .unsupportedOperation)
     }
 
+    @Test func semanticValidator_ambiguousFilterCarriesPendingQueryForTargetPatching() {
+        let filter = MarinaFilter(
+            role: .primaryTarget,
+            relationship: .unknown,
+            value: "Apple",
+            entityTypeHint: nil
+        )
+        let query = MarinaSemanticQuery(
+            subject: .variableExpenses,
+            operation: .sum,
+            filters: [filter],
+            amountField: .budgetImpactAmount
+        )
+        let resolved = MarinaResolvedSemanticQuery(
+            query: query,
+            candidate: nil,
+            resolvedFilters: [],
+            unresolvedFilters: [],
+            ambiguousFilters: [
+                MarinaAmbiguousFilter(
+                    filter: filter,
+                    choices: [
+                        MarinaClarificationChoice(
+                            title: "Apple Card",
+                            entityRole: .primaryTarget,
+                            entityTypeHint: .card,
+                            patchSlot: .target,
+                            rawValue: "Apple Card",
+                            sourceID: UUID(),
+                            mentionID: filter.id
+                        )
+                    ]
+                )
+            ],
+            primaryDateRange: nil,
+            comparisonDateRange: nil,
+            databaseLookupRequest: nil
+        )
+
+        let outcome = MarinaQueryValidator().validate(resolved)
+
+        guard case .clarification(let clarification) = outcome else {
+            Issue.record("Expected ambiguous semantic filter clarification")
+            return
+        }
+        #expect(clarification.kind == .ambiguousTarget)
+        #expect(clarification.patchSlot == .target)
+        #expect(clarification.pendingSemanticQuery?.id == query.id)
+        #expect(clarification.pendingSemanticQuery?.subject == query.subject)
+        #expect(clarification.pendingSemanticQuery?.operation == query.operation)
+        #expect(clarification.pendingSemanticQuery?.filters.first?.id == filter.id)
+        #expect(clarification.choices.first?.patchSlot == .target)
+    }
+
     @Test func semanticValidator_allowsVariableExpenseCategoryPercentageShare() {
         let filter = MarinaFilter(
             role: .primaryTarget,

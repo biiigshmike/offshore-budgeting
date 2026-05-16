@@ -99,7 +99,7 @@ struct MarinaFoundationModelsInterpreterTests {
         assertDateRange(
             candidate.timeScopes.first?.resolvedRangeHint,
             start: date(2026, 2, 1),
-            end: date(2026, 4, 30)
+            inclusiveEndDay: date(2026, 4, 30)
         )
         #expect(candidate.responseShapeHint == .scalarCurrency)
     }
@@ -133,12 +133,12 @@ struct MarinaFoundationModelsInterpreterTests {
         assertDateRange(
             candidate.timeScopes.first?.resolvedRangeHint,
             start: date(2026, 5, 1),
-            end: date(2026, 5, 31)
+            inclusiveEndDay: date(2026, 5, 31)
         )
         assertDateRange(
             candidate.timeScopes.last?.resolvedRangeHint,
             start: date(2026, 4, 1),
-            end: date(2026, 4, 30)
+            inclusiveEndDay: date(2026, 4, 30)
         )
         #expect(candidate.responseShapeHint == .comparison)
     }
@@ -417,6 +417,76 @@ struct MarinaFoundationModelsInterpreterTests {
         #expect(candidate.measure == .spend)
     }
 
+    @Test func foundationModelsAsyncCanonicalAdapter_emitsSemanticQueryWithCandidateShim() async throws {
+        let structuredIntent = MarinaStructuredIntent.query(
+            MarinaStructuredQueryIntent(
+                metricRaw: "categorySpendTotal",
+                targetName: "Groceries",
+                targetTypeRaw: "category",
+                dateStartISO8601: "2026-05-01",
+                dateEndISO8601: "2026-05-31",
+                comparisonDateStartISO8601: nil,
+                comparisonDateEndISO8601: nil,
+                resultLimit: nil,
+                periodUnitRaw: "month",
+                confidenceRaw: "high",
+                clarification: nil
+            )
+        )
+        let interpretation = try await MarinaFoundationModelsInterpreter(
+            structuredInterpreter: StubStructuredIntentInterpreter(structuredIntent: structuredIntent)
+        ).interpretCanonical(prompt: "what did I spend on groceries this month?", context: makeRouterContext())
+
+        guard case .query(let query) = interpretation.result else {
+            Issue.record("Expected canonical semantic query.")
+            return
+        }
+
+        #expect(query.subject == .variableExpenses)
+        #expect(query.operation == .sum)
+        #expect(query.amountField == .budgetImpactAmount)
+        #expect(query.filters.first?.relationship == .category)
+        #expect(query.filters.first?.value == "Groceries")
+        #expect(interpretation.compatibilityCandidate.source == .foundationModels)
+        #expect(interpretation.compatibilityCandidate.operation == .sum)
+    }
+
+    @Test func foundationModelsCanonicalLookupDetails_keepsModelOutputAsSemanticShapeOnly() {
+        let command = MarinaSemanticCommand(
+            family: .databaseLookup,
+            action: .lookupDetails,
+            datasets: [.cards],
+            measure: nil,
+            includeFilters: [
+                MarinaSemanticCommandFilter(rawText: "Apple Card", allowedTypes: [.card])
+            ],
+            excludeFilters: [],
+            grouping: nil,
+            sort: nil,
+            dateRange: nil,
+            comparisonDateRange: nil,
+            periodUnit: nil,
+            limit: 5,
+            requestedDetail: .general
+        )
+        let interpretation = MarinaFoundationModelsInterpreter().canonicalInterpretation(
+            from: .semanticCommand(command),
+            prompt: "show Apple Card",
+            defaultPeriodUnit: .month
+        )
+
+        guard case .query(let query) = interpretation.result else {
+            Issue.record("Expected semantic lookup query.")
+            return
+        }
+
+        #expect(query.operation == .lookupDetails)
+        #expect(query.subject == .cards)
+        #expect(query.filters.first?.value == "Apple Card")
+        #expect(interpretation.compatibilityCandidate.databaseLookupRequest == nil)
+        #expect(interpretation.compatibilityCandidate.semanticCommand == command)
+    }
+
     @Test func foundationModels_lowConfidenceModelOutput_preservesValidCandidate() async throws {
         let structuredIntent = MarinaStructuredIntent.query(
             MarinaStructuredQueryIntent(
@@ -568,7 +638,7 @@ struct MarinaFoundationModelsInterpreterTests {
     private func assertDateRange(
         _ actual: HomeQueryDateRange?,
         start: Date,
-        end: Date
+        inclusiveEndDay: Date
     ) {
         guard let actual else {
             Issue.record("Expected date range")
@@ -576,13 +646,19 @@ struct MarinaFoundationModelsInterpreterTests {
         }
 
         #expect(actual.startDate == start)
-        #expect(actual.endDate == end)
+        #expect(actual.endDate == endOfDay(inclusiveEndDay))
     }
 
     private func date(_ year: Int, _ month: Int, _ day: Int) -> Date {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
         return calendar.date(from: DateComponents(year: year, month: month, day: day))!
+    }
+
+    private func endOfDay(_ date: Date) -> Date {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        return calendar.date(byAdding: DateComponents(day: 1, second: -1), to: calendar.startOfDay(for: date))!
     }
 
     private func makeRouterContext() -> MarinaLanguageRouterContext {

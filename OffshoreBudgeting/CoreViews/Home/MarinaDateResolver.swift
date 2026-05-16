@@ -84,6 +84,11 @@ struct MarinaDateResolver {
             return relativeRange
         }
 
+        if let currentPeriodRange = currentPeriodRange(from: normalized, now: now, defaultPeriodUnit: defaultPeriodUnit) {
+            logResolved(source: "current_period", input: input, range: currentPeriodRange)
+            return currentPeriodRange
+        }
+
         if let namedMonthRange = extractedNamedMonthRange(from: normalized, now: now) {
             logResolved(source: "explicit", input: input, range: namedMonthRange)
             return namedMonthRange
@@ -142,6 +147,18 @@ struct MarinaDateResolver {
 
         if normalized.contains("this year") || normalized.contains("current year") || normalized.contains("year to date") {
             return yearRange(containing: now)
+        }
+
+        if normalized.contains("last quarter") || normalized.contains("previous quarter") {
+            guard let currentQuarterStart = quarterStart(containing: now),
+                  let previousQuarterDate = calendar.date(byAdding: .month, value: -3, to: currentQuarterStart) else {
+                return nil
+            }
+            return quarterRange(containing: previousQuarterDate)
+        }
+
+        if normalized.contains("this quarter") || normalized.contains("current quarter") || normalized.contains("quarter to date") {
+            return quarterRange(containing: now)
         }
 
         return nil
@@ -294,6 +311,37 @@ struct MarinaDateResolver {
         }
 
         return MarinaResolvedDateRange(start: start, end: end)
+    }
+
+    private func currentPeriodRange(
+        from text: String,
+        now: Date,
+        defaultPeriodUnit: HomeQueryPeriodUnit
+    ) -> MarinaResolvedDateRange? {
+        let phrases = [
+            "active period",
+            "current period",
+            "this period",
+            "budget period",
+            "active budget",
+            "current budget"
+        ]
+        guard phrases.contains(where: { text.contains($0) }) else {
+            return nil
+        }
+
+        switch defaultPeriodUnit {
+        case .day:
+            return dayRange(for: now)
+        case .week:
+            return fullWeekRange(containing: now)
+        case .month:
+            return monthRange(containing: now)
+        case .quarter:
+            return quarterRange(containing: now)
+        case .year:
+            return yearRange(containing: now)
+        }
     }
 
     private func extractedNamedMonthRange(from text: String, now: Date) -> MarinaResolvedDateRange? {
@@ -548,6 +596,15 @@ struct MarinaDateResolver {
         quarterComponents.day = 1
         quarterComponents.timeZone = calendar.timeZone
         return calendar.date(from: quarterComponents)
+    }
+
+    private func quarterRange(containing date: Date) -> MarinaResolvedDateRange? {
+        guard let start = quarterStart(containing: date) else {
+            return nil
+        }
+        let endBase = calendar.date(byAdding: DateComponents(month: 3), to: start) ?? start
+        let end = calendar.date(byAdding: .second, value: -1, to: endBase) ?? start
+        return MarinaResolvedDateRange(start: start, end: end)
     }
 
     private func endOfDay(for date: Date) -> Date {

@@ -59,13 +59,7 @@ struct MarinaQueryRecoveryPolicy {
             return candidate.operation == .average
         }
 
-        if prompt.contains("most recent")
-            || prompt.contains("newest")
-            || prompt.contains("latest")
-            || prompt.hasPrefix("list ")
-            || prompt.hasPrefix("show ")
-            || prompt.contains(" list ")
-            || prompt.contains(" last ") {
+        if isRowListPrompt(prompt) {
             return candidate.operation == .listRows
                 || candidate.ranking?.direction == .newest
         }
@@ -94,6 +88,30 @@ struct MarinaQueryRecoveryPolicy {
         }
 
         return true
+    }
+
+    private func isRowListPrompt(_ prompt: String) -> Bool {
+        if prompt.contains("most recent")
+            || prompt.contains("newest")
+            || prompt.contains("latest") {
+            return true
+        }
+
+        let rowObjects = [
+            "expense", "expenses", "transaction", "transactions",
+            "purchase", "purchases", "planned expenses", "items", "rows"
+        ]
+        let mentionsRows = rowObjects.contains { prompt.contains($0) }
+        guard mentionsRows else { return false }
+
+        if prompt.hasPrefix("list ")
+            || prompt.hasPrefix("show ")
+            || prompt.contains(" list ")
+            || prompt.contains(" show ") {
+            return true
+        }
+
+        return prompt.range(of: "\\blast\\s+\\d+\\b", options: .regularExpression) != nil
     }
 
     private func normalized(_ text: String) -> String {

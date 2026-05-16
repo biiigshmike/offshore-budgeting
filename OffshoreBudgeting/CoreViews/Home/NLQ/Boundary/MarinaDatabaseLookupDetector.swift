@@ -27,7 +27,7 @@ struct MarinaDatabaseLookupDetector {
             searchText: searchText,
             objectTypes: objectTypes,
             dateRange: dateRange,
-            limit: 5,
+            limit: requestedDetail == .date ? 1 : 5,
             requestedDetail: requestedDetail
         ).clamped
     }
@@ -72,6 +72,10 @@ struct MarinaDatabaseLookupDetector {
         }
 
         let transactionPrefixes = [
+            "when did i last buy ",
+            "when did i last purchase ",
+            "when did i last order ",
+            "when did i last get ",
             "when did i buy ",
             "when did i purchase ",
             "when did i order ",
@@ -166,6 +170,7 @@ struct MarinaDatabaseLookupDetector {
         text = text.trimmingCharacters(in: CharacterSet(charactersIn: "?.!"))
 
         let caseInsensitivePrefixes = [
+            "when did i last purchase ", "when did i last buy ", "when did i last order ", "when did i last get ",
             "when did i purchase ", "when did i buy ", "when did i order ", "when did i get ",
             "what card did i use for ",
             "what category was ",

@@ -21,6 +21,25 @@ struct MarinaFoundationModelsInterpreter {
         )
     }
 
+    func interpretSemantic(
+        prompt: String,
+        context: MarinaLanguageRouterContext
+    ) async throws -> MarinaInterpretationResult {
+        try await interpretCanonical(prompt: prompt, context: context).result
+    }
+
+    func interpretCanonical(
+        prompt: String,
+        context: MarinaLanguageRouterContext
+    ) async throws -> MarinaCanonicalReadInterpretation {
+        let structuredIntent = try await structuredInterpreter.interpret(prompt: prompt, context: context)
+        return canonicalInterpretation(
+            from: structuredIntent,
+            prompt: prompt,
+            defaultPeriodUnit: context.defaultPeriodUnit
+        )
+    }
+
     func candidate(
         from structuredIntent: MarinaStructuredIntent,
         prompt: String,
@@ -67,6 +86,34 @@ struct MarinaFoundationModelsInterpreter {
                 unsupportedHint: .lowConfidence
             )
         }
+    }
+
+    func semanticInterpretation(
+        from structuredIntent: MarinaStructuredIntent,
+        prompt: String,
+        defaultPeriodUnit: HomeQueryPeriodUnit
+    ) -> MarinaInterpretationResult {
+        canonicalInterpretation(
+            from: structuredIntent,
+            prompt: prompt,
+            defaultPeriodUnit: defaultPeriodUnit
+        ).result
+    }
+
+    func canonicalInterpretation(
+        from structuredIntent: MarinaStructuredIntent,
+        prompt: String,
+        defaultPeriodUnit: HomeQueryPeriodUnit
+    ) -> MarinaCanonicalReadInterpretation {
+        let candidate = candidate(
+            from: structuredIntent,
+            prompt: prompt,
+            defaultPeriodUnit: defaultPeriodUnit
+        )
+        return MarinaCanonicalReadInterpretation(
+            result: MarinaSemanticQueryAdapter().interpretationResult(from: candidate),
+            compatibilityCandidate: candidate
+        )
     }
 
     private func candidate(
@@ -506,6 +553,16 @@ struct MarinaFoundationModelsInterpreter {
               targetName.isEmpty == false else {
             return []
         }
+        if metric == .incomeAverageActual || queryIntent.metricRaw?.localizedCaseInsensitiveContains("income") == true {
+            let normalizedTarget = targetName
+                .lowercased()
+                .replacingOccurrences(of: "[^a-z0-9\\s]", with: " ", options: .regularExpression)
+                .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if ["actual", "planned", "received", "expected", "projected"].contains(normalizedTarget) {
+                return []
+            }
+        }
 
         return [
             MarinaUnresolvedEntityMention(
@@ -631,24 +688,12 @@ struct MarinaFoundationModelsInterpreter {
     }
 
     private func makeDateRange(start: String?, end: String?) -> HomeQueryDateRange? {
-        guard let startDate = makeDate(start),
-              let endDate = makeDate(end) else {
-            return nil
-        }
-        return HomeQueryDateRange(startDate: startDate, endDate: endDate)
-    }
-
-    private func makeDate(_ value: String?) -> Date? {
-        guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines),
-              value.isEmpty == false else {
-            return nil
-        }
-
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
-        let parts = value.split(separator: "-").compactMap { Int($0) }
-        guard parts.count == 3 else { return nil }
-        return calendar.date(from: DateComponents(year: parts[0], month: parts[1], day: parts[2]))
+        return MarinaDateResolver(calendar: calendar).resolveExplicitRange(
+            start: start,
+            end: end
+        )?.queryDateRange
     }
 
     private func grouping(from metric: HomeQueryMetric?) -> MarinaGroupingCandidate? {

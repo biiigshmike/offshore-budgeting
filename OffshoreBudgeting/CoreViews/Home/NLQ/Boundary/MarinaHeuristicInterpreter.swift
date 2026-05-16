@@ -57,6 +57,27 @@ struct MarinaHeuristicInterpreter {
         )
     }
 
+    func interpretSemantic(
+        prompt: String,
+        defaultPeriodUnit: HomeQueryPeriodUnit
+    ) -> MarinaInterpretationResult {
+        interpretCanonical(
+            prompt: prompt,
+            defaultPeriodUnit: defaultPeriodUnit
+        ).result
+    }
+
+    func interpretCanonical(
+        prompt: String,
+        defaultPeriodUnit: HomeQueryPeriodUnit
+    ) -> MarinaCanonicalReadInterpretation {
+        let candidate = interpret(prompt: prompt, defaultPeriodUnit: defaultPeriodUnit)
+        return MarinaCanonicalReadInterpretation(
+            result: MarinaSemanticQueryAdapter().interpretationResult(from: candidate),
+            compatibilityCandidate: candidate
+        )
+    }
+
     private func operation(from intent: NormalizedQueryIntent) -> MarinaCandidateOperation? {
         if intent.unsupportedShapeReason == .whatIfSimulation {
             return .simulate
@@ -257,7 +278,7 @@ struct MarinaHeuristicInterpreter {
 
         switch intent.queryShape.grouping {
         case .some(.category):
-            return .category
+            return hasExplicitCategoryCue(intent.rawPrompt) ? .category : nil
         case .some(.merchant):
             return .merchant
         case .some(.preset):
@@ -276,10 +297,12 @@ struct MarinaHeuristicInterpreter {
         }
 
         switch intent.normalizedMetric {
-        case .categorySpendTotal, .categorySpendShare, .categoryMonthComparison:
+        case .categorySpendShare:
             return .category
+        case .categorySpendTotal, .categoryMonthComparison:
+            return hasExplicitCategoryCue(intent.rawPrompt) ? .category : nil
         case .merchantSpendTotal:
-            return .merchant
+            return normalizedPrompt.contains("merchant") || normalizedPrompt.contains("store") ? .merchant : nil
         case .incomeAverageActual:
             return .incomeSource
         case .presetDueSoon:
@@ -295,6 +318,17 @@ struct MarinaHeuristicInterpreter {
         let target = intent.rawTargetText?.lowercased() ?? ""
         guard target.contains("card") else { return false }
         return intent.normalizedMetric == .spendTotal || intent.queryShape.grouping == .some(.none)
+    }
+
+    private func hasExplicitCategoryCue(_ prompt: String) -> Bool {
+        let normalizedPrompt = normalized(prompt)
+        return normalizedPrompt.contains("category")
+            || normalizedPrompt.contains("grocer")
+            || normalizedPrompt.contains("dining")
+            || normalizedPrompt.contains("food")
+            || normalizedPrompt.contains("uncategorized")
+            || normalizedPrompt.contains("spend in ")
+            || normalizedPrompt.contains("spent in ")
     }
 
     private func timeScopes(
@@ -522,7 +556,6 @@ struct MarinaHeuristicInterpreter {
             || prompt.contains("if i spend")
             || prompt.contains("list my last")
             || prompt.contains(" my last ")
-            || prompt.contains(" last ")
             || prompt.hasPrefix("most recent")
             || prompt.hasPrefix("latest")
             || prompt.hasPrefix("newest")
@@ -540,6 +573,8 @@ struct MarinaHeuristicInterpreter {
             || prompt.contains("compare ")
             || prompt.contains("total income")
             || prompt.contains("income came in")
+            || isIncomeStatusAggregatePrompt(prompt)
+            || isIncomeEntryListPrompt(prompt)
             || prompt.contains("paid me the most")
             || prompt.contains("shared balances")
             || prompt.contains("savings movements")
@@ -592,6 +627,17 @@ struct MarinaHeuristicInterpreter {
             )
         }
 
+        if isCategoryAvailabilityPrompt(prompt),
+           let target = categoryAvailabilityTarget(in: prompt) {
+            return ProtectedShape(
+                operation: .lookupDetails,
+                measure: .remainingBudget,
+                entityMentions: categoryMention(from: target),
+                timeScopes: baseTimeScopes(from: intent, defaultPeriodUnit: .month),
+                responseShapeHint: .summaryCard
+            )
+        }
+
         if isProjectionPrompt(prompt) {
             return ProtectedShape(
                 operation: .forecast,
@@ -634,11 +680,24 @@ struct MarinaHeuristicInterpreter {
             )
         }
 
+        if isIncomeEntryListPrompt(prompt) {
+            return ProtectedShape(
+                operation: .listRows,
+                measure: .income,
+                entityMentions: incomeSourceMention(from: prompt),
+                timeScopes: baseTimeScopes(from: intent, defaultPeriodUnit: .month),
+                grouping: MarinaGroupingCandidate(dimension: .incomeSource),
+                ranking: MarinaRankingCandidate(direction: .newest, limit: intent.resultLimit ?? 10),
+                limit: intent.resultLimit ?? 10,
+                responseShapeHint: .rankedList
+            )
+        }
+
         if isIncomeSummaryPrompt(prompt) {
             return ProtectedShape(
                 operation: .sum,
                 measure: .income,
-                entityMentions: [],
+                entityMentions: incomeSourceMention(from: prompt),
                 timeScopes: baseTimeScopes(from: intent, defaultPeriodUnit: .month),
                 responseShapeHint: .summaryCard
             )
@@ -718,6 +777,20 @@ struct MarinaHeuristicInterpreter {
                 operation: .listRows,
                 measure: .transactionAmount,
                 entityMentions: filteredPurchaseMentions(from: prompt),
+                timeScopes: baseTimeScopes(from: intent, defaultPeriodUnit: .month),
+                grouping: MarinaGroupingCandidate(dimension: .transaction),
+                ranking: MarinaRankingCandidate(direction: .newest, limit: limit),
+                limit: limit,
+                responseShapeHint: .rankedList
+            )
+        }
+
+        if isDateScopedExpenseListPrompt(prompt, intent: intent) {
+            let limit = intent.resultLimit ?? explicitLimit(in: prompt) ?? defaultDateScopedListLimit
+            return ProtectedShape(
+                operation: .listRows,
+                measure: .transactionAmount,
+                entityMentions: dateScopedExpenseListMentions(from: prompt),
                 timeScopes: baseTimeScopes(from: intent, defaultPeriodUnit: .month),
                 grouping: MarinaGroupingCandidate(dimension: .transaction),
                 ranking: MarinaRankingCandidate(direction: .newest, limit: limit),
@@ -939,6 +1012,32 @@ struct MarinaHeuristicInterpreter {
                 || prompt.contains("bills"))
     }
 
+    private func isCategoryAvailabilityPrompt(_ prompt: String) -> Bool {
+        guard prompt.hasPrefix("if ") == false else { return false }
+
+        let asksRemaining = prompt.contains("left in")
+            || prompt.contains("left for")
+            || prompt.contains("remaining in")
+            || prompt.contains("remaining for")
+            || prompt.contains("available in")
+            || prompt.contains("available for")
+            || prompt.contains("room in")
+            || prompt.contains("room for")
+        return asksRemaining
+            && (prompt.contains("spend") == false || prompt.contains("safe spend") == false)
+    }
+
+    private func categoryAvailabilityTarget(in prompt: String) -> String? {
+        firstCapture(
+            in: prompt,
+            patterns: [
+                #"\b(?:left|remaining|available|room)\s+(?:in|for)\s+(.+?)(?:\s+this\b|\s+last\b|\s+in\s+[a-z]+\b|\s+for\s+this\b|$)"#,
+                #"\bhave\s+left\s+(?:in|for)\s+(.+?)(?:\s+this\b|\s+last\b|\s+in\s+[a-z]+\b|\s+for\s+this\b|$)"#
+            ]
+        )
+        .map { cleanEntitySpan($0, operation: .lookupDetails, typeHint: .category) }
+    }
+
     private func isSimulationPrompt(_ prompt: String) -> Bool {
         ((prompt.hasPrefix("if i add") || prompt.hasPrefix("if i increase"))
             && prompt.contains("does")
@@ -967,6 +1066,49 @@ struct MarinaHeuristicInterpreter {
             || prompt.contains(" latest ")
             || prompt.contains(" newest "))
             && (prompt.contains("purchase") || prompt.contains("transaction") || prompt.contains("expense"))
+    }
+
+    private var defaultDateScopedListLimit: Int { 10 }
+
+    private func isDateScopedExpenseListPrompt(_ prompt: String, intent: NormalizedQueryIntent) -> Bool {
+        let hasListVerb = prompt.hasPrefix("list ")
+            || prompt.hasPrefix("show ")
+            || prompt.contains(" list ")
+            || prompt.contains(" show ")
+        let hasExpenseObject = prompt.contains("expense")
+            || prompt.contains("expenses")
+            || prompt.contains("transaction")
+            || prompt.contains("transactions")
+            || prompt.contains("purchase")
+            || prompt.contains("purchases")
+        return hasListVerb
+            && hasExpenseObject
+            && intent.dateRange != nil
+    }
+
+    private func dateScopedExpenseListMentions(from prompt: String) -> [MarinaUnresolvedEntityMention] {
+        guard let target = firstCapture(
+            in: prompt,
+            patterns: [
+                #"\b(?:list|show)(?:\s+my)?\s+(.+?)\s+(?:expense|expenses|transaction|transactions|purchase|purchases)\s+(?:this|last|in|from|during)\b"#,
+                #"\b(?:list|show)(?:\s+my)?\s+(?:expense|expenses|transaction|transactions|purchase|purchases)\s+(?:for|in)\s+(.+?)\s+(?:this|last|in|from|during)\b"#
+            ]
+        ) else {
+            return []
+        }
+        let cleaned = cleanEntitySpan(target, operation: .listRows, typeHint: .category)
+        guard cleaned.isEmpty == false,
+              ["expense", "expenses", "transaction", "transactions", "purchase", "purchases"].contains(normalized(cleaned)) == false else {
+            return []
+        }
+        return [
+            MarinaUnresolvedEntityMention(
+                role: .filter,
+                rawText: cleaned,
+                typeHint: .category,
+                confidence: .medium
+            )
+        ]
     }
 
     private func isTargetedPeriodicAveragePrompt(_ prompt: String) -> Bool {
@@ -1011,9 +1153,30 @@ struct MarinaHeuristicInterpreter {
     private func isIncomeSummaryPrompt(_ prompt: String) -> Bool {
         prompt.contains("income came in")
             || prompt.contains("what income")
+            || prompt.contains("actual income")
+            || prompt.contains("planned income")
+            || prompt.contains("received income")
+            || prompt.contains("income so far")
+            || prompt.contains("my income")
             || prompt.contains("income did i get")
             || prompt.contains("got paid")
             || prompt.contains("deposited")
+    }
+
+    private func isIncomeStatusAggregatePrompt(_ prompt: String) -> Bool {
+        prompt.contains("income")
+            && (prompt.contains("actual")
+                || prompt.contains("planned")
+                || prompt.contains("received")
+                || prompt.contains("expected")
+                || prompt.contains("projected")
+                || prompt.contains("so far"))
+    }
+
+    private func isIncomeEntryListPrompt(_ prompt: String) -> Bool {
+        prompt.contains("income")
+            && (prompt.contains("entry") || prompt.contains("entries") || prompt.contains("rows"))
+            && (prompt.hasPrefix("show") || prompt.hasPrefix("list") || prompt.contains(" show ") || prompt.contains(" list "))
     }
 
     private func isIncomeSourceRankingPrompt(_ prompt: String) -> Bool {
@@ -1321,6 +1484,28 @@ struct MarinaHeuristicInterpreter {
                 role: .primaryTarget,
                 rawText: rawText,
                 typeHint: .category,
+                confidence: .medium
+            )
+        ]
+    }
+
+    private func incomeSourceMention(from prompt: String) -> [MarinaUnresolvedEntityMention] {
+        guard let rawSource = firstCapture(
+            in: prompt,
+            patterns: [
+                #"\bfrom\s+(.+?)(?:\s+this\b|\s+last\b|\s+in\b|\s+for\b|$)"#,
+                #"\bsource\s+(.+?)(?:\s+this\b|\s+last\b|\s+in\b|\s+for\b|$)"#
+            ]
+        ) else {
+            return []
+        }
+        let source = cleanEntitySpan(rawSource, operation: .sum, typeHint: .incomeSource)
+        guard source.isEmpty == false else { return [] }
+        return [
+            MarinaUnresolvedEntityMention(
+                role: .filter,
+                rawText: source,
+                typeHint: .incomeSource,
                 confidence: .medium
             )
         ]
