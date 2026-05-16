@@ -7,10 +7,11 @@ func sharedContext(
     sharedPipelineEnabled: Bool = true,
     aiOptInEnabled: Bool = false,
     turnClassification: MarinaPromptTurnClassification = .freshQuestion,
-    priorQueryContext: MarinaPriorQueryContext = .empty,
+    priorQueryContext: MarinaPriorQueryContext? = nil,
     now: Date = sharedPipelineDate(2026, 5, 15)
 ) -> MarinaSharedPipelineContext {
-    MarinaSharedPipelineContext(
+    let priorQueryContext = priorQueryContext ?? .empty
+    return MarinaSharedPipelineContext(
         provider: fixture.provider,
         routerContext: MarinaLanguageRouterContext(
             workspaceName: fixture.workspace.name,

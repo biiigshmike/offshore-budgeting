@@ -73,6 +73,27 @@ struct MarinaDatabaseLookupExecutorTests {
         #expect(answer.subtitle?.contains("clearer budgeting prompt") == false)
     }
 
+    @Test func responseBuilder_workspaceLookupUsesDirectConfidentCopy() throws {
+        let fixture = try makeLookupFixture()
+        let response = MarinaDatabaseLookupExecutor().execute(
+            MarinaDatabaseLookupRequest(
+                rawPrompt: "What workspace am I in?",
+                searchText: "",
+                objectTypes: [.workspace],
+                dateRange: nil,
+                limit: 5,
+                requestedDetail: .general
+            ),
+            provider: fixture.provider
+        )
+
+        let answer = MarinaDatabaseLookupResponseBuilder().responseCompatibleAnswer(from: response)
+
+        #expect(answer.title == "You are in Lookup Workspace.")
+        #expect(answer.subtitle?.localizedCaseInsensitiveContains("waiting on") != true)
+        #expect(answer.rows.contains { $0.title == "Type" && $0.value == "Workspace" })
+    }
+
     @Test func workspaceScoping_ignoresOtherWorkspaceMatches() throws {
         let fixture = try makeLookupFixture()
         let otherWorkspace = Workspace(name: "Other", hexColor: "#111111")

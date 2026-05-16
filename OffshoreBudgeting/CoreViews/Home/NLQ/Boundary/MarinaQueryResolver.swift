@@ -426,14 +426,6 @@ struct MarinaQueryResolver {
     private func collapseEquivalentMatches(_ matches: [MarinaNLQCandidateMatch]) -> [MarinaNLQCandidateMatch] {
         guard matches.count > 1 else { return matches }
 
-        let hasStoredEntityMatch = matches.contains { match in
-            switch match.entityType {
-            case .merchant, .expense:
-                return false
-            case .category, .card, .budget, .preset, .incomeSource, .allocationAccount, .savingsAccount:
-                return true
-            }
-        }
         let groupedByNormalizedDisplay = Dictionary(grouping: matches, by: {
             normalizeDisplay($0.displayValue)
         })
@@ -442,7 +434,7 @@ struct MarinaQueryResolver {
         for bucket in groupedByNormalizedDisplay.values {
             let hasMerchant = bucket.contains { $0.entityType == .merchant }
             let hasExpense = bucket.contains { $0.entityType == .expense }
-            if hasMerchant, hasExpense, hasStoredEntityMatch == false {
+            if hasMerchant, hasExpense {
                 collapsed.append(contentsOf: bucket.filter { $0.entityType != .expense })
             } else {
                 collapsed.append(contentsOf: bucket)

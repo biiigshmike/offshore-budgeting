@@ -19,6 +19,13 @@ struct MarinaHeuristicInterpreter {
         defaultPeriodUnit: HomeQueryPeriodUnit
     ) -> MarinaQueryPlanCandidate {
         let intent = normalize(prompt, defaultPeriodUnit)
+        if let readShape = MarinaReadRequestShapeDetector().detect(
+            prompt: prompt,
+            defaultPeriodUnit: defaultPeriodUnit,
+            now: now()
+        ) {
+            return readShape
+        }
         if shouldPreferAnalyticsOverLookup(prompt) == false,
            let lookupRequest = MarinaDatabaseLookupDetector().detect(
             prompt: prompt,

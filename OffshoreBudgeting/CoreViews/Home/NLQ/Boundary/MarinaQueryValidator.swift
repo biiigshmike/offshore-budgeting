@@ -312,8 +312,9 @@ struct MarinaQueryValidator {
         case .trend:
             return .chartRows
         case .sum, .average, .count, .minimum, .maximum, .forecast, .simulate, .lookupDetails:
-            if candidate.responseShapeHint == .summaryCard {
-                return .summaryCard
+            if let responseShapeHint = candidate.responseShapeHint,
+               [.summaryCard, .relationshipList, .membershipStatus].contains(responseShapeHint) {
+                return responseShapeHint
             }
             return candidate.responseShapeHint == .groupedBreakdown ? .groupedBreakdown : .scalarCurrency
         }

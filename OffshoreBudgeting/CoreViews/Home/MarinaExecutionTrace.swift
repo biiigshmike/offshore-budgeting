@@ -43,8 +43,14 @@ struct MarinaExecutionTrace: Equatable {
     let sharedPipelineValidatorSummary: String?
     let sharedPipelineExecutorSummary: String?
     let sharedPipelineResponseBridgeSummary: String?
+    let sharedPipelineResponseShapeSummary: String?
+    let sharedPipelineSemanticInterpretationSummary: String?
+    let sharedPipelineSemanticResolverSummary: String?
+    let sharedPipelineSemanticValidationSummary: String?
     let sharedPipelineFallbackReason: MarinaSharedPipelineFallbackReason?
     let sharedPipelineDisagreementSummary: String?
+    let sharedPipelineTurnClassification: MarinaPromptTurnClassification?
+    let sharedPipelinePriorContextIncluded: Bool?
 }
 
 enum MarinaExecutionRoutingMode: String, Equatable {
@@ -241,6 +247,23 @@ final class MarinaTraceRecorder {
         }
     }
 
+    func recordDebugMarker(_ marker: String) {
+        guard isEnabled else { return }
+        mutate { draft in
+            let existing = draft.finalAnswerSummary
+            draft.finalAnswerSummary = [existing, "debug=\(marker)"]
+                .compactMap { $0 }
+                .joined(separator: ";")
+        }
+    }
+
+    func recordSharedPipelineTurnClassification(_ turnClassification: MarinaPromptTurnClassification) {
+        guard isEnabled else { return }
+        mutate { draft in
+            draft.sharedPipelineTurnClassification = turnClassification
+        }
+    }
+
     func recordSharedPipelineTrace(_ trace: MarinaSharedPipelineTrace) {
         guard isEnabled else { return }
         mutate { draft in
@@ -252,8 +275,14 @@ final class MarinaTraceRecorder {
             draft.sharedPipelineValidatorSummary = trace.validatorOutcomeSummary
             draft.sharedPipelineExecutorSummary = trace.executorResultSummary
             draft.sharedPipelineResponseBridgeSummary = trace.responseBridgeSummary
+            draft.sharedPipelineResponseShapeSummary = trace.responseShapeSummary
+            draft.sharedPipelineSemanticInterpretationSummary = trace.semanticInterpretationSummary
+            draft.sharedPipelineSemanticResolverSummary = trace.semanticResolverSummary
+            draft.sharedPipelineSemanticValidationSummary = trace.semanticValidationSummary
             draft.sharedPipelineFallbackReason = trace.fallbackReason
             draft.sharedPipelineDisagreementSummary = trace.disagreementSummary
+            draft.sharedPipelineTurnClassification = trace.turnClassification
+            draft.sharedPipelinePriorContextIncluded = trace.priorContextIncluded
         }
     }
 
@@ -267,6 +296,7 @@ final class MarinaTraceRecorder {
         completed.append(trace)
         currentDraft = nil
         MarinaDebugLogger.log("[MarinaTrace] \(trace.sanitizedLogLine)")
+        MarinaTraceExporter.exportIfConfigured(trace)
         return trace
     }
 
@@ -328,8 +358,14 @@ private struct MarinaExecutionTraceDraft {
     var sharedPipelineValidatorSummary: String?
     var sharedPipelineExecutorSummary: String?
     var sharedPipelineResponseBridgeSummary: String?
+    var sharedPipelineResponseShapeSummary: String?
+    var sharedPipelineSemanticInterpretationSummary: String?
+    var sharedPipelineSemanticResolverSummary: String?
+    var sharedPipelineSemanticValidationSummary: String?
     var sharedPipelineFallbackReason: MarinaSharedPipelineFallbackReason?
     var sharedPipelineDisagreementSummary: String?
+    var sharedPipelineTurnClassification: MarinaPromptTurnClassification?
+    var sharedPipelinePriorContextIncluded: Bool?
 
     func freeze() -> MarinaExecutionTrace {
         MarinaExecutionTrace(
@@ -367,9 +403,123 @@ private struct MarinaExecutionTraceDraft {
             sharedPipelineValidatorSummary: sharedPipelineValidatorSummary,
             sharedPipelineExecutorSummary: sharedPipelineExecutorSummary,
             sharedPipelineResponseBridgeSummary: sharedPipelineResponseBridgeSummary,
+            sharedPipelineResponseShapeSummary: sharedPipelineResponseShapeSummary,
+            sharedPipelineSemanticInterpretationSummary: sharedPipelineSemanticInterpretationSummary,
+            sharedPipelineSemanticResolverSummary: sharedPipelineSemanticResolverSummary,
+            sharedPipelineSemanticValidationSummary: sharedPipelineSemanticValidationSummary,
             sharedPipelineFallbackReason: sharedPipelineFallbackReason,
-            sharedPipelineDisagreementSummary: sharedPipelineDisagreementSummary
+            sharedPipelineDisagreementSummary: sharedPipelineDisagreementSummary,
+            sharedPipelineTurnClassification: sharedPipelineTurnClassification,
+            sharedPipelinePriorContextIncluded: sharedPipelinePriorContextIncluded
         )
+    }
+}
+
+struct MarinaExecutionTraceSnapshot: Codable, Equatable {
+    let originalPrompt: String
+    let routingMode: String
+    let marinaNLQv1Enabled: Bool
+    let runtimeSettingsSummary: String?
+    let selectedRoute: String
+    let selectedRouteReason: String?
+    let aggregationPath: String?
+    let responseType: String?
+    let finalAnswerSummary: String?
+    let sharedPipelineEnabled: Bool?
+    let sharedPipelinePath: String?
+    let sharedPipelineInterpreterSource: String?
+    let sharedPipelineCandidateSummary: String?
+    let sharedPipelineResolverSummary: String?
+    let sharedPipelineValidatorSummary: String?
+    let sharedPipelineExecutorSummary: String?
+    let sharedPipelineResponseBridgeSummary: String?
+    let sharedPipelineResponseShapeSummary: String?
+    let sharedPipelineSemanticInterpretationSummary: String?
+    let sharedPipelineSemanticResolverSummary: String?
+    let sharedPipelineSemanticValidationSummary: String?
+    let sharedPipelineFallbackReason: String?
+    let sharedPipelineDisagreementSummary: String?
+    let turnClassification: String?
+    let priorContextIncluded: Bool?
+
+    init(_ trace: MarinaExecutionTrace) {
+        self.originalPrompt = trace.originalPrompt
+        self.routingMode = trace.routingMode.rawValue
+        self.marinaNLQv1Enabled = trace.marinaNLQv1Enabled
+        self.runtimeSettingsSummary = trace.runtimeSettingsSummary
+        self.selectedRoute = trace.selectedRoute.rawValue
+        self.selectedRouteReason = trace.selectedRouteReason
+        self.aggregationPath = trace.aggregationPath
+        self.responseType = trace.responseType
+        self.finalAnswerSummary = trace.finalAnswerSummary
+        self.sharedPipelineEnabled = trace.sharedPipelineEnabled
+        self.sharedPipelinePath = trace.sharedPipelinePath?.rawValue
+        self.sharedPipelineInterpreterSource = trace.sharedPipelineInterpreterSource?.rawValue
+        self.sharedPipelineCandidateSummary = trace.sharedPipelineCandidateSummary
+        self.sharedPipelineResolverSummary = trace.sharedPipelineResolverSummary
+        self.sharedPipelineValidatorSummary = trace.sharedPipelineValidatorSummary
+        self.sharedPipelineExecutorSummary = trace.sharedPipelineExecutorSummary
+        self.sharedPipelineResponseBridgeSummary = trace.sharedPipelineResponseBridgeSummary
+        self.sharedPipelineResponseShapeSummary = trace.sharedPipelineResponseShapeSummary
+        self.sharedPipelineSemanticInterpretationSummary = trace.sharedPipelineSemanticInterpretationSummary
+        self.sharedPipelineSemanticResolverSummary = trace.sharedPipelineSemanticResolverSummary
+        self.sharedPipelineSemanticValidationSummary = trace.sharedPipelineSemanticValidationSummary
+        self.sharedPipelineFallbackReason = trace.sharedPipelineFallbackReason?.rawValue
+        self.sharedPipelineDisagreementSummary = trace.sharedPipelineDisagreementSummary
+        self.turnClassification = trace.sharedPipelineTurnClassification?.rawValue
+        self.priorContextIncluded = trace.sharedPipelinePriorContextIncluded
+    }
+
+    var accessibilityValue: String {
+        [
+            "prompt=\(originalPrompt)",
+            "routingMode=\(routingMode)",
+            "selectedRoute=\(selectedRoute)",
+            sharedPipelinePath.map { "sharedPath=\($0)" },
+            sharedPipelineInterpreterSource.map { "interpreter=\($0)" },
+            turnClassification.map { "turnClassification=\($0)" },
+            priorContextIncluded.map { "priorContextIncluded=\($0)" },
+            aggregationPath.map { "aggregationPath=\($0)" },
+            responseType.map { "responseType=\($0)" },
+            sharedPipelineExecutorSummary.map { "executor=\($0)" },
+            sharedPipelineResponseBridgeSummary.map { "bridge=\($0)" },
+            sharedPipelineFallbackReason.map { "fallback=\($0)" }
+        ]
+        .compactMap { $0 }
+        .joined(separator: " | ")
+    }
+}
+
+enum MarinaTraceExporter {
+    static func exportIfConfigured(_ trace: MarinaExecutionTrace) {
+        #if DEBUG
+        let environment = ProcessInfo.processInfo.environment
+        guard let path = environment[MarinaRuntimeSettings.traceOutputPathEnvironmentKey]?.trimmingCharacters(in: .whitespacesAndNewlines),
+              path.isEmpty == false else {
+            return
+        }
+
+        let snapshot = MarinaExecutionTraceSnapshot(trace)
+        do {
+            let data = try JSONEncoder().encode(snapshot)
+            let url = URL(fileURLWithPath: path)
+            try FileManager.default.createDirectory(
+                at: url.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            if FileManager.default.fileExists(atPath: path) {
+                let handle = try FileHandle(forWritingTo: url)
+                try handle.seekToEnd()
+                try handle.write(contentsOf: Data("\n".utf8))
+                try handle.write(contentsOf: data)
+                try handle.close()
+            } else {
+                try data.write(to: url, options: .atomic)
+            }
+        } catch {
+            MarinaDebugLogger.log("[MarinaTraceExporter] failed path='\(path)' error='\(error)'")
+        }
+        #endif
     }
 }
 

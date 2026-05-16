@@ -145,7 +145,7 @@ struct MarinaQueryResolverTests {
         let choiceTypes = resolved.ambiguousMentions[0].choices
             .compactMap(\.entityTypeHint?.rawValue)
             .sorted()
-        #expect(choiceTypes == ["card", "expense", "merchant"])
+        #expect(choiceTypes == ["card", "merchant"])
     }
 
     @Test func resolver_allowedTypesPreferExactCategoryOverExpensePrefixes() throws {
@@ -406,8 +406,50 @@ struct MarinaQueryResolverTests {
         let choiceTypes = resolved.ambiguousMentions.first?.choices.compactMap(\.entityTypeHint) ?? []
 
         #expect(choiceTypes.contains(.card))
-        #expect(choiceTypes.contains(.merchant))
         #expect(choiceTypes.contains(.expense))
+        #expect(choiceTypes.contains(.merchant) == false)
+    }
+
+    @Test func resolver_transactionBackedAppleChoicesDistinguishMerchantFromExpense() throws {
+        let fixture = try makeFixture()
+        let card = Card(name: "Apple Card", workspace: fixture.workspace)
+        fixture.context.insert(card)
+        fixture.context.insert(VariableExpense(
+            descriptionText: "Apple Store",
+            amount: 129.0,
+            transactionDate: Date(),
+            workspace: fixture.workspace,
+            card: card,
+            category: nil
+        ))
+        fixture.context.insert(VariableExpense(
+            descriptionText: "Apple Watch",
+            amount: 35.0,
+            transactionDate: Date(),
+            workspace: fixture.workspace,
+            card: card,
+            category: nil
+        ))
+        try fixture.context.save()
+
+        let candidate = MarinaQueryPlanCandidate(
+            source: .heuristic,
+            rawPrompt: "What did I spend at Apple?",
+            operation: .sum,
+            measure: .spend,
+            entityMentions: [
+                MarinaUnresolvedEntityMention(role: .primaryTarget, rawText: "Apple", typeHint: nil)
+            ],
+            confidence: .high
+        )
+
+        let resolved = MarinaQueryResolver().resolve(candidate: candidate, provider: fixture.provider)
+        let choicesByTitle = Dictionary(
+            uniqueKeysWithValues: (resolved.ambiguousMentions.first?.choices ?? []).map { ($0.title, $0.entityTypeHint) }
+        )
+
+        #expect(choicesByTitle["Apple Store"] == .merchant)
+        #expect(choicesByTitle["Apple Watch"] == .expense)
     }
 
     @Test func resolver_typeHintMerchantResolvesCrossDomainName() throws {

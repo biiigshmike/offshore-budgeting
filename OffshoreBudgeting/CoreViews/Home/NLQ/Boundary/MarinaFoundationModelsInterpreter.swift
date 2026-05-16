@@ -273,6 +273,14 @@ struct MarinaFoundationModelsInterpreter {
         case .simulate:
             return .summaryCard
         case .lookupDetails:
+            switch command.requestedDetail {
+            case .linkedCards, .linkedPresets, .categoryLimits:
+                return .relationshipList
+            case .membership:
+                return .membershipStatus
+            default:
+                break
+            }
             return .summaryCard
         case .total, .average:
             return measure == .categoryShare ? .groupedBreakdown : .scalarCurrency
@@ -343,7 +351,7 @@ struct MarinaFoundationModelsInterpreter {
             return .account
         case .balance:
             return .balance
-        case .linkedObjects:
+        case .linkedObjects, .linkedCards, .linkedPresets, .categoryLimits, .membership:
             return .linkedObjects
         case .general, nil:
             return .general

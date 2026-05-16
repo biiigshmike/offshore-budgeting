@@ -72,7 +72,8 @@ struct MarinaNLQCandidateExtractor {
             }
 
             let merchantName = MerchantNormalizer.displayName(expense.descriptionText)
-            if let merchantMatch = matchCandidate(target: normalizedTarget, displayValue: merchantName, targetType: .merchant, sourceID: expense.id) {
+            if shouldOfferMerchantCandidate(merchantName),
+               let merchantMatch = matchCandidate(target: normalizedTarget, displayValue: merchantName, targetType: .merchant, sourceID: expense.id) {
                 collected.append(merchantMatch)
             }
         }
@@ -146,5 +147,24 @@ struct MarinaNLQCandidateExtractor {
             .replacingOccurrences(of: "[^a-z0-9\\s&]", with: " ", options: .regularExpression)
             .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func shouldOfferMerchantCandidate(_ displayValue: String) -> Bool {
+        let normalized = normalize(displayValue)
+        guard normalized.isEmpty == false else { return false }
+
+        let tokens = normalized
+            .split(separator: " ")
+            .map(String.init)
+
+        if tokens.count == 1 {
+            return true
+        }
+
+        let merchantIndicators: Set<String> = [
+            "bakery", "bar", "cafe", "coffee", "deli", "foods", "grocery", "market",
+            "pharmacy", "restaurant", "shop", "store", "supermarket"
+        ]
+        return tokens.contains { merchantIndicators.contains($0) }
     }
 }

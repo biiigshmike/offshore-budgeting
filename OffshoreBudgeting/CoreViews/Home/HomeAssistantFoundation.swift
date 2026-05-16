@@ -122,6 +122,7 @@ struct HomeAssistantPanelView: View {
     @State private var answers: [HomeAnswer] = []
     @State private var promptText = ""
     @State private var pendingUserPromptForNextAnswer: String? = nil
+    @State private var latestTraceAccessibilityValue: String = ""
     @State private var quickButtonsVisible = false
     @State private var followUpsCollapsed = false
     @State private var hasLoadedConversation = false
@@ -133,6 +134,8 @@ struct HomeAssistantPanelView: View {
     @State private var lastClarificationReasons: [HomeAssistantClarificationReason] = []
     @State private var activeClarificationContext: HomeAssistantClarificationContext? = nil
     @State private var sharedPipelineClarification: MarinaTypedClarification? = nil
+    @State private var sharedPipelineClarificationChoiceContext: MarinaTypedClarification? = nil
+    @State private var sharedPipelineClarificationChoicesByTitle: [String: MarinaClarificationChoice] = [:]
     @State private var selectedEmptySuggestionGroup: EmptySuggestionGroup?
     @State private var personaSessionSeed: UInt64 = UInt64.random(in: UInt64.min...UInt64.max)
     @State private var personaCooldownSessionID: String = UUID().uuidString
@@ -423,6 +426,10 @@ struct HomeAssistantPanelView: View {
             .onAppear {
                 loadConversationIfNeeded()
             }
+            .accessibilityIdentifier("marina.panel")
+            .overlay(alignment: .topLeading) {
+                debugTraceAccessibilityOverlay
+            }
         
         if shouldUseLargeMinimumSize {
             content.frame(minWidth: 700, minHeight: 520)
@@ -492,9 +499,25 @@ struct HomeAssistantPanelView: View {
             .modifier(AssistantIconButtonModifier())
             .disabled(trimmedPromptText.isEmpty)
             .accessibilityLabel(String(localized: "assistant.submitQuestion", defaultValue: "Submit Question", comment: "Accessibility label for submitting assistant question."))
+            .accessibilityIdentifier("marina.submitButton")
         }
         .padding(.horizontal, 16)
         .padding(.bottom, 10)
+    }
+
+    @ViewBuilder
+    private var debugTraceAccessibilityOverlay: some View {
+        #if DEBUG
+        if UITestSupport.shouldRunMarinaHarness {
+            Text(latestTraceAccessibilityValue)
+                .font(.caption2)
+                .frame(width: 1, height: 1)
+                .opacity(0.01)
+                .accessibilityIdentifier("marina.trace.latest")
+                .accessibilityLabel("Marina trace latest")
+                .accessibilityValue(latestTraceAccessibilityValue)
+        }
+        #endif
     }
     
     private func handleCreateMenuSelection(_ kind: HomeAssistantCreateEntityKind) {
@@ -960,6 +983,7 @@ struct HomeAssistantPanelView: View {
                 .focused($isPromptFieldFocused)
                 .padding(.horizontal, 12)
                 .frame(minHeight: 44)
+                .accessibilityIdentifier("marina.promptField")
 //                .background(Color.white.opacity(0.28), in: Capsule())
                 .overlay {
                     Capsule()
@@ -973,6 +997,7 @@ struct HomeAssistantPanelView: View {
                 .textFieldStyle(.automatic)
                 .focused($isPromptFieldFocused)
                 .frame(minHeight: 44)
+                .accessibilityIdentifier("marina.promptField")
                 .onSubmit {
                     submitPrompt()
                 }
@@ -1139,9 +1164,10 @@ struct HomeAssistantPanelView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     if let userPrompt = answer.userPrompt, userPrompt.isEmpty == false {
                         userMessageBubble(text: userPrompt, generatedAt: answer.generatedAt)
+                            .accessibilityIdentifier("marina.userMessage.\(index)")
                     }
                     
-                    assistantMessageBubble(for: answer)
+                    assistantMessageBubble(for: answer, index: index)
                     
                     if index == answers.count - 1, selectedEmptySuggestionGroup == nil {
                         let sections = inlineConversationSuggestionSections(for: answer)
@@ -1152,6 +1178,7 @@ struct HomeAssistantPanelView: View {
                 }
             }
         }
+        .accessibilityIdentifier("marina.answerList")
     }
     
     private func assistantFollowUpRail(
@@ -1214,10 +1241,11 @@ struct HomeAssistantPanelView: View {
                             Text(section.title)
                                 .font(.footnote.weight(.semibold))
                                 .foregroundStyle(.secondary)
+                                .accessibilityIdentifier("marina.suggestionSection.\(normalizedAccessibilityToken(section.title))")
 
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 10) {
-                                    ForEach(section.suggestions) { suggestion in
+                                    ForEach(Array(section.suggestions.enumerated()), id: \.element.id) { chipIndex, suggestion in
                                         Button {
                                             handleSuggestionTap(suggestion)
                                         } label: {
@@ -1227,6 +1255,7 @@ struct HomeAssistantPanelView: View {
                                                 .frame(height: 33)
                                         }
                                         .modifier(AssistantChipButtonModifier())
+                                        .accessibilityIdentifier(suggestionAccessibilityIdentifier(section: section, index: chipIndex))
                                     }
                                 }
                             }
@@ -1268,35 +1297,40 @@ struct HomeAssistantPanelView: View {
         }
     }
     
-    private func assistantMessageBubble(for answer: HomeAnswer) -> some View {
+    private func assistantMessageBubble(for answer: HomeAnswer, index: Int) -> some View {
         let subtitlePresentation = assistantSubtitlePresentation(for: answer.subtitle)
         
         return VStack(alignment: .leading, spacing: 4) {
             VStack(alignment: .leading, spacing: 8) {
                 Text(answer.title)
                     .font(.subheadline.weight(.semibold))
+                    .accessibilityIdentifier("marina.answer.\(index).title")
                 
                 if let primaryValue = answer.primaryValue {
                     Text(primaryValue)
                         .font(.title2.weight(.bold))
+                        .accessibilityIdentifier("marina.answer.\(index).primaryValue")
                 }
                 
                 if let narrative = subtitlePresentation.narrative {
                     Text(narrative)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("marina.answer.\(index).narrative")
                 }
                 
                 if answer.rows.isEmpty == false {
-                    ForEach(answer.rows) { row in
+                    ForEach(Array(answer.rows.enumerated()), id: \.element.id) { rowIndex, row in
                         HStack {
                             Text(row.title)
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(.primary)
+                                .accessibilityIdentifier("marina.answer.\(index).row.\(rowIndex).title")
                             Spacer()
                             Text(row.value)
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
+                                .accessibilityIdentifier("marina.answer.\(index).row.\(rowIndex).value")
                         }
                     }
                 }
@@ -1332,11 +1366,71 @@ struct HomeAssistantPanelView: View {
                     .stroke(assistantBubbleStroke, lineWidth: 1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("marina.answer.\(index)")
+            .accessibilityLabel(answerStateAccessibilityLabel(for: answer))
+            .accessibilityValue(answerAccessibilityValue(answer, subtitlePresentation: subtitlePresentation))
             
             Text(timestampText(for: answer.generatedAt))
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }
+    }
+
+    private func answerStateAccessibilityLabel(for answer: HomeAnswer) -> String {
+        let normalizedTitle = normalizedPrompt(answer.title)
+        let normalizedSubtitle = normalizedPrompt(answer.subtitle ?? "")
+        if normalizedTitle.contains("quick clarification") || normalizedSubtitle.contains("pick") {
+            return "Marina answer clarification \(answer.kind.rawValue)"
+        }
+        if normalizedTitle.contains("can answer") || normalizedSubtitle.contains("different way") || normalizedSubtitle.contains("unsupported") {
+            return "Marina answer unsupported \(answer.kind.rawValue)"
+        }
+        if normalizedTitle.contains("no ") || normalizedSubtitle.contains("no data") {
+            return "Marina answer no data \(answer.kind.rawValue)"
+        }
+        return "Marina answer \(answer.kind.rawValue)"
+    }
+
+    private func answerAccessibilityValue(
+        _ answer: HomeAnswer,
+        subtitlePresentation: AssistantSubtitlePresentation
+    ) -> String {
+        var parts: [String] = [answer.title]
+        if let primaryValue = answer.primaryValue {
+            parts.append(primaryValue)
+        }
+        if let narrative = subtitlePresentation.narrative {
+            parts.append(narrative)
+        }
+        for row in answer.rows {
+            parts.append("\(row.title): \(row.value)")
+        }
+        if let provenance = subtitlePresentation.provenance {
+            parts.append("Based on: \(provenance)")
+        }
+        parts.append("kind=\(answer.kind.rawValue)")
+        return parts.joined(separator: "\n")
+    }
+
+    private func suggestionAccessibilityIdentifier(
+        section: HomeAssistantSuggestionSection,
+        index: Int
+    ) -> String {
+        if section.isRecovery {
+            return "marina.recoveryChip.\(index)"
+        }
+        if section.title.localizedCaseInsensitiveContains("clarification") {
+            return "marina.clarificationChip.\(index)"
+        }
+        return "marina.followupChip.\(index)"
+    }
+
+    private func normalizedAccessibilityToken(_ value: String) -> String {
+        value
+            .lowercased()
+            .replacingOccurrences(of: "[^a-z0-9]+", with: "-", options: .regularExpression)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
     }
     
     private func assistantSubtitlePresentation(for subtitle: String?) -> AssistantSubtitlePresentation {
@@ -1395,6 +1489,8 @@ struct HomeAssistantPanelView: View {
         lastClarificationReasons = []
         activeClarificationContext = nil
         sharedPipelineClarification = nil
+        sharedPipelineClarificationChoiceContext = nil
+        sharedPipelineClarificationChoicesByTitle = [:]
         clearNLQClarificationState()
         
         let baseAnswer = engine.execute(
@@ -1456,17 +1552,22 @@ struct HomeAssistantPanelView: View {
         recoverySuggestions = []
         lastClarificationReasons = []
         activeClarificationContext = nil
+        sharedPipelineClarification = nil
+        sharedPipelineClarificationChoiceContext = nil
+        sharedPipelineClarificationChoicesByTitle = [:]
         clearNLQClarificationState()
 
         let query = homeQueryPlan?.query
         let normalizedAnswer = query.map {
             executedQueryAnswerNormalizer.normalize(answer, for: $0)
         } ?? answer
-        let styled = personaFormatter.styledAnswer(
-            from: normalizedAnswer,
-            userPrompt: rawPrompt,
-            personaID: selectedPersonaID
-        )
+        let styled = shouldBypassPersonaStyling(for: normalizedAnswer)
+            ? normalizedAnswer
+            : personaFormatter.styledAnswer(
+                from: normalizedAnswer,
+                userPrompt: rawPrompt,
+                personaID: selectedPersonaID
+            )
 
         if let homeQueryPlan, let query {
             updateSessionContext(after: homeQueryPlan)
@@ -1487,6 +1588,19 @@ struct HomeAssistantPanelView: View {
             notes: "shared_pipeline"
         )
         appendAnswer(styled)
+    }
+
+    private func shouldBypassPersonaStyling(for answer: HomeAnswer) -> Bool {
+        guard answer.kind == .message,
+              answer.rows.isEmpty == false else {
+            return false
+        }
+
+        if answer.title.hasPrefix("You are in ") {
+            return true
+        }
+
+        return false
     }
     
     private func submitPrompt() {
@@ -5521,11 +5635,20 @@ struct HomeAssistantPanelView: View {
     }
 
     private func handleSuggestionTap(_ suggestion: HomeAssistantSuggestion) {
-        if let clarification = sharedPipelineClarification,
-           let choice = clarification.choices.first(where: { sharedPipelineChoiceTitle($0) == suggestion.title }) {
+        if let choice = sharedPipelineClarificationChoicesByTitle[suggestion.title],
+           let clarification = sharedPipelineClarification ?? sharedPipelineClarificationChoiceContext {
             Task {
+                MarinaTraceRecorder.shared.recordDebugMarker("clarification_chip_tapped:title=\(suggestion.title)")
                 await handleSharedPipelineClarificationChoice(choice, clarification: clarification)
             }
+            return
+        }
+
+        if clarificationSuggestions.contains(where: { $0.title == suggestion.title }) {
+            emitSharedPipelineClarificationDiagnostic(
+                title: suggestion.title,
+                reason: "missing_pending_shared_pipeline_clarification"
+            )
             return
         }
 
@@ -5537,6 +5660,15 @@ struct HomeAssistantPanelView: View {
         }
 
         runQuery(suggestion.query, userPrompt: suggestion.title)
+    }
+
+    @discardableResult
+    private func finishMarinaTrace() -> MarinaExecutionTrace? {
+        let trace = MarinaTraceRecorder.shared.finish()
+        if let trace {
+            latestTraceAccessibilityValue = MarinaExecutionTraceSnapshot(trace).accessibilityValue
+        }
+        return trace
     }
 
     @MainActor
@@ -5565,7 +5697,7 @@ struct HomeAssistantPanelView: View {
                     sharedPipelineEnabled: runtimeSettings.sharedPipeline.isEnabled,
                     aiOptInEnabled: runtimeSettings.aiOptIn.isEnabled,
                     turnClassification: turnClassification,
-                    now: Date()
+                    now: runtimeSettings.now
                 )
             )
             MarinaTraceRecorder.shared.recordSharedPipelineTrace(result.trace)
@@ -5586,7 +5718,7 @@ struct HomeAssistantPanelView: View {
                     homeQueryPlan: homeQueryPlan,
                     source: trace.interpreterSource == .foundationModels ? .sharedFoundationModels : .sharedHeuristic
                 )
-                _ = MarinaTraceRecorder.shared.finish()
+                finishMarinaTrace()
                 return
             case .validationBlocked(let answer, let outcome, let trace):
                 MarinaTraceRecorder.shared.recordSelectedRoute(
@@ -5600,7 +5732,7 @@ struct HomeAssistantPanelView: View {
                         rawPrompt: prompt,
                         source: trace.interpreterSource == .foundationModels ? .sharedFoundationModels : .sharedHeuristic
                     )
-                    _ = MarinaTraceRecorder.shared.finish()
+                    finishMarinaTrace()
                     return
                 }
                 handleSharedPipelineAnswer(
@@ -5609,7 +5741,7 @@ struct HomeAssistantPanelView: View {
                     homeQueryPlan: nil,
                     source: trace.interpreterSource == .foundationModels ? .sharedFoundationModels : .sharedHeuristic
                 )
-                _ = MarinaTraceRecorder.shared.finish()
+                finishMarinaTrace()
                 return
             case .fallbackToLegacy(let trace):
                 MarinaTraceRecorder.shared.recordSelectedRoute(.sharedFallback, reason: trace.compactSummary)
@@ -5624,10 +5756,10 @@ struct HomeAssistantPanelView: View {
                 prompt: prompt,
                 activeBudgetPeriod: activeBudgetDateRange(),
                 priorContext: nlqExecutionContext,
-                now: Date()
+                now: runtimeSettings.now
             )
             _ = handleNLQPipelineResult(pipelineResult, originalPrompt: prompt)
-            _ = MarinaTraceRecorder.shared.finish()
+            finishMarinaTrace()
             return
         }
 
@@ -5640,7 +5772,7 @@ struct HomeAssistantPanelView: View {
         )
 
         handleInterpretedRequest(interpreted, rawPrompt: prompt)
-        _ = MarinaTraceRecorder.shared.finish()
+        finishMarinaTrace()
     }
 
     @MainActor
@@ -5742,6 +5874,15 @@ struct HomeAssistantPanelView: View {
     ) {
         let actionable = clarification.isActionable(for: rawPrompt)
         sharedPipelineClarification = actionable ? clarification : nil
+        sharedPipelineClarificationChoiceContext = actionable ? clarification : nil
+        sharedPipelineClarificationChoicesByTitle = actionable
+            ? Dictionary(
+                clarification.actionableChoices.map {
+                    (sharedPipelineChoiceTitle($0), $0)
+                },
+                uniquingKeysWith: { first, _ in first }
+            )
+            : [:]
         clarificationSuggestions = actionable ? clarification.actionableChoices.map { choice in
             HomeAssistantSuggestion(
                 title: sharedPipelineChoiceTitle(choice),
@@ -5768,6 +5909,19 @@ struct HomeAssistantPanelView: View {
         _ choice: MarinaClarificationChoice,
         clarification: MarinaTypedClarification
     ) async {
+        let runtimeSettings = marinaRuntimeSettings
+        let rawPrompt = clarification.candidate?.rawPrompt ?? choice.title
+        MarinaTraceRecorder.shared.begin(
+            prompt: rawPrompt,
+            routingMode: runtimeSettings.routingMode,
+            marinaNLQv1Enabled: runtimeSettings.nlqV1.isEnabled,
+            runtimeSettingsSummary: runtimeSettings.traceSummary
+        )
+        MarinaTraceRecorder.shared.recordSharedPipelineTurnClassification(.clarificationAnswer)
+        MarinaTraceRecorder.shared.recordAggregation(
+            path: "marina_shared_pipeline_clarification_resume_start",
+            summary: "choice=\(sharedPipelineChoiceTitle(choice))"
+        )
         let provider = MarinaDataProvider(modelContext: modelContext, workspaceID: workspace.id)
         let coordinator = MarinaSharedPipelineCoordinator()
         let result = await coordinator.resume(
@@ -5777,41 +5931,64 @@ struct HomeAssistantPanelView: View {
                 provider: provider,
                 routerContext: makeMarinaRouterContext(turnClassification: .clarificationAnswer),
                 defaultPeriodUnit: defaultQueryPeriodUnit,
-                sharedPipelineEnabled: marinaRuntimeSettings.sharedPipeline.isEnabled,
-                aiOptInEnabled: marinaRuntimeSettings.aiOptIn.isEnabled,
+                sharedPipelineEnabled: runtimeSettings.sharedPipeline.isEnabled,
+                aiOptInEnabled: runtimeSettings.aiOptIn.isEnabled,
                 turnClassification: .clarificationAnswer,
-                now: Date()
+                now: runtimeSettings.now
             )
         )
         MarinaTraceRecorder.shared.recordSharedPipelineTrace(result.trace)
-        sharedPipelineClarification = nil
 
         switch result {
         case .handled(let answer, _, let homeQueryPlan, let trace):
+            MarinaTraceRecorder.shared.recordSelectedRoute(
+                trace.selectedPath == .sharedFoundationModels ? .sharedFoundationModels : .sharedHeuristic,
+                reason: trace.compactSummary
+            )
+            MarinaTraceRecorder.shared.recordAggregation(
+                path: "marina_shared_pipeline_clarification_resume",
+                summary: trace.executorResultSummary
+            )
             handleSharedPipelineAnswer(
                 answer,
-                rawPrompt: clarification.candidate?.rawPrompt ?? choice.title,
+                rawPrompt: rawPrompt,
                 homeQueryPlan: homeQueryPlan,
                 source: trace.interpreterSource == .foundationModels ? .sharedFoundationModels : .sharedHeuristic
             )
+            sharedPipelineClarification = nil
+            sharedPipelineClarificationChoiceContext = nil
+            sharedPipelineClarificationChoicesByTitle = [:]
+            finishMarinaTrace()
         case .validationBlocked(let answer, let outcome, let trace):
+            MarinaTraceRecorder.shared.recordSelectedRoute(
+                trace.selectedPath == .sharedFoundationModels ? .sharedFoundationModels : .sharedHeuristic,
+                reason: trace.compactSummary
+            )
             if case .clarification(let nextClarification) = outcome {
                 handleSharedPipelineClarification(
                     answer,
                     clarification: nextClarification,
-                    rawPrompt: clarification.candidate?.rawPrompt ?? choice.title,
+                    rawPrompt: rawPrompt,
                     source: trace.interpreterSource == .foundationModels ? .sharedFoundationModels : .sharedHeuristic
                 )
             } else {
                 handleSharedPipelineAnswer(
                     answer,
-                    rawPrompt: clarification.candidate?.rawPrompt ?? choice.title,
+                    rawPrompt: rawPrompt,
                     homeQueryPlan: nil,
                     source: trace.interpreterSource == .foundationModels ? .sharedFoundationModels : .sharedHeuristic
                 )
+                sharedPipelineClarification = nil
+                sharedPipelineClarificationChoiceContext = nil
+                sharedPipelineClarificationChoicesByTitle = [:]
             }
+            finishMarinaTrace()
         case .fallbackToLegacy(let trace):
             MarinaTraceRecorder.shared.recordSelectedRoute(.sharedFallback, reason: trace.compactSummary)
+            sharedPipelineClarification = nil
+            sharedPipelineClarificationChoiceContext = nil
+            sharedPipelineClarificationChoicesByTitle = [:]
+            finishMarinaTrace()
         }
     }
 
@@ -5835,6 +6012,40 @@ struct HomeAssistantPanelView: View {
     }
 
     @MainActor
+    private func emitSharedPipelineClarificationDiagnostic(title: String, reason: String) {
+        let runtimeSettings = marinaRuntimeSettings
+        MarinaTraceRecorder.shared.begin(
+            prompt: title,
+            routingMode: runtimeSettings.routingMode,
+            marinaNLQv1Enabled: runtimeSettings.nlqV1.isEnabled,
+            runtimeSettingsSummary: runtimeSettings.traceSummary
+        )
+        MarinaTraceRecorder.shared.recordSharedPipelineTurnClassification(.clarificationAnswer)
+        MarinaTraceRecorder.shared.recordSelectedRoute(.clarification, reason: reason)
+        MarinaTraceRecorder.shared.recordAggregation(
+            path: "marina_shared_pipeline_clarification_diagnostic",
+            summary: "title=\(title),reason=\(reason)"
+        )
+        MarinaTraceRecorder.shared.recordResponse(
+            type: HomeAnswerKind.message.rawValue,
+            finalAnswerSummary: "clarification diagnostic \(reason)"
+        )
+        appendAnswer(
+            HomeAnswer(
+                queryID: UUID(),
+                kind: .message,
+                userPrompt: title,
+                title: "I need that choice again",
+                subtitle: "That clarification state expired before I could apply the chip. Ask the original question again and I can resume from the choices.",
+                rows: [
+                    HomeAnswerRow(title: "Reason", value: reason)
+                ]
+            )
+        )
+        _ = finishMarinaTrace()
+    }
+
+    @MainActor
     private func handleNLQClarificationInput(
         _ typedInput: String,
         payload: MarinaNLQClarificationPayload
@@ -5848,13 +6059,13 @@ struct HomeAssistantPanelView: View {
             prompt: seedPrompt,
             activeBudgetPeriod: activeBudgetDateRange(),
             priorContext: nlqExecutionContext,
-            now: Date()
+            now: marinaRuntimeSettings.now
         )
         _ = handleNLQPipelineResult(result, originalPrompt: typedInput)
     }
 
     private func activeBudgetDateRange() -> HomeQueryDateRange? {
-        let now = Date()
+        let now = marinaRuntimeSettings.now
         if let activeBudget = budgets.first(where: { budget in
             budget.startDate <= now && budget.endDate >= now
         }) {
@@ -5985,7 +6196,7 @@ struct HomeAssistantPanelView: View {
                     targetValue: $0.targetValue
                 )
             },
-            now: Date()
+            now: marinaRuntimeSettings.now
         )
     }
 

@@ -462,6 +462,82 @@ struct MarinaAggregationExecutorTests {
         #expect(result.rows.contains(where: { $0.label == "Groceries" && $0.value.contains("max") }))
     }
 
+    @Test func composableExecutor_budgetRelationshipsReturnFocusedResponses() throws {
+        let fixture = try makeFixture()
+        let budget = Budget(name: "May", startDate: date(2026, 5, 1), endDate: date(2026, 5, 31), workspace: fixture.workspace)
+        let harborCard = Card(name: "Harbor Checking", workspace: fixture.workspace)
+        let preset = Preset(title: "Rent", plannedAmount: 900, workspace: fixture.workspace, defaultCard: fixture.appleCard, defaultCategory: fixture.groceries)
+        fixture.context.insert(budget)
+        fixture.context.insert(harborCard)
+        fixture.context.insert(preset)
+        fixture.context.insert(BudgetCardLink(budget: budget, card: fixture.appleCard))
+        fixture.context.insert(BudgetCardLink(budget: budget, card: fixture.backupCard))
+        fixture.context.insert(BudgetCardLink(budget: budget, card: harborCard))
+        fixture.context.insert(BudgetPresetLink(budget: budget, preset: preset))
+        fixture.context.insert(BudgetCategoryLimit(maxAmount: 500, budget: budget, category: fixture.groceries))
+        try fixture.context.save()
+
+        let executor = MarinaComposableWorkspaceQueryExecutor(calendar: Calendar(identifier: .gregorian))
+        let budgetMention = mention("may budget", .budget)
+        let budgetTarget = resolvedTarget(mention: budgetMention, role: .primaryTarget, entityType: .budget, displayName: "May", sourceID: budget.id)
+        let plan = MarinaAggregationPlan(
+            operation: .lookupDetails,
+            measure: .spend,
+            targets: [target(.budget, "May", sourceID: budget.id)],
+            responseShape: .relationshipList
+        )
+
+        let linkedCards = handledCard(executor.execute(
+            candidate: candidate(prompt: "Which cards are linked to May Budget?", operation: .lookupDetails, measure: .spend, mentions: [budgetMention], requestedDetail: .linkedCards, responseShapeHint: .relationshipList),
+            resolved: resolvedCandidate(targets: [budgetTarget]),
+            plan: plan,
+            provider: fixture.provider,
+            now: date(2026, 5, 15)
+        ))
+        #expect(linkedCards.title == "Cards linked to May")
+        #expect(linkedCards.rows.map(\.label).contains("Apple Card"))
+        #expect(linkedCards.rows.map(\.label).contains("Backup Card"))
+        #expect(linkedCards.rows.map(\.label).contains("Harbor Checking"))
+        #expect(linkedCards.rows.contains(where: { $0.label == "Variable spend" }) == false)
+        #expect(linkedCards.traceSummary.contains("budgetLinkedCards"))
+
+        let linkedPresets = handledCard(executor.execute(
+            candidate: candidate(prompt: "Which presets are linked to May Budget?", operation: .lookupDetails, measure: .spend, mentions: [budgetMention], requestedDetail: .linkedPresets, responseShapeHint: .relationshipList),
+            resolved: resolvedCandidate(targets: [budgetTarget]),
+            plan: plan,
+            provider: fixture.provider,
+            now: date(2026, 5, 15)
+        ))
+        #expect(linkedPresets.title == "Presets linked to May")
+        #expect(linkedPresets.rows.map(\.label) == ["Rent"])
+        #expect(linkedPresets.rows.contains(where: { $0.label == "Linked cards" }) == false)
+        #expect(linkedPresets.traceSummary.contains("budgetLinkedPresets"))
+
+        let cardMention = mention("Apple Card", .card)
+        let membershipPlan = MarinaAggregationPlan(
+            operation: .lookupDetails,
+            measure: .spend,
+            targets: [
+                target(.budget, "May", sourceID: budget.id),
+                target(.card, "Apple Card", role: .filter, sourceID: fixture.appleCard.id)
+            ],
+            responseShape: .membershipStatus
+        )
+        let membership = handledCard(executor.execute(
+            candidate: candidate(prompt: "Is Apple Card included in this budget?", operation: .lookupDetails, measure: .spend, mentions: [budgetMention, cardMention], requestedDetail: .membership, responseShapeHint: .membershipStatus),
+            resolved: resolvedCandidate(targets: [
+                budgetTarget,
+                resolvedTarget(mention: cardMention, role: .filter, entityType: .card, displayName: "Apple Card", sourceID: fixture.appleCard.id)
+            ]),
+            plan: membershipPlan,
+            provider: fixture.provider,
+            now: date(2026, 5, 15)
+        ))
+        #expect(membership.primaryValue == "Included")
+        #expect(membership.title.contains("Apple Card"))
+        #expect(membership.traceSummary.contains("budgetMembershipCheck"))
+    }
+
     @Test func composableExecutor_deltaReconciliationAndSimulationReturnCards() throws {
         let fixture = try makeFixture()
         let food = fixture.groceries
@@ -593,14 +669,33 @@ struct MarinaAggregationExecutorTests {
         prompt: String,
         operation: MarinaCandidateOperation,
         measure: MarinaCandidateMeasure,
-        mentions: [MarinaUnresolvedEntityMention] = []
+        mentions: [MarinaUnresolvedEntityMention] = [],
+        requestedDetail: MarinaSemanticRequestedDetail? = nil,
+        responseShapeHint: MarinaResponseShapeHint? = nil
     ) -> MarinaQueryPlanCandidate {
         MarinaQueryPlanCandidate(
             source: .heuristic,
             rawPrompt: prompt,
             operation: operation,
             measure: measure,
-            entityMentions: mentions
+            entityMentions: mentions,
+            responseShapeHint: responseShapeHint,
+            semanticCommand: requestedDetail.map {
+                MarinaSemanticCommand(
+                    family: .analytics,
+                    action: .lookupDetails,
+                    datasets: [.budgets],
+                    measure: measure,
+                    includeFilters: mentions.compactMap { mention in
+                        guard let rawText = mention.rawText else { return nil }
+                        return MarinaSemanticCommandFilter(
+                            rawText: rawText,
+                            allowedTypes: mention.typeHint.map { [$0] } ?? []
+                        )
+                    },
+                    requestedDetail: $0
+                )
+            }
         )
     }
 

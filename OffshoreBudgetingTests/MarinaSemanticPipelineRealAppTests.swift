@@ -591,6 +591,7 @@ struct MarinaSemanticPipelineRealAppTests {
         #expect(clarification.kind == .ambiguousTarget)
         #expect(clarification.choices.compactMap(\.entityTypeHint).contains(.card))
         #expect(clarification.choices.compactMap(\.entityTypeHint).contains(.merchant))
+        #expect(clarification.choices.first(where: { $0.title == "Apple Watch" })?.entityTypeHint == .expense)
         #expect(clarification.choices.first?.entityTypeHint == .card)
         #expect(trace.semanticResolverSummary?.contains("ambiguous=1") == true)
         #expect(trace.executorResultSummary == nil)
@@ -658,7 +659,7 @@ struct MarinaSemanticPipelineRealAppTests {
         let handled = try requireHandled(resumed)
         #expect(handled.answer.kind == .metric)
         #expect(renderedText(handled.aggregationResult).localizedCaseInsensitiveContains("Merchant Spend"))
-        #expect(renderedText(handled.aggregationResult).contains("$145.00"))
+        #expect(renderedText(handled.aggregationResult).contains("$120.00"))
     }
 
     @Test func semanticPipeline_clarificationChoiceCanAdaptExpenseToLookupDetail() async throws {
@@ -670,20 +671,7 @@ struct MarinaSemanticPipelineRealAppTests {
             Issue.record("Expected Apple clarification with an expense choice.")
             return
         }
-        let expenseChoice = clarification.choices.first(where: { $0.entityTypeHint == .expense || $0.entityTypeHint == .transaction })
-            ?? fixture.provider.fetchAllVariableExpenses()
-                .first(where: { $0.descriptionText.localizedCaseInsensitiveContains("Apple Watch") })
-                .map {
-                    MarinaClarificationChoice(
-                        title: $0.descriptionText,
-                        subtitle: "expense",
-                        entityRole: .primaryTarget,
-                        entityTypeHint: .expense,
-                        patchSlot: .target,
-                        rawValue: $0.descriptionText,
-                        sourceID: $0.id
-                    )
-                }
+        let expenseChoice = clarification.choices.first(where: { $0.title == "Apple Watch" && $0.entityTypeHint == .expense })
         guard let expenseChoice else {
             Issue.record("Expected Apple clarification with an expense choice.")
             return

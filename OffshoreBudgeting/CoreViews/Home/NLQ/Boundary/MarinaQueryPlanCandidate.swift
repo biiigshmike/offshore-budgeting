@@ -170,6 +170,8 @@ struct MarinaRankingCandidate: Codable, Equatable, Sendable {
 enum MarinaResponseShapeHint: String, Codable, Equatable, Sendable {
     case scalarCurrency
     case summaryCard
+    case relationshipList
+    case membershipStatus
     case comparison
     case rankedList
     case groupedBreakdown
@@ -235,6 +237,10 @@ enum MarinaSemanticRequestedDetail: String, Codable, Equatable, Sendable {
     case account
     case balance
     case linkedObjects
+    case linkedCards
+    case linkedPresets
+    case categoryLimits
+    case membership
 }
 
 struct MarinaSemanticCommandFilter: Codable, Equatable, Sendable {

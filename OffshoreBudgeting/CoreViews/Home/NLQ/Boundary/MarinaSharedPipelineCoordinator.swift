@@ -967,6 +967,7 @@ struct MarinaSharedPipelineCoordinator {
                 "operation=\(query.operation.rawValue)",
                 "filters=\(query.filters.count)",
                 "incomeStatus=\(query.incomeStatusScope?.rawValue ?? "nil")",
+                "detail=\(query.requestedDetail?.rawValue ?? "nil")",
                 "shape=\(query.responseShape?.rawValue ?? "nil")"
             ].joined(separator: ",")
         case .clarification(let clarification):
@@ -1274,9 +1275,13 @@ struct MarinaExplicitConstraintDetector {
         context: MarinaLanguageRouterContext
     ) -> MarinaExplicitPromptConstraints {
         let normalizedPrompt = normalized(prompt)
+        let explicitCards = explicitNames(context.cardNames, in: normalizedPrompt)
+        let explicitCategories = explicitNames(context.categoryNames, in: normalizedPrompt)
         return MarinaExplicitPromptConstraints(
-            categories: explicitNames(context.categoryNames, in: normalizedPrompt),
-            cards: explicitNames(context.cardNames, in: normalizedPrompt),
+            categories: explicitCategories.filter { category in
+                isLikelyCardNameFragment(category, cards: explicitCards, prompt: normalizedPrompt) == false
+            },
+            cards: explicitCards,
             hasDateConstraint: hasDateConstraint(in: normalizedPrompt),
             limit: explicitLimit(in: normalizedPrompt),
             sort: explicitSort(in: normalizedPrompt)
@@ -1289,6 +1294,20 @@ struct MarinaExplicitConstraintDetector {
             guard normalizedName.isEmpty == false else { return nil }
             return containsWholePhrase(normalizedName, in: normalizedPrompt) ? normalizedName : nil
         })
+    }
+
+    private func isLikelyCardNameFragment(
+        _ category: String,
+        cards: Set<String>,
+        prompt: String
+    ) -> Bool {
+        guard cards.isEmpty == false else { return false }
+        if containsWholePhrase("\(category) card", in: prompt) {
+            return true
+        }
+        return cards.contains { card in
+            card != category && card.contains(category) && containsWholePhrase(card, in: prompt)
+        }
     }
 
     private func hasDateConstraint(in prompt: String) -> Bool {

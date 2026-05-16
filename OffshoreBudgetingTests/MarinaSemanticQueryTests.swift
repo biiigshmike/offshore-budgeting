@@ -48,6 +48,41 @@ struct MarinaSemanticQueryTests {
         #expect(semanticQuery.responseShape == .scalarCurrency)
     }
 
+    @Test func candidateToSemanticQuery_preservesBudgetRelationshipDetailAndShape() {
+        let candidate = MarinaQueryPlanCandidate(
+            source: .heuristic,
+            rawPrompt: "Which cards are linked to May Budget?",
+            operation: .lookupDetails,
+            measure: .spend,
+            entityMentions: [
+                MarinaUnresolvedEntityMention(role: .primaryTarget, rawText: "May Budget", typeHint: .budget, confidence: .high)
+            ],
+            responseShapeHint: .relationshipList,
+            confidence: .high,
+            semanticCommand: MarinaSemanticCommand(
+                family: .analytics,
+                action: .lookupDetails,
+                datasets: [.budgets],
+                measure: .spend,
+                includeFilters: [
+                    MarinaSemanticCommandFilter(rawText: "May Budget", allowedTypes: [.budget])
+                ],
+                requestedDetail: .linkedCards
+            )
+        )
+
+        guard case .query(let semanticQuery) = adapter.interpretationResult(from: candidate) else {
+            Issue.record("Expected semantic query")
+            return
+        }
+
+        #expect(semanticQuery.subject == .budgets)
+        #expect(semanticQuery.operation == .lookupDetails)
+        #expect(semanticQuery.requestedDetail == .linkedCards)
+        #expect(semanticQuery.responseShape == .relationshipList)
+        #expect(semanticQuery.filters.first?.entityTypeHint == .budget)
+    }
+
     @Test func candidateToSemanticQuery_preservesSemanticCommandListRowsShape() {
         let command = MarinaSemanticCommand(
             family: .analytics,
@@ -514,6 +549,10 @@ struct MarinaSemanticQueryTests {
                         return .scalarCurrency
                     case .summaryCard:
                         return .summaryCard
+                    case .relationshipList:
+                        return .relationshipList
+                    case .membershipStatus:
+                        return .membershipStatus
                     case .comparison:
                         return .comparison
                     case .rankedList:

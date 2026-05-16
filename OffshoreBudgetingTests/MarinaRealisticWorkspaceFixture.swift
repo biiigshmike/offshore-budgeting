@@ -25,10 +25,11 @@ struct MarinaRealisticWorkspaceFixture {
 
     func sharedPipelineContext(
         turnClassification: MarinaPromptTurnClassification = .freshQuestion,
-        priorQueryContext: MarinaPriorQueryContext = .empty,
+        priorQueryContext: MarinaPriorQueryContext? = nil,
         aiOptInEnabled: Bool = false
     ) -> MarinaSharedPipelineContext {
-        MarinaSharedPipelineContext(
+        let priorQueryContext = priorQueryContext ?? .empty
+        return MarinaSharedPipelineContext(
             provider: provider,
             routerContext: MarinaLanguageRouterContext(
                 workspaceName: workspace.name,

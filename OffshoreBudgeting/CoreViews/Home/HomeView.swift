@@ -76,6 +76,7 @@ struct HomeView: View {
     @State private var whatIfInitialScenarioID: UUID? = nil
     @State private var whatIfInitialDraft: HomeAssistantWhatIfPlannerDraft? = nil
     @State private var isShowingAssistantPanel: Bool = false
+    @State private var didAutoPresentAssistantForUITest: Bool = false
 
     // MARK: - Data Fixups
 
@@ -405,6 +406,7 @@ struct HomeView: View {
             }
             schedulePostSettleHousekeeping(reason: "onAppear")
             scheduleActivationEnrichment(reason: "onAppear")
+            autoPresentAssistantForUITestIfNeeded()
         }
         .onDisappear {
             dismissAssistantPanel()
@@ -494,6 +496,15 @@ struct HomeView: View {
         } else {
             assistantToolbarContext.openAssistant()
         }
+    }
+
+    private func autoPresentAssistantForUITestIfNeeded() {
+        #if DEBUG
+        guard UITestSupport.shouldRunMarinaHarness else { return }
+        guard didAutoPresentAssistantForUITest == false else { return }
+        didAutoPresentAssistantForUITest = true
+        presentAssistantPanel()
+        #endif
     }
 
     private func dismissAssistantPanel() {
@@ -1316,6 +1327,7 @@ struct HomeView: View {
         }
         .buttonStyle(.glassProminent)
         .accessibilityLabel(String(localized: "assistant.open", defaultValue: "Open Assistant", comment: "Accessibility label for opening assistant."))
+        .accessibilityIdentifier("home.assistant.openButton")
     }
 
     private var assistantToolbarButtonLegacy: some View {
@@ -1325,6 +1337,7 @@ struct HomeView: View {
         .buttonStyle(.borderedProminent)
         .tint(Color("AccentColor"))
         .accessibilityLabel(String(localized: "assistant.open", defaultValue: "Open Assistant", comment: "Accessibility label for opening assistant."))
+        .accessibilityIdentifier("home.assistant.openButton")
     }
 
     private var widgetsHeader: some View {

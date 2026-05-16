@@ -14,6 +14,7 @@ struct MarinaSemanticQuery: Codable, Equatable, Identifiable, Sendable {
     let averageBasis: MarinaAverageBasis?
     let incomeStatusScope: MarinaIncomeStatusScope?
     let responseShape: MarinaResponseShape?
+    let requestedDetail: MarinaSemanticRequestedDetail?
 
     init(
         id: UUID = UUID(),
@@ -28,7 +29,8 @@ struct MarinaSemanticQuery: Codable, Equatable, Identifiable, Sendable {
         limit: Int? = nil,
         averageBasis: MarinaAverageBasis? = nil,
         incomeStatusScope: MarinaIncomeStatusScope? = nil,
-        responseShape: MarinaResponseShape? = nil
+        responseShape: MarinaResponseShape? = nil,
+        requestedDetail: MarinaSemanticRequestedDetail? = nil
     ) {
         self.id = id
         self.subject = subject
@@ -43,6 +45,36 @@ struct MarinaSemanticQuery: Codable, Equatable, Identifiable, Sendable {
         self.averageBasis = averageBasis
         self.incomeStatusScope = incomeStatusScope
         self.responseShape = responseShape
+        self.requestedDetail = requestedDetail
+    }
+}
+
+private extension MarinaDatabaseLookupRequest.RequestedDetail {
+    var semanticDetail: MarinaSemanticRequestedDetail {
+        switch self {
+        case .general:
+            return .general
+        case .date:
+            return .date
+        case .amount:
+            return .amount
+        case .card:
+            return .card
+        case .category:
+            return .category
+        case .status:
+            return .status
+        case .schedule:
+            return .schedule
+        case .recurrence:
+            return .recurrence
+        case .account:
+            return .account
+        case .balance:
+            return .balance
+        case .linkedObjects:
+            return .linkedObjects
+        }
     }
 }
 
@@ -217,6 +249,8 @@ struct MarinaRanking: Codable, Equatable, Sendable {
 enum MarinaResponseShape: String, Codable, Equatable, CaseIterable, Sendable {
     case scalarCurrency
     case summaryCard
+    case relationshipList
+    case membershipStatus
     case comparison
     case rankedList
     case groupedBreakdown
@@ -375,7 +409,8 @@ struct MarinaSemanticQueryAdapter {
                     limit: lookupRequest.limit,
                     averageBasis: nil,
                     incomeStatusScope: incomeStatusScope(from: candidate),
-                    responseShape: .summaryCard
+                    responseShape: responseShape(candidate.responseShapeHint ?? .summaryCard),
+                    requestedDetail: lookupRequest.requestedDetail.semanticDetail
                 )
             )
         }
@@ -408,7 +443,8 @@ struct MarinaSemanticQueryAdapter {
                     limit: command.limit,
                     averageBasis: nil,
                     incomeStatusScope: command.incomeStatusScope ?? incomeStatusScope(from: candidate),
-                    responseShape: .summaryCard
+                    responseShape: responseShape(candidate.responseShapeHint ?? .summaryCard),
+                    requestedDetail: command.requestedDetail
                 )
             )
         }
@@ -440,7 +476,8 @@ struct MarinaSemanticQueryAdapter {
             limit: candidate.limit,
             averageBasis: averageBasis(from: candidate.grouping),
             incomeStatusScope: incomeStatusScope(from: candidate),
-            responseShape: candidate.responseShapeHint.flatMap(responseShape)
+            responseShape: candidate.responseShapeHint.flatMap(responseShape),
+            requestedDetail: candidate.semanticCommand?.requestedDetail
         )
         return .query(semantic)
     }

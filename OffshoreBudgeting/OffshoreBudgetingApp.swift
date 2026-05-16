@@ -65,7 +65,13 @@ struct OffshoreBudgetingApp: App {
         }
         #endif
 
-        return Self.makeModelContainer(useICloud: desiredUseICloud)
+        let container = Self.makeModelContainer(useICloud: desiredUseICloud)
+        #if DEBUG
+        if UITestSupport.shouldRunMarinaHarness {
+            UITestSupport.applyScenarioDataIfNeeded(container: container)
+        }
+        #endif
+        return container
     }()
 
     @Environment(\.scenePhase) private var scenePhase

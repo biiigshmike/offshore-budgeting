@@ -63,8 +63,14 @@ struct MarinaComposableWorkspaceQueryExecutor {
             return simulate(candidate: candidate, resolved: resolved, plan: plan, provider: provider, now: now)
         }
 
-        if let budget = resolvedBudgetTarget(in: resolved, provider: provider),
-           plan.measure == .spend || candidate.semanticCommand?.requestedDetail == .linkedObjects {
+        if let budget = resolvedBudgetTarget(in: resolved, candidate: candidate, provider: provider, now: now),
+           let detail = candidate.semanticCommand?.requestedDetail,
+           isBudgetRelationshipDetail(detail) {
+            return .handled(budgetRelationshipResponse(budget: budget, detail: detail, resolved: resolved, plan: plan, provider: provider))
+        }
+
+        if let budget = resolvedBudgetTarget(in: resolved, candidate: candidate, provider: provider, now: now),
+           plan.measure == .spend {
             return .handled(budgetLinkedSummary(budget: budget, plan: plan, provider: provider))
         }
 
@@ -156,6 +162,146 @@ struct MarinaComposableWorkspaceQueryExecutor {
             primaryValue: currency(total),
             rows: rows,
             traceSummary: "composableWorkspace=budgetLinkedSummary,linkedCards=\(linkedCardIDs.count),linkedPresets=\(linkedPresetIDs.count),total=\(total)"
+        )
+    }
+
+    private func budgetRelationshipResponse(
+        budget: Budget,
+        detail: MarinaSemanticRequestedDetail,
+        resolved: MarinaResolvedQueryCandidate,
+        plan: MarinaAggregationPlan,
+        provider: MarinaDataProvider
+    ) -> MarinaWorkspaceAggregationCard {
+        switch detail {
+        case .linkedCards:
+            return budgetLinkedCards(budget: budget)
+        case .linkedPresets:
+            return budgetLinkedPresets(budget: budget)
+        case .categoryLimits:
+            return budgetCategoryLimits(budget: budget)
+        case .membership:
+            return budgetMembership(budget: budget, resolved: resolved)
+        case .linkedObjects, .status:
+            return budgetLinkedSummary(budget: budget, plan: plan, provider: provider)
+        default:
+            return budgetLinkedSummary(budget: budget, plan: plan, provider: provider)
+        }
+    }
+
+    private func budgetLinkedCards(budget: Budget) -> MarinaWorkspaceAggregationCard {
+        let rows = (budget.cardLinks ?? [])
+            .compactMap(\.card)
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+            .map {
+                MarinaWorkspaceAggregationCard.Row(
+                    label: $0.name,
+                    value: "Linked card",
+                    objectType: .card,
+                    sourceID: $0.id
+                )
+            }
+
+        return MarinaWorkspaceAggregationCard(
+            title: "Cards linked to \(budget.name)",
+            subtitle: rows.isEmpty ? "No cards are linked to this budget." : "\(rows.count) linked card\(rows.count == 1 ? "" : "s")",
+            primaryValue: rows.isEmpty ? "None" : "\(rows.count)",
+            rows: rows,
+            traceSummary: "composableWorkspace=budgetLinkedCards,linkedCards=\(rows.count)"
+        )
+    }
+
+    private func budgetLinkedPresets(budget: Budget) -> MarinaWorkspaceAggregationCard {
+        let rows = (budget.presetLinks ?? [])
+            .compactMap(\.preset)
+            .sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+            .map {
+                MarinaWorkspaceAggregationCard.Row(
+                    label: $0.title,
+                    value: currency($0.plannedAmount),
+                    amount: $0.plannedAmount,
+                    objectType: .preset,
+                    sourceID: $0.id,
+                    sortValue: $0.plannedAmount
+                )
+            }
+
+        return MarinaWorkspaceAggregationCard(
+            title: "Presets linked to \(budget.name)",
+            subtitle: rows.isEmpty ? "No presets are linked to this budget." : "\(rows.count) linked preset\(rows.count == 1 ? "" : "s")",
+            primaryValue: rows.isEmpty ? "None" : "\(rows.count)",
+            rows: rows,
+            traceSummary: "composableWorkspace=budgetLinkedPresets,linkedPresets=\(rows.count)"
+        )
+    }
+
+    private func budgetCategoryLimits(budget: Budget) -> MarinaWorkspaceAggregationCard {
+        let rows = (budget.categoryLimits ?? [])
+            .compactMap { limit -> MarinaWorkspaceAggregationCard.Row? in
+                guard let category = limit.category else { return nil }
+                let parts = [
+                    limit.minAmount.map { "min \(currency($0))" },
+                    limit.maxAmount.map { "max \(currency($0))" }
+                ].compactMap { $0 }
+                return MarinaWorkspaceAggregationCard.Row(
+                    label: category.name,
+                    value: parts.isEmpty ? "Limit" : parts.joined(separator: " • "),
+                    objectType: .category,
+                    sourceID: category.id
+                )
+            }
+            .sorted { $0.label.localizedCaseInsensitiveCompare($1.label) == .orderedAscending }
+
+        return MarinaWorkspaceAggregationCard(
+            title: "Category limits for \(budget.name)",
+            subtitle: rows.isEmpty ? "No category limits are set for this budget." : "\(rows.count) category limit\(rows.count == 1 ? "" : "s")",
+            primaryValue: rows.isEmpty ? "None" : "\(rows.count)",
+            rows: rows,
+            traceSummary: "composableWorkspace=budgetCategoryLimits,categoryLimits=\(rows.count)"
+        )
+    }
+
+    private func budgetMembership(
+        budget: Budget,
+        resolved: MarinaResolvedQueryCandidate
+    ) -> MarinaWorkspaceAggregationCard {
+        guard let member = resolved.resolvedTargets.first(where: { $0.entityType == .card || $0.entityType == .preset }) else {
+            return MarinaWorkspaceAggregationCard(
+                title: "I need one linked item",
+                subtitle: "Pick a card or preset and I can check whether it belongs to this budget.",
+                rows: [
+                    .init(label: "Budget", value: budget.name)
+                ],
+                traceSummary: "composableWorkspace=budgetMembershipCheck,missingMember=true"
+            )
+        }
+
+        let included: Bool
+        let noun: String
+        switch member.entityType {
+        case .card:
+            noun = "card"
+            included = (budget.cardLinks ?? []).contains { link in
+                link.card?.id == member.sourceID || normalized(link.card?.name ?? "") == normalized(member.displayName)
+            }
+        case .preset:
+            noun = "preset"
+            included = (budget.presetLinks ?? []).contains { link in
+                link.preset?.id == member.sourceID || normalized(link.preset?.title ?? "") == normalized(member.displayName)
+            }
+        default:
+            noun = "item"
+            included = false
+        }
+
+        return MarinaWorkspaceAggregationCard(
+            title: included ? "Yes, \(member.displayName) is linked" : "No, \(member.displayName) is not linked",
+            subtitle: "\(budget.name) budget",
+            primaryValue: included ? "Included" : "Not included",
+            rows: [
+                .init(label: "Budget", value: budget.name, objectType: .budget, sourceID: budget.id),
+                .init(label: noun.capitalized, value: member.displayName, objectType: lookupObjectType(from: member.entityType), sourceID: member.sourceID)
+            ],
+            traceSummary: "composableWorkspace=budgetMembershipCheck,memberType=\(member.entityType.rawValue),included=\(included)"
         )
     }
 
@@ -617,13 +763,45 @@ struct MarinaComposableWorkspaceQueryExecutor {
 
     private func resolvedBudgetTarget(
         in resolved: MarinaResolvedQueryCandidate,
-        provider: MarinaDataProvider
+        candidate: MarinaQueryPlanCandidate,
+        provider: MarinaDataProvider,
+        now: Date
     ) -> Budget? {
-        guard let target = resolved.resolvedTargets.first(where: { $0.entityType == .budget }) else {
+        if let target = resolved.resolvedTargets.first(where: { $0.entityType == .budget }) {
+            return provider.fetchAllBudgets().first { budget in
+                budget.id == target.sourceID || normalized(budget.name) == normalized(target.displayName)
+            }
+        }
+
+        guard candidate.semanticCommand?.requestedDetail.map(isBudgetRelationshipDetail) == true else {
             return nil
         }
-        return provider.fetchAllBudgets().first { budget in
-            budget.id == target.sourceID || normalized(budget.name) == normalized(target.displayName)
+
+        let range = monthRange(containing: now)
+        return activeBudget(provider: provider, now: now, range: range)
+    }
+
+    private func isBudgetRelationshipDetail(_ detail: MarinaSemanticRequestedDetail) -> Bool {
+        switch detail {
+        case .linkedObjects, .linkedCards, .linkedPresets, .categoryLimits, .membership, .status:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func lookupObjectType(from entityType: MarinaCandidateEntityTypeHint) -> MarinaLookupObjectType? {
+        switch entityType {
+        case .card:
+            return .card
+        case .preset:
+            return .preset
+        case .budget:
+            return .budget
+        case .category:
+            return .category
+        default:
+            return nil
         }
     }
 

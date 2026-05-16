@@ -68,6 +68,10 @@ struct MarinaDatabaseLookupResponseBuilder {
         for result: MarinaDatabaseLookupResult,
         request: MarinaDatabaseLookupRequest
     ) -> String {
+        if result.objectType == .workspace {
+            return "You are in \(result.title)."
+        }
+
         switch request.requestedDetail {
         case .date:
             if let date = result.date {

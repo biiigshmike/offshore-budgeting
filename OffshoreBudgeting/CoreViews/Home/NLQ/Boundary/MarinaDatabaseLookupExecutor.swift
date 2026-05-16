@@ -62,6 +62,16 @@ struct MarinaDatabaseLookupExecutor {
         let workspaceName = provider.fetchWorkspace()?.name
 
         for budget in provider.fetchAllBudgets() {
+            let linkedCards = (budget.cardLinks ?? []).compactMap { $0.card?.name }.sorted()
+            let linkedPresets = (budget.presetLinks ?? []).compactMap { $0.preset?.title }.sorted()
+            let limitNames = (budget.categoryLimits ?? []).compactMap { limit -> String? in
+                guard let category = limit.category else { return nil }
+                let values = [
+                    limit.minAmount.map { "min \(CurrencyFormatter.string(from: $0))" },
+                    limit.maxAmount.map { "max \(CurrencyFormatter.string(from: $0))" }
+                ].compactMap { $0 }
+                return values.isEmpty ? category.name : "\(category.name) (\(values.joined(separator: ", ")))"
+            }.sorted()
             results.append(result(
                 id: budget.id,
                 objectType: .budget,
@@ -72,7 +82,10 @@ struct MarinaDatabaseLookupExecutor {
                 details: [
                     ("Type", "Budget"),
                     ("Starts", formatDate(budget.startDate)),
-                    ("Ends", formatDate(budget.endDate))
+                    ("Ends", formatDate(budget.endDate)),
+                    ("Linked cards", linkedCards.isEmpty ? "None" : linkedCards.joined(separator: ", ")),
+                    ("Linked presets", linkedPresets.isEmpty ? "None" : linkedPresets.joined(separator: ", ")),
+                    ("Category limits", limitNames.isEmpty ? "None" : limitNames.joined(separator: ", "))
                 ]
             ))
         }
@@ -194,16 +207,25 @@ struct MarinaDatabaseLookupExecutor {
         }
 
         for card in provider.fetchAllCards() {
+            let ledgerTotal = provider.fetchAllVariableExpenses()
+                .filter { $0.card?.id == card.id }
+                .reduce(0.0) { $0 + $1.ledgerSignedAmount() }
+            let spendTotal = provider.fetchAllVariableExpenses()
+                .filter { $0.card?.id == card.id }
+                .reduce(0.0) { $0 + SavingsMathService.variableBudgetImpactAmount(for: $1) }
             results.append(result(
                 id: card.id,
                 objectType: .card,
                 title: card.name,
                 subtitle: "Card",
+                amount: ledgerTotal,
                 workspaceName: workspaceName,
                 details: [
                     ("Type", "Card"),
                     ("Theme", card.theme),
-                    ("Effect", card.effect)
+                    ("Effect", card.effect),
+                    ("Ledger total", CurrencyFormatter.string(from: ledgerTotal)),
+                    ("Budget impact", CurrencyFormatter.string(from: spendTotal))
                 ]
             ))
         }
