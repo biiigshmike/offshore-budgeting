@@ -4,6 +4,7 @@ struct MarinaAppSurfaceReport: Codable {
     let model: String?
     let prompt: String
     let expectedOutcome: String?
+    let expectedRequestShape: String?
     let expectedResponseShape: String?
     let visibleAnswer: MarinaVisibleAnswer
     let responseKind: String?
@@ -16,6 +17,7 @@ struct MarinaAppSurfaceReport: Codable {
     let turnClassification: String?
     let priorContextUsed: Bool?
     let executorRoute: String?
+    let diagnostics: MarinaSurfaceDiagnostics?
     let trace: MarinaTraceSnapshot?
     let result: MarinaSurfaceResult
 }
@@ -79,7 +81,7 @@ struct MarinaTraceSnapshot: Codable {
         self.sharedPipelineEnabled = nil
         self.sharedPipelinePath = fields["sharedPath"]
         self.sharedPipelineInterpreterSource = fields["interpreter"]
-        self.sharedPipelineCandidateSummary = nil
+        self.sharedPipelineCandidateSummary = fields["candidate"]
         self.sharedPipelineResolverSummary = nil
         self.sharedPipelineValidatorSummary = nil
         self.sharedPipelineExecutorSummary = fields["executor"]
@@ -101,6 +103,14 @@ struct MarinaSurfaceResult: Codable {
     let reason: String
 }
 
+struct MarinaSurfaceDiagnostics: Codable {
+    let candidateSummary: String?
+    let resolverSummary: String?
+    let semanticResolverSummary: String?
+    let validatorSummary: String?
+    let unsupportedReason: String?
+}
+
 enum MarinaSurfaceFailureCategory: String, Codable {
     case pass
     case noAssistantSurface
@@ -118,7 +128,10 @@ enum MarinaSurfaceFailureCategory: String, Codable {
     case legacyRouteInterception
     case traceUnavailable
     case responseShapeMismatch
+    case requestShapeMismatch
     case missingClarificationChips
+    case ambiguityCollapsedToUnsupported
+    case ambiguityCollapsedToSingleType
 }
 
 @MainActor

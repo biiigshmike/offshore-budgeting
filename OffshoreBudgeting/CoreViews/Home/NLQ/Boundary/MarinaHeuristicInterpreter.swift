@@ -267,7 +267,7 @@ struct MarinaHeuristicInterpreter {
                prompt.contains("grocer") == false,
                prompt.contains("food & drink") == false,
                prompt.contains("transportation") == false {
-                if prompt.contains(" at ") || prompt.contains(" with ") || prompt.contains("merchant") || prompt.contains("store") {
+                if hasExplicitMerchantCue(normalizedPrompt: prompt, rawTargetText: rawTargetText) {
                     return .merchant
                 }
                 if normalized(rawTargetText).contains("card") || prompt.contains(" card ") {
@@ -287,7 +287,7 @@ struct MarinaHeuristicInterpreter {
         case .some(.category):
             return hasExplicitCategoryCue(intent.rawPrompt) ? .category : nil
         case .some(.merchant):
-            return .merchant
+            return hasExplicitMerchantCue(normalizedPrompt: normalizedPrompt, rawTargetText: rawTargetText) ? .merchant : nil
         case .some(.preset):
             return .preset
         case .some(.incomeSource):
@@ -309,7 +309,7 @@ struct MarinaHeuristicInterpreter {
         case .categorySpendTotal, .categoryMonthComparison:
             return hasExplicitCategoryCue(intent.rawPrompt) ? .category : nil
         case .merchantSpendTotal:
-            return normalizedPrompt.contains("merchant") || normalizedPrompt.contains("store") ? .merchant : nil
+            return hasExplicitMerchantCue(normalizedPrompt: normalizedPrompt, rawTargetText: rawTargetText) ? .merchant : nil
         case .incomeAverageActual:
             return .incomeSource
         case .presetDueSoon:
@@ -336,6 +336,19 @@ struct MarinaHeuristicInterpreter {
             || normalizedPrompt.contains("uncategorized")
             || normalizedPrompt.contains("spend in ")
             || normalizedPrompt.contains("spent in ")
+    }
+
+    private func hasExplicitMerchantCue(normalizedPrompt: String, rawTargetText: String) -> Bool {
+        let normalizedTarget = normalized(rawTargetText)
+        let merchantTargetTokens: Set<String> = [
+            "merchant", "store", "shop", "market", "restaurant", "cafe", "coffee", "grocery", "foods"
+        ]
+        if merchantTargetTokens.contains(where: { containsWholePhrase($0, in: normalizedTarget) }) {
+            return true
+        }
+        return containsWholePhrase("merchant", in: normalizedPrompt)
+            || containsWholePhrase("store", in: normalizedPrompt)
+            || containsWholePhrase("shop", in: normalizedPrompt)
     }
 
     private func timeScopes(
@@ -552,6 +565,11 @@ struct MarinaHeuristicInterpreter {
             .replacingOccurrences(of: "[^a-z0-9\\s&]", with: " ", options: .regularExpression)
             .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func containsWholePhrase(_ phrase: String, in text: String) -> Bool {
+        let escaped = NSRegularExpression.escapedPattern(for: normalized(phrase))
+        return text.range(of: "\\b\(escaped)\\b", options: .regularExpression) != nil
     }
 
     private func shouldPreferAnalyticsOverLookup(_ prompt: String) -> Bool {

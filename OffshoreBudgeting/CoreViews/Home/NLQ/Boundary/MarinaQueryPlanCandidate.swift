@@ -191,6 +191,14 @@ enum MarinaRequestFamily: String, Codable, Sendable, Equatable {
     case unsupported
 }
 
+enum MarinaRequestShape: String, Codable, Sendable, Equatable {
+    case objectInventoryList
+    case ledgerRowList
+    case objectDetails
+    case relationshipList
+    case aggregateMetric
+}
+
 enum MarinaSemanticCommandAction: String, Codable, Equatable, Sendable {
     case total
     case listRows
@@ -375,6 +383,7 @@ struct MarinaQueryPlanCandidate: Codable, Equatable, Sendable {
     let unsupportedHint: MarinaUnsupportedHint?
     let databaseLookupRequest: MarinaDatabaseLookupRequest?
     let semanticCommand: MarinaSemanticCommand?
+    let requestShape: MarinaRequestShape?
 
     init(
         requestFamily: MarinaRequestFamily = .analytics,
@@ -391,7 +400,8 @@ struct MarinaQueryPlanCandidate: Codable, Equatable, Sendable {
         confidence: MarinaCandidateConfidence = .medium,
         unsupportedHint: MarinaUnsupportedHint? = nil,
         databaseLookupRequest: MarinaDatabaseLookupRequest? = nil,
-        semanticCommand: MarinaSemanticCommand? = nil
+        semanticCommand: MarinaSemanticCommand? = nil,
+        requestShape: MarinaRequestShape? = nil
     ) {
         self.requestFamily = requestFamily
         self.source = source
@@ -408,5 +418,6 @@ struct MarinaQueryPlanCandidate: Codable, Equatable, Sendable {
         self.unsupportedHint = unsupportedHint
         self.databaseLookupRequest = databaseLookupRequest
         self.semanticCommand = semanticCommand
+        self.requestShape = requestShape
     }
 }

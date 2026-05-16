@@ -40,7 +40,7 @@ struct MarinaDatabaseLookupResponseBuilder {
             queryID: queryID,
             kind: .list,
             userPrompt: request.rawPrompt,
-            title: "I found a few matches for \"\(request.searchText)\".",
+            title: listTitle(for: request),
             subtitle: nil,
             rows: response.results.map { result in
                 HomeAnswerRow(title: result.title, value: compactValue(for: result))
@@ -131,6 +131,15 @@ struct MarinaDatabaseLookupResponseBuilder {
         .joined(separator: ", ")
     }
 
+    private func listTitle(for request: MarinaDatabaseLookupRequest) -> String {
+        if request.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+           request.objectTypes.count == 1,
+           let objectType = request.objectTypes.first {
+            return "Your \(objectType.readablePluralName)"
+        }
+        return "I found a few matches for \"\(request.searchText)\"."
+    }
+
     private func purchaseVerb(for result: MarinaDatabaseLookupResult) -> String {
         switch result.objectType {
         case .variableExpense:
@@ -184,6 +193,45 @@ private extension MarinaLookupObjectType {
             return "Workspace"
         case .unknown:
             return "Item"
+        }
+    }
+
+    var readablePluralName: String {
+        switch self {
+        case .budget:
+            return "Budgets"
+        case .income:
+            return "Income"
+        case .incomeSeries:
+            return "Recurring Income"
+        case .variableExpense:
+            return "Expenses"
+        case .plannedExpense:
+            return "Planned Expenses"
+        case .category:
+            return "Categories"
+        case .preset:
+            return "Presets"
+        case .card:
+            return "Cards"
+        case .savingsAccount:
+            return "Savings Accounts"
+        case .savingsLedgerEntry:
+            return "Savings Activity"
+        case .reconciliationAccount:
+            return "Reconciliation Accounts"
+        case .reconciliationItem:
+            return "Settlements"
+        case .expenseAllocation:
+            return "Allocations"
+        case .importMerchantRule:
+            return "Import Merchant Rules"
+        case .assistantAliasRule:
+            return "Marina Aliases"
+        case .workspace:
+            return "Workspaces"
+        case .unknown:
+            return "Items"
         }
     }
 }

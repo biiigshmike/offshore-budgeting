@@ -79,6 +79,7 @@ struct MarinaUITestDriver {
             model: expectation?.model,
             prompt: prompt,
             expectedOutcome: expectation?.outcome.rawValue,
+            expectedRequestShape: expectation?.requestShape?.rawValue,
             expectedResponseShape: expectation?.responseShape?.rawValue,
             visibleAnswer: answer,
             responseKind: trace?.responseType,
@@ -91,6 +92,7 @@ struct MarinaUITestDriver {
             turnClassification: trace?.turnClassification,
             priorContextUsed: trace?.priorContextIncluded,
             executorRoute: trace?.sharedPipelineExecutorSummary,
+            diagnostics: diagnostics(from: trace),
             trace: trace,
             result: result
         )
@@ -300,8 +302,32 @@ struct MarinaUITestDriver {
         if expectation?.outcome == .handled, isClarification {
             return MarinaSurfaceResult(passed: false, category: .unexpectedClarification, reason: "Supported prompt unexpectedly asked for clarification.")
         }
+        if expectation?.outcome == .clarification, isUnsupported {
+            return MarinaSurfaceResult(
+                passed: false,
+                category: .ambiguityCollapsedToUnsupported,
+                reason: "Expected typed clarification, but candidate resolved/validated as unsupported. candidate=\(trace.sharedPipelineCandidateSummary ?? "nil"); resolver=\(trace.sharedPipelineResolverSummary ?? "nil"); semanticResolver=\(trace.sharedPipelineSemanticResolverSummary ?? "nil"); validator=\(trace.sharedPipelineValidatorSummary ?? "nil")"
+            )
+        }
+        if expectation?.outcome == .clarification, isClarification == false {
+            return MarinaSurfaceResult(
+                passed: false,
+                category: .ambiguityCollapsedToSingleType,
+                reason: "Expected typed clarification, but the prompt resolved to a handled response. responseType=\(trace.responseType ?? "nil"); candidate=\(trace.sharedPipelineCandidateSummary ?? "nil"); resolver=\(trace.sharedPipelineResolverSummary ?? "nil"); semanticResolver=\(trace.sharedPipelineSemanticResolverSummary ?? "nil"); executor=\(trace.sharedPipelineExecutorSummary ?? "nil")"
+            )
+        }
         if expectation?.outcome == .clarification, chips.clarification.isEmpty {
             return MarinaSurfaceResult(passed: false, category: .missingClarificationChips, reason: "Expected actionable clarification chips.")
+        }
+        if let expectedShape = expectation?.requestShape {
+            let candidate = trace.sharedPipelineCandidateSummary ?? ""
+            if candidate.localizedCaseInsensitiveContains("requestShape=\(expectedShape.rawValue)") == false {
+                return MarinaSurfaceResult(
+                    passed: false,
+                    category: .requestShapeMismatch,
+                    reason: "Expected requestShape=\(expectedShape.rawValue), saw \(candidate.isEmpty ? "nil" : candidate)."
+                )
+            }
         }
         if let expectedShape = expectation?.responseShape,
            bridge.isEmpty == false,
@@ -333,6 +359,28 @@ struct MarinaUITestDriver {
         return MarinaSurfaceResult(passed: true, category: .pass, reason: "Surface response and trace were captured.")
     }
 
+    private func diagnostics(from trace: MarinaTraceSnapshot?) -> MarinaSurfaceDiagnostics? {
+        guard let trace else { return nil }
+        return MarinaSurfaceDiagnostics(
+            candidateSummary: trace.sharedPipelineCandidateSummary,
+            resolverSummary: trace.sharedPipelineResolverSummary,
+            semanticResolverSummary: trace.sharedPipelineSemanticResolverSummary,
+            validatorSummary: trace.sharedPipelineValidatorSummary,
+            unsupportedReason: unsupportedReason(from: trace)
+        )
+    }
+
+    private func unsupportedReason(from trace: MarinaTraceSnapshot) -> String? {
+        [
+            trace.sharedPipelineValidatorSummary,
+            trace.sharedPipelineSemanticValidationSummary,
+            trace.sharedPipelineResponseBridgeSummary,
+            trace.selectedRouteReason
+        ]
+        .compactMap { $0 }
+        .first { $0.localizedCaseInsensitiveContains("unsupported") }
+    }
+
     private func waitUntil(timeout: TimeInterval, predicate: () -> Bool) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
@@ -352,6 +400,7 @@ enum MarinaRuntimeLaunchArgument {
 struct MarinaPromptExpectation {
     let model: String
     let outcome: Outcome
+    let requestShape: RequestShape?
     let responseShape: ResponseShape?
     let requiredVisibleText: [String]
     let forbiddenVisibleText: [String]
@@ -359,12 +408,14 @@ struct MarinaPromptExpectation {
     init(
         model: String,
         outcome: Outcome,
+        requestShape: RequestShape? = nil,
         responseShape: ResponseShape?,
         requiredVisibleText: [String] = [],
         forbiddenVisibleText: [String] = []
     ) {
         self.model = model
         self.outcome = outcome
+        self.requestShape = requestShape
         self.responseShape = responseShape
         self.requiredVisibleText = requiredVisibleText
         self.forbiddenVisibleText = forbiddenVisibleText
@@ -374,6 +425,14 @@ struct MarinaPromptExpectation {
         case handled
         case clarification
         case typedUnsupported
+    }
+
+    enum RequestShape: String {
+        case objectInventoryList
+        case ledgerRowList
+        case objectDetails
+        case relationshipList
+        case aggregateMetric
     }
 
     enum ResponseShape: String {

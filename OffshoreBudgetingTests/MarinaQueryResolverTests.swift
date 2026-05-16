@@ -452,6 +452,74 @@ struct MarinaQueryResolverTests {
         #expect(choicesByTitle["Apple Watch"] == .expense)
     }
 
+    @Test func resolver_bareTargetWithCategoryMerchantExpenseAndCardClarifies() throws {
+        let fixture = try makeFixture()
+        fixture.context.insert(Category(name: "Apple", hexColor: "#00AA00", workspace: fixture.workspace))
+        let card = Card(name: "Apple Card", workspace: fixture.workspace)
+        fixture.context.insert(card)
+        fixture.context.insert(VariableExpense(
+            descriptionText: "Apple Store",
+            amount: 129.0,
+            transactionDate: Date(),
+            workspace: fixture.workspace,
+            card: card,
+            category: nil
+        ))
+        fixture.context.insert(VariableExpense(
+            descriptionText: "Apple Watch",
+            amount: 35.0,
+            transactionDate: Date(),
+            workspace: fixture.workspace,
+            card: card,
+            category: nil
+        ))
+        try fixture.context.save()
+
+        let candidate = MarinaQueryPlanCandidate(
+            source: .heuristic,
+            rawPrompt: "What did I spend at Apple?",
+            operation: .sum,
+            measure: .spend,
+            entityMentions: [
+                MarinaUnresolvedEntityMention(role: .primaryTarget, rawText: "Apple", typeHint: nil)
+            ],
+            confidence: .high
+        )
+
+        let resolved = MarinaQueryResolver().resolve(candidate: candidate, provider: fixture.provider)
+        let choiceTypes = resolved.ambiguousMentions.first?.choices.compactMap(\.entityTypeHint?.rawValue).sorted() ?? []
+
+        #expect(resolved.resolvedTargets.isEmpty)
+        #expect(resolved.ambiguousMentions.count == 1)
+        #expect(choiceTypes == ["card", "category", "expense", "merchant"])
+    }
+
+    @Test func resolver_bareStoredObjectCrossFamilyExactMatchesClarify() throws {
+        let fixture = try makeFixture()
+        fixture.context.insert(Category(name: "Salary", hexColor: "#00AA00", workspace: fixture.workspace))
+        fixture.context.insert(Preset(title: "Salary", plannedAmount: 100, workspace: fixture.workspace))
+        fixture.context.insert(Income(source: "Salary", amount: 100, date: Date(), isPlanned: false, workspace: fixture.workspace))
+        try fixture.context.save()
+
+        let candidate = MarinaQueryPlanCandidate(
+            source: .heuristic,
+            rawPrompt: "Show Salary",
+            operation: .lookupDetails,
+            measure: .spend,
+            entityMentions: [
+                MarinaUnresolvedEntityMention(role: .primaryTarget, rawText: "Salary", typeHint: nil)
+            ],
+            confidence: .high
+        )
+
+        let resolved = MarinaQueryResolver().resolve(candidate: candidate, provider: fixture.provider)
+        let choiceTypes = resolved.ambiguousMentions.first?.choices.compactMap(\.entityTypeHint?.rawValue).sorted() ?? []
+
+        #expect(resolved.resolvedTargets.isEmpty)
+        #expect(resolved.ambiguousMentions.count == 1)
+        #expect(choiceTypes == ["category", "incomeSource", "preset"])
+    }
+
     @Test func resolver_typeHintMerchantResolvesCrossDomainName() throws {
         let fixture = try makeFixture()
         fixture.context.insert(Category(name: "Starbucks", hexColor: "#22AA44", workspace: fixture.workspace))

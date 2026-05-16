@@ -356,14 +356,30 @@ struct MarinaQueryResolver {
             }
         }
         let hasSingleTypeHint = mention.typeHint != nil || mention.allowedTypeHints?.count == 1
+        let matchEntityTypes = Set(matches.map(\.entityType))
         let exactEntityTypes = Set(exactMatches.map(\.entityType))
+        let hasOnlyCategoryExactMatch = Set(storedExactMatches.map(\.entityType)) == [.category]
+        let hasMerchantPrefixCollision = matchEntityTypes.contains(.merchant)
+            && exactEntityTypes.contains(.merchant) == false
+        let hasStoredObjectPrefixCollision = matchEntityTypes.contains { type in
+            switch type {
+            case .card, .budget, .preset, .incomeSource, .allocationAccount, .savingsAccount:
+                return exactEntityTypes.contains(type) == false
+            case .category, .merchant, .expense:
+                return false
+            }
+        }
+        let shouldPreservePrefixCrossFamilyMatches = hasSingleTypeHint == false
+            && hasOnlyCategoryExactMatch
+            && (hasMerchantPrefixCollision || hasStoredObjectPrefixCollision)
         let shouldPreferExactCategory = hasSingleTypeHint == false
-            && Set(storedExactMatches.map(\.entityType)) == [.category]
+            && hasOnlyCategoryExactMatch
             && exactEntityTypes.isSubset(of: [.category, .merchant, .expense])
+            && shouldPreservePrefixCrossFamilyMatches == false
         let shouldPreserveCrossFamilyExactMatches = hasSingleTypeHint == false
             && exactEntityTypes.count > 1
             && shouldPreferExactCategory == false
-        let preferredMatches = shouldPreserveCrossFamilyExactMatches
+        let preferredMatches = shouldPreserveCrossFamilyExactMatches || shouldPreservePrefixCrossFamilyMatches
             ? matches
             : (storedExactMatches.isEmpty == false ? storedExactMatches : matches)
         let equivalenceCollapsed = collapseEquivalentMatches(preferredMatches)

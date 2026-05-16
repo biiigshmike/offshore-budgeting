@@ -950,8 +950,10 @@ struct MarinaSharedPipelineCoordinator {
     private func resolverSummary(_ resolved: MarinaResolvedQueryCandidate) -> String {
         [
             "resolved=\(resolved.resolvedTargets.count)",
+            "resolvedTypes=\(resolved.resolvedTargets.map(\.entityType.rawValue).joined(separator: "+"))",
             "unresolved=\(resolved.unresolvedMentions.count)",
             "ambiguous=\(resolved.ambiguousMentions.count)",
+            "ambiguousTypes=\(resolved.ambiguousMentions.flatMap { $0.choices.compactMap(\.entityTypeHint?.rawValue) }.joined(separator: "+"))",
             "primary=\(resolved.primaryDateRange?.traceSummary ?? "nil")",
             "comparison=\(resolved.comparisonDateRange?.traceSummary ?? "nil")"
         ].joined(separator: ",")
@@ -980,8 +982,10 @@ struct MarinaSharedPipelineCoordinator {
     private func semanticResolverSummary(_ resolved: MarinaResolvedSemanticQuery) -> String {
         [
             "resolved=\(resolved.resolvedFilters.count)",
+            "resolvedTypes=\(resolved.resolvedFilters.map(\.entityType.rawValue).joined(separator: "+"))",
             "unresolved=\(resolved.unresolvedFilters.count)",
             "ambiguous=\(resolved.ambiguousFilters.count)",
+            "ambiguousTypes=\(resolved.ambiguousFilters.flatMap { $0.choices.compactMap(\.entityTypeHint?.rawValue) }.joined(separator: "+"))",
             "primary=\(resolved.primaryDateRange?.traceSummary ?? "nil")",
             "comparison=\(resolved.comparisonDateRange?.traceSummary ?? "nil")"
         ].joined(separator: ",")

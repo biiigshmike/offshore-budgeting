@@ -109,16 +109,20 @@ final class MarinaAssistantUITests: XCTestCase {
     private static let promptMatrix: [ModelPrompt] = [
         ModelPrompt(model: "Workspace", text: "What workspace am I in?", shape: .summaryCard),
         ModelPrompt(model: "Workspace", text: "Show my workspace summary", shape: .summaryCard),
-        ModelPrompt(model: "Workspace", text: "Do I have any other workspaces?", shape: .summaryCard),
+        ModelPrompt(model: "Workspace", text: "Do I have any other workspaces?", requestShape: .objectInventoryList),
         ModelPrompt(model: "Budget", text: "What is my active budget?", shape: .summaryCard),
         ModelPrompt(model: "Budget", text: "Show May Budget", shape: .summaryCard),
-        ModelPrompt(model: "Budget", text: "What budgets do I have this month?", shape: .summaryCard),
+        ModelPrompt(model: "Budget", text: "What budgets do I have this month?", requestShape: .objectInventoryList),
+        ModelPrompt(model: "Budget", text: "List all my budgets", requestShape: .objectInventoryList, shape: .relationshipList),
         ModelPrompt(model: "BudgetCategoryLimit", text: "How much do I have left in Groceries?", shape: .summaryCard),
         ModelPrompt(model: "BudgetCategoryLimit", text: "Show my Groceries budget limit", shape: .summaryCard),
         ModelPrompt(model: "BudgetCategoryLimit", text: "Which categories are over budget?", shape: .rankedList),
         ModelPrompt(model: "Card", text: "What did I spend on Apple Card this month?", shape: .scalarCurrency),
         ModelPrompt(model: "Card", text: "Show my card balances", shape: .rankedList),
         ModelPrompt(model: "Card", text: "List expenses on Backup Card", shape: .rankedList),
+        ModelPrompt(model: "Card", text: "Show all my cards", requestShape: .objectInventoryList, shape: .relationshipList, requiredVisibleText: ["Apple Card"]),
+        ModelPrompt(model: "Card", text: "List all of my cards", requestShape: .objectInventoryList, shape: .relationshipList, requiredVisibleText: ["Apple Card"]),
+        ModelPrompt(model: "Card", text: "What cards do I have?", requestShape: .objectInventoryList, shape: .relationshipList, requiredVisibleText: ["Apple Card"]),
         ModelPrompt(
             model: "BudgetCardLink",
             text: "Which cards are linked to May Budget?",
@@ -150,8 +154,9 @@ final class MarinaAssistantUITests: XCTestCase {
         ModelPrompt(model: "Category", text: "What did I spend on Groceries this month?"),
         ModelPrompt(model: "Category", text: "Show category spending this month"),
         ModelPrompt(model: "Category", text: "List expenses in Dining this week"),
+        ModelPrompt(model: "Category", text: "List all my categories", requestShape: .objectInventoryList, shape: .relationshipList),
         ModelPrompt(model: "Preset", text: "Show my Rent preset"),
-        ModelPrompt(model: "Preset", text: "What presets do I have?"),
+        ModelPrompt(model: "Preset", text: "What presets do I have?", requestShape: .objectInventoryList, shape: .relationshipList),
         ModelPrompt(model: "Preset", text: "Do I have presets due soon?"),
         ModelPrompt(model: "PlannedExpense", text: "What planned expenses are due this month?"),
         ModelPrompt(model: "PlannedExpense", text: "Show Rent planned expense"),
@@ -161,7 +166,7 @@ final class MarinaAssistantUITests: XCTestCase {
         ModelPrompt(model: "VariableExpense", text: "What did I spend this month?"),
         ModelPrompt(model: "AllocationAccount", text: "Show my Roommate reconciliation account"),
         ModelPrompt(model: "AllocationAccount", text: "What is my Roommate balance?"),
-        ModelPrompt(model: "AllocationAccount", text: "List reconciliation accounts"),
+        ModelPrompt(model: "AllocationAccount", text: "List reconciliation accounts", requestShape: .objectInventoryList, shape: .relationshipList),
         ModelPrompt(model: "ExpenseAllocation", text: "Which expenses are split with Roommate?"),
         ModelPrompt(model: "ExpenseAllocation", text: "Show allocations this month"),
         ModelPrompt(model: "ExpenseAllocation", text: "How much spending was allocated away?"),
@@ -171,17 +176,18 @@ final class MarinaAssistantUITests: XCTestCase {
         ModelPrompt(model: "SavingsAccount", text: "Show my Emergency Fund"),
         ModelPrompt(model: "SavingsAccount", text: "How much do I have in savings?"),
         ModelPrompt(model: "SavingsAccount", text: "Show savings account details"),
+        ModelPrompt(model: "SavingsAccount", text: "Show all my savings accounts", requestShape: .objectInventoryList, shape: .relationshipList),
         ModelPrompt(model: "SavingsLedgerEntry", text: "Show savings activity this month"),
         ModelPrompt(model: "SavingsLedgerEntry", text: "What savings adjustments happened this month?"),
         ModelPrompt(model: "SavingsLedgerEntry", text: "When was my last savings transfer?"),
         ModelPrompt(model: "ImportMerchantRule", text: "What import rule do I have for Whole Foods?"),
-        ModelPrompt(model: "ImportMerchantRule", text: "Show learned merchant rules"),
+        ModelPrompt(model: "ImportMerchantRule", text: "Show learned merchant rules", requestShape: .objectInventoryList, shape: .relationshipList),
         ModelPrompt(model: "ImportMerchantRule", text: "What category does Whole Foods import as?"),
         ModelPrompt(model: "AssistantAliasRule", text: "What does food mean?"),
-        ModelPrompt(model: "AssistantAliasRule", text: "Show my Marina aliases"),
+        ModelPrompt(model: "AssistantAliasRule", text: "Show my Marina aliases", requestShape: .objectInventoryList, shape: .relationshipList),
         ModelPrompt(model: "AssistantAliasRule", text: "Use food spending this month"),
-        ModelPrompt(model: "IncomeSeries", text: "Show recurring income"),
-        ModelPrompt(model: "IncomeSeries", text: "What income repeats monthly?"),
+        ModelPrompt(model: "IncomeSeries", text: "Show recurring income", requestShape: .objectInventoryList, shape: .relationshipList),
+        ModelPrompt(model: "IncomeSeries", text: "What income repeats monthly?", requestShape: .objectInventoryList, shape: .relationshipList),
         ModelPrompt(model: "IncomeSeries", text: "Show my Salary income series"),
         ModelPrompt(model: "Income", text: "What is my actual income this month?"),
         ModelPrompt(model: "Income", text: "What is my income so far this month?"),
@@ -193,6 +199,7 @@ private struct ModelPrompt {
     let model: String
     let text: String
     let outcome: MarinaPromptExpectation.Outcome
+    let requestShape: MarinaPromptExpectation.RequestShape?
     let shape: MarinaPromptExpectation.ResponseShape?
     let requiredVisibleText: [String]
     let forbiddenVisibleText: [String]
@@ -201,6 +208,7 @@ private struct ModelPrompt {
         model: String,
         text: String,
         outcome: MarinaPromptExpectation.Outcome = .handled,
+        requestShape: MarinaPromptExpectation.RequestShape? = nil,
         shape: MarinaPromptExpectation.ResponseShape? = nil,
         requiredVisibleText: [String] = [],
         forbiddenVisibleText: [String] = []
@@ -208,6 +216,7 @@ private struct ModelPrompt {
         self.model = model
         self.text = text
         self.outcome = outcome
+        self.requestShape = requestShape
         self.shape = shape
         self.requiredVisibleText = requiredVisibleText
         self.forbiddenVisibleText = forbiddenVisibleText
@@ -217,6 +226,7 @@ private struct ModelPrompt {
         MarinaPromptExpectation(
             model: model,
             outcome: outcome,
+            requestShape: requestShape,
             responseShape: shape,
             requiredVisibleText: requiredVisibleText,
             forbiddenVisibleText: forbiddenVisibleText

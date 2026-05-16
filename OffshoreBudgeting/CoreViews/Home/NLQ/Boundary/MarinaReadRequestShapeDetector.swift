@@ -86,6 +86,22 @@ struct MarinaReadRequestShapeDetector {
             )
         }
 
+        if isIncomeRowList(normalizedPrompt) {
+            return MarinaQueryPlanCandidate(
+                source: .heuristic,
+                rawPrompt: prompt,
+                operation: .listRows,
+                measure: .income,
+                timeScopes: dateScopes(prompt: prompt, defaultPeriodUnit: defaultPeriodUnit),
+                grouping: MarinaGroupingCandidate(dimension: .incomeSource),
+                ranking: MarinaRankingCandidate(direction: .newest, limit: explicitLimit(in: normalizedPrompt) ?? 10),
+                limit: explicitLimit(in: normalizedPrompt) ?? 10,
+                responseShapeHint: .rankedList,
+                confidence: .high,
+                requestShape: .ledgerRowList
+            )
+        }
+
         if let cardName = listExpensesCard(in: normalizedPrompt) {
             return MarinaQueryPlanCandidate(
                 source: .heuristic,
@@ -105,7 +121,8 @@ struct MarinaReadRequestShapeDetector {
                 ranking: MarinaRankingCandidate(direction: .newest, limit: explicitLimit(in: normalizedPrompt) ?? 10),
                 limit: explicitLimit(in: normalizedPrompt) ?? 10,
                 responseShapeHint: .rankedList,
-                confidence: .high
+                confidence: .high,
+                requestShape: .ledgerRowList
             )
         }
 
@@ -145,6 +162,19 @@ struct MarinaReadRequestShapeDetector {
             )
         }
 
+        if let objectType = objectInventoryListType(in: normalizedPrompt),
+           objectType.allowsEmptySearchListing {
+            return lookup(
+                prompt: prompt,
+                searchText: "",
+                objectTypes: [objectType],
+                requestedDetail: .general,
+                limit: 10,
+                responseShapeHint: .relationshipList,
+                requestShape: .objectInventoryList
+            )
+        }
+
         return nil
     }
 
@@ -153,7 +183,9 @@ struct MarinaReadRequestShapeDetector {
         searchText: String,
         objectTypes: [MarinaLookupObjectType],
         requestedDetail: MarinaDatabaseLookupRequest.RequestedDetail,
-        limit: Int
+        limit: Int,
+        responseShapeHint: MarinaResponseShapeHint? = nil,
+        requestShape: MarinaRequestShape? = nil
     ) -> MarinaQueryPlanCandidate {
         let request = MarinaDatabaseLookupRequest(
             rawPrompt: prompt,
@@ -168,13 +200,15 @@ struct MarinaReadRequestShapeDetector {
             source: .heuristic,
             rawPrompt: prompt,
             operation: .lookupDetails,
+            responseShapeHint: responseShapeHint,
             databaseLookupRequest: request,
             semanticCommand: MarinaSemanticCommand(
                 family: .databaseLookup,
                 action: .lookupDetails,
                 datasets: objectTypes.compactMap(dataset(from:)),
                 requestedDetail: requestedDetail.semanticDetail
-            )
+            ),
+            requestShape: requestShape ?? (searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? .objectInventoryList : .objectDetails)
         )
     }
 
@@ -218,7 +252,8 @@ struct MarinaReadRequestShapeDetector {
                 measure: .spend,
                 includeFilters: allFilters,
                 requestedDetail: requestedDetail
-            )
+            ),
+            requestShape: .relationshipList
         )
     }
 
@@ -344,6 +379,15 @@ struct MarinaReadRequestShapeDetector {
         ).map(cleanObjectName)
     }
 
+    private func isIncomeRowList(_ prompt: String) -> Bool {
+        (prompt.hasPrefix("list ") || prompt.hasPrefix("show "))
+            && prompt.contains("income")
+            && prompt.contains("recurring income") == false
+            && prompt.contains("income series") == false
+            && prompt.contains("income repeats") == false
+            && (prompt.contains("this ") || prompt.contains("last ") || prompt.contains("in "))
+    }
+
     private func spendCard(in prompt: String) -> String? {
         guard prompt.contains("spend"),
               prompt.contains(" card") else { return nil }
@@ -360,6 +404,99 @@ struct MarinaReadRequestShapeDetector {
         prompt.contains("card")
             && (prompt.contains("balances") || prompt.contains("balance"))
             && (prompt.hasPrefix("show") || prompt.hasPrefix("list") || prompt.hasPrefix("what"))
+    }
+
+    private func objectInventoryListType(in prompt: String) -> MarinaLookupObjectType? {
+        if (prompt.contains("recurring income")
+            || prompt.contains("income series")
+            || prompt.contains("income repeats")
+            || prompt.contains("repeating income")),
+           containsAnalyticsCue(prompt) == false {
+            return .incomeSeries
+        }
+
+        if (prompt.contains("learned merchant rule")
+            || prompt.contains("merchant rules")
+            || prompt.contains("import rule")
+            || prompt.contains("import rules")),
+           containsAnalyticsCue(prompt) == false {
+            return .importMerchantRule
+        }
+
+        if (prompt.contains("marina aliases")
+            || prompt.contains("assistant aliases")
+            || prompt.contains("aliases")),
+           containsAnalyticsCue(prompt) == false {
+            return .assistantAliasRule
+        }
+
+        guard hasInventoryListShape(prompt),
+              containsAnalyticsCue(prompt) == false else {
+            return nil
+        }
+
+        if prompt.contains("reconciliation accounts")
+            || prompt.contains("shared accounts")
+            || prompt.contains("allocation accounts") {
+            return .reconciliationAccount
+        }
+
+        if prompt.contains("savings accounts")
+            || prompt.contains("true savings accounts") {
+            return .savingsAccount
+        }
+
+        let candidates: [(patterns: [String], type: MarinaLookupObjectType)] = [
+            (["workspaces"], .workspace),
+            (["budgets"], .budget),
+            (["cards"], .card),
+            (["categories"], .category),
+            (["presets", "templates"], .preset)
+        ]
+
+        for candidate in candidates where candidate.patterns.contains(where: { containsWholePhrase($0, in: prompt) }) {
+            return candidate.type
+        }
+
+        return nil
+    }
+
+    private func hasInventoryListShape(_ prompt: String) -> Bool {
+        let listPrefixes = [
+            "show all ", "show all of my ", "show my ", "show me all ", "show me all of my ", "show me my ",
+            "list ", "list all ", "list all of my ", "list my ", "list the ", "display all ", "display all of my ", "display my ",
+            "give me all ", "give me all of my ", "give me my "
+        ]
+        if listPrefixes.contains(where: { prompt.hasPrefix($0) }) {
+            return true
+        }
+
+        let questionPatterns = [
+            #"\bwhat\s+.+?\s+do\s+i\s+have\b"#,
+            #"\bwhat\s+.+?\s+are\s+there\b"#,
+            #"\bdo\s+i\s+have\s+(?:any|other)?\s*.+"#
+        ]
+        return questionPatterns.contains { pattern in
+            prompt.range(of: pattern, options: .regularExpression) != nil
+        }
+    }
+
+    private func containsAnalyticsCue(_ prompt: String) -> Bool {
+        let cues = [
+            "balance", "balances", "spend", "spent", "spending", "income so far",
+            "actual income", "planned income", "left", "remaining", "over budget",
+            "linked", "included", "split", "allocated", "settlement", "settlements",
+            "activity", "adjustment", "adjustments", "last buy", "last purchase",
+            "due soon"
+        ]
+        return cues.contains { prompt.contains($0) }
+    }
+
+    private func containsWholePhrase(_ phrase: String, in prompt: String) -> Bool {
+        prompt.range(
+            of: #"(^|\s)\#(NSRegularExpression.escapedPattern(for: phrase))(\s|$)"#,
+            options: .regularExpression
+        ) != nil
     }
 
     private func dateScopes(prompt: String, defaultPeriodUnit: HomeQueryPeriodUnit) -> [MarinaUnresolvedTimeScope] {

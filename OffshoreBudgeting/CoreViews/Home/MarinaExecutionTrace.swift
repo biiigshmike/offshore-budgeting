@@ -479,6 +479,7 @@ struct MarinaExecutionTraceSnapshot: Codable, Equatable {
             sharedPipelineInterpreterSource.map { "interpreter=\($0)" },
             turnClassification.map { "turnClassification=\($0)" },
             priorContextIncluded.map { "priorContextIncluded=\($0)" },
+            sharedPipelineCandidateSummary.map { "candidate=\($0)" },
             aggregationPath.map { "aggregationPath=\($0)" },
             responseType.map { "responseType=\($0)" },
             sharedPipelineExecutorSummary.map { "executor=\($0)" },

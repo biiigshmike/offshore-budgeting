@@ -2,6 +2,7 @@ import Foundation
 
 struct MarinaCandidateTrace: Codable, Equatable {
     let requestFamily: MarinaRequestFamily?
+    let requestShape: MarinaRequestShape?
     let interpreterSource: MarinaInterpreterSource?
     let operation: MarinaCandidateOperation?
     let measure: MarinaCandidateMeasure?
@@ -26,6 +27,7 @@ struct MarinaCandidateTrace: Codable, Equatable {
         operationPreserved: Bool? = nil
     ) {
         self.requestFamily = candidate?.requestFamily
+        self.requestShape = candidate.flatMap(Self.requestShape)
         self.interpreterSource = candidate?.source
         self.operation = candidate?.operation
         self.measure = candidate?.measure
@@ -45,6 +47,7 @@ struct MarinaCandidateTrace: Codable, Equatable {
     var compactSummary: String {
         [
             requestFamily.map { "family=\($0.rawValue)" },
+            requestShape.map { "requestShape=\($0.rawValue)" },
             interpreterSource.map { "source=\($0.rawValue)" },
             operation.map { "operation=\($0.rawValue)" },
             measure.map { "measure=\($0.rawValue)" },
@@ -107,5 +110,39 @@ struct MarinaCandidateTrace: Codable, Equatable {
             command.sort?.rawValue ?? "nil",
             command.limit.map(String.init) ?? "nil"
         ].joined(separator: ":")
+    }
+
+    nonisolated private static func requestShape(_ candidate: MarinaQueryPlanCandidate) -> MarinaRequestShape? {
+        if let requestShape = candidate.requestShape {
+            return requestShape
+        }
+
+        if candidate.requestFamily == .databaseLookup {
+            let hasSearch = candidate.databaseLookupRequest?.searchText
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .isEmpty == false
+            return hasSearch ? .objectDetails : .objectInventoryList
+        }
+
+        if candidate.operation == .listRows
+            || candidate.measure == .savingsMovement
+            || candidate.grouping?.dimension == .savingsLedgerEntry {
+            return .ledgerRowList
+        }
+
+        if candidate.operation == .lookupDetails {
+            switch candidate.semanticCommand?.requestedDetail {
+            case .linkedCards, .linkedPresets, .categoryLimits, .membership:
+                return .relationshipList
+            default:
+                return .objectDetails
+            }
+        }
+
+        if candidate.operation != nil {
+            return .aggregateMetric
+        }
+
+        return nil
     }
 }

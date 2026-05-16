@@ -62,6 +62,58 @@ struct MarinaHeuristicInterpreterTests {
         }
     }
 
+    @Test func requestShape_inventoryListVerbsRouteToDatabaseLookup() {
+        let cases: [(String, MarinaLookupObjectType)] = [
+            ("Show all my cards", .card),
+            ("List all of my cards", .card),
+            ("What cards do I have?", .card),
+            ("Show all my budgets", .budget),
+            ("List all my categories", .category),
+            ("What presets do I have?", .preset),
+            ("List reconciliation accounts", .reconciliationAccount),
+            ("Show all my savings accounts", .savingsAccount),
+            ("Show recurring income", .incomeSeries),
+            ("What income repeats monthly?", .incomeSeries),
+            ("Show learned merchant rules", .importMerchantRule),
+            ("List all my Marina aliases", .assistantAliasRule),
+            ("Do I have any other workspaces?", .workspace)
+        ]
+
+        for testCase in cases {
+            let candidate = MarinaHeuristicInterpreter().interpret(
+                prompt: testCase.0,
+                defaultPeriodUnit: .month
+            )
+
+            #expect(candidate.requestFamily == .databaseLookup)
+            #expect(candidate.operation == .lookupDetails)
+            #expect(candidate.databaseLookupRequest?.searchText == "")
+            #expect(candidate.databaseLookupRequest?.objectTypes == [testCase.1])
+            #expect(candidate.requestShape == .objectInventoryList)
+            #expect(MarinaCandidateTrace(candidate: candidate).compactSummary.contains("requestShape=objectInventoryList"))
+        }
+    }
+
+    @Test func requestShape_rowListPromptsStayLedgerRowLists() {
+        let cases = [
+            "List expenses this week",
+            "Show my last 10 expenses",
+            "List income this month",
+            "Show savings activity this month"
+        ]
+
+        for prompt in cases {
+            let candidate = MarinaHeuristicInterpreter().interpret(
+                prompt: prompt,
+                defaultPeriodUnit: .month
+            )
+
+            #expect(candidate.requestFamily == .analytics)
+            #expect(candidate.operation == .listRows || candidate.operation == .rank)
+            #expect(MarinaCandidateTrace(candidate: candidate).compactSummary.contains("requestShape=ledgerRowList"))
+        }
+    }
+
     @Test func heuristic_workspaceAggregationPrompts_emitSummaryCardCandidates() {
         let cases: [(String, MarinaCandidateOperation, MarinaCandidateMeasure, MarinaGroupingDimensionCandidate?)] = [
             ("What income came in this month?", .sum, .income, nil),
@@ -135,6 +187,32 @@ struct MarinaHeuristicInterpreterTests {
             #expect(mention.rawText?.lowercased().contains("card") == true)
             #expect(mention.typeHint == nil || mention.typeHint == .card)
         }
+    }
+
+    @Test func heuristic_shortNamedSpendTargetDoesNotForceMerchantHint() {
+        let candidate = MarinaHeuristicInterpreter().interpret(
+            prompt: "What did I spend at Apple?",
+            defaultPeriodUnit: .month
+        )
+
+        #expect(candidate.requestFamily == .analytics)
+        #expect(candidate.operation == .sum)
+        #expect(candidate.measure == .spend)
+        #expect(candidate.entityMentions.first?.rawText?.localizedCaseInsensitiveContains("Apple") == true)
+        #expect(candidate.entityMentions.first?.typeHint == nil)
+    }
+
+    @Test func heuristic_explicitMerchantSpendTargetKeepsMerchantHint() {
+        let candidate = MarinaHeuristicInterpreter().interpret(
+            prompt: "What did I spend at Apple Store?",
+            defaultPeriodUnit: .month
+        )
+
+        #expect(candidate.requestFamily == .analytics)
+        #expect(candidate.operation == .sum)
+        #expect(candidate.measure == .spend)
+        #expect(candidate.entityMentions.first?.rawText?.localizedCaseInsensitiveContains("Apple Store") == true)
+        #expect(candidate.entityMentions.first?.typeHint == .merchant)
     }
 
     @Test func heuristic_averageFoodAndDrinkLastThreeMonths_emitsAverageCandidateWithoutResolvingEntityTruth() {

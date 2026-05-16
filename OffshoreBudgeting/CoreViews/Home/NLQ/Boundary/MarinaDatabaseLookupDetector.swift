@@ -263,7 +263,7 @@ struct MarinaDatabaseLookupDetector {
     }
 }
 
-private extension MarinaLookupObjectType {
+extension MarinaLookupObjectType {
     static var safeDefaultSearchTypes: [MarinaLookupObjectType] {
         [
             .budget,

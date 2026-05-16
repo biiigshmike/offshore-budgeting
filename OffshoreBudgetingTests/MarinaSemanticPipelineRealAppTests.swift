@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 import Testing
 @testable import Offshore
 
@@ -597,6 +598,29 @@ struct MarinaSemanticPipelineRealAppTests {
         #expect(trace.executorResultSummary == nil)
     }
 
+    @Test func semanticPipeline_bareAppleClarifiesAcrossCategoryMerchantExpenseAndCard() async throws {
+        let fixture = try MarinaRealisticWorkspaceFixture.make()
+        fixture.context.insert(Category(name: "Apple", hexColor: "#111111", workspace: fixture.workspace))
+        try fixture.context.save()
+
+        let result = await fixture.run("What did I spend at Apple?")
+
+        guard case .validationBlocked(_, let outcome, let trace) = result,
+              case .clarification(let clarification) = outcome else {
+            Issue.record("Expected Apple cross-entity collision to clarify: \(result.trace.compactSummary)")
+            return
+        }
+
+        let choiceTypes = Set(clarification.choices.compactMap(\.entityTypeHint))
+        #expect(choiceTypes.contains(.card))
+        #expect(choiceTypes.contains(.category))
+        #expect(choiceTypes.contains(.merchant))
+        #expect(choiceTypes.contains(.expense))
+        #expect(trace.semanticResolverSummary?.contains("ambiguous=1") == true)
+        #expect(trace.semanticResolverSummary?.contains("ambiguousTypes=") == true)
+        #expect(trace.executorResultSummary == nil)
+    }
+
     @Test func semanticPipeline_scenarioExecutesThroughWhatIfRouteWithoutBroadFallback() async throws {
         let fixture = try MarinaRealisticWorkspaceFixture.make()
         let result = await fixture.run("If I spend $80 on dining, how does that affect savings?")
@@ -693,6 +717,52 @@ struct MarinaSemanticPipelineRealAppTests {
         )
         #expect(handled.answer.kind == .message || handled.answer.kind == .list)
         #expect(answerText(handled.answer).localizedCaseInsensitiveContains("Apple"))
+    }
+
+    @Test func semanticPipeline_clarificationChoiceCanExecuteCategorySpend() async throws {
+        let fixture = try MarinaRealisticWorkspaceFixture.make()
+        let appleCategory = Category(name: "Apple", hexColor: "#111111", workspace: fixture.workspace)
+        fixture.context.insert(appleCategory)
+        fixture.context.insert(VariableExpense(
+            descriptionText: "Apple Category Item",
+            amount: 44,
+            transactionDate: MarinaRealisticWorkspaceFixture.date(2026, 5, 13),
+            workspace: fixture.workspace,
+            card: fixture.appleCard,
+            category: appleCategory
+        ))
+        try fixture.context.save()
+
+        let result = await fixture.run("What did I spend at Apple?")
+
+        guard case .validationBlocked(_, let outcome, _) = result,
+              case .clarification(let clarification) = outcome,
+              let categoryChoice = clarification.choices.first(where: { $0.title == "Apple" && $0.entityTypeHint == .category }) else {
+            Issue.record("Expected Apple clarification with a category choice.")
+            return
+        }
+
+        let resumed = await MarinaSharedPipelineCoordinator().resume(
+            clarification: clarification,
+            choice: categoryChoice,
+            context: fixture.contextForSharedPipeline
+        )
+
+        let handled = try requireHandled(resumed)
+        #expect(handled.answer.kind == .metric)
+        #expect(handled.trace.semanticResolverSummary?.contains("resolvedTypes=category") == true)
+        #expect(renderedText(handled.aggregationResult).localizedCaseInsensitiveContains("Category Spend"))
+    }
+
+    @Test func semanticPipeline_explicitAppleStoreTargetExecutesMerchantSpendDirectly() async throws {
+        let fixture = try MarinaRealisticWorkspaceFixture.make()
+        let result = await fixture.run("What did I spend at Apple Store?")
+
+        let handled = try requireHandled(result)
+        #expect(handled.answer.kind == .metric)
+        #expect(handled.trace.semanticResolverSummary?.contains("resolved=1") == true)
+        #expect(handled.trace.semanticResolverSummary?.contains("ambiguous=0") == true)
+        #expect(renderedText(handled.aggregationResult).localizedCaseInsensitiveContains("Merchant Spend"))
     }
 
     @Test func semanticPipeline_comparisonDateFollowUpPatchesPendingSemanticQuery() async throws {
