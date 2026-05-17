@@ -550,6 +550,12 @@ struct HomeAssistantModelsTests {
         #expect(plan.targetName == "Groceries")
     }
 
+    // MARK: - Intentional Legacy Model-Router Diagnostic Coverage
+    //
+    // Keep these tests until model-router flag-off diagnostics are intentionally
+    // retired. Shared-pipeline replacement coverage should live in
+    // MarinaSharedPipelineParityTests before any assertion here is removed.
+
     @Test func marinaLanguageRouter_followUpClarificationFallsBackToHeuristicQuery() async throws {
         let router = MarinaLanguageRouter(
             availability: StubAvailability(status: .available),

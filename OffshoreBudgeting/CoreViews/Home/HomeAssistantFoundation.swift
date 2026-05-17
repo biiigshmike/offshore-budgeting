@@ -1487,6 +1487,9 @@ struct HomeAssistantPanelView: View {
         explanation: String? = nil,
         executedPlan: HomeQueryPlan? = nil
     ) {
+        // Legacy reachable: suggestion chips and older resolved plans can carry a
+        // prebuilt HomeQuery, so this still executes HomeQueryEngine directly until
+        // each chip path is proven equivalent through the shared pipeline.
         clarificationSuggestions = []
         recoverySuggestions = []
         lastClarificationReasons = []
@@ -1760,6 +1763,8 @@ struct HomeAssistantPanelView: View {
         if runtimeSettings.sharedPipeline.isEnabled == false,
            runtimeSettings.nlqV1.isEnabled,
            let nlqPayload = nlqClarificationPayload {
+            // Legacy reachable: NLQ v1 clarification remains behind its flag until
+            // shared-pipeline clarification resume has parity coverage for this flow.
             handleNLQClarificationInput(prompt, payload: nlqPayload)
             return
         }
@@ -1805,6 +1810,8 @@ struct HomeAssistantPanelView: View {
             for: prompt,
             defaultPeriodUnit: defaultQueryPeriodUnit
         ) {
+            // Legacy reachable: command and mutation-style requests still use the
+            // established command handler while shared read-pipeline parity is proven.
             handleInterpretedRequest(.command(command, source: .parser), rawPrompt: prompt)
             return
         }
@@ -5877,11 +5884,16 @@ struct HomeAssistantPanelView: View {
                 finishMarinaTrace()
                 return
             case .fallbackToLegacy(let trace):
+                // Legacy reachable: when the shared pipeline explicitly declines a
+                // prompt, preserve the flagged NLQ/model-router fallthrough instead
+                // of silently changing non-AI or debug fallback behavior.
                 MarinaTraceRecorder.shared.recordSelectedRoute(.sharedFallback, reason: trace.compactSummary)
             }
         }
 
         if runtimeSettings.nlqV1.isEnabled {
+            // Legacy reachable: NLQ v1 remains executable only through its feature
+            // flag and should be shimmed after shared-pipeline equivalence is tested.
             let provider = MarinaDataProvider(modelContext: modelContext, workspaceID: workspace.id)
             let pipeline = MarinaNLQPipeline(provider: provider, defaultPeriodUnit: defaultQueryPeriodUnit)
 
@@ -5896,6 +5908,9 @@ struct HomeAssistantPanelView: View {
             return
         }
 
+        // Legacy reachable: model-router fallback is selected only after the shared
+        // pipeline/NLQ gates allow it, and remains until its read-query behavior is
+        // replaced by tested shared-pipeline routes.
         let interpreted = await languageRouter.interpret(
             prompt: prompt,
             context: makeMarinaRouterContext(turnClassification: turnClassification),
@@ -6192,6 +6207,9 @@ struct HomeAssistantPanelView: View {
         _ typedInput: String,
         payload: MarinaNLQClarificationPayload
     ) {
+        // Legacy reachable: this resumes the NLQ v1 clarification state directly,
+        // so do not remove it until the shared clarification path covers the same
+        // prompt, context, and trace behavior.
         let provider = MarinaDataProvider(modelContext: modelContext, workspaceID: workspace.id)
         let pipeline = MarinaNLQPipeline(provider: provider, defaultPeriodUnit: defaultQueryPeriodUnit)
         let seedPrompt = nlqClarificationOriginalPrompt ?? typedInput
@@ -6217,6 +6235,9 @@ struct HomeAssistantPanelView: View {
     }
 
     private func heuristicInterpretedRequest(for prompt: String) -> MarinaInterpretedRequest {
+        // Legacy reachable: this closure feeds the model-router fallback path. The
+        // parser and intent builder stay in place until their outputs are mapped to
+        // shared semantic queries with equivalent tests.
         if let command = commandParser.parse(prompt, defaultPeriodUnit: defaultQueryPeriodUnit) {
             let interpreted: MarinaInterpretedRequest = .command(command, source: .parser)
             MarinaTraceRecorder.shared.recordFallbackAttempt(outputSummary: interpreted.traceSummary)

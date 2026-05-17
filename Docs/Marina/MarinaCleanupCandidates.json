@@ -1,0 +1,206 @@
+[
+  {
+    "file": "OffshoreBudgeting/CoreViews/Home/MarinaLanguageRouter.swift",
+    "symbol": "MarinaLanguageRouter",
+    "category": "legacy-reachable",
+    "confidence": "high",
+    "recommendedAction": "shim",
+    "evidence": [
+      "Reachable from HomeAssistantFoundation.interpretPrompt when shared pipeline and NLQ v1 do not handle the prompt: OffshoreBudgeting/CoreViews/Home/HomeAssistantFoundation.swift:5899-5907",
+      "Routing mode selects modelRouter when sharedPipeline and nlqV1 are both disabled: OffshoreBudgeting/CoreViews/Home/MarinaRuntimeSettings.swift:20-28",
+      "Still covered by intentional model-router and trace-oriented tests; Phase 3 labels the model-router block as diagnostic coverage at OffshoreBudgetingTests/HomeAssistantModelsTests.swift:553-557",
+      "Phase 2 added MarinaSharedReadShim for a narrow read-query subset: OffshoreBudgeting/CoreViews/Home/NLQ/Boundary/MarinaSharedReadShim.swift:3-124",
+      "Shared-read shim parity tests cover broad spend, category spend, card spend, category comparison, top categories, largest transactions, actual income summary, decline behavior, and Phase 3 replacement coverage for selected legacy model-router read assertions: OffshoreBudgetingTests/MarinaSharedPipelineParityTests.swift:8-168"
+    ],
+    "risk": "high",
+    "requiredBeforeRemoval": [
+      "Keep explicit debug/release/test flag-off diagnostics on modelRouter until product policy changes",
+      "Extend MarinaSharedReadShim coverage to more read-query families",
+      "Wire UI callers to the shim only after deciding how explicit shared-pipeline-disabled diagnostics should behave",
+      "Migrate or retire model-router tests intentionally",
+      "Remove UI fallthrough from HomeAssistantFoundation.swift"
+    ]
+  },
+  {
+    "file": "OffshoreBudgeting/CoreViews/Home/NLQ/Boundary/MarinaSharedReadShim.swift",
+    "symbol": "MarinaSharedReadShim",
+    "category": "active-runtime",
+    "confidence": "medium",
+    "recommendedAction": "keep",
+    "evidence": [
+      "Provides a shared-pipeline shim for proven model-router read prompt families: OffshoreBudgeting/CoreViews/Home/NLQ/Boundary/MarinaSharedReadShim.swift:35-83",
+      "Declines excluded prompts, commands, follow-ups, validation-blocked prompts, shared fallback, and unsupported read metrics explicitly: OffshoreBudgeting/CoreViews/Home/NLQ/Boundary/MarinaSharedReadShim.swift:39-82",
+      "Allowlist is limited to proven read metrics and income summary executor output: OffshoreBudgeting/CoreViews/Home/NLQ/Boundary/MarinaSharedReadShim.swift:103-124",
+      "Parity tests validate handled, declined, and Phase 3 replacement-read coverage paths: OffshoreBudgetingTests/MarinaSharedPipelineParityTests.swift:8-168"
+    ],
+    "risk": "medium",
+    "requiredBeforeRemoval": [
+      "Complete model-router read migration or intentionally abandon the shim strategy",
+      "Replace its parity tests with equivalent shared-pipeline coverage",
+      "Confirm no future UI routing uses it"
+    ]
+  },
+  {
+    "file": "OffshoreBudgeting/CoreViews/Home/NLQ/MarinaNLQPipeline.swift",
+    "symbol": "MarinaNLQPipeline",
+    "category": "legacy-reachable",
+    "confidence": "high",
+    "recommendedAction": "deprecate",
+    "evidence": [
+      "Reachable when shared pipeline is disabled and debug_marina_nlq_v1_enabled is true: OffshoreBudgeting/CoreViews/Home/HomeAssistantFoundation.swift:5884-5896",
+      "NLQ clarification resume still constructs MarinaNLQPipeline: OffshoreBudgeting/CoreViews/Home/HomeAssistantFoundation.swift:6191-6206",
+      "NLQ authoritative trace mode and tests still exist; Phase 3 labels NLQ v1 tests as intentional legacy coverage at OffshoreBudgetingTests/MarinaNLQPipelineTests.swift:8-12"
+    ],
+    "risk": "high",
+    "requiredBeforeRemoval": [
+      "Retire or repoint debug_marina_nlq_v1_enabled",
+      "Prove shared clarification resume replaces NLQ clarification behavior",
+      "Migrate NLQ pipeline tests to shared semantic pipeline coverage",
+      "Confirm trace analysis no longer needs nlq_authoritative mode"
+    ]
+  },
+  {
+    "file": "OffshoreBudgeting/CoreViews/Home/HomeAssistantTextParser.swift",
+    "symbol": "HomeAssistantTextParser",
+    "category": "active-runtime",
+    "confidence": "high",
+    "recommendedAction": "keep",
+    "evidence": [
+      "HomeAssistantFoundation owns a parser instance: OffshoreBudgeting/CoreViews/Home/HomeAssistantFoundation.swift:209",
+      "Shared heuristic fixed-now path constructs HomeAssistantTextParser through MarinaHeuristicInterpreter: OffshoreBudgeting/CoreViews/Home/NLQ/Boundary/MarinaHeuristicInterpreter.swift:93-100",
+      "Legacy fallback resolvedPlan and command/date parsing still depend on parser behavior"
+    ],
+    "risk": "high",
+    "requiredBeforeRemoval": [
+      "Replace parser dependency in MarinaHeuristicInterpreter and MarinaNLQNormalizer",
+      "Replace command/date parsing in legacy UI paths",
+      "Migrate HomeAssistantTextParserTests to new parser coverage"
+    ]
+  },
+  {
+    "file": "OffshoreBudgeting/CoreViews/Home/HomeAssistantIntentBuilder.swift",
+    "symbol": "HomeAssistantIntentBuilder",
+    "category": "legacy-reachable",
+    "confidence": "medium",
+    "recommendedAction": "shim",
+    "evidence": [
+      "HomeAssistantFoundation constructs HomeAssistantIntentBuilder from category, card, and income names: OffshoreBudgeting/CoreViews/Home/HomeAssistantFoundation.swift:229-234",
+      "Legacy heuristic fallback can return resolvedPlan(for:) as a query: OffshoreBudgeting/CoreViews/Home/HomeAssistantFoundation.swift:6226-6229",
+      "HomeAssistantIntentBuilder has dedicated test coverage in OffshoreBudgetingTests/HomeAssistantIntentBuilderTests.swift"
+    ],
+    "risk": "medium",
+    "requiredBeforeRemoval": [
+      "Map every intent-builder output to MarinaSemanticQuery or shared coordinator behavior",
+      "Migrate HomeAssistantIntentBuilderTests to semantic query or shared pipeline tests",
+      "Confirm command paths no longer need legacy plan construction"
+    ]
+  },
+  {
+    "file": "OffshoreBudgeting/CoreViews/Home/HomeAssistantRequestRouting.swift",
+    "symbol": "HomeAssistantRequestRoutingResolver",
+    "category": "legacy-reachable",
+    "confidence": "medium",
+    "recommendedAction": "investigate",
+    "evidence": [
+      "HomeAssistantFoundation owns HomeAssistantRequestRoutingResolver: OffshoreBudgeting/CoreViews/Home/HomeAssistantFoundation.swift:218",
+      "Legacy handleResolvedPlan uses request routing after plan reconciliation",
+      "Request routing resolver is tested through HomeAssistantModelsTests"
+    ],
+    "risk": "medium",
+    "requiredBeforeRemoval": [
+      "Confirm shared semantic routing covers spendAndWhere, spendByDay, income summaries, savings diagnostics, category availability, spend drivers, and card summaries",
+      "Migrate legacy request-shape tests to shared pipeline tests",
+      "Remove handleResolvedPlan callers or route them through shared coordinator"
+    ]
+  },
+  {
+    "file": "OffshoreBudgeting/CoreViews/Home/NLQ/Boundary/MarinaSharedPipelineCoordinator.swift",
+    "symbol": "MarinaSemanticWorkspaceQueryExecutor",
+    "category": "duplicate",
+    "confidence": "medium",
+    "recommendedAction": "investigate",
+    "evidence": [
+      "Private compatibility executor recognizes prompt strings: OffshoreBudgeting/CoreViews/Home/NLQ/Boundary/MarinaSharedPipelineCoordinator.swift:1893-1925",
+      "Evaluation promotes recognized prompts before ordinary validator fallback: OffshoreBudgeting/CoreViews/Home/NLQ/Boundary/MarinaSharedPipelineCoordinator.swift:681-688",
+      "MarinaQueryExecutor can execute the same helper before semantic route decisions: OffshoreBudgeting/CoreViews/Home/NLQ/Boundary/MarinaSharedPipelineCoordinator.swift:2756-2762"
+    ],
+    "risk": "high",
+    "requiredBeforeRemoval": [
+      "Identify every prompt shape currently handled only by this executor",
+      "Add semantic resolver, validator, and executor tests for equivalent behavior",
+      "Remove string-recognition dependency or move it behind an explicit compatibility shim"
+    ]
+  },
+  {
+    "file": "OffshoreBudgeting/CoreViews/Home/MarinaResponseGenerationService.swift",
+    "symbol": "MarinaResponseGenerationService",
+    "category": "active-runtime",
+    "confidence": "high",
+    "recommendedAction": "keep",
+    "evidence": [
+      "HomeAssistantFoundation stores responseGenerationService: OffshoreBudgeting/CoreViews/Home/HomeAssistantFoundation.swift:226",
+      "surfaceGeneratedPresentation uses it only after deterministic answer creation and AI opt-in/availability gates: OffshoreBudgeting/CoreViews/Home/HomeAssistantFoundation.swift:1628",
+      "Dedicated tests exist in OffshoreBudgetingTests/MarinaResponseGenerationServiceTests.swift"
+    ],
+    "risk": "medium",
+    "requiredBeforeRemoval": [
+      "Decide product policy for AI-generated presentation text",
+      "Ensure deterministic answer display remains acceptable without generated surface text",
+      "Update response-generation tests and trace expectations"
+    ]
+  },
+  {
+    "file": "OffshoreBudgeting/CoreViews/Home/MarinaExecutionTrace.swift",
+    "symbol": "MarinaTraceRecorder",
+    "category": "debug-only",
+    "confidence": "high",
+    "recommendedAction": "keep",
+    "evidence": [
+      "HomeAssistantFoundation begins traces with runtime mode and settings: OffshoreBudgeting/CoreViews/Home/HomeAssistantFoundation.swift:5812-5819",
+      "HomeAssistantFoundation records shared pipeline trace: OffshoreBudgeting/CoreViews/Home/HomeAssistantFoundation.swift:5836",
+      "UI tests fail on wrong runtime route or legacy shared path using trace output: OffshoreBudgetingUITests/MarinaUITestDriver.swift:292-296"
+    ],
+    "risk": "high",
+    "requiredBeforeRemoval": [
+      "Replace UI trace assertions with equivalent diagnostics",
+      "Migrate MarinaTraceAnalysisTests and MarinaExecutionTraceTests",
+      "Confirm no debugging workflow relies on trace output files"
+    ]
+  },
+  {
+    "file": "OffshoreBudgetingTests/MarinaTraceAnalysisReport.json",
+    "symbol": "MarinaTraceAnalysisReport.json",
+    "category": "debug-only",
+    "confidence": "medium",
+    "recommendedAction": "keep",
+    "evidence": [
+      "Generated trace analysis report rather than app runtime code",
+      "MarinaTraceAnalysisTests writes snapshot report files to OffshoreBudgetingTests: OffshoreBudgetingTests/MarinaTraceAnalysisTests.swift:932-951",
+      "Phase 4 proof gate confirmed deleting generated trace reports is not useful while the test writer intentionally recreates them"
+    ],
+    "risk": "medium",
+    "requiredBeforeRemoval": [
+      "Change trace analysis output policy so generated snapshots no longer live in OffshoreBudgetingTests",
+      "Replace or remove the developer workflow that relies on committed trace report snapshots",
+      "Run MarinaTraceAnalysisTests after policy change"
+    ]
+  },
+  {
+    "file": "OffshoreBudgetingTests/MarinaTraceAnalysisReport.txt",
+    "symbol": "MarinaTraceAnalysisReport.txt",
+    "category": "debug-only",
+    "confidence": "medium",
+    "recommendedAction": "keep",
+    "evidence": [
+      "Generated trace analysis report rather than app runtime code",
+      "MarinaTraceAnalysisTests writes snapshot report files to OffshoreBudgetingTests: OffshoreBudgetingTests/MarinaTraceAnalysisTests.swift:932-951",
+      "Phase 4 proof gate confirmed deleting generated trace reports is not useful while the test writer intentionally recreates them"
+    ],
+    "risk": "medium",
+    "requiredBeforeRemoval": [
+      "Change trace analysis output policy so generated snapshots no longer live in OffshoreBudgetingTests",
+      "Replace or remove the developer workflow that relies on committed trace report snapshots",
+      "Run MarinaTraceAnalysisTests after policy change"
+    ]
+  }
+]

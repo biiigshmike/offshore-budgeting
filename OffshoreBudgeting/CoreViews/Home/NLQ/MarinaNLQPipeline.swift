@@ -1,5 +1,8 @@
 import Foundation
 
+// Legacy reachable: NLQ v1 remains available behind debug_marina_nlq_v1_enabled
+// for trace/debug parity and clarification fallback. Do not delete or bypass it
+// until shared-pipeline tests prove equivalent behavior.
 @MainActor
 struct MarinaNLQPipeline {
     let provider: MarinaDataProvider

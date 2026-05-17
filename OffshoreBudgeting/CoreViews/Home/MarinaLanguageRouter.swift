@@ -13,6 +13,10 @@ protocol MarinaModelAvailabilityProviding {
 
 extension MarinaModelAvailability: MarinaModelAvailabilityProviding {}
 
+// Legacy reachable: this router is still selected by MarinaRuntimeSettings when
+// the shared pipeline and NLQ v1 gates do not handle a prompt. Avoid warning-based
+// deprecation while it has active callers; migrate behavior behind tested shared
+// pipeline shims before removal.
 struct MarinaLanguageRouter {
     private let availability: MarinaModelAvailabilityProviding
     private let modelService: MarinaStructuredIntentInterpreting

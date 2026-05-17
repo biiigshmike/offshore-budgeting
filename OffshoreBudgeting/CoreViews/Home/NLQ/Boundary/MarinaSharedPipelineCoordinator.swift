@@ -679,6 +679,9 @@ struct MarinaSharedPipelineCoordinator {
             ) {
                 outcome = .executable(merchantSpendPlan)
             } else if MarinaSemanticWorkspaceQueryExecutor.recognizes(prompt: candidate.rawPrompt) {
+                // Compatibility bridge: some workspace summary prompts still rely
+                // on string recognition before the validator can express them as
+                // ordinary semantic capabilities.
                 outcome = .executable(
                     semanticWorkspaceExecutablePlan(
                         query: query,
@@ -1893,6 +1896,8 @@ enum MarinaQueryExecutionResult {
 private struct MarinaSemanticWorkspaceQueryExecutor {
     private let calendar = Calendar(identifier: .gregorian)
 
+    // Compatibility bridge: this recognizer protects prompt shapes that have not
+    // all been promoted into first-class semantic resolver/validator capability.
     static func recognizes(prompt: String) -> Bool {
         let prompt = prompt
             .lowercased()
@@ -2758,6 +2763,8 @@ struct MarinaQueryExecutor {
             provider: provider,
             now: now
         ) {
+            // Compatibility bridge: execute the same protected workspace prompt
+            // shapes after validation dispatch until equivalent typed routes exist.
             return .handled(workspaceExecution(semanticCard, decision: MarinaSemanticExecutionDecision(route: .aggregate, amountBasis: .budgetImpact)))
         }
 

@@ -5,6 +5,168 @@ import Testing
 
 @MainActor
 struct MarinaSharedPipelineParityTests {
+    @Test func parity_sharedReadShimHandlesProvenModelRouterReadPrompts() async throws {
+        let fixture = try makeFixture()
+        try fixture.seedSpendData()
+        try fixture.seedComparisonData()
+
+        let cases: [(prompt: String, legacyPlan: HomeQueryPlan)] = [
+            (
+                "What did I spend this month?",
+                HomeQueryPlan(metric: .spendTotal, dateRange: nil, resultLimit: nil, confidenceBand: .high, periodUnit: .month)
+            ),
+            (
+                "What did I spend on Groceries this month?",
+                HomeQueryPlan(metric: .categorySpendTotal, dateRange: nil, resultLimit: nil, confidenceBand: .high, targetName: "Groceries", periodUnit: .month)
+            ),
+            (
+                "What is the total spend on my Apple Card?",
+                HomeQueryPlan(metric: .cardSpendTotal, dateRange: nil, resultLimit: nil, confidenceBand: .high, targetName: "Apple Card", periodUnit: .month)
+            ),
+            (
+                "Compare Groceries this month to last month",
+                HomeQueryPlan(metric: .categoryMonthComparison, dateRange: nil, comparisonDateRange: nil, resultLimit: nil, confidenceBand: .high, targetName: "Groceries", periodUnit: .month)
+            ),
+            (
+                "Show my top categories this month",
+                HomeQueryPlan(metric: .topCategories, dateRange: nil, resultLimit: nil, confidenceBand: .high, periodUnit: .month)
+            ),
+            (
+                "What were my biggest purchases this month?",
+                HomeQueryPlan(metric: .largestTransactions, dateRange: nil, resultLimit: nil, confidenceBand: .high, periodUnit: .month)
+            )
+        ]
+
+        let router = MarinaLanguageRouter(
+            availability: SharedPipelineStubAvailability(status: .unavailable(reason: "shim parity")),
+            modelService: SharedPipelineThrowingStructuredInterpreter(),
+            planBuilder: MarinaStructuredIntentPlanBuilder()
+        )
+        let shim = MarinaSharedReadShim()
+
+        for testCase in cases {
+            let legacy = await router.interpret(
+                prompt: testCase.prompt,
+                context: sharedContext(fixture: fixture).routerContext,
+                heuristicFallback: {
+                    .query(testCase.legacyPlan, source: .parser)
+                }
+            )
+            guard case .query(let legacyPlan, _) = legacy else {
+                Issue.record("Expected legacy model-router query fallback for \(testCase.prompt)")
+                continue
+            }
+
+            let shimResult = await shim.run(
+                prompt: testCase.prompt,
+                context: sharedContext(fixture: fixture, sharedPipelineEnabled: false)
+            )
+            guard case .handled(_, _, let sharedPlan, let trace) = shimResult else {
+                Issue.record("Expected shared read shim to handle \(testCase.prompt): \(shimResult)")
+                continue
+            }
+
+            #expect(trace.selectedPath != .sharedAttemptedThenLegacyFallback)
+            #expect(sharedPlan?.metric == legacyPlan.metric)
+            #expect(sharedPlan?.targetName == legacyPlan.targetName)
+        }
+    }
+
+    @Test func parity_sharedReadShimCoversLegacyModelRouterReadAssertionsBeforeRetirement() async throws {
+        let fixture = try makeFixture()
+        try fixture.seedSpendData()
+        let cannabis = Offshore.Category(name: "Cannabis", hexColor: "#225522", workspace: fixture.workspace)
+        fixture.context.insert(cannabis)
+        fixture.context.insert(VariableExpense(descriptionText: "Cannabis March", amount: 30, transactionDate: date(2026, 3, 9), workspace: fixture.workspace, card: fixture.appleCard, category: cannabis))
+        try fixture.context.save()
+
+        let cases: [(prompt: String, expectedMetric: HomeQueryMetric, expectedTarget: String?)] = [
+            ("What did I spend on groceries last month?", .categorySpendTotal, "Groceries"),
+            ("Top expense of all time", .largestTransactions, nil),
+            ("Spending by category for this period", .topCategories, nil),
+            ("Spend in Cannabis this year", .categorySpendTotal, "Cannabis")
+        ]
+
+        for testCase in cases {
+            let result = await MarinaSharedReadShim().run(
+                prompt: testCase.prompt,
+                context: sharedContext(fixture: fixture, sharedPipelineEnabled: false)
+            )
+
+            guard case .handled(_, _, let plan, let trace) = result else {
+                Issue.record("Expected shared-read replacement coverage before retiring legacy model-router assertion: \(testCase.prompt), result=\(result)")
+                continue
+            }
+            #expect(trace.selectedPath != .sharedAttemptedThenLegacyFallback)
+            #expect(plan?.metric == testCase.expectedMetric)
+            #expect(plan?.targetName == testCase.expectedTarget)
+        }
+    }
+
+    @Test func parity_sharedReadShimHandlesActualIncomeSummaryWhenSharedPipelineSupportsIt() async throws {
+        let fixture = try makeFixture()
+        fixture.context.insert(Income(source: "Salary", amount: 2_400, date: date(2026, 5, 5), isPlanned: false, workspace: fixture.workspace))
+        fixture.context.insert(Income(source: "Salary", amount: 2_500, date: date(2026, 5, 15), isPlanned: true, workspace: fixture.workspace))
+        try fixture.context.save()
+
+        let result = await MarinaSharedReadShim().run(
+            prompt: "What is my actual income this month?",
+            context: sharedContext(fixture: fixture, sharedPipelineEnabled: false)
+        )
+
+        guard case .handled(let answer, _, _, let trace) = result else {
+            Issue.record("Expected actual income summary to be shimmed when shared pipeline handles it: \(result)")
+            return
+        }
+        #expect(answer.title == "Actual Income")
+        #expect(trace.executorResultSummary?.contains("workspaceAggregation=incomeSummary") == true)
+        #expect(trace.selectedPath != .sharedAttemptedThenLegacyFallback)
+    }
+
+    @Test func parity_sharedReadShimDeclinesUnprovenLegacyRoutes() async throws {
+        let fixture = try makeFixture()
+        try fixture.seedSpendData()
+        let shim = MarinaSharedReadShim()
+
+        let excludedPrompts = [
+            "/explain What did I spend this month?",
+            "If I add $75 to Shopping, does Transportation still have room?",
+            "hello"
+        ]
+
+        for prompt in excludedPrompts {
+            let result = await shim.run(prompt: prompt, context: sharedContext(fixture: fixture))
+            guard case .notShimmed(let reason, let trace) = result else {
+                Issue.record("Expected excluded prompt to decline shim: \(prompt), result=\(result)")
+                continue
+            }
+            #expect(reason == .excludedPrompt)
+            #expect(trace == nil)
+        }
+
+        let commandResult = await shim.run(
+            prompt: "create card named Travel Card",
+            context: sharedContext(fixture: fixture)
+        )
+        guard case .notShimmed(let commandReason, let commandTrace) = commandResult else {
+            Issue.record("Expected command prompt to decline shim: \(commandResult)")
+            return
+        }
+        #expect(commandReason == .command)
+        #expect(commandTrace == nil)
+
+        let validationResult = await shim.run(
+            prompt: "What did I spend on Unknown this month?",
+            context: sharedContext(fixture: fixture)
+        )
+        guard case .notShimmed(let validationReason, let validationTrace) = validationResult else {
+            Issue.record("Expected unknown target to decline shim: \(validationResult)")
+            return
+        }
+        #expect(validationReason == .validationBlocked)
+        #expect(validationTrace?.executorResultSummary == nil)
+    }
+
     @Test func parity_broadSpendMatchesLegacyMetricFamily() async throws {
         let fixture = try makeFixture()
         try fixture.seedSpendData()

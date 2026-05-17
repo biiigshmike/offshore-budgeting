@@ -5,6 +5,12 @@ import Testing
 
 @MainActor
 struct MarinaNLQPipelineTests {
+    // MARK: - Intentional Legacy NLQ v1 Coverage
+    //
+    // These tests still protect debug_marina_nlq_v1_enabled behavior and trace
+    // comparisons. Migrate individual read or clarification cases to shared
+    // semantic-pipeline parity before retiring their NLQ v1 assertions.
+
     @Test func normalizedMetricDefinitions_controlRequiresTarget() {
         #expect(MarinaNormalizedMetric.merchantSpendTotal.definition.requiresTarget == true)
         #expect(MarinaNormalizedMetric.categorySpendShare.definition.requiresTarget == false)
