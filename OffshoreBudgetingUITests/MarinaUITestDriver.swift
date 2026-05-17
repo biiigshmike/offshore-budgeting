@@ -61,10 +61,11 @@ struct MarinaUITestDriver {
         submit(prompt)
 
         let trace = waitForTrace(prompt: prompt, previousTraceCount: previousTraceCount, timeout: timeout)
+        let expectedAnswerIndex = previousTraceCount
         let appeared = trace != nil || waitUntil(timeout: min(timeout, 2)) {
-            answerElements().isEmpty == false
+            answerExists(at: expectedAnswerIndex)
         }
-        let answer = latestVisibleAnswer()
+        let answer = latestVisibleAnswer(preferredIndex: expectedAnswerIndex)
         let chips = chipTitles(for: expectation)
         let result = classify(
             prompt: prompt,
@@ -99,7 +100,7 @@ struct MarinaUITestDriver {
     }
 
     func tapFirstClarificationChip() -> Bool {
-        let chip = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "marina.clarificationChip.")).firstMatch
+        let chip = app.buttons["marina.clarificationChip.0"].firstMatch
         guard chip.waitForExistence(timeout: 5) else { return false }
         chip.tap()
         return true
@@ -131,18 +132,14 @@ struct MarinaUITestDriver {
         return app.textFields["Message Marina"].firstMatch
     }
 
-    private func latestVisibleAnswer() -> MarinaVisibleAnswer {
-        guard let latestIndex = answerIndices().max() else {
+    private func latestVisibleAnswer(preferredIndex: Int) -> MarinaVisibleAnswer {
+        guard answerExists(at: preferredIndex) else {
             return MarinaVisibleAnswer(title: nil, value: "", label: "", text: "")
         }
-        let title = app.staticTexts["marina.answer.\(latestIndex).title"].firstMatch
-        let primaryValue = app.staticTexts["marina.answer.\(latestIndex).primaryValue"].firstMatch
-        let narrative = app.staticTexts["marina.answer.\(latestIndex).narrative"].firstMatch
-        let rowTexts = app.staticTexts
-            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "marina.answer.\(latestIndex).row."))
-            .allElementsBoundByIndex
-            .filter(\.exists)
-            .map(\.label)
+        let title = app.staticTexts["marina.answer.\(preferredIndex).title"].firstMatch
+        let primaryValue = app.staticTexts["marina.answer.\(preferredIndex).primaryValue"].firstMatch
+        let narrative = app.staticTexts["marina.answer.\(preferredIndex).narrative"].firstMatch
+        let rowTexts = boundedAnswerRowLabels(answerIndex: preferredIndex)
         let parts = [
             title.exists ? title.label : nil,
             primaryValue.exists ? primaryValue.label : nil,
@@ -158,24 +155,30 @@ struct MarinaUITestDriver {
         )
     }
 
-    private func answerElements() -> [Int] {
-        answerIndices()
+    private func answerExists(at index: Int) -> Bool {
+        let answer = app.otherElements["marina.answer.\(index)"].firstMatch
+        if answer.exists { return true }
+        return app.staticTexts["marina.answer.\(index).title"].firstMatch.exists
     }
 
-    private func answerIndices() -> [Int] {
-        let identifiers = app.staticTexts
-            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "marina.answer."))
-            .allElementsBoundByIndex
-            .map(\.identifier)
-
-        let indices = identifiers.compactMap { identifier -> Int? in
-            guard let range = identifier.range(of: #"^marina\.answer\.([0-9]+)"#, options: .regularExpression) else {
-                return nil
+    private func boundedAnswerRowLabels(answerIndex: Int, limit: Int = 16) -> [String] {
+        var labels: [String] = []
+        for rowIndex in 0..<limit {
+            let title = app.staticTexts["marina.answer.\(answerIndex).row.\(rowIndex).title"].firstMatch
+            let value = app.staticTexts["marina.answer.\(answerIndex).row.\(rowIndex).value"].firstMatch
+            let titleExists = title.exists
+            let valueExists = value.exists
+            if titleExists {
+                labels.append(title.label)
             }
-            let match = String(identifier[range])
-            return match.split(separator: ".").last.flatMap { Int($0) }
+            if valueExists {
+                labels.append(value.label)
+            }
+            if titleExists == false, valueExists == false, labels.isEmpty == false {
+                break
+            }
         }
-        return Array(Set(indices)).sorted()
+        return labels
     }
 
     private func chipTitles(
@@ -191,11 +194,16 @@ struct MarinaUITestDriver {
     }
 
     private func titles(forIdentifierPrefix prefix: String) -> [String] {
-        app.buttons
-            .matching(NSPredicate(format: "identifier BEGINSWITH %@", prefix))
-            .allElementsBoundByIndex
-            .filter(\.exists)
-            .map(\.label)
+        var titles: [String] = []
+        for index in 0..<8 {
+            let button = app.buttons["\(prefix)\(index)"].firstMatch
+            guard button.exists else {
+                if titles.isEmpty == false { break }
+                continue
+            }
+            titles.append(button.label)
+        }
+        return titles
     }
 
     private func waitForTrace(

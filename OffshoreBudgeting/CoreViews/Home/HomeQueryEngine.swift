@@ -2887,8 +2887,26 @@ struct HomeQueryEngine {
         }
 
         return normalizedExpense == targetKey
-            || normalizedExpense.hasPrefix(targetKey + " ")
+            || isLikelyMerchantVariant(normalizedExpense, of: targetKey)
             || targetKey.hasPrefix(normalizedExpense + " ")
+    }
+
+    private func isLikelyMerchantVariant(_ normalizedExpense: String, of targetKey: String) -> Bool {
+        let prefix = targetKey + " "
+        guard normalizedExpense.hasPrefix(prefix) else { return false }
+
+        let suffix = normalizedExpense
+            .dropFirst(prefix.count)
+            .split(separator: " ")
+            .map(String.init)
+        guard let firstSuffixToken = suffix.first else { return false }
+
+        let locationTokens: Set<String> = [
+            "CAFE", "COFFEE", "GROCERY", "MARKET", "PHARMACY", "RESTAURANT",
+            "SHOP", "STORE", "SUPERMARKET"
+        ]
+        return firstSuffixToken.allSatisfy(\.isNumber)
+            || locationTokens.contains(firstSuffixToken)
     }
 
     private func rankedCategoryDeltas(

@@ -147,6 +147,28 @@ struct MarinaExecutionTraceTests {
         #expect(trace?.normalizedMetric == nil)
     }
 
+    @Test func trace_recordsInterpreterAndResponseSurfaceSeparately() throws {
+        MarinaTraceRecorder.shared.reset()
+        MarinaTraceRecorder.shared.begin(
+            prompt: "What did I spend this month?",
+            routingMode: .sharedPipeline,
+            marinaNLQv1Enabled: false
+        )
+        MarinaTraceRecorder.shared.recordSelectedRoute(.sharedFoundationModels, reason: "model interpreted")
+        MarinaTraceRecorder.shared.recordResponseSurface(
+            source: .foundationModelsSurface,
+            fallbackReason: nil
+        )
+        let trace = MarinaTraceRecorder.shared.finish()
+        let snapshot = trace.map(MarinaExecutionTraceSnapshot.init)
+
+        #expect(trace?.selectedRoute == .sharedFoundationModels)
+        #expect(trace?.responseSurfaceSource == .foundationModelsSurface)
+        #expect(trace?.responseSurfaceFallbackReason == nil)
+        #expect(snapshot?.responseSurfaceSource == "foundationModelsSurface")
+        #expect(snapshot?.accessibilityValue.contains("responseSurface=foundationModelsSurface") == true)
+    }
+
     private func runDiagnosticPromptMatrix(mode: MarinaExecutionRoutingMode) async -> [PromptTraceResult] {
         switch mode {
         case .modelRouter:

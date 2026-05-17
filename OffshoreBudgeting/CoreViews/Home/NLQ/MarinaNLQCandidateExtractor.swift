@@ -137,6 +137,16 @@ struct MarinaNLQCandidateExtractor {
             )
         }
 
+        if targetType == .merchant, target.hasPrefix(normalizedCandidate + " ") {
+            return MarinaNLQCandidateMatch(
+                entityType: targetType,
+                displayValue: displayValue,
+                normalizedValue: normalizedCandidate,
+                matchType: .prefix,
+                sourceID: sourceID
+            )
+        }
+
         return nil
     }
 

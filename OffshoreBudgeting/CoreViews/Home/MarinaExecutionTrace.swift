@@ -34,6 +34,8 @@ struct MarinaExecutionTrace: Equatable {
     let aggregationPath: String?
     let responseType: String?
     let finalAnswerSummary: String?
+    let responseSurfaceSource: MarinaResponseSurfaceSource?
+    let responseSurfaceFallbackReason: MarinaResponseGenerationFallbackReason?
 
     let sharedPipelineEnabled: Bool?
     let sharedPipelinePath: MarinaSharedPipelineRuntimePath?
@@ -94,7 +96,9 @@ final class MarinaTraceRecorder {
         #if DEBUG
         return true
         #else
-        return false
+        let environment = ProcessInfo.processInfo.environment
+        return environment["XCTestConfigurationFilePath"] != nil
+            || environment["XCTestSessionIdentifier"] != nil
         #endif
     }
 
@@ -247,6 +251,17 @@ final class MarinaTraceRecorder {
         }
     }
 
+    func recordResponseSurface(
+        source: MarinaResponseSurfaceSource,
+        fallbackReason: MarinaResponseGenerationFallbackReason?
+    ) {
+        guard isEnabled else { return }
+        mutate { draft in
+            draft.responseSurfaceSource = source
+            draft.responseSurfaceFallbackReason = fallbackReason
+        }
+    }
+
     func recordDebugMarker(_ marker: String) {
         guard isEnabled else { return }
         mutate { draft in
@@ -349,6 +364,8 @@ private struct MarinaExecutionTraceDraft {
     var aggregationPath: String?
     var responseType: String?
     var finalAnswerSummary: String?
+    var responseSurfaceSource: MarinaResponseSurfaceSource?
+    var responseSurfaceFallbackReason: MarinaResponseGenerationFallbackReason?
 
     var sharedPipelineEnabled: Bool?
     var sharedPipelinePath: MarinaSharedPipelineRuntimePath?
@@ -395,6 +412,8 @@ private struct MarinaExecutionTraceDraft {
             aggregationPath: aggregationPath,
             responseType: responseType,
             finalAnswerSummary: finalAnswerSummary,
+            responseSurfaceSource: responseSurfaceSource,
+            responseSurfaceFallbackReason: responseSurfaceFallbackReason,
             sharedPipelineEnabled: sharedPipelineEnabled,
             sharedPipelinePath: sharedPipelinePath,
             sharedPipelineInterpreterSource: sharedPipelineInterpreterSource,
@@ -425,6 +444,8 @@ struct MarinaExecutionTraceSnapshot: Codable, Equatable {
     let aggregationPath: String?
     let responseType: String?
     let finalAnswerSummary: String?
+    let responseSurfaceSource: String?
+    let responseSurfaceFallbackReason: String?
     let sharedPipelineEnabled: Bool?
     let sharedPipelinePath: String?
     let sharedPipelineInterpreterSource: String?
@@ -452,6 +473,8 @@ struct MarinaExecutionTraceSnapshot: Codable, Equatable {
         self.aggregationPath = trace.aggregationPath
         self.responseType = trace.responseType
         self.finalAnswerSummary = trace.finalAnswerSummary
+        self.responseSurfaceSource = trace.responseSurfaceSource?.rawValue
+        self.responseSurfaceFallbackReason = trace.responseSurfaceFallbackReason?.rawValue
         self.sharedPipelineEnabled = trace.sharedPipelineEnabled
         self.sharedPipelinePath = trace.sharedPipelinePath?.rawValue
         self.sharedPipelineInterpreterSource = trace.sharedPipelineInterpreterSource?.rawValue
@@ -482,6 +505,8 @@ struct MarinaExecutionTraceSnapshot: Codable, Equatable {
             sharedPipelineCandidateSummary.map { "candidate=\($0)" },
             aggregationPath.map { "aggregationPath=\($0)" },
             responseType.map { "responseType=\($0)" },
+            responseSurfaceSource.map { "responseSurface=\($0)" },
+            responseSurfaceFallbackReason.map { "responseSurfaceFallback=\($0)" },
             sharedPipelineExecutorSummary.map { "executor=\($0)" },
             sharedPipelineResponseBridgeSummary.map { "bridge=\($0)" },
             sharedPipelineFallbackReason.map { "fallback=\($0)" }
@@ -536,7 +561,9 @@ extension MarinaExecutionTrace {
             "sharedPath=\(sharedPipelinePath?.rawValue ?? "none")",
             "sharedFallback=\(sharedPipelineFallbackReason?.rawValue ?? "none")",
             "metric=\(normalizedMetric ?? "nil")",
-            "response=\(responseType ?? "nil")"
+            "response=\(responseType ?? "nil")",
+            "surface=\(responseSurfaceSource?.rawValue ?? "nil")",
+            "surfaceFallback=\(responseSurfaceFallbackReason?.rawValue ?? "nil")"
         ]
         .compactMap { $0 }
         .joined(separator: " | ")

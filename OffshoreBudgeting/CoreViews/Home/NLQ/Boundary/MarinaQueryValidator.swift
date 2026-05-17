@@ -233,6 +233,10 @@ struct MarinaQueryValidator {
             )
         }
 
+        if isSupportedMerchantSpendSemanticQuery(query, resolved: resolved) {
+            return .executable(semanticExecutablePlan(from: resolved, candidate: candidate))
+        }
+
         guard query.operation == .lookupDetails || relationshipsSupported(resolved.resolvedFilters, by: descriptor) else {
             return unsupported(
                 .unsupportedCombination,
@@ -264,6 +268,10 @@ struct MarinaQueryValidator {
             responseShape: basePlan.responseShape ?? responseShape(operation: basePlan.operation, measure: basePlan.measure, candidate: candidate)
         )
 
+        if isSupportedMerchantSpendSemanticQuery(query, plan: plan) {
+            return .executable(plan)
+        }
+
         if query.operation != .lookupDetails,
            MarinaQueryCapabilityMatrix.supports(
                operation: plan.operation,
@@ -279,6 +287,57 @@ struct MarinaQueryValidator {
         }
 
         return .executable(plan)
+    }
+
+    private func isSupportedMerchantSpendSemanticQuery(
+        _ query: MarinaSemanticQuery,
+        resolved: MarinaResolvedSemanticQuery
+    ) -> Bool {
+        query.subject == .variableExpenses
+            && query.operation == .sum
+            && query.grouping == nil
+            && resolved.resolvedFilters.count == 1
+            && resolved.resolvedFilters.first?.entityType == .merchant
+    }
+
+    private func isSupportedMerchantSpendSemanticQuery(
+        _ query: MarinaSemanticQuery,
+        plan: MarinaAggregationPlan
+    ) -> Bool {
+        query.subject == .variableExpenses
+            && plan.operation == .sum
+            && plan.measure == .spend
+            && plan.grouping == nil
+            && plan.targets.count == 1
+            && plan.targets.first?.entityType == .merchant
+    }
+
+    private func semanticExecutablePlan(
+        from resolved: MarinaResolvedSemanticQuery,
+        candidate: MarinaQueryPlanCandidate
+    ) -> MarinaAggregationPlan {
+        let basePlan = semanticAdapter.aggregationPlan(from: resolved.query)
+        return MarinaAggregationPlan(
+            status: .notExecutableShell,
+            operation: basePlan.operation,
+            measure: basePlan.measure,
+            targets: resolved.resolvedFilters.map { filter in
+                MarinaResolvedAggregationTarget(
+                    id: filter.id,
+                    role: filter.role,
+                    entityType: filter.entityType,
+                    displayName: filter.displayName,
+                    sourceID: filter.sourceID
+                )
+            },
+            dateRange: resolved.primaryDateRange,
+            comparisonDateRange: resolved.comparisonDateRange,
+            grouping: basePlan.grouping,
+            ranking: basePlan.ranking,
+            limit: basePlan.limit,
+            incomeStatusScope: basePlan.incomeStatusScope,
+            responseShape: basePlan.responseShape ?? responseShape(operation: basePlan.operation, measure: basePlan.measure, candidate: candidate)
+        )
     }
 
     private func requiresResolvedTarget(_ candidate: MarinaQueryPlanCandidate) -> Bool {

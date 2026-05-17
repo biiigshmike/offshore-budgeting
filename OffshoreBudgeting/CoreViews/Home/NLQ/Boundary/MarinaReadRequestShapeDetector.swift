@@ -162,7 +162,8 @@ struct MarinaReadRequestShapeDetector {
             )
         }
 
-        if let objectType = objectInventoryListType(in: normalizedPrompt),
+        if isAnalyticsRankingInventoryPrompt(normalizedPrompt) == false,
+           let objectType = objectInventoryListType(in: normalizedPrompt),
            objectType.allowsEmptySearchListing {
             return lookup(
                 prompt: prompt,
@@ -176,6 +177,14 @@ struct MarinaReadRequestShapeDetector {
         }
 
         return nil
+    }
+
+    private func isAnalyticsRankingInventoryPrompt(_ prompt: String) -> Bool {
+        prompt.contains("top categories")
+            || prompt.contains("top merchants")
+            || prompt.contains("where is my money going")
+            || prompt.contains("where is most of my money going")
+            || prompt.contains("where did most of my money go")
     }
 
     private func lookup(

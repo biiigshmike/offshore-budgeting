@@ -183,6 +183,7 @@ struct HomeAssistantPanelView: View {
     @State private var nlqClarificationPayload: MarinaNLQClarificationPayload? = nil
     @State private var nlqClarificationOriginalPrompt: String? = nil
     @State private var nlqExecutionContext: MarinaNLQExecutionContext? = nil
+    @State private var generatedFollowUpSuggestionsByAnswerID: [UUID: [HomeAssistantSuggestion]] = [:]
     @FocusState private var isPromptFieldFocused: Bool
     @AppStorage("general_defaultBudgetingPeriod")
     private var defaultBudgetingPeriodRaw: String = BudgetingPeriod.monthly.rawValue
@@ -222,6 +223,7 @@ struct HomeAssistantPanelView: View {
     private let incomePeriodSummaryAnswerBuilder = HomeAssistantIncomePeriodSummaryAnswerBuilder()
     private let categoryAvailabilityAnswerBuilder = HomeAssistantCategoryAvailabilityAnswerBuilder()
     private let cardSummaryAnswerBuilder = HomeAssistantCardSummaryAnswerBuilder()
+    private let responseGenerationService: any MarinaResponseGenerating = MarinaResponseGenerationService()
     private let mutationService = HomeAssistantMutationService()
     private let followUpAnchorResolver = HomeAssistantFollowUpAnchorResolver()
     private var intentBuilder: HomeAssistantIntentBuilder {
@@ -1073,11 +1075,12 @@ struct HomeAssistantPanelView: View {
     ) -> [HomeAssistantSuggestionSection] {
         let groundedQuery = sessionContext.recentAnswerContexts.last?.executedPlan?.query
             ?? sessionContext.recentAnswerContexts.last?.query
-        let followUps = personaFormatter.followUpSuggestions(
-            after: answer,
-            executedQuery: groundedQuery,
-            personaID: selectedPersonaID
-        )
+        let followUps = generatedFollowUpSuggestionsByAnswerID[answer.id]
+            ?? personaFormatter.followUpSuggestions(
+                after: answer,
+                executedQuery: groundedQuery,
+                personaID: selectedPersonaID
+            )
         let sections = HomeAssistantSuggestionSectionBuilder.build(
             clarificationSuggestions: clarificationSuggestions,
             clarificationReasonCount: lastClarificationReasons.count,
@@ -1547,7 +1550,7 @@ struct HomeAssistantPanelView: View {
         rawPrompt: String,
         homeQueryPlan: HomeQueryPlan?,
         source: HomeAssistantPlanResolutionSource
-    ) {
+    ) async {
         clarificationSuggestions = []
         recoverySuggestions = []
         lastClarificationReasons = []
@@ -1568,6 +1571,14 @@ struct HomeAssistantPanelView: View {
                 userPrompt: rawPrompt,
                 personaID: selectedPersonaID
             )
+        let deterministicFollowUps = followUpSuggestions(for: styled, query: query)
+        let surfaced = await surfaceGeneratedPresentation(
+            deterministicAnswer: styled,
+            rawPrompt: rawPrompt,
+            source: source,
+            homeQueryPlan: homeQueryPlan,
+            deterministicFollowUps: deterministicFollowUps
+        )
 
         if let homeQueryPlan, let query {
             updateSessionContext(after: homeQueryPlan)
@@ -1575,7 +1586,7 @@ struct HomeAssistantPanelView: View {
                 for: query,
                 executedPlan: homeQueryPlan,
                 rawAnswer: normalizedAnswer,
-                presentedAnswer: styled,
+                presentedAnswer: surfaced.answer,
                 userPrompt: rawPrompt
             )
         }
@@ -1587,7 +1598,10 @@ struct HomeAssistantPanelView: View {
             plan: homeQueryPlan,
             notes: "shared_pipeline"
         )
-        appendAnswer(styled)
+        if surfaced.followUpSuggestions.isEmpty == false {
+            generatedFollowUpSuggestionsByAnswerID[surfaced.answer.id] = surfaced.followUpSuggestions
+        }
+        appendAnswer(surfaced.answer)
     }
 
     private func shouldBypassPersonaStyling(for answer: HomeAnswer) -> Bool {
@@ -1601,6 +1615,125 @@ struct HomeAssistantPanelView: View {
         }
 
         return false
+    }
+
+    private func followUpSuggestions(for answer: HomeAnswer, query: HomeQuery?) -> [HomeAssistantSuggestion] {
+        personaFormatter.followUpSuggestions(
+            after: answer,
+            executedQuery: query,
+            personaID: selectedPersonaID
+        )
+    }
+
+    private func surfaceGeneratedPresentation(
+        deterministicAnswer: HomeAnswer,
+        rawPrompt: String,
+        source: HomeAssistantPlanResolutionSource,
+        homeQueryPlan: HomeQueryPlan?,
+        deterministicFollowUps: [HomeAssistantSuggestion],
+        validationOutcomeSummary: String? = nil,
+        clarificationChoices: [String] = []
+    ) async -> MarinaResponseSurfaceApplication {
+        let fallback = MarinaResponseSurfaceApplication(
+            answer: deterministicAnswer,
+            followUpSuggestions: deterministicFollowUps
+        )
+        guard marinaRuntimeSettings.aiOptIn.isEnabled else {
+            MarinaTraceRecorder.shared.recordResponseSurface(
+                source: .deterministicSurfaceFallback,
+                fallbackReason: .aiOptOut
+            )
+            return fallback
+        }
+
+        let availability = MarinaModelAvailability().currentStatus()
+        guard availability == .available else {
+            MarinaTraceRecorder.shared.recordResponseSurface(
+                source: .deterministicSurfaceFallback,
+                fallbackReason: .modelUnavailable
+            )
+            return fallback
+        }
+
+        do {
+            let context = MarinaResponseGenerationContext(
+                userPrompt: rawPrompt,
+                workspaceName: workspace.name,
+                routeSourceRaw: source.rawValue,
+                deterministicAnswer: deterministicAnswer,
+                dateWindow: homeQueryPlan?.dateRange?.traceSummary,
+                provenance: visibleProvenance(for: homeQueryPlan.map { [$0.query] } ?? []),
+                validationOutcomeSummary: validationOutcomeSummary,
+                clarificationChoices: clarificationChoices,
+                followUpCandidates: deterministicFollowUps.enumerated().map { index, suggestion in
+                    MarinaResponseSuggestionCandidate(
+                        index: index,
+                        title: suggestion.title,
+                        querySummary: responseGenerationQuerySummary(suggestion.query)
+                    )
+                },
+                recentResponses: sessionContext.recentAnswerContexts.suffix(3).map { context in
+                    MarinaRecentResponseSummary(
+                        title: context.answerTitle,
+                        kindRaw: context.answerKind.rawValue,
+                        primaryValue: context.rowValues.first
+                    )
+                }
+            )
+            let generated = try await responseGenerationService.generateSurfaceResponse(context: context)
+            let applied = try MarinaResponseSurfaceApplicator().apply(
+                generated: generated,
+                to: deterministicAnswer,
+                deterministicFollowUps: deterministicFollowUps
+            )
+            MarinaTraceRecorder.shared.recordResponseSurface(
+                source: .foundationModelsSurface,
+                fallbackReason: nil
+            )
+            return applied
+        } catch MarinaResponseGenerationError.unavailable {
+            MarinaTraceRecorder.shared.recordResponseSurface(
+                source: .deterministicSurfaceFallback,
+                fallbackReason: .modelUnavailable
+            )
+            return fallback
+        } catch MarinaResponseGenerationError.malformedResponse {
+            MarinaTraceRecorder.shared.recordResponseSurface(
+                source: .deterministicSurfaceFallback,
+                fallbackReason: .malformedResponse
+            )
+            return fallback
+        } catch MarinaResponseGenerationError.invariantViolation {
+            MarinaTraceRecorder.shared.recordResponseSurface(
+                source: .deterministicSurfaceFallback,
+                fallbackReason: .invariantViolation
+            )
+            return fallback
+        } catch {
+            MarinaTraceRecorder.shared.recordResponseSurface(
+                source: .deterministicSurfaceFallback,
+                fallbackReason: .modelServiceFailed
+            )
+            return fallback
+        }
+    }
+
+    private func responseGenerationQuerySummary(_ query: HomeQuery) -> String {
+        var parts = ["intent=\(query.intent.rawValue)"]
+        if let targetName = query.targetName {
+            parts.append("target=\(targetName)")
+        }
+        if let dateRange = query.dateRange {
+            parts.append("date=\(dateRange.traceSummary)")
+        }
+        if let comparisonDateRange = query.comparisonDateRange {
+            parts.append("comparison=\(comparisonDateRange.traceSummary)")
+        }
+        parts.append("limit=\(query.resultLimit)")
+        if let periodUnit = query.periodUnit {
+            parts.append("period=\(periodUnit.rawValue)")
+        }
+        return parts.joined(separator: ",")
     }
     
     private func submitPrompt() {
@@ -5712,7 +5845,7 @@ struct HomeAssistantPanelView: View {
                     path: "marina_shared_pipeline",
                     summary: trace.executorResultSummary
                 )
-                handleSharedPipelineAnswer(
+                await handleSharedPipelineAnswer(
                     answer,
                     rawPrompt: prompt,
                     homeQueryPlan: homeQueryPlan,
@@ -5726,7 +5859,7 @@ struct HomeAssistantPanelView: View {
                     reason: trace.compactSummary
                 )
                 if case .clarification(let clarification) = outcome {
-                    handleSharedPipelineClarification(
+                    await handleSharedPipelineClarification(
                         answer,
                         clarification: clarification,
                         rawPrompt: prompt,
@@ -5735,7 +5868,7 @@ struct HomeAssistantPanelView: View {
                     finishMarinaTrace()
                     return
                 }
-                handleSharedPipelineAnswer(
+                await handleSharedPipelineAnswer(
                     answer,
                     rawPrompt: prompt,
                     homeQueryPlan: nil,
@@ -5871,7 +6004,7 @@ struct HomeAssistantPanelView: View {
         clarification: MarinaTypedClarification,
         rawPrompt: String,
         source: HomeAssistantPlanResolutionSource
-    ) {
+    ) async {
         let actionable = clarification.isActionable(for: rawPrompt)
         sharedPipelineClarification = actionable ? clarification : nil
         sharedPipelineClarificationChoiceContext = actionable ? clarification : nil
@@ -5901,7 +6034,16 @@ struct HomeAssistantPanelView: View {
             plan: nil,
             notes: "shared_pipeline_clarification"
         )
-        appendAnswer(answer)
+        let surfaced = await surfaceGeneratedPresentation(
+            deterministicAnswer: answer,
+            rawPrompt: rawPrompt,
+            source: source,
+            homeQueryPlan: nil,
+            deterministicFollowUps: [],
+            validationOutcomeSummary: "clarification:\(clarification.kind.rawValue)",
+            clarificationChoices: clarification.actionableChoices.map(sharedPipelineChoiceTitle)
+        )
+        appendAnswer(surfaced.answer)
     }
 
     @MainActor
@@ -5949,7 +6091,7 @@ struct HomeAssistantPanelView: View {
                 path: "marina_shared_pipeline_clarification_resume",
                 summary: trace.executorResultSummary
             )
-            handleSharedPipelineAnswer(
+            await handleSharedPipelineAnswer(
                 answer,
                 rawPrompt: rawPrompt,
                 homeQueryPlan: homeQueryPlan,
@@ -5965,14 +6107,14 @@ struct HomeAssistantPanelView: View {
                 reason: trace.compactSummary
             )
             if case .clarification(let nextClarification) = outcome {
-                handleSharedPipelineClarification(
+                await handleSharedPipelineClarification(
                     answer,
                     clarification: nextClarification,
                     rawPrompt: rawPrompt,
                     source: trace.interpreterSource == .foundationModels ? .sharedFoundationModels : .sharedHeuristic
                 )
             } else {
-                handleSharedPipelineAnswer(
+                await handleSharedPipelineAnswer(
                     answer,
                     rawPrompt: rawPrompt,
                     homeQueryPlan: nil,

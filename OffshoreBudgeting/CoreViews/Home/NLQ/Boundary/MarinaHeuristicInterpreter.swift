@@ -85,6 +85,27 @@ struct MarinaHeuristicInterpreter {
         )
     }
 
+    func interpretCanonical(
+        prompt: String,
+        defaultPeriodUnit: HomeQueryPeriodUnit,
+        now: Date
+    ) -> MarinaCanonicalReadInterpretation {
+        let parser = HomeAssistantTextParser(nowProvider: { now })
+        let interpreter = MarinaHeuristicInterpreter(
+            normalize: { prompt, defaultPeriodUnit in
+                MarinaNLQNormalizer(
+                    parser: parser,
+                    defaultPeriodUnit: defaultPeriodUnit
+                ).normalize(prompt: prompt)
+            },
+            now: { now }
+        )
+        return interpreter.interpretCanonical(
+            prompt: prompt,
+            defaultPeriodUnit: defaultPeriodUnit
+        )
+    }
+
     private func operation(from intent: NormalizedQueryIntent) -> MarinaCandidateOperation? {
         if intent.unsupportedShapeReason == .whatIfSimulation {
             return .simulate
@@ -202,7 +223,17 @@ struct MarinaHeuristicInterpreter {
         operation: MarinaCandidateOperation?
     ) -> Bool {
         guard operation == .rank, grouping(from: intent) != nil else { return false }
-        return normalized(rawTargetText) == normalized(intent.rawPrompt)
+        let normalizedTarget = normalized(rawTargetText)
+        let unscopedRankingPhrases: Set<String> = [
+            "top categories",
+            "my top categories",
+            "show my top categories",
+            "top merchants",
+            "my top merchants",
+            "show my top merchants"
+        ]
+        return normalizedTarget == normalized(intent.rawPrompt)
+            || unscopedRankingPhrases.contains(normalizedTarget)
     }
 
     private func shouldSuppressSyntheticBroadTarget(
@@ -436,6 +467,15 @@ struct MarinaHeuristicInterpreter {
     }
 
     private func grouping(from intent: NormalizedQueryIntent) -> MarinaGroupingCandidate? {
+        if intent.rawTargetText?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
+            switch intent.normalizedMetric {
+            case .categorySpendTotal, .merchantSpendTotal:
+                return nil
+            default:
+                break
+            }
+        }
+
         switch intent.queryShape.grouping {
         case .some(.category):
             return MarinaGroupingCandidate(dimension: .category)
@@ -902,6 +942,18 @@ struct MarinaHeuristicInterpreter {
             )
         }
 
+        if isBroadCategoryRankingPrompt(prompt) {
+            return ProtectedShape(
+                operation: .rank,
+                measure: .spend,
+                entityMentions: [],
+                timeScopes: baseTimeScopes(from: intent, defaultPeriodUnit: .month),
+                grouping: MarinaGroupingCandidate(dimension: .category),
+                ranking: MarinaRankingCandidate(direction: .top, limit: intent.resultLimit),
+                responseShapeHint: .rankedList
+            )
+        }
+
         if isBreakdownPrompt(prompt) {
             return ProtectedShape(
                 operation: .rank,
@@ -1281,6 +1333,13 @@ struct MarinaHeuristicInterpreter {
             || prompt.contains("category breakdown")
             || (prompt.contains("break down") && prompt.contains("by category"))
             || (prompt.contains("break down") && prompt.contains("where my money went"))
+    }
+
+    private func isBroadCategoryRankingPrompt(_ prompt: String) -> Bool {
+        prompt.contains("top categories")
+            || prompt.contains("where is my money going")
+            || prompt.contains("where is most of my money going")
+            || prompt.contains("where did most of my money go")
     }
 
     private func isSharePrompt(_ prompt: String) -> Bool {

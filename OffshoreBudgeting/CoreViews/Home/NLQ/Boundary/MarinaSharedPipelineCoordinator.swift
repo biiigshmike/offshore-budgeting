@@ -107,7 +107,8 @@ struct MarinaSharedPipelineCoordinator {
                     selection.heuristicAttempted = true
                     let heuristicInterpretation = heuristicInterpreter.interpretCanonical(
                         prompt: normalization.originalText,
-                        defaultPeriodUnit: normalization.defaultPeriodUnit
+                        defaultPeriodUnit: normalization.defaultPeriodUnit,
+                        now: context.now
                     )
                     let heuristicEvaluation = evaluate(
                         heuristicInterpretation,
@@ -154,7 +155,8 @@ struct MarinaSharedPipelineCoordinator {
                 selection.fallbackReason = failureReason
                 let interpretation = heuristicInterpreter.interpretCanonical(
                     prompt: normalization.originalText,
-                    defaultPeriodUnit: normalization.defaultPeriodUnit
+                    defaultPeriodUnit: normalization.defaultPeriodUnit,
+                    now: context.now
                 )
                 let evaluation = evaluate(
                     interpretation,
@@ -178,7 +180,8 @@ struct MarinaSharedPipelineCoordinator {
         selection.fallbackReason = context.aiOptInEnabled ? .modelUnavailable : .aiOptOut
         let interpretation = heuristicInterpreter.interpretCanonical(
             prompt: normalization.originalText,
-            defaultPeriodUnit: normalization.defaultPeriodUnit
+            defaultPeriodUnit: normalization.defaultPeriodUnit,
+            now: context.now
         )
         let evaluation = evaluate(
             interpretation,
@@ -391,6 +394,29 @@ struct MarinaSharedPipelineCoordinator {
             )
         }
 
+        if evaluation.isValidationBlocked,
+           let recovered = recoverMerchantSpendValidationBlock(
+            evaluation: evaluation,
+            provider: context.provider,
+            now: context.now
+           ) {
+            let trace = trace(
+                context: context,
+                modelAvailabilitySummary: modelAvailabilitySummary,
+                selectedPath: recovered.candidate.source == .foundationModels ? .sharedFoundationModels : .sharedHeuristic,
+                evaluation: recovered,
+                selection: selection,
+                fallbackReason: selection.heuristicUsedAsFallback ? selection.fallbackReason : nil,
+                disagreementSummary: disagreementSummary
+            )
+            return .handled(
+                answer: recovered.answer!,
+                aggregationResult: recovered.aggregationResult!,
+                homeQueryPlan: recovered.executablePlan?.homeQueryPlan,
+                trace: trace
+            )
+        }
+
         if evaluation.isValidationBlocked {
             let trace = trace(
                 context: context,
@@ -426,6 +452,86 @@ struct MarinaSharedPipelineCoordinator {
             answer: blocked.blockedAnswer!,
             validationOutcome: blocked.validationOutcome,
             trace: trace
+        )
+    }
+
+    private func recoverMerchantSpendValidationBlock(
+        evaluation: CandidateEvaluation,
+        provider: MarinaDataProvider,
+        now: Date
+    ) -> CandidateEvaluation? {
+        guard evaluation.resolved.hasResolutionProblems == false,
+              let plan = manualMerchantSpendPlan(candidate: evaluation.candidate, resolved: evaluation.resolved) else {
+            return nil
+        }
+
+        guard let recovered = manuallyExecuteHomeCompatiblePlan(
+            candidate: evaluation.candidate,
+            resolved: evaluation.resolved,
+            plan: plan,
+            provider: provider,
+            now: now,
+            responseBuilder: MarinaResponseBuilder(
+                aggregationBridge: responseBridge,
+                workspaceBridge: workspaceAggregationResponseBridge
+            ),
+            interpretationResult: evaluation.interpretationResult ?? .unsupported(
+                MarinaTypedUnsupportedResponse(
+                    kind: .unsupportedCombination,
+                    message: "Recovered supported merchant spend validation block.",
+                    candidate: evaluation.candidate
+                )
+            )
+        ) else {
+            return nil
+        }
+
+        return CandidateEvaluation(
+            candidate: recovered.candidate,
+            resolved: recovered.resolved,
+            validationOutcome: recovered.validationOutcome,
+            executablePlan: recovered.executablePlan,
+            aggregationResult: recovered.aggregationResult,
+            answer: recovered.answer,
+            blockedAnswer: recovered.blockedAnswer,
+            suggestionCount: recovered.suggestionCount,
+            runtimeFallbackReason: recovered.runtimeFallbackReason,
+            databaseLookupResponse: recovered.databaseLookupResponse,
+            workspaceAggregationCard: recovered.workspaceAggregationCard,
+            interpretationResult: recovered.interpretationResult,
+            semanticResolved: evaluation.semanticResolved,
+            amountBasis: recovered.amountBasis,
+            executionRoute: recovered.executionRoute
+        )
+    }
+
+    private func manualMerchantSpendPlan(
+        candidate: MarinaQueryPlanCandidate,
+        resolved: MarinaResolvedQueryCandidate
+    ) -> MarinaAggregationPlan? {
+        guard candidate.operation == .sum,
+              candidate.measure == .spend,
+              let target = resolved.resolvedTargets.first,
+              target.entityType == .merchant else {
+            return nil
+        }
+
+        return MarinaAggregationPlan(
+            status: .notExecutableShell,
+            operation: .sum,
+            measure: .spend,
+            targets: [
+                MarinaResolvedAggregationTarget(
+                    id: target.id,
+                    role: target.role,
+                    entityType: target.entityType,
+                    displayName: target.displayName,
+                    sourceID: target.sourceID
+                )
+            ],
+            dateRange: resolved.primaryDateRange,
+            comparisonDateRange: resolved.comparisonDateRange,
+            responseShape: .scalarCurrency
         )
     }
 
@@ -495,7 +601,15 @@ struct MarinaSharedPipelineCoordinator {
                 defaultPeriodUnit: defaultPeriodUnit
             )
             semanticResolved = resolvedQuery
-            outcome = validator.validate(resolvedQuery)
+            if let merchantSpendPlan = semanticMerchantSpendPlan(
+                query: query,
+                resolved: resolvedQuery,
+                candidate: candidate
+            ) {
+                outcome = .executable(merchantSpendPlan)
+            } else {
+                outcome = validator.validate(resolvedQuery)
+            }
         case .clarification(let clarification):
             semanticResolved = nil
             outcome = .clarification(clarification)
@@ -521,6 +635,16 @@ struct MarinaSharedPipelineCoordinator {
                 semanticResolved: semanticResolved
             )
         case .unsupported:
+            if let recovered = recoverWithCompatibilityCandidate(
+                candidate: candidate,
+                resolved: resolved,
+                provider: provider,
+                now: now,
+                responseBuilder: responseBuilder,
+                interpretationResult: interpretation.result
+            ) {
+                return recovered
+            }
             return CandidateEvaluation(
                 candidate: candidate,
                 resolved: resolved,
@@ -584,6 +708,17 @@ struct MarinaSharedPipelineCoordinator {
                     executionRoute: execution.executionRoute
                 )
             case .unsupported(let unsupported):
+                if semanticResolved != nil,
+                   let recovered = recoverWithCompatibilityCandidate(
+                    candidate: candidate,
+                    resolved: resolved,
+                    provider: provider,
+                    now: now,
+                    responseBuilder: responseBuilder,
+                    interpretationResult: interpretation.result
+                   ) {
+                    return recovered
+                }
                 let unsupportedOutcome = MarinaPlanValidationOutcome.unsupported(unsupported)
                 return CandidateEvaluation(
                     candidate: candidate,
@@ -596,6 +731,229 @@ struct MarinaSharedPipelineCoordinator {
                 )
             }
         }
+    }
+
+    private func semanticMerchantSpendPlan(
+        query: MarinaSemanticQuery,
+        resolved: MarinaResolvedSemanticQuery,
+        candidate: MarinaQueryPlanCandidate
+    ) -> MarinaAggregationPlan? {
+        guard resolved.hasResolutionProblems == false,
+              query.subject == .variableExpenses,
+              query.operation == .sum,
+              query.grouping == nil,
+              resolved.resolvedFilters.count == 1,
+              resolved.resolvedFilters.first?.entityType == .merchant else {
+            return nil
+        }
+
+        let basePlan = semanticAdapter.aggregationPlan(from: query)
+        return MarinaAggregationPlan(
+            status: .notExecutableShell,
+            operation: basePlan.operation,
+            measure: basePlan.measure,
+            targets: resolved.resolvedFilters.map { filter in
+                MarinaResolvedAggregationTarget(
+                    id: filter.id,
+                    role: filter.role,
+                    entityType: filter.entityType,
+                    displayName: filter.displayName,
+                    sourceID: filter.sourceID
+                )
+            },
+            dateRange: resolved.primaryDateRange,
+            comparisonDateRange: resolved.comparisonDateRange,
+            grouping: basePlan.grouping,
+            ranking: basePlan.ranking,
+            limit: basePlan.limit,
+            incomeStatusScope: basePlan.incomeStatusScope,
+            responseShape: basePlan.responseShape ?? .scalarCurrency
+        )
+    }
+
+    private func recoverWithCompatibilityCandidate(
+        candidate: MarinaQueryPlanCandidate,
+        resolved: MarinaResolvedQueryCandidate,
+        provider: MarinaDataProvider,
+        now: Date,
+        responseBuilder: MarinaResponseBuilder,
+        interpretationResult: MarinaInterpretationResult
+    ) -> CandidateEvaluation? {
+        guard resolved.hasResolutionProblems == false else { return nil }
+        let compatibilityOutcome = validator.validate(resolved)
+        guard case .executable(let compatibilityPlan) = compatibilityOutcome else {
+            guard let manualPlan = manualAggregationPlan(candidate: candidate, resolved: resolved) else { return nil }
+            return manuallyExecuteHomeCompatiblePlan(
+                candidate: candidate,
+                resolved: resolved,
+                plan: manualPlan,
+                provider: provider,
+                now: now,
+                responseBuilder: responseBuilder,
+                interpretationResult: interpretationResult
+            )
+        }
+
+        let queryExecutor = MarinaQueryExecutor(
+            adapter: adapter,
+            executor: executor,
+            composableWorkspaceQueryExecutor: composableWorkspaceQueryExecutor,
+            workspaceAggregationExecutor: workspaceAggregationExecutor,
+            databaseLookupExecutor: databaseLookupExecutor,
+            databaseLookupResponseBuilder: databaseLookupResponseBuilder
+        )
+        switch queryExecutor.execute(
+            candidate: candidate,
+            resolved: resolved,
+            semanticResolved: nil,
+            validationOutcome: compatibilityOutcome,
+            provider: provider,
+            now: now
+        ) {
+        case .handled(let execution):
+            let answer = execution.databaseLookupResponse.map(databaseLookupResponseBuilder.responseCompatibleAnswer)
+                ?? responseBuilder.responseCompatibleAnswer(from: execution.aggregationResult)
+            let suggestions = MarinaSuggestionBuilder().suggestions(
+                candidate: candidate,
+                executablePlan: execution.executablePlan,
+                result: execution.aggregationResult,
+                answer: answer
+            )
+            return CandidateEvaluation(
+                candidate: candidate,
+                resolved: resolved,
+                validationOutcome: compatibilityOutcome,
+                executablePlan: execution.executablePlan,
+                aggregationResult: execution.aggregationResult,
+                answer: answer,
+                suggestionCount: suggestions.count,
+                databaseLookupResponse: execution.databaseLookupResponse,
+                workspaceAggregationCard: execution.workspaceAggregationCard,
+                interpretationResult: interpretationResult,
+                semanticResolved: nil,
+                amountBasis: execution.amountBasis,
+                executionRoute: execution.executionRoute
+            )
+        case .unsupported:
+            if let manual = manuallyExecuteHomeCompatiblePlan(
+                candidate: candidate,
+                resolved: resolved,
+                plan: compatibilityPlan,
+                provider: provider,
+                now: now,
+                responseBuilder: responseBuilder,
+                interpretationResult: interpretationResult
+            ) {
+                return manual
+            }
+            return nil
+        }
+    }
+
+    private func manualAggregationPlan(
+        candidate: MarinaQueryPlanCandidate,
+        resolved: MarinaResolvedQueryCandidate
+    ) -> MarinaAggregationPlan? {
+        if candidate.operation == .sum,
+           candidate.measure == .spend,
+           let target = resolved.resolvedTargets.first,
+           target.entityType == .merchant {
+            return MarinaAggregationPlan(
+                status: .notExecutableShell,
+                operation: .sum,
+                measure: .spend,
+                targets: [
+                    MarinaResolvedAggregationTarget(
+                        id: target.id,
+                        role: target.role,
+                        entityType: target.entityType,
+                        displayName: target.displayName,
+                        sourceID: target.sourceID
+                    )
+                ],
+                dateRange: resolved.primaryDateRange,
+                comparisonDateRange: resolved.comparisonDateRange,
+                responseShape: .scalarCurrency
+            )
+        }
+
+        if candidate.operation == .rank,
+           candidate.measure == .spend,
+           candidate.grouping?.dimension == .category {
+            return MarinaAggregationPlan(
+                status: .notExecutableShell,
+                operation: .rank,
+                measure: .spend,
+                dateRange: resolved.primaryDateRange,
+                comparisonDateRange: resolved.comparisonDateRange,
+                grouping: MarinaGroupingCandidate(dimension: .category),
+                ranking: MarinaRankingCandidate(direction: .top, limit: candidate.limit),
+                limit: candidate.limit,
+                responseShape: .rankedList
+            )
+        }
+
+        return nil
+    }
+
+    private func manuallyExecuteHomeCompatiblePlan(
+        candidate: MarinaQueryPlanCandidate,
+        resolved: MarinaResolvedQueryCandidate,
+        plan: MarinaAggregationPlan,
+        provider: MarinaDataProvider,
+        now: Date,
+        responseBuilder: MarinaResponseBuilder,
+        interpretationResult: MarinaInterpretationResult
+    ) -> CandidateEvaluation? {
+        let target = plan.targets.first
+        let metric: HomeQueryMetric?
+        if plan.operation == .sum, plan.measure == .spend, target?.entityType == .merchant {
+            metric = .merchantSpendTotal
+        } else if plan.operation == .rank, plan.measure == .spend, plan.grouping?.dimension == .category {
+            metric = .topCategories
+        } else {
+            metric = nil
+        }
+        guard let metric else { return nil }
+
+        let homePlan = HomeQueryPlan(
+            metric: metric,
+            dateRange: plan.dateRange,
+            comparisonDateRange: plan.comparisonDateRange,
+            resultLimit: plan.limit ?? plan.ranking?.limit,
+            confidenceBand: .high,
+            targetName: target?.displayName,
+            targetTypeRaw: target?.entityType.rawValue,
+            periodUnit: nil
+        )
+        let executablePlan = MarinaExecutableAggregationPlan(
+            aggregationPlan: plan,
+            homeQueryPlan: homePlan
+        )
+        let result = executor.execute(executablePlan, provider: provider, now: now)
+        if case .unsupported = result { return nil }
+        let answer = responseBuilder.responseCompatibleAnswer(from: result)
+        let suggestions = MarinaSuggestionBuilder().suggestions(
+            candidate: candidate,
+            executablePlan: executablePlan,
+            result: result,
+            answer: answer
+        )
+        return CandidateEvaluation(
+            candidate: candidate,
+            resolved: resolved,
+            validationOutcome: .executable(plan),
+            executablePlan: executablePlan,
+            aggregationResult: result,
+            answer: answer,
+            suggestionCount: suggestions.count,
+            databaseLookupResponse: nil,
+            workspaceAggregationCard: nil,
+            interpretationResult: interpretationResult,
+            semanticResolved: nil,
+            amountBasis: .budgetImpact,
+            executionRoute: .aggregate
+        )
     }
 
     private func evaluate(

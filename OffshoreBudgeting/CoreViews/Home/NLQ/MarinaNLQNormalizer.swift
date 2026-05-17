@@ -208,6 +208,7 @@ struct MarinaNLQNormalizer {
             "who is my",
             "how much did i",
             "show me",
+            "show my",
             "tell me",
             "what did i",
             "can you"
