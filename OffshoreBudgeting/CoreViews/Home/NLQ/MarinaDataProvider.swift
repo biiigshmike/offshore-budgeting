@@ -154,6 +154,29 @@ struct MarinaDataProvider {
         ).first
     }
 
+    func fetchAllWorkspaces() -> [Workspace] {
+        fetch(
+            descriptor: FetchDescriptor<Workspace>(
+                sortBy: [SortDescriptor(\Workspace.name, order: .forward)]
+            )
+        )
+    }
+
+    func fetchVariableExpenses(workspaceName: String) -> [VariableExpense] {
+        guard let workspace = fetchAllWorkspaces().first(where: {
+            $0.name.localizedCaseInsensitiveCompare(workspaceName) == .orderedSame
+        }) else {
+            return []
+        }
+        let targetWorkspaceID = workspace.id
+        return fetch(
+            descriptor: FetchDescriptor<VariableExpense>(
+                predicate: #Predicate { $0.workspace?.id == targetWorkspaceID },
+                sortBy: [SortDescriptor(\VariableExpense.transactionDate, order: .forward)]
+            )
+        )
+    }
+
     private func fetch<T>(descriptor: FetchDescriptor<T>) -> [T] where T: PersistentModel {
         (try? modelContext.fetch(descriptor)) ?? []
     }

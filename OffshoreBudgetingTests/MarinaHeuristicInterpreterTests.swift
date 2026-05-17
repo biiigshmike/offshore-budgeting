@@ -149,6 +149,7 @@ struct MarinaHeuristicInterpreterTests {
             ("Which card is eating the most of my budget?", .rank, .spend, .card, .top),
             ("What did I spend on Apple Card outside of Food & Drink?", .sum, .spend, nil, nil),
             ("List my last 5 Cannabis purchases", .listRows, .transactionAmount, .transaction, .newest),
+            ("List my Cannabis purchases", .listRows, .transactionAmount, .transaction, .newest),
             ("What was my average weekly Shopping spending over the last 3 months?", .average, .spend, .week, nil),
             ("Which expenses made this month higher than last month?", .compare, .spend, .transaction, .largest),
             ("How much did Roommate spend on Food & Drink?", .sum, .spend, nil, nil),

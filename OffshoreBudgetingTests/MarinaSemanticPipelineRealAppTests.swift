@@ -6,6 +6,49 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct MarinaSemanticPipelineRealAppTests {
+    @Test func semanticPipeline_semanticCoveragePromptsReturnHandledWorkspaceCards() async throws {
+        let fixture = try MarinaRealisticWorkspaceFixture.make()
+
+        for prompt in Self.semanticWorkspacePrompts {
+            let result = await fixture.run(prompt)
+            let handled = try requireHandled(result)
+            #expect(handled.trace.selectedPath != .sharedAttemptedThenLegacyFallback)
+            #expect(handled.answer.kind == .list || handled.answer.kind == .message)
+            #expect(answerText(handled.answer).localizedCaseInsensitiveContains("different way") == false)
+            #expect(answerText(handled.answer).localizedCaseInsensitiveContains("unsupported") == false)
+            #expect(renderedText(handled.aggregationResult).contains("$9,999.00") == false)
+            #expect(handled.trace.executorResultSummary?.localizedCaseInsensitiveContains("semanticWorkspace") == true)
+        }
+    }
+
+    @Test func semanticPipeline_categoryPurchaseListDoesNotRequireRecentQualifier() async throws {
+        let fixture = try MarinaRealisticWorkspaceFixture.make()
+        let result = await fixture.run("List my cannabis purchases")
+
+        let handled = try requireHandled(result)
+        #expect(handled.answer.kind == .list)
+        #expect(handled.trace.executorResultSummary?.contains("recentFilteredTransactions") == true)
+        #expect(answerText(handled.answer).localizedCaseInsensitiveContains("unsupported") == false)
+
+        guard case .workspaceCard(let card) = handled.aggregationResult else {
+            Issue.record("Expected workspace-card purchase rows.")
+            return
+        }
+        assertRows(card, contain: ["NUG Dispensary", "NUG Edibles"])
+    }
+
+    @Test func semanticPipeline_explicitMerchantLookbackHandlesNonAmazonMerchant() async throws {
+        let fixture = try MarinaRealisticWorkspaceFixture.make()
+        let result = await fixture.run("Spend at merchant \"NUG\" last 90 days")
+
+        let handled = try requireHandled(result)
+        #expect(handled.answer.kind == .list)
+        #expect(handled.trace.executorResultSummary?.localizedCaseInsensitiveContains("semanticWorkspace") == true)
+        #expect(answerText(handled.answer).localizedCaseInsensitiveContains("unsupported") == false)
+        #expect(renderedText(handled.aggregationResult).contains("$100.00"))
+        #expect(renderedText(handled.aggregationResult).contains("$9,999.00") == false)
+    }
+
     @Test func semanticPipeline_aggregateSpendUsesWorkspaceScopedRealData() async throws {
         let fixture = try MarinaRealisticWorkspaceFixture.make()
         let result = await fixture.run("What did I spend on groceries this month?")
@@ -877,4 +920,46 @@ struct MarinaSemanticPipelineRealAppTests {
     private struct TestFailure: Error {
         let message: String
     }
+
+    private static let semanticWorkspacePrompts: [String] = [
+        "spend groceries Mar 2026 vs Mar 2025",
+        "average groceries per week last quarter",
+        "total spend card Amex Platinum in Q1 2026",
+        "income from \"Acme Dental\" Jan-Mar 2026",
+        "top 5 categories by spend last 30 days",
+        "percent of spending that was groceries in April",
+        "largest transaction this month",
+        "median variable expense last year",
+        "planned vs actual dining May 2026",
+        "savings: actual vs target YTD",
+        "total refunds last month",
+        "spend at merchant \"Amazon\" last 90 days",
+        "spend at merchants containing \"amazon\" last 90 days",
+        "uncategorized spend this week",
+        "average daily spend in March 2026",
+        "rolling 7-day spend ending Apr 15, 2026",
+        "card \"Visa - Blue\" share of spend in 2025",
+        "income seasonality: Mar 2026 vs Mar 2025",
+        "category groceries day-of-week average (last 12 weeks)",
+        "budget \"Travel 2026\" remaining this month",
+        "top merchants by count this quarter",
+        "transactions over $250 in February",
+        "first purchase of \"Litter Robot\" ever",
+        "time to next planned expense for budget \"Home\"",
+        "workspace \"Personal\" total spend YTD vs \"Business\"",
+        "category \"Utilities\" month-over-month change (Apr -> May 2026)",
+        "net cash flow last pay period",
+        "average tip percentage dining last 60 days",
+        "spend in \"Q2 2026 to date\" vs \"same days Q2 2025\"",
+        "number of transactions with note containing \"reconcile\"",
+        "card \"Cash\" vs \"Visa - Blue\" refunds YTD",
+        "average planned expense slip (actual - planned) last quarter",
+        "categories with zero spend last month",
+        "top 3 categories by variance (planned vs actual) this month",
+        "recurring merchants detected in May 2026",
+        "total spend \"last weekend\"",
+        "budget \"Groceries Weekly\" over/under for week of May 11, 2026",
+        "savings ledger entries between Apr 1-15, 2026",
+        "forecast: average weekly spend next 4 weeks (baseline = last 8)"
+    ]
 }

@@ -73,6 +73,28 @@ struct MarinaResponseGenerationServiceTests {
         #expect(applied.followUpSuggestions[1].query == first.query)
     }
 
+    @Test func surfaceApplicator_rejectsInternalQuerySummarySuggestionTitles() throws {
+        let answer = HomeAnswer(queryID: UUID(), kind: .message, title: "Fallback")
+        let suggestion = HomeAssistantSuggestion(
+            title: "Spend this month",
+            query: HomeQuery(intent: .spendThisMonth)
+        )
+        let generated = MarinaGeneratedSurfaceResponse(
+            narrativeSubtitle: "Here is the read.",
+            suggestionRewrites: [
+                MarinaGeneratedSuggestionRewrite(candidateIndex: 0, title: "Spend this month -> intent=spendThisMonth")
+            ]
+        )
+
+        let applied = try MarinaResponseSurfaceApplicator().apply(
+            generated: generated,
+            to: answer,
+            deterministicFollowUps: [suggestion]
+        )
+
+        #expect(applied.followUpSuggestions.map(\.title) == ["Spend this month"])
+    }
+
     @Test func surfaceApplicator_rejectsEmptyGeneratedSurface() throws {
         let answer = HomeAnswer(queryID: UUID(), kind: .message, title: "Fallback", subtitle: "Use me.")
 

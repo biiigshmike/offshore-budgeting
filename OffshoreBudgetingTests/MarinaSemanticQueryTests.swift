@@ -5,6 +5,26 @@ import Testing
 struct MarinaSemanticQueryTests {
     private let adapter = MarinaSemanticQueryAdapter()
 
+    @Test func semanticCoveragePromptsStayInsideSemanticQueryPipeline() {
+        for prompt in semanticWorkspacePrompts {
+            let result = MarinaHeuristicInterpreter().interpretSemantic(
+                prompt: prompt,
+                defaultPeriodUnit: .month
+            )
+
+            guard case .query(let semanticQuery) = result else {
+                Issue.record("Expected semantic query for semantic coverage prompt: \(prompt)")
+                continue
+            }
+
+            #expect(semanticQuery.subject == .variableExpenses || semanticQuery.subject == .savingsLedgerEntries)
+            #expect(semanticQuery.responseShape == .summaryCard)
+            if let amountField = semanticQuery.amountField {
+                #expect(amountField == .budgetImpactAmount || amountField == .savingsAmount)
+            }
+        }
+    }
+
     @Test func candidateToSemanticQuery_preservesAverageCategoryShape() {
         let range = HomeQueryDateRange(startDate: date(2026, 2, 1), endDate: date(2026, 4, 30))
         let mention = MarinaUnresolvedEntityMention(
@@ -582,3 +602,45 @@ struct MarinaSemanticQueryTests {
         )
     }
 }
+
+private let semanticWorkspacePrompts: [String] = [
+    "spend groceries Mar 2026 vs Mar 2025",
+    "average groceries per week last quarter",
+    "total spend card Amex Platinum in Q1 2026",
+    "income from \"Acme Dental\" Jan-Mar 2026",
+    "top 5 categories by spend last 30 days",
+    "percent of spending that was groceries in April",
+    "largest transaction this month",
+    "median variable expense last year",
+    "planned vs actual dining May 2026",
+    "savings: actual vs target YTD",
+    "total refunds last month",
+    "spend at merchant \"Amazon\" last 90 days",
+    "spend at merchants containing \"amazon\" last 90 days",
+    "uncategorized spend this week",
+    "average daily spend in March 2026",
+    "rolling 7-day spend ending Apr 15, 2026",
+    "card \"Visa - Blue\" share of spend in 2025",
+    "income seasonality: Mar 2026 vs Mar 2025",
+    "category groceries day-of-week average (last 12 weeks)",
+    "budget \"Travel 2026\" remaining this month",
+    "top merchants by count this quarter",
+    "transactions over $250 in February",
+    "first purchase of \"Litter Robot\" ever",
+    "time to next planned expense for budget \"Home\"",
+    "workspace \"Personal\" total spend YTD vs \"Business\"",
+    "category \"Utilities\" month-over-month change (Apr -> May 2026)",
+    "net cash flow last pay period",
+    "average tip percentage dining last 60 days",
+    "spend in \"Q2 2026 to date\" vs \"same days Q2 2025\"",
+    "number of transactions with note containing \"reconcile\"",
+    "card \"Cash\" vs \"Visa - Blue\" refunds YTD",
+    "average planned expense slip (actual - planned) last quarter",
+    "categories with zero spend last month",
+    "top 3 categories by variance (planned vs actual) this month",
+    "recurring merchants detected in May 2026",
+    "total spend \"last weekend\"",
+    "budget \"Groceries Weekly\" over/under for week of May 11, 2026",
+    "savings ledger entries between Apr 1-15, 2026",
+    "forecast: average weekly spend next 4 weeks (baseline = last 8)"
+]

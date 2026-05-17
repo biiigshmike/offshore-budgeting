@@ -160,8 +160,8 @@ struct MarinaResponseSurfaceApplicator {
                   usedIndexes.contains(rewrite.candidateIndex) == false else {
                 continue
             }
-            let title = rewrite.title.nilIfBlank ?? deterministicFollowUps[rewrite.candidateIndex].title
             let original = deterministicFollowUps[rewrite.candidateIndex]
+            let title = safeSuggestionTitle(rewrite.title, fallback: original.title)
             rewritten.append(
                 HomeAssistantSuggestion(
                     id: original.id,
@@ -179,6 +179,18 @@ struct MarinaResponseSurfaceApplicator {
         }
 
         return rewritten
+    }
+
+    private func safeSuggestionTitle(_ generatedTitle: String, fallback: String) -> String {
+        guard let title = generatedTitle.nilIfBlank else { return fallback }
+        let lowercased = title.lowercased()
+        if lowercased.contains("intent=")
+            || lowercased.contains("target=")
+            || lowercased.contains("date=")
+            || title.contains("->") {
+            return fallback
+        }
+        return title
     }
 }
 

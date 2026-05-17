@@ -57,7 +57,7 @@ enum MarinaUITestFixtureSeeder {
 
         let mayBudget = Budget(
             id: UUID(uuidString: "22222222-2222-2222-2222-222222222222")!,
-            name: "May 2026",
+            name: "May Budget",
             startDate: monthStart,
             endDate: monthEnd,
             workspace: workspace
@@ -85,9 +85,15 @@ enum MarinaUITestFixtureSeeder {
             effect: "matte",
             workspace: workspace
         )
+        let amexCard = Card(name: "Amex Platinum", workspace: workspace)
+        let visaCard = Card(name: "Visa - Blue", workspace: workspace)
+        let cashCard = Card(name: "Cash", workspace: workspace)
         context.insert(checkingCard)
         context.insert(appleCard)
         context.insert(backupCard)
+        context.insert(amexCard)
+        context.insert(visaCard)
+        context.insert(cashCard)
 
         context.insert(BudgetCardLink(budget: mayBudget, card: checkingCard))
         context.insert(BudgetCardLink(budget: mayBudget, card: appleCard))
@@ -123,16 +129,25 @@ enum MarinaUITestFixtureSeeder {
             hexColor: "#64748B",
             workspace: workspace
         )
+        let cannabis = Category(
+            id: UUID(uuidString: "44444444-4444-4444-4444-444444444449")!,
+            name: "Cannabis",
+            hexColor: "#225522",
+            workspace: workspace
+        )
         context.insert(groceries)
         context.insert(rent)
         context.insert(utilities)
         context.insert(dining)
         context.insert(shopping)
+        context.insert(cannabis)
 
         context.insert(BudgetCategoryLimit(minAmount: 250, maxAmount: 650, budget: mayBudget, category: groceries))
         context.insert(BudgetCategoryLimit(minAmount: nil, maxAmount: 2300, budget: mayBudget, category: rent))
         context.insert(BudgetCategoryLimit(minAmount: nil, maxAmount: 300, budget: mayBudget, category: dining))
         context.insert(BudgetCategoryLimit(minAmount: nil, maxAmount: 500, budget: mayBudget, category: shopping))
+        context.insert(Budget(name: "Travel 2026", startDate: date(2026, 6, 1, calendar: calendar), endDate: date(2026, 12, 31, calendar: calendar), workspace: workspace))
+        context.insert(Budget(name: "Home", startDate: date(2026, 6, 1, calendar: calendar), endDate: date(2026, 6, 30, calendar: calendar), workspace: workspace))
 
         let rentPreset = Preset(
             id: UUID(uuidString: "55555555-5555-5555-5555-555555555555")!,
@@ -273,6 +288,26 @@ enum MarinaUITestFixtureSeeder {
         context.insert(olderStarbucks)
         context.insert(appleStore)
         context.insert(appleWatch)
+        [
+            VariableExpense(descriptionText: "March Market", amount: 120, transactionDate: date(2026, 3, 8, calendar: calendar), workspace: workspace, card: amexCard, category: groceries),
+            VariableExpense(descriptionText: "March Market", amount: 95, transactionDate: date(2025, 3, 8, calendar: calendar), workspace: workspace, card: visaCard, category: groceries),
+            VariableExpense(descriptionText: "Amazon Marketplace", amount: 42, transactionDate: date(2026, 5, 2, calendar: calendar), workspace: workspace, card: visaCard, category: shopping),
+            VariableExpense(descriptionText: "Amazon Fresh", amount: 58, transactionDate: date(2026, 4, 18, calendar: calendar), workspace: workspace, card: visaCard, category: groceries),
+            VariableExpense(descriptionText: "Amazon Marketplace refund", amount: 12, kindRaw: VariableExpenseKind.credit.rawValue, transactionDate: date(2026, 4, 20, calendar: calendar), workspace: workspace, card: visaCard, category: shopping),
+            VariableExpense(descriptionText: "Cash refund", amount: 5, kindRaw: VariableExpenseKind.credit.rawValue, transactionDate: date(2026, 5, 4, calendar: calendar), workspace: workspace, card: cashCard, category: dining),
+            VariableExpense(descriptionText: "February Appliance", amount: 275, transactionDate: date(2026, 2, 14, calendar: calendar), workspace: workspace, card: amexCard, category: utilities),
+            VariableExpense(descriptionText: "Litter Robot", amount: 499, transactionDate: date(2025, 11, 2, calendar: calendar), workspace: workspace, card: visaCard, category: shopping),
+            VariableExpense(descriptionText: "Reconcile utility split", amount: 30, transactionDate: date(2026, 5, 5, calendar: calendar), workspace: workspace, card: cashCard, category: utilities),
+            VariableExpense(descriptionText: "Utility Co", amount: 110, transactionDate: date(2026, 4, 7, calendar: calendar), workspace: workspace, card: visaCard, category: utilities),
+            VariableExpense(descriptionText: "Utility Co", amount: 125, transactionDate: date(2026, 5, 7, calendar: calendar), workspace: workspace, card: visaCard, category: utilities),
+            VariableExpense(descriptionText: "Amex Q1 Market", amount: 66, transactionDate: date(2026, 1, 12, calendar: calendar), workspace: workspace, card: amexCard, category: groceries),
+            VariableExpense(descriptionText: "No Category Snack", amount: 11, transactionDate: date(2026, 5, 15, calendar: calendar), workspace: workspace, card: cashCard, category: nil),
+            VariableExpense(descriptionText: "Last Weekend Cafe", amount: 22, transactionDate: date(2026, 5, 9, calendar: calendar), workspace: workspace, card: cashCard, category: dining),
+            VariableExpense(descriptionText: "Q2 Current Books", amount: 35, transactionDate: date(2026, 4, 12, calendar: calendar), workspace: workspace, card: visaCard, category: shopping),
+            VariableExpense(descriptionText: "Q2 Prior Books", amount: 25, transactionDate: date(2025, 4, 12, calendar: calendar), workspace: workspace, card: visaCard, category: shopping),
+            VariableExpense(descriptionText: "NUG Dispensary", amount: 64, transactionDate: date(2026, 5, 12, calendar: calendar), workspace: workspace, card: cashCard, category: cannabis),
+            VariableExpense(descriptionText: "NUG Edibles", amount: 36, transactionDate: date(2026, 4, 28, calendar: calendar), workspace: workspace, card: cashCard, category: cannabis)
+        ].forEach { context.insert($0) }
 
         let roommate = AllocationAccount(
             id: UUID(uuidString: "88888888-8888-8888-8888-888888888888")!,
@@ -345,6 +380,12 @@ enum MarinaUITestFixtureSeeder {
                 card: checkingCard
             )
         )
+        [
+            Income(source: "Acme Dental", amount: 700, date: date(2026, 1, 15, calendar: calendar), isPlanned: false, workspace: workspace),
+            Income(source: "Acme Dental", amount: 800, date: date(2026, 2, 15, calendar: calendar), isPlanned: false, workspace: workspace),
+            Income(source: "Acme Dental", amount: 900, date: date(2026, 3, 15, calendar: calendar), isPlanned: false, workspace: workspace),
+            Income(source: "Acme Dental", amount: 650, date: date(2025, 3, 15, calendar: calendar), isPlanned: false, workspace: workspace)
+        ].forEach { context.insert($0) }
         context.insert(
             Income(
                 id: UUID(uuidString: "CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCD")!,
@@ -378,6 +419,16 @@ enum MarinaUITestFixtureSeeder {
                 kindRaw: SavingsLedgerEntryKind.manualAdjustment.rawValue,
                 createdAt: date(2026, 5, 15, calendar: calendar),
                 updatedAt: date(2026, 5, 15, calendar: calendar),
+                workspace: workspace,
+                account: savings
+            )
+        )
+        context.insert(
+            SavingsLedgerEntry(
+                date: date(2026, 4, 10, calendar: calendar),
+                amount: 75,
+                note: "April savings seed",
+                kindRaw: SavingsLedgerEntryKind.manualAdjustment.rawValue,
                 workspace: workspace,
                 account: savings
             )
@@ -444,7 +495,7 @@ enum MarinaUITestFixtureSeeder {
 
         let otherWorkspace = Workspace(
             id: UUID(uuidString: "12121212-1212-1212-1212-121212121212")!,
-            name: "Decoy Workspace",
+            name: "Business",
             hexColor: "#111827"
         )
         let decoyCard = Card(name: "Apple Card", workspace: otherWorkspace)

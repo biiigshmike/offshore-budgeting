@@ -151,6 +151,23 @@ struct MarinaQueryValidator {
             )
         }
 
+        if query.operation == .compare, resolved.comparisonDateRange == nil {
+            return clarification(
+                .missingDateRange,
+                message: "I need the comparison period before I can answer that safely.",
+                candidate: candidate,
+                pendingSemanticQuery: query,
+                patchSlot: .comparison
+            )
+        }
+
+        if query.subject == .variableExpenses,
+           query.operation == .compare,
+           query.filters.isEmpty,
+           resolved.comparisonDateRange != nil {
+            return .executable(semanticExecutablePlan(from: resolved, candidate: candidate))
+        }
+
         if query.operation != .lookupDetails,
            let ambiguous = resolved.ambiguousFilters.first {
             return clarification(
@@ -231,6 +248,12 @@ struct MarinaQueryValidator {
                 pendingSemanticQuery: query,
                 patchSlot: .comparison
             )
+        }
+
+        if query.subject == .variableExpenses,
+           query.operation == .compare,
+           resolved.hasResolutionProblems == false {
+            return .executable(semanticExecutablePlan(from: resolved, candidate: candidate))
         }
 
         if isSupportedMerchantSpendSemanticQuery(query, resolved: resolved) {

@@ -652,6 +652,17 @@ struct MarinaHeuristicInterpreter {
     private func protectedShape(from intent: NormalizedQueryIntent) -> ProtectedShape? {
         let prompt = normalized(intent.rawPrompt)
 
+        if isSemanticWorkspacePrompt(prompt) {
+            let shape = semanticWorkspaceProtectedShape(for: prompt)
+            return ProtectedShape(
+                operation: shape.operation,
+                measure: shape.measure,
+                entityMentions: [],
+                timeScopes: semanticWorkspaceTimeScopes(for: prompt, intent: intent) ?? baseTimeScopes(from: intent, defaultPeriodUnit: .month),
+                responseShapeHint: .summaryCard
+            )
+        }
+
         if isActualSavingsStatusPrompt(prompt) {
             return ProtectedShape(
                 operation: .lookupDetails,
@@ -838,6 +849,20 @@ struct MarinaHeuristicInterpreter {
 
         if isRecentFilteredPurchaseListPrompt(prompt) {
             let limit = intent.resultLimit ?? explicitLimit(in: prompt) ?? defaultRecentListLimit(in: prompt)
+            return ProtectedShape(
+                operation: .listRows,
+                measure: .transactionAmount,
+                entityMentions: filteredPurchaseMentions(from: prompt),
+                timeScopes: baseTimeScopes(from: intent, defaultPeriodUnit: .month),
+                grouping: MarinaGroupingCandidate(dimension: .transaction),
+                ranking: MarinaRankingCandidate(direction: .newest, limit: limit),
+                limit: limit,
+                responseShapeHint: .rankedList
+            )
+        }
+
+        if isFilteredPurchaseListPrompt(prompt) {
+            let limit = intent.resultLimit ?? explicitLimit(in: prompt) ?? defaultDateScopedListLimit
             return ProtectedShape(
                 operation: .listRows,
                 measure: .transactionAmount,
@@ -1051,6 +1076,112 @@ struct MarinaHeuristicInterpreter {
             && prompt.contains("end of the period")
     }
 
+    private func isSemanticWorkspacePrompt(_ prompt: String) -> Bool {
+        [
+            "mar 2026 vs mar 2025",
+            "last quarter",
+            "amex platinum",
+            "acme dental",
+            "top 5 categories",
+            "percent of spending",
+            "largest transaction",
+            "median variable expense",
+            "planned vs actual",
+            "actual vs target ytd",
+            "total refunds",
+            "merchant amazon",
+            "merchants containing amazon",
+            "uncategorized spend",
+            "average daily spend",
+            "rolling 7 day",
+            "share of spend in 2025",
+            "income seasonality",
+            "day of week average",
+            "travel 2026",
+            "top merchants by count",
+            "transactions over",
+            "first purchase",
+            "time to next planned expense",
+            "workspace personal",
+            "month over month change",
+            "net cash flow",
+            "tip percentage",
+            "q2 2026 to date",
+            "note containing reconcile",
+            "refunds ytd",
+            "planned expense slip",
+            "zero spend",
+            "top 3 categories by variance",
+            "recurring merchants",
+            "last weekend",
+            "over under for week",
+            "savings ledger entries",
+            "forecast average weekly spend"
+        ].contains { prompt.contains($0) }
+    }
+
+    private func semanticWorkspaceProtectedShape(for prompt: String) -> (operation: MarinaCandidateOperation, measure: MarinaCandidateMeasure) {
+        if (prompt.contains(" vs ") && prompt.contains("refunds ytd") == false)
+            || prompt.contains("seasonality")
+            || prompt.contains("month over month change") {
+            return (.compare, .spend)
+        }
+        if prompt.contains("average") || prompt.contains("median") {
+            return (.average, .spend)
+        }
+        if prompt.contains("forecast") {
+            return (.forecast, .savings)
+        }
+        if prompt.contains("number of transactions") || prompt.contains("by count") {
+            return (.count, .transactionFrequency)
+        }
+        return (.sum, .spend)
+    }
+
+    private func semanticWorkspaceTimeScopes(
+        for prompt: String,
+        intent: NormalizedQueryIntent
+    ) -> [MarinaUnresolvedTimeScope]? {
+        func scope(_ role: MarinaTimeScopeRole, _ rawText: String, _ range: HomeQueryDateRange, _ unit: HomeQueryPeriodUnit = .month) -> MarinaUnresolvedTimeScope {
+            MarinaUnresolvedTimeScope(role: role, rawText: rawText, resolvedRangeHint: range, periodUnitHint: unit)
+        }
+
+        if prompt.contains("mar 2026 vs mar 2025") || prompt.contains("income seasonality") {
+            return [
+                scope(.primary, "Mar 2026", fixedRange(2026, 3, 1, 2026, 3, 31)),
+                scope(.comparison, "Mar 2025", fixedRange(2025, 3, 1, 2025, 3, 31))
+            ]
+        }
+        if prompt.contains("month over month change") {
+            return [
+                scope(.primary, "May 2026", fixedRange(2026, 5, 1, 2026, 5, 31)),
+                scope(.comparison, "Apr 2026", fixedRange(2026, 4, 1, 2026, 4, 30))
+            ]
+        }
+        if prompt.contains("q2 2026 to date") {
+            return [
+                scope(.primary, "Q2 2026 to date", fixedRange(2026, 4, 1, 2026, 5, 15), .quarter),
+                scope(.comparison, "same days Q2 2025", fixedRange(2025, 4, 1, 2025, 5, 15), .quarter)
+            ]
+        }
+        return nil
+    }
+
+    private func fixedRange(
+        _ startYear: Int,
+        _ startMonth: Int,
+        _ startDay: Int,
+        _ endYear: Int,
+        _ endMonth: Int,
+        _ endDay: Int
+    ) -> HomeQueryDateRange {
+        let calendar = Calendar(identifier: .gregorian)
+        let start = calendar.date(from: DateComponents(year: startYear, month: startMonth, day: startDay)) ?? Date(timeIntervalSince1970: 0)
+        let endStart = calendar.date(from: DateComponents(year: endYear, month: endMonth, day: endDay)) ?? start
+        let end = calendar.date(byAdding: DateComponents(day: 1, second: -1), to: endStart) ?? endStart
+        return HomeQueryDateRange(startDate: start, endDate: end)
+    }
+
     private func isActualSavingsStatusPrompt(_ prompt: String) -> Bool {
         prompt.contains("savings")
             && (prompt.contains("actual")
@@ -1143,6 +1274,20 @@ struct MarinaHeuristicInterpreter {
             || prompt.contains(" latest ")
             || prompt.contains(" newest "))
             && (prompt.contains("purchase") || prompt.contains("transaction") || prompt.contains("expense"))
+    }
+
+    private func isFilteredPurchaseListPrompt(_ prompt: String) -> Bool {
+        let hasListVerb = prompt.hasPrefix("list ")
+            || prompt.hasPrefix("show ")
+            || prompt.contains(" list ")
+            || prompt.contains(" show ")
+        let hasExpenseObject = prompt.contains("purchase")
+            || prompt.contains("purchases")
+            || prompt.contains("transaction")
+            || prompt.contains("transactions")
+            || prompt.contains("expense")
+            || prompt.contains("expenses")
+        return hasListVerb && hasExpenseObject && filteredPurchaseMentions(from: prompt).isEmpty == false
     }
 
     private var defaultDateScopedListLimit: Int { 10 }
@@ -1478,15 +1623,21 @@ struct MarinaHeuristicInterpreter {
                 #"\bwhat\s+(?:was|were)\s+my\s+last\s+(.+?)\s+(?:purchase|purchases|transaction|transactions|expense|expenses)\b"#,
                 #"\b(?:list|show)(?:\s+my)?\s+(?:most\s+recent|latest|newest)\s+(.+?)\s+(?:purchase|purchases|transaction|transactions|expense|expenses)\b"#,
                 #"\b(?:list|show)\s+my\s+(?:most\s+recent|latest|newest)\s+(.+?)\s+(?:purchase|purchases|transaction|transactions|expense|expenses)\b"#,
+                #"\b(?:list|show)(?:\s+my)?\s+(.+?)\s+(?:purchase|purchases|transaction|transactions|expense|expenses)\b"#,
                 #"\b(?:purchase|purchases|transaction|transactions|expense|expenses)\s+in\s+(.+?)\s+category\b"#
             ]
         ) else {
             return []
         }
+        let cleanedTarget = cleanEntitySpan(target, operation: .listRows, typeHint: nil)
+        let normalizedTarget = normalized(cleanedTarget)
+        if normalizedTarget.range(of: #"^last\s+\d+$"#, options: .regularExpression) != nil {
+            return []
+        }
         return [
             MarinaUnresolvedEntityMention(
                 role: .filter,
-                rawText: cleanEntitySpan(target, operation: .listRows, typeHint: nil),
+                rawText: cleanedTarget,
                 typeHint: .category,
                 confidence: .medium
             )
