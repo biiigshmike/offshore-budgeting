@@ -1,16 +1,16 @@
 {
   "failuresByBucket" : {
-    "aggregation execution failure" : 13,
+    "aggregation execution failure" : 12,
     "comparison range failure" : 13,
-    "correct" : 30,
+    "correct" : 31,
     "metric\/operation mapping failure" : 6,
     "unsupported capability" : 6
   },
   "failuresByRootCauseFamily" : {
     "capability_gap" : 6,
-    "correct" : 30,
+    "correct" : 31,
     "entity_and_time_resolution" : 13,
-    "execution" : 13,
+    "execution" : 12,
     "interpretation_and_mapping" : 6
   },
   "nextPhaseRecommendation" : "Phase 1: mapping hardening for average\/targeted operations + explicit unsupported capability labels",
@@ -34,8 +34,10 @@
       "verdictRaw" : "correct"
     },
     {
-      "actualMetricOperation" : "",
-      "aggregationPath" : "none",
+      "actualMetricOperation" : "spendTotal | sum",
+      "actualPrimaryDateRange" : "2026-05-01..2026-06-01",
+      "actualTarget" : "",
+      "aggregationPath" : "single_home_query_engine",
       "expectedEntityScope" : "global",
       "expectedMeasure" : "spendTotal",
       "expectedOperation" : "sum",
@@ -43,12 +45,12 @@
       "expectedPrimaryDateRange" : "this_month",
       "fallbackReplacedModelOutput" : false,
       "group" : "core",
-      "likelySmallestFix" : "add graceful execution fallback for unresolved mapped queries",
+      "likelySmallestFix" : "none",
       "mode" : "nlq_authoritative",
       "prompt" : "What did I spend this month?",
       "responseType" : "list",
-      "selectedRoute" : "unknown",
-      "verdictRaw" : "aggregation execution failure"
+      "selectedRoute" : "nlq",
+      "verdictRaw" : "correct"
     },
     {
       "actualMetricOperation" : "",
@@ -70,7 +72,7 @@
     },
     {
       "actualMetricOperation" : "spendTotal | sum",
-      "actualPrimaryDateRange" : "2026-05-03..2026-05-10",
+      "actualPrimaryDateRange" : "2026-05-10..2026-05-17",
       "actualTarget" : "",
       "aggregationPath" : "single_home_query_engine",
       "expectedEntityScope" : "global",
@@ -721,7 +723,7 @@
     },
     {
       "actualMetricOperation" : "",
-      "actualPrimaryDateRange" : "2026-05-16..2026-05-17",
+      "actualPrimaryDateRange" : "2026-05-17..2026-05-18",
       "actualTarget" : "if i buy something for 120",
       "aggregationPath" : "none",
       "expectedEntityScope" : "global",
@@ -782,7 +784,7 @@
       "actualComparisonDateRange" : "2026-04-01..2026-05-01",
       "actualMetricOperation" : "operation=compare | measure=spend",
       "actualPrimaryDateRange" : "2026-05-01..2026-06-01",
-      "actualTarget" : "primaryTarget:category:Food & Drink:E0B2A489-0AC6-4945-ABA3-C4476CB10E79",
+      "actualTarget" : "primaryTarget:category:Food & Drink:CBF398BA-D9C5-4C67-A5C8-6282A1A957CB",
       "aggregationPath" : "shared_pipeline",
       "expectedComparisonDateRange" : "normal_baseline",
       "expectedEntityScope" : "category",
@@ -807,7 +809,7 @@
       "sharedFailureLayer" : "handled",
       "sharedPath" : "sharedHeuristic",
       "sharedResolvedEntityStates" : [
-        "primaryTarget:category:Food & Drink:E0B2A489-0AC6-4945-ABA3-C4476CB10E79"
+        "primaryTarget:category:Food & Drink:CBF398BA-D9C5-4C67-A5C8-6282A1A957CB"
       ],
       "sharedResponseBridgeShape" : "kind=message,title=Category Comparison (Food & Drink),rows=0,responseShape=comparison,suggestions=2",
       "sharedSelectedInterpreter" : "heuristic",
@@ -866,7 +868,7 @@
       "actualComparisonDateRange" : "2026-04-01..2026-05-01",
       "actualMetricOperation" : "operation=compare | measure=spend",
       "actualPrimaryDateRange" : "2026-05-01..2026-06-01",
-      "actualTarget" : "primaryTarget:category:Food & Drink:E0B2A489-0AC6-4945-ABA3-C4476CB10E79",
+      "actualTarget" : "primaryTarget:category:Food & Drink:CBF398BA-D9C5-4C67-A5C8-6282A1A957CB",
       "aggregationPath" : "shared_pipeline",
       "expectedComparisonDateRange" : "last_month",
       "expectedEntityScope" : "category",
@@ -891,7 +893,7 @@
       "sharedFailureLayer" : "handled",
       "sharedPath" : "sharedHeuristic",
       "sharedResolvedEntityStates" : [
-        "primaryTarget:category:Food & Drink:E0B2A489-0AC6-4945-ABA3-C4476CB10E79"
+        "primaryTarget:category:Food & Drink:CBF398BA-D9C5-4C67-A5C8-6282A1A957CB"
       ],
       "sharedResponseBridgeShape" : "kind=message,title=Category Comparison (Food & Drink),rows=0,responseShape=comparison,suggestions=2",
       "sharedSelectedInterpreter" : "heuristic",
@@ -951,7 +953,7 @@
       "actualComparisonDateRange" : "2026-03-01..2026-04-01",
       "actualMetricOperation" : "operation=compare | measure=spend",
       "actualPrimaryDateRange" : "2026-04-01..2026-05-01",
-      "actualTarget" : "primaryTarget:category:Groceries:A7DAA4E6-456C-463A-8010-58DECC6C33BF",
+      "actualTarget" : "primaryTarget:category:Groceries:7C94F679-BB3F-4D62-A828-568E3FA6813B",
       "aggregationPath" : "shared_pipeline",
       "expectedComparisonDateRange" : "march",
       "expectedEntityScope" : "category",
@@ -976,7 +978,7 @@
       "sharedFailureLayer" : "handled",
       "sharedPath" : "sharedHeuristic",
       "sharedResolvedEntityStates" : [
-        "primaryTarget:category:Groceries:A7DAA4E6-456C-463A-8010-58DECC6C33BF"
+        "primaryTarget:category:Groceries:7C94F679-BB3F-4D62-A828-568E3FA6813B"
       ],
       "sharedResponseBridgeShape" : "kind=message,title=Category Comparison (Groceries),rows=0,responseShape=comparison,suggestions=2",
       "sharedSelectedInterpreter" : "heuristic",
@@ -1253,7 +1255,7 @@
     },
     {
       "actualMetricOperation" : "operation=sum | measure=spend",
-      "actualTarget" : "filter:card:Apple Card:B603EE22-3D26-48A4-ADE8-35CB4F5F9A1F;filter:category:Food & Drink:E0B2A489-0AC6-4945-ABA3-C4476CB10E79",
+      "actualTarget" : "filter:card:Apple Card:53B0B9C8-F813-44D8-9BCE-D7A33B8A40E4;filter:category:Food & Drink:CBF398BA-D9C5-4C67-A5C8-6282A1A957CB",
       "aggregationPath" : "shared_pipeline",
       "expectedEntityScope" : "card_and_category_filter",
       "expectedMeasure" : "cardSpendExcludingCategory",
@@ -1277,8 +1279,8 @@
       "sharedFailureLayer" : "handled",
       "sharedPath" : "sharedHeuristic",
       "sharedResolvedEntityStates" : [
-        "filter:card:Apple Card:B603EE22-3D26-48A4-ADE8-35CB4F5F9A1F",
-        "filter:category:Food & Drink:E0B2A489-0AC6-4945-ABA3-C4476CB10E79"
+        "filter:card:Apple Card:53B0B9C8-F813-44D8-9BCE-D7A33B8A40E4",
+        "filter:category:Food & Drink:CBF398BA-D9C5-4C67-A5C8-6282A1A957CB"
       ],
       "sharedResponseBridgeShape" : "kind=message,title=Filtered Spending,rows=0,responseShape=summaryCard,suggestions=2",
       "sharedSelectedInterpreter" : "heuristic",
@@ -1333,7 +1335,7 @@
     {
       "actualMetricOperation" : "operation=sum | measure=categoryShare",
       "actualPrimaryDateRange" : "2026-05-01..2026-06-01",
-      "actualTarget" : "primaryTarget:category:Food & Drink:E0B2A489-0AC6-4945-ABA3-C4476CB10E79",
+      "actualTarget" : "primaryTarget:category:Food & Drink:CBF398BA-D9C5-4C67-A5C8-6282A1A957CB",
       "aggregationPath" : "shared_pipeline",
       "expectedEntityScope" : "category",
       "expectedMeasure" : "categorySpendShare",
@@ -1357,7 +1359,7 @@
       "sharedFailureLayer" : "handled",
       "sharedPath" : "sharedHeuristic",
       "sharedResolvedEntityStates" : [
-        "primaryTarget:category:Food & Drink:E0B2A489-0AC6-4945-ABA3-C4476CB10E79"
+        "primaryTarget:category:Food & Drink:CBF398BA-D9C5-4C67-A5C8-6282A1A957CB"
       ],
       "sharedResponseBridgeShape" : "kind=message,title=Category Spend Share,rows=0,responseShape=groupedBreakdown,suggestions=2",
       "sharedSelectedInterpreter" : "heuristic",
@@ -1410,7 +1412,7 @@
     },
     {
       "actualMetricOperation" : "operation=compare | measure=remainingBudget",
-      "actualTarget" : "primaryTarget:category:Shopping:59C6CD5F-DDA7-4484-9B28-85B25E05C41F",
+      "actualTarget" : "primaryTarget:category:Shopping:79333C3D-9C46-4AF0-90DF-23339902F6E0",
       "aggregationPath" : "none",
       "expectedEntityScope" : "category",
       "expectedMeasure" : "categoryBudgetAvailability",
@@ -1432,7 +1434,7 @@
       "sharedFailureLayer" : "validation",
       "sharedPath" : "sharedHeuristic",
       "sharedResolvedEntityStates" : [
-        "primaryTarget:category:Shopping:59C6CD5F-DDA7-4484-9B28-85B25E05C41F"
+        "primaryTarget:category:Shopping:79333C3D-9C46-4AF0-90DF-23339902F6E0"
       ],
       "sharedResponseBridgeShape" : "kind=message,title=I need a narrower query,rows=1,responseShape=unsupported,suggestions=0",
       "sharedSelectedInterpreter" : "heuristic",
@@ -1546,7 +1548,7 @@
     },
     {
       "actualMetricOperation" : "spendAveragePerPeriod | average",
-      "actualPrimaryDateRange" : "2026-02-16..2026-05-17",
+      "actualPrimaryDateRange" : "2026-02-17..2026-05-17",
       "actualTarget" : "",
       "aggregationPath" : "single_home_query_engine",
       "expectedEntityScope" : "category",
@@ -1566,7 +1568,7 @@
     },
     {
       "actualMetricOperation" : "operation=average | measure=spend",
-      "actualPrimaryDateRange" : "2026-02-16..2026-05-17",
+      "actualPrimaryDateRange" : "2026-02-17..2026-05-17",
       "aggregationPath" : "none",
       "expectedEntityScope" : "category",
       "expectedMeasure" : "categoryAverageSpend",
@@ -1593,7 +1595,7 @@
       "sharedResponseBridgeShape" : "kind=message,title=I need one choice first,rows=1,responseShape=clarification,suggestions=0",
       "sharedSelectedInterpreter" : "heuristic",
       "sharedTimeScopes" : [
-        "lookbackWindow:nil:month:2026-02-16..2026-05-17"
+        "lookbackWindow:nil:month:2026-02-17..2026-05-17"
       ],
       "sharedUnresolvedEntityMentions" : [
         "primaryTarget:unknown:weekly:medium"
@@ -1712,7 +1714,7 @@
     },
     {
       "actualMetricOperation" : "operation=simulate | measure=remainingBudget",
-      "actualTarget" : "simulationInput:category:Shopping:59C6CD5F-DDA7-4484-9B28-85B25E05C41F;simulationOutput:category:Transportation:38904AC7-8320-4D40-871B-E145DF5B9128",
+      "actualTarget" : "simulationInput:category:Shopping:79333C3D-9C46-4AF0-90DF-23339902F6E0;simulationOutput:category:Transportation:837C20C2-21DB-4E5A-8550-2E17999FF720",
       "aggregationPath" : "shared_pipeline",
       "expectedEntityScope" : "category_pair",
       "expectedMeasure" : "simulation",
@@ -1736,8 +1738,8 @@
       "sharedFailureLayer" : "handled",
       "sharedPath" : "sharedHeuristic",
       "sharedResolvedEntityStates" : [
-        "simulationInput:category:Shopping:59C6CD5F-DDA7-4484-9B28-85B25E05C41F",
-        "simulationOutput:category:Transportation:38904AC7-8320-4D40-871B-E145DF5B9128"
+        "simulationInput:category:Shopping:79333C3D-9C46-4AF0-90DF-23339902F6E0",
+        "simulationOutput:category:Transportation:837C20C2-21DB-4E5A-8550-2E17999FF720"
       ],
       "sharedResponseBridgeShape" : "kind=list,title=What-If Budget Impact,rows=2,responseShape=summaryCard,suggestions=2",
       "sharedSelectedInterpreter" : "heuristic",

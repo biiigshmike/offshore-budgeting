@@ -182,6 +182,22 @@ enum MarinaResponseShapeHint: String, Codable, Equatable, Sendable {
     var isAdvisory: Bool { true }
 }
 
+enum MarinaInsightIntent: String, Codable, Equatable, CaseIterable, Sendable {
+    case changeSummary
+    case contributorAnalysis
+    case normalityCheck
+    case watchOuts
+    case explainBudgeting
+    case multiPartContributors
+}
+
+enum MarinaInsightSoftTimeHint: String, Codable, Equatable, CaseIterable, Sendable {
+    case lately
+    case sincePayday
+    case budgetCycle
+    case aroundTrip
+}
+
 enum MarinaRequestFamily: String, Codable, Sendable, Equatable {
     case analytics
     case databaseLookup
@@ -271,6 +287,8 @@ struct MarinaSemanticCommand: Codable, Equatable, Sendable {
     let limit: Int?
     let incomeStatusScope: MarinaIncomeStatusScope?
     let requestedDetail: MarinaSemanticRequestedDetail?
+    let insightIntent: MarinaInsightIntent?
+    let softTimeHint: MarinaInsightSoftTimeHint?
 
     init(
         family: MarinaRequestFamily,
@@ -286,7 +304,9 @@ struct MarinaSemanticCommand: Codable, Equatable, Sendable {
         periodUnit: HomeQueryPeriodUnit? = nil,
         limit: Int? = nil,
         incomeStatusScope: MarinaIncomeStatusScope? = nil,
-        requestedDetail: MarinaSemanticRequestedDetail? = nil
+        requestedDetail: MarinaSemanticRequestedDetail? = nil,
+        insightIntent: MarinaInsightIntent? = nil,
+        softTimeHint: MarinaInsightSoftTimeHint? = nil
     ) {
         self.family = family
         self.action = action
@@ -302,6 +322,8 @@ struct MarinaSemanticCommand: Codable, Equatable, Sendable {
         self.limit = limit
         self.incomeStatusScope = incomeStatusScope
         self.requestedDetail = requestedDetail
+        self.insightIntent = insightIntent
+        self.softTimeHint = softTimeHint
     }
 }
 
@@ -384,6 +406,8 @@ struct MarinaQueryPlanCandidate: Codable, Equatable, Sendable {
     let databaseLookupRequest: MarinaDatabaseLookupRequest?
     let semanticCommand: MarinaSemanticCommand?
     let requestShape: MarinaRequestShape?
+    let insightIntent: MarinaInsightIntent?
+    let softTimeHint: MarinaInsightSoftTimeHint?
 
     init(
         requestFamily: MarinaRequestFamily = .analytics,
@@ -401,7 +425,9 @@ struct MarinaQueryPlanCandidate: Codable, Equatable, Sendable {
         unsupportedHint: MarinaUnsupportedHint? = nil,
         databaseLookupRequest: MarinaDatabaseLookupRequest? = nil,
         semanticCommand: MarinaSemanticCommand? = nil,
-        requestShape: MarinaRequestShape? = nil
+        requestShape: MarinaRequestShape? = nil,
+        insightIntent: MarinaInsightIntent? = nil,
+        softTimeHint: MarinaInsightSoftTimeHint? = nil
     ) {
         self.requestFamily = requestFamily
         self.source = source
@@ -419,5 +445,7 @@ struct MarinaQueryPlanCandidate: Codable, Equatable, Sendable {
         self.databaseLookupRequest = databaseLookupRequest
         self.semanticCommand = semanticCommand
         self.requestShape = requestShape
+        self.insightIntent = insightIntent
+        self.softTimeHint = softTimeHint
     }
 }

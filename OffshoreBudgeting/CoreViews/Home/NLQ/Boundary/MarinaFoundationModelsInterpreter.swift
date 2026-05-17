@@ -137,7 +137,9 @@ struct MarinaFoundationModelsInterpreter {
             limit: command.limit,
             responseShapeHint: responseShape,
             confidence: .high,
-            semanticCommand: command
+            semanticCommand: command,
+            insightIntent: command.insightIntent,
+            softTimeHint: command.softTimeHint
         )
     }
 
@@ -390,7 +392,9 @@ struct MarinaFoundationModelsInterpreter {
                 unsupportedHint: unsupportedHint
             ),
             confidence: confidence,
-            unsupportedHint: unsupportedHint
+            unsupportedHint: unsupportedHint,
+            insightIntent: queryIntent.insightIntent,
+            softTimeHint: queryIntent.softTimeHint
         )
     }
 

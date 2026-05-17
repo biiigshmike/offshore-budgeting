@@ -189,12 +189,12 @@ struct HomeAssistantPanelView: View {
     private var defaultBudgetingPeriodRaw: String = BudgetingPeriod.monthly.rawValue
     @AppStorage("general_confirmBeforeDeleting")
     private var confirmBeforeDeleting: Bool = true
-    @AppStorage("debug_marina_nlq_v1_enabled")
-    private var marinaNLQv1Enabled: Bool = false
-    @AppStorage("debug_marina_shared_pipeline_enabled")
-    private var marinaSharedPipelineEnabled: Bool = true
-    @AppStorage("marina_ai_opt_in_enabled")
-    private var marinaAIOptInEnabled: Bool = false
+    @AppStorage(MarinaRuntimeSettings.nlqV1Key)
+    private var marinaNLQv1Enabled: Bool = MarinaRuntimeSettings.defaultNLQv1Enabled
+    @AppStorage(MarinaRuntimeSettings.sharedPipelineKey)
+    private var marinaSharedPipelineEnabled: Bool = MarinaRuntimeSettings.defaultSharedPipelineEnabled
+    @AppStorage(MarinaRuntimeSettings.aiOptInKey)
+    private var marinaAIOptInEnabled: Bool = MarinaRuntimeSettings.defaultAIOptInEnabled
 
     private var marinaRuntimeSettings: MarinaRuntimeSettings {
         MarinaRuntimeSettings.resolve(
@@ -370,45 +370,22 @@ struct HomeAssistantPanelView: View {
             }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    if #available(iOS 26.0, macCatalyst 26.0, *) {
-                        Button(action: onDismiss) {
-                            Image(systemName: "xmark")
-                                .font(.body.weight(.semibold))
-                                .frame(width: 33, height: 33)
-                                .buttonStyle(.glass)
-                        }
-                        .accessibilityLabel(String(localized: "assistant.close", defaultValue: "Close Assistant", comment: "Accessibility label for closing assistant."))
-                    } else {
-                        Button(action: onDismiss) {
-                            Image(systemName: "xmark")
-                                .font(.body.weight(.semibold))
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(String(localized: "assistant.close", defaultValue: "Close Assistant", comment: "Accessibility label for closing assistant."))
+                    Button(action: onDismiss) {
+                        Label(
+                            String(localized: "assistant.close", defaultValue: "Close Assistant", comment: "Accessibility label for closing assistant."),
+                            systemImage: "xmark"
+                        )
+                        .labelStyle(.iconOnly)
+                        .font(.body.weight(.semibold))
+                        .frame(width: 33, height: 33)
                     }
+                    .modifier(AssistantPanelIconButtonModifier())
+                    .accessibilityLabel(String(localized: "assistant.close", defaultValue: "Close Assistant", comment: "Accessibility label for closing assistant."))
                 }
                 
-                ToolbarItem(placement: .topBarTrailing) {
-                    if #available(iOS 26.0, macCatalyst 26.0, *) {
-                        Button {
-                            isShowingClearConversationAlert = true
-                        } label: {
-                            Text(String(localized: "common.clear", defaultValue: "Clear", comment: "Action to clear a selection."))
-                                .frame(height: 33)
-                                .buttonStyle(.glass)
-                        }
-                        .disabled(answers.isEmpty)
-                        .accessibilityLabel(String(localized: "assistant.clearChat", defaultValue: "Clear Chat", comment: "Accessibility label for clearing assistant chat."))
-                    } else {
-                        Button {
-                            isShowingClearConversationAlert = true
-                        } label: {
-                            Text(String(localized: "common.clear", defaultValue: "Clear", comment: "Action to clear a selection."))
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(answers.isEmpty)
-                        .accessibilityLabel(String(localized: "assistant.clearChat", defaultValue: "Clear Chat", comment: "Accessibility label for clearing assistant chat."))
-                    }
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    foundationModelToggleButton
+                    clearConversationButton
                 }
             }
         }
@@ -544,6 +521,54 @@ struct HomeAssistantPanelView: View {
                 command: nil
             )
         )
+    }
+
+    private var foundationModelToggleButton: some View {
+        Button {
+            toggleFoundationModelInterpreter()
+        } label: {
+            Label(
+                String(localized: "assistant.foundationModel.toggle", defaultValue: "Foundation Model", comment: "Accessibility label for toggling Foundation Models in Marina."),
+                systemImage: "apple.intelligence"
+            )
+            .labelStyle(.iconOnly)
+            .font(.body.weight(.semibold))
+            .frame(width: 33, height: 33)
+        }
+        .modifier(AssistantToggleIconButtonModifier(isActive: marinaAIOptInEnabled))
+        .accessibilityLabel(String(localized: "assistant.foundationModel.toggle", defaultValue: "Foundation Model", comment: "Accessibility label for toggling Foundation Models in Marina."))
+        .accessibilityValue(foundationModelToggleAccessibilityValue)
+        .accessibilityIdentifier("marina.foundationModelToggle")
+    }
+
+    private var clearConversationButton: some View {
+        Button {
+            isShowingClearConversationAlert = true
+        } label: {
+            Text(String(localized: "common.clear", defaultValue: "Clear", comment: "Action to clear a selection."))
+                .frame(height: 33)
+        }
+        .modifier(AssistantActionButtonModifier(prominent: false))
+        .disabled(answers.isEmpty)
+        .accessibilityLabel(String(localized: "assistant.clearChat", defaultValue: "Clear Chat", comment: "Accessibility label for clearing assistant chat."))
+    }
+
+    private var foundationModelToggleAccessibilityValue: String {
+        guard marinaAIOptInEnabled else {
+            return String(localized: "common.off", defaultValue: "Off", comment: "Accessibility value for a disabled toggle.")
+        }
+
+        switch MarinaModelAvailability().currentStatus() {
+        case .available:
+            return String(localized: "common.on", defaultValue: "On", comment: "Accessibility value for an enabled toggle.")
+        case .unavailable:
+            return String(localized: "assistant.foundationModel.onUnavailable", defaultValue: "On, unavailable", comment: "Accessibility value when Foundation Models are enabled but unavailable.")
+        }
+    }
+
+    private func toggleFoundationModelInterpreter() {
+        marinaSharedPipelineEnabled = true
+        marinaAIOptInEnabled.toggle()
     }
     
     private func creationGuidance(
@@ -1576,11 +1601,14 @@ struct HomeAssistantPanelView: View {
             )
         let deterministicFollowUps = followUpSuggestions(for: styled, query: query)
         let surfaced = await surfaceGeneratedPresentation(
-            deterministicAnswer: styled,
+            generationBaseAnswer: normalizedAnswer,
+            fallbackApplication: MarinaResponseSurfaceApplication(
+                answer: styled,
+                followUpSuggestions: deterministicFollowUps
+            ),
             rawPrompt: rawPrompt,
             source: source,
-            homeQueryPlan: homeQueryPlan,
-            deterministicFollowUps: deterministicFollowUps
+            homeQueryPlan: homeQueryPlan
         )
 
         if let homeQueryPlan, let query {
@@ -1629,18 +1657,15 @@ struct HomeAssistantPanelView: View {
     }
 
     private func surfaceGeneratedPresentation(
-        deterministicAnswer: HomeAnswer,
+        generationBaseAnswer: HomeAnswer,
+        fallbackApplication: MarinaResponseSurfaceApplication,
         rawPrompt: String,
         source: HomeAssistantPlanResolutionSource,
         homeQueryPlan: HomeQueryPlan?,
-        deterministicFollowUps: [HomeAssistantSuggestion],
         validationOutcomeSummary: String? = nil,
         clarificationChoices: [String] = []
     ) async -> MarinaResponseSurfaceApplication {
-        let fallback = MarinaResponseSurfaceApplication(
-            answer: deterministicAnswer,
-            followUpSuggestions: deterministicFollowUps
-        )
+        let fallback = fallbackApplication
         guard marinaRuntimeSettings.aiOptIn.isEnabled else {
             MarinaTraceRecorder.shared.recordResponseSurface(
                 source: .deterministicSurfaceFallback,
@@ -1659,16 +1684,17 @@ struct HomeAssistantPanelView: View {
         }
 
         do {
-            let context = MarinaResponseGenerationContext(
+            let request = MarinaResponseSurfaceRequestFactory.make(
                 userPrompt: rawPrompt,
                 workspaceName: workspace.name,
                 routeSourceRaw: source.rawValue,
-                deterministicAnswer: deterministicAnswer,
+                generationBaseAnswer: generationBaseAnswer,
+                fallbackApplication: fallback,
                 dateWindow: homeQueryPlan?.dateRange?.traceSummary,
                 provenance: visibleProvenance(for: homeQueryPlan.map { [$0.query] } ?? []),
                 validationOutcomeSummary: validationOutcomeSummary,
                 clarificationChoices: clarificationChoices,
-                followUpCandidates: deterministicFollowUps.enumerated().map { index, suggestion in
+                followUpCandidates: fallback.followUpSuggestions.enumerated().map { index, suggestion in
                     MarinaResponseSuggestionCandidate(
                         index: index,
                         title: suggestion.title,
@@ -1683,11 +1709,11 @@ struct HomeAssistantPanelView: View {
                     )
                 }
             )
-            let generated = try await responseGenerationService.generateSurfaceResponse(context: context)
+            let generated = try await responseGenerationService.generateSurfaceResponse(context: request.context)
             let applied = try MarinaResponseSurfaceApplicator().apply(
                 generated: generated,
-                to: deterministicAnswer,
-                deterministicFollowUps: deterministicFollowUps
+                to: request.context.deterministicAnswer,
+                deterministicFollowUps: request.fallbackApplication.followUpSuggestions
             )
             MarinaTraceRecorder.shared.recordResponseSurface(
                 source: .foundationModelsSurface,
@@ -6050,11 +6076,14 @@ struct HomeAssistantPanelView: View {
             notes: "shared_pipeline_clarification"
         )
         let surfaced = await surfaceGeneratedPresentation(
-            deterministicAnswer: answer,
+            generationBaseAnswer: answer,
+            fallbackApplication: MarinaResponseSurfaceApplication(
+                answer: answer,
+                followUpSuggestions: []
+            ),
             rawPrompt: rawPrompt,
             source: source,
             homeQueryPlan: nil,
-            deterministicFollowUps: [],
             validationOutcomeSummary: "clarification:\(clarification.kind.rawValue)",
             clarificationChoices: clarification.actionableChoices.map(sharedPipelineChoiceTitle)
         )
@@ -10260,6 +10289,48 @@ private struct AssistantIconButtonModifier: ViewModifier {
         } else {
             content
                 .buttonStyle(.borderedProminent)
+        }
+    }
+}
+
+private struct AssistantPanelIconButtonModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content
+                .buttonStyle(.glass)
+                .buttonBorderShape(.circle)
+        } else {
+            content
+                .buttonStyle(.bordered)
+                .buttonBorderShape(.circle)
+        }
+    }
+}
+
+private struct AssistantToggleIconButtonModifier: ViewModifier {
+    let isActive: Bool
+
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            if isActive {
+                content
+                    .buttonStyle(.glassProminent)
+                    .buttonBorderShape(.circle)
+            } else {
+                content
+                    .buttonStyle(.glass)
+                    .buttonBorderShape(.circle)
+            }
+        } else {
+            if isActive {
+                content
+                    .buttonStyle(.borderedProminent)
+                    .buttonBorderShape(.circle)
+            } else {
+                content
+                    .buttonStyle(.bordered)
+                    .buttonBorderShape(.circle)
+            }
         }
     }
 }

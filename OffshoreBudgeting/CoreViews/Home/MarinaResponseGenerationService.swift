@@ -38,10 +38,15 @@ struct MarinaRecentResponseSummary: Equatable {
     let primaryValue: String?
 }
 
+enum MarinaResponsePresentationMode: String, Codable, Equatable {
+    case foundationModelsPersonalized
+}
+
 struct MarinaResponseGenerationContext: Equatable {
     let userPrompt: String
     let workspaceName: String
     let routeSourceRaw: String
+    let presentationMode: MarinaResponsePresentationMode
     let deterministicAnswer: HomeAnswer
     let dateWindow: String?
     let provenance: String?
@@ -54,6 +59,7 @@ struct MarinaResponseGenerationContext: Equatable {
         userPrompt: String,
         workspaceName: String,
         routeSourceRaw: String,
+        presentationMode: MarinaResponsePresentationMode = .foundationModelsPersonalized,
         deterministicAnswer: HomeAnswer,
         dateWindow: String? = nil,
         provenance: String? = nil,
@@ -65,6 +71,7 @@ struct MarinaResponseGenerationContext: Equatable {
         self.userPrompt = userPrompt
         self.workspaceName = workspaceName
         self.routeSourceRaw = routeSourceRaw
+        self.presentationMode = presentationMode
         self.deterministicAnswer = deterministicAnswer
         self.dateWindow = dateWindow
         self.provenance = provenance
@@ -72,6 +79,73 @@ struct MarinaResponseGenerationContext: Equatable {
         self.clarificationChoices = clarificationChoices
         self.followUpCandidates = followUpCandidates
         self.recentResponses = recentResponses
+    }
+}
+
+enum MarinaFoundationSurfacePromptBuilder {
+    static func instructions() -> String {
+        """
+        You are Marina, a private budgeting assistant inside Offshore.
+        This pass is presentation only. The app has already routed, validated, fetched, and calculated the answer.
+
+        Voice:
+        - Warm, direct, and budget-bestie without sounding canned.
+        - Speak like a practical person reading the user's actual budget facts with them.
+        - Mention the user's ask when it helps the answer feel specific.
+        - Use light personality sparingly; never turn the response into generic hype.
+
+        Rules:
+        - Do not compute, change, or invent totals, balances, percentages, dates, rows, entities, transactions, or sources.
+        - Use only the deterministic facts in the prompt.
+        - Preserve the user's workspace boundary.
+        - Keep the response concise, natural, and specific to the facts.
+        - If rows include Status, Compared With, Main Driver, Pattern, or Watch, use them as insight context, not as new calculations.
+        - If clarification choices are provided, rewrite only the clarification question; do not add or remove choices.
+        - Follow-up suggestions may only reference provided candidate indexes.
+        - Avoid generic stock phrases when a concrete fact is available.
+        """
+    }
+
+    static func prompt(context: MarinaResponseGenerationContext) -> String {
+        let answer = context.deterministicAnswer
+        let rows = answer.rows.prefix(8).enumerated().map { index, row in
+            "\(index + 1). \(row.title): \(row.value)"
+        }.joined(separator: "\n")
+        let suggestions = context.followUpCandidates.map {
+            "[\($0.index)] \($0.title) -> \($0.querySummary)"
+        }.joined(separator: "\n")
+        let recent = context.recentResponses.prefix(3).map {
+            "\($0.kindRaw): \($0.title)\($0.primaryValue.map { " \($0)" } ?? "")"
+        }.joined(separator: "\n")
+
+        return """
+        User prompt: \(context.userPrompt)
+        Workspace: \(context.workspaceName)
+        Route/source: \(context.routeSourceRaw)
+        Presentation mode: \(context.presentationMode.rawValue)
+        Validation: \(context.validationOutcomeSummary ?? "none")
+        Date window: \(context.dateWindow ?? "none")
+        Provenance: \(context.provenance ?? "none")
+
+        Deterministic answer:
+        kind: \(answer.kind.rawValue)
+        title: \(answer.title)
+        subtitle: \(answer.subtitle ?? "none")
+        primaryValue: \(answer.primaryValue ?? "none")
+        rows:
+        \(rows.isEmpty ? "none" : rows)
+
+        Clarification choices:
+        \(context.clarificationChoices.isEmpty ? "none" : context.clarificationChoices.joined(separator: ", "))
+
+        Follow-up candidates:
+        \(suggestions.isEmpty ? "none" : suggestions)
+
+        Recent context:
+        \(recent.isEmpty ? "none" : recent)
+
+        Return presentation fields only. For normal answers, provide narrativeSubtitle. For clarifications, provide clarificationMessage. For follow-ups, provide candidate indexes and rewritten chip titles only.
+        """
     }
 }
 
@@ -108,6 +182,44 @@ protocol MarinaResponseGenerating {
 struct MarinaResponseSurfaceApplication: Equatable {
     let answer: HomeAnswer
     let followUpSuggestions: [HomeAssistantSuggestion]
+}
+
+struct MarinaResponseSurfaceRequest: Equatable {
+    let context: MarinaResponseGenerationContext
+    let fallbackApplication: MarinaResponseSurfaceApplication
+}
+
+enum MarinaResponseSurfaceRequestFactory {
+    static func make(
+        userPrompt: String,
+        workspaceName: String,
+        routeSourceRaw: String,
+        generationBaseAnswer: HomeAnswer,
+        fallbackApplication: MarinaResponseSurfaceApplication,
+        dateWindow: String? = nil,
+        provenance: String? = nil,
+        validationOutcomeSummary: String? = nil,
+        clarificationChoices: [String] = [],
+        followUpCandidates: [MarinaResponseSuggestionCandidate] = [],
+        recentResponses: [MarinaRecentResponseSummary] = []
+    ) -> MarinaResponseSurfaceRequest {
+        MarinaResponseSurfaceRequest(
+            context: MarinaResponseGenerationContext(
+                userPrompt: userPrompt,
+                workspaceName: workspaceName,
+                routeSourceRaw: routeSourceRaw,
+                presentationMode: .foundationModelsPersonalized,
+                deterministicAnswer: generationBaseAnswer,
+                dateWindow: dateWindow,
+                provenance: provenance,
+                validationOutcomeSummary: validationOutcomeSummary,
+                clarificationChoices: clarificationChoices,
+                followUpCandidates: followUpCandidates,
+                recentResponses: recentResponses
+            ),
+            fallbackApplication: fallbackApplication
+        )
+    }
 }
 
 struct MarinaResponseSurfaceApplicator {
@@ -239,11 +351,11 @@ private func generateWithFoundationModels(
 
     let session = LanguageModelSession(
         model: model,
-        instructions: marinaSurfaceInstructions()
+        instructions: MarinaFoundationSurfacePromptBuilder.instructions()
     )
 
     let response = try await session.respond(
-        to: marinaSurfacePrompt(context: context),
+        to: MarinaFoundationSurfacePromptBuilder.prompt(context: context),
         schema: marinaSurfaceResponseSchema(),
         includeSchemaInPrompt: true,
         options: GenerationOptions(
@@ -278,65 +390,6 @@ private func generateWithFoundationModels(
     }
 
     return generated
-}
-
-@available(iOS 26.0, macOS 26.0, *)
-private func marinaSurfaceInstructions() -> String {
-    """
-    You are Marina, a private budgeting assistant inside Offshore.
-    This pass is presentation only. The app has already routed, validated, fetched, and calculated the answer.
-
-    Rules:
-    - Do not compute, change, or invent totals, balances, percentages, dates, rows, entities, transactions, or sources.
-    - Use only the deterministic facts in the prompt.
-    - Preserve the user's workspace boundary.
-    - Keep the response concise, natural, and specific to the facts.
-    - If clarification choices are provided, rewrite only the clarification question; do not add or remove choices.
-    - Follow-up suggestions may only reference provided candidate indexes.
-    - Avoid generic stock phrases when a concrete fact is available.
-    """
-}
-
-@available(iOS 26.0, macOS 26.0, *)
-private func marinaSurfacePrompt(context: MarinaResponseGenerationContext) -> String {
-    let answer = context.deterministicAnswer
-    let rows = answer.rows.prefix(8).enumerated().map { index, row in
-        "\(index + 1). \(row.title): \(row.value)"
-    }.joined(separator: "\n")
-    let suggestions = context.followUpCandidates.map {
-        "[\($0.index)] \($0.title) -> \($0.querySummary)"
-    }.joined(separator: "\n")
-    let recent = context.recentResponses.prefix(3).map {
-        "\($0.kindRaw): \($0.title)\($0.primaryValue.map { " \($0)" } ?? "")"
-    }.joined(separator: "\n")
-
-    return """
-    User prompt: \(context.userPrompt)
-    Workspace: \(context.workspaceName)
-    Route/source: \(context.routeSourceRaw)
-    Validation: \(context.validationOutcomeSummary ?? "none")
-    Date window: \(context.dateWindow ?? "none")
-    Provenance: \(context.provenance ?? "none")
-
-    Deterministic answer:
-    kind: \(answer.kind.rawValue)
-    title: \(answer.title)
-    subtitle: \(answer.subtitle ?? "none")
-    primaryValue: \(answer.primaryValue ?? "none")
-    rows:
-    \(rows.isEmpty ? "none" : rows)
-
-    Clarification choices:
-    \(context.clarificationChoices.isEmpty ? "none" : context.clarificationChoices.joined(separator: ", "))
-
-    Follow-up candidates:
-    \(suggestions.isEmpty ? "none" : suggestions)
-
-    Recent context:
-    \(recent.isEmpty ? "none" : recent)
-
-    Return presentation fields only. For normal answers, provide narrativeSubtitle. For clarifications, provide clarificationMessage. For follow-ups, provide candidate indexes and rewritten chip titles only.
-    """
 }
 
 @available(iOS 26.0, macOS 26.0, *)

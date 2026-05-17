@@ -1,6 +1,90 @@
 import Foundation
 
 struct MarinaQueryRecoveryPolicy {
+    func canonicalized(
+        candidate: MarinaQueryPlanCandidate,
+        explicitConstraints: MarinaExplicitPromptConstraints,
+        now: Date,
+        defaultPeriodUnit: HomeQueryPeriodUnit
+    ) -> MarinaQueryPlanCandidate {
+        guard candidate.source == .foundationModels else { return candidate }
+
+        let prompt = normalized(candidate.rawPrompt)
+        var operation = candidate.operation
+        var measure = candidate.measure
+        var grouping = candidate.grouping
+        var ranking = candidate.ranking
+        var limit = candidate.limit
+        var responseShapeHint = candidate.responseShapeHint
+        var timeScopes = candidate.timeScopes
+        var insightIntent = candidate.insightIntent
+        let repairedShape: Bool
+
+        if insightIntent == nil {
+            insightIntent = inferredInsightIntent(from: prompt)
+        }
+
+        if isBiggestOffendersPrompt(prompt) {
+            operation = .rank
+            if grouping?.dimension == .merchant {
+                measure = .spend
+            } else {
+                measure = .transactionAmount
+                grouping = MarinaGroupingCandidate(dimension: .transaction, rawText: "biggest offenders")
+            }
+            ranking = MarinaRankingCandidate(direction: .largest, limit: limit ?? 5, rawText: "biggest offenders")
+            limit = limit ?? 5
+            responseShapeHint = .rankedList
+            insightIntent = insightIntent ?? .multiPartContributors
+        }
+
+        if isSoftComparisonPrompt(prompt) {
+            operation = .compare
+            measure = .spend
+            responseShapeHint = .comparison
+            insightIntent = insightIntent ?? .changeSummary
+            timeScopes = repairedComparisonScopes(
+                existingScopes: timeScopes,
+                prompt: prompt,
+                now: now
+            )
+        }
+
+        repairedShape = operation != candidate.operation
+            || measure != candidate.measure
+            || grouping != candidate.grouping
+            || ranking != candidate.ranking
+            || limit != candidate.limit
+            || responseShapeHint != candidate.responseShapeHint
+            || timeScopes != candidate.timeScopes
+            || insightIntent != candidate.insightIntent
+
+        guard repairedShape else { return candidate }
+        guard preservesExplicitConstraints(
+            explicitConstraints,
+            original: candidate,
+            operation: operation,
+            timeScopes: timeScopes,
+            ranking: ranking,
+            limit: limit
+        ) else {
+            return candidate
+        }
+
+        return copy(
+            candidate,
+            operation: operation,
+            measure: measure,
+            timeScopes: timeScopes,
+            grouping: grouping,
+            ranking: ranking,
+            limit: limit,
+            responseShapeHint: responseShapeHint,
+            unsupportedHint: nil,
+            insightIntent: insightIntent
+        )
+    }
+
     func unsupportedTitle(for unsupported: MarinaTypedUnsupportedResponse) -> String {
         switch unsupported.kind {
         case .unsupportedOperation:
@@ -88,6 +172,184 @@ struct MarinaQueryRecoveryPolicy {
         }
 
         return true
+    }
+
+    private func inferredInsightIntent(from prompt: String) -> MarinaInsightIntent? {
+        if isBiggestOffendersPrompt(prompt) {
+            return .multiPartContributors
+        }
+
+        if prompt.contains("why higher")
+            || prompt.contains("why is this higher")
+            || prompt.contains("why is it higher")
+            || (prompt.contains("why is") && prompt.contains("higher")) {
+            return .contributorAnalysis
+        }
+
+        if prompt.contains("what changed")
+            || containsAnyWholePhrase(["worse", "higher", "lower", "changed"], in: prompt) {
+            return .changeSummary
+        }
+
+        if containsAnyWholePhrase(["weird", "weirdly", "normal", "unusual", "lately"], in: prompt) {
+            return .normalityCheck
+        }
+
+        return nil
+    }
+
+    private func isSoftComparisonPrompt(_ prompt: String) -> Bool {
+        prompt.contains("what changed")
+            || containsAnyWholePhrase(["worse", "higher", "lower", "changed"], in: prompt)
+    }
+
+    private func isBiggestOffendersPrompt(_ prompt: String) -> Bool {
+        prompt.contains("biggest offender")
+            || prompt.contains("biggest offenders")
+    }
+
+    private func repairedComparisonScopes(
+        existingScopes: [MarinaUnresolvedTimeScope],
+        prompt: String,
+        now: Date
+    ) -> [MarinaUnresolvedTimeScope] {
+        var scopes = existingScopes
+        let primaryRange = scopes.first { $0.role == .primary }?.resolvedRangeHint
+            ?? scopes.first { $0.role == .lookbackWindow }?.resolvedRangeHint
+            ?? currentMonthRange(containing: now)
+        let comparisonRange = scopes.first { $0.role == .comparison }?.resolvedRangeHint
+            ?? (containsWholePhrase("last month", in: prompt)
+                ? previousMonthRange(before: primaryRange)
+                : previousEquivalentRange(to: primaryRange))
+
+        if scopes.contains(where: { $0.role == .primary || $0.role == .lookbackWindow }) == false {
+            scopes.append(
+                MarinaUnresolvedTimeScope(
+                    role: .primary,
+                    rawText: containsWholePhrase("this month", in: prompt) ? "this month" : nil,
+                    resolvedRangeHint: primaryRange,
+                    periodUnitHint: .month
+                )
+            )
+        }
+
+        if scopes.contains(where: { $0.role == .comparison }) == false {
+            scopes.append(
+                MarinaUnresolvedTimeScope(
+                    role: .comparison,
+                    rawText: containsWholePhrase("last month", in: prompt) ? "last month" : "previous period",
+                    resolvedRangeHint: comparisonRange,
+                    periodUnitHint: .month
+                )
+            )
+        }
+
+        return scopes
+    }
+
+    private func preservesExplicitConstraints(
+        _ constraints: MarinaExplicitPromptConstraints,
+        original: MarinaQueryPlanCandidate,
+        operation: MarinaCandidateOperation?,
+        timeScopes: [MarinaUnresolvedTimeScope],
+        ranking: MarinaRankingCandidate?,
+        limit: Int?
+    ) -> Bool {
+        if constraints.hasDateConstraint, timeScopes.isEmpty {
+            return false
+        }
+        if let explicitLimit = constraints.limit,
+           limit != explicitLimit,
+           original.limit != explicitLimit,
+           ranking?.limit != explicitLimit,
+           original.ranking?.limit != explicitLimit {
+            return false
+        }
+        if let explicitSort = constraints.sort,
+           ranking?.direction != explicitSort,
+           original.ranking?.direction != explicitSort {
+            return false
+        }
+        if operation == nil, original.operation != nil {
+            return false
+        }
+        return true
+    }
+
+    private func currentMonthRange(containing date: Date) -> HomeQueryDateRange {
+        let calendar = Calendar(identifier: .gregorian)
+        let start = calendar.date(from: calendar.dateComponents([.year, .month], from: date)) ?? date
+        let end = calendar.date(byAdding: DateComponents(month: 1, second: -1), to: start) ?? start
+        return HomeQueryDateRange(startDate: start, endDate: end)
+    }
+
+    private func previousMonthRange(before range: HomeQueryDateRange) -> HomeQueryDateRange {
+        let calendar = Calendar(identifier: .gregorian)
+        let monthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: range.startDate)) ?? range.startDate
+        let previousStart = calendar.date(byAdding: .month, value: -1, to: monthStart) ?? monthStart
+        let previousEnd = calendar.date(byAdding: DateComponents(second: -1), to: monthStart) ?? previousStart
+        return HomeQueryDateRange(startDate: previousStart, endDate: previousEnd)
+    }
+
+    private func previousEquivalentRange(to range: HomeQueryDateRange) -> HomeQueryDateRange {
+        if isFullCalendarMonth(range) {
+            return previousMonthRange(before: range)
+        }
+        let duration = max(range.endDate.timeIntervalSince(range.startDate), 0)
+        let previousEnd = range.startDate.addingTimeInterval(-1)
+        let previousStart = previousEnd.addingTimeInterval(-duration)
+        return HomeQueryDateRange(startDate: previousStart, endDate: previousEnd)
+    }
+
+    private func isFullCalendarMonth(_ range: HomeQueryDateRange) -> Bool {
+        let calendar = Calendar(identifier: .gregorian)
+        let start = calendar.date(from: calendar.dateComponents([.year, .month], from: range.startDate)) ?? range.startDate
+        let end = calendar.date(byAdding: DateComponents(month: 1, second: -1), to: start) ?? start
+        return abs(range.startDate.timeIntervalSince(start)) < 1
+            && abs(range.endDate.timeIntervalSince(end)) < 1
+    }
+
+    private func copy(
+        _ candidate: MarinaQueryPlanCandidate,
+        operation: MarinaCandidateOperation?,
+        measure: MarinaCandidateMeasure?,
+        timeScopes: [MarinaUnresolvedTimeScope],
+        grouping: MarinaGroupingCandidate?,
+        ranking: MarinaRankingCandidate?,
+        limit: Int?,
+        responseShapeHint: MarinaResponseShapeHint?,
+        unsupportedHint: MarinaUnsupportedHint?,
+        insightIntent: MarinaInsightIntent?
+    ) -> MarinaQueryPlanCandidate {
+        MarinaQueryPlanCandidate(
+            requestFamily: candidate.requestFamily,
+            source: candidate.source,
+            rawPrompt: candidate.rawPrompt,
+            operation: operation,
+            measure: measure,
+            entityMentions: candidate.entityMentions,
+            timeScopes: timeScopes,
+            grouping: grouping,
+            ranking: ranking,
+            limit: limit,
+            responseShapeHint: responseShapeHint,
+            confidence: candidate.confidence,
+            unsupportedHint: unsupportedHint,
+            databaseLookupRequest: candidate.databaseLookupRequest,
+            semanticCommand: candidate.semanticCommand,
+            requestShape: candidate.requestShape,
+            insightIntent: insightIntent,
+            softTimeHint: candidate.softTimeHint
+        )
+    }
+
+    private func containsAnyWholePhrase(_ phrases: [String], in prompt: String) -> Bool {
+        phrases.contains { containsWholePhrase($0, in: prompt) }
+    }
+
+    private func containsWholePhrase(_ phrase: String, in prompt: String) -> Bool {
+        let pattern = "(^|\\s)\(NSRegularExpression.escapedPattern(for: phrase))(\\s|$)"
+        return prompt.range(of: pattern, options: .regularExpression) != nil
     }
 
     private func isRowListPrompt(_ prompt: String) -> Bool {

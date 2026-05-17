@@ -3,6 +3,60 @@ import Testing
 @testable import Offshore
 
 struct MarinaRuntimeSettingsTests {
+    @Test func defaultRuntime_usesSharedPipelineWithoutLaunchArguments() throws {
+        let defaults = try makeDefaults(suiteName: "MarinaRuntimeSettingsTests.defaultRuntime")
+        defer { defaults.removePersistentDomain(forName: "MarinaRuntimeSettingsTests.defaultRuntime") }
+
+        let settings = MarinaRuntimeSettings.resolve(
+            defaults: defaults,
+            arguments: [],
+            environment: [:]
+        )
+
+        #expect(settings.routingMode == .sharedPipeline)
+        #expect(settings.sharedPipeline.isEnabled)
+        #expect(settings.sharedPipeline.source == .fallback)
+        #expect(settings.aiOptIn.isEnabled == false)
+        #expect(settings.aiOptIn.source == .fallback)
+    }
+
+    @Test func aiOptInDefaults_controlModelEligibilityWithoutChangingSharedPipelineGate() throws {
+        let defaults = try makeDefaults(suiteName: "MarinaRuntimeSettingsTests.aiOptInDefaults")
+        defer { defaults.removePersistentDomain(forName: "MarinaRuntimeSettingsTests.aiOptInDefaults") }
+        defaults.set(true, forKey: MarinaRuntimeSettings.aiOptInKey)
+
+        let settings = MarinaRuntimeSettings.resolve(
+            defaults: defaults,
+            arguments: [],
+            environment: [:]
+        )
+
+        #expect(settings.routingMode == .sharedPipeline)
+        #expect(settings.sharedPipeline.isEnabled)
+        #expect(settings.sharedPipeline.source == .fallback)
+        #expect(settings.aiOptIn.isEnabled)
+        #expect(settings.aiOptIn.source == .userDefaults)
+        #expect(settings.traceSummary.contains("aiOptInDefaultsPresent=true"))
+    }
+
+    @Test func explicitSharedPipelineDefault_canStillForceLegacyRouteForDebugging() throws {
+        let defaults = try makeDefaults(suiteName: "MarinaRuntimeSettingsTests.sharedPipelineDefaultDisabled")
+        defer { defaults.removePersistentDomain(forName: "MarinaRuntimeSettingsTests.sharedPipelineDefaultDisabled") }
+        defaults.set(false, forKey: MarinaRuntimeSettings.sharedPipelineKey)
+        defaults.set(true, forKey: MarinaRuntimeSettings.aiOptInKey)
+
+        let settings = MarinaRuntimeSettings.resolve(
+            defaults: defaults,
+            arguments: [],
+            environment: [:]
+        )
+
+        #expect(settings.routingMode == .modelRouter)
+        #expect(settings.sharedPipeline.isEnabled == false)
+        #expect(settings.sharedPipeline.source == .userDefaults)
+        #expect(settings.aiOptIn.isEnabled)
+    }
+
     @Test func checkedLaunchArguments_selectSharedPipelineRoute() throws {
         let defaults = try makeDefaults(suiteName: "MarinaRuntimeSettingsTests.checkedLaunchArguments")
         defer { defaults.removePersistentDomain(forName: "MarinaRuntimeSettingsTests.checkedLaunchArguments") }

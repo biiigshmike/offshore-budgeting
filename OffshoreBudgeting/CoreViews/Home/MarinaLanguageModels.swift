@@ -93,6 +93,38 @@ struct MarinaStructuredQueryIntent: Equatable {
     let periodUnitRaw: String?
     let confidenceRaw: String?
     let clarification: MarinaStructuredClarification?
+    let insightIntent: MarinaInsightIntent?
+    let softTimeHint: MarinaInsightSoftTimeHint?
+
+    init(
+        metricRaw: String?,
+        targetName: String?,
+        targetTypeRaw: String?,
+        dateStartISO8601: String?,
+        dateEndISO8601: String?,
+        comparisonDateStartISO8601: String?,
+        comparisonDateEndISO8601: String?,
+        resultLimit: Int?,
+        periodUnitRaw: String?,
+        confidenceRaw: String?,
+        clarification: MarinaStructuredClarification?,
+        insightIntent: MarinaInsightIntent? = nil,
+        softTimeHint: MarinaInsightSoftTimeHint? = nil
+    ) {
+        self.metricRaw = metricRaw
+        self.targetName = targetName
+        self.targetTypeRaw = targetTypeRaw
+        self.dateStartISO8601 = dateStartISO8601
+        self.dateEndISO8601 = dateEndISO8601
+        self.comparisonDateStartISO8601 = comparisonDateStartISO8601
+        self.comparisonDateEndISO8601 = comparisonDateEndISO8601
+        self.resultLimit = resultLimit
+        self.periodUnitRaw = periodUnitRaw
+        self.confidenceRaw = confidenceRaw
+        self.clarification = clarification
+        self.insightIntent = insightIntent
+        self.softTimeHint = softTimeHint
+    }
 }
 
 struct MarinaStructuredCommandIntent: Equatable {

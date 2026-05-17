@@ -32,7 +32,11 @@ struct MarinaTraceAnalysisTests {
             report.rows.allSatisfy { row in
                 switch row.mode {
                 case "model_router":
-                    return row.fallbackSummary != nil || row.modelSummary != nil
+                    return row.fallbackSummary != nil
+                        || row.modelSummary != nil
+                        || row.sharedCandidateSummary != nil
+                        || row.sharedValidatorOutcome != nil
+                        || row.sharedExecutorResultShape != nil
                 case "nlq_authoritative":
                     // NLQ-authoritative runs may not populate model/fallback summaries.
                     // Route/aggregation/response fields remain the required signal.

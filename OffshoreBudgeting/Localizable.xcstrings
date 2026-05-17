@@ -5434,6 +5434,30 @@
         }
       }
     },
+    "assistant.foundationModel.onUnavailable" : {
+      "comment" : "Accessibility value when Foundation Models are enabled but unavailable.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "On, unavailable"
+          }
+        }
+      }
+    },
+    "assistant.foundationModel.toggle" : {
+      "comment" : "Accessibility label for toggling Foundation Models in Marina.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Foundation Model"
+          }
+        }
+      }
+    },
     "assistant.messagePrompt" : {
       "comment" : "Prompt placeholder for assistant message input.",
       "extractionState" : "extracted_with_value",
@@ -13818,6 +13842,18 @@
         }
       }
     },
+    "common.off" : {
+      "comment" : "Accessibility value for a disabled toggle.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Off"
+          }
+        }
+      }
+    },
     "common.ok" : {
       "comment" : "OK action label.",
       "extractionState" : "extracted_with_value",
@@ -13862,6 +13898,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "好的"
+          }
+        }
+      }
+    },
+    "common.on" : {
+      "comment" : "Accessibility value for an enabled toggle.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "On"
           }
         }
       }

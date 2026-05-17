@@ -143,6 +143,116 @@ struct MarinaFoundationModelsInterpreterTests {
         #expect(candidate.responseShapeHint == .comparison)
     }
 
+    @Test func foundationModels_weirdLatelyInsight_emitsNormalityIntent() {
+        let candidate = MarinaFoundationModelsInterpreter().candidate(
+            from: .query(
+                MarinaStructuredQueryIntent(
+                    metricRaw: "categorySpendTotal",
+                    targetName: "Food & Drink",
+                    targetTypeRaw: "category",
+                    dateStartISO8601: nil,
+                    dateEndISO8601: nil,
+                    comparisonDateStartISO8601: nil,
+                    comparisonDateEndISO8601: nil,
+                    resultLimit: nil,
+                    periodUnitRaw: "month",
+                    confidenceRaw: "high",
+                    clarification: nil,
+                    insightIntent: .normalityCheck,
+                    softTimeHint: .lately
+                )
+            ),
+            prompt: "am I spending weirdly on food lately?",
+            defaultPeriodUnit: .month
+        )
+
+        #expect(candidate.insightIntent == .normalityCheck)
+        #expect(candidate.softTimeHint == .lately)
+        #expect(candidate.measure == .spend)
+        #expect(candidate.entityMentions.first?.typeHint == .category)
+    }
+
+    @Test func foundationModels_worseInsight_emitsChangeSummaryIntent() {
+        let candidate = MarinaFoundationModelsInterpreter().candidate(
+            from: .query(
+                MarinaStructuredQueryIntent(
+                    metricRaw: "categoryMonthComparison",
+                    targetName: "groceries",
+                    targetTypeRaw: "category",
+                    dateStartISO8601: "2026-05-01",
+                    dateEndISO8601: "2026-05-31",
+                    comparisonDateStartISO8601: "2026-04-01",
+                    comparisonDateEndISO8601: "2026-04-30",
+                    resultLimit: nil,
+                    periodUnitRaw: "month",
+                    confidenceRaw: "high",
+                    clarification: nil,
+                    insightIntent: .changeSummary
+                )
+            ),
+            prompt: "is groceries worse?",
+            defaultPeriodUnit: .month
+        )
+
+        #expect(candidate.operation == .compare)
+        #expect(candidate.insightIntent == .changeSummary)
+        #expect(candidate.timeScopes.map(\.role) == [.primary, .comparison])
+    }
+
+    @Test func foundationModels_whyHigherInsight_emitsContributorIntent() {
+        let candidate = MarinaFoundationModelsInterpreter().candidate(
+            from: .query(
+                MarinaStructuredQueryIntent(
+                    metricRaw: "categoryMonthComparison",
+                    targetName: "Dining",
+                    targetTypeRaw: "category",
+                    dateStartISO8601: "2026-05-01",
+                    dateEndISO8601: "2026-05-31",
+                    comparisonDateStartISO8601: "2026-04-01",
+                    comparisonDateEndISO8601: "2026-04-30",
+                    resultLimit: nil,
+                    periodUnitRaw: "month",
+                    confidenceRaw: "high",
+                    clarification: nil,
+                    insightIntent: .contributorAnalysis
+                )
+            ),
+            prompt: "why is dining higher?",
+            defaultPeriodUnit: .month
+        )
+
+        #expect(candidate.insightIntent == .contributorAnalysis)
+        #expect(candidate.operation == .compare)
+    }
+
+    @Test func foundationModels_biggestOffendersInsight_emitsMultiPartContributorIntent() {
+        let command = MarinaSemanticCommand(
+            family: .analytics,
+            action: .total,
+            datasets: [.variableExpenses],
+            measure: .spend,
+            includeFilters: [
+                MarinaSemanticCommandFilter(rawText: "Dining", allowedTypes: [.category])
+            ],
+            dateRange: HomeQueryDateRange(
+                startDate: date(2026, 5, 1),
+                endDate: date(2026, 5, 31)
+            ),
+            periodUnit: .month,
+            insightIntent: .multiPartContributors
+        )
+
+        let candidate = MarinaFoundationModelsInterpreter().candidate(
+            from: .semanticCommand(command),
+            prompt: "show dining this month and the biggest offenders",
+            defaultPeriodUnit: .month
+        )
+
+        #expect(candidate.operation == .sum)
+        #expect(candidate.insightIntent == .multiPartContributors)
+        #expect(candidate.semanticCommand?.insightIntent == .multiPartContributors)
+    }
+
     @Test func foundationModels_whereIsMyMoneyGoing_emitsGroupedRankingWithoutSpecificEntityTruth() {
         let candidate = MarinaFoundationModelsInterpreter().candidate(
             from: .query(

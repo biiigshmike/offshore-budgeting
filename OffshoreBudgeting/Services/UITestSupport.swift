@@ -102,9 +102,9 @@ enum UITestSupport {
         defaults.set(false, forKey: "general_hideFutureVariableExpenses")
         defaults.set(false, forKey: "general_excludeFutureVariableExpensesFromCalculations")
 
-        defaults.set(true, forKey: "debug_marina_shared_pipeline_enabled")
-        defaults.set(false, forKey: "debug_marina_nlq_v1_enabled")
-        defaults.set(false, forKey: "marina_ai_opt_in_enabled")
+        defaults.set(MarinaRuntimeSettings.defaultSharedPipelineEnabled, forKey: MarinaRuntimeSettings.sharedPipelineKey)
+        defaults.set(MarinaRuntimeSettings.defaultNLQv1Enabled, forKey: MarinaRuntimeSettings.nlqV1Key)
+        defaults.set(MarinaRuntimeSettings.defaultAIOptInEnabled, forKey: MarinaRuntimeSettings.aiOptInKey)
     }
 
     // MARK: - Data

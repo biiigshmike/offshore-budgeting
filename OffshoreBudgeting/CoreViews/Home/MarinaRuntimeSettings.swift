@@ -6,6 +6,9 @@ struct MarinaRuntimeSettings: Equatable {
     static let aiOptInKey = "marina_ai_opt_in_enabled"
     static let fixedNowEnvironmentKey = "MARINA_UI_FIXED_NOW_ISO8601"
     static let traceOutputPathEnvironmentKey = "MARINA_UI_TRACE_OUTPUT_PATH"
+    static let defaultNLQv1Enabled = false
+    static let defaultSharedPipelineEnabled = true
+    static let defaultAIOptInEnabled = false
 
     let nlqV1: DebugFeatureFlagResolver.ResolvedFlag
     let sharedPipeline: DebugFeatureFlagResolver.ResolvedFlag
@@ -47,9 +50,9 @@ struct MarinaRuntimeSettings: Equatable {
     }
 
     static func resolve(
-        nlqV1Fallback: Bool,
-        sharedPipelineFallback: Bool,
-        aiOptInFallback: Bool,
+        nlqV1Fallback: Bool = defaultNLQv1Enabled,
+        sharedPipelineFallback: Bool = defaultSharedPipelineEnabled,
+        aiOptInFallback: Bool = defaultAIOptInEnabled,
         defaults: UserDefaults = .standard,
         arguments: [String] = ProcessInfo.processInfo.arguments,
         environment: [String: String] = ProcessInfo.processInfo.environment

@@ -63,6 +63,8 @@ private struct MarinaFoundationModelsFlatResponse {
     let queryResultLimit: Int?
     let queryPeriodUnitRaw: String?
     let queryConfidenceRaw: String?
+    let insightIntentRaw: String?
+    let softTimeHintRaw: String?
     let commandIntentRaw: String?
     let commandConfidenceRaw: String?
     let amount: Double?
@@ -164,6 +166,9 @@ private func marinaInstructions(context: MarinaLanguageRouterContext) -> String 
     - Row/list requests such as "last purchase" or "most recent purchases" use family analytics, action listRows, measure transactionAmount, grouping transaction, sort newest, and a limit.
     - Object detail requests such as "show/tell/find details for X" use family databaseLookup and action lookupDetails.
     - Use query only for simple existing HomeQueryMetric-style requests.
+    - For NLQ-only insight requests, set insightIntentRaw to changeSummary, contributorAnalysis, normalityCheck, watchOuts, explainBudgeting, or multiPartContributors.
+    - Map words like "weird", "normal", or "lately" to normalityCheck; "worse", "changed", or "what changed" to changeSummary; "why higher" to contributorAnalysis; "watch" or "risk" to watchOuts; "explain" to explainBudgeting; and "biggest offenders" to multiPartContributors.
+    - softTimeHintRaw may be lately, sincePayday, budgetCycle, or aroundTrip when the user uses fuzzy timing language.
     - Emit raw app values when known; dates must be YYYY-MM-DD.
     - Final answer text, totals, balances, percentages, and rows must not be included.
 
@@ -247,6 +252,8 @@ private func marinaResponseSchema() -> GenerationSchema {
             .init(name: "queryResultLimit", type: Int?.self),
             .init(name: "queryPeriodUnitRaw", type: String?.self),
             .init(name: "queryConfidenceRaw", type: String?.self),
+            .init(name: "insightIntentRaw", description: "Optional NLQ insight request: changeSummary, contributorAnalysis, normalityCheck, watchOuts, explainBudgeting, or multiPartContributors.", type: String?.self),
+            .init(name: "softTimeHintRaw", description: "Optional fuzzy time hint: lately, sincePayday, budgetCycle, or aroundTrip.", type: String?.self),
             .init(name: "commandIntentRaw", type: String?.self),
             .init(name: "commandConfidenceRaw", type: String?.self),
             .init(name: "amount", type: Double?.self),
@@ -311,6 +318,8 @@ private func makeFlatResponse(from content: GeneratedContent) throws -> MarinaFo
         queryResultLimit: try content.value(Int?.self, forProperty: "queryResultLimit"),
         queryPeriodUnitRaw: try content.value(String?.self, forProperty: "queryPeriodUnitRaw"),
         queryConfidenceRaw: try content.value(String?.self, forProperty: "queryConfidenceRaw"),
+        insightIntentRaw: try content.value(String?.self, forProperty: "insightIntentRaw"),
+        softTimeHintRaw: try content.value(String?.self, forProperty: "softTimeHintRaw"),
         commandIntentRaw: try content.value(String?.self, forProperty: "commandIntentRaw"),
         commandConfidenceRaw: try content.value(String?.self, forProperty: "commandConfidenceRaw"),
         amount: try content.value(Double?.self, forProperty: "amount"),
@@ -381,7 +390,9 @@ private func makeStructuredIntent(from flat: MarinaFoundationModelsFlatResponse)
                 resultLimit: flat.queryResultLimit,
                 periodUnitRaw: flat.queryPeriodUnitRaw?.nilIfBlank,
                 confidenceRaw: flat.queryConfidenceRaw?.nilIfBlank,
-                clarification: clarification.isActionable ? clarification : nil
+                clarification: clarification.isActionable ? clarification : nil,
+                insightIntent: flat.insightIntent,
+                softTimeHint: flat.softTimeHint
             )
         )
     case .command:
@@ -454,8 +465,21 @@ private func makeSemanticCommand(from flat: MarinaFoundationModelsFlatResponse) 
         periodUnit: periodUnit,
         limit: flat.queryResultLimit,
         incomeStatusScope: incomeStatusScope(from: flat),
-        requestedDetail: flat.semanticRequestedDetailRaw.flatMap(MarinaSemanticRequestedDetail.init(rawValue:))
+        requestedDetail: flat.semanticRequestedDetailRaw.flatMap(MarinaSemanticRequestedDetail.init(rawValue:)),
+        insightIntent: flat.insightIntent,
+        softTimeHint: flat.softTimeHint
     )
+}
+
+@available(iOS 26.0, macOS 26.0, *)
+private extension MarinaFoundationModelsFlatResponse {
+    var insightIntent: MarinaInsightIntent? {
+        insightIntentRaw?.nilIfBlank.flatMap(MarinaInsightIntent.init(rawValue:))
+    }
+
+    var softTimeHint: MarinaInsightSoftTimeHint? {
+        softTimeHintRaw?.nilIfBlank.flatMap(MarinaInsightSoftTimeHint.init(rawValue:))
+    }
 }
 
 @available(iOS 26.0, macOS 26.0, *)

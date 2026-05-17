@@ -89,8 +89,18 @@ struct MarinaComposableWorkspaceQueryExecutor {
         case (.sum, .spend, _):
             guard resolved.resolvedTargets.isEmpty == false else { return .unsupported }
             return .handled(filteredSpend(candidate: candidate, resolved: resolved, plan: plan, provider: provider, now: now, amountBasis: amountBasis))
+        case (.rank, .spend, nil), (.rank, .spend, .transaction):
+            guard candidate.measure == .transactionAmount || candidate.grouping?.dimension == .transaction,
+                  plan.ranking?.direction == .largest || candidate.ranking?.direction == .largest else {
+                return .unsupported
+            }
+            return .handled(recentFilteredTransactions(resolved: resolved, plan: plan, provider: provider, now: now, amountBasis: amountBasis))
         case (.rank, .transactionAmount, .transaction), (.listRows, .transactionAmount, .transaction):
-            guard plan.operation == .listRows || plan.ranking?.direction == .newest else { return .unsupported }
+            guard plan.operation == .listRows
+                    || plan.ranking?.direction == .newest
+                    || plan.ranking?.direction == .largest else {
+                return .unsupported
+            }
             return .handled(recentFilteredTransactions(resolved: resolved, plan: plan, provider: provider, now: now, amountBasis: amountBasis))
         case (.average, .spend, nil), (.average, .spend, .week), (.average, .spend, .month):
             guard plan.targets.isEmpty || resolved.resolvedTargets.isEmpty == false else { return .unsupported }
@@ -397,14 +407,16 @@ struct MarinaComposableWorkspaceQueryExecutor {
     ) -> MarinaWorkspaceAggregationCard {
         let range = plan.dateRange ?? lookbackRange(from: now, months: 12)
         let filters = resolved.resolvedTargets.filter { $0.role != .excludeFilter }
-        let rows = spendingRows(provider: provider, range: range, amountBasis: amountBasis)
+        let filteredRows = spendingRows(provider: provider, range: range, amountBasis: amountBasis)
             .filter { row in filters.isEmpty || filters.allSatisfy { matches(row: row, target: $0) } }
-            .sorted { $0.date > $1.date }
+        let rows = plan.ranking?.direction == .largest
+            ? filteredRows.sorted { $0.amount > $1.amount }
+            : filteredRows.sorted { $0.date > $1.date }
         let shown = Array(rows.prefix(limit(for: plan)))
         let total = shown.reduce(0.0) { $0 + $1.amount }
 
         return MarinaWorkspaceAggregationCard(
-            title: "Recent Purchases",
+            title: plan.ranking?.direction == .largest ? "Largest Purchases" : "Recent Purchases",
             subtitle: filterSummary(include: filters, exclude: [], range: range),
             primaryValue: currency(total),
             rows: shown.map(displayRow),

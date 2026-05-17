@@ -386,8 +386,9 @@ struct MarinaSharedPipelineCoordinator {
                 fallbackReason: selection.heuristicUsedAsFallback ? selection.fallbackReason : nil,
                 disagreementSummary: disagreementSummary
             )
+            let answer = enrichedAnswerIfNeeded(evaluation: evaluation, context: context)
             return .handled(
-                answer: evaluation.answer!,
+                answer: answer,
                 aggregationResult: evaluation.aggregationResult!,
                 homeQueryPlan: evaluation.executablePlan?.homeQueryPlan,
                 trace: trace
@@ -409,8 +410,9 @@ struct MarinaSharedPipelineCoordinator {
                 fallbackReason: selection.heuristicUsedAsFallback ? selection.fallbackReason : nil,
                 disagreementSummary: disagreementSummary
             )
+            let answer = enrichedAnswerIfNeeded(evaluation: recovered, context: context)
             return .handled(
-                answer: recovered.answer!,
+                answer: answer,
                 aggregationResult: recovered.aggregationResult!,
                 homeQueryPlan: recovered.executablePlan?.homeQueryPlan,
                 trace: trace
@@ -432,8 +434,9 @@ struct MarinaSharedPipelineCoordinator {
                 fallbackReason: selection.heuristicUsedAsFallback ? selection.fallbackReason : nil,
                 disagreementSummary: disagreementSummary
             )
+            let answer = enrichedAnswerIfNeeded(evaluation: recovered, context: context)
             return .handled(
-                answer: recovered.answer!,
+                answer: answer,
                 aggregationResult: recovered.aggregationResult!,
                 homeQueryPlan: recovered.executablePlan?.homeQueryPlan,
                 trace: trace
@@ -652,6 +655,12 @@ struct MarinaSharedPipelineCoordinator {
         defaultPeriodUnit: HomeQueryPeriodUnit,
         explicitConstraints: MarinaExplicitPromptConstraints
     ) -> CandidateEvaluation {
+        let interpretation = canonicalizedInterpretation(
+            interpretation,
+            explicitConstraints: explicitConstraints,
+            now: now,
+            defaultPeriodUnit: defaultPeriodUnit
+        )
         let candidate = interpretation.compatibilityCandidate
         let resolved = resolver.resolve(
             candidate: candidate,
@@ -849,6 +858,52 @@ struct MarinaSharedPipelineCoordinator {
                 )
             }
         }
+    }
+
+    private func enrichedAnswerIfNeeded(
+        evaluation: CandidateEvaluation,
+        context: MarinaSharedPipelineContext
+    ) -> HomeAnswer {
+        guard evaluation.candidate.source == .foundationModels,
+              let answer = evaluation.answer,
+              let result = evaluation.aggregationResult else {
+            return evaluation.answer!
+        }
+
+        return MarinaInsightContextBuilder().enrich(
+            answer: answer,
+            result: result,
+            candidate: evaluation.candidate,
+            resolved: evaluation.resolved,
+            semanticResolved: evaluation.semanticResolved,
+            provider: context.provider,
+            now: context.now
+        )
+    }
+
+    private func canonicalizedInterpretation(
+        _ interpretation: MarinaCanonicalReadInterpretation,
+        explicitConstraints: MarinaExplicitPromptConstraints,
+        now: Date,
+        defaultPeriodUnit: HomeQueryPeriodUnit
+    ) -> MarinaCanonicalReadInterpretation {
+        if case .clarification = interpretation.result {
+            return interpretation
+        }
+
+        let candidate = interpretation.compatibilityCandidate
+        let repaired = recoveryPolicy.canonicalized(
+            candidate: candidate,
+            explicitConstraints: explicitConstraints,
+            now: now,
+            defaultPeriodUnit: defaultPeriodUnit
+        )
+        guard repaired != candidate else { return interpretation }
+
+        return MarinaCanonicalReadInterpretation(
+            result: semanticAdapter.interpretationResult(from: repaired),
+            compatibilityCandidate: repaired
+        )
     }
 
     private func semanticMerchantSpendPlan(
@@ -1111,6 +1166,25 @@ struct MarinaSharedPipelineCoordinator {
         defaultPeriodUnit: HomeQueryPeriodUnit,
         explicitConstraints: MarinaExplicitPromptConstraints
     ) -> CandidateEvaluation {
+        let repairedCandidate = recoveryPolicy.canonicalized(
+            candidate: candidate,
+            explicitConstraints: explicitConstraints,
+            now: now,
+            defaultPeriodUnit: defaultPeriodUnit
+        )
+        if repairedCandidate != candidate {
+            return evaluate(
+                MarinaCanonicalReadInterpretation(
+                    result: semanticAdapter.interpretationResult(from: repairedCandidate),
+                    compatibilityCandidate: repairedCandidate
+                ),
+                provider: provider,
+                now: now,
+                defaultPeriodUnit: defaultPeriodUnit,
+                explicitConstraints: explicitConstraints
+            )
+        }
+
         let interpretation = MarinaInterpretationResult.query(query)
         let resolved = resolver.resolve(
             candidate: candidate,
@@ -2786,6 +2860,10 @@ struct MarinaQueryExecutor {
             }
             return executeLookup(request, provider: provider, decision: decision)
         case .aggregate:
+            if shouldPreferComposableWorkspaceExecution(candidate: candidate, resolved: resolved, plan: plan),
+               let handled = executeComposable(candidate: candidate, resolved: resolved, plan: plan, provider: provider, now: now, decision: decision) {
+                return handled
+            }
             if let handled = executeHomeAdapter(validationOutcome, provider: provider, now: now, decision: decision) {
                 return handled
             }
@@ -2799,6 +2877,11 @@ struct MarinaQueryExecutor {
             }
             return unsupported(candidate: candidate)
         case .comparison, .groupedRanked:
+            if hasExecutableTarget(plan) || resolved.resolvedTargets.isEmpty == false {
+                if let handled = executeComposable(candidate: candidate, resolved: resolved, plan: plan, provider: provider, now: now, decision: decision) {
+                    return handled
+                }
+            }
             if let handled = executeHomeAdapter(validationOutcome, provider: provider, now: now, decision: decision) {
                 return handled
             }
@@ -3001,6 +3084,19 @@ struct MarinaQueryExecutor {
                 return false
             }
         }
+    }
+
+    private func shouldPreferComposableWorkspaceExecution(
+        candidate: MarinaQueryPlanCandidate,
+        resolved: MarinaResolvedQueryCandidate,
+        plan: MarinaAggregationPlan
+    ) -> Bool {
+        guard hasExecutableTarget(plan) || resolved.resolvedTargets.isEmpty == false else { return false }
+        if candidate.operation == .rank || plan.operation == .rank { return true }
+        if candidate.operation == .listRows || plan.operation == .listRows { return true }
+        if candidate.grouping?.dimension == .transaction || plan.grouping?.dimension == .transaction { return true }
+        if candidate.ranking?.direction == .largest || plan.ranking?.direction == .largest { return true }
+        return false
     }
 
     private func noDataIfNeeded(_ result: MarinaAggregationResult) -> MarinaAggregationResult {

@@ -19,10 +19,7 @@ struct MarinaUITestDriver {
         app.launchArguments = [
             "-uiTesting",
             "-uiTestingReset",
-            "-uiTestingMarinaHarness",
-            MarinaRuntimeLaunchArgument.sharedPipelineEnabled,
-            MarinaRuntimeLaunchArgument.nlqDisabled,
-            MarinaRuntimeLaunchArgument.aiOptInDisabled
+            "-uiTestingMarinaHarness"
         ]
         app.launchEnvironment = [
             "MARINA_UI_TRACE_OUTPUT_PATH": traceOutputURL.path,
@@ -124,6 +121,10 @@ struct MarinaUITestDriver {
 
     func clarificationChipTitles() -> [String] {
         titles(forIdentifierPrefix: "marina.clarificationChip.")
+    }
+
+    func foundationModelToggle() -> XCUIElement {
+        app.buttons["marina.foundationModelToggle"].firstMatch
     }
 
     private func promptField() -> XCUIElement {
@@ -397,12 +398,6 @@ struct MarinaUITestDriver {
         }
         return predicate()
     }
-}
-
-enum MarinaRuntimeLaunchArgument {
-    static let sharedPipelineEnabled = "debug_marina_shared_pipeline_enabled"
-    static let nlqDisabled = "debug_marina_nlq_v1_enabled=false"
-    static let aiOptInDisabled = "marina_ai_opt_in_enabled=false"
 }
 
 struct MarinaPromptExpectation {

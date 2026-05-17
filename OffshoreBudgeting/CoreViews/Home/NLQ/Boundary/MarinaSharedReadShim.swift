@@ -26,10 +26,10 @@ struct MarinaSharedReadShim {
 
     init(
         coordinator: MarinaSharedPipelineCoordinator? = nil,
-        classifier: MarinaPromptTurnClassifier = MarinaPromptTurnClassifier()
+        classifier: MarinaPromptTurnClassifier? = nil
     ) {
         self.coordinator = coordinator ?? MarinaSharedPipelineCoordinator()
-        self.classifier = classifier
+        self.classifier = classifier ?? MarinaPromptTurnClassifier()
     }
 
     func run(
