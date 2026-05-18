@@ -1885,6 +1885,7 @@ struct MarinaSharedPipelineCoordinator {
         let normalizedPrompt = Self.normalized(prompt)
         let comparisonFollowUps: Set<String> = [
             "compare to last month",
+            "compare this to last month",
             "compare it to last month",
             "compare that to last month",
             "how about last month",

@@ -14,7 +14,9 @@ struct MarinaWorkspaceAggregationExecutor {
         now: Date = Date()
     ) -> MarinaWorkspaceAggregationExecutionResult {
         switch (plan.operation, plan.measure, plan.grouping?.dimension) {
-        case (.sum, .income, nil), (.sum, .income, .incomeSource):
+        case (.sum, .income, .incomeSource):
+            return .handled(incomeBySource(plan: plan, provider: provider, now: now))
+        case (.sum, .income, nil):
             return .handled(incomeSummary(plan: plan, provider: provider, now: now))
         case (.listRows, .income, nil), (.listRows, .income, .incomeSource):
             return .handled(incomeRows(plan: plan, provider: provider, now: now))
@@ -22,7 +24,7 @@ struct MarinaWorkspaceAggregationExecutor {
             return .handled(topIncomeSources(plan: plan, provider: provider, now: now))
         case (.compare, .income, nil), (.compare, .income, .incomeSource):
             return .handled(incomeComparison(plan: plan, provider: provider, now: now))
-        case (.rank, .presetAmount, .transaction):
+        case (.rank, .presetAmount, .transaction), (.listRows, .presetAmount, .transaction):
             return .handled(upcomingPlannedExpenses(plan: plan, provider: provider, now: now))
         case (.rank, .presetAmount, .preset):
             return .handled(highestCostPresets(plan: plan, provider: provider))
@@ -30,10 +32,11 @@ struct MarinaWorkspaceAggregationExecutor {
             return .handled(plannedExpensesByCategory(plan: plan, provider: provider, now: now))
         case (.sum, .presetAmount, .card), (.rank, .presetAmount, .card):
             return .handled(plannedExpensesByCard(plan: plan, provider: provider, now: now))
-        case (.rank, .savingsMovement, .savingsLedgerEntry):
+        case (.rank, .savingsMovement, .savingsLedgerEntry), (.listRows, .savingsMovement, .savingsLedgerEntry):
             return .handled(largestSavingsMovements(plan: plan, provider: provider, now: now))
         case (.rank, .reconciliationBalance, .allocationAccount),
-             (.sum, .reconciliationBalance, .allocationAccount):
+             (.sum, .reconciliationBalance, .allocationAccount),
+             (.listRows, .reconciliationBalance, .allocationAccount):
             return .handled(sharedBalances(plan: plan, provider: provider))
         default:
             return .unsupported
@@ -129,6 +132,29 @@ struct MarinaWorkspaceAggregationExecutor {
         )
     }
 
+    private func incomeBySource(
+        plan: MarinaAggregationPlan,
+        provider: MarinaDataProvider,
+        now: Date
+    ) -> MarinaWorkspaceAggregationCard {
+        let range = plan.dateRange ?? monthRange(containing: now)
+        let actual = provider.fetchAllIncomes().filter {
+            $0.isPlanned == false && $0.date >= range.startDate && $0.date <= range.endDate
+        }
+        let sources = Array(totalsByIncomeSource(actual).prefix(limit(for: plan)))
+        let total = sources.reduce(0.0) { $0 + $1.total }
+
+        return MarinaWorkspaceAggregationCard(
+            title: "Income by Source",
+            subtitle: rangeLabel(range),
+            primaryValue: currency(total),
+            rows: sources.map {
+                .init(label: $0.source, value: currency($0.total), amount: $0.total, sortValue: $0.total)
+            },
+            traceSummary: "workspaceAggregation=incomeBySource,resultCount=\(sources.count),total=\(total)"
+        )
+    }
+
     private func incomeComparison(
         plan: MarinaAggregationPlan,
         provider: MarinaDataProvider,
@@ -161,9 +187,14 @@ struct MarinaWorkspaceAggregationExecutor {
         now: Date
     ) -> MarinaWorkspaceAggregationCard {
         let range = plan.dateRange ?? nextDaysRange(from: now, days: 30)
+        let newestFirst = plan.operation == .listRows || plan.ranking?.direction == .newest
         let rows = provider.fetchAllPlannedExpenses()
             .filter { $0.expenseDate >= range.startDate && $0.expenseDate <= range.endDate }
             .sorted { lhs, rhs in
+                if newestFirst {
+                    if lhs.expenseDate == rhs.expenseDate { return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending }
+                    return lhs.expenseDate < rhs.expenseDate
+                }
                 let lhsAmount = lhs.effectiveAmount()
                 let rhsAmount = rhs.effectiveAmount()
                 if lhsAmount == rhsAmount { return lhs.expenseDate < rhs.expenseDate }
@@ -183,7 +214,7 @@ struct MarinaWorkspaceAggregationExecutor {
             }
 
         return MarinaWorkspaceAggregationCard(
-            title: "Upcoming Bills",
+            title: newestFirst ? "Planned Expenses Due" : "Upcoming Bills",
             subtitle: rangeLabel(range),
             primaryValue: rows.first?.value,
             rows: Array(rows),
@@ -291,9 +322,16 @@ struct MarinaWorkspaceAggregationExecutor {
         now: Date
     ) -> MarinaWorkspaceAggregationCard {
         let range = plan.dateRange ?? monthRange(containing: now)
+        let activityList = plan.operation == .listRows || plan.ranking?.direction == .newest
         let rows = provider.fetchAllSavingsLedgerEntries()
             .filter { $0.date >= range.startDate && $0.date <= range.endDate }
-            .sorted { abs($0.amount) > abs($1.amount) }
+            .sorted { lhs, rhs in
+                if activityList {
+                    if lhs.date == rhs.date { return lhs.note.localizedCaseInsensitiveCompare(rhs.note) == .orderedAscending }
+                    return lhs.date > rhs.date
+                }
+                return abs(lhs.amount) > abs(rhs.amount)
+            }
             .prefix(limit(for: plan))
             .map { entry in
                 MarinaWorkspaceAggregationCard.Row(
@@ -308,7 +346,7 @@ struct MarinaWorkspaceAggregationExecutor {
             }
 
         return MarinaWorkspaceAggregationCard(
-            title: "Largest Savings Movements",
+            title: activityList ? "Savings Activity" : "Largest Savings Movements",
             subtitle: rangeLabel(range),
             primaryValue: rows.first?.value,
             rows: Array(rows),
@@ -320,8 +358,13 @@ struct MarinaWorkspaceAggregationExecutor {
         plan: MarinaAggregationPlan,
         provider: MarinaDataProvider
     ) -> MarinaWorkspaceAggregationCard {
+        let accountTargets = plan.targets.filter { $0.entityType == .allocationAccount }
         let rows = provider.fetchAllAllocationAccounts()
             .filter { $0.isArchived == false }
+            .filter { account in
+                accountTargets.isEmpty
+                    || accountTargets.contains { $0.sourceID == account.id || $0.displayName.localizedCaseInsensitiveCompare(account.name) == .orderedSame }
+            }
             .map { account in
                 (account: account, balance: AllocationLedgerService.balance(for: account))
             }

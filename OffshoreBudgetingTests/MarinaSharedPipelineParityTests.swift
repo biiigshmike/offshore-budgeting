@@ -513,6 +513,45 @@ struct MarinaSharedPipelineParityTests {
         }
     }
 
+    @Test func parity_followUpCompareThisToLastMonthUsesPriorTopCategory() async throws {
+        let fixture = try makeFixture()
+        try fixture.seedSpendData()
+        try fixture.seedComparisonData()
+
+        let priorRange = HomeQueryDateRange(startDate: date(2026, 5, 1), endDate: date(2026, 5, 31))
+        let prior = MarinaPriorQueryContext(
+            lastQueryPlan: HomeQueryPlan(metric: .topCategories, dateRange: priorRange, resultLimit: 1, confidenceBand: .high, targetName: "Groceries", targetTypeRaw: "category", periodUnit: .month),
+            lastMetric: .topCategories,
+            lastTargetName: "Groceries",
+            lastTargetType: .category,
+            lastDateRange: priorRange,
+            lastResultLimit: 1,
+            lastPeriodUnit: .month
+        )
+
+        let result = await MarinaSharedPipelineCoordinator().run(
+            prompt: "Compare this to last month",
+            context: sharedContext(
+                fixture: fixture,
+                turnClassification: .followUp,
+                priorQueryContext: prior
+            )
+        )
+
+        guard case .handled(let answer, let aggregationResult, let homeQueryPlan, let trace) = result else {
+            Issue.record("Expected follow-up comparison to use prior top category: \(result.trace.compactSummary)")
+            return
+        }
+        assertSharedTrace(trace, prompt: "Compare this to last month")
+        #expect(homeQueryPlan?.metric == .categoryMonthComparison)
+        #expect(homeQueryPlan?.targetName == "Groceries")
+        #expect(answer.kind == .comparison)
+        guard case .comparison = aggregationResult else {
+            Issue.record("Expected comparison aggregation for follow-up.")
+            return
+        }
+    }
+
     @Test func parity_largestTransactionsStaySharedPathWithoutLegacyFallback() async throws {
         let fixture = try makeFixture()
         try fixture.seedSpendData()

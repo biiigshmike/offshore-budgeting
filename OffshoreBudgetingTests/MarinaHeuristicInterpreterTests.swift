@@ -49,6 +49,7 @@ struct MarinaHeuristicInterpreterTests {
             "Compare groceries this month to last month.",
             "Top categories this month.",
             "Top merchants this month.",
+            "Which merchants do I spend the most at?",
             "Largest purchases this month.",
             "What percent of my spending was groceries this month?"
         ]
@@ -121,7 +122,7 @@ struct MarinaHeuristicInterpreterTests {
             ("What is my planned income this month?", .sum, .income, nil),
             ("What is my income so far this month?", .sum, .income, nil),
             ("What paid me the most this month?", .rank, .income, .incomeSource),
-            ("Show income by source.", .rank, .income, .incomeSource),
+            ("Show income by source.", .sum, .income, .incomeSource),
             ("Compare income this month to last month.", .compare, .income, nil),
             ("What are my biggest upcoming bills?", .rank, .presetAmount, .transaction),
             ("Which presets cost the most?", .rank, .presetAmount, .preset),
@@ -153,6 +154,12 @@ struct MarinaHeuristicInterpreterTests {
             ("What was my average weekly Shopping spending over the last 3 months?", .average, .spend, .week, nil),
             ("Which expenses made this month higher than last month?", .compare, .spend, .transaction, .largest),
             ("How much did Roommate spend on Food & Drink?", .sum, .spend, nil, nil),
+            ("What planned expenses are due this month?", .rank, .presetAmount, .transaction, .newest),
+            ("Which categories are over budget?", .rank, .remainingBudget, .category, .largest),
+            ("What is my Roommate balance?", .rank, .reconciliationBalance, .allocationAccount, .largest),
+            ("Which expenses are split with Roommate?", .rank, .reconciliationBalance, .allocationAccount, .newest),
+            ("Show allocations this month.", .rank, .reconciliationBalance, .allocationAccount, .newest),
+            ("What settlements happened this month?", .rank, .reconciliationBalance, .allocationAccount, .newest),
             ("If I spend $50 on Groceries, how will that affect my budget?", .simulate, .remainingBudget, nil, nil)
         ]
 

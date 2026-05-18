@@ -5801,7 +5801,7 @@ struct HomeAssistantPanelView: View {
     }
 
     private func handleSuggestionTap(_ suggestion: HomeAssistantSuggestion) {
-        if let choice = sharedPipelineClarificationChoicesByTitle[suggestion.title],
+        if let choice = sharedPipelineClarificationChoice(matching: suggestion.title),
            let clarification = sharedPipelineClarification ?? sharedPipelineClarificationChoiceContext {
             Task {
                 MarinaTraceRecorder.shared.recordDebugMarker("clarification_chip_tapped:title=\(suggestion.title)")
@@ -6047,17 +6047,11 @@ struct HomeAssistantPanelView: View {
         source: HomeAssistantPlanResolutionSource
     ) async {
         let actionable = clarification.isActionable(for: rawPrompt)
+        let actionableChoices = clarification.actionableChoices(for: rawPrompt)
         sharedPipelineClarification = actionable ? clarification : nil
         sharedPipelineClarificationChoiceContext = actionable ? clarification : nil
-        sharedPipelineClarificationChoicesByTitle = actionable
-            ? Dictionary(
-                clarification.actionableChoices.map {
-                    (sharedPipelineChoiceTitle($0), $0)
-                },
-                uniquingKeysWith: { first, _ in first }
-            )
-            : [:]
-        clarificationSuggestions = actionable ? clarification.actionableChoices.map { choice in
+        sharedPipelineClarificationChoicesByTitle = actionable ? sharedPipelineChoiceLookup(for: actionableChoices) : [:]
+        clarificationSuggestions = actionable ? actionableChoices.map { choice in
             HomeAssistantSuggestion(
                 title: sharedPipelineChoiceTitle(choice),
                 query: HomeQuery(intent: .spendThisMonth)
@@ -6075,17 +6069,27 @@ struct HomeAssistantPanelView: View {
             plan: nil,
             notes: "shared_pipeline_clarification"
         )
+        let baseAnswer = actionable || actionableChoices.isEmpty == false
+            ? answer
+            : HomeAnswer(
+                queryID: UUID(),
+                kind: .message,
+                userPrompt: rawPrompt,
+                title: "Try a more specific prompt",
+                subtitle: "I could not turn that into a safe clarification choice. Try asking for a total, a list, or a named object, like \"How much did I spend on Groceries?\"",
+                rows: []
+            )
         let surfaced = await surfaceGeneratedPresentation(
-            generationBaseAnswer: answer,
+            generationBaseAnswer: baseAnswer,
             fallbackApplication: MarinaResponseSurfaceApplication(
-                answer: answer,
+                answer: baseAnswer,
                 followUpSuggestions: []
             ),
             rawPrompt: rawPrompt,
             source: source,
             homeQueryPlan: nil,
             validationOutcomeSummary: "clarification:\(clarification.kind.rawValue)",
-            clarificationChoices: clarification.actionableChoices.map(sharedPipelineChoiceTitle)
+            clarificationChoices: actionableChoices.map(sharedPipelineChoiceTitle)
         )
         appendAnswer(surfaced.answer)
     }
@@ -6183,11 +6187,84 @@ struct HomeAssistantPanelView: View {
         return "\(choice.title) (\(type.rawValue))"
     }
 
+    private func sharedPipelineClarificationChoice(matching rawTitle: String) -> MarinaClarificationChoice? {
+        sharedPipelineClarificationChoicesByTitle[sharedPipelineChoiceLookupKey(rawTitle)]
+            ?? sharedPipelineClarificationChoicesByTitle[rawTitle]
+    }
+
+    private func sharedPipelineChoiceLookup(for choices: [MarinaClarificationChoice]) -> [String: MarinaClarificationChoice] {
+        var buckets: [String: [MarinaClarificationChoice]] = [:]
+        for choice in choices {
+            for key in sharedPipelineChoiceLookupKeys(for: choice) {
+                buckets[key, default: []].append(choice)
+            }
+        }
+        var lookup: [String: MarinaClarificationChoice] = [:]
+        for (key, choices) in buckets where choices.count == 1 {
+            lookup[key] = choices[0]
+        }
+        return lookup
+    }
+
+    private func sharedPipelineChoiceLookupKeys(for choice: MarinaClarificationChoice) -> Set<String> {
+        var keys: Set<String> = [
+            sharedPipelineChoiceTitle(choice),
+            choice.title
+        ]
+        if let rawValue = choice.rawValue {
+            keys.insert(rawValue)
+        }
+        if let type = choice.entityTypeHint {
+            keys.insert(type.rawValue)
+            keys.insert("\(choice.title) \(type.rawValue)")
+            keys.insert("\(choice.title) (\(type.rawValue))")
+            for alias in sharedPipelineChoiceTypeAliases(for: type) {
+                keys.insert(alias)
+                keys.insert("\(choice.title) \(alias)")
+                keys.insert("\(choice.title) (\(alias))")
+            }
+        }
+        return Set(keys.map(sharedPipelineChoiceLookupKey).filter { $0.isEmpty == false })
+    }
+
+    private func sharedPipelineChoiceTypeAliases(for type: MarinaCandidateEntityTypeHint) -> [String] {
+        switch type {
+        case .category:
+            return ["category"]
+        case .card:
+            return ["card"]
+        case .merchant:
+            return ["merchant", "expense description", "description"]
+        case .expense, .transaction:
+            return ["expense", "transaction", "purchase"]
+        case .budget:
+            return ["budget"]
+        case .preset:
+            return ["preset"]
+        case .incomeSource:
+            return ["income source"]
+        case .allocationAccount:
+            return ["reconciliation", "reconciliation account", "shared balance"]
+        case .savingsAccount:
+            return ["savings", "savings account"]
+        case .workspace:
+            return ["workspace"]
+        }
+    }
+
+    private func sharedPipelineChoiceLookupKey(_ value: String) -> String {
+        normalizedPrompt(value)
+    }
+
     private func sharedPipelineTypedChoice(
         from prompt: String,
         clarification: MarinaTypedClarification
     ) -> MarinaClarificationChoice {
-        MarinaClarificationChoice(
+        if let choice = sharedPipelineClarificationChoice(matching: prompt)
+            ?? sharedPipelineChoiceLookup(for: clarification.actionableChoices)[sharedPipelineChoiceLookupKey(prompt)] {
+            return choice
+        }
+        return MarinaClarificationChoice(
             title: prompt,
             entityRole: clarification.choices.first?.entityRole,
             entityTypeHint: clarification.choices.first?.entityTypeHint,
@@ -6858,13 +6935,16 @@ struct HomeAssistantPanelView: View {
         presentedAnswer: HomeAnswer,
         userPrompt: String?
     ) {
+        let inferredTargetType = targetType(for: query.intent.metric)
+        let inferredTargetName = query.targetName
+            ?? inferredTargetName(for: query.intent.metric, rawAnswer: rawAnswer)
         let context = HomeAssistantAnswerContext(
             query: query,
             answerTitle: presentedAnswer.title,
             answerKind: rawAnswer.kind,
             userPrompt: userPrompt,
-            targetName: query.targetName,
-            targetType: targetType(for: query.intent.metric),
+            targetName: inferredTargetName,
+            targetType: inferredTargetType,
             rowTitles: Array(rawAnswer.rows.prefix(5).map(\.title)),
             rowValues: Array(rawAnswer.rows.prefix(5).map(\.value)),
             scenarioPercent: extractedPercentValue(from: rawAnswer.subtitle ?? userPrompt ?? ""),
@@ -6878,9 +6958,18 @@ struct HomeAssistantPanelView: View {
         }
     }
 
+    private func inferredTargetName(for metric: HomeQueryMetric, rawAnswer: HomeAnswer) -> String? {
+        switch metric {
+        case .topCategories, .topMerchants, .cardVariableSpendingHabits, .topCardChanges:
+            return rawAnswer.rows.first?.title
+        default:
+            return nil
+        }
+    }
+
     private func targetType(for metric: HomeQueryMetric) -> HomeAssistantAnswerTargetType? {
         switch metric {
-        case .categorySpendTotal, .categorySpendShare, .categorySpendShareTrend, .categoryPotentialSavings, .categoryReallocationGuidance, .categoryMonthComparison:
+        case .categorySpendTotal, .topCategories, .categorySpendShare, .categorySpendShareTrend, .categoryPotentialSavings, .categoryReallocationGuidance, .categoryMonthComparison, .topCategoryChanges:
             return .category
         case .cardSpendTotal, .cardVariableSpendingHabits, .cardMonthComparison, .cardSnapshotSummary, .topCardChanges:
             return .card

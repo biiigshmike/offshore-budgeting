@@ -79,6 +79,8 @@ struct MarinaPromptTurnClassifier {
             "same with ",
             "and ",
             "also ",
+            "compare to ",
+            "compare this to ",
             "compare that",
             "compare it",
             "what if "

@@ -167,6 +167,8 @@ struct MarinaSharedPipelineRuntimeGateTests {
         #expect(classifier.classify("What did I spend last month?", defaultPeriodUnit: .month) == .freshQuestion)
         #expect(classifier.classify("What did I spend this week?", defaultPeriodUnit: .month) == .freshQuestion)
         #expect(classifier.classify("what about last month?", defaultPeriodUnit: .month) == .followUp)
+        #expect(classifier.classify("Compare to last month", defaultPeriodUnit: .month) == .followUp)
+        #expect(classifier.classify("Compare this to last month", defaultPeriodUnit: .month) == .followUp)
         #expect(classifier.classify("Groceries", defaultPeriodUnit: .month, hasActiveClarification: true) == .clarificationAnswer)
         #expect(classifier.classify("add expense $12 coffee on Apple Card", defaultPeriodUnit: .month) == .command)
     }

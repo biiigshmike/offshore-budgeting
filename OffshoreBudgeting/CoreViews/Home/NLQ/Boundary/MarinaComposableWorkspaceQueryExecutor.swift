@@ -63,6 +63,20 @@ struct MarinaComposableWorkspaceQueryExecutor {
             return simulate(candidate: candidate, resolved: resolved, plan: plan, provider: provider, now: now)
         }
 
+        let normalizedPrompt = normalized(candidate.rawPrompt)
+        if isBudgetListForPeriodPrompt(normalizedPrompt) {
+            return .handled(budgetsOverlappingRange(plan: plan, provider: provider, now: now))
+        }
+        if isOverBudgetCategoriesPrompt(normalizedPrompt) {
+            return .handled(overBudgetCategories(plan: plan, provider: provider, now: now, amountBasis: amountBasis))
+        }
+        if isAllocationListPrompt(normalizedPrompt) {
+            return .handled(allocationRows(resolved: resolved, plan: plan, provider: provider, now: now))
+        }
+        if isSettlementListPrompt(normalizedPrompt) {
+            return .handled(settlementRows(resolved: resolved, plan: plan, provider: provider, now: now))
+        }
+
         if let budget = resolvedBudgetTarget(in: resolved, candidate: candidate, provider: provider, now: now),
            let detail = candidate.semanticCommand?.requestedDetail,
            isBudgetRelationshipDetail(detail) {
@@ -74,7 +88,7 @@ struct MarinaComposableWorkspaceQueryExecutor {
             return .handled(budgetLinkedSummary(budget: budget, plan: plan, provider: provider))
         }
 
-        if hasAllocationAccountTarget(plan) {
+        if hasAllocationAccountTarget(plan), plan.measure != .reconciliationBalance {
             return allocatedSpend(resolved: resolved, plan: plan, provider: provider, now: now)
         }
 
@@ -114,6 +128,39 @@ struct MarinaComposableWorkspaceQueryExecutor {
     }
 
     // MARK: - Budgets
+
+    private func budgetsOverlappingRange(
+        plan: MarinaAggregationPlan,
+        provider: MarinaDataProvider,
+        now: Date
+    ) -> MarinaWorkspaceAggregationCard {
+        let range = plan.dateRange ?? monthRange(containing: now)
+        let rows = provider.fetchAllBudgets()
+            .filter { $0.startDate <= range.endDate && $0.endDate >= range.startDate }
+            .sorted { lhs, rhs in
+                if lhs.startDate == rhs.startDate { return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending }
+                return lhs.startDate < rhs.startDate
+            }
+            .prefix(limit(for: plan))
+            .map { budget in
+                MarinaWorkspaceAggregationCard.Row(
+                    label: budget.name,
+                    value: "\(shortDate(budget.startDate))-\(shortDate(budget.endDate))",
+                    date: budget.startDate,
+                    objectType: .budget,
+                    sourceID: budget.id,
+                    sortValue: budget.startDate.timeIntervalSince1970
+                )
+            }
+
+        return MarinaWorkspaceAggregationCard(
+            title: "Budgets",
+            subtitle: rangeLabel(range),
+            primaryValue: rows.first?.label,
+            rows: Array(rows),
+            traceSummary: "composableWorkspace=budgetsOverlappingRange,resultCount=\(rows.count)"
+        )
+    }
 
     private func budgetLinkedSummary(
         budget: Budget,
@@ -172,6 +219,46 @@ struct MarinaComposableWorkspaceQueryExecutor {
             primaryValue: currency(total),
             rows: rows,
             traceSummary: "composableWorkspace=budgetLinkedSummary,linkedCards=\(linkedCardIDs.count),linkedPresets=\(linkedPresetIDs.count),total=\(total)"
+        )
+    }
+
+    private func overBudgetCategories(
+        plan: MarinaAggregationPlan,
+        provider: MarinaDataProvider,
+        now: Date,
+        amountBasis: MarinaFinancialAmountBasis
+    ) -> MarinaWorkspaceAggregationCard {
+        let range = plan.dateRange ?? monthRange(containing: now)
+        let budget = activeBudget(provider: provider, now: now, range: range)
+        let rows = spendingRows(provider: provider, range: range, amountBasis: amountBasis)
+        let spendByCategory = groupedTotals(rows, by: \.categoryName)
+        let limitRows = (budget?.categoryLimits ?? [])
+            .compactMap { limit -> MarinaWorkspaceAggregationCard.Row? in
+                guard let category = limit.category,
+                      let maxAmount = limit.maxAmount else {
+                    return nil
+                }
+                let spend = spendByCategory[category.name, default: 0]
+                let over = spend - maxAmount
+                guard over > 0 else { return nil }
+                return MarinaWorkspaceAggregationCard.Row(
+                    label: category.name,
+                    value: "\(currency(spend)) spent • \(currency(over)) over \(currency(maxAmount))",
+                    amount: over,
+                    objectType: .category,
+                    sourceID: category.id,
+                    sortValue: over
+                )
+            }
+            .sorted { ($0.sortValue ?? 0) > ($1.sortValue ?? 0) }
+            .prefix(limit(for: plan))
+
+        return MarinaWorkspaceAggregationCard(
+            title: "Categories Over Budget",
+            subtitle: budget.map { "\($0.name) • \(rangeLabel(range))" } ?? rangeLabel(range),
+            primaryValue: limitRows.first?.value,
+            rows: Array(limitRows),
+            traceSummary: "composableWorkspace=overBudgetCategories,resultCount=\(limitRows.count)"
         )
     }
 
@@ -633,6 +720,86 @@ struct MarinaComposableWorkspaceQueryExecutor {
         )
     }
 
+    private func allocationRows(
+        resolved: MarinaResolvedQueryCandidate,
+        plan: MarinaAggregationPlan,
+        provider: MarinaDataProvider,
+        now: Date
+    ) -> MarinaWorkspaceAggregationCard {
+        let range = plan.dateRange ?? monthRange(containing: now)
+        let accountFilters = resolved.resolvedTargets.filter { $0.entityType == .allocationAccount }
+        let rows = provider.fetchAllExpenseAllocations()
+            .filter { allocation in
+                accountFilters.isEmpty
+                    || accountFilters.contains { $0.sourceID == allocation.account?.id || $0.displayName.localizedCaseInsensitiveCompare(allocation.account?.name ?? "") == .orderedSame }
+            }
+            .compactMap { allocation -> MarinaWorkspaceAggregationCard.Row? in
+                let linkedDate = allocation.expense?.transactionDate ?? allocation.plannedExpense?.expenseDate ?? allocation.createdAt
+                guard contains(linkedDate, in: range) else { return nil }
+                let title = allocation.expense?.descriptionText ?? allocation.plannedExpense?.title ?? "Allocation"
+                let accountName = allocation.account?.name ?? "Reconciliation"
+                return MarinaWorkspaceAggregationCard.Row(
+                    label: title,
+                    value: "\(currency(allocation.allocatedAmount)) • \(accountName) • \(shortDate(linkedDate))",
+                    amount: allocation.allocatedAmount,
+                    date: linkedDate,
+                    objectType: .expenseAllocation,
+                    sourceID: allocation.id,
+                    sortValue: linkedDate.timeIntervalSince1970
+                )
+            }
+            .sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
+            .prefix(limit(for: plan))
+
+        return MarinaWorkspaceAggregationCard(
+            title: "Allocations",
+            subtitle: rangeLabel(range),
+            primaryValue: rows.first?.value,
+            rows: Array(rows),
+            traceSummary: "composableWorkspace=allocationRows,resultCount=\(rows.count)"
+        )
+    }
+
+    private func settlementRows(
+        resolved: MarinaResolvedQueryCandidate,
+        plan: MarinaAggregationPlan,
+        provider: MarinaDataProvider,
+        now: Date
+    ) -> MarinaWorkspaceAggregationCard {
+        let range = plan.dateRange ?? monthRange(containing: now)
+        let accountFilters = resolved.resolvedTargets.filter { $0.entityType == .allocationAccount }
+        let rows = provider.fetchAllAllocationSettlements()
+            .filter { settlement in
+                contains(settlement.date, in: range)
+                    && (accountFilters.isEmpty
+                        || accountFilters.contains { $0.sourceID == settlement.account?.id || $0.displayName.localizedCaseInsensitiveCompare(settlement.account?.name ?? "") == .orderedSame })
+            }
+            .sorted { lhs, rhs in
+                if lhs.date == rhs.date { return lhs.note.localizedCaseInsensitiveCompare(rhs.note) == .orderedAscending }
+                return lhs.date > rhs.date
+            }
+            .prefix(limit(for: plan))
+            .map { settlement in
+                MarinaWorkspaceAggregationCard.Row(
+                    label: settlement.note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Settlement" : settlement.note,
+                    value: "\(currency(settlement.amount)) • \(settlement.account?.name ?? "Reconciliation") • \(shortDate(settlement.date))",
+                    amount: settlement.amount,
+                    date: settlement.date,
+                    objectType: .reconciliationItem,
+                    sourceID: settlement.id,
+                    sortValue: settlement.date.timeIntervalSince1970
+                )
+            }
+
+        return MarinaWorkspaceAggregationCard(
+            title: "Settlements",
+            subtitle: rangeLabel(range),
+            primaryValue: rows.first?.value,
+            rows: Array(rows),
+            traceSummary: "composableWorkspace=settlementRows,resultCount=\(rows.count)"
+        )
+    }
+
     // MARK: - Simulation
 
     private func simulate(
@@ -771,6 +938,26 @@ struct MarinaComposableWorkspaceQueryExecutor {
 
     private func hasAllocationAccountTarget(_ plan: MarinaAggregationPlan) -> Bool {
         plan.targets.contains { $0.entityType == .allocationAccount }
+    }
+
+    private func isBudgetListForPeriodPrompt(_ prompt: String) -> Bool {
+        (prompt.contains("budget") || prompt.contains("budgets"))
+            && (prompt.contains("do i have") || prompt.contains("have this") || prompt.contains("have in"))
+    }
+
+    private func isOverBudgetCategoriesPrompt(_ prompt: String) -> Bool {
+        prompt.contains("over budget")
+            && (prompt.contains("category") || prompt.contains("categories"))
+    }
+
+    private func isAllocationListPrompt(_ prompt: String) -> Bool {
+        prompt.contains("allocation")
+            || prompt.contains("allocations")
+            || (prompt.contains("expenses") && prompt.contains("split with"))
+    }
+
+    private func isSettlementListPrompt(_ prompt: String) -> Bool {
+        prompt.contains("settlement") || prompt.contains("settlements")
     }
 
     private func resolvedBudgetTarget(

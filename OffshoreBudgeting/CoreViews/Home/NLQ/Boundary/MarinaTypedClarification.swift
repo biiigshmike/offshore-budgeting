@@ -92,6 +92,29 @@ extension MarinaClarificationChoice {
         }
     }
 
+    func isActionableChoice(for prompt: String) -> Bool {
+        if isFullPromptEchoWithoutStableIdentity(of: prompt) {
+            return false
+        }
+        if entityTypeHint != nil || sourceID != nil || patchSlot != nil || mentionID != nil {
+            return true
+        }
+        return isEcho(of: prompt) == false
+    }
+
+    private func isFullPromptEchoWithoutStableIdentity(of prompt: String) -> Bool {
+        let prompt = Self.normalized(prompt)
+        guard prompt.isEmpty == false,
+              sourceID == nil,
+              mentionID == nil else {
+            return false
+        }
+        return [title, rawValue]
+            .compactMap { $0 }
+            .map(Self.normalized)
+            .contains(prompt)
+    }
+
     nonisolated private static func normalized(_ value: String) -> String {
         value
             .lowercased()
@@ -103,12 +126,13 @@ extension MarinaClarificationChoice {
 
 extension MarinaTypedClarification {
     func isActionable(for originalPrompt: String) -> Bool {
+        let choices = actionableChoices(for: originalPrompt)
         switch kind {
         case .missingTarget:
-            if choices.count == 1, choices[0].isEcho(of: originalPrompt) {
-                return false
+            if choices.isEmpty == false {
+                return true
             }
-            return choices.isEmpty == false || patchSlot != nil || pendingSemanticQuery != nil
+            return self.choices.isEmpty && (patchSlot != nil || pendingSemanticQuery != nil)
         case .ambiguousTarget, .ambiguousDateRange:
             return choices.count > 1
         case .missingDateRange:
@@ -118,9 +142,13 @@ extension MarinaTypedClarification {
         }
     }
 
+    func actionableChoices(for originalPrompt: String) -> [MarinaClarificationChoice] {
+        choices.filter { $0.isActionableChoice(for: originalPrompt) }
+    }
+
     var actionableChoices: [MarinaClarificationChoice] {
         guard let prompt = candidate?.rawPrompt else { return choices }
-        return choices.filter { $0.isEcho(of: prompt) == false }
+        return actionableChoices(for: prompt)
     }
 }
 

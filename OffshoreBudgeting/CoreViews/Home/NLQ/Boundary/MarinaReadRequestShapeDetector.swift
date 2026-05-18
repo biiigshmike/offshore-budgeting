@@ -16,6 +16,17 @@ struct MarinaReadRequestShapeDetector {
         }
 
         if isBudgetList(normalizedPrompt) {
+            if isPeriodScopedBudgetList(normalizedPrompt) {
+                return MarinaQueryPlanCandidate(
+                    source: .heuristic,
+                    rawPrompt: prompt,
+                    operation: .lookupDetails,
+                    measure: .remainingBudget,
+                    timeScopes: dateScopes(prompt: prompt, defaultPeriodUnit: defaultPeriodUnit),
+                    responseShapeHint: .rankedList,
+                    confidence: .high
+                )
+            }
             return lookup(prompt: prompt, searchText: "", objectTypes: [.budget], requestedDetail: .general, limit: 10)
         }
 
@@ -63,6 +74,21 @@ struct MarinaReadRequestShapeDetector {
                 budgetName: budgetName,
                 defaultPeriodUnit: defaultPeriodUnit,
                 requestedDetail: .linkedObjects
+            )
+        }
+
+        if isOverBudgetCategoryList(normalizedPrompt) {
+            return MarinaQueryPlanCandidate(
+                source: .heuristic,
+                rawPrompt: prompt,
+                operation: .rank,
+                measure: .remainingBudget,
+                timeScopes: dateScopes(prompt: prompt, defaultPeriodUnit: defaultPeriodUnit),
+                grouping: MarinaGroupingCandidate(dimension: .category),
+                ranking: MarinaRankingCandidate(direction: .largest, limit: 10),
+                limit: 10,
+                responseShapeHint: .rankedList,
+                confidence: .high
             )
         }
 
@@ -303,6 +329,18 @@ struct MarinaReadRequestShapeDetector {
             && (prompt.contains("budgets do i have")
                 || prompt.contains("show budgets")
                 || prompt.contains("list budgets"))
+    }
+
+    private func isPeriodScopedBudgetList(_ prompt: String) -> Bool {
+        prompt.contains("this month")
+            || prompt.contains("this week")
+            || prompt.contains("today")
+            || prompt.range(of: #"\bin\s+[a-z]+\b"#, options: .regularExpression) != nil
+    }
+
+    private func isOverBudgetCategoryList(_ prompt: String) -> Bool {
+        prompt.contains("over budget")
+            && (prompt.contains("category") || prompt.contains("categories"))
     }
 
     private func isActiveBudgetLookup(_ prompt: String) -> Bool {

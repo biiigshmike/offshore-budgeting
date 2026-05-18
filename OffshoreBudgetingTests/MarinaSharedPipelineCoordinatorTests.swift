@@ -839,9 +839,6 @@ struct MarinaSharedPipelineCoordinatorTests {
             choices: [
                 MarinaClarificationChoice(
                     title: prompt,
-                    entityRole: .filter,
-                    entityTypeHint: .merchant,
-                    patchSlot: .target,
                     rawValue: prompt
                 )
             ]
@@ -849,6 +846,45 @@ struct MarinaSharedPipelineCoordinatorTests {
 
         #expect(clarification.isActionable(for: prompt) == false)
         #expect(clarification.actionableChoices.isEmpty)
+    }
+
+    @Test func coordinator_typedClarificationKeepsTypedChoiceThatOverlapsPrompt() {
+        let prompt = "Show Groceries"
+        let clarification = MarinaTypedClarification(
+            kind: .ambiguousTarget,
+            message: "Which Groceries?",
+            candidate: MarinaQueryPlanCandidate(source: .heuristic, rawPrompt: prompt),
+            pendingSemanticQuery: MarinaSemanticQuery(
+                subject: .variableExpenses,
+                operation: .list,
+                filters: [],
+                amountField: .spendingAmount
+            ),
+            patchSlot: .target,
+            choices: [
+                MarinaClarificationChoice(
+                    title: "Groceries",
+                    entityRole: .filter,
+                    entityTypeHint: .category,
+                    patchSlot: .target,
+                    rawValue: "Groceries",
+                    sourceID: UUID()
+                ),
+                MarinaClarificationChoice(
+                    title: "Groceries",
+                    subtitle: "May 12 • $42.00 • Apple",
+                    entityRole: .filter,
+                    entityTypeHint: .expense,
+                    patchSlot: .target,
+                    rawValue: "Groceries",
+                    sourceID: UUID()
+                )
+            ]
+        )
+
+        #expect(clarification.isActionable(for: prompt))
+        #expect(clarification.actionableChoices(for: prompt).count == 2)
+        #expect(clarification.actionableChoices(for: prompt).contains { $0.entityTypeHint == MarinaCandidateEntityTypeHint.category })
     }
 
     @Test func coordinator_modelSelectedWhenOptedInAvailableAndExecutable() async throws {

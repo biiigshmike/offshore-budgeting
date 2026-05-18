@@ -475,6 +475,38 @@ struct MarinaSemanticPipelineRealAppTests {
         #expect(renderedText(handled.aggregationResult).contains("$9,999.00") == false)
     }
 
+    @Test func semanticPipeline_userReportedUnsupportedWorkspacePromptsAreHandled() async throws {
+        let fixture = try MarinaRealisticWorkspaceFixture.make()
+        fixture.groceryBudgetLimit.maxAmount = 50
+        try fixture.context.save()
+
+        let cases: [(prompt: String, expectedFragments: [String])] = [
+            ("What budgets do I have this month?", ["Budgets", "May Budget"]),
+            ("Which presets are linked to May Budget?", ["Presets linked", "Rent"]),
+            ("Which categories are over budget?", ["Categories Over Budget", "Groceries"]),
+            ("What planned expenses are due this month?", ["Planned Expenses Due", "Rent"]),
+            ("Show income by source.", ["Income by Source", "Salary"]),
+            ("How much do I have in savings?", ["Savings"]),
+            ("Show savings activity this month.", ["Savings Activity", "Manual savings transfer"]),
+            ("What is my Roommate balance?", ["Shared Balances", "Roommate", "$10.00"]),
+            ("Which expenses are split with Roommate?", ["Allocations", "Cafe", "Roommate"]),
+            ("Show allocations this month.", ["Allocations", "Cafe", "$30.00"]),
+            ("What settlements happened this month?", ["Settlements", "Roommate paid back", "$20.00"]),
+            ("Which merchants do I spend the most at?", ["Top Merchants"])
+        ]
+
+        for testCase in cases {
+            let result = await fixture.run(testCase.prompt)
+            let handled = try requireHandled(result)
+            let text = renderedText(handled.aggregationResult)
+            #expect(handled.trace.selectedPath != .sharedAttemptedThenLegacyFallback)
+            #expect(text.localizedCaseInsensitiveContains("unsupported") == false)
+            for fragment in testCase.expectedFragments {
+                #expect(text.localizedCaseInsensitiveContains(fragment), "Expected \(testCase.prompt) to include \(fragment). Text: \(text)")
+            }
+        }
+    }
+
     @Test func semanticPipeline_budgetImpactSimulationIncludesCategoryLimitWithoutFallback() async throws {
         let fixture = try MarinaRealisticWorkspaceFixture.make()
         let result = await fixture.run("If I spend $80 on Groceries this month, how will that affect my budget?")
