@@ -17,63 +17,64 @@ struct MarinaNLQCandidateExtractor {
                 target: normalizedTarget,
                 displayValue: category.name,
                 targetType: .category,
-                sourceID: category.id
+                sourceID: category.id,
+                clarificationSubtitle: "category"
             ) {
                 collected.append(match)
             }
         }
 
         for card in provider.fetchAllCards() {
-            if let match = matchCandidate(target: normalizedTarget, displayValue: card.name, targetType: .card, sourceID: card.id) {
+            if let match = matchCandidate(target: normalizedTarget, displayValue: card.name, targetType: .card, sourceID: card.id, clarificationSubtitle: "card") {
                 collected.append(match)
             }
         }
 
         for budget in provider.fetchAllBudgets() {
-            if let match = matchCandidate(target: normalizedTarget, displayValue: budget.name, targetType: .budget, sourceID: budget.id) {
+            if let match = matchCandidate(target: normalizedTarget, displayValue: budget.name, targetType: .budget, sourceID: budget.id, clarificationSubtitle: "budget") {
                 collected.append(match)
             }
         }
 
         for preset in provider.fetchAllPresets() {
-            if let match = matchCandidate(target: normalizedTarget, displayValue: preset.title, targetType: .preset, sourceID: preset.id) {
+            if let match = matchCandidate(target: normalizedTarget, displayValue: preset.title, targetType: .preset, sourceID: preset.id, clarificationSubtitle: "preset") {
                 collected.append(match)
             }
         }
 
         for income in provider.fetchAllIncomes() {
-            if let match = matchCandidate(target: normalizedTarget, displayValue: income.source, targetType: .incomeSource, sourceID: income.id) {
+            if let match = matchCandidate(target: normalizedTarget, displayValue: income.source, targetType: .incomeSource, sourceID: income.id, clarificationSubtitle: incomeSubtitle(income)) {
                 collected.append(match)
             }
         }
 
         for account in provider.fetchAllAllocationAccounts() {
-            if let match = matchCandidate(target: normalizedTarget, displayValue: account.name, targetType: .allocationAccount, sourceID: account.id) {
+            if let match = matchCandidate(target: normalizedTarget, displayValue: account.name, targetType: .allocationAccount, sourceID: account.id, clarificationSubtitle: "reconciliation account") {
                 collected.append(match)
             }
         }
 
         for account in provider.fetchAllSavingsAccounts() {
-            if let match = matchCandidate(target: normalizedTarget, displayValue: account.name, targetType: .savingsAccount, sourceID: account.id) {
+            if let match = matchCandidate(target: normalizedTarget, displayValue: account.name, targetType: .savingsAccount, sourceID: account.id, clarificationSubtitle: "savings account") {
                 collected.append(match)
             }
         }
 
         let expenses = provider.fetchAllExpenses()
         for expense in expenses.planned {
-            if let match = matchCandidate(target: normalizedTarget, displayValue: expense.title, targetType: .expense, sourceID: expense.id) {
+            if let match = matchCandidate(target: normalizedTarget, displayValue: expense.title, targetType: .expense, sourceID: expense.id, clarificationSubtitle: plannedExpenseSubtitle(expense)) {
                 collected.append(match)
             }
         }
 
         for expense in expenses.variable {
-            if let expenseMatch = matchCandidate(target: normalizedTarget, displayValue: expense.descriptionText, targetType: .expense, sourceID: expense.id) {
+            if let expenseMatch = matchCandidate(target: normalizedTarget, displayValue: expense.descriptionText, targetType: .expense, sourceID: expense.id, clarificationSubtitle: variableExpenseSubtitle(expense)) {
                 collected.append(expenseMatch)
             }
 
             let merchantName = MerchantNormalizer.displayName(expense.descriptionText)
             if shouldOfferMerchantCandidate(merchantName),
-               let merchantMatch = matchCandidate(target: normalizedTarget, displayValue: merchantName, targetType: .merchant, sourceID: expense.id) {
+               let merchantMatch = matchCandidate(target: normalizedTarget, displayValue: merchantName, targetType: .merchant, sourceID: expense.id, clarificationSubtitle: "expense description") {
                 collected.append(merchantMatch)
             }
         }
@@ -112,7 +113,8 @@ struct MarinaNLQCandidateExtractor {
         target: String,
         displayValue: String,
         targetType: MarinaNLQTargetType,
-        sourceID: UUID
+        sourceID: UUID,
+        clarificationSubtitle: String? = nil
     ) -> MarinaNLQCandidateMatch? {
         let normalizedCandidate = normalize(displayValue)
         guard normalizedCandidate.isEmpty == false else { return nil }
@@ -123,7 +125,8 @@ struct MarinaNLQCandidateExtractor {
                 displayValue: displayValue,
                 normalizedValue: normalizedCandidate,
                 matchType: .exact,
-                sourceID: sourceID
+                sourceID: sourceID,
+                clarificationSubtitle: clarificationSubtitle
             )
         }
 
@@ -133,7 +136,8 @@ struct MarinaNLQCandidateExtractor {
                 displayValue: displayValue,
                 normalizedValue: normalizedCandidate,
                 matchType: .prefix,
-                sourceID: sourceID
+                sourceID: sourceID,
+                clarificationSubtitle: clarificationSubtitle
             )
         }
 
@@ -143,7 +147,8 @@ struct MarinaNLQCandidateExtractor {
                 displayValue: displayValue,
                 normalizedValue: normalizedCandidate,
                 matchType: .prefix,
-                sourceID: sourceID
+                sourceID: sourceID,
+                clarificationSubtitle: clarificationSubtitle
             )
         }
 
@@ -176,5 +181,44 @@ struct MarinaNLQCandidateExtractor {
             "pharmacy", "restaurant", "shop", "store", "supermarket"
         ]
         return tokens.contains { merchantIndicators.contains($0) }
+    }
+
+    private func variableExpenseSubtitle(_ expense: VariableExpense) -> String {
+        compactSubtitle([
+            "expense",
+            formatDate(expense.transactionDate),
+            CurrencyFormatter.string(from: expense.ledgerDisplayAmount()),
+            expense.card?.name
+        ])
+    }
+
+    private func plannedExpenseSubtitle(_ expense: PlannedExpense) -> String {
+        let amount = expense.actualAmount > 0 ? expense.actualAmount : expense.plannedAmount
+        return compactSubtitle([
+            "planned expense",
+            formatDate(expense.expenseDate),
+            CurrencyFormatter.string(from: amount),
+            expense.card?.name
+        ])
+    }
+
+    private func incomeSubtitle(_ income: Income) -> String {
+        compactSubtitle([
+            income.isPlanned ? "planned income" : "income",
+            formatDate(income.date),
+            CurrencyFormatter.string(from: income.amount)
+        ])
+    }
+
+    private func compactSubtitle(_ parts: [String?]) -> String {
+        parts.compactMap { part in
+            let trimmed = part?.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed?.isEmpty == false ? trimmed : nil
+        }
+        .joined(separator: " • ")
+    }
+
+    private func formatDate(_ date: Date) -> String {
+        date.formatted(.dateTime.month(.abbreviated).day().year())
     }
 }

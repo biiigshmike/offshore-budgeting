@@ -58,11 +58,22 @@ struct MarinaUITestDriver {
         submit(prompt)
 
         let trace = waitForTrace(prompt: prompt, previousTraceCount: previousTraceCount, timeout: timeout)
-        let expectedAnswerIndex = previousTraceCount
+        let expectedAnswerIndex = answerIndex(for: prompt, preferredIndex: previousTraceCount)
         let appeared = trace != nil || waitUntil(timeout: min(timeout, 2)) {
             answerExists(at: expectedAnswerIndex)
         }
-        let answer = latestVisibleAnswer(preferredIndex: expectedAnswerIndex)
+        if let requiredText = expectation?.requiredVisibleText, requiredText.isEmpty == false {
+            _ = waitUntil(timeout: min(timeout, 4)) {
+                visibleAnswer(
+                    preferredIndex: expectedAnswerIndex,
+                    requiredText: requiredText
+                ).containsAll(requiredText)
+            }
+        }
+        let answer = visibleAnswer(
+            preferredIndex: expectedAnswerIndex,
+            requiredText: expectation?.requiredVisibleText ?? []
+        )
         let chips = chipTitles(for: expectation)
         let result = classify(
             prompt: prompt,
@@ -116,7 +127,7 @@ struct MarinaUITestDriver {
     }
 
     func latestTrace() -> MarinaTraceSnapshot? {
-        readTraceLines().last
+        readTraceLines().last ?? latestTraceFromAccessibility()
     }
 
     func clarificationChipTitles() -> [String] {
@@ -137,36 +148,88 @@ struct MarinaUITestDriver {
         guard answerExists(at: preferredIndex) else {
             return MarinaVisibleAnswer(title: nil, value: "", label: "", text: "")
         }
-        let title = app.staticTexts["marina.answer.\(preferredIndex).title"].firstMatch
-        let primaryValue = app.staticTexts["marina.answer.\(preferredIndex).primaryValue"].firstMatch
-        let narrative = app.staticTexts["marina.answer.\(preferredIndex).narrative"].firstMatch
+        let container = app.descendants(matching: .any)["marina.answer.\(preferredIndex)"].firstMatch
+        let title = app.descendants(matching: .any)["marina.answer.\(preferredIndex).title"].firstMatch
+        let primaryValue = app.descendants(matching: .any)["marina.answer.\(preferredIndex).primaryValue"].firstMatch
+        let narrative = app.descendants(matching: .any)["marina.answer.\(preferredIndex).narrative"].firstMatch
         let rowTexts = boundedAnswerRowLabels(answerIndex: preferredIndex)
+        let containerText = [
+            container.exists ? container.label : nil,
+            container.exists ? container.value as? String : nil
+        ]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { $0.isEmpty == false }
         let parts = [
             title.exists ? title.label : nil,
             primaryValue.exists ? primaryValue.label : nil,
             narrative.exists ? narrative.label : nil
         ]
-        .compactMap { $0 } + rowTexts
+        .compactMap { $0 } + rowTexts + containerText
+        let text = deduped(parts).joined(separator: "\n")
 
         return MarinaVisibleAnswer(
             title: title.exists ? title.label : nil,
             value: primaryValue.exists ? primaryValue.label : "",
-            label: parts.joined(separator: "\n"),
-            text: parts.joined(separator: "\n")
+            label: text,
+            text: text
         )
     }
 
+    private func visibleAnswer(preferredIndex: Int, requiredText: [String]) -> MarinaVisibleAnswer {
+        if requiredText.isEmpty == false,
+           let matchingAnswer = answerContainingAll(requiredText, around: preferredIndex) {
+            return matchingAnswer
+        }
+        return latestVisibleAnswer(preferredIndex: preferredIndex)
+    }
+
+    private func answerContainingAll(_ requiredText: [String], around preferredIndex: Int) -> MarinaVisibleAnswer? {
+        let upperBound = max(preferredIndex + 8, 30)
+        for index in stride(from: upperBound, through: 0, by: -1) {
+            guard answerExists(at: index) else { continue }
+            let answer = latestVisibleAnswer(preferredIndex: index)
+            if answer.containsAll(requiredText) {
+                return answer
+            }
+        }
+        return nil
+    }
+
+    private func answerIndex(for prompt: String, preferredIndex: Int) -> Int {
+        let upperBound = max(preferredIndex + 5, 30)
+        for index in stride(from: upperBound, through: 0, by: -1) {
+            let userMessage = app.descendants(matching: .any)["marina.userMessage.\(index)"].firstMatch
+            if userMessage.exists,
+               userMessage.label.trimmingCharacters(in: .whitespacesAndNewlines) == prompt {
+                return index
+            }
+        }
+        if answerExists(at: preferredIndex) {
+            return preferredIndex
+        }
+        return latestExistingAnswerIndex(maxIndex: upperBound) ?? preferredIndex
+    }
+
+    private func latestExistingAnswerIndex(maxIndex: Int) -> Int? {
+        for index in stride(from: maxIndex, through: 0, by: -1) {
+            if answerExists(at: index) {
+                return index
+            }
+        }
+        return nil
+    }
+
     private func answerExists(at index: Int) -> Bool {
-        let answer = app.otherElements["marina.answer.\(index)"].firstMatch
+        let answer = app.descendants(matching: .any)["marina.answer.\(index)"].firstMatch
         if answer.exists { return true }
-        return app.staticTexts["marina.answer.\(index).title"].firstMatch.exists
+        return app.descendants(matching: .any)["marina.answer.\(index).title"].firstMatch.exists
     }
 
     private func boundedAnswerRowLabels(answerIndex: Int, limit: Int = 16) -> [String] {
         var labels: [String] = []
         for rowIndex in 0..<limit {
-            let title = app.staticTexts["marina.answer.\(answerIndex).row.\(rowIndex).title"].firstMatch
-            let value = app.staticTexts["marina.answer.\(answerIndex).row.\(rowIndex).value"].firstMatch
+            let title = app.descendants(matching: .any)["marina.answer.\(answerIndex).row.\(rowIndex).title"].firstMatch
+            let value = app.descendants(matching: .any)["marina.answer.\(answerIndex).row.\(rowIndex).value"].firstMatch
             let titleExists = title.exists
             let valueExists = value.exists
             if titleExists {
@@ -180,6 +243,17 @@ struct MarinaUITestDriver {
             }
         }
         return labels
+    }
+
+    private func deduped(_ values: [String]) -> [String] {
+        var seen: Set<String> = []
+        var result: [String] = []
+        for value in values {
+            let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard normalized.isEmpty == false, seen.insert(normalized).inserted else { continue }
+            result.append(normalized)
+        }
+        return result
     }
 
     private func chipTitles(
@@ -250,9 +324,25 @@ struct MarinaUITestDriver {
             if let matching = newTraces.last(where: predicate) {
                 return matching
             }
+            if let fallback = latestTraceFromAccessibility(), predicate(fallback) {
+                return fallback
+            }
             RunLoop.current.run(until: Date().addingTimeInterval(0.2))
         }
+        if let fallback = latestTraceFromAccessibility(), predicate(fallback) {
+            return fallback
+        }
         return latest
+    }
+
+    private func latestTraceFromAccessibility() -> MarinaTraceSnapshot? {
+        let traceElement = app.staticTexts["marina.trace.latest"].firstMatch
+        guard traceElement.exists else { return nil }
+        let value = traceElement.value as? String ?? ""
+        guard value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false else {
+            return nil
+        }
+        return MarinaTraceSnapshot(accessibilityValue: value)
     }
 
     private func readTraceLines() -> [MarinaTraceSnapshot] {

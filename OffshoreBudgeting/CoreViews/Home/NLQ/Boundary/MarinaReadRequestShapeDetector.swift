@@ -126,6 +126,31 @@ struct MarinaReadRequestShapeDetector {
             )
         }
 
+        if let targetName = listExpensesTarget(in: normalizedPrompt) {
+            return MarinaQueryPlanCandidate(
+                source: .heuristic,
+                rawPrompt: prompt,
+                operation: .listRows,
+                measure: .transactionAmount,
+                entityMentions: [
+                    MarinaUnresolvedEntityMention(
+                        role: .filter,
+                        rawText: targetName,
+                        typeHint: nil,
+                        allowedTypeHints: [.category, .merchant, .expense],
+                        confidence: .medium
+                    )
+                ],
+                timeScopes: dateScopes(prompt: prompt, defaultPeriodUnit: defaultPeriodUnit),
+                grouping: MarinaGroupingCandidate(dimension: .transaction),
+                ranking: MarinaRankingCandidate(direction: .newest, limit: explicitLimit(in: normalizedPrompt) ?? 10),
+                limit: explicitLimit(in: normalizedPrompt) ?? 10,
+                responseShapeHint: .rankedList,
+                confidence: .medium,
+                requestShape: .ledgerRowList
+            )
+        }
+
         if let cardName = spendCard(in: normalizedPrompt) {
             return MarinaQueryPlanCandidate(
                 source: .heuristic,
@@ -382,10 +407,39 @@ struct MarinaReadRequestShapeDetector {
         return firstCapture(
             in: prompt,
             patterns: [
+                #"\b(?:list|show)\s+(?:the\s+)?last\s+(?:[0-9]+|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:expense|expenses|transaction|transactions|purchase|purchases)\s+on\s+(?:my\s+)?(.+?\s+card)\b"#,
                 #"\b(?:list|show)(?:\s+my)?\s+expenses\s+on\s+(.+?\s+card)\b"#,
                 #"\b(?:list|show)(?:\s+my)?\s+(.+?\s+card)\s+expenses\b"#
             ]
         ).map(cleanObjectName)
+    }
+
+    private func listExpensesTarget(in prompt: String) -> String? {
+        guard (prompt.hasPrefix("list ") || prompt.hasPrefix("show ")),
+              prompt.contains("expense"),
+              prompt.contains("planned expense") == false,
+              prompt.contains("by category") == false else { return nil }
+        let target = firstCapture(
+            in: prompt,
+            patterns: [
+                #"\b(?:list|show)\s+(?:the\s+)?last\s+(?:[0-9]+|one|two|three|four|five|six|seven|eight|nine|ten)\s+(.+?)\s+(?:expense|expenses|transaction|transactions|purchase|purchases)\b"#,
+                #"\b(?:list|show)(?:\s+my)?\s+(.+?)\s+(?:expense|expenses|transaction|transactions|purchase|purchases)\b"#
+            ]
+        )
+        .map(cleanObjectName)?
+        .replacingOccurrences(
+            of: #"^(?:my\s+)?last\s+(?:[0-9]+|one|two|three|four|five|six|seven|eight|nine|ten)\s*"#,
+            with: "",
+            options: [.regularExpression, .caseInsensitive]
+        )
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard let target,
+              target.isEmpty == false,
+              target.localizedCaseInsensitiveCompare("last") != .orderedSame else {
+            return nil
+        }
+        return target
     }
 
     private func isIncomeRowList(_ prompt: String) -> Bool {
@@ -403,6 +457,7 @@ struct MarinaReadRequestShapeDetector {
         return firstCapture(
             in: prompt,
             patterns: [
+                #"\b(?:what\s+was\s+)?(?:my\s+)?(.+?\s+card)\s+spend(?:\s+this|\s+last|\s+in\b|$)"#,
                 #"\bspend\s+on\s+(.+?\s+card)(?:\s+this|\s+last|\s+in\b|$)"#,
                 #"\bspent\s+on\s+(.+?\s+card)(?:\s+this|\s+last|\s+in\b|$)"#
             ]
@@ -509,7 +564,8 @@ struct MarinaReadRequestShapeDetector {
     }
 
     private func dateScopes(prompt: String, defaultPeriodUnit: HomeQueryPeriodUnit) -> [MarinaUnresolvedTimeScope] {
-        guard let range = parser.parseDateRange(prompt, defaultPeriodUnit: defaultPeriodUnit) else { return [] }
+        guard let range = explicitSingleDayRange(in: prompt)
+            ?? parser.parseDateRange(prompt, defaultPeriodUnit: defaultPeriodUnit) else { return [] }
         return [
             MarinaUnresolvedTimeScope(
                 role: .primary,
@@ -518,6 +574,25 @@ struct MarinaReadRequestShapeDetector {
                 periodUnitHint: defaultPeriodUnit
             )
         ]
+    }
+
+    private func explicitSingleDayRange(in prompt: String) -> HomeQueryDateRange? {
+        let normalizedPrompt = normalized(prompt)
+        guard let rawDate = firstCapture(
+            in: normalizedPrompt,
+            patterns: [
+                #"\bon\s+((?:jan|january|feb|february|mar|march|apr|april|may|jun|june|jul|july|aug|august|sep|sept|september|oct|october|nov|november|dec|december)\s+\d{1,2}(?:\s+\d{4})?)\b"#,
+                #"\bon\s+(\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?)\b"#
+            ]
+        ) else {
+            return nil
+        }
+        let resolver = MarinaDateResolver(calendar: Calendar(identifier: .gregorian))
+        guard let date = resolver.resolveSingleDate(rawDate) else { return nil }
+        let calendar = Calendar(identifier: .gregorian)
+        let start = calendar.startOfDay(for: date)
+        let end = calendar.date(byAdding: DateComponents(day: 1, second: -1), to: start) ?? start
+        return HomeQueryDateRange(startDate: start, endDate: end)
     }
 
     private func explicitLimit(in prompt: String) -> Int? {

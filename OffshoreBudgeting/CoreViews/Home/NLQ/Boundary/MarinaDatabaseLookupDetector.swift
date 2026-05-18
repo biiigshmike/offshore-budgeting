@@ -27,7 +27,7 @@ struct MarinaDatabaseLookupDetector {
             searchText: searchText,
             objectTypes: objectTypes,
             dateRange: dateRange,
-            limit: requestedDetail == .date ? 1 : 5,
+            limit: requestedDetail == .date && normalizedPrompt.hasPrefix("when was ") ? 5 : (requestedDetail == .date ? 1 : 5),
             requestedDetail: requestedDetail
         ).clamped
     }
@@ -57,11 +57,15 @@ struct MarinaDatabaseLookupDetector {
         if analyticsRankingCues.contains(where: { normalizedPrompt.contains($0) }) {
             return false
         }
+        if isLedgerRowListPrompt(normalizedPrompt) {
+            return false
+        }
 
         let prefixes = [
             "find ", "find my ", "find the ",
             "look up ", "lookup ",
             "show me ", "show me my ", "show my ", "show the ",
+            "show ",
             "open ",
             "tell me about ",
             "what is "
@@ -82,6 +86,7 @@ struct MarinaDatabaseLookupDetector {
             "when did i get ",
             "what card did i use for ",
             "what category was ",
+            "when was ",
             "how much was ",
             "what did "
         ]
@@ -98,6 +103,9 @@ struct MarinaDatabaseLookupDetector {
 
     private func requestedDetail(from normalizedPrompt: String) -> MarinaDatabaseLookupRequest.RequestedDetail {
         if normalizedPrompt.hasPrefix("when did ") {
+            return .date
+        }
+        if normalizedPrompt.hasPrefix("when was ") {
             return .date
         }
         if normalizedPrompt.hasPrefix("what card ") {
@@ -132,6 +140,7 @@ struct MarinaDatabaseLookupDetector {
             || normalizedPrompt.contains("buy ")
             || normalizedPrompt.contains("order")
             || normalizedPrompt.hasPrefix("when did i get ")
+            || normalizedPrompt.hasPrefix("when was ")
             || [.date, .amount, .card, .category].contains(requestedDetail) {
             return [.variableExpense, .plannedExpense]
         }
@@ -172,6 +181,7 @@ struct MarinaDatabaseLookupDetector {
         let caseInsensitivePrefixes = [
             "when did i last purchase ", "when did i last buy ", "when did i last order ", "when did i last get ",
             "when did i purchase ", "when did i buy ", "when did i order ", "when did i get ",
+            "when was ",
             "what card did i use for ",
             "what category was ",
             "how much was ",
@@ -179,6 +189,7 @@ struct MarinaDatabaseLookupDetector {
             "tell me about ",
             "look up ", "lookup ",
             "show me my ", "show me the ", "show me ", "show my ", "show the ",
+            "show ",
             "find my ", "find the ", "find ",
             "open ",
             "what is ", "where is "
@@ -199,6 +210,16 @@ struct MarinaDatabaseLookupDetector {
         text = stripLeadingFiller(from: text)
         text = stripTrailingTypeClue(from: text)
         return text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func isLedgerRowListPrompt(_ normalizedPrompt: String) -> Bool {
+        let rowListPatterns = [
+            #"^(?:list|show)\s+(?:my\s+)?(?:last\s+)?(?:\d+\s+)?(?:expenses|transactions|purchases)\b"#,
+            #"^(?:list|show)\s+(?:income|savings\s+activity)\b"#
+        ]
+        return rowListPatterns.contains { pattern in
+            normalizedPrompt.range(of: pattern, options: .regularExpression) != nil
+        }
     }
 
     private func removeDateTail(from text: String) -> String {

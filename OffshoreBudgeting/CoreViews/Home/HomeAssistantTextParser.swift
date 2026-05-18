@@ -494,6 +494,7 @@ struct HomeAssistantTextParser {
             || text.contains("where am i spending the most")
             || text.contains("where do i spend most")
             || text.contains("where do i spend the most")
+            || text.contains("where did my money go")
             || text.contains("where s my money going")
             || text.contains("where is my money going")
             || (text.contains("where") && containsAny(text, keywords: ["spend most", "spending most", "most spending"])) {

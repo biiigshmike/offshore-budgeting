@@ -353,6 +353,23 @@ struct MarinaNLQCandidateMatch: Equatable {
     let normalizedValue: String
     let matchType: MarinaNLQMatchType
     let sourceID: UUID
+    let clarificationSubtitle: String?
+
+    init(
+        entityType: MarinaNLQTargetType,
+        displayValue: String,
+        normalizedValue: String,
+        matchType: MarinaNLQMatchType,
+        sourceID: UUID,
+        clarificationSubtitle: String? = nil
+    ) {
+        self.entityType = entityType
+        self.displayValue = displayValue
+        self.normalizedValue = normalizedValue
+        self.matchType = matchType
+        self.sourceID = sourceID
+        self.clarificationSubtitle = clarificationSubtitle
+    }
 }
 
 struct MarinaNLQTargetExtractionResult: Equatable {

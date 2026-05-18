@@ -106,7 +106,11 @@ struct MarinaQueryResolver {
                 mention: mention
             )
 
-            switch representativeMatches(from: matches, mention: mention) {
+            switch representativeMatches(
+                from: matches,
+                mention: mention,
+                preferExactCategoryOverExpenseDescription: candidate.operation != .lookupDetails
+            ) {
             case .none:
                 unresolvedMentions.append(mention)
             case .one(let match):
@@ -127,7 +131,7 @@ struct MarinaQueryResolver {
                         choices: sortedClarificationChoices(matches.map { match in
                             MarinaClarificationChoice(
                                 title: match.displayValue,
-                                subtitle: match.entityType.rawValue,
+                                subtitle: match.clarificationSubtitle ?? match.entityType.rawValue,
                                 entityRole: mention.role,
                                 entityTypeHint: candidateType(from: match.entityType),
                                 patchSlot: .target,
@@ -222,7 +226,11 @@ struct MarinaQueryResolver {
                 mention: mention
             )
 
-            switch representativeMatches(from: matches, mention: mention) {
+            switch representativeMatches(
+                from: matches,
+                mention: mention,
+                preferExactCategoryOverExpenseDescription: query.operation != .lookupDetails
+            ) {
             case .none:
                 unresolvedFilters.append(filter)
             case .one(let match):
@@ -244,7 +252,7 @@ struct MarinaQueryResolver {
                         choices: sortedClarificationChoices(matches.map { match in
                             MarinaClarificationChoice(
                                 title: match.displayValue,
-                                subtitle: match.entityType.rawValue,
+                                subtitle: match.clarificationSubtitle ?? match.entityType.rawValue,
                                 entityRole: mention.role,
                                 entityTypeHint: candidateType(from: match.entityType),
                                 patchSlot: .target,
@@ -342,7 +350,8 @@ struct MarinaQueryResolver {
 
     private func representativeMatches(
         from matches: [MarinaNLQCandidateMatch],
-        mention: MarinaUnresolvedEntityMention
+        mention: MarinaUnresolvedEntityMention,
+        preferExactCategoryOverExpenseDescription: Bool
     ) -> RepresentativeMatchSet {
         guard matches.isEmpty == false else { return .none }
 
@@ -355,10 +364,16 @@ struct MarinaQueryResolver {
                 return true
             }
         }
-        let hasSingleTypeHint = mention.typeHint != nil || mention.allowedTypeHints?.count == 1
+        let hasSingleTypeHint = mention.allowedTypeHints?.count == 1
+            || (mention.allowedTypeHints == nil && mention.typeHint != nil)
+        let isExplicitMerchantCue = mention.typeHint == .merchant
+            && (mention.allowedTypeHints?.count ?? 0) > 1
         let matchEntityTypes = Set(matches.map(\.entityType))
         let exactEntityTypes = Set(exactMatches.map(\.entityType))
         let hasOnlyCategoryExactMatch = Set(storedExactMatches.map(\.entityType)) == [.category]
+        let shouldPreferExplicitMerchant = isExplicitMerchantCue
+            && exactEntityTypes.contains(.merchant)
+            && exactEntityTypes.contains(.card) == false
         let hasMerchantPrefixCollision = matchEntityTypes.contains(.merchant)
             && exactEntityTypes.contains(.merchant) == false
         let hasStoredObjectPrefixCollision = matchEntityTypes.contains { type in
@@ -376,13 +391,26 @@ struct MarinaQueryResolver {
             && hasOnlyCategoryExactMatch
             && exactEntityTypes.isSubset(of: [.category, .merchant, .expense])
             && shouldPreservePrefixCrossFamilyMatches == false
+            && shouldPreferExplicitMerchant == false
+            && preferExactCategoryOverExpenseDescription
         let shouldPreserveCrossFamilyExactMatches = hasSingleTypeHint == false
             && exactEntityTypes.count > 1
             && shouldPreferExactCategory == false
-        let preferredMatches = shouldPreserveCrossFamilyExactMatches || shouldPreservePrefixCrossFamilyMatches
-            ? matches
-            : (storedExactMatches.isEmpty == false ? storedExactMatches : matches)
-        let equivalenceCollapsed = collapseEquivalentMatches(preferredMatches)
+        let preferredMatches: [MarinaNLQCandidateMatch]
+        if shouldPreferExplicitMerchant {
+            let exactMerchantMatches = exactMatches.filter { $0.entityType == .merchant }
+            preferredMatches = exactMerchantMatches.isEmpty
+                ? matches.filter { $0.entityType == .merchant || $0.entityType == .expense }
+                : exactMerchantMatches
+        } else if shouldPreserveCrossFamilyExactMatches || shouldPreservePrefixCrossFamilyMatches {
+            preferredMatches = matches
+        } else {
+            preferredMatches = storedExactMatches.isEmpty == false ? storedExactMatches : matches
+        }
+        let equivalenceCollapsed = collapseEquivalentMatches(
+            preferredMatches,
+            preferExpenseOverMerchant: preferExactCategoryOverExpenseDescription == false
+        )
         var bestByKey: [String: MarinaNLQCandidateMatch] = [:]
         for match in equivalenceCollapsed {
             let key = canonicalIdentityKey(for: match)
@@ -439,7 +467,10 @@ struct MarinaQueryResolver {
         }
     }
 
-    private func collapseEquivalentMatches(_ matches: [MarinaNLQCandidateMatch]) -> [MarinaNLQCandidateMatch] {
+    private func collapseEquivalentMatches(
+        _ matches: [MarinaNLQCandidateMatch],
+        preferExpenseOverMerchant: Bool
+    ) -> [MarinaNLQCandidateMatch] {
         guard matches.count > 1 else { return matches }
 
         let groupedByNormalizedDisplay = Dictionary(grouping: matches, by: {
@@ -451,7 +482,11 @@ struct MarinaQueryResolver {
             let hasMerchant = bucket.contains { $0.entityType == .merchant }
             let hasExpense = bucket.contains { $0.entityType == .expense }
             if hasMerchant, hasExpense {
-                collapsed.append(contentsOf: bucket.filter { $0.entityType != .expense })
+                collapsed.append(contentsOf: bucket.filter {
+                    preferExpenseOverMerchant
+                        ? $0.entityType != .merchant
+                        : $0.entityType != .expense
+                })
             } else {
                 collapsed.append(contentsOf: bucket)
             }

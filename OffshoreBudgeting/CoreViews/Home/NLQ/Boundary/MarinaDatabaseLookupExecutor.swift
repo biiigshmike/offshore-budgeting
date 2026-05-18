@@ -41,9 +41,18 @@ struct MarinaDatabaseLookupExecutor {
             .filter { $0.1 == 100 }
             .map(\.0)
         let exactObjectTypes = Set(exactTypeMatches.map(\.objectType))
-        if request.objectTypes.contains(.unknown),
-           request.requestedDetail == .general,
-           exactObjectTypes.count > 1 {
+        if request.requestedDetail == .general,
+           exactObjectTypes.count > 1,
+           shouldClarifyBroadExactMatches(request.objectTypes) {
+            return MarinaDatabaseLookupResponse(
+                request: request,
+                results: [],
+                ambiguityChoices: Array(broadExactAmbiguityChoices(exactTypeMatches).prefix(request.limit))
+            )
+        }
+
+        if request.requestedDetail != .general,
+           exactTypeMatches.count > 1 {
             return MarinaDatabaseLookupResponse(
                 request: request,
                 results: [],
@@ -55,6 +64,62 @@ struct MarinaDatabaseLookupExecutor {
             request: request,
             results: Array(bestResults.prefix(request.limit))
         )
+    }
+
+    private func broadExactAmbiguityChoices(_ matches: [MarinaDatabaseLookupResult]) -> [MarinaDatabaseLookupResult] {
+        let rowMatches = matches
+            .filter { $0.objectType == .variableExpense || $0.objectType == .plannedExpense }
+            .sorted { lhs, rhs in
+                if lhs.objectType != rhs.objectType {
+                    return ambiguityRank(lhs.objectType) < ambiguityRank(rhs.objectType)
+                }
+                return (lhs.date ?? .distantFuture) < (rhs.date ?? .distantFuture)
+            }
+        return representativeStoredObjectMatches(matches) + rowMatches
+    }
+
+    private func representativeStoredObjectMatches(_ matches: [MarinaDatabaseLookupResult]) -> [MarinaDatabaseLookupResult] {
+        var bestByType: [MarinaLookupObjectType: MarinaDatabaseLookupResult] = [:]
+        for match in matches where match.objectType != .variableExpense && match.objectType != .plannedExpense {
+            if let existing = bestByType[match.objectType] {
+                if (match.date ?? .distantPast) > (existing.date ?? .distantPast) {
+                    bestByType[match.objectType] = match
+                }
+            } else {
+                bestByType[match.objectType] = match
+            }
+        }
+        return bestByType.values.sorted { lhs, rhs in
+            let lhsRank = ambiguityRank(lhs.objectType)
+            let rhsRank = ambiguityRank(rhs.objectType)
+            if lhsRank != rhsRank { return lhsRank < rhsRank }
+            return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
+        }
+    }
+
+    private func ambiguityRank(_ type: MarinaLookupObjectType) -> Int {
+        switch type {
+        case .category:
+            return 0
+        case .card:
+            return 1
+        case .variableExpense:
+            return 2
+        case .plannedExpense:
+            return 3
+        case .budget:
+            return 4
+        case .preset:
+            return 5
+        case .income, .incomeSeries:
+            return 6
+        case .savingsAccount, .savingsLedgerEntry:
+            return 7
+        case .reconciliationAccount, .reconciliationItem, .expenseAllocation:
+            return 8
+        case .importMerchantRule, .assistantAliasRule, .workspace, .unknown:
+            return 9
+        }
     }
 
     private func candidateResults(provider: MarinaDataProvider) -> [MarinaDatabaseLookupResult] {
@@ -402,6 +467,11 @@ struct MarinaDatabaseLookupExecutor {
             return MarinaLookupObjectType.allCases.filter { $0 != .unknown }
         }
         return objectTypes
+    }
+
+    private func shouldClarifyBroadExactMatches(_ objectTypes: [MarinaLookupObjectType]) -> Bool {
+        if objectTypes.contains(.unknown) { return true }
+        return Set(objectTypes) == Set(MarinaLookupObjectType.safeDefaultSearchTypes)
     }
 
     private func matchScore(search: String, result: MarinaDatabaseLookupResult) -> Int {

@@ -3,6 +3,7 @@ import SwiftData
 import Testing
 @testable import Offshore
 
+@Suite(.serialized)
 @MainActor
 struct MarinaSharedPipelineParityTests {
     @Test func parity_sharedReadShimHandlesProvenModelRouterReadPrompts() async throws {
@@ -308,7 +309,7 @@ struct MarinaSharedPipelineParityTests {
         let fixture = try makeFixture()
         try fixture.seedSpendData()
 
-        for prompt in ["Where is my money going?", "Show my top categories this month"] {
+        for prompt in ["Where is my money going?", "Where did my money go this month?", "Show my top categories this month"] {
             let result = await run(prompt, fixture: fixture)
             guard case .handled(let answer, let aggregationResult, let homeQueryPlan, _) = result else {
                 Issue.record("Expected ranked prompt to be handled: \(prompt)")
@@ -321,6 +322,194 @@ struct MarinaSharedPipelineParityTests {
                 continue
             }
             #expect(list.rows.isEmpty == false)
+        }
+    }
+
+    @Test func parity_userReportedReadPhrasesStayOnSharedPath() async throws {
+        let fixture = try makeFixture()
+        try fixture.seedSpendData()
+        try fixture.seedComparisonData()
+        try fixture.seedIncomeData()
+        fixture.context.insert(VariableExpense(descriptionText: "Apple Card May 12 A", amount: 12, transactionDate: date(2026, 5, 12), workspace: fixture.workspace, card: fixture.appleCard, category: fixture.groceries))
+        fixture.context.insert(VariableExpense(descriptionText: "Apple Card May 12 B", amount: 18, transactionDate: date(2026, 5, 12), workspace: fixture.workspace, card: fixture.appleCard, category: fixture.travel))
+        fixture.context.insert(VariableExpense(descriptionText: "Apple Card May 13", amount: 90, transactionDate: date(2026, 5, 13), workspace: fixture.workspace, card: fixture.appleCard, category: fixture.travel))
+        try fixture.context.save()
+
+        let metricCases: [(prompt: String, metric: HomeQueryMetric, target: String?)] = [
+            ("How much did I spend on groceries?", .categorySpendTotal, "Groceries"),
+            ("How much did I spend on groceries last month?", .categorySpendTotal, "Groceries"),
+            ("What was my Apple Card spend last month?", .cardSpendTotal, "Apple Card"),
+            ("What did groceries cost me last month?", .categorySpendTotal, "Groceries"),
+            ("What is my average actual income each month?", .incomeAverageActual, nil)
+        ]
+
+        for testCase in metricCases {
+            let result = await run(testCase.prompt, fixture: fixture)
+            guard case .handled(let answer, let aggregationResult, let homeQueryPlan, let trace) = result else {
+                Issue.record("Expected handled shared result for \(testCase.prompt): \(result.trace.compactSummary)")
+                continue
+            }
+            assertSharedTrace(trace, prompt: testCase.prompt)
+            #expect(homeQueryPlan?.metric == testCase.metric)
+            #expect(homeQueryPlan?.targetName == testCase.target)
+            #expect(answer.title != "Unsupported Marina Query")
+            switch aggregationResult {
+            case .scalar, .rankedList, .workspaceCard:
+                break
+            default:
+                Issue.record("Unexpected result shape for \(testCase.prompt): \(aggregationResult)")
+            }
+        }
+
+        for prompt in ["List the last 10 expenses on my Apple Card", "Show the last 10 expenses on my Apple Card"] {
+            let result = await run(prompt, fixture: fixture)
+            guard case .handled(_, let aggregationResult, _, let trace) = result else {
+                Issue.record("Expected handled shared expense list for \(prompt): \(result.trace.compactSummary)")
+                continue
+            }
+            assertSharedTrace(trace, prompt: prompt)
+            #expect(trace.candidateSummary?.contains("operation=listRows") == true)
+            #expect(trace.candidateSummary?.contains("limit=10") == true || trace.candidateSummary?.contains("ranking=newest:10") == true)
+            guard case .workspaceCard(let card) = aggregationResult else {
+                Issue.record("Expected workspace-card list result for \(prompt): \(aggregationResult)")
+                continue
+            }
+            #expect(card.rows.count <= 10)
+            #expect(card.rows.isEmpty == false)
+            #expect(card.rows.allSatisfy { $0.label.localizedCaseInsensitiveContains("Apple Card") || $0.value.localizedCaseInsensitiveContains("Apple Card") })
+        }
+
+        let exactDay = await run("Show Apple Card expenses on May 12, 2026", fixture: fixture)
+        guard case .handled(_, let exactDayResult, _, let exactDayTrace) = exactDay else {
+            Issue.record("Expected exact-day Apple Card expense list to be handled: \(exactDay.trace.compactSummary)")
+            return
+        }
+        assertSharedTrace(exactDayTrace, prompt: "Show Apple Card expenses on May 12, 2026")
+        guard case .workspaceCard(let exactDayCard) = exactDayResult else {
+            Issue.record("Expected exact-day expense list to use workspace card result: \(exactDayResult)")
+            return
+        }
+        #expect(exactDayCard.subtitle?.contains("May 12") == true, "Expected exact-day subtitle, got \(exactDayCard.subtitle ?? "nil")")
+        #expect(exactDayCard.subtitle?.contains("May 1-May 31") != true, "Expected exact-day subtitle instead of month range, got \(exactDayCard.subtitle ?? "nil")")
+        #expect(exactDayCard.rows.count == 2)
+        #expect(exactDayCard.rows.allSatisfy { $0.date.map { Calendar(identifier: .gregorian).component(.day, from: $0) == 12 } ?? false })
+    }
+
+    @Test func parity_questionRepertoireHandlesHybridCategoryExpenseAmbiguityPolicy() async throws {
+        let fixture = try makeFixture()
+        try fixture.seedSpendData()
+        fixture.context.insert(VariableExpense(descriptionText: "Groceries", amount: 42, transactionDate: date(2026, 5, 12), workspace: fixture.workspace, card: fixture.appleCard, category: fixture.groceries))
+        fixture.context.insert(VariableExpense(descriptionText: "Groceries", amount: 18, transactionDate: date(2026, 5, 13), workspace: fixture.workspace, card: fixture.backupCard, category: fixture.travel))
+        fixture.context.insert(VariableExpense(descriptionText: "Whole Foods Groceries", amount: 64, transactionDate: date(2026, 5, 14), workspace: fixture.workspace, card: fixture.appleCard, category: fixture.groceries))
+        fixture.context.insert(VariableExpense(descriptionText: "Starbucks", amount: 9, transactionDate: date(2026, 5, 15), workspace: fixture.workspace, card: fixture.appleCard, category: fixture.travel))
+        try fixture.context.save()
+
+        let categoryAggregate = await run("How much did I spend on Groceries?", fixture: fixture)
+        guard case .handled(_, _, let categoryPlan, let categoryTrace) = categoryAggregate else {
+            Issue.record("Expected category aggregate to execute despite same-named expenses: \(categoryAggregate.trace.compactSummary)")
+            return
+        }
+        assertSharedTrace(categoryTrace, prompt: "How much did I spend on Groceries?")
+        #expect(categoryPlan?.metric == .categorySpendTotal)
+        #expect(categoryPlan?.targetName == "Groceries")
+        #expect(categoryPlan?.targetTypeRaw == "category")
+
+        let merchantAggregate = await run("What did I spend at Groceries?", fixture: fixture)
+        guard case .handled(_, _, let merchantPlan, let merchantTrace) = merchantAggregate else {
+            Issue.record("Expected explicit merchant/description aggregate to execute: \(merchantAggregate.trace.compactSummary)")
+            return
+        }
+        assertSharedTrace(merchantTrace, prompt: "What did I spend at Groceries?")
+        #expect(merchantPlan?.metric == .merchantSpendTotal)
+        #expect(merchantPlan?.targetName == "Groceries")
+        #expect(merchantPlan?.targetTypeRaw == "merchant")
+
+        let bareLookup = await run("Show Groceries", fixture: fixture)
+        guard case .handled(let lookupAnswer, _, _, let lookupTrace) = bareLookup else {
+            Issue.record("Expected bare lookup to clarify across category and expense rows: \(bareLookup.trace.compactSummary)")
+            return
+        }
+        #expect(lookupTrace.compactSummary.contains("family=databaseLookup"))
+        #expect(lookupAnswer.title.contains("Which Groceries"))
+        #expect(lookupAnswer.rows.contains { $0.value.contains("Category") })
+        #expect(lookupAnswer.rows.contains { $0.value.contains("$42.00") && $0.value.contains("Apple Card") })
+
+    }
+
+    @Test func parity_questionRepertoireCoversBroaderReadEntitiesAndAggregations() async throws {
+        let fixture = try makeFixture()
+        try fixture.seedSpendData()
+        try fixture.seedIncomeData()
+        fixture.context.insert(VariableExpense(descriptionText: "Starbucks", amount: 9, transactionDate: date(2026, 5, 15), workspace: fixture.workspace, card: fixture.appleCard, category: fixture.travel))
+        let budget = Budget(name: "May Budget", startDate: date(2026, 5, 1), endDate: date(2026, 5, 31), workspace: fixture.workspace)
+        fixture.context.insert(budget)
+        fixture.context.insert(PlannedExpense(title: "Internet", plannedAmount: 90, expenseDate: date(2026, 5, 20), workspace: fixture.workspace, card: fixture.appleCard, category: fixture.travel))
+        fixture.context.insert(SavingsAccount(name: "True Savings", total: 500, workspace: fixture.workspace))
+        fixture.context.insert(AllocationAccount(name: "Roommate", workspace: fixture.workspace))
+        try fixture.context.save()
+
+        let cases: [(prompt: String, metric: HomeQueryMetric?)] = [
+            ("Where did my money go this month?", .topCategories),
+            ("What merchants did I spend the most at?", .topMerchants),
+            ("What is my average actual income each month?", .incomeAverageActual),
+            ("What is my safe spend today?", .safeSpendToday),
+            ("What is my next planned expense?", .nextPlannedExpense),
+            ("Show shared balances.", nil)
+        ]
+
+        for testCase in cases {
+            let result = await run(testCase.prompt, fixture: fixture)
+            guard case .handled(_, _, let plan, let trace) = result else {
+                Issue.record("Expected repertoire prompt to be handled: \(testCase.prompt), trace=\(result.trace.compactSummary)")
+                continue
+            }
+            #expect(trace.selectedPath != .sharedAttemptedThenLegacyFallback)
+            if let expectedMetric = testCase.metric {
+                #expect(plan?.metric == expectedMetric, "Unexpected metric for \(testCase.prompt): \(String(describing: plan?.metric))")
+            } else {
+                #expect(trace.executorResultSummary?.contains("workspaceAggregation=sharedBalances") == true)
+            }
+        }
+    }
+
+    @Test func parity_followUpCompareToLastMonthUsesPriorTopCategory() async throws {
+        let fixture = try makeFixture()
+        try fixture.seedSpendData()
+        try fixture.seedComparisonData()
+
+        let priorRange = HomeQueryDateRange(startDate: date(2026, 5, 1), endDate: date(2026, 5, 31))
+        let prior = MarinaPriorQueryContext(
+            lastQueryPlan: HomeQueryPlan(metric: .topCategories, dateRange: priorRange, resultLimit: 1, confidenceBand: .high, targetName: "Groceries", targetTypeRaw: "category", periodUnit: .month),
+            lastMetric: .topCategories,
+            lastTargetName: "Groceries",
+            lastTargetType: .category,
+            lastDateRange: priorRange,
+            lastResultLimit: 1,
+            lastPeriodUnit: .month
+        )
+
+        let result = await MarinaSharedPipelineCoordinator().run(
+            prompt: "Compare to last month",
+            context: sharedContext(
+                fixture: fixture,
+                turnClassification: .followUp,
+                priorQueryContext: prior
+            )
+        )
+
+        guard case .handled(let answer, let aggregationResult, let homeQueryPlan, let trace) = result else {
+            Issue.record("Expected follow-up comparison to use prior top category: \(result.trace.compactSummary)")
+            return
+        }
+        assertSharedTrace(trace, prompt: "Compare to last month")
+        #expect(trace.priorContextIncluded == true)
+        #expect(homeQueryPlan?.metric == .categoryMonthComparison)
+        #expect(homeQueryPlan?.targetName == "Groceries")
+        #expect(homeQueryPlan?.comparisonDateRange != nil)
+        #expect(answer.kind == .comparison)
+        guard case .comparison = aggregationResult else {
+            Issue.record("Expected comparison aggregation for follow-up.")
+            return
         }
     }
 

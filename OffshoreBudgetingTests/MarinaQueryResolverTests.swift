@@ -192,6 +192,92 @@ struct MarinaQueryResolverTests {
         #expect(resolved.ambiguousMentions.isEmpty)
     }
 
+    @Test func resolver_aggregateSpendPrefersExactCategoryOverSameNamedExpenseDescription() throws {
+        let fixture = try makeFixture()
+        let groceries = Category(name: "Groceries", hexColor: "#00AA00", workspace: fixture.workspace)
+        let card = Card(name: "Apple Card", workspace: fixture.workspace)
+        fixture.context.insert(groceries)
+        fixture.context.insert(card)
+        fixture.context.insert(VariableExpense(
+            descriptionText: "Groceries",
+            amount: 42,
+            transactionDate: date(2026, 5, 12),
+            workspace: fixture.workspace,
+            card: card,
+            category: groceries
+        ))
+        try fixture.context.save()
+
+        let candidate = MarinaQueryPlanCandidate(
+            source: .heuristic,
+            rawPrompt: "How much did I spend on Groceries?",
+            operation: .sum,
+            measure: .spend,
+            entityMentions: [
+                MarinaUnresolvedEntityMention(
+                    role: .primaryTarget,
+                    rawText: "Groceries",
+                    typeHint: nil,
+                    allowedTypeHints: [.category, .merchant, .expense],
+                    confidence: .high
+                )
+            ],
+            confidence: .high
+        )
+
+        let resolved = MarinaQueryResolver().resolve(candidate: candidate, provider: fixture.provider)
+
+        #expect(resolved.resolvedTargets.count == 1)
+        #expect(resolved.resolvedTargets.first?.entityType == .category)
+        #expect(resolved.resolvedTargets.first?.displayName == "Groceries")
+        #expect(resolved.ambiguousMentions.isEmpty)
+    }
+
+    @Test func resolver_lookupDetailsClarifiesExactCategoryAndExpenseDescriptionCollision() throws {
+        let fixture = try makeFixture()
+        let groceries = Category(name: "Groceries", hexColor: "#00AA00", workspace: fixture.workspace)
+        let card = Card(name: "Apple Card", workspace: fixture.workspace)
+        fixture.context.insert(groceries)
+        fixture.context.insert(card)
+        fixture.context.insert(VariableExpense(
+            descriptionText: "Groceries",
+            amount: 42,
+            transactionDate: date(2026, 5, 12),
+            workspace: fixture.workspace,
+            card: card,
+            category: groceries
+        ))
+        try fixture.context.save()
+
+        let candidate = MarinaQueryPlanCandidate(
+            source: .heuristic,
+            rawPrompt: "Show Groceries",
+            operation: .lookupDetails,
+            measure: .spend,
+            entityMentions: [
+                MarinaUnresolvedEntityMention(
+                    role: .primaryTarget,
+                    rawText: "Groceries",
+                    typeHint: nil,
+                    allowedTypeHints: [.category, .merchant, .expense],
+                    confidence: .high
+                )
+            ],
+            confidence: .high
+        )
+
+        let resolved = MarinaQueryResolver().resolve(candidate: candidate, provider: fixture.provider)
+        let choices = resolved.ambiguousMentions.first?.choices ?? []
+        let choiceTypes = choices.compactMap(\.entityTypeHint)
+
+        #expect(resolved.resolvedTargets.isEmpty)
+        #expect(resolved.ambiguousMentions.count == 1)
+        #expect(choiceTypes.contains(.category))
+        #expect(choiceTypes.contains(.expense))
+        #expect(choices.first(where: { $0.entityTypeHint == .expense })?.subtitle?.contains("$42.00") == true)
+        #expect(choices.first(where: { $0.entityTypeHint == .expense })?.subtitle?.contains("Apple Card") == true)
+    }
+
     @Test func semanticResolver_allowedTypesPreferExactCategoryOverExpensePrefixes() throws {
         let fixture = try makeFixture()
         let cannabis = Category(name: "Cannabis", hexColor: "#225522", workspace: fixture.workspace)

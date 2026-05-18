@@ -35,7 +35,10 @@ struct MarinaHeuristicInterpreter {
                 requestFamily: .databaseLookup,
                 source: .heuristic,
                 rawPrompt: prompt,
+                operation: .lookupDetails,
+                measure: .transactionAmount,
                 limit: lookupRequest.limit,
+                responseShapeHint: .summaryCard,
                 confidence: .high,
                 databaseLookupRequest: lookupRequest
             )
@@ -191,7 +194,8 @@ struct MarinaHeuristicInterpreter {
         }
 
         if shouldSuppressUnscopedRankingTarget(rawTargetText, intent: intent, operation: operation)
-            || shouldSuppressSyntheticBroadTarget(rawTargetText, intent: intent, operation: operation) {
+            || shouldSuppressSyntheticBroadTarget(rawTargetText, intent: intent, operation: operation)
+            || shouldSuppressSyntheticIncomeAverageTarget(rawTargetText, intent: intent) {
             return []
         }
 
@@ -212,9 +216,30 @@ struct MarinaHeuristicInterpreter {
                 role: entityMentionRole(from: intent),
                 rawText: cleanedRawText,
                 typeHint: typeHint,
+                allowedTypeHints: allowedTypeHints(
+                    from: intent,
+                    typeHint: typeHint,
+                    rawTargetText: cleanedRawText
+                ),
                 confidence: confidence(from: intent, protectedShape: protectedShape)
             )
         ]
+    }
+
+    private func allowedTypeHints(
+        from intent: NormalizedQueryIntent,
+        typeHint: MarinaCandidateEntityTypeHint?,
+        rawTargetText: String
+    ) -> [MarinaCandidateEntityTypeHint]? {
+        guard typeHint == .merchant,
+              hasExplicitMerchantCue(
+                normalizedPrompt: normalized(intent.rawPrompt),
+                rawTargetText: rawTargetText
+              ) else {
+            return nil
+        }
+
+        return [.merchant, .expense, .category, .card]
     }
 
     private func shouldSuppressUnscopedRankingTarget(
@@ -261,6 +286,22 @@ struct MarinaHeuristicInterpreter {
         return broadScaffoldingPrefixes.contains { prefix in
             normalizedTarget == prefix || normalizedTarget.hasPrefix(prefix + " ")
         }
+    }
+
+    private func shouldSuppressSyntheticIncomeAverageTarget(
+        _ rawTargetText: String,
+        intent: NormalizedQueryIntent
+    ) -> Bool {
+        guard intent.normalizedMetric == .incomeAverageActual
+            || intent.queryShape.measure == .incomeAverage else {
+            return false
+        }
+        let normalizedTarget = normalized(rawTargetText)
+        return normalizedTarget == normalized(intent.rawPrompt)
+            || normalizedTarget.contains("income")
+            || normalizedTarget.contains("average")
+            || normalizedTarget.contains("each month")
+            || normalizedTarget.contains("per month")
     }
 
     private func entityMentionRole(from intent: NormalizedQueryIntent) -> MarinaEntityMentionRole {
@@ -372,9 +413,15 @@ struct MarinaHeuristicInterpreter {
     private func hasExplicitMerchantCue(normalizedPrompt: String, rawTargetText: String) -> Bool {
         let normalizedTarget = normalized(rawTargetText)
         let merchantTargetTokens: Set<String> = [
-            "merchant", "store", "shop", "market", "restaurant", "cafe", "coffee", "grocery", "foods"
+            "merchant", "store", "shop", "market", "restaurant", "cafe", "coffee", "grocery", "groceries", "foods"
         ]
         if merchantTargetTokens.contains(where: { containsWholePhrase($0, in: normalizedTarget) }) {
+            return true
+        }
+        if normalizedTarget.isEmpty == false,
+           normalizedTarget.split(separator: " ").count > 1,
+           normalizedPrompt.contains(" at \(normalizedTarget)")
+            || normalizedPrompt.contains(" from \(normalizedTarget)") {
             return true
         }
         return containsWholePhrase("merchant", in: normalizedPrompt)
@@ -1335,6 +1382,7 @@ struct MarinaHeuristicInterpreter {
 
     private func isTargetedPeriodicAveragePrompt(_ prompt: String) -> Bool {
         (prompt.contains("average") || prompt.contains("normally") || prompt.contains("usually") || prompt.contains("typical"))
+            && prompt.contains("income") == false
             && (prompt.contains("weekly")
                 || prompt.contains("per week")
                 || prompt.contains("monthly")
@@ -1370,10 +1418,16 @@ struct MarinaHeuristicInterpreter {
     private func isReconciliationAllocatedSpendPrompt(_ prompt: String) -> Bool {
         prompt.hasPrefix("how much did ")
             && prompt.contains(" spend on ")
+            && prompt.hasPrefix("how much did i ") == false
+            && prompt.hasPrefix("how much did we ") == false
+            && prompt.hasPrefix("how much did my ") == false
     }
 
     private func isIncomeSummaryPrompt(_ prompt: String) -> Bool {
-        prompt.contains("income came in")
+        if prompt.contains("average") || prompt.contains("avg") || prompt.contains("mean") {
+            return false
+        }
+        return prompt.contains("income came in")
             || prompt.contains("what income")
             || prompt.contains("actual income")
             || prompt.contains("planned income")
@@ -1482,6 +1536,7 @@ struct MarinaHeuristicInterpreter {
 
     private func isBroadCategoryRankingPrompt(_ prompt: String) -> Bool {
         prompt.contains("top categories")
+            || prompt.contains("where did my money go")
             || prompt.contains("where is my money going")
             || prompt.contains("where is most of my money going")
             || prompt.contains("where did most of my money go")
@@ -1504,7 +1559,9 @@ struct MarinaHeuristicInterpreter {
     }
 
     private func isBroadMerchantRankingPrompt(_ prompt: String) -> Bool {
-        prompt.contains("what stores did i spend the most at")
+        prompt.contains("what merchants did i spend the most at")
+            || prompt.contains("which merchants did i spend the most at")
+            || prompt.contains("what stores did i spend the most at")
             || prompt.contains("which stores did i spend the most at")
             || prompt.contains("stores got the most money from me")
             || prompt.contains("who did i pay the most")
@@ -1894,6 +1951,7 @@ struct MarinaHeuristicInterpreter {
             #"^how\s+much\s+did\s+"#,
             #"^what\s+did\s+i\s+spend\s+(?:on|in)\s+"#,
             #"^what\s+have\s+i\s+spent\s+(?:on|in)\s+"#,
+            #"^what\s+did\s+"#,
             #"^spend\s+in\s+"#,
             #"^how\s+much\s+went\s+to\s+"#,
             #"^how\s+much\s+of\s+my\s+money\s+went\s+to\s+"#,

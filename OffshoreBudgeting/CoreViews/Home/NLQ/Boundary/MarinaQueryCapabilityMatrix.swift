@@ -341,7 +341,7 @@ struct MarinaQueryCapabilityMatrix {
         case .forecast:
             return measure == .savings
         case .lookupDetails:
-            return measure == .savings || measure == .presetAmount || measure == .remainingBudget
+            return measure == .transactionAmount || measure == .savings || measure == .presetAmount || measure == .remainingBudget
         case .minimum, .maximum, .trend:
             return false
         }

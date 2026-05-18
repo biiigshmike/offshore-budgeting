@@ -150,6 +150,35 @@ struct MarinaDatabaseLookupExecutorTests {
         #expect(answer.subtitle?.contains("more than one kind") == true)
     }
 
+    @Test func ambiguousLookup_defaultBroadSearchClarifiesExactCategoryAndExpenseCollision() throws {
+        let fixture = try makeLookupFixture()
+        let groceries = Category(name: "Groceries", hexColor: "#00AA00", workspace: fixture.workspace)
+        let card = Card(name: "Grocery Card", workspace: fixture.workspace)
+        fixture.context.insert(groceries)
+        fixture.context.insert(card)
+        fixture.context.insert(VariableExpense(
+            descriptionText: "Groceries",
+            amount: 42,
+            transactionDate: date(2026, 5, 12),
+            workspace: fixture.workspace,
+            card: card,
+            category: groceries
+        ))
+        try fixture.context.save()
+
+        let response = MarinaDatabaseLookupExecutor().execute(
+            request(searchText: "Groceries", objectTypes: MarinaLookupObjectType.safeDefaultSearchTypes),
+            provider: fixture.provider
+        )
+        let answer = MarinaDatabaseLookupResponseBuilder().responseCompatibleAnswer(from: response)
+
+        #expect(response.needsClarification)
+        #expect(response.ambiguityChoices.map(\.objectType).contains(.category))
+        #expect(response.ambiguityChoices.map(\.objectType).contains(.variableExpense))
+        #expect(answer.rows.contains { $0.title == "Groceries" && $0.value.contains("Category") })
+        #expect(answer.rows.contains { $0.title == "Groceries" && $0.value.contains("$42.00") && $0.value.contains("Grocery Card") })
+    }
+
     @Test func supportObjectLookup_returnsRulesAliasesSeriesAndAllocations() throws {
         let fixture = try makeLookupFixture()
 
@@ -187,6 +216,7 @@ struct MarinaDatabaseLookupExecutorTests {
 
     private struct Fixture {
         let context: ModelContext
+        let workspace: Workspace
         let provider: MarinaDataProvider
     }
 
@@ -315,6 +345,7 @@ struct MarinaDatabaseLookupExecutorTests {
 
         return Fixture(
             context: context,
+            workspace: workspace,
             provider: MarinaDataProvider(modelContext: context, workspaceID: workspace.id)
         )
     }

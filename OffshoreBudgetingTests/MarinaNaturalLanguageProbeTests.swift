@@ -75,6 +75,40 @@ struct MarinaNaturalLanguageProbeTests {
         }
     }
 
+    @Test func questionRepertoire_lockCommonReadRoutingOutcomes() async throws {
+        let fixture = try makeProbeFixture()
+        let expectations: [(prompt: String, expectedOutcome: ExpectedOutcome, metric: HomeQueryMetric?)] = [
+            ("How much did I spend on groceries?", .executable, .categorySpendTotal),
+            ("What did I spend at Starbucks?", .executable, .merchantSpendTotal),
+            ("Show Groceries expenses", .executable, nil),
+            ("Where did my money go this month?", .executable, .topCategories),
+            ("Which card did I spend the most on?", .executable, nil),
+            ("What merchants did I spend the most at?", .executable, .topMerchants),
+            ("What is my average actual income each month?", .executable, .incomeAverageActual),
+            ("What is my safe spend today?", .executable, .safeSpendToday),
+            ("What is my next planned expense?", .executable, .nextPlannedExpense),
+            ("What are my shared balances?", .executable, nil)
+        ]
+
+        for expectation in expectations {
+            let record = await runProbeCase(
+                ProbeCase(
+                    group: "Question Repertoire",
+                    prompt: expectation.prompt,
+                    expectedOutcome: expectation.expectedOutcome,
+                    expectedMetric: expectation.metric
+                ),
+                fixture: fixture
+            )
+
+            #expect(record.actualOutcome.rawValue == expectation.expectedOutcome.rawValue, "Unexpected outcome for \(expectation.prompt): \(record.consoleLine)")
+            if let metric = expectation.metric {
+                #expect(record.metric == metric.rawValue, "Unexpected metric for \(expectation.prompt): \(record.consoleLine)")
+            }
+            #expect(record.route != "legacyFallback", "Unexpected legacy fallback for \(expectation.prompt): \(record.consoleLine)")
+        }
+    }
+
     @Test func databaseLookupProbe_whenDidIPurchase_routesToLookup() async throws {
         let fixture = try makeProbeFixture()
         fixture.context.insert(VariableExpense(

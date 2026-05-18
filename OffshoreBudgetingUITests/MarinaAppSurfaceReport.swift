@@ -29,6 +29,10 @@ struct MarinaVisibleAnswer: Codable {
     let value: String
     let label: String
     let text: String
+
+    func containsAll(_ requiredText: [String]) -> Bool {
+        requiredText.allSatisfy { text.localizedCaseInsensitiveContains($0) }
+    }
 }
 
 struct MarinaTraceSnapshot: Codable {

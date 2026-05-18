@@ -63,8 +63,9 @@ struct MarinaSharedPipelineCoordinator {
             )
         }
 
+        let promptForInterpretation = contextualizedFollowUpPrompt(prompt, context: context)
         let normalization = promptNormalizer.normalize(
-            prompt: prompt,
+            prompt: promptForInterpretation,
             defaultPeriodUnit: context.defaultPeriodUnit,
             now: context.now
         )
@@ -687,6 +688,8 @@ struct MarinaSharedPipelineCoordinator {
                 candidate: candidate
             ) {
                 outcome = .executable(merchantSpendPlan)
+            } else if candidate.databaseLookupRequest != nil {
+                outcome = .executable(databaseLookupExecutablePlan(candidate: candidate, resolved: resolvedQuery))
             } else if MarinaSemanticWorkspaceQueryExecutor.recognizes(prompt: candidate.rawPrompt) {
                 // Compatibility bridge: some workspace summary prompts still rely
                 // on string recognition before the validator can express them as
@@ -716,6 +719,16 @@ struct MarinaSharedPipelineCoordinator {
 
         switch outcome {
         case .clarification:
+            if let lookupEvaluation = executeDatabaseLookupCandidate(
+                candidate: candidate,
+                resolved: resolved,
+                semanticResolved: semanticResolved,
+                validationOutcome: outcome,
+                provider: provider,
+                interpretationResult: interpretation.result
+            ) {
+                return lookupEvaluation
+            }
             return CandidateEvaluation(
                 candidate: candidate,
                 resolved: resolved,
@@ -771,6 +784,16 @@ struct MarinaSharedPipelineCoordinator {
                 interpretationResult: interpretation.result
             ) {
                 return recovered
+            }
+            if let lookupEvaluation = executeDatabaseLookupCandidate(
+                candidate: candidate,
+                resolved: resolved,
+                semanticResolved: semanticResolved,
+                validationOutcome: outcome,
+                provider: provider,
+                interpretationResult: interpretation.result
+            ) {
+                return lookupEvaluation
             }
             return CandidateEvaluation(
                 candidate: candidate,
@@ -971,6 +994,168 @@ struct MarinaSharedPipelineCoordinator {
             incomeStatusScope: basePlan.incomeStatusScope,
             responseShape: basePlan.responseShape ?? candidate.responseShapeHint ?? .summaryCard
         )
+    }
+
+    private func databaseLookupExecutablePlan(
+        candidate: MarinaQueryPlanCandidate,
+        resolved: MarinaResolvedSemanticQuery
+    ) -> MarinaAggregationPlan {
+        MarinaAggregationPlan(
+            status: .notExecutableShell,
+            operation: .lookupDetails,
+            measure: candidate.measure ?? .transactionAmount,
+            targets: resolved.resolvedFilters.map { filter in
+                MarinaResolvedAggregationTarget(
+                    id: filter.id,
+                    role: filter.role,
+                    entityType: filter.entityType,
+                    displayName: filter.displayName,
+                    sourceID: filter.sourceID
+                )
+            },
+            dateRange: resolved.primaryDateRange,
+            comparisonDateRange: resolved.comparisonDateRange,
+            grouping: candidate.grouping,
+            ranking: candidate.ranking,
+            limit: candidate.limit,
+            incomeStatusScope: nil,
+            responseShape: candidate.responseShapeHint ?? .summaryCard
+        )
+    }
+
+    private func executeDatabaseLookupCandidate(
+        candidate: MarinaQueryPlanCandidate,
+        resolved: MarinaResolvedQueryCandidate,
+        semanticResolved: MarinaResolvedSemanticQuery?,
+        validationOutcome: MarinaPlanValidationOutcome,
+        provider: MarinaDataProvider,
+        interpretationResult: MarinaInterpretationResult
+    ) -> CandidateEvaluation? {
+        guard let request = semanticResolved?.databaseLookupRequest
+            ?? candidate.databaseLookupRequest
+            ?? syntheticDatabaseLookupRequest(candidate: candidate, semanticResolved: semanticResolved) else {
+            return nil
+        }
+
+        let response = databaseLookupExecutor.execute(request, provider: provider)
+        let answer = databaseLookupResponseBuilder.responseCompatibleAnswer(from: response)
+        let result: MarinaAggregationResult = response.results.isEmpty && response.ambiguityChoices.isEmpty
+            ? .noData(
+                MarinaNoDataAggregationResult(
+                    title: answer.title,
+                    message: answer.subtitle ?? "No matching data found.",
+                    sourceAnswer: answer
+                )
+            )
+            : .message(
+                MarinaMessageAggregationResult(
+                    title: answer.title,
+                    message: answer.subtitle,
+                    sourceAnswer: answer
+                )
+            )
+
+        return CandidateEvaluation(
+            candidate: candidate,
+            resolved: resolved,
+            validationOutcome: validationOutcome,
+            aggregationResult: result,
+            answer: answer,
+            databaseLookupResponse: response,
+            interpretationResult: interpretationResult,
+            semanticResolved: semanticResolved,
+            amountBasis: .budgetImpact,
+            executionRoute: .lookupDetail
+        )
+    }
+
+    private func syntheticDatabaseLookupRequest(
+        candidate: MarinaQueryPlanCandidate,
+        semanticResolved: MarinaResolvedSemanticQuery?
+    ) -> MarinaDatabaseLookupRequest? {
+        guard let semanticResolved,
+              semanticResolved.query.operation == .lookupDetails,
+              let filter = semanticResolved.query.filters.first else {
+            return nil
+        }
+        switch semanticResolved.query.requestedDetail {
+        case .linkedObjects, .linkedCards, .linkedPresets, .categoryLimits, .membership:
+            return nil
+        case .general, .date, .amount, .card, .category, .status, .schedule, .recurrence, .account, .balance, nil:
+            break
+        }
+
+        let objectTypes: [MarinaLookupObjectType]
+        switch semanticResolved.query.subject {
+        case .variableExpenses:
+            objectTypes = [.variableExpense, .plannedExpense]
+        case .plannedExpenses:
+            objectTypes = [.plannedExpense]
+        case .categories:
+            objectTypes = [.category]
+        case .cards:
+            objectTypes = [.card]
+        case .budgets:
+            objectTypes = [.budget]
+        case .presets:
+            objectTypes = [.preset]
+        case .income, .incomeSource:
+            objectTypes = [.income, .incomeSeries]
+        case .savingsAccounts:
+            objectTypes = [.savingsAccount]
+        case .savingsLedgerEntries:
+            objectTypes = [.savingsAccount, .savingsLedgerEntry]
+        case .reconciliationAccounts:
+            objectTypes = [.reconciliationAccount]
+        case .reconciliationItems:
+            objectTypes = [.reconciliationAccount, .reconciliationItem, .expenseAllocation]
+        case .merchant, .uncategorizedExpenses, .workspaces:
+            objectTypes = MarinaLookupObjectType.safeDefaultSearchTypes
+        }
+
+        let normalizedPrompt = candidate.rawPrompt
+            .lowercased()
+            .replacingOccurrences(of: "[^a-z0-9\\s]", with: " ", options: .regularExpression)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let limit = semanticResolved.query.requestedDetail == .date && normalizedPrompt.hasPrefix("when was ") ? 5 : 1
+        return MarinaDatabaseLookupRequest(
+            rawPrompt: candidate.rawPrompt,
+            searchText: filter.value,
+            objectTypes: objectTypes,
+            dateRange: semanticResolved.primaryDateRange,
+            limit: limit,
+            requestedDetail: databaseLookupDetail(from: semanticResolved.query.requestedDetail)
+        ).clamped
+    }
+
+    private func databaseLookupDetail(
+        from detail: MarinaSemanticRequestedDetail?
+    ) -> MarinaDatabaseLookupRequest.RequestedDetail {
+        switch detail {
+        case .date:
+            return .date
+        case .amount:
+            return .amount
+        case .card, .linkedCards:
+            return .card
+        case .category, .categoryLimits:
+            return .category
+        case .status:
+            return .status
+        case .schedule:
+            return .schedule
+        case .recurrence:
+            return .recurrence
+        case .account:
+            return .account
+        case .balance:
+            return .balance
+        case .linkedObjects, .linkedPresets, .membership:
+            return .linkedObjects
+        case .general, nil:
+            return .general
+        }
     }
 
     private func recoverWithCompatibilityCandidate(
@@ -1234,6 +1419,16 @@ struct MarinaSharedPipelineCoordinator {
                     amountBasis: .budgetImpact,
                     executionRoute: .aggregate
                 )
+            }
+            if let lookupEvaluation = executeDatabaseLookupCandidate(
+                candidate: candidate,
+                resolved: resolved,
+                semanticResolved: semanticResolved,
+                validationOutcome: outcome,
+                provider: provider,
+                interpretationResult: interpretation
+            ) {
+                return lookupEvaluation
             }
             return CandidateEvaluation(
                 candidate: candidate,
@@ -1671,6 +1866,40 @@ struct MarinaSharedPipelineCoordinator {
         guard prefix.isEmpty == false else { return base }
         guard let base else { return prefix }
         return "\(prefix);\(base)"
+    }
+
+    private func contextualizedFollowUpPrompt(
+        _ prompt: String,
+        context: MarinaSharedPipelineContext
+    ) -> String {
+        guard context.turnClassification == .followUp else { return prompt }
+
+        let prior = context.routerContext.priorQueryContext
+        guard (prior.lastQueryPlan?.metric ?? prior.lastMetric) == .topCategories,
+              prior.lastTargetType == .category,
+              let targetName = prior.lastTargetName?.trimmingCharacters(in: .whitespacesAndNewlines),
+              targetName.isEmpty == false else {
+            return prompt
+        }
+
+        let normalizedPrompt = Self.normalized(prompt)
+        let comparisonFollowUps: Set<String> = [
+            "compare to last month",
+            "compare it to last month",
+            "compare that to last month",
+            "how about last month",
+            "what about last month"
+        ]
+        guard comparisonFollowUps.contains(normalizedPrompt) else { return prompt }
+        return "Compare \(targetName) this month to last month"
+    }
+
+    private static func normalized(_ value: String) -> String {
+        value
+            .lowercased()
+            .replacingOccurrences(of: "[^a-z0-9\\s&]", with: " ", options: .regularExpression)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private static func modelAvailabilitySummary(_ status: MarinaModelAvailability.Status) -> String {
