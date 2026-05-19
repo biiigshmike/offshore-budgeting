@@ -567,6 +567,9 @@ struct HomeAssistantAnswerContext: Identifiable, Codable, Equatable {
     let targetType: HomeAssistantAnswerTargetType?
     let rowTitles: [String]
     let rowValues: [String]
+    let topRowTitle: String?
+    let topRowValue: String?
+    let topRowTargetType: HomeAssistantAnswerTargetType?
     let scenarioPercent: Double?
     let executedPlan: HomeQueryPlan?
     let generatedAt: Date
@@ -581,6 +584,9 @@ struct HomeAssistantAnswerContext: Identifiable, Codable, Equatable {
         targetType: HomeAssistantAnswerTargetType? = nil,
         rowTitles: [String] = [],
         rowValues: [String] = [],
+        topRowTitle: String? = nil,
+        topRowValue: String? = nil,
+        topRowTargetType: HomeAssistantAnswerTargetType? = nil,
         scenarioPercent: Double? = nil,
         executedPlan: HomeQueryPlan? = nil,
         generatedAt: Date = Date()
@@ -594,6 +600,9 @@ struct HomeAssistantAnswerContext: Identifiable, Codable, Equatable {
         self.targetType = targetType
         self.rowTitles = rowTitles
         self.rowValues = rowValues
+        self.topRowTitle = topRowTitle
+        self.topRowValue = topRowValue
+        self.topRowTargetType = topRowTargetType
         self.scenarioPercent = scenarioPercent
         self.executedPlan = executedPlan
         self.generatedAt = generatedAt

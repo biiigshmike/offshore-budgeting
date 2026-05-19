@@ -917,7 +917,7 @@ private extension MarinaPriorQueryContext {
             resultLimit: lastResultLimit ?? lastQueryPlan?.resultLimit,
             confidenceBand: .high,
             targetName: lastTargetName ?? lastQueryPlan?.targetName,
-            targetTypeRaw: lastQueryPlan?.targetTypeRaw,
+            targetTypeRaw: lastQueryPlan?.targetTypeRaw ?? lastTargetType?.rawValue,
             periodUnit: lastPeriodUnit ?? lastQueryPlan?.periodUnit
         )
     }

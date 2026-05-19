@@ -425,7 +425,8 @@ struct MarinaSharedPipelineParityTests {
         #expect(merchantPlan?.targetTypeRaw == "merchant")
 
         let bareLookup = await run("Show Groceries", fixture: fixture)
-        guard case .handled(let lookupAnswer, _, _, let lookupTrace) = bareLookup else {
+        guard case .validationBlocked(let lookupAnswer, let lookupOutcome, let lookupTrace) = bareLookup,
+              case .clarification(let clarification) = lookupOutcome else {
             Issue.record("Expected bare lookup to clarify across category and expense rows: \(bareLookup.trace.compactSummary)")
             return
         }
@@ -433,6 +434,8 @@ struct MarinaSharedPipelineParityTests {
         #expect(lookupAnswer.title.contains("Which Groceries"))
         #expect(lookupAnswer.rows.contains { $0.value.contains("Category") })
         #expect(lookupAnswer.rows.contains { $0.value.contains("$42.00") && $0.value.contains("Apple Card") })
+        #expect(clarification.choices.contains { $0.entityTypeHint == .category })
+        #expect(clarification.choices.contains { $0.entityTypeHint == .expense })
 
     }
 

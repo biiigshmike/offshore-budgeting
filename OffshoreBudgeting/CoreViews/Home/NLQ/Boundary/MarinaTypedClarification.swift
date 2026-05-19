@@ -82,6 +82,96 @@ struct MarinaTypedClarification: Codable, Equatable, Identifiable {
     }
 }
 
+enum MarinaClarificationChoiceResolution: Equatable {
+    case resolved(MarinaClarificationChoice)
+    case ambiguous([MarinaClarificationChoice])
+    case unresolved
+}
+
+struct MarinaClarificationChoiceResolver {
+    func resolve(
+        reply: String,
+        clarification: MarinaTypedClarification
+    ) -> MarinaClarificationChoiceResolution {
+        let key = Self.normalized(reply)
+        guard key.isEmpty == false else { return .unresolved }
+
+        let choices = clarification.actionableChoices
+        guard choices.isEmpty == false else { return .unresolved }
+
+        let matches = choices.filter { choice in
+            lookupKeys(for: choice).contains(key)
+        }
+
+        if matches.count == 1, let match = matches.first {
+            return .resolved(match)
+        }
+        if matches.count > 1 {
+            return .ambiguous(matches)
+        }
+        return .unresolved
+    }
+
+    static func displayTitle(for choice: MarinaClarificationChoice) -> String {
+        guard let type = choice.entityTypeHint else { return choice.title }
+        return "\(choice.title) (\(type.rawValue))"
+    }
+
+    nonisolated static func normalized(_ value: String) -> String {
+        value
+            .lowercased()
+            .replacingOccurrences(of: "[^a-z0-9\\s]", with: " ", options: .regularExpression)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func lookupKeys(for choice: MarinaClarificationChoice) -> Set<String> {
+        var keys: Set<String> = [
+            Self.displayTitle(for: choice),
+            choice.title
+        ]
+        if let rawValue = choice.rawValue {
+            keys.insert(rawValue)
+        }
+        if let type = choice.entityTypeHint {
+            keys.insert(type.rawValue)
+            keys.insert("\(choice.title) \(type.rawValue)")
+            keys.insert("\(choice.title) (\(type.rawValue))")
+            for alias in Self.typeAliases(for: type) {
+                keys.insert(alias)
+                keys.insert("\(choice.title) \(alias)")
+                keys.insert("\(choice.title) (\(alias))")
+            }
+        }
+        return Set(keys.map(Self.normalized).filter { $0.isEmpty == false })
+    }
+
+    private static func typeAliases(for type: MarinaCandidateEntityTypeHint) -> [String] {
+        switch type {
+        case .category:
+            return ["category"]
+        case .card:
+            return ["card"]
+        case .merchant:
+            return ["merchant", "expense description", "description"]
+        case .expense, .transaction:
+            return ["expense", "transaction", "purchase"]
+        case .budget:
+            return ["budget"]
+        case .preset:
+            return ["preset"]
+        case .incomeSource:
+            return ["income source"]
+        case .allocationAccount:
+            return ["reconciliation", "reconciliation account", "shared balance"]
+        case .savingsAccount:
+            return ["savings", "savings account"]
+        case .workspace:
+            return ["workspace"]
+        }
+    }
+}
+
 extension MarinaClarificationChoice {
     func isEcho(of prompt: String) -> Bool {
         let prompt = Self.normalized(prompt)

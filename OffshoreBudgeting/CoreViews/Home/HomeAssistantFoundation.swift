@@ -135,6 +135,7 @@ struct HomeAssistantPanelView: View {
     @State private var activeClarificationContext: HomeAssistantClarificationContext? = nil
     @State private var sharedPipelineClarification: MarinaTypedClarification? = nil
     @State private var sharedPipelineClarificationChoiceContext: MarinaTypedClarification? = nil
+    @State private var sharedPipelineClarificationChoicesByID: [UUID: MarinaClarificationChoice] = [:]
     @State private var sharedPipelineClarificationChoicesByTitle: [String: MarinaClarificationChoice] = [:]
     @State private var selectedEmptySuggestionGroup: EmptySuggestionGroup?
     @State private var personaSessionSeed: UInt64 = UInt64.random(in: UInt64.min...UInt64.max)
@@ -1521,6 +1522,7 @@ struct HomeAssistantPanelView: View {
         activeClarificationContext = nil
         sharedPipelineClarification = nil
         sharedPipelineClarificationChoiceContext = nil
+        sharedPipelineClarificationChoicesByID = [:]
         sharedPipelineClarificationChoicesByTitle = [:]
         clearNLQClarificationState()
         
@@ -1575,6 +1577,7 @@ struct HomeAssistantPanelView: View {
 
     private func handleSharedPipelineAnswer(
         _ answer: HomeAnswer,
+        aggregationResult: MarinaAggregationResult?,
         rawPrompt: String,
         homeQueryPlan: HomeQueryPlan?,
         source: HomeAssistantPlanResolutionSource
@@ -1585,6 +1588,7 @@ struct HomeAssistantPanelView: View {
         activeClarificationContext = nil
         sharedPipelineClarification = nil
         sharedPipelineClarificationChoiceContext = nil
+        sharedPipelineClarificationChoicesByID = [:]
         sharedPipelineClarificationChoicesByTitle = [:]
         clearNLQClarificationState()
 
@@ -1617,6 +1621,7 @@ struct HomeAssistantPanelView: View {
                 for: query,
                 executedPlan: homeQueryPlan,
                 rawAnswer: normalizedAnswer,
+                aggregationResult: aggregationResult,
                 presentedAnswer: surfaced.answer,
                 userPrompt: rawPrompt
             )
@@ -1804,8 +1809,9 @@ struct HomeAssistantPanelView: View {
                 sharedPipelineClarification = nil
             } else {
                 Task {
-                    await handleSharedPipelineClarificationChoice(
-                        sharedPipelineTypedChoice(from: prompt, clarification: clarification),
+                    await handleSharedPipelineTypedClarificationResolution(
+                        sharedPipelineTypedChoiceResolution(from: prompt, clarification: clarification),
+                        reply: prompt,
                         clarification: clarification
                     )
                 }
@@ -1815,8 +1821,9 @@ struct HomeAssistantPanelView: View {
 
         if let clarification = sharedPipelineClarification {
             Task {
-                await handleSharedPipelineClarificationChoice(
-                    sharedPipelineTypedChoice(from: prompt, clarification: clarification),
+                await handleSharedPipelineTypedClarificationResolution(
+                    sharedPipelineTypedChoiceResolution(from: prompt, clarification: clarification),
+                    reply: prompt,
                     clarification: clarification
                 )
             }
@@ -5801,7 +5808,8 @@ struct HomeAssistantPanelView: View {
     }
 
     private func handleSuggestionTap(_ suggestion: HomeAssistantSuggestion) {
-        if let choice = sharedPipelineClarificationChoice(matching: suggestion.title),
+        if let choice = sharedPipelineClarificationChoicesByID[suggestion.id]
+            ?? sharedPipelineClarificationChoice(matching: suggestion.title),
            let clarification = sharedPipelineClarification ?? sharedPipelineClarificationChoiceContext {
             Task {
                 MarinaTraceRecorder.shared.recordDebugMarker("clarification_chip_tapped:title=\(suggestion.title)")
@@ -5869,7 +5877,7 @@ struct HomeAssistantPanelView: View {
             MarinaTraceRecorder.shared.recordSharedPipelineTrace(result.trace)
 
             switch result {
-            case .handled(let answer, _, let homeQueryPlan, let trace):
+            case .handled(let answer, let aggregationResult, let homeQueryPlan, let trace):
                 MarinaTraceRecorder.shared.recordSelectedRoute(
                     trace.selectedPath == .sharedFoundationModels ? .sharedFoundationModels : .sharedHeuristic,
                     reason: trace.compactSummary
@@ -5880,6 +5888,7 @@ struct HomeAssistantPanelView: View {
                 )
                 await handleSharedPipelineAnswer(
                     answer,
+                    aggregationResult: aggregationResult,
                     rawPrompt: prompt,
                     homeQueryPlan: homeQueryPlan,
                     source: trace.interpreterSource == .foundationModels ? .sharedFoundationModels : .sharedHeuristic
@@ -5903,6 +5912,7 @@ struct HomeAssistantPanelView: View {
                 }
                 await handleSharedPipelineAnswer(
                     answer,
+                    aggregationResult: nil,
                     rawPrompt: prompt,
                     homeQueryPlan: nil,
                     source: trace.interpreterSource == .foundationModels ? .sharedFoundationModels : .sharedHeuristic
@@ -6050,9 +6060,13 @@ struct HomeAssistantPanelView: View {
         let actionableChoices = clarification.actionableChoices(for: rawPrompt)
         sharedPipelineClarification = actionable ? clarification : nil
         sharedPipelineClarificationChoiceContext = actionable ? clarification : nil
+        sharedPipelineClarificationChoicesByID = actionable
+            ? Dictionary(uniqueKeysWithValues: actionableChoices.map { ($0.id, $0) })
+            : [:]
         sharedPipelineClarificationChoicesByTitle = actionable ? sharedPipelineChoiceLookup(for: actionableChoices) : [:]
         clarificationSuggestions = actionable ? actionableChoices.map { choice in
             HomeAssistantSuggestion(
+                id: choice.id,
                 title: sharedPipelineChoiceTitle(choice),
                 query: HomeQuery(intent: .spendThisMonth)
             )
@@ -6095,6 +6109,75 @@ struct HomeAssistantPanelView: View {
     }
 
     @MainActor
+    private func handleSharedPipelineTypedClarificationResolution(
+        _ resolution: MarinaClarificationChoiceResolution,
+        reply: String,
+        clarification: MarinaTypedClarification
+    ) async {
+        switch resolution {
+        case .resolved(let choice):
+            await handleSharedPipelineClarificationChoice(choice, clarification: clarification)
+        case .ambiguous(let choices):
+            presentSharedPipelineTypedClarificationRetry(
+                reply: reply,
+                clarification: clarification,
+                title: "I found more than one matching choice",
+                subtitle: "Pick one of the existing choices so I can keep this pinned to the right data.",
+                choices: choices
+            )
+        case .unresolved:
+            presentSharedPipelineTypedClarificationRetry(
+                reply: reply,
+                clarification: clarification,
+                title: "I need one of those choices",
+                subtitle: "I could not match that reply to a unique clarification choice. Use a chip title or a unique type like category, card, merchant, or expense.",
+                choices: clarification.actionableChoices
+            )
+        }
+    }
+
+    @MainActor
+    private func presentSharedPipelineTypedClarificationRetry(
+        reply: String,
+        clarification: MarinaTypedClarification,
+        title: String,
+        subtitle: String,
+        choices: [MarinaClarificationChoice]
+    ) {
+        let actionableChoices = choices.isEmpty ? clarification.actionableChoices : choices
+        sharedPipelineClarification = clarification
+        sharedPipelineClarificationChoiceContext = clarification
+        sharedPipelineClarificationChoicesByID = Dictionary(uniqueKeysWithValues: actionableChoices.map { ($0.id, $0) })
+        sharedPipelineClarificationChoicesByTitle = sharedPipelineChoiceLookup(for: actionableChoices)
+        clarificationSuggestions = actionableChoices.map { choice in
+            HomeAssistantSuggestion(
+                id: choice.id,
+                title: sharedPipelineChoiceTitle(choice),
+                query: HomeQuery(intent: .spendThisMonth)
+            )
+        }
+        recoverySuggestions = []
+        lastClarificationReasons = [.lowConfidenceLanguage]
+        activeClarificationContext = nil
+
+        appendAnswer(
+            HomeAnswer(
+                queryID: clarification.id,
+                kind: .message,
+                userPrompt: reply,
+                title: title,
+                subtitle: subtitle,
+                rows: actionableChoices.prefix(4).map { choice in
+                    HomeAnswerRow(
+                        title: sharedPipelineChoiceTitle(choice),
+                        value: choice.subtitle ?? choice.rawValue ?? choice.entityTypeHint?.rawValue ?? ""
+                    )
+                }
+            )
+        )
+    }
+
+    @MainActor
     private func handleSharedPipelineClarificationChoice(
         _ choice: MarinaClarificationChoice,
         clarification: MarinaTypedClarification
@@ -6130,7 +6213,7 @@ struct HomeAssistantPanelView: View {
         MarinaTraceRecorder.shared.recordSharedPipelineTrace(result.trace)
 
         switch result {
-        case .handled(let answer, _, let homeQueryPlan, let trace):
+        case .handled(let answer, let aggregationResult, let homeQueryPlan, let trace):
             MarinaTraceRecorder.shared.recordSelectedRoute(
                 trace.selectedPath == .sharedFoundationModels ? .sharedFoundationModels : .sharedHeuristic,
                 reason: trace.compactSummary
@@ -6141,12 +6224,14 @@ struct HomeAssistantPanelView: View {
             )
             await handleSharedPipelineAnswer(
                 answer,
+                aggregationResult: aggregationResult,
                 rawPrompt: rawPrompt,
                 homeQueryPlan: homeQueryPlan,
                 source: trace.interpreterSource == .foundationModels ? .sharedFoundationModels : .sharedHeuristic
             )
             sharedPipelineClarification = nil
             sharedPipelineClarificationChoiceContext = nil
+            sharedPipelineClarificationChoicesByID = [:]
             sharedPipelineClarificationChoicesByTitle = [:]
             finishMarinaTrace()
         case .validationBlocked(let answer, let outcome, let trace):
@@ -6164,12 +6249,14 @@ struct HomeAssistantPanelView: View {
             } else {
                 await handleSharedPipelineAnswer(
                     answer,
+                    aggregationResult: nil,
                     rawPrompt: rawPrompt,
                     homeQueryPlan: nil,
                     source: trace.interpreterSource == .foundationModels ? .sharedFoundationModels : .sharedHeuristic
                 )
                 sharedPipelineClarification = nil
                 sharedPipelineClarificationChoiceContext = nil
+                sharedPipelineClarificationChoicesByID = [:]
                 sharedPipelineClarificationChoicesByTitle = [:]
             }
             finishMarinaTrace()
@@ -6177,14 +6264,14 @@ struct HomeAssistantPanelView: View {
             MarinaTraceRecorder.shared.recordSelectedRoute(.sharedFallback, reason: trace.compactSummary)
             sharedPipelineClarification = nil
             sharedPipelineClarificationChoiceContext = nil
+            sharedPipelineClarificationChoicesByID = [:]
             sharedPipelineClarificationChoicesByTitle = [:]
             finishMarinaTrace()
         }
     }
 
     private func sharedPipelineChoiceTitle(_ choice: MarinaClarificationChoice) -> String {
-        guard let type = choice.entityTypeHint else { return choice.title }
-        return "\(choice.title) (\(type.rawValue))"
+        MarinaClarificationChoiceResolver.displayTitle(for: choice)
     }
 
     private func sharedPipelineClarificationChoice(matching rawTitle: String) -> MarinaClarificationChoice? {
@@ -6253,25 +6340,49 @@ struct HomeAssistantPanelView: View {
     }
 
     private func sharedPipelineChoiceLookupKey(_ value: String) -> String {
-        normalizedPrompt(value)
+        MarinaClarificationChoiceResolver.normalized(value)
     }
 
-    private func sharedPipelineTypedChoice(
+    private func sharedPipelineTypedChoiceResolution(
         from prompt: String,
         clarification: MarinaTypedClarification
-    ) -> MarinaClarificationChoice {
+    ) -> MarinaClarificationChoiceResolution {
         if let choice = sharedPipelineClarificationChoice(matching: prompt)
             ?? sharedPipelineChoiceLookup(for: clarification.actionableChoices)[sharedPipelineChoiceLookupKey(prompt)] {
-            return choice
+            return .resolved(choice)
         }
-        return MarinaClarificationChoice(
-            title: prompt,
-            entityRole: clarification.choices.first?.entityRole,
-            entityTypeHint: clarification.choices.first?.entityTypeHint,
-            patchSlot: clarification.patchSlot,
-            rawValue: prompt,
-            mentionID: clarification.choices.first?.mentionID
+        let resolution = MarinaClarificationChoiceResolver().resolve(reply: prompt, clarification: clarification)
+        if resolution != .unresolved {
+            return resolution
+        }
+        guard shouldSynthesizeFreeTextClarificationChoice(prompt, clarification: clarification) else {
+            return .unresolved
+        }
+        return .resolved(
+            MarinaClarificationChoice(
+                title: prompt,
+                entityRole: clarification.choices.first?.entityRole,
+                entityTypeHint: clarification.choices.first?.entityTypeHint,
+                patchSlot: clarification.patchSlot,
+                rawValue: prompt,
+                mentionID: clarification.choices.first?.mentionID
+            )
         )
+    }
+
+    private func shouldSynthesizeFreeTextClarificationChoice(
+        _ prompt: String,
+        clarification: MarinaTypedClarification
+    ) -> Bool {
+        guard prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false else {
+            return false
+        }
+        switch clarification.patchSlot {
+        case .date, .comparison, .amount, .simulation:
+            return true
+        case .target, nil:
+            return clarification.choices.isEmpty && clarification.patchSlot != .target
+        }
     }
 
     @MainActor
@@ -6442,8 +6553,8 @@ struct HomeAssistantPanelView: View {
         let priorQueryContext = MarinaPriorQueryContext(
             lastQueryPlan: sessionContext.lastQueryPlan,
             lastMetric: sessionContext.lastMetric,
-            lastTargetName: sessionContext.lastTargetName ?? mostRecentAnswerContext?.targetName,
-            lastTargetType: mostRecentAnswerContext?.targetType,
+            lastTargetName: sessionContext.lastTargetName ?? mostRecentAnswerContext?.targetName ?? mostRecentAnswerContext?.topRowTitle,
+            lastTargetType: mostRecentAnswerContext?.targetType ?? mostRecentAnswerContext?.topRowTargetType,
             lastDateRange: sessionContext.lastDateRange,
             lastResultLimit: sessionContext.lastResultLimit,
             lastPeriodUnit: sessionContext.lastPeriodUnit
@@ -6932,12 +7043,18 @@ struct HomeAssistantPanelView: View {
         for query: HomeQuery,
         executedPlan: HomeQueryPlan?,
         rawAnswer: HomeAnswer,
+        aggregationResult: MarinaAggregationResult? = nil,
         presentedAnswer: HomeAnswer,
         userPrompt: String?
     ) {
-        let inferredTargetType = targetType(for: query.intent.metric)
+        let contextRows = answerContextRows(
+            from: aggregationResult,
+            fallbackRows: rawAnswer.rows
+        )
+        let topRow = contextRows.first
+        let inferredTargetType = targetType(for: query.intent.metric) ?? topRow?.targetType
         let inferredTargetName = query.targetName
-            ?? inferredTargetName(for: query.intent.metric, rawAnswer: rawAnswer)
+            ?? inferredTargetName(for: query.intent.metric, rows: contextRows)
         let context = HomeAssistantAnswerContext(
             query: query,
             answerTitle: presentedAnswer.title,
@@ -6945,8 +7062,11 @@ struct HomeAssistantPanelView: View {
             userPrompt: userPrompt,
             targetName: inferredTargetName,
             targetType: inferredTargetType,
-            rowTitles: Array(rawAnswer.rows.prefix(5).map(\.title)),
-            rowValues: Array(rawAnswer.rows.prefix(5).map(\.value)),
+            rowTitles: Array(contextRows.prefix(5).map(\.title)),
+            rowValues: Array(contextRows.prefix(5).map(\.value)),
+            topRowTitle: topRow?.title,
+            topRowValue: topRow?.value,
+            topRowTargetType: topRow?.targetType ?? inferredTargetType,
             scenarioPercent: extractedPercentValue(from: rawAnswer.subtitle ?? userPrompt ?? ""),
             executedPlan: executedPlan,
             generatedAt: presentedAnswer.generatedAt
@@ -6958,11 +7078,81 @@ struct HomeAssistantPanelView: View {
         }
     }
 
-    private func inferredTargetName(for metric: HomeQueryMetric, rawAnswer: HomeAnswer) -> String? {
+    private struct AssistantAnswerContextRow {
+        let title: String
+        let value: String
+        let targetType: HomeAssistantAnswerTargetType?
+    }
+
+    private func answerContextRows(
+        from aggregationResult: MarinaAggregationResult?,
+        fallbackRows: [HomeAnswerRow]
+    ) -> [AssistantAnswerContextRow] {
+        let rows: [AssistantAnswerContextRow]
+        switch aggregationResult {
+        case .rankedList(let list), .groupedBreakdown(let list):
+            rows = list.rows.map {
+                AssistantAnswerContextRow(
+                    title: $0.label,
+                    value: $0.renderedValue,
+                    targetType: nil
+                )
+            }
+        case .workspaceCard(let card):
+            let cardRows = card.rows.isEmpty == false
+                ? card.rows
+                : card.items.map {
+                    MarinaWorkspaceAggregationCard.Row(
+                        label: $0.label,
+                        value: $0.value,
+                        amount: $0.amount,
+                        date: $0.date,
+                        objectType: $0.objectType,
+                        sourceID: $0.sourceID,
+                        sortValue: $0.sortValue
+                    )
+                }
+            rows = cardRows.map {
+                AssistantAnswerContextRow(
+                    title: $0.label,
+                    value: $0.value,
+                    targetType: targetType(for: $0.objectType)
+                )
+            }
+        case .scalar, .comparison, .message, .noData, .unsupported, nil:
+            rows = []
+        }
+
+        if rows.isEmpty == false {
+            return rows
+        }
+        return fallbackRows.map {
+            AssistantAnswerContextRow(title: $0.title, value: $0.value, targetType: nil)
+        }
+    }
+
+    private func inferredTargetName(for metric: HomeQueryMetric, rows: [AssistantAnswerContextRow]) -> String? {
         switch metric {
         case .topCategories, .topMerchants, .cardVariableSpendingHabits, .topCardChanges:
-            return rawAnswer.rows.first?.title
+            return rows.first?.title
         default:
+            return nil
+        }
+    }
+
+    private func targetType(for objectType: MarinaLookupObjectType?) -> HomeAssistantAnswerTargetType? {
+        switch objectType {
+        case .category:
+            return .category
+        case .card:
+            return .card
+        case .income, .incomeSeries:
+            return .incomeSource
+        case .importMerchantRule:
+            return .merchant
+        case .budget, .variableExpense, .plannedExpense, .preset, .savingsAccount,
+            .savingsLedgerEntry, .reconciliationAccount, .reconciliationItem,
+            .expenseAllocation, .assistantAliasRule, .workspace, .unknown, nil:
             return nil
         }
     }

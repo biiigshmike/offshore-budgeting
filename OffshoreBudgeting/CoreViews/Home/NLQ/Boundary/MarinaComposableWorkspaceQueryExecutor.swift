@@ -953,11 +953,19 @@ struct MarinaComposableWorkspaceQueryExecutor {
     private func isAllocationListPrompt(_ prompt: String) -> Bool {
         prompt.contains("allocation")
             || prompt.contains("allocations")
+            || prompt.contains("allocated")
             || (prompt.contains("expenses") && prompt.contains("split with"))
+            || (prompt.contains("split expenses") && prompt.contains(" with "))
+            || (prompt.contains("split charges") && prompt.contains(" with "))
     }
 
     private func isSettlementListPrompt(_ prompt: String) -> Bool {
-        prompt.contains("settlement") || prompt.contains("settlements")
+        prompt.contains("settlement")
+            || prompt.contains("settlements")
+            || prompt.contains("paid me back")
+            || prompt.contains("pay me back")
+            || prompt.contains("repaid")
+            || prompt.contains("reimburse")
     }
 
     private func resolvedBudgetTarget(

@@ -122,6 +122,17 @@ struct MarinaUITestDriver {
         }
     }
 
+    func typeClarificationReplyAndWaitForResume(
+        _ reply: String,
+        timeout: TimeInterval = 15
+    ) -> MarinaTraceSnapshot? {
+        let previousTraceCount = traceCount()
+        submit(reply)
+        return waitForNewTrace(after: previousTraceCount, timeout: timeout) {
+            $0.turnClassification == "clarificationAnswer"
+        }
+    }
+
     func traceCount() -> Int {
         readTraceLines().count
     }
@@ -146,13 +157,16 @@ struct MarinaUITestDriver {
 
     private func latestVisibleAnswer(preferredIndex: Int) -> MarinaVisibleAnswer {
         guard answerExists(at: preferredIndex) else {
-            return MarinaVisibleAnswer(title: nil, value: "", label: "", text: "")
+            return MarinaVisibleAnswer(title: nil, value: "", label: "", text: "", rowTitles: [], rowValues: [])
         }
         let container = app.descendants(matching: .any)["marina.answer.\(preferredIndex)"].firstMatch
         let title = app.descendants(matching: .any)["marina.answer.\(preferredIndex).title"].firstMatch
         let primaryValue = app.descendants(matching: .any)["marina.answer.\(preferredIndex).primaryValue"].firstMatch
         let narrative = app.descendants(matching: .any)["marina.answer.\(preferredIndex).narrative"].firstMatch
-        let rowTexts = boundedAnswerRowLabels(answerIndex: preferredIndex)
+        let rows = boundedAnswerRows(answerIndex: preferredIndex)
+        let rowTexts = rows.flatMap { row in
+            [row.title, row.value].compactMap { $0 }
+        }
         let containerText = [
             container.exists ? container.label : nil,
             container.exists ? container.value as? String : nil
@@ -171,7 +185,9 @@ struct MarinaUITestDriver {
             title: title.exists ? title.label : nil,
             value: primaryValue.exists ? primaryValue.label : "",
             label: text,
-            text: text
+            text: text,
+            rowTitles: rows.map { $0.title },
+            rowValues: rows.compactMap { $0.value }
         )
     }
 
@@ -225,24 +241,23 @@ struct MarinaUITestDriver {
         return app.descendants(matching: .any)["marina.answer.\(index).title"].firstMatch.exists
     }
 
-    private func boundedAnswerRowLabels(answerIndex: Int, limit: Int = 16) -> [String] {
-        var labels: [String] = []
+    private func boundedAnswerRows(answerIndex: Int, limit: Int = 16) -> [(title: String, value: String?)] {
+        var rows: [(title: String, value: String?)] = []
         for rowIndex in 0..<limit {
             let title = app.descendants(matching: .any)["marina.answer.\(answerIndex).row.\(rowIndex).title"].firstMatch
             let value = app.descendants(matching: .any)["marina.answer.\(answerIndex).row.\(rowIndex).value"].firstMatch
             let titleExists = title.exists
             let valueExists = value.exists
             if titleExists {
-                labels.append(title.label)
+                rows.append((title.label, valueExists ? value.label : nil))
+            } else if valueExists {
+                rows.append((value.label, nil))
             }
-            if valueExists {
-                labels.append(value.label)
-            }
-            if titleExists == false, valueExists == false, labels.isEmpty == false {
+            if titleExists == false, valueExists == false, rows.isEmpty == false {
                 break
             }
         }
-        return labels
+        return rows
     }
 
     private func deduped(_ values: [String]) -> [String] {
@@ -535,6 +550,7 @@ struct MarinaPromptExpectation {
         case rankedList
         case scalarCurrency
         case groupedBreakdown
+        case comparison
         case clarification
         case unsupported
     }

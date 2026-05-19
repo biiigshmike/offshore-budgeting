@@ -91,6 +91,129 @@ final class MarinaAssistantUITests: XCTestCase {
         reporter.attach(to: self)
     }
 
+    func testMarinaAppSurfaceTypedClarificationReply_resumesWithoutLegacyFallback() throws {
+        let app = XCUIApplication()
+        let driver = MarinaUITestDriver(app: app, testCase: self)
+        let reporter = MarinaAppSurfaceReporter()
+
+        driver.launchHarness()
+
+        let ambiguityReport = driver.runPrompt(
+            "Show Groceries.",
+            expectation: MarinaPromptExpectation(model: "Category", outcome: .clarification, responseShape: .clarification)
+        )
+        reporter.record(ambiguityReport)
+        XCTAssertTrue(ambiguityReport.result.passed, ambiguityReport.result.reason)
+        XCTAssertFalse(ambiguityReport.clarificationChips.isEmpty, "Expected Groceries ambiguity to surface clarification chips.")
+
+        let resumedTrace = driver.typeClarificationReplyAndWaitForResume("category", timeout: 15)
+        XCTAssertEqual(resumedTrace?.turnClassification, "clarificationAnswer")
+        XCTAssertNotEqual(resumedTrace?.selectedRoute, "shared_fallback")
+        XCTAssertNotEqual(resumedTrace?.sharedPipelinePath, "legacy")
+
+        reporter.attach(to: self)
+    }
+
+    func testMarinaAppSurfaceExactChipTitleTypedReply_resumesWithoutLegacyFallback() throws {
+        let app = XCUIApplication()
+        let driver = MarinaUITestDriver(app: app, testCase: self)
+        let reporter = MarinaAppSurfaceReporter()
+
+        driver.launchHarness()
+
+        let ambiguityReport = driver.runPrompt(
+            "Tell me about Apple",
+            expectation: MarinaPromptExpectation(model: "VariableExpense", outcome: .clarification, responseShape: .clarification)
+        )
+        reporter.record(ambiguityReport)
+        XCTAssertTrue(ambiguityReport.result.passed, ambiguityReport.result.reason)
+        guard let chipTitle = ambiguityReport.clarificationChips.first else {
+            XCTFail("Expected Apple ambiguity to surface clarification chips.")
+            return
+        }
+
+        let resumedTrace = driver.typeClarificationReplyAndWaitForResume(chipTitle, timeout: 15)
+        XCTAssertEqual(resumedTrace?.turnClassification, "clarificationAnswer")
+        XCTAssertNotEqual(resumedTrace?.selectedRoute, "shared_fallback")
+        XCTAssertNotEqual(resumedTrace?.sharedPipelinePath, "legacy")
+
+        reporter.attach(to: self)
+    }
+
+    func testMarinaAppSurfaceFollowUpCompareToLastMonth_anchorsTopCategory() throws {
+        let app = XCUIApplication()
+        let driver = MarinaUITestDriver(app: app, testCase: self)
+        let reporter = MarinaAppSurfaceReporter()
+        defer { reporter.attach(to: self) }
+
+        driver.launchHarness()
+
+        let rankedReport = driver.runPrompt(
+            "Where did my money go this month?",
+            expectation: MarinaPromptExpectation(model: "Category", outcome: .handled, responseShape: .rankedList)
+        )
+        reporter.record(rankedReport)
+        XCTAssertTrue(rankedReport.result.passed, rankedReport.result.reason)
+        guard let topCategory = rankedReport.visibleAnswer.topRowTitle else {
+            XCTFail("Expected a top category row in the ranked answer. answer=\(rankedReport.visibleAnswer.text)")
+            return
+        }
+
+        let comparisonReport = driver.runPrompt(
+            "Compare to last month",
+            expectation: MarinaPromptExpectation(model: "Category", outcome: .handled, responseShape: .comparison, requiredVisibleText: [topCategory])
+        )
+        reporter.record(comparisonReport)
+        XCTAssertTrue(comparisonReport.result.passed, comparisonReport.result.reason)
+        XCTAssertEqual(comparisonReport.turnClassification, "followUp")
+        XCTAssertEqual(comparisonReport.priorContextUsed, true)
+    }
+
+    func testMarinaAppSurfaceStep5PhraseCapabilityBatches_renderDataBackedAnswers() throws {
+        let app = XCUIApplication()
+        let driver = MarinaUITestDriver(app: app, testCase: self)
+        let reporter = MarinaAppSurfaceReporter()
+        defer { reporter.attach(to: self) }
+
+        driver.launchHarness()
+
+        let prompts = [
+            ModelPrompt(
+                model: "BudgetCardLink",
+                text: "Which cards are in May Budget?",
+                shape: .relationshipList,
+                requiredVisibleText: ["Apple Card", "Backup Card"],
+                forbiddenVisibleText: ["Budget Summary", "Variable spend", "Planned spend"]
+            ),
+            ModelPrompt(
+                model: "SavingsAccount",
+                text: "How much have I saved?",
+                shape: .summaryCard,
+                requiredVisibleText: ["Savings"]
+            ),
+            ModelPrompt(
+                model: "AllocationAccount",
+                text: "What is my Roommate balance?",
+                shape: .summaryCard,
+                requiredVisibleText: ["Roommate"]
+            ),
+            ModelPrompt(
+                model: "ExpenseAllocation",
+                text: "Show allocations this month",
+                shape: .rankedList,
+                requiredVisibleText: ["Allocations"]
+            )
+        ]
+
+        for prompt in prompts {
+            let report = driver.runPrompt(prompt.text, expectation: prompt.expectation, timeout: 8)
+            reporter.record(report)
+            XCTAssertTrue(report.result.passed, report.result.reason)
+            XCTAssertNotEqual(report.selectedRoute, "shared_fallback")
+            XCTAssertNotEqual(report.trace?.sharedPipelinePath, "legacy")
+        }
+    }
+
     func testMarinaFoundationModelToggle_isAvailableWithoutRuntimeLaunchArguments() throws {
         let app = XCUIApplication()
         let driver = MarinaUITestDriver(app: app, testCase: self)
@@ -184,7 +307,7 @@ final class MarinaAssistantUITests: XCTestCase {
         ModelPrompt(model: "VariableExpense", text: "Spend at merchant \"NUG\" last 90 days"),
         ModelPrompt(model: "VariableExpense", text: "What did I spend this month?"),
         ModelPrompt(model: "AllocationAccount", text: "Show my Roommate reconciliation account"),
-        ModelPrompt(model: "AllocationAccount", text: "What is my Roommate balance?"),
+        ModelPrompt(model: "AllocationAccount", text: "What is my Roommate balance?", shape: .summaryCard),
         ModelPrompt(model: "AllocationAccount", text: "List reconciliation accounts", requestShape: .objectInventoryList, shape: .relationshipList),
         ModelPrompt(model: "ExpenseAllocation", text: "Which expenses are split with Roommate?"),
         ModelPrompt(model: "ExpenseAllocation", text: "Show allocations this month"),

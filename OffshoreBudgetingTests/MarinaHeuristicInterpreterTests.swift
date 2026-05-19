@@ -177,6 +177,53 @@ struct MarinaHeuristicInterpreterTests {
         }
     }
 
+    @Test func heuristic_step5PhraseCapabilityVariants_routeToExistingReadOnlyShapes() {
+        let relationshipCases: [(prompt: String, detail: MarinaSemanticRequestedDetail)] = [
+            ("Which cards are in May Budget?", .linkedCards),
+            ("Show May Budget presets", .linkedPresets),
+            ("Show category limits for May Budget", .categoryLimits)
+        ]
+
+        for testCase in relationshipCases {
+            let candidate = MarinaHeuristicInterpreter().interpret(
+                prompt: testCase.prompt,
+                defaultPeriodUnit: .month
+            )
+            #expect(candidate.requestFamily == .analytics)
+            #expect(candidate.operation == .lookupDetails)
+            #expect(candidate.semanticCommand?.requestedDetail == testCase.detail)
+            #expect(candidate.requestShape == .relationshipList)
+        }
+
+        let savings = MarinaHeuristicInterpreter().interpret(
+            prompt: "How much have I saved?",
+            defaultPeriodUnit: .month
+        )
+        #expect(savings.requestFamily == .analytics)
+        #expect(savings.operation == .lookupDetails)
+        #expect(savings.measure == .savings)
+
+        let splitExpenses = MarinaHeuristicInterpreter().interpret(
+            prompt: "Show split expenses with Roommate this month",
+            defaultPeriodUnit: .month
+        )
+        #expect(splitExpenses.requestFamily == .analytics)
+        #expect(splitExpenses.operation == .rank)
+        #expect(splitExpenses.measure == .reconciliationBalance)
+        #expect(splitExpenses.entityMentions.first?.typeHint == .allocationAccount)
+        #expect(splitExpenses.entityMentions.first?.rawText == "roommate")
+
+        let settlement = MarinaHeuristicInterpreter().interpret(
+            prompt: "When did Roommate last pay me back?",
+            defaultPeriodUnit: .month
+        )
+        #expect(settlement.requestFamily == .analytics)
+        #expect(settlement.operation == .rank)
+        #expect(settlement.measure == .reconciliationBalance)
+        #expect(settlement.entityMentions.first?.typeHint == .allocationAccount)
+        #expect(settlement.entityMentions.first?.rawText == "roommate")
+    }
+
     @Test func heuristic_totalSpendOnAppleCard_emitsUnresolvedCardFilterCandidate() {
         let candidate = MarinaHeuristicInterpreter().interpret(
             prompt: "total spend on my Apple Card",

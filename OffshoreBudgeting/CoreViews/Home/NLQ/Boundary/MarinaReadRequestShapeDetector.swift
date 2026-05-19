@@ -59,24 +59,6 @@ struct MarinaReadRequestShapeDetector {
             )
         }
 
-        if let relationship = linkedBudgetRelationship(in: normalizedPrompt) {
-            return budgetRelationshipCandidate(
-                prompt: prompt,
-                budgetName: relationship.budgetName,
-                defaultPeriodUnit: defaultPeriodUnit,
-                requestedDetail: relationship.requestedDetail
-            )
-        }
-
-        if let budgetName = explicitBudgetName(in: normalizedPrompt) {
-            return budgetRelationshipCandidate(
-                prompt: prompt,
-                budgetName: budgetName,
-                defaultPeriodUnit: defaultPeriodUnit,
-                requestedDetail: .linkedObjects
-            )
-        }
-
         if isOverBudgetCategoryList(normalizedPrompt) {
             return MarinaQueryPlanCandidate(
                 source: .heuristic,
@@ -112,6 +94,24 @@ struct MarinaReadRequestShapeDetector {
             )
         }
 
+        if let relationship = linkedBudgetRelationship(in: normalizedPrompt) {
+            return budgetRelationshipCandidate(
+                prompt: prompt,
+                budgetName: relationship.budgetName,
+                defaultPeriodUnit: defaultPeriodUnit,
+                requestedDetail: relationship.requestedDetail
+            )
+        }
+
+        if let budgetName = explicitBudgetName(in: normalizedPrompt) {
+            return budgetRelationshipCandidate(
+                prompt: prompt,
+                budgetName: budgetName,
+                defaultPeriodUnit: defaultPeriodUnit,
+                requestedDetail: .linkedObjects
+            )
+        }
+
         if isIncomeRowList(normalizedPrompt) {
             return MarinaQueryPlanCandidate(
                 source: .heuristic,
@@ -120,6 +120,33 @@ struct MarinaReadRequestShapeDetector {
                 measure: .income,
                 timeScopes: dateScopes(prompt: prompt, defaultPeriodUnit: defaultPeriodUnit),
                 grouping: MarinaGroupingCandidate(dimension: .incomeSource),
+                ranking: MarinaRankingCandidate(direction: .newest, limit: explicitLimit(in: normalizedPrompt) ?? 10),
+                limit: explicitLimit(in: normalizedPrompt) ?? 10,
+                responseShapeHint: .rankedList,
+                confidence: .high,
+                requestShape: .ledgerRowList
+            )
+        }
+
+        if isAllocationActivityList(normalizedPrompt) {
+            let accountName = allocationAccountName(in: normalizedPrompt)
+            return MarinaQueryPlanCandidate(
+                source: .heuristic,
+                rawPrompt: prompt,
+                operation: .rank,
+                measure: .reconciliationBalance,
+                entityMentions: accountName.map {
+                    [
+                        MarinaUnresolvedEntityMention(
+                            role: .filter,
+                            rawText: $0,
+                            typeHint: .allocationAccount,
+                            confidence: .medium
+                        )
+                    ]
+                } ?? [],
+                timeScopes: dateScopes(prompt: prompt, defaultPeriodUnit: defaultPeriodUnit),
+                grouping: MarinaGroupingCandidate(dimension: .allocationAccount),
                 ranking: MarinaRankingCandidate(direction: .newest, limit: explicitLimit(in: normalizedPrompt) ?? 10),
                 limit: explicitLimit(in: normalizedPrompt) ?? 10,
                 responseShapeHint: .rankedList,
@@ -376,6 +403,13 @@ struct MarinaReadRequestShapeDetector {
             requestedDetail = .linkedPresets
         } else if (prompt.contains("category") || prompt.contains("limit")) && prompt.contains("linked") {
             requestedDetail = .categoryLimits
+        } else if prompt.contains("card") && prompt.contains("budget") && containsRelationshipCue(prompt) {
+            requestedDetail = .linkedCards
+        } else if prompt.contains("preset") && prompt.contains("budget") && containsRelationshipCue(prompt) {
+            requestedDetail = .linkedPresets
+        } else if (prompt.contains("category limit") || prompt.contains("category limits") || prompt.contains("budget limit") || prompt.contains("budget limits"))
+            && prompt.contains("budget") {
+            requestedDetail = .categoryLimits
         } else {
             return nil
         }
@@ -384,10 +418,27 @@ struct MarinaReadRequestShapeDetector {
             in: prompt,
             patterns: [
                 #"\b(?:cards|presets|categories|limits)\s+(?:are\s+)?linked\s+to\s+(.+?)$"#,
-                #"\blinked\s+to\s+(.+?)$"#
+                #"\blinked\s+to\s+(.+?)$"#,
+                #"\b(?:cards|presets)\s+(?:are\s+)?(?:in|on|for|attached\s+to|part\s+of)\s+(.+?)$"#,
+                #"\b(?:category\s+limits|budget\s+limits|limits)\s+(?:are\s+)?(?:in|on|for)\s+(.+?)$"#,
+                #"\bshow\s+(.+?)\s+(?:cards|presets|category\s+limits|budget\s+limits|limits)$"#
             ]
         ).map(titleCaseBudgetName)
         return (budgetName, requestedDetail)
+    }
+
+    private func containsRelationshipCue(_ prompt: String) -> Bool {
+        prompt.contains(" linked")
+            || prompt.contains(" in ")
+            || prompt.contains(" on ")
+            || prompt.contains(" for ")
+            || prompt.contains("attached")
+            || prompt.contains("part of")
+            || prompt.hasSuffix(" cards")
+            || prompt.hasSuffix(" presets")
+            || prompt.hasSuffix(" category limits")
+            || prompt.hasSuffix(" budget limits")
+            || prompt.hasSuffix(" limits")
     }
 
     private func budgetMembership(in prompt: String) -> (budgetName: String?, memberName: String, memberType: MarinaCandidateEntityTypeHint)? {
@@ -487,6 +538,26 @@ struct MarinaReadRequestShapeDetector {
             && prompt.contains("income series") == false
             && prompt.contains("income repeats") == false
             && (prompt.contains("this ") || prompt.contains("last ") || prompt.contains("in "))
+    }
+
+    private func isAllocationActivityList(_ prompt: String) -> Bool {
+        prompt.contains("allocation")
+            || prompt.contains("allocations")
+            || prompt.contains("allocated")
+            || (prompt.contains("expenses") && prompt.contains("split with"))
+            || (prompt.contains("split expenses") && prompt.contains(" with "))
+            || (prompt.contains("split charges") && prompt.contains(" with "))
+    }
+
+    private func allocationAccountName(in prompt: String) -> String? {
+        firstCapture(
+            in: prompt,
+            patterns: [
+                #"\bsplit\s+with\s+(.+?)(?:\s+this|\s+last|$)"#,
+                #"\bsplit\s+(?:expenses|charges)\s+with\s+(.+?)(?:\s+this|\s+last|$)"#,
+                #"\ballocations?\s+(?:for|with)\s+(.+?)(?:\s+this|\s+last|$)"#
+            ]
+        ).map(cleanObjectName)
     }
 
     private func spendCard(in prompt: String) -> String? {

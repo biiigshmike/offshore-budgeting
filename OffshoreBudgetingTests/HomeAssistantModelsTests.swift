@@ -2166,6 +2166,115 @@ struct HomeAssistantModelsTests {
 
     // MARK: - Follow-up Anchoring
 
+    @Test func clarificationChoiceResolver_resolvesExactChipTitle() throws {
+        let card = MarinaClarificationChoice(
+            title: "Apple Card",
+            entityTypeHint: .card,
+            patchSlot: .target,
+            rawValue: "Apple Card",
+            sourceID: UUID()
+        )
+        let clarification = MarinaTypedClarification(
+            kind: .ambiguousTarget,
+            message: "Which Apple?",
+            choices: [card]
+        )
+
+        let result = MarinaClarificationChoiceResolver().resolve(
+            reply: "Apple Card (card)",
+            clarification: clarification
+        )
+
+        #expect(result == .resolved(card))
+    }
+
+    @Test func clarificationChoiceResolver_resolvesUniqueTypeAlias() throws {
+        let category = MarinaClarificationChoice(
+            title: "Groceries",
+            entityTypeHint: .category,
+            patchSlot: .target,
+            rawValue: "Groceries",
+            sourceID: UUID()
+        )
+        let expense = MarinaClarificationChoice(
+            title: "Groceries",
+            entityTypeHint: .expense,
+            patchSlot: .target,
+            rawValue: "Groceries",
+            sourceID: UUID()
+        )
+        let clarification = MarinaTypedClarification(
+            kind: .ambiguousTarget,
+            message: "Which Groceries?",
+            choices: [category, expense]
+        )
+
+        let result = MarinaClarificationChoiceResolver().resolve(
+            reply: "category",
+            clarification: clarification
+        )
+
+        #expect(result == .resolved(category))
+    }
+
+    @Test func clarificationChoiceResolver_returnsAmbiguousForRepeatedTypeAlias() throws {
+        let first = MarinaClarificationChoice(
+            title: "Apple Watch",
+            entityTypeHint: .expense,
+            patchSlot: .target,
+            rawValue: "Apple Watch",
+            sourceID: UUID()
+        )
+        let second = MarinaClarificationChoice(
+            title: "Apple Store",
+            entityTypeHint: .expense,
+            patchSlot: .target,
+            rawValue: "Apple Store",
+            sourceID: UUID()
+        )
+        let clarification = MarinaTypedClarification(
+            kind: .ambiguousTarget,
+            message: "Which Apple?",
+            choices: [first, second]
+        )
+
+        let result = MarinaClarificationChoiceResolver().resolve(
+            reply: "expense",
+            clarification: clarification
+        )
+
+        #expect(result == .ambiguous([first, second]))
+    }
+
+    @Test func clarificationChoiceResolver_doesNotFabricateUnmatchedTargetChoice() throws {
+        let choice = MarinaClarificationChoice(
+            title: "Groceries",
+            entityTypeHint: .category,
+            patchSlot: .target,
+            rawValue: "Groceries",
+            sourceID: UUID()
+        )
+        let clarification = MarinaTypedClarification(
+            kind: .ambiguousTarget,
+            message: "Which Groceries?",
+            choices: [choice]
+        )
+
+        let result = MarinaClarificationChoiceResolver().resolve(
+            reply: "category(category) category",
+            clarification: clarification
+        )
+
+        #expect(result == .unresolved)
+    }
+
+    @Test func promptTurnClassifier_compareToLastMonthIsFollowUp() throws {
+        let classifier = MarinaPromptTurnClassifier()
+
+        #expect(classifier.classify("Compare to last month", defaultPeriodUnit: .month) == .followUp)
+        #expect(classifier.classify("Compare this to last month", defaultPeriodUnit: .month) == .followUp)
+    }
+
     @Test func followUpAnchorResolver_matchesLatestRelevantAnswer() throws {
         let resolver = HomeAssistantFollowUpAnchorResolver()
         let context = HomeAssistantAnswerContext(

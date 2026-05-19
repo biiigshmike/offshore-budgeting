@@ -507,6 +507,37 @@ struct MarinaSemanticPipelineRealAppTests {
         }
     }
 
+    @Test func semanticPipeline_step5PhraseCapabilityVariantsStayOnSharedReadOnlyRoutes() async throws {
+        let fixture = try MarinaRealisticWorkspaceFixture.make()
+        fixture.groceryBudgetLimit.maxAmount = 50
+        try fixture.context.save()
+
+        let cases: [(prompt: String, routeFragment: String?, expectedFragments: [String])] = [
+            ("Which cards are in May Budget?", "budgetLinkedCards", ["Cards linked", "Apple"]),
+            ("Show May Budget presets", "budgetLinkedPresets", ["Presets linked", "Rent"]),
+            ("Show category limits for May Budget", "budgetCategoryLimits", ["Category limits", "Groceries"]),
+            ("How much have I saved?", nil, ["Savings"]),
+            ("Show split expenses with Roommate this month", "allocationRows", ["Allocations", "Cafe", "Roommate"]),
+            ("When did Roommate last pay me back?", "settlementRows", ["Settlements", "Roommate paid back", "$20.00"])
+        ]
+
+        for testCase in cases {
+            let handled = try requireHandled(await fixture.run(testCase.prompt))
+            let text = renderedText(handled.aggregationResult)
+            #expect(handled.trace.selectedPath != .sharedAttemptedThenLegacyFallback)
+            if let routeFragment = testCase.routeFragment {
+                #expect(
+                    handled.trace.executorResultSummary?.localizedCaseInsensitiveContains(routeFragment) == true,
+                    "Expected \(testCase.prompt) executor summary to include \(routeFragment). Summary: \(handled.trace.executorResultSummary ?? "nil")"
+                )
+            }
+            #expect(text.localizedCaseInsensitiveContains("unsupported") == false)
+            for fragment in testCase.expectedFragments {
+                #expect(text.localizedCaseInsensitiveContains(fragment), "Expected \(testCase.prompt) to include \(fragment). Text: \(text)")
+            }
+        }
+    }
+
     @Test func semanticPipeline_budgetImpactSimulationIncludesCategoryLimitWithoutFallback() async throws {
         let fixture = try MarinaRealisticWorkspaceFixture.make()
         let result = await fixture.run("If I spend $80 on Groceries this month, how will that affect my budget?")
@@ -649,6 +680,55 @@ struct MarinaSemanticPipelineRealAppTests {
         #expect(third.answer.title == "Spend This Week")
         #expect(third.trace.turnClassification == .freshQuestion)
         #expect(third.trace.priorContextIncluded == false)
+    }
+
+    @Test func semanticPipeline_compareToLastMonthFollowUpAnchorsTopCategoryRow() async throws {
+        let fixture = try MarinaRealisticWorkspaceFixture.make()
+        let coordinator = MarinaSharedPipelineCoordinator()
+
+        let first = try requireHandled(
+            await coordinator.run(
+                prompt: "Where did my money go this month?",
+                context: fixture.sharedPipelineContext()
+            )
+        )
+        let topCategory: String?
+        switch first.aggregationResult {
+        case .rankedList(let list), .groupedBreakdown(let list):
+            topCategory = list.rows.first?.label
+        default:
+            topCategory = nil
+        }
+        guard let topCategory else {
+            Issue.record("Expected a ranked category answer with rows.")
+            return
+        }
+
+        let prior = MarinaPriorQueryContext(
+            lastQueryPlan: first.homeQueryPlan,
+            lastMetric: first.homeQueryPlan?.metric,
+            lastTargetName: topCategory,
+            lastTargetType: .category,
+            lastDateRange: first.homeQueryPlan?.dateRange,
+            lastResultLimit: first.homeQueryPlan?.resultLimit,
+            lastPeriodUnit: first.homeQueryPlan?.periodUnit
+        )
+
+        let second = try requireHandled(
+            await coordinator.run(
+                prompt: "Compare to last month",
+                context: fixture.sharedPipelineContext(
+                    turnClassification: .followUp,
+                    priorQueryContext: prior
+                )
+            )
+        )
+
+        #expect(second.answer.kind == .comparison)
+        #expect(second.trace.turnClassification == .followUp)
+        #expect(second.trace.priorContextIncluded == true)
+        #expect(second.trace.semanticResolverSummary?.contains("resolvedTypes=category") == true)
+        #expect(renderedText(second.aggregationResult).localizedCaseInsensitiveContains(topCategory))
     }
 
     @Test func semanticPipeline_cardMerchantCollisionClarifiesWithoutExecuting() async throws {
@@ -827,6 +907,54 @@ struct MarinaSemanticPipelineRealAppTests {
         #expect(handled.answer.kind == .metric)
         #expect(handled.trace.semanticResolverSummary?.contains("resolvedTypes=category") == true)
         #expect(renderedText(handled.aggregationResult).localizedCaseInsensitiveContains("Category Spend"))
+    }
+
+    @Test func semanticPipeline_databaseLookupAmbiguitySurfacesTypedClarificationAndResumes() async throws {
+        let fixture = try MarinaRealisticWorkspaceFixture.make()
+        let result = await fixture.run("Show Groceries.")
+
+        guard case .validationBlocked(let answer, let outcome, let trace) = result,
+              case .clarification(let clarification) = outcome else {
+            Issue.record("Expected Groceries lookup ambiguity to surface typed clarification: \(result.trace.compactSummary)")
+            return
+        }
+
+        #expect(answer.title.localizedCaseInsensitiveContains("Groceries"))
+        #expect(clarification.kind == .ambiguousTarget)
+        #expect(clarification.choices.compactMap(\.entityTypeHint).contains(.category))
+        #expect(clarification.choices.compactMap(\.entityTypeHint).contains(.expense))
+        #expect(trace.executorResultSummary?.contains("ambiguityCount") == true)
+
+        guard let categoryChoice = clarification.choices.first(where: { $0.entityTypeHint == .category }) else {
+            Issue.record("Expected a category clarification choice.")
+            return
+        }
+
+        let resumed = await MarinaSharedPipelineCoordinator().resume(
+            clarification: clarification,
+            choice: categoryChoice,
+            context: fixture.contextForSharedPipeline
+        )
+
+        let handled = try requireHandled(resumed)
+        #expect(answerText(handled.answer).localizedCaseInsensitiveContains("Groceries"))
+        #expect(answerText(handled.answer).localizedCaseInsensitiveContains("Category"))
+    }
+
+    @Test func semanticPipeline_tellMeAboutAppleLookupAmbiguityProvidesChipChoices() async throws {
+        let fixture = try MarinaRealisticWorkspaceFixture.make()
+        let result = await fixture.run("Tell me about Apple")
+
+        guard case .validationBlocked(_, let outcome, _) = result,
+              case .clarification(let clarification) = outcome else {
+            Issue.record("Expected Apple lookup ambiguity to surface typed clarification: \(result.trace.compactSummary)")
+            return
+        }
+
+        let choiceTypes = Set(clarification.choices.compactMap(\.entityTypeHint))
+        #expect(choiceTypes.contains(.card))
+        #expect(choiceTypes.contains(.expense) || choiceTypes.contains(.merchant))
+        #expect(clarification.choices.isEmpty == false)
     }
 
     @Test func semanticPipeline_explicitAppleStoreTargetExecutesMerchantSpendDirectly() async throws {

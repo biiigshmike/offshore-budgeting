@@ -700,6 +700,12 @@ struct MarinaHeuristicInterpreter {
             || isProjectedSavingsPrompt(prompt)
             || isSafeSpendPrompt(prompt)
             || isNextPlannedExpensePrompt(prompt)
+            || prompt.contains("savings adjustment")
+            || prompt.contains("savings transfer")
+            || prompt.contains("paid me back")
+            || prompt.contains("pay me back")
+            || prompt.contains("repaid")
+            || prompt.contains("reimburse")
     }
 
     private func protectedShape(from intent: NormalizedQueryIntent) -> ProtectedShape? {
@@ -1296,10 +1302,11 @@ struct MarinaHeuristicInterpreter {
     }
 
     private func isActualSavingsStatusPrompt(_ prompt: String) -> Bool {
-        prompt.contains("savings")
+        (prompt.contains("savings") || prompt.contains("saved"))
             && (prompt.contains("actual")
                 || prompt.contains("so far")
                 || prompt.contains("status")
+                || prompt.contains("balance")
                 || prompt.contains("saved")
                 || prompt.contains("have in savings")
                 || prompt.contains("in savings"))
@@ -1571,6 +1578,10 @@ struct MarinaHeuristicInterpreter {
         prompt.contains("largest savings movement")
             || prompt.contains("biggest savings movement")
             || prompt.contains("savings movements")
+            || prompt.contains("savings adjustment")
+            || prompt.contains("savings adjustments")
+            || prompt.contains("savings transfer")
+            || prompt.contains("savings transfers")
             || (prompt.contains("what changed") && prompt.contains("savings"))
             || (prompt.contains("savings") && prompt.contains("activity"))
     }
@@ -1589,11 +1600,19 @@ struct MarinaHeuristicInterpreter {
 
     private func isAllocationListPrompt(_ prompt: String) -> Bool {
         (prompt.contains("allocation") || prompt.contains("allocations"))
+            || prompt.contains("allocated")
             || (prompt.contains("expenses") && prompt.contains("split with"))
+            || (prompt.contains("split expenses") && prompt.contains(" with "))
+            || (prompt.contains("split charges") && prompt.contains(" with "))
     }
 
     private func isSettlementListPrompt(_ prompt: String) -> Bool {
-        prompt.contains("settlement") || prompt.contains("settlements")
+        prompt.contains("settlement")
+            || prompt.contains("settlements")
+            || prompt.contains("paid me back")
+            || prompt.contains("pay me back")
+            || prompt.contains("repaid")
+            || prompt.contains("reimburse")
     }
 
     private func isBudgetLimitPrompt(_ prompt: String) -> Bool {
@@ -1882,7 +1901,12 @@ struct MarinaHeuristicInterpreter {
             in: prompt,
             patterns: [
                 #"\bsplit\s+with\s+(.+?)(?:\s+this|\s+last|$)"#,
-                #"\ballocations?\s+(?:for|with)\s+(.+?)(?:\s+this|\s+last|$)"#
+                #"\bsplit\s+(?:expenses|charges)\s+with\s+(.+?)(?:\s+this|\s+last|$)"#,
+                #"\ballocations?\s+(?:for|with)\s+(.+?)(?:\s+this|\s+last|$)"#,
+                #"\bshow\s+(.+?)\s+settlements?\b"#,
+                #"\bwhat\s+settlements?\s+(?:happened\s+)?(?:with|for)\s+(.+?)(?:\s+this|\s+last|$)"#,
+                #"\bwhen\s+did\s+(.+?)\s+(?:last\s+)?(?:pay\s+me\s+back|reimburse\s+me|repay\s+me)\b"#,
+                #"\b(.+?)\s+(?:paid\s+me\s+back|reimbursed\s+me|repaid\s+me)\b"#
             ]
         ) else {
             return []
