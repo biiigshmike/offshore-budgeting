@@ -54,6 +54,33 @@ struct MarinaUITestDriver {
         expectation: MarinaPromptExpectation? = nil,
         timeout: TimeInterval = 15
     ) -> MarinaSurfaceReport {
+        runPrompt(
+            prompt,
+            expectation: expectation,
+            timeout: timeout,
+            allowCommandOrUnsupportedTrace: false
+        )
+    }
+
+    func runCommandOrUnsupportedPrompt(
+        _ prompt: String,
+        expectation: MarinaPromptExpectation,
+        timeout: TimeInterval = 15
+    ) -> MarinaSurfaceReport {
+        runPrompt(
+            prompt,
+            expectation: expectation,
+            timeout: timeout,
+            allowCommandOrUnsupportedTrace: true
+        )
+    }
+
+    private func runPrompt(
+        _ prompt: String,
+        expectation: MarinaPromptExpectation?,
+        timeout: TimeInterval,
+        allowCommandOrUnsupportedTrace: Bool
+    ) -> MarinaSurfaceReport {
         let previousTraceCount = readTraceLines().count
         submit(prompt)
 
@@ -81,7 +108,8 @@ struct MarinaUITestDriver {
             answerAppeared: appeared,
             answer: answer,
             trace: trace,
-            chips: chips
+            chips: chips,
+            allowCommandOrUnsupportedTrace: allowCommandOrUnsupportedTrace
         )
 
         return MarinaSurfaceReport(
@@ -377,7 +405,8 @@ struct MarinaUITestDriver {
         answerAppeared: Bool,
         answer: MarinaVisibleAnswer,
         trace: MarinaTraceSnapshot?,
-        chips: (clarification: [String], recovery: [String], followUp: [String])
+        chips: (clarification: [String], recovery: [String], followUp: [String]),
+        allowCommandOrUnsupportedTrace: Bool = false
     ) -> MarinaSurfaceResult {
         guard answerAppeared else {
             return MarinaSurfaceResult(passed: false, category: .noVisibleAnswer, reason: "No new answer appeared for prompt.")
@@ -385,10 +414,25 @@ struct MarinaUITestDriver {
         guard answer.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false else {
             return MarinaSurfaceResult(passed: false, category: .noVisibleAnswer, reason: "Latest answer had no readable text.")
         }
+        let looksUnsupported = answer.text.localizedCaseInsensitiveContains("different way")
+            || answer.text.localizedCaseInsensitiveContains("unsupported")
+            || answer.text.localizedCaseInsensitiveContains("read-only")
+            || answer.text.localizedCaseInsensitiveContains("can't")
+            || answer.text.localizedCaseInsensitiveContains("cannot")
         guard let trace else {
+            if allowCommandOrUnsupportedTrace,
+               expectation?.outcome == .typedUnsupported,
+               looksUnsupported {
+                return MarinaSurfaceResult(passed: true, category: .pass, reason: "Typed unsupported response was visible without a prompt-specific shared-read trace.")
+            }
             return MarinaSurfaceResult(passed: false, category: .traceUnavailable, reason: "No Marina trace was exported or surfaced.")
         }
         if trace.originalPrompt != prompt {
+            if allowCommandOrUnsupportedTrace,
+               expectation?.outcome == .typedUnsupported,
+               (looksUnsupported || trace.originalPrompt.isEmpty) {
+                return MarinaSurfaceResult(passed: true, category: .pass, reason: "Typed unsupported response was visible; latest trace belonged to a non-read or accessibility-only turn.")
+            }
             return MarinaSurfaceResult(
                 passed: false,
                 category: .promptNotSubmitted,
@@ -396,6 +440,10 @@ struct MarinaUITestDriver {
             )
         }
         guard trace.routingMode == "shared_pipeline" else {
+            if allowCommandOrUnsupportedTrace,
+               expectation?.outcome == .typedUnsupported {
+                return MarinaSurfaceResult(passed: true, category: .pass, reason: "Prompt was handled outside the shared read route.")
+            }
             return MarinaSurfaceResult(passed: false, category: .wrongRuntimeRoute, reason: "Expected shared_pipeline, saw \(trace.routingMode).")
         }
         if trace.selectedRoute == "shared_fallback" || trace.sharedPipelinePath == "legacy" {

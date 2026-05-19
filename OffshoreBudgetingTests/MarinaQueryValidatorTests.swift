@@ -439,6 +439,115 @@ struct MarinaQueryValidatorTests {
         ).reason == .unsupportedTargetType)
     }
 
+    @Test func capabilityMatrix_catalogRejectsCrossDomainRouteEdges() {
+        let cases: [(name: String, intent: MarinaRouteIntent, operation: MarinaCandidateOperation, measure: MarinaCandidateMeasure, targetTypes: [MarinaCandidateEntityTypeHint], grouping: MarinaGroupingDimensionCandidate?, expected: MarinaCapabilityDecisionReason?)] = [
+            (
+                "valid reconciliation balance by allocation account",
+                routeIntent(kind: .reconciliationBalance, subject: .reconciliationAccounts, operation: .rank, measure: .reconciliationBalance, grouping: .allocationAccount, targetTypes: [.allocationAccount]),
+                .rank,
+                .reconciliationBalance,
+                [.allocationAccount],
+                .allocationAccount,
+                nil
+            ),
+            (
+                "invalid reconciliation balance by savings account",
+                routeIntent(kind: .reconciliationBalance, subject: .reconciliationAccounts, operation: .rank, measure: .reconciliationBalance, grouping: .allocationAccount, targetTypes: [.savingsAccount]),
+                .rank,
+                .reconciliationBalance,
+                [.savingsAccount],
+                .allocationAccount,
+                .unsupportedTargetType
+            ),
+            (
+                "valid savings movement by ledger row",
+                routeIntent(kind: .savingsActivity, subject: .savingsLedgerEntries, operation: .listRows, measure: .savingsMovement, grouping: .savingsLedgerEntry, targetTypes: [.savingsAccount]),
+                .listRows,
+                .savingsMovement,
+                [.savingsAccount],
+                .savingsLedgerEntry,
+                nil
+            ),
+            (
+                "invalid savings movement scoped to allocation account",
+                routeIntent(kind: .savingsActivity, subject: .savingsLedgerEntries, operation: .listRows, measure: .savingsMovement, grouping: .savingsLedgerEntry, targetTypes: [.allocationAccount]),
+                .listRows,
+                .savingsMovement,
+                [.allocationAccount],
+                .savingsLedgerEntry,
+                .unsupportedTargetType
+            ),
+            (
+                "valid budget category limits",
+                routeIntent(kind: .budgetCategoryLimits, subject: .budgets, operation: .lookupDetails, measure: .remainingBudget, targetTypes: [.budget, .category], requestedDetail: .categoryLimits),
+                .lookupDetails,
+                .remainingBudget,
+                [.budget, .category],
+                nil,
+                nil
+            ),
+            (
+                "invalid budget category limits with merchant target",
+                routeIntent(kind: .budgetCategoryLimits, subject: .budgets, operation: .lookupDetails, measure: .remainingBudget, targetTypes: [.merchant], requestedDetail: .categoryLimits),
+                .lookupDetails,
+                .remainingBudget,
+                [.merchant],
+                nil,
+                .unsupportedTargetType
+            ),
+            (
+                "valid recent transaction rows",
+                routeIntent(kind: .recentTransactionRows, subject: .variableExpenses, operation: .listRows, measure: .transactionAmount, grouping: .transaction, targetTypes: [.card]),
+                .listRows,
+                .transactionAmount,
+                [.card],
+                .transaction,
+                nil
+            ),
+            (
+                "valid broad spend with allocation account and category targets",
+                routeIntent(kind: .broadSpend, subject: .variableExpenses, operation: .sum, measure: .spend, targetTypes: [.allocationAccount, .category]),
+                .sum,
+                .spend,
+                [.allocationAccount, .category],
+                nil,
+                nil
+            ),
+            (
+                "invalid broad spend with income measure",
+                routeIntent(kind: .broadSpend, subject: .variableExpenses, operation: .sum, measure: .spend, targetTypes: []),
+                .sum,
+                .income,
+                [],
+                nil,
+                .unsupportedMeasure
+            )
+        ]
+
+        for testCase in cases {
+            let decision = MarinaQueryCapabilityMatrix.decision(
+                operation: testCase.operation,
+                measure: testCase.measure,
+                targetTypes: testCase.targetTypes,
+                grouping: testCase.grouping,
+                routeIntent: testCase.intent
+            )
+
+            if let expected = testCase.expected {
+                #expect(decision.reason == expected, "Expected \(testCase.name) to fail with \(expected.rawValue), got \(decision.reason.rawValue)")
+                #expect(MarinaQueryCapabilityMatrix.supports(
+                    operation: testCase.operation,
+                    measure: testCase.measure,
+                    targetTypes: testCase.targetTypes,
+                    grouping: testCase.grouping,
+                    routeIntent: testCase.intent
+                ) == false)
+            } else {
+                #expect(decision.isSupported, "Expected \(testCase.name) to be supported, got \(decision.reason.rawValue)")
+            }
+        }
+    }
+
     @Test func validator_blocksStep5MutationsFromSharedReadPipeline() {
         let prompts = [
             "create settlement with Roommate for $20",

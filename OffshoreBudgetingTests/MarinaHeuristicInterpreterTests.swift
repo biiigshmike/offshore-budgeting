@@ -246,40 +246,44 @@ struct MarinaHeuristicInterpreterTests {
     }
 
     @Test func routePatternRegistryCoversReadRoutePrecedenceAndCommonSpendRows() {
-        let recent = MarinaRoutePatternRegistry.intentKind(
-            rawPrompt: "Show my recent Groceries transactions",
-            requestFamily: .analytics,
-            operation: .listRows,
-            measure: .transactionAmount,
-            grouping: .transaction,
-            requestedDetail: nil,
-            requestShape: .ledgerRowList,
-            databaseLookupRequest: nil
-        )
-        let broadSpend = MarinaRoutePatternRegistry.intentKind(
-            rawPrompt: "How much did I spend this month?",
-            requestFamily: .analytics,
-            operation: .sum,
-            measure: .spend,
-            grouping: nil,
-            requestedDetail: nil,
-            requestShape: .aggregateMetric,
-            databaseLookupRequest: nil
-        )
-        let settlementWins = MarinaRoutePatternRegistry.intentKind(
-            rawPrompt: "When did Roommate last pay me back?",
-            requestFamily: .analytics,
-            operation: .rank,
-            measure: .reconciliationBalance,
-            grouping: .allocationAccount,
-            requestedDetail: nil,
-            requestShape: .ledgerRowList,
-            databaseLookupRequest: nil
-        )
+        let cases: [(prompt: String, operation: MarinaCandidateOperation, measure: MarinaCandidateMeasure, grouping: MarinaGroupingDimensionCandidate?, detail: MarinaSemanticRequestedDetail?, shape: MarinaRequestShape?, kind: MarinaRouteIntentKind)] = [
+            ("Show my Groceries budget limit", .lookupDetails, .remainingBudget, nil, nil, nil, .budgetCategoryLimit),
+            ("Show category limits for May Budget", .lookupDetails, .remainingBudget, nil, .categoryLimits, nil, .budgetCategoryLimits),
+            ("Which cards are linked to May Budget?", .lookupDetails, .spend, nil, .linkedCards, nil, .budgetLinkedCards),
+            ("Which presets are linked to May Budget?", .lookupDetails, .spend, nil, .linkedPresets, nil, .budgetLinkedPresets),
+            ("Is Apple Card included in this budget?", .lookupDetails, .spend, nil, .membership, nil, .budgetMembership),
+            ("What is my active budget?", .lookupDetails, .remainingBudget, nil, .status, nil, .activeBudget),
+            ("Which categories are over budget?", .rank, .remainingBudget, .category, nil, nil, .overBudgetCategories),
+            ("How much do I have in savings?", .lookupDetails, .savings, nil, .balance, nil, .savingsStatus),
+            ("Show savings activity this month", .listRows, .savingsMovement, .savingsLedgerEntry, nil, .ledgerRowList, .savingsActivity),
+            ("Largest savings movements this month", .rank, .savingsMovement, .savingsLedgerEntry, nil, .ledgerRowList, .savingsMovementRanking),
+            ("Roommate balance", .rank, .reconciliationBalance, .allocationAccount, nil, nil, .reconciliationBalance),
+            ("Show split expenses with Roommate", .rank, .reconciliationBalance, .allocationAccount, nil, .ledgerRowList, .allocationRows),
+            ("When did Roommate last pay me back?", .rank, .reconciliationBalance, .allocationAccount, nil, .ledgerRowList, .settlementRows),
+            ("Show my recent Groceries transactions", .listRows, .transactionAmount, .transaction, nil, .ledgerRowList, .recentTransactionRows),
+            ("How much did I spend this month?", .sum, .spend, nil, nil, .aggregateMetric, .broadSpend)
+        ]
 
-        #expect(recent == .recentTransactionRows)
-        #expect(broadSpend == .broadSpend)
-        #expect(settlementWins == .settlementRows)
+        for testCase in cases {
+            let kind = MarinaRoutePatternRegistry.intentKind(
+                rawPrompt: testCase.prompt,
+                requestFamily: .analytics,
+                operation: testCase.operation,
+                measure: testCase.measure,
+                grouping: testCase.grouping,
+                requestedDetail: testCase.detail,
+                requestShape: testCase.shape,
+                databaseLookupRequest: nil
+            )
+            #expect(kind == testCase.kind, "Expected \(testCase.prompt) to route as \(testCase.kind.rawValue), got \(kind.rawValue)")
+        }
+    }
+
+    @Test func routePatternRegistryCatalogCoversComposableFallbackRoutes() {
+        let catalogKinds = Set(MarinaRoutePatternRegistry.routeCatalog.map(\.kind))
+        for expected in [MarinaRouteIntentKind.budgetInventory, .overBudgetCategories, .allocationRows, .settlementRows, .recentTransactionRows] {
+            #expect(catalogKinds.contains(expected), "Expected route catalog to cover fallback route \(expected.rawValue)")
+        }
     }
 
     @Test func heuristic_totalSpendOnAppleCard_emitsUnresolvedCardFilterCandidate() {

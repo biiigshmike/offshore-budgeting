@@ -827,6 +827,12 @@ extension MarinaRouteIntent {
         operation: MarinaCandidateOperation,
         requestFamily: MarinaRequestFamily
     ) -> MarinaPreferredExecutorRoute? {
+        if let catalogRoute = MarinaRoutePatternRegistry.preferredExecutorRoute(for: kind) {
+            if kind == .recentTransactionRows {
+                return nil
+            }
+            return catalogRoute
+        }
         switch kind {
         case .databaseLookup:
             return .databaseLookup
@@ -861,6 +867,158 @@ extension MarinaRouteIntent {
 }
 
 struct MarinaRoutePatternRegistry {
+    struct RoutePattern: Sendable, Equatable {
+        let kind: MarinaRouteIntentKind
+        let preferredExecutorRoute: MarinaPreferredExecutorRoute?
+        let operations: Set<MarinaCandidateOperation>
+        let measures: Set<MarinaCandidateMeasure>
+        let groupings: Set<MarinaGroupingDimensionCandidate?>
+        let requestedDetails: Set<MarinaSemanticRequestedDetail?>
+
+        nonisolated func matches(
+            operation: MarinaCandidateOperation,
+            measure: MarinaCandidateMeasure,
+            grouping: MarinaGroupingDimensionCandidate?,
+            requestedDetail: MarinaSemanticRequestedDetail?
+        ) -> Bool {
+            operations.contains(operation)
+                && measures.contains(measure)
+                && groupings.contains(grouping)
+                && requestedDetails.contains(requestedDetail)
+        }
+    }
+
+    nonisolated static let routeCatalog: [RoutePattern] = [
+        RoutePattern(
+            kind: .budgetCategoryLimits,
+            preferredExecutorRoute: .composableWorkspace,
+            operations: [.lookupDetails],
+            measures: [.remainingBudget, .spend],
+            groupings: [nil],
+            requestedDetails: [.categoryLimits]
+        ),
+        RoutePattern(
+            kind: .budgetLinkedCards,
+            preferredExecutorRoute: .composableWorkspace,
+            operations: [.lookupDetails],
+            measures: [.remainingBudget, .spend],
+            groupings: [nil],
+            requestedDetails: [.linkedCards]
+        ),
+        RoutePattern(
+            kind: .budgetLinkedPresets,
+            preferredExecutorRoute: .composableWorkspace,
+            operations: [.lookupDetails],
+            measures: [.remainingBudget, .spend],
+            groupings: [nil],
+            requestedDetails: [.linkedPresets]
+        ),
+        RoutePattern(
+            kind: .budgetMembership,
+            preferredExecutorRoute: .composableWorkspace,
+            operations: [.lookupDetails],
+            measures: [.remainingBudget, .spend],
+            groupings: [nil],
+            requestedDetails: [.membership]
+        ),
+        RoutePattern(
+            kind: .activeBudget,
+            preferredExecutorRoute: .composableWorkspace,
+            operations: [.lookupDetails],
+            measures: [.remainingBudget],
+            groupings: [nil],
+            requestedDetails: [.status]
+        ),
+        RoutePattern(
+            kind: .budgetCategoryLimit,
+            preferredExecutorRoute: .composableWorkspace,
+            operations: [.lookupDetails],
+            measures: [.remainingBudget],
+            groupings: [nil],
+            requestedDetails: [nil, .general, .amount, .balance]
+        ),
+        RoutePattern(
+            kind: .overBudgetCategories,
+            preferredExecutorRoute: .composableWorkspace,
+            operations: [.rank],
+            measures: [.remainingBudget],
+            groupings: [.category],
+            requestedDetails: [nil, .general]
+        ),
+        RoutePattern(
+            kind: .savingsMovementRanking,
+            preferredExecutorRoute: .workspaceAggregation,
+            operations: [.rank],
+            measures: [.savingsMovement],
+            groupings: [nil, .savingsLedgerEntry],
+            requestedDetails: [nil, .general]
+        ),
+        RoutePattern(
+            kind: .savingsActivity,
+            preferredExecutorRoute: .workspaceAggregation,
+            operations: [.listRows, .rank],
+            measures: [.savingsMovement],
+            groupings: [nil, .savingsLedgerEntry],
+            requestedDetails: [nil, .general, .date, .amount]
+        ),
+        RoutePattern(
+            kind: .savingsStatus,
+            preferredExecutorRoute: .homeAdapter,
+            operations: [.lookupDetails],
+            measures: [.savings],
+            groupings: [nil],
+            requestedDetails: [nil, .general, .status, .balance, .account]
+        ),
+        RoutePattern(
+            kind: .settlementRows,
+            preferredExecutorRoute: .composableWorkspace,
+            operations: [.listRows, .rank],
+            measures: [.reconciliationBalance],
+            groupings: [.allocationAccount],
+            requestedDetails: [nil, .general, .date, .amount]
+        ),
+        RoutePattern(
+            kind: .allocationRows,
+            preferredExecutorRoute: .composableWorkspace,
+            operations: [.listRows, .rank],
+            measures: [.reconciliationBalance],
+            groupings: [.allocationAccount],
+            requestedDetails: [nil, .general, .amount]
+        ),
+        RoutePattern(
+            kind: .reconciliationBalance,
+            preferredExecutorRoute: .workspaceAggregation,
+            operations: [.sum, .rank, .listRows, .lookupDetails],
+            measures: [.reconciliationBalance],
+            groupings: [nil, .allocationAccount],
+            requestedDetails: [nil, .general, .balance, .account]
+        ),
+        RoutePattern(
+            kind: .budgetInventory,
+            preferredExecutorRoute: .composableWorkspace,
+            operations: [.listRows, .lookupDetails],
+            measures: [.remainingBudget],
+            groupings: [nil],
+            requestedDetails: [nil, .general]
+        ),
+        RoutePattern(
+            kind: .recentTransactionRows,
+            preferredExecutorRoute: .list,
+            operations: [.listRows, .rank],
+            measures: [.transactionAmount, .spend],
+            groupings: [nil, .transaction],
+            requestedDetails: [nil, .general, .date, .amount, .card, .category]
+        ),
+        RoutePattern(
+            kind: .broadSpend,
+            preferredExecutorRoute: .aggregate,
+            operations: [.sum],
+            measures: [.spend],
+            groupings: [nil],
+            requestedDetails: [nil, .general]
+        )
+    ]
+
     nonisolated static func intentKind(
         rawPrompt: String,
         requestFamily: MarinaRequestFamily,
@@ -876,56 +1034,42 @@ struct MarinaRoutePatternRegistry {
         }
         let normalized = normalized(rawPrompt)
 
-        if operation == .lookupDetails, requestedDetail == .categoryLimits {
-            return .budgetCategoryLimits
+        if isSettlementRowsPrompt(normalized), matchesCatalog(.settlementRows, operation: operation, measure: measure, grouping: grouping, requestedDetail: requestedDetail) { return .settlementRows }
+        if isAllocationRowsPrompt(normalized), matchesCatalog(.allocationRows, operation: operation, measure: measure, grouping: grouping, requestedDetail: requestedDetail) { return .allocationRows }
+        if normalized.contains("activity") || normalized.contains("transactions") || normalized.contains("transfers"),
+           matchesCatalog(.savingsActivity, operation: operation, measure: measure, grouping: grouping, requestedDetail: requestedDetail) { return .savingsActivity }
+        if normalized.contains("limit"),
+           matchesCatalog(.budgetCategoryLimit, operation: operation, measure: measure, grouping: grouping, requestedDetail: requestedDetail) { return .budgetCategoryLimit }
+        if let detailMatch = routeCatalog.first(where: {
+            [.budgetCategoryLimits, .budgetLinkedCards, .budgetLinkedPresets, .budgetMembership, .activeBudget].contains($0.kind)
+                && $0.matches(operation: operation, measure: measure, grouping: grouping, requestedDetail: requestedDetail)
+        }) {
+            return detailMatch.kind
         }
-        if operation == .lookupDetails, requestedDetail == .linkedCards {
-            return .budgetLinkedCards
-        }
-        if operation == .lookupDetails, requestedDetail == .linkedPresets {
-            return .budgetLinkedPresets
-        }
-        if operation == .lookupDetails, requestedDetail == .membership {
-            return .budgetMembership
-        }
-        if operation == .lookupDetails, requestedDetail == .status {
-            return .activeBudget
+        if requestShape == .objectInventoryList,
+           matchesCatalog(.budgetInventory, operation: operation, measure: measure, grouping: grouping, requestedDetail: requestedDetail) {
+            return .budgetInventory
         }
         if operation == .lookupDetails, measure == .remainingBudget, grouping == nil {
-            return normalized.contains("limit") ? .budgetCategoryLimit : .generic
+            return .generic
         }
-        if operation == .rank, measure == .remainingBudget, grouping == .category {
+        if matchesCatalog(.overBudgetCategories, operation: operation, measure: measure, grouping: grouping, requestedDetail: requestedDetail) {
             return .overBudgetCategories
         }
         if measure == .savingsMovement {
-            if normalized.contains("activity") || normalized.contains("transactions") || normalized.contains("transfers") {
-                return .savingsActivity
-            }
-            return operation == .rank && grouping == .savingsLedgerEntry ? .savingsMovementRanking : .savingsActivity
+            return matchesCatalog(.savingsMovementRanking, operation: operation, measure: measure, grouping: grouping, requestedDetail: requestedDetail) ? .savingsMovementRanking : .savingsActivity
         }
-        if operation == .lookupDetails, measure == .savings {
+        if matchesCatalog(.savingsStatus, operation: operation, measure: measure, grouping: grouping, requestedDetail: requestedDetail) {
             return .savingsStatus
         }
-        if measure == .reconciliationBalance, grouping == .allocationAccount {
-            if isSettlementRowsPrompt(normalized) {
-                return .settlementRows
-            }
-            if isAllocationRowsPrompt(normalized) {
-                return .allocationRows
-            }
+        if matchesCatalog(.reconciliationBalance, operation: operation, measure: measure, grouping: grouping, requestedDetail: requestedDetail) {
             return .reconciliationBalance
         }
-        if requestShape == .objectInventoryList, measure == .remainingBudget {
-            return .budgetInventory
-        }
-        if isRecentTransactionRows(
-            operation: operation,
-            measure: measure,
-            grouping: grouping
-        ) {
+        if isRecentTransactionRows(operation: operation, measure: measure, grouping: grouping),
+           matchesCatalog(.recentTransactionRows, operation: operation, measure: measure, grouping: grouping, requestedDetail: requestedDetail) {
             return .recentTransactionRows
         }
-        if operation == .sum, measure == .spend {
+        if matchesCatalog(.broadSpend, operation: operation, measure: measure, grouping: grouping, requestedDetail: requestedDetail) {
             return .broadSpend
         }
         return .generic
@@ -978,12 +1122,29 @@ struct MarinaRoutePatternRegistry {
         return .generic
     }
 
+    nonisolated static func preferredExecutorRoute(for kind: MarinaRouteIntentKind) -> MarinaPreferredExecutorRoute? {
+        routeCatalog.first { $0.kind == kind }?.preferredExecutorRoute
+    }
+
     nonisolated static func normalized(_ text: String) -> String {
         text
             .lowercased()
             .replacingOccurrences(of: "[^a-z0-9\\s&]", with: " ", options: .regularExpression)
             .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private nonisolated static func matchesCatalog(
+        _ kind: MarinaRouteIntentKind,
+        operation: MarinaCandidateOperation,
+        measure: MarinaCandidateMeasure,
+        grouping: MarinaGroupingDimensionCandidate?,
+        requestedDetail: MarinaSemanticRequestedDetail?
+    ) -> Bool {
+        routeCatalog.contains {
+            $0.kind == kind
+                && $0.matches(operation: operation, measure: measure, grouping: grouping, requestedDetail: requestedDetail)
+        }
     }
 
     nonisolated static func fallbackComposableKind(

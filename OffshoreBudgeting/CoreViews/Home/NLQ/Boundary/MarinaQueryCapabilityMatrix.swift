@@ -125,6 +125,188 @@ struct MarinaCapabilityDecision: Codable, Equatable, Sendable {
 }
 
 struct MarinaQueryCapabilityMatrix {
+    private struct RouteCapabilityRecord: Sendable, Equatable {
+        let kind: MarinaRouteIntentKind
+        let operations: Set<MarinaCandidateOperation>
+        let measures: Set<MarinaCandidateMeasure>
+        let groupings: Set<MarinaGroupingDimensionCandidate?>
+        let targetTypes: Set<MarinaCandidateEntityTypeHint>
+        let requestedDetails: Set<MarinaSemanticRequestedDetail?>
+        let preferredExecutorRoute: MarinaPreferredExecutorRoute?
+
+        func decision(
+            routeIntent: MarinaRouteIntent,
+            operation: MarinaCandidateOperation,
+            measure: MarinaCandidateMeasure,
+            targetTypes actualTargetTypes: [MarinaCandidateEntityTypeHint],
+            grouping: MarinaGroupingDimensionCandidate?
+        ) -> MarinaCapabilityDecision {
+            guard operations.contains(operation) else {
+                return .unsupported(.unsupportedOperation, "Route \(kind.rawValue) does not support \(operation.rawValue).")
+            }
+            guard measures.contains(measure) else {
+                return .unsupported(.unsupportedMeasure, "Route \(kind.rawValue) does not support \(measure.rawValue).")
+            }
+            guard groupings.contains(grouping) else {
+                return .unsupported(.unsupportedGrouping, "Route \(kind.rawValue) does not support grouping \(grouping?.rawValue ?? "none").")
+            }
+            guard requestedDetails.contains(routeIntent.requestedDetail) else {
+                return .unsupported(.unsupportedRoute, "Route \(kind.rawValue) does not support detail \(routeIntent.requestedDetail?.rawValue ?? "none").")
+            }
+            guard actualTargetTypes.allSatisfy({ targetTypes.contains($0) }) else {
+                return .unsupported(.unsupportedTargetType, "Route \(kind.rawValue) does not support target types \(actualTargetTypes.map(\.rawValue).joined(separator: ",")).")
+            }
+            return .supported()
+        }
+    }
+
+    private static let routeCapabilityCatalog: [MarinaRouteIntentKind: RouteCapabilityRecord] = [
+        .budgetInventory: RouteCapabilityRecord(
+            kind: .budgetInventory,
+            operations: [.listRows, .lookupDetails],
+            measures: [.remainingBudget],
+            groupings: [nil],
+            targetTypes: [.budget],
+            requestedDetails: [nil, .general],
+            preferredExecutorRoute: .composableWorkspace
+        ),
+        .activeBudget: RouteCapabilityRecord(
+            kind: .activeBudget,
+            operations: [.lookupDetails],
+            measures: [.remainingBudget],
+            groupings: [nil],
+            targetTypes: [.budget],
+            requestedDetails: [nil, .general, .status],
+            preferredExecutorRoute: .composableWorkspace
+        ),
+        .budgetLinkedCards: RouteCapabilityRecord(
+            kind: .budgetLinkedCards,
+            operations: [.lookupDetails],
+            measures: [.remainingBudget, .spend],
+            groupings: [nil],
+            targetTypes: [.budget, .card],
+            requestedDetails: [.linkedCards],
+            preferredExecutorRoute: .composableWorkspace
+        ),
+        .budgetLinkedPresets: RouteCapabilityRecord(
+            kind: .budgetLinkedPresets,
+            operations: [.lookupDetails],
+            measures: [.remainingBudget, .spend],
+            groupings: [nil],
+            targetTypes: [.budget, .preset],
+            requestedDetails: [.linkedPresets],
+            preferredExecutorRoute: .composableWorkspace
+        ),
+        .budgetMembership: RouteCapabilityRecord(
+            kind: .budgetMembership,
+            operations: [.lookupDetails],
+            measures: [.remainingBudget, .spend],
+            groupings: [nil],
+            targetTypes: [.budget, .card, .preset, .category],
+            requestedDetails: [.membership],
+            preferredExecutorRoute: .composableWorkspace
+        ),
+        .budgetCategoryLimits: RouteCapabilityRecord(
+            kind: .budgetCategoryLimits,
+            operations: [.lookupDetails],
+            measures: [.remainingBudget, .spend],
+            groupings: [nil],
+            targetTypes: [.budget, .category],
+            requestedDetails: [.categoryLimits],
+            preferredExecutorRoute: .composableWorkspace
+        ),
+        .budgetCategoryLimit: RouteCapabilityRecord(
+            kind: .budgetCategoryLimit,
+            operations: [.lookupDetails],
+            measures: [.remainingBudget],
+            groupings: [nil],
+            targetTypes: [.budget, .category],
+            requestedDetails: [nil, .general, .amount, .balance],
+            preferredExecutorRoute: .composableWorkspace
+        ),
+        .overBudgetCategories: RouteCapabilityRecord(
+            kind: .overBudgetCategories,
+            operations: [.rank],
+            measures: [.remainingBudget],
+            groupings: [.category],
+            targetTypes: [.budget, .category],
+            requestedDetails: [nil, .general],
+            preferredExecutorRoute: .composableWorkspace
+        ),
+        .savingsStatus: RouteCapabilityRecord(
+            kind: .savingsStatus,
+            operations: [.lookupDetails],
+            measures: [.savings],
+            groupings: [nil],
+            targetTypes: [.savingsAccount],
+            requestedDetails: [nil, .general, .status, .balance, .account],
+            preferredExecutorRoute: .homeAdapter
+        ),
+        .savingsActivity: RouteCapabilityRecord(
+            kind: .savingsActivity,
+            operations: [.listRows, .rank],
+            measures: [.savingsMovement],
+            groupings: [nil, .savingsLedgerEntry],
+            targetTypes: [.savingsAccount],
+            requestedDetails: [nil, .general, .date, .amount],
+            preferredExecutorRoute: .workspaceAggregation
+        ),
+        .savingsMovementRanking: RouteCapabilityRecord(
+            kind: .savingsMovementRanking,
+            operations: [.rank],
+            measures: [.savingsMovement],
+            groupings: [nil, .savingsLedgerEntry],
+            targetTypes: [.savingsAccount],
+            requestedDetails: [nil, .general],
+            preferredExecutorRoute: .workspaceAggregation
+        ),
+        .reconciliationBalance: RouteCapabilityRecord(
+            kind: .reconciliationBalance,
+            operations: [.sum, .rank, .listRows, .lookupDetails],
+            measures: [.reconciliationBalance],
+            groupings: [nil, .allocationAccount],
+            targetTypes: [.allocationAccount],
+            requestedDetails: [nil, .general, .balance, .account],
+            preferredExecutorRoute: .workspaceAggregation
+        ),
+        .allocationRows: RouteCapabilityRecord(
+            kind: .allocationRows,
+            operations: [.listRows, .rank],
+            measures: [.reconciliationBalance],
+            groupings: [.allocationAccount],
+            targetTypes: [.allocationAccount],
+            requestedDetails: [nil, .general, .amount],
+            preferredExecutorRoute: .composableWorkspace
+        ),
+        .settlementRows: RouteCapabilityRecord(
+            kind: .settlementRows,
+            operations: [.listRows, .rank],
+            measures: [.reconciliationBalance],
+            groupings: [.allocationAccount],
+            targetTypes: [.allocationAccount],
+            requestedDetails: [nil, .general, .date, .amount],
+            preferredExecutorRoute: .composableWorkspace
+        ),
+        .recentTransactionRows: RouteCapabilityRecord(
+            kind: .recentTransactionRows,
+            operations: [.listRows, .rank],
+            measures: [.transactionAmount, .spend],
+            groupings: [nil, .transaction],
+            targetTypes: [.card, .category, .merchant, .expense, .transaction],
+            requestedDetails: [nil, .general, .date, .amount, .card, .category],
+            preferredExecutorRoute: .list
+        ),
+        .broadSpend: RouteCapabilityRecord(
+            kind: .broadSpend,
+            operations: [.sum],
+            measures: [.spend],
+            groupings: [nil],
+            targetTypes: [.card, .category, .merchant, .expense, .transaction, .allocationAccount],
+            requestedDetails: [nil, .general],
+            preferredExecutorRoute: .aggregate
+        )
+    ]
+
     static var catalog: MarinaEntityCatalog { .current }
 
     static var modelEntityNames: Set<String> {
@@ -445,74 +627,16 @@ struct MarinaQueryCapabilityMatrix {
         targetTypes: [MarinaCandidateEntityTypeHint],
         grouping: MarinaGroupingDimensionCandidate?
     ) -> MarinaCapabilityDecision {
-        switch routeIntent.kind {
-        case .budgetInventory:
-            return operation == .listRows || operation == .lookupDetails
-                ? .supported()
-                : .unsupported(.unsupportedOperation)
-        case .activeBudget:
-            return operation == .lookupDetails && measure == .remainingBudget
-                ? .supported()
-                : .unsupported(.unsupportedMeasure)
-        case .budgetLinkedCards:
-            return operation == .lookupDetails && targetsAre(targetTypes, allowed: [.budget, .card])
-                ? .supported()
-                : .unsupported(.unsupportedTargetType)
-        case .budgetLinkedPresets:
-            return operation == .lookupDetails && targetsAre(targetTypes, allowed: [.budget, .preset])
-                ? .supported()
-                : .unsupported(.unsupportedTargetType)
-        case .budgetMembership:
-            return operation == .lookupDetails && targetsAre(targetTypes, allowed: [.budget, .card, .preset, .category])
-                ? .supported()
-                : .unsupported(.unsupportedTargetType)
-        case .budgetCategoryLimits:
-            return operation == .lookupDetails && targetsAre(targetTypes, allowed: [.budget, .category])
-                ? .supported()
-                : .unsupported(.unsupportedTargetType)
-        case .budgetCategoryLimit:
-            return operation == .lookupDetails && measure == .remainingBudget && targetsAre(targetTypes, allowed: [.budget, .category])
-                ? .supported()
-                : .unsupported(.unsupportedTargetType)
-        case .overBudgetCategories:
-            return operation == .rank && measure == .remainingBudget && grouping == .category && targetsAre(targetTypes, allowed: [.budget, .category])
-                ? .supported()
-                : .unsupported(.unsupportedGrouping)
-        case .savingsStatus:
-            return operation == .lookupDetails && measure == .savings && targetsAre(targetTypes, allowed: [.savingsAccount])
-                ? .supported()
-                : .unsupported(.unsupportedTargetType)
-        case .savingsActivity:
-            return (operation == .listRows || operation == .rank) && measure == .savingsMovement && targetsAre(targetTypes, allowed: [.savingsAccount])
-                ? .supported()
-                : .unsupported(.unsupportedTargetType)
-        case .savingsMovementRanking:
-            return operation == .rank && measure == .savingsMovement && (grouping == nil || grouping == .savingsLedgerEntry) && targetsAre(targetTypes, allowed: [.savingsAccount])
-                ? .supported()
-                : .unsupported(.unsupportedGrouping)
-        case .reconciliationBalance:
-            return measure == .reconciliationBalance && grouping == .allocationAccount && targetsAre(targetTypes, allowed: [.allocationAccount])
-                ? .supported()
-                : .unsupported(.unsupportedTargetType)
-        case .allocationRows:
-            return (operation == .listRows || operation == .rank) && measure == .reconciliationBalance && grouping == .allocationAccount && targetsAre(targetTypes, allowed: [.allocationAccount])
-                ? .supported()
-                : .unsupported(.unsupportedGrouping)
-        case .settlementRows:
-            return (operation == .listRows || operation == .rank) && measure == .reconciliationBalance && grouping == .allocationAccount && targetsAre(targetTypes, allowed: [.allocationAccount])
-                ? .supported()
-                : .unsupported(.unsupportedGrouping)
-        case .recentTransactionRows:
-            return (operation == .listRows || operation == .rank) && [.transactionAmount, .spend].contains(measure) && (grouping == nil || grouping == .transaction)
-                ? .supported()
-                : .unsupported(.unsupportedGrouping)
-        case .broadSpend:
-            return operation == .sum && measure == .spend
-                ? .supported()
-                : .unsupported(.unsupportedMeasure)
-        case .databaseLookup, .generic:
-            return .unsupported(.unsupportedRoute)
+        guard let record = routeCapabilityCatalog[routeIntent.kind] else {
+            return .unsupported(.unsupportedRoute, "No capability catalog record for \(routeIntent.kind.rawValue).")
         }
+        return record.decision(
+            routeIntent: routeIntent,
+            operation: operation,
+            measure: measure,
+            targetTypes: targetTypes,
+            grouping: grouping
+        )
     }
 
     private static func supportsRank(

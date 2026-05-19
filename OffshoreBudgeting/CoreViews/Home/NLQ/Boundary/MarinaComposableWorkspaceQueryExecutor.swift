@@ -91,6 +91,8 @@ struct MarinaComposableWorkspaceQueryExecutor {
             break
         }
 
+        // Compatibility only: covered Marina read routes should arrive with routeIntent.kind.
+        // Tests run Step 5 routes with this disabled so prompt text cannot choose the route.
         if allowsPromptRouteFallback,
            let fallbackKind = MarinaRoutePatternRegistry.fallbackComposableKind(
                rawPrompt: candidate.rawPrompt,
@@ -195,7 +197,7 @@ struct MarinaComposableWorkspaceQueryExecutor {
             subtitle: rangeLabel(range),
             primaryValue: rows.first?.label,
             rows: Array(rows),
-            traceSummary: "composableWorkspace=budgetsOverlappingRange,resultCount=\(rows.count)"
+            traceSummary: "composableWorkspace=budgetInventory;route=budgetsOverlappingRange,resultCount=\(rows.count)"
         )
     }
 

@@ -541,6 +541,7 @@ struct MarinaAggregationExecutorTests {
     @Test func composableExecutor_step5RoutesDoNotNeedPromptFallback() throws {
         let fixture = try makeFixture()
         let shared = AllocationAccount(name: "Roommate", workspace: fixture.workspace)
+        let budget = Budget(name: "May", startDate: date(2026, 5, 1), endDate: date(2026, 5, 31), workspace: fixture.workspace)
         let cafe = VariableExpense(
             descriptionText: "Cafe",
             amount: 60,
@@ -550,7 +551,9 @@ struct MarinaAggregationExecutorTests {
             category: fixture.groceries
         )
         fixture.context.insert(shared)
+        fixture.context.insert(budget)
         fixture.context.insert(cafe)
+        fixture.context.insert(BudgetCategoryLimit(maxAmount: 50, budget: budget, category: fixture.groceries))
         fixture.context.insert(ExpenseAllocation(
             allocatedAmount: 30,
             workspace: fixture.workspace,
@@ -571,6 +574,48 @@ struct MarinaAggregationExecutorTests {
             calendar: Calendar(identifier: .gregorian),
             allowsPromptRouteFallback: false
         )
+        let budgetInventory = handledCard(executor.execute(
+            candidate: MarinaQueryPlanCandidate(
+                source: .heuristic,
+                rawPrompt: "What budgets do I have this month?",
+                operation: .lookupDetails,
+                measure: .remainingBudget,
+                requestShape: .objectInventoryList
+            ),
+            resolved: resolvedCandidate(),
+            plan: MarinaAggregationPlan(
+                operation: .lookupDetails,
+                measure: .remainingBudget,
+                dateRange: monthRange()
+            ),
+            provider: fixture.provider,
+            now: date(2026, 5, 15)
+        ))
+        #expect(budgetInventory.traceSummary.contains("budgetInventory"))
+        #expect(budgetInventory.rows.map(\.label).contains("May"))
+
+        let overBudget = handledCard(executor.execute(
+            candidate: MarinaQueryPlanCandidate(
+                source: .heuristic,
+                rawPrompt: "Which categories are over budget?",
+                operation: .rank,
+                measure: .remainingBudget,
+                grouping: MarinaGroupingCandidate(dimension: .category)
+            ),
+            resolved: resolvedCandidate(),
+            plan: MarinaAggregationPlan(
+                operation: .rank,
+                measure: .remainingBudget,
+                dateRange: monthRange(),
+                grouping: MarinaGroupingCandidate(dimension: .category),
+                ranking: MarinaRankingCandidate(direction: .largest, limit: 5)
+            ),
+            provider: fixture.provider,
+            now: date(2026, 5, 15)
+        ))
+        #expect(overBudget.traceSummary.contains("overBudgetCategories"))
+        #expect(overBudget.rows.map(\.label).contains("Groceries"))
+
         let accountMention = mention("roommate", .allocationAccount)
         let accountTarget = resolvedTarget(
             mention: accountMention,

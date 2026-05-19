@@ -214,6 +214,42 @@ final class MarinaAssistantUITests: XCTestCase {
         }
     }
 
+    func testMarinaAppSurfaceStep5MutationPrompt_doesNotExecuteSharedReadApproximation() throws {
+        let app = XCUIApplication()
+        let driver = MarinaUITestDriver(app: app, testCase: self)
+        let reporter = MarinaAppSurfaceReporter()
+        defer { reporter.attach(to: self) }
+
+        driver.launchHarness()
+
+        let mutationReport = driver.runCommandOrUnsupportedPrompt(
+            "create settlement with Roommate for $20",
+            expectation: MarinaPromptExpectation(
+                model: "AllocationSettlement",
+                outcome: .typedUnsupported,
+                responseShape: .unsupported
+            ),
+            timeout: 8
+        )
+        reporter.record(mutationReport)
+        XCTAssertTrue(mutationReport.result.passed, mutationReport.result.reason)
+        XCTAssertNotEqual(mutationReport.executorRoute?.localizedCaseInsensitiveContains("shared balances"), true)
+        XCTAssertNotEqual(mutationReport.executorRoute?.localizedCaseInsensitiveContains("settlementRows"), true)
+
+        let balanceReport = driver.runPrompt(
+            "What is my Roommate balance?",
+            expectation: MarinaPromptExpectation(
+                model: "AllocationAccount",
+                outcome: .handled,
+                responseShape: .summaryCard,
+                requiredVisibleText: ["Roommate"]
+            ),
+            timeout: 8
+        )
+        reporter.record(balanceReport)
+        XCTAssertTrue(balanceReport.result.passed, balanceReport.result.reason)
+    }
+
     func testMarinaFoundationModelToggle_isAvailableWithoutRuntimeLaunchArguments() throws {
         let app = XCUIApplication()
         let driver = MarinaUITestDriver(app: app, testCase: self)
