@@ -22,6 +22,14 @@ struct MarinaQueryValidator {
             )
         }
 
+        if let mutationViolation = MarinaRoutePatternRegistry.isReadOnlyStep5Mutation(candidate.rawPrompt) {
+            return unsupported(
+                .unsupportedOperation,
+                message: mutationViolation.message,
+                candidate: candidate
+            )
+        }
+
         guard let operation = candidate.operation else {
             return unsupported(
                 .unsupportedOperation,
@@ -90,15 +98,17 @@ struct MarinaQueryValidator {
             )
         }
 
-        guard MarinaQueryCapabilityMatrix.supports(
+        let capabilityDecision = MarinaQueryCapabilityMatrix.decision(
             operation: operation,
             measure: measure,
             targetTypes: resolved.resolvedTargets.map(\.entityType),
-            grouping: candidate.grouping?.dimension
-        ) else {
+            grouping: candidate.grouping?.dimension,
+            routeIntent: candidate.routeIntent
+        )
+        guard capabilityDecision.isSupported else {
             return unsupported(
                 .unsupportedCombination,
-                message: "That operation and measure combination is not supported by Marina's entity capability matrix.",
+                message: capabilityDecision.message ?? "That operation and measure combination is not supported by Marina's entity capability matrix.",
                 candidate: candidate
             )
         }
@@ -123,7 +133,8 @@ struct MarinaQueryValidator {
                 ranking: candidate.ranking,
                 limit: candidate.limit,
                 incomeStatusScope: incomeStatusScope(from: candidate, measure: measure),
-                responseShape: responseShape(operation: operation, measure: measure, candidate: candidate)
+                responseShape: responseShape(operation: operation, measure: measure, candidate: candidate),
+                routeIntent: candidate.routeIntent
             )
         )
     }
@@ -134,6 +145,14 @@ struct MarinaQueryValidator {
     ) -> MarinaPlanValidationOutcome {
         let candidate = resolved.candidate ?? compatibilityCandidate(from: resolved.query)
         let query = resolved.query
+
+        if let mutationViolation = MarinaRoutePatternRegistry.isReadOnlyStep5Mutation(candidate.rawPrompt) {
+            return unsupported(
+                .unsupportedOperation,
+                message: mutationViolation.message,
+                candidate: candidate
+            )
+        }
 
         guard let descriptor = catalog.descriptor(for: entityName(for: query.subject)) else {
             return unsupported(
@@ -288,7 +307,8 @@ struct MarinaQueryValidator {
             ranking: basePlan.ranking,
             limit: basePlan.limit,
             incomeStatusScope: basePlan.incomeStatusScope,
-            responseShape: basePlan.responseShape ?? responseShape(operation: basePlan.operation, measure: basePlan.measure, candidate: candidate)
+            responseShape: basePlan.responseShape ?? responseShape(operation: basePlan.operation, measure: basePlan.measure, candidate: candidate),
+            routeIntent: query.routeIntent ?? basePlan.routeIntent
         )
 
         if isSupportedMerchantSpendSemanticQuery(query, plan: plan) {
@@ -296,12 +316,13 @@ struct MarinaQueryValidator {
         }
 
         if query.operation != .lookupDetails,
-           MarinaQueryCapabilityMatrix.supports(
+           MarinaQueryCapabilityMatrix.decision(
                operation: plan.operation,
                measure: plan.measure,
                targetTypes: plan.targets.map(\.entityType),
-               grouping: plan.grouping?.dimension
-           ) == false {
+               grouping: plan.grouping?.dimension,
+               routeIntent: query.routeIntent ?? plan.routeIntent
+           ).isSupported == false {
             return unsupported(
                 .unsupportedCombination,
                 message: "That operation and measure combination is not supported by Marina's entity catalog.",
@@ -359,7 +380,8 @@ struct MarinaQueryValidator {
             ranking: basePlan.ranking,
             limit: basePlan.limit,
             incomeStatusScope: basePlan.incomeStatusScope,
-            responseShape: basePlan.responseShape ?? responseShape(operation: basePlan.operation, measure: basePlan.measure, candidate: candidate)
+            responseShape: basePlan.responseShape ?? responseShape(operation: basePlan.operation, measure: basePlan.measure, candidate: candidate),
+            routeIntent: resolved.query.routeIntent ?? basePlan.routeIntent
         )
     }
 

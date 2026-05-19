@@ -597,6 +597,119 @@ struct MarinaFoundationModelsInterpreterTests {
         #expect(interpretation.compatibilityCandidate.semanticCommand == command)
     }
 
+    @Test func foundationModelsSemanticCommandProducesSameRouteIntentAsHeuristicPhrase() {
+        let cases: [(prompt: String, command: MarinaSemanticCommand, targetTypes: [MarinaCandidateEntityTypeHint])] = [
+            (
+                "Show split expenses with Roommate",
+                MarinaSemanticCommand(
+                    family: .analytics,
+                    action: .rank,
+                    datasets: [.expenseAllocations],
+                    measure: .reconciliationBalance,
+                    includeFilters: [MarinaSemanticCommandFilter(rawText: "Roommate", allowedTypes: [.allocationAccount])],
+                    grouping: .allocationAccount,
+                    sort: .newest,
+                    limit: 10
+                ),
+                [.allocationAccount]
+            ),
+            (
+                "When did Roommate last pay me back?",
+                MarinaSemanticCommand(
+                    family: .analytics,
+                    action: .rank,
+                    datasets: [.reconciliation],
+                    measure: .reconciliationBalance,
+                    includeFilters: [MarinaSemanticCommandFilter(rawText: "Roommate", allowedTypes: [.allocationAccount])],
+                    grouping: .allocationAccount,
+                    sort: .newest,
+                    limit: 10
+                ),
+                [.allocationAccount]
+            ),
+            (
+                "Show savings activity",
+                MarinaSemanticCommand(
+                    family: .analytics,
+                    action: .rank,
+                    datasets: [.savingsLedger],
+                    measure: .savingsMovement,
+                    grouping: .savingsLedgerEntry,
+                    sort: .newest,
+                    limit: 10
+                ),
+                []
+            ),
+            (
+                "Show category limits for May Budget",
+                MarinaSemanticCommand(
+                    family: .analytics,
+                    action: .lookupDetails,
+                    datasets: [.budgets],
+                    measure: .spend,
+                    includeFilters: [MarinaSemanticCommandFilter(rawText: "May Budget", allowedTypes: [.budget])],
+                    requestedDetail: .categoryLimits
+                ),
+                [.budget]
+            )
+        ]
+
+        for testCase in cases {
+            let modelCandidate = MarinaFoundationModelsInterpreter().candidate(
+                from: .semanticCommand(testCase.command),
+                prompt: testCase.prompt,
+                defaultPeriodUnit: .month
+            )
+            let heuristicCandidate = MarinaHeuristicInterpreter().interpret(
+                prompt: testCase.prompt,
+                defaultPeriodUnit: .month
+            )
+
+            #expect(modelCandidate.routeIntent?.kind == heuristicCandidate.routeIntent?.kind, "Expected FM and heuristic route kind parity for \(testCase.prompt)")
+            #expect(modelCandidate.routeIntent?.subject == heuristicCandidate.routeIntent?.subject)
+            #expect(modelCandidate.routeIntent?.operation == heuristicCandidate.routeIntent?.operation)
+            #expect(modelCandidate.routeIntent?.measure == heuristicCandidate.routeIntent?.measure)
+            #expect(modelCandidate.routeIntent?.grouping == heuristicCandidate.routeIntent?.grouping)
+            #expect(modelCandidate.routeIntent?.preferredExecutorRoute == heuristicCandidate.routeIntent?.preferredExecutorRoute)
+            #expect(modelCandidate.routeIntent?.targetTypes == testCase.targetTypes)
+        }
+    }
+
+    @Test func foundationModelsSemanticCommandCannotBypassReadOnlyMutationGuard() {
+        let command = MarinaSemanticCommand(
+            family: .analytics,
+            action: .rank,
+            datasets: [.reconciliation],
+            measure: .reconciliationBalance,
+            includeFilters: [MarinaSemanticCommandFilter(rawText: "Roommate", allowedTypes: [.allocationAccount])],
+            grouping: .allocationAccount,
+            sort: .newest,
+            limit: 10
+        )
+        let candidate = MarinaFoundationModelsInterpreter().candidate(
+            from: .semanticCommand(command),
+            prompt: "create settlement with Roommate for $20",
+            defaultPeriodUnit: .month
+        )
+        let outcome = MarinaQueryValidator().validate(
+            MarinaResolvedQueryCandidate(
+                candidate: candidate,
+                resolvedTargets: [],
+                unresolvedMentions: [],
+                ambiguousMentions: [],
+                primaryDateRange: nil,
+                comparisonDateRange: nil
+            )
+        )
+
+        guard case .unsupported(let unsupported) = outcome else {
+            Issue.record("Expected FM candidate to be blocked by read-only mutation guard")
+            return
+        }
+        #expect(unsupported.kind == .unsupportedOperation)
+        #expect(unsupported.message.localizedCaseInsensitiveContains("read-only"))
+    }
+
     @Test func foundationModels_lowConfidenceModelOutput_preservesValidCandidate() async throws {
         let structuredIntent = MarinaStructuredIntent.query(
             MarinaStructuredQueryIntent(

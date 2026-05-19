@@ -313,7 +313,7 @@ struct MarinaUITestDriver {
                 }) {
                     return matching
                 }
-                return newTraces.last
+                latest = newTraces.last ?? latest
             }
             RunLoop.current.run(until: Date().addingTimeInterval(0.2))
         }

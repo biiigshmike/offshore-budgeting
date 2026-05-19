@@ -348,6 +348,127 @@ struct MarinaQueryValidatorTests {
         #expect(frequencyPlan.grouping?.dimension == .transaction)
     }
 
+    @Test func capabilityMatrix_isEntityAwareForSavingsAndReconciliationRoutes() {
+        #expect(MarinaQueryCapabilityMatrix.supports(
+            operation: .rank,
+            measure: .reconciliationBalance,
+            targetTypes: [.allocationAccount],
+            grouping: .allocationAccount
+        ))
+        #expect(MarinaQueryCapabilityMatrix.supports(
+            operation: .rank,
+            measure: .reconciliationBalance,
+            targetTypes: [.savingsAccount],
+            grouping: .allocationAccount
+        ) == false)
+        #expect(MarinaQueryCapabilityMatrix.supports(
+            operation: .rank,
+            measure: .savingsMovement,
+            targetTypes: [.savingsAccount],
+            grouping: .savingsLedgerEntry
+        ))
+        #expect(MarinaQueryCapabilityMatrix.supports(
+            operation: .rank,
+            measure: .savingsMovement,
+            targetTypes: [.allocationAccount],
+            grouping: .savingsLedgerEntry
+        ) == false)
+    }
+
+    @Test func capabilityMatrix_routeDecisionsAreEntityAwareForBudgetAndSavingsDomains() {
+        let budgetLimits = routeIntent(
+            kind: .budgetCategoryLimits,
+            subject: .budgets,
+            operation: .lookupDetails,
+            measure: .remainingBudget,
+            targetTypes: [.budget, .category],
+            requestedDetail: .categoryLimits
+        )
+        let merchantBudgetLimits = routeIntent(
+            kind: .budgetCategoryLimits,
+            subject: .budgets,
+            operation: .lookupDetails,
+            measure: .remainingBudget,
+            targetTypes: [.merchant],
+            requestedDetail: .categoryLimits
+        )
+        let savingsActivity = routeIntent(
+            kind: .savingsActivity,
+            subject: .savingsLedgerEntries,
+            operation: .listRows,
+            measure: .savingsMovement,
+            grouping: .savingsLedgerEntry,
+            targetTypes: [.savingsAccount]
+        )
+        let allocationScopedSavings = routeIntent(
+            kind: .savingsActivity,
+            subject: .savingsLedgerEntries,
+            operation: .listRows,
+            measure: .savingsMovement,
+            grouping: .savingsLedgerEntry,
+            targetTypes: [.allocationAccount]
+        )
+
+        #expect(MarinaQueryCapabilityMatrix.decision(
+            operation: .lookupDetails,
+            measure: .remainingBudget,
+            targetTypes: [.budget, .category],
+            grouping: nil,
+            routeIntent: budgetLimits
+        ).isSupported)
+        #expect(MarinaQueryCapabilityMatrix.decision(
+            operation: .lookupDetails,
+            measure: .remainingBudget,
+            targetTypes: [.merchant],
+            grouping: nil,
+            routeIntent: merchantBudgetLimits
+        ).reason == .unsupportedTargetType)
+        #expect(MarinaQueryCapabilityMatrix.decision(
+            operation: .listRows,
+            measure: .savingsMovement,
+            targetTypes: [.savingsAccount],
+            grouping: .savingsLedgerEntry,
+            routeIntent: savingsActivity
+        ).isSupported)
+        #expect(MarinaQueryCapabilityMatrix.decision(
+            operation: .listRows,
+            measure: .savingsMovement,
+            targetTypes: [.allocationAccount],
+            grouping: .savingsLedgerEntry,
+            routeIntent: allocationScopedSavings
+        ).reason == .unsupportedTargetType)
+    }
+
+    @Test func validator_blocksStep5MutationsFromSharedReadPipeline() {
+        let prompts = [
+            "create settlement with Roommate for $20",
+            "mark Roommate paid",
+            "move this to savings",
+            "add allocation for Roommate",
+            "delete allocation",
+            "add preset Rent"
+        ]
+
+        for prompt in prompts {
+            let candidate = MarinaQueryPlanCandidate(
+                source: .heuristic,
+                rawPrompt: prompt,
+                operation: .rank,
+                measure: .reconciliationBalance,
+                grouping: MarinaGroupingCandidate(dimension: .allocationAccount),
+                confidence: .medium
+            )
+            let outcome = MarinaQueryValidator().validate(resolvedCandidate(candidate))
+
+            guard case .unsupported(let unsupported) = outcome else {
+                Issue.record("Expected read-only mutation guard for \(prompt)")
+                continue
+            }
+            #expect(unsupported.kind == .unsupportedOperation)
+            #expect(unsupported.message.localizedCaseInsensitiveContains("read-only"))
+        }
+    }
+
     @Test func validator_responseShapeHintIsAdvisoryAndCanBeOverridden() {
         let candidate = MarinaQueryPlanCandidate(
             source: .heuristic,
@@ -575,6 +696,28 @@ struct MarinaQueryValidatorTests {
             entityType: entityType,
             displayName: displayName,
             sourceID: UUID()
+        )
+    }
+
+    private func routeIntent(
+        kind: MarinaRouteIntentKind,
+        subject: MarinaSubject,
+        operation: MarinaCandidateOperation,
+        measure: MarinaCandidateMeasure,
+        grouping: MarinaGroupingDimensionCandidate? = nil,
+        targetTypes: [MarinaCandidateEntityTypeHint],
+        requestedDetail: MarinaSemanticRequestedDetail? = nil
+    ) -> MarinaRouteIntent {
+        MarinaRouteIntent(
+            kind: kind,
+            subject: subject,
+            operation: operation,
+            measure: measure,
+            grouping: grouping,
+            targetTypes: targetTypes,
+            requestedDetail: requestedDetail,
+            responseShape: nil,
+            preferredExecutorRoute: nil
         )
     }
 

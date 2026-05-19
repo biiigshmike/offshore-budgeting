@@ -85,6 +85,45 @@ struct MarinaAppSurfaceMetricRecord: Codable, Equatable, Identifiable, Sendable 
     let unsupportedReason: String?
 }
 
+enum MarinaCapabilityDecisionStatus: String, Codable, Equatable, Sendable {
+    case supported
+    case clarificationNeeded
+    case unsupported
+}
+
+enum MarinaCapabilityDecisionReason: String, Codable, Equatable, Sendable {
+    case routeSupported
+    case broadRuleSupported
+    case unsupportedOperation
+    case unsupportedMeasure
+    case unsupportedGrouping
+    case unsupportedTargetType
+    case unsupportedRoute
+    case clarificationNeeded
+}
+
+struct MarinaCapabilityDecision: Codable, Equatable, Sendable {
+    let status: MarinaCapabilityDecisionStatus
+    let reason: MarinaCapabilityDecisionReason
+    let message: String?
+
+    var isSupported: Bool {
+        status == .supported
+    }
+
+    static func supported(_ reason: MarinaCapabilityDecisionReason = .routeSupported) -> MarinaCapabilityDecision {
+        MarinaCapabilityDecision(status: .supported, reason: reason, message: nil)
+    }
+
+    static func clarificationNeeded(_ message: String) -> MarinaCapabilityDecision {
+        MarinaCapabilityDecision(status: .clarificationNeeded, reason: .clarificationNeeded, message: message)
+    }
+
+    static func unsupported(_ reason: MarinaCapabilityDecisionReason, _ message: String? = nil) -> MarinaCapabilityDecision {
+        MarinaCapabilityDecision(status: .unsupported, reason: reason, message: message)
+    }
+}
+
 struct MarinaQueryCapabilityMatrix {
     static var catalog: MarinaEntityCatalog { .current }
 
@@ -317,41 +356,237 @@ struct MarinaQueryCapabilityMatrix {
         appSurfaceMetrics.first { $0.id == id }
     }
 
+    static func decision(
+        operation: MarinaCandidateOperation,
+        measure: MarinaCandidateMeasure,
+        targetTypes: [MarinaCandidateEntityTypeHint],
+        grouping: MarinaGroupingDimensionCandidate?,
+        routeIntent: MarinaRouteIntent? = nil
+    ) -> MarinaCapabilityDecision {
+        let effectiveGrouping = routeIntent?.grouping ?? grouping
+        let effectiveTargets = routeIntent?.targetTypes.isEmpty == false ? routeIntent?.targetTypes ?? [] : targetTypes
+        if let routeIntent, routeIntent.kind != .generic, routeIntent.kind != .databaseLookup {
+            let routeDecision = decision(for: routeIntent, operation: operation, measure: measure, targetTypes: effectiveTargets, grouping: effectiveGrouping)
+            return routeDecision
+        }
+        switch operation {
+        case .sum:
+            switch measure {
+            case .spend, .income, .categoryShare, .presetAmount, .transactionAmount:
+                return .supported(.broadRuleSupported)
+            case .reconciliationBalance:
+                return effectiveGrouping == .allocationAccount && targetsAre(effectiveTargets, allowed: [.allocationAccount])
+                    ? .supported(.broadRuleSupported)
+                    : .unsupported(.unsupportedGrouping)
+            case .savings, .savingsMovement, .remainingBudget, .transactionFrequency:
+                return .unsupported(.unsupportedMeasure)
+            }
+        case .average:
+            return [.spend, .income, .savings].contains(measure)
+                ? .supported(.broadRuleSupported)
+                : .unsupported(.unsupportedMeasure)
+        case .count:
+            return measure == .transactionFrequency
+                ? .supported(.broadRuleSupported)
+                : .unsupported(.unsupportedMeasure)
+        case .rank:
+            return supportsRank(
+                measure: measure,
+                targetTypes: effectiveTargets,
+                grouping: effectiveGrouping
+            )
+        case .listRows:
+            return supportsListRows(
+                measure: measure,
+                targetTypes: effectiveTargets,
+                grouping: effectiveGrouping
+            )
+        case .compare:
+            return [.spend, .income, .savings, .categoryShare].contains(measure)
+                ? .supported(.broadRuleSupported)
+                : .unsupported(.unsupportedMeasure)
+        case .simulate:
+            return measure == .remainingBudget
+                ? .supported(.broadRuleSupported)
+                : .unsupported(.unsupportedMeasure)
+        case .forecast:
+            return measure == .savings
+                ? .supported(.broadRuleSupported)
+                : .unsupported(.unsupportedMeasure)
+        case .lookupDetails:
+            return measure == .transactionAmount || measure == .savings || measure == .presetAmount || measure == .remainingBudget
+                ? .supported(.broadRuleSupported)
+                : .unsupported(.unsupportedMeasure)
+        case .minimum, .maximum, .trend:
+            return .unsupported(.unsupportedOperation)
+        }
+    }
+
     static func supports(
         operation: MarinaCandidateOperation,
         measure: MarinaCandidateMeasure,
         targetTypes: [MarinaCandidateEntityTypeHint],
-        grouping: MarinaGroupingDimensionCandidate?
+        grouping: MarinaGroupingDimensionCandidate?,
+        routeIntent: MarinaRouteIntent? = nil
     ) -> Bool {
-        switch operation {
-        case .sum:
-            return [.spend, .income, .categoryShare, .presetAmount, .transactionAmount].contains(measure)
-        case .average:
-            return [.spend, .income, .savings].contains(measure)
-        case .count:
-            return measure == .transactionFrequency
-        case .rank:
-            return grouping != nil || measure == .reconciliationBalance || measure == .savingsMovement
-        case .listRows:
-            return [
-                .transactionAmount,
-                .income,
-                .presetAmount,
-                .savingsMovement,
-                .reconciliationBalance,
-                .remainingBudget
-            ].contains(measure)
-        case .compare:
-            return [.spend, .income, .savings, .categoryShare].contains(measure)
-        case .simulate:
-            return measure == .remainingBudget
-        case .forecast:
-            return measure == .savings
-        case .lookupDetails:
-            return measure == .transactionAmount || measure == .savings || measure == .presetAmount || measure == .remainingBudget
-        case .minimum, .maximum, .trend:
-            return false
+        decision(
+            operation: operation,
+            measure: measure,
+            targetTypes: targetTypes,
+            grouping: grouping,
+            routeIntent: routeIntent
+        ).isSupported
+    }
+
+    private static func decision(
+        for routeIntent: MarinaRouteIntent,
+        operation: MarinaCandidateOperation,
+        measure: MarinaCandidateMeasure,
+        targetTypes: [MarinaCandidateEntityTypeHint],
+        grouping: MarinaGroupingDimensionCandidate?
+    ) -> MarinaCapabilityDecision {
+        switch routeIntent.kind {
+        case .budgetInventory:
+            return operation == .listRows || operation == .lookupDetails
+                ? .supported()
+                : .unsupported(.unsupportedOperation)
+        case .activeBudget:
+            return operation == .lookupDetails && measure == .remainingBudget
+                ? .supported()
+                : .unsupported(.unsupportedMeasure)
+        case .budgetLinkedCards:
+            return operation == .lookupDetails && targetsAre(targetTypes, allowed: [.budget, .card])
+                ? .supported()
+                : .unsupported(.unsupportedTargetType)
+        case .budgetLinkedPresets:
+            return operation == .lookupDetails && targetsAre(targetTypes, allowed: [.budget, .preset])
+                ? .supported()
+                : .unsupported(.unsupportedTargetType)
+        case .budgetMembership:
+            return operation == .lookupDetails && targetsAre(targetTypes, allowed: [.budget, .card, .preset, .category])
+                ? .supported()
+                : .unsupported(.unsupportedTargetType)
+        case .budgetCategoryLimits:
+            return operation == .lookupDetails && targetsAre(targetTypes, allowed: [.budget, .category])
+                ? .supported()
+                : .unsupported(.unsupportedTargetType)
+        case .budgetCategoryLimit:
+            return operation == .lookupDetails && measure == .remainingBudget && targetsAre(targetTypes, allowed: [.budget, .category])
+                ? .supported()
+                : .unsupported(.unsupportedTargetType)
+        case .overBudgetCategories:
+            return operation == .rank && measure == .remainingBudget && grouping == .category && targetsAre(targetTypes, allowed: [.budget, .category])
+                ? .supported()
+                : .unsupported(.unsupportedGrouping)
+        case .savingsStatus:
+            return operation == .lookupDetails && measure == .savings && targetsAre(targetTypes, allowed: [.savingsAccount])
+                ? .supported()
+                : .unsupported(.unsupportedTargetType)
+        case .savingsActivity:
+            return (operation == .listRows || operation == .rank) && measure == .savingsMovement && targetsAre(targetTypes, allowed: [.savingsAccount])
+                ? .supported()
+                : .unsupported(.unsupportedTargetType)
+        case .savingsMovementRanking:
+            return operation == .rank && measure == .savingsMovement && (grouping == nil || grouping == .savingsLedgerEntry) && targetsAre(targetTypes, allowed: [.savingsAccount])
+                ? .supported()
+                : .unsupported(.unsupportedGrouping)
+        case .reconciliationBalance:
+            return measure == .reconciliationBalance && grouping == .allocationAccount && targetsAre(targetTypes, allowed: [.allocationAccount])
+                ? .supported()
+                : .unsupported(.unsupportedTargetType)
+        case .allocationRows:
+            return (operation == .listRows || operation == .rank) && measure == .reconciliationBalance && grouping == .allocationAccount && targetsAre(targetTypes, allowed: [.allocationAccount])
+                ? .supported()
+                : .unsupported(.unsupportedGrouping)
+        case .settlementRows:
+            return (operation == .listRows || operation == .rank) && measure == .reconciliationBalance && grouping == .allocationAccount && targetsAre(targetTypes, allowed: [.allocationAccount])
+                ? .supported()
+                : .unsupported(.unsupportedGrouping)
+        case .recentTransactionRows:
+            return (operation == .listRows || operation == .rank) && [.transactionAmount, .spend].contains(measure) && (grouping == nil || grouping == .transaction)
+                ? .supported()
+                : .unsupported(.unsupportedGrouping)
+        case .broadSpend:
+            return operation == .sum && measure == .spend
+                ? .supported()
+                : .unsupported(.unsupportedMeasure)
+        case .databaseLookup, .generic:
+            return .unsupported(.unsupportedRoute)
         }
+    }
+
+    private static func supportsRank(
+        measure: MarinaCandidateMeasure,
+        targetTypes: [MarinaCandidateEntityTypeHint],
+        grouping: MarinaGroupingDimensionCandidate?
+    ) -> MarinaCapabilityDecision {
+        switch measure {
+        case .spend:
+            return grouping.map { Set([.category, .merchant, .card, .transaction, .day, .week, .month]).contains($0) } == true
+                ? .supported(.broadRuleSupported)
+                : .unsupported(.unsupportedGrouping)
+        case .income:
+            return grouping == .incomeSource ? .supported(.broadRuleSupported) : .unsupported(.unsupportedGrouping)
+        case .presetAmount:
+            return grouping.map { Set([.transaction, .preset, .category, .card]).contains($0) } == true
+                ? .supported(.broadRuleSupported)
+                : .unsupported(.unsupportedGrouping)
+        case .transactionAmount, .transactionFrequency:
+            return grouping == .transaction ? .supported(.broadRuleSupported) : .unsupported(.unsupportedGrouping)
+        case .remainingBudget, .categoryShare:
+            return grouping == .category ? .supported(.broadRuleSupported) : .unsupported(.unsupportedGrouping)
+        case .reconciliationBalance:
+            return grouping == .allocationAccount && targetsAre(targetTypes, allowed: [.allocationAccount])
+                ? .supported(.broadRuleSupported)
+                : .unsupported(targetsAre(targetTypes, allowed: [.allocationAccount]) ? .unsupportedGrouping : .unsupportedTargetType)
+        case .savingsMovement:
+            return (grouping == .savingsLedgerEntry || grouping == nil)
+                && targetsAre(targetTypes, allowed: [.savingsAccount])
+                ? .supported(.broadRuleSupported)
+                : .unsupported(targetsAre(targetTypes, allowed: [.savingsAccount]) ? .unsupportedGrouping : .unsupportedTargetType)
+        case .savings:
+            return grouping == nil && targetsAre(targetTypes, allowed: [.savingsAccount])
+                ? .supported(.broadRuleSupported)
+                : .unsupported(targetsAre(targetTypes, allowed: [.savingsAccount]) ? .unsupportedGrouping : .unsupportedTargetType)
+        }
+    }
+
+    private static func supportsListRows(
+        measure: MarinaCandidateMeasure,
+        targetTypes: [MarinaCandidateEntityTypeHint],
+        grouping: MarinaGroupingDimensionCandidate?
+    ) -> MarinaCapabilityDecision {
+        switch measure {
+        case .transactionAmount:
+            return grouping == nil || grouping == .transaction ? .supported(.broadRuleSupported) : .unsupported(.unsupportedGrouping)
+        case .income:
+            return grouping == nil || grouping == .incomeSource ? .supported(.broadRuleSupported) : .unsupported(.unsupportedGrouping)
+        case .presetAmount:
+            return grouping == nil || grouping.map { Set([.transaction, .preset, .category, .card]).contains($0) } == true
+                ? .supported(.broadRuleSupported)
+                : .unsupported(.unsupportedGrouping)
+        case .savingsMovement:
+            return (grouping == nil || grouping == .savingsLedgerEntry)
+                && targetsAre(targetTypes, allowed: [.savingsAccount])
+                ? .supported(.broadRuleSupported)
+                : .unsupported(targetsAre(targetTypes, allowed: [.savingsAccount]) ? .unsupportedGrouping : .unsupportedTargetType)
+        case .reconciliationBalance:
+            return (grouping == nil || grouping == .allocationAccount)
+                && targetsAre(targetTypes, allowed: [.allocationAccount])
+                ? .supported(.broadRuleSupported)
+                : .unsupported(targetsAre(targetTypes, allowed: [.allocationAccount]) ? .unsupportedGrouping : .unsupportedTargetType)
+        case .remainingBudget:
+            return grouping == nil || grouping == .category ? .supported(.broadRuleSupported) : .unsupported(.unsupportedGrouping)
+        case .spend, .savings, .categoryShare, .transactionFrequency:
+            return .unsupported(.unsupportedMeasure)
+        }
+    }
+
+    private static func targetsAre(
+        _ targetTypes: [MarinaCandidateEntityTypeHint],
+        allowed: Set<MarinaCandidateEntityTypeHint>
+    ) -> Bool {
+        targetTypes.allSatisfy { allowed.contains($0) }
     }
 
     static func capabilities(for type: MarinaLookupObjectType) -> Set<MarinaQueryCapability> {

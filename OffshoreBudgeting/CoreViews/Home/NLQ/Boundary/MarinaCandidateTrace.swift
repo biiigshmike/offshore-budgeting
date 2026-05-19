@@ -3,6 +3,7 @@ import Foundation
 struct MarinaCandidateTrace: Codable, Equatable {
     let requestFamily: MarinaRequestFamily?
     let requestShape: MarinaRequestShape?
+    let routeIntentSummary: String?
     let interpreterSource: MarinaInterpreterSource?
     let operation: MarinaCandidateOperation?
     let measure: MarinaCandidateMeasure?
@@ -28,6 +29,7 @@ struct MarinaCandidateTrace: Codable, Equatable {
     ) {
         self.requestFamily = candidate?.requestFamily
         self.requestShape = candidate.flatMap(Self.requestShape)
+        self.routeIntentSummary = candidate?.routeIntent.map(Self.routeIntentSummary)
         self.interpreterSource = candidate?.source
         self.operation = candidate?.operation
         self.measure = candidate?.measure
@@ -48,6 +50,7 @@ struct MarinaCandidateTrace: Codable, Equatable {
         [
             requestFamily.map { "family=\($0.rawValue)" },
             requestShape.map { "requestShape=\($0.rawValue)" },
+            routeIntentSummary.map { "routeIntent=\($0)" },
             interpreterSource.map { "source=\($0.rawValue)" },
             operation.map { "operation=\($0.rawValue)" },
             measure.map { "measure=\($0.rawValue)" },
@@ -109,6 +112,17 @@ struct MarinaCandidateTrace: Codable, Equatable {
             command.datasets.map(\.rawValue).joined(separator: "|"),
             command.sort?.rawValue ?? "nil",
             command.limit.map(String.init) ?? "nil"
+        ].joined(separator: ":")
+    }
+
+    nonisolated private static func routeIntentSummary(_ intent: MarinaRouteIntent) -> String {
+        [
+            intent.kind.rawValue,
+            intent.subject.rawValue,
+            intent.operation.rawValue,
+            intent.measure.rawValue,
+            intent.grouping?.rawValue ?? "nil",
+            intent.preferredExecutorRoute?.rawValue ?? "nil"
         ].joined(separator: ":")
     }
 

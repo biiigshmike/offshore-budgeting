@@ -40,13 +40,16 @@ struct MarinaComposableWorkspaceQuery: Codable, Equatable, Sendable {
 struct MarinaComposableWorkspaceQueryExecutor {
     private let calendar: Calendar
     private let amountBasisAdapter: MarinaAmountBasisAdapter
+    private let allowsPromptRouteFallback: Bool
 
     init(
         calendar: Calendar = .current,
-        amountBasisAdapter: MarinaAmountBasisAdapter = MarinaAmountBasisAdapter()
+        amountBasisAdapter: MarinaAmountBasisAdapter = MarinaAmountBasisAdapter(),
+        allowsPromptRouteFallback: Bool = true
     ) {
         self.calendar = calendar
         self.amountBasisAdapter = amountBasisAdapter
+        self.allowsPromptRouteFallback = allowsPromptRouteFallback
     }
 
     func execute(
@@ -63,18 +66,52 @@ struct MarinaComposableWorkspaceQueryExecutor {
             return simulate(candidate: candidate, resolved: resolved, plan: plan, provider: provider, now: now)
         }
 
-        let normalizedPrompt = normalized(candidate.rawPrompt)
-        if isBudgetListForPeriodPrompt(normalizedPrompt) {
+        switch candidate.routeIntent?.kind ?? plan.routeIntent?.kind {
+        case .budgetInventory?:
             return .handled(budgetsOverlappingRange(plan: plan, provider: provider, now: now))
-        }
-        if isOverBudgetCategoriesPrompt(normalizedPrompt) {
+        case .overBudgetCategories?:
             return .handled(overBudgetCategories(plan: plan, provider: provider, now: now, amountBasis: amountBasis))
-        }
-        if isAllocationListPrompt(normalizedPrompt) {
+        case .allocationRows?:
             return .handled(allocationRows(resolved: resolved, plan: plan, provider: provider, now: now))
-        }
-        if isSettlementListPrompt(normalizedPrompt) {
+        case .settlementRows?:
             return .handled(settlementRows(resolved: resolved, plan: plan, provider: provider, now: now))
+        case .budgetLinkedCards?, .budgetLinkedPresets?, .budgetCategoryLimits?, .budgetMembership?, .activeBudget?:
+            if let budget = resolvedBudgetTarget(in: resolved, candidate: candidate, provider: provider, now: now),
+               let detail = (candidate.routeIntent?.requestedDetail ?? plan.routeIntent?.requestedDetail ?? candidate.semanticCommand?.requestedDetail),
+               isBudgetRelationshipDetail(detail) {
+                return .handled(budgetRelationshipResponse(budget: budget, detail: detail, resolved: resolved, plan: plan, provider: provider))
+            }
+        case .budgetCategoryLimit?:
+            if let categoryTarget = resolved.resolvedTargets.first(where: { $0.entityType == .category }) {
+                return .handled(categoryAvailability(target: categoryTarget, plan: plan, provider: provider, now: now))
+            }
+        case .recentTransactionRows?:
+            return .handled(recentFilteredTransactions(resolved: resolved, plan: plan, provider: provider, now: now, amountBasis: amountBasis))
+        case .databaseLookup?, .generic?, .broadSpend?, .savingsStatus?, .savingsActivity?, .savingsMovementRanking?, .reconciliationBalance?, nil:
+            break
+        }
+
+        if allowsPromptRouteFallback,
+           let fallbackKind = MarinaRoutePatternRegistry.fallbackComposableKind(
+               rawPrompt: candidate.rawPrompt,
+               operation: plan.operation,
+               measure: plan.measure,
+               grouping: plan.grouping?.dimension
+           ) {
+            switch fallbackKind {
+            case .budgetInventory:
+                return .handled(budgetsOverlappingRange(plan: plan, provider: provider, now: now))
+            case .overBudgetCategories:
+                return .handled(overBudgetCategories(plan: plan, provider: provider, now: now, amountBasis: amountBasis))
+            case .allocationRows:
+                return .handled(allocationRows(resolved: resolved, plan: plan, provider: provider, now: now))
+            case .settlementRows:
+                return .handled(settlementRows(resolved: resolved, plan: plan, provider: provider, now: now))
+            case .recentTransactionRows:
+                return .handled(recentFilteredTransactions(resolved: resolved, plan: plan, provider: provider, now: now, amountBasis: amountBasis))
+            case .generic, .databaseLookup, .activeBudget, .budgetMembership, .budgetLinkedCards, .budgetLinkedPresets, .budgetCategoryLimits, .budgetCategoryLimit, .savingsStatus, .savingsActivity, .savingsMovementRanking, .reconciliationBalance, .broadSpend:
+                break
+            }
         }
 
         if let budget = resolvedBudgetTarget(in: resolved, candidate: candidate, provider: provider, now: now),
@@ -938,34 +975,6 @@ struct MarinaComposableWorkspaceQueryExecutor {
 
     private func hasAllocationAccountTarget(_ plan: MarinaAggregationPlan) -> Bool {
         plan.targets.contains { $0.entityType == .allocationAccount }
-    }
-
-    private func isBudgetListForPeriodPrompt(_ prompt: String) -> Bool {
-        (prompt.contains("budget") || prompt.contains("budgets"))
-            && (prompt.contains("do i have") || prompt.contains("have this") || prompt.contains("have in"))
-    }
-
-    private func isOverBudgetCategoriesPrompt(_ prompt: String) -> Bool {
-        prompt.contains("over budget")
-            && (prompt.contains("category") || prompt.contains("categories"))
-    }
-
-    private func isAllocationListPrompt(_ prompt: String) -> Bool {
-        prompt.contains("allocation")
-            || prompt.contains("allocations")
-            || prompt.contains("allocated")
-            || (prompt.contains("expenses") && prompt.contains("split with"))
-            || (prompt.contains("split expenses") && prompt.contains(" with "))
-            || (prompt.contains("split charges") && prompt.contains(" with "))
-    }
-
-    private func isSettlementListPrompt(_ prompt: String) -> Bool {
-        prompt.contains("settlement")
-            || prompt.contains("settlements")
-            || prompt.contains("paid me back")
-            || prompt.contains("pay me back")
-            || prompt.contains("repaid")
-            || prompt.contains("reimburse")
     }
 
     private func resolvedBudgetTarget(

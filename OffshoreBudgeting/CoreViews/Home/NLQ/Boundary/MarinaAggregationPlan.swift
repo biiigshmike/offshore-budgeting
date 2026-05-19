@@ -50,6 +50,7 @@ struct MarinaAggregationPlan: Codable, Equatable, Identifiable {
     let limit: Int?
     let incomeStatusScope: MarinaIncomeStatusScope?
     let responseShape: MarinaResponseShapeHint?
+    let routeIntent: MarinaRouteIntent?
 
     init(
         id: UUID = UUID(),
@@ -63,7 +64,8 @@ struct MarinaAggregationPlan: Codable, Equatable, Identifiable {
         ranking: MarinaRankingCandidate? = nil,
         limit: Int? = nil,
         incomeStatusScope: MarinaIncomeStatusScope? = nil,
-        responseShape: MarinaResponseShapeHint? = nil
+        responseShape: MarinaResponseShapeHint? = nil,
+        routeIntent: MarinaRouteIntent? = nil
     ) {
         self.id = id
         self.status = status
@@ -77,5 +79,45 @@ struct MarinaAggregationPlan: Codable, Equatable, Identifiable {
         self.limit = limit
         self.incomeStatusScope = incomeStatusScope
         self.responseShape = responseShape
+        let targetTypes = targets.map(\.entityType)
+        let subject = Self.subject(for: measure)
+        let kind = MarinaRouteIntentRegistry.intentKind(
+            subject: subject,
+            operation: operation,
+            measure: measure,
+            grouping: grouping?.dimension,
+            requestedDetail: nil,
+            targetTypes: targetTypes
+        )
+        self.routeIntent = routeIntent ?? MarinaRouteIntent(
+            kind: kind,
+            subject: subject,
+            operation: operation,
+            measure: measure,
+            grouping: grouping?.dimension,
+            targetTypes: targetTypes,
+            requestedDetail: nil,
+            responseShape: responseShape,
+            preferredExecutorRoute: nil
+        )
+    }
+
+    nonisolated private static func subject(for measure: MarinaCandidateMeasure) -> MarinaSubject {
+        switch measure {
+        case .spend, .categoryShare, .transactionAmount, .transactionFrequency:
+            return .variableExpenses
+        case .income:
+            return .income
+        case .savings:
+            return .savingsAccounts
+        case .savingsMovement:
+            return .savingsLedgerEntries
+        case .remainingBudget:
+            return .budgets
+        case .reconciliationBalance:
+            return .reconciliationAccounts
+        case .presetAmount:
+            return .plannedExpenses
+        }
     }
 }

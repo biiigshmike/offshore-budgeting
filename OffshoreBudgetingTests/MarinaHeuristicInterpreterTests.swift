@@ -224,6 +224,64 @@ struct MarinaHeuristicInterpreterTests {
         #expect(settlement.entityMentions.first?.rawText == "roommate")
     }
 
+    @Test func heuristic_routeIntentRegistryPreservesStep5Precedence() {
+        let cases: [(prompt: String, kind: MarinaRouteIntentKind, preferred: MarinaPreferredExecutorRoute?)] = [
+            ("Show my Groceries budget limit", .budgetCategoryLimit, .composableWorkspace),
+            ("Show category limits for May Budget", .budgetCategoryLimits, .composableWorkspace),
+            ("Roommate balance", .reconciliationBalance, .workspaceAggregation),
+            ("Show split expenses with Roommate", .allocationRows, .composableWorkspace),
+            ("When did Roommate last pay me back?", .settlementRows, .composableWorkspace),
+            ("Show savings activity", .savingsActivity, .workspaceAggregation)
+        ]
+
+        for testCase in cases {
+            let candidate = MarinaHeuristicInterpreter().interpret(
+                prompt: testCase.prompt,
+                defaultPeriodUnit: .month
+            )
+
+            #expect(candidate.routeIntent?.kind == testCase.kind, "Expected \(testCase.prompt) to route as \(testCase.kind.rawValue), got \(candidate.routeIntent?.kind.rawValue ?? "nil")")
+            #expect(candidate.routeIntent?.preferredExecutorRoute == testCase.preferred)
+        }
+    }
+
+    @Test func routePatternRegistryCoversReadRoutePrecedenceAndCommonSpendRows() {
+        let recent = MarinaRoutePatternRegistry.intentKind(
+            rawPrompt: "Show my recent Groceries transactions",
+            requestFamily: .analytics,
+            operation: .listRows,
+            measure: .transactionAmount,
+            grouping: .transaction,
+            requestedDetail: nil,
+            requestShape: .ledgerRowList,
+            databaseLookupRequest: nil
+        )
+        let broadSpend = MarinaRoutePatternRegistry.intentKind(
+            rawPrompt: "How much did I spend this month?",
+            requestFamily: .analytics,
+            operation: .sum,
+            measure: .spend,
+            grouping: nil,
+            requestedDetail: nil,
+            requestShape: .aggregateMetric,
+            databaseLookupRequest: nil
+        )
+        let settlementWins = MarinaRoutePatternRegistry.intentKind(
+            rawPrompt: "When did Roommate last pay me back?",
+            requestFamily: .analytics,
+            operation: .rank,
+            measure: .reconciliationBalance,
+            grouping: .allocationAccount,
+            requestedDetail: nil,
+            requestShape: .ledgerRowList,
+            databaseLookupRequest: nil
+        )
+
+        #expect(recent == .recentTransactionRows)
+        #expect(broadSpend == .broadSpend)
+        #expect(settlementWins == .settlementRows)
+    }
+
     @Test func heuristic_totalSpendOnAppleCard_emitsUnresolvedCardFilterCandidate() {
         let candidate = MarinaHeuristicInterpreter().interpret(
             prompt: "total spend on my Apple Card",

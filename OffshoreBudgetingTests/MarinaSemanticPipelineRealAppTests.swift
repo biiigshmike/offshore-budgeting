@@ -512,13 +512,13 @@ struct MarinaSemanticPipelineRealAppTests {
         fixture.groceryBudgetLimit.maxAmount = 50
         try fixture.context.save()
 
-        let cases: [(prompt: String, routeFragment: String?, expectedFragments: [String])] = [
-            ("Which cards are in May Budget?", "budgetLinkedCards", ["Cards linked", "Apple"]),
-            ("Show May Budget presets", "budgetLinkedPresets", ["Presets linked", "Rent"]),
-            ("Show category limits for May Budget", "budgetCategoryLimits", ["Category limits", "Groceries"]),
-            ("How much have I saved?", nil, ["Savings"]),
-            ("Show split expenses with Roommate this month", "allocationRows", ["Allocations", "Cafe", "Roommate"]),
-            ("When did Roommate last pay me back?", "settlementRows", ["Settlements", "Roommate paid back", "$20.00"])
+        let cases: [(prompt: String, routeFragment: String?, routeIntent: String?, expectedFragments: [String])] = [
+            ("Which cards are in May Budget?", "budgetLinkedCards", "budgetLinkedCards", ["Cards linked", "Apple"]),
+            ("Show May Budget presets", "budgetLinkedPresets", "budgetLinkedPresets", ["Presets linked", "Rent"]),
+            ("Show category limits for May Budget", "budgetCategoryLimits", "budgetCategoryLimits", ["Category limits", "Groceries"]),
+            ("How much have I saved?", nil, "savingsStatus", ["Savings"]),
+            ("Show split expenses with Roommate this month", "allocationRows", "allocationRows", ["Allocations", "Cafe", "Roommate"]),
+            ("When did Roommate last pay me back?", "settlementRows", "settlementRows", ["Settlements", "Roommate paid back", "$20.00"])
         ]
 
         for testCase in cases {
@@ -531,10 +531,45 @@ struct MarinaSemanticPipelineRealAppTests {
                     "Expected \(testCase.prompt) executor summary to include \(routeFragment). Summary: \(handled.trace.executorResultSummary ?? "nil")"
                 )
             }
+            if let routeIntent = testCase.routeIntent {
+                #expect(
+                    handled.trace.candidateSummary?.localizedCaseInsensitiveContains("routeIntent=\(routeIntent)") == true,
+                    "Expected \(testCase.prompt) candidate summary to include routeIntent=\(routeIntent). Summary: \(handled.trace.candidateSummary ?? "nil")"
+                )
+            }
             #expect(text.localizedCaseInsensitiveContains("unsupported") == false)
             for fragment in testCase.expectedFragments {
                 #expect(text.localizedCaseInsensitiveContains(fragment), "Expected \(testCase.prompt) to include \(fragment). Text: \(text)")
             }
+        }
+    }
+
+    @Test func semanticPipeline_step5MutationPromptsDoNotExecuteSharedReadOrMutateData() async throws {
+        let fixture = try MarinaRealisticWorkspaceFixture.make()
+        let before = counts(in: fixture)
+        let prompts = [
+            "create settlement with Roommate for $20",
+            "mark Roommate paid",
+            "move this to savings",
+            "add allocation for Roommate",
+            "delete allocation",
+            "add preset Rent"
+        ]
+
+        for prompt in prompts {
+            let result = await fixture.run(prompt)
+
+            guard case .validationBlocked(_, let outcome, let trace) = result else {
+                Issue.record("Expected \(prompt) to be blocked before shared read execution. Trace: \(result.trace.compactSummary)")
+                continue
+            }
+            guard case .unsupported = outcome else {
+                Issue.record("Expected \(prompt) to produce typed unsupported.")
+                continue
+            }
+            #expect(trace.executorResultSummary == nil)
+            #expect(trace.selectedPath != .sharedAttemptedThenLegacyFallback)
+            #expect(counts(in: fixture) == before, "Expected \(prompt) not to mutate seeded data.")
         }
     }
 
@@ -1002,6 +1037,32 @@ struct MarinaSemanticPipelineRealAppTests {
         let aggregationResult: MarinaAggregationResult
         let homeQueryPlan: HomeQueryPlan?
         let trace: MarinaSharedPipelineTrace
+    }
+
+    private struct EntityCounts: Equatable {
+        let savingsAccounts: Int
+        let savingsLedgerEntries: Int
+        let allocationAccounts: Int
+        let allocations: Int
+        let settlements: Int
+        let presets: Int
+        let budgets: Int
+        let plannedExpenses: Int
+        let variableExpenses: Int
+    }
+
+    private func counts(in fixture: MarinaRealisticWorkspaceFixture) -> EntityCounts {
+        EntityCounts(
+            savingsAccounts: fixture.provider.fetchAllSavingsAccounts().count,
+            savingsLedgerEntries: fixture.provider.fetchAllSavingsLedgerEntries().count,
+            allocationAccounts: fixture.provider.fetchAllAllocationAccounts().count,
+            allocations: fixture.provider.fetchAllExpenseAllocations().count,
+            settlements: fixture.provider.fetchAllAllocationSettlements().count,
+            presets: fixture.provider.fetchAllPresets().count,
+            budgets: fixture.provider.fetchAllBudgets().count,
+            plannedExpenses: fixture.provider.fetchAllPlannedExpenses().count,
+            variableExpenses: fixture.provider.fetchAllVariableExpenses().count
+        )
     }
 
     private func requireHandled(_ result: MarinaSharedPipelineRuntimeResult) throws -> HandledResult {

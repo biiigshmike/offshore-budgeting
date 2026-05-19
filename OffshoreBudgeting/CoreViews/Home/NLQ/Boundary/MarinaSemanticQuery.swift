@@ -15,6 +15,7 @@ struct MarinaSemanticQuery: Codable, Equatable, Identifiable, Sendable {
     let incomeStatusScope: MarinaIncomeStatusScope?
     let responseShape: MarinaResponseShape?
     let requestedDetail: MarinaSemanticRequestedDetail?
+    let routeIntent: MarinaRouteIntent?
 
     init(
         id: UUID = UUID(),
@@ -30,7 +31,8 @@ struct MarinaSemanticQuery: Codable, Equatable, Identifiable, Sendable {
         averageBasis: MarinaAverageBasis? = nil,
         incomeStatusScope: MarinaIncomeStatusScope? = nil,
         responseShape: MarinaResponseShape? = nil,
-        requestedDetail: MarinaSemanticRequestedDetail? = nil
+        requestedDetail: MarinaSemanticRequestedDetail? = nil,
+        routeIntent: MarinaRouteIntent? = nil
     ) {
         self.id = id
         self.subject = subject
@@ -46,6 +48,7 @@ struct MarinaSemanticQuery: Codable, Equatable, Identifiable, Sendable {
         self.incomeStatusScope = incomeStatusScope
         self.responseShape = responseShape
         self.requestedDetail = requestedDetail
+        self.routeIntent = routeIntent
     }
 }
 
@@ -324,6 +327,11 @@ struct MarinaSemanticExecutionRouter {
         plan: MarinaAggregationPlan,
         semanticQuery: MarinaSemanticQuery? = nil
     ) -> MarinaSemanticExecutionRoute {
+        if let preferred = semanticQuery?.routeIntent?.preferredExecutorRoute ?? plan.routeIntent?.preferredExecutorRoute,
+           let route = route(from: preferred) {
+            return route
+        }
+
         if semanticQuery?.operation == .lookupDetails || plan.operation == .lookupDetails {
             return .lookupDetail
         }
@@ -364,6 +372,23 @@ struct MarinaSemanticExecutionRouter {
         case .rank, .trend, .listRows:
             return .groupedRanked
         case .forecast, .simulate:
+            return .scenario
+        }
+    }
+
+    private func route(from preferred: MarinaPreferredExecutorRoute) -> MarinaSemanticExecutionRoute? {
+        switch preferred {
+        case .lookupDetail, .databaseLookup:
+            return .lookupDetail
+        case .list:
+            return .list
+        case .aggregate, .homeAdapter, .workspaceAggregation:
+            return .aggregate
+        case .comparison:
+            return .comparison
+        case .groupedRanked, .composableWorkspace:
+            return .groupedRanked
+        case .scenario:
             return .scenario
         }
     }
@@ -410,7 +435,8 @@ struct MarinaSemanticQueryAdapter {
                     averageBasis: nil,
                     incomeStatusScope: incomeStatusScope(from: candidate),
                     responseShape: responseShape(candidate.responseShapeHint ?? .summaryCard),
-                    requestedDetail: lookupRequest.requestedDetail.semanticDetail
+                    requestedDetail: lookupRequest.requestedDetail.semanticDetail,
+                    routeIntent: candidate.routeIntent
                 )
             )
         }
@@ -444,7 +470,8 @@ struct MarinaSemanticQueryAdapter {
                     averageBasis: nil,
                     incomeStatusScope: command.incomeStatusScope ?? incomeStatusScope(from: candidate),
                     responseShape: responseShape(candidate.responseShapeHint ?? .summaryCard),
-                    requestedDetail: command.requestedDetail
+                    requestedDetail: command.requestedDetail,
+                    routeIntent: candidate.routeIntent
                 )
             )
         }
@@ -477,7 +504,8 @@ struct MarinaSemanticQueryAdapter {
             averageBasis: averageBasis(from: candidate.grouping),
             incomeStatusScope: incomeStatusScope(from: candidate),
             responseShape: candidate.responseShapeHint.flatMap(responseShape),
-            requestedDetail: candidate.semanticCommand?.requestedDetail
+            requestedDetail: candidate.semanticCommand?.requestedDetail,
+            routeIntent: candidate.routeIntent
         )
         return .query(semantic)
     }
@@ -494,7 +522,8 @@ struct MarinaSemanticQueryAdapter {
             ranking: semanticQuery.ranking.map { MarinaRankingCandidate(direction: $0.direction, limit: $0.limit, rawText: $0.rawText) },
             limit: semanticQuery.limit,
             incomeStatusScope: semanticQuery.incomeStatusScope,
-            responseShape: semanticQuery.responseShape.flatMap(responseShapeHint)
+            responseShape: semanticQuery.responseShape.flatMap(responseShapeHint),
+            routeIntent: semanticQuery.routeIntent
         )
     }
 

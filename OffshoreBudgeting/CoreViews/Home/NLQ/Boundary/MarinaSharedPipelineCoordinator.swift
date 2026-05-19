@@ -3245,6 +3245,18 @@ struct MarinaQueryExecutor {
         }
 
         let decision = router.decision(validationOutcome: validationOutcome, semanticResolved: semanticResolved)
+        if let handled = executePreferredRoute(
+            candidate: candidate,
+            resolved: resolved,
+            plan: plan,
+            semanticResolved: semanticResolved,
+            validationOutcome: validationOutcome,
+            provider: provider,
+            now: now,
+            decision: decision
+        ) {
+            return handled
+        }
 
         switch decision.route {
         case .lookupDetail:
@@ -3453,6 +3465,34 @@ struct MarinaQueryExecutor {
         }
     }
 
+    private func executePreferredRoute(
+        candidate: MarinaQueryPlanCandidate,
+        resolved: MarinaResolvedQueryCandidate,
+        plan: MarinaAggregationPlan,
+        semanticResolved: MarinaResolvedSemanticQuery?,
+        validationOutcome: MarinaPlanValidationOutcome,
+        provider: MarinaDataProvider,
+        now: Date,
+        decision: MarinaSemanticExecutionDecision
+    ) -> MarinaQueryExecutionResult? {
+        guard let preferred = semanticResolved?.query.routeIntent?.preferredExecutorRoute ?? plan.routeIntent?.preferredExecutorRoute ?? candidate.routeIntent?.preferredExecutorRoute else {
+            return nil
+        }
+        switch preferred {
+        case .composableWorkspace:
+            return executeComposable(candidate: candidate, resolved: resolved, plan: plan, provider: provider, now: now, decision: decision)
+        case .workspaceAggregation:
+            return executeWorkspace(plan: plan, provider: provider, now: now, decision: decision)
+        case .homeAdapter:
+            return executeHomeAdapter(validationOutcome, provider: provider, now: now, decision: decision)
+        case .databaseLookup:
+            guard let request = semanticResolved?.databaseLookupRequest ?? candidate.databaseLookupRequest else { return nil }
+            return executeLookup(request, provider: provider, decision: decision)
+        case .lookupDetail, .list, .aggregate, .comparison, .groupedRanked, .scenario:
+            return nil
+        }
+    }
+
     private func workspaceExecution(
         _ card: MarinaWorkspaceAggregationCard,
         decision: MarinaSemanticExecutionDecision
@@ -3493,6 +3533,16 @@ struct MarinaQueryExecutor {
         resolved: MarinaResolvedQueryCandidate,
         plan: MarinaAggregationPlan
     ) -> Bool {
+        if candidate.routeIntent?.preferredExecutorRoute == .composableWorkspace
+            || plan.routeIntent?.preferredExecutorRoute == .composableWorkspace {
+            return true
+        }
+        if candidate.routeIntent?.kind == .allocationRows
+            || candidate.routeIntent?.kind == .settlementRows
+            || plan.routeIntent?.kind == .allocationRows
+            || plan.routeIntent?.kind == .settlementRows {
+            return true
+        }
         if isAllocationOrSettlementRowPrompt(candidate.rawPrompt),
            (candidate.measure == .reconciliationBalance || plan.measure == .reconciliationBalance),
            (candidate.grouping?.dimension == .allocationAccount || plan.grouping?.dimension == .allocationAccount) {

@@ -538,6 +538,91 @@ struct MarinaAggregationExecutorTests {
         #expect(membership.traceSummary.contains("budgetMembershipCheck"))
     }
 
+    @Test func composableExecutor_step5RoutesDoNotNeedPromptFallback() throws {
+        let fixture = try makeFixture()
+        let shared = AllocationAccount(name: "Roommate", workspace: fixture.workspace)
+        let cafe = VariableExpense(
+            descriptionText: "Cafe",
+            amount: 60,
+            transactionDate: date(2026, 5, 14),
+            workspace: fixture.workspace,
+            card: fixture.appleCard,
+            category: fixture.groceries
+        )
+        fixture.context.insert(shared)
+        fixture.context.insert(cafe)
+        fixture.context.insert(ExpenseAllocation(
+            allocatedAmount: 30,
+            workspace: fixture.workspace,
+            account: shared,
+            expense: cafe
+        ))
+        fixture.context.insert(AllocationSettlement(
+            date: date(2026, 5, 20),
+            note: "Roommate paid back",
+            amount: -20,
+            workspace: fixture.workspace,
+            account: shared,
+            expense: cafe
+        ))
+        try fixture.context.save()
+
+        let executor = MarinaComposableWorkspaceQueryExecutor(
+            calendar: Calendar(identifier: .gregorian),
+            allowsPromptRouteFallback: false
+        )
+        let accountMention = mention("roommate", .allocationAccount)
+        let accountTarget = resolvedTarget(
+            mention: accountMention,
+            role: .filter,
+            entityType: .allocationAccount,
+            displayName: "Roommate",
+            sourceID: shared.id
+        )
+        let plan = MarinaAggregationPlan(
+            operation: .rank,
+            measure: .reconciliationBalance,
+            targets: [target(.allocationAccount, "Roommate", sourceID: shared.id)],
+            dateRange: monthRange(),
+            grouping: MarinaGroupingCandidate(dimension: .allocationAccount),
+            ranking: MarinaRankingCandidate(direction: .newest, limit: 5)
+        )
+
+        let allocations = handledCard(executor.execute(
+            candidate: MarinaQueryPlanCandidate(
+                source: .heuristic,
+                rawPrompt: "Show split expenses with Roommate",
+                operation: .rank,
+                measure: .reconciliationBalance,
+                entityMentions: [accountMention],
+                grouping: MarinaGroupingCandidate(dimension: .allocationAccount)
+            ),
+            resolved: resolvedCandidate(targets: [accountTarget]),
+            plan: plan,
+            provider: fixture.provider,
+            now: date(2026, 5, 15)
+        ))
+        #expect(allocations.traceSummary.contains("allocationRows"))
+        #expect(allocations.rows.map(\.label).contains("Cafe"))
+
+        let settlements = handledCard(executor.execute(
+            candidate: MarinaQueryPlanCandidate(
+                source: .heuristic,
+                rawPrompt: "When did Roommate last pay me back?",
+                operation: .rank,
+                measure: .reconciliationBalance,
+                entityMentions: [accountMention],
+                grouping: MarinaGroupingCandidate(dimension: .allocationAccount)
+            ),
+            resolved: resolvedCandidate(targets: [accountTarget]),
+            plan: plan,
+            provider: fixture.provider,
+            now: date(2026, 5, 15)
+        ))
+        #expect(settlements.traceSummary.contains("settlementRows"))
+        #expect(settlements.rows.map(\.label).contains("Roommate paid back"))
+    }
+
     @Test func composableExecutor_deltaReconciliationAndSimulationReturnCards() throws {
         let fixture = try makeFixture()
         let food = fixture.groceries
