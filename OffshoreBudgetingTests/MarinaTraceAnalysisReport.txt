@@ -1114,7 +1114,7 @@ mode: nlq_authoritative
   fallbackSummary: nil
   actualMetricOperation: nil
   actualTarget: if i buy something for 120
-  actualPrimaryDateRange: 2026-05-18..2026-05-19
+  actualPrimaryDateRange: 2026-05-19..2026-05-20
   actualComparisonDateRange: nil
   aggregationPath: none
   responseType: clarification
@@ -1345,7 +1345,7 @@ mode: nlq_authoritative
   fallbackSummary: nil
   actualMetricOperation: spendAveragePerPeriod | average
   actualTarget: nil
-  actualPrimaryDateRange: 2026-02-18..2026-05-19
+  actualPrimaryDateRange: 2026-02-19..2026-05-19
   actualComparisonDateRange: nil
   aggregationPath: single_home_query_engine
   responseType: message
@@ -1451,7 +1451,7 @@ mode: shared_pipeline_heuristic
   modelSummary: nil
   fallbackSummary: nil
   actualMetricOperation: operation=compare | measure=spend
-  actualTarget: primaryTarget:category:Food & Drink:7C99F73E-E032-4604-81EF-DB7EB684047E
+  actualTarget: primaryTarget:category:Food & Drink:6FC9F622-8BEC-4B52-9942-A2C7302B39F3
   actualPrimaryDateRange: 2026-05-01..2026-06-01
   actualComparisonDateRange: 2026-04-01..2026-05-01
   aggregationPath: shared_pipeline
@@ -1464,7 +1464,7 @@ mode: shared_pipeline_heuristic
   sharedCandidateMeasure: spend
   sharedCandidateSummary: family=analytics,requestShape=aggregateMetric,routeIntent=generic:variableExpenses:compare:spend:category:comparison,source=heuristic,operation=compare,measure=spend,entities=primaryTarget:category:food:medium,timeScopes=primary:nil:month:2026-05-01...2026-06-01;comparison:nil:month:2026-04-01...2026-05-01,grouping=category:nil,responseHint=comparison,validator=executable:compare:spend:incomeStatus=nil:shape=comparison,plan=metric=categoryMonthComparison,target=Food & Drink,date=2026-05-01..2026-06-01,comparison=2026-04-01..2026-05-01,selectionRank=1,operationPreserved=true
   sharedUnresolvedEntityMentions: nil
-  sharedResolvedEntityStates: primaryTarget:category:Food & Drink:7C99F73E-E032-4604-81EF-DB7EB684047E
+  sharedResolvedEntityStates: primaryTarget:category:Food & Drink:6FC9F622-8BEC-4B52-9942-A2C7302B39F3
   sharedTimeScopes: primary:nil:month:2026-05-01..2026-06-01;comparison:nil:month:2026-04-01..2026-05-01
   sharedValidatorOutcome: executable:compare:spend
   sharedAggregationPlanSummary: operation=compare,measure=spend,targets=primaryTarget:category:Food & Drink,primary=2026-05-01..2026-06-01,comparison=2026-04-01..2026-05-01,grouping=category,ranking=nil,shape=comparison
@@ -1487,7 +1487,7 @@ mode: shared_pipeline_heuristic
   modelSummary: nil
   fallbackSummary: nil
   actualMetricOperation: operation=compare | measure=spend
-  actualTarget: primaryTarget:category:Food & Drink:7C99F73E-E032-4604-81EF-DB7EB684047E
+  actualTarget: primaryTarget:category:Food & Drink:6FC9F622-8BEC-4B52-9942-A2C7302B39F3
   actualPrimaryDateRange: 2026-05-01..2026-06-01
   actualComparisonDateRange: 2026-04-01..2026-05-01
   aggregationPath: shared_pipeline
@@ -1500,7 +1500,7 @@ mode: shared_pipeline_heuristic
   sharedCandidateMeasure: spend
   sharedCandidateSummary: family=analytics,requestShape=aggregateMetric,routeIntent=generic:variableExpenses:compare:spend:category:comparison,source=heuristic,operation=compare,measure=spend,entities=primaryTarget:category:food & drink:medium,timeScopes=primary:nil:month:2026-05-01...2026-06-01;comparison:nil:month:2026-04-01...2026-05-01,grouping=category:nil,responseHint=comparison,validator=executable:compare:spend:incomeStatus=nil:shape=comparison,plan=metric=categoryMonthComparison,target=Food & Drink,date=2026-05-01..2026-06-01,comparison=2026-04-01..2026-05-01,selectionRank=1,operationPreserved=true
   sharedUnresolvedEntityMentions: nil
-  sharedResolvedEntityStates: primaryTarget:category:Food & Drink:7C99F73E-E032-4604-81EF-DB7EB684047E
+  sharedResolvedEntityStates: primaryTarget:category:Food & Drink:6FC9F622-8BEC-4B52-9942-A2C7302B39F3
   sharedTimeScopes: primary:nil:month:2026-05-01..2026-06-01;comparison:nil:month:2026-04-01..2026-05-01
   sharedValidatorOutcome: executable:compare:spend
   sharedAggregationPlanSummary: operation=compare,measure=spend,targets=primaryTarget:category:Food & Drink,primary=2026-05-01..2026-06-01,comparison=2026-04-01..2026-05-01,grouping=category,ranking=nil,shape=comparison
@@ -1523,7 +1523,7 @@ mode: shared_pipeline_heuristic
   modelSummary: nil
   fallbackSummary: nil
   actualMetricOperation: operation=compare | measure=spend
-  actualTarget: primaryTarget:category:Groceries:2B966EFB-303B-4766-B25B-6C2FDD846C66
+  actualTarget: primaryTarget:category:Groceries:6891A1DF-2577-49C7-A913-0D0ADA03B6FE
   actualPrimaryDateRange: 2026-04-01..2026-05-01
   actualComparisonDateRange: 2026-03-01..2026-04-01
   aggregationPath: shared_pipeline
@@ -1536,7 +1536,7 @@ mode: shared_pipeline_heuristic
   sharedCandidateMeasure: spend
   sharedCandidateSummary: family=analytics,requestShape=aggregateMetric,routeIntent=generic:variableExpenses:compare:spend:category:comparison,source=heuristic,operation=compare,measure=spend,entities=primaryTarget:category:groceries:medium,timeScopes=primary:nil:month:2026-04-01...2026-05-01;comparison:nil:month:2026-03-01...2026-04-01,grouping=category:nil,responseHint=comparison,validator=executable:compare:spend:incomeStatus=nil:shape=comparison,plan=metric=categoryMonthComparison,target=Groceries,date=2026-04-01..2026-05-01,comparison=2026-03-01..2026-04-01,selectionRank=1,operationPreserved=true
   sharedUnresolvedEntityMentions: nil
-  sharedResolvedEntityStates: primaryTarget:category:Groceries:2B966EFB-303B-4766-B25B-6C2FDD846C66
+  sharedResolvedEntityStates: primaryTarget:category:Groceries:6891A1DF-2577-49C7-A913-0D0ADA03B6FE
   sharedTimeScopes: primary:nil:month:2026-04-01..2026-05-01;comparison:nil:month:2026-03-01..2026-04-01
   sharedValidatorOutcome: executable:compare:spend
   sharedAggregationPlanSummary: operation=compare,measure=spend,targets=primaryTarget:category:Groceries,primary=2026-04-01..2026-05-01,comparison=2026-03-01..2026-04-01,grouping=category,ranking=nil,shape=comparison
@@ -1667,7 +1667,7 @@ mode: shared_pipeline_heuristic
   modelSummary: nil
   fallbackSummary: nil
   actualMetricOperation: operation=sum | measure=spend
-  actualTarget: filter:card:Apple Card:D5C104AA-CB64-48B2-81B2-7D4B50FEFB91;filter:category:Food & Drink:7C99F73E-E032-4604-81EF-DB7EB684047E
+  actualTarget: filter:card:Apple Card:A5EDD77F-7489-40A8-8210-8505D5552BB3;filter:category:Food & Drink:6FC9F622-8BEC-4B52-9942-A2C7302B39F3
   actualPrimaryDateRange: nil
   actualComparisonDateRange: nil
   aggregationPath: shared_pipeline
@@ -1680,7 +1680,7 @@ mode: shared_pipeline_heuristic
   sharedCandidateMeasure: spend
   sharedCandidateSummary: family=analytics,requestShape=aggregateMetric,routeIntent=broadSpend:variableExpenses:sum:spend:nil:aggregate,source=heuristic,operation=sum,measure=spend,entities=filter:card:apple card:medium;filter:category:food & drink:medium,responseHint=summaryCard,validator=executable:sum:spend:incomeStatus=nil:shape=summaryCard,plan=operation=sum,measure=spend,targets=2,date=nil,comparison=nil,shape=summaryCard,selectionRank=1,operationPreserved=true
   sharedUnresolvedEntityMentions: nil
-  sharedResolvedEntityStates: filter:card:Apple Card:D5C104AA-CB64-48B2-81B2-7D4B50FEFB91;filter:category:Food & Drink:7C99F73E-E032-4604-81EF-DB7EB684047E
+  sharedResolvedEntityStates: filter:card:Apple Card:A5EDD77F-7489-40A8-8210-8505D5552BB3;filter:category:Food & Drink:6FC9F622-8BEC-4B52-9942-A2C7302B39F3
   sharedTimeScopes: nil
   sharedValidatorOutcome: executable:sum:spend
   sharedAggregationPlanSummary: operation=sum,measure=spend,targets=filter:card:Apple Card;filter:category:Food & Drink,primary=nil,comparison=nil,grouping=nil,ranking=nil,shape=summaryCard
@@ -1703,7 +1703,7 @@ mode: shared_pipeline_heuristic
   modelSummary: nil
   fallbackSummary: nil
   actualMetricOperation: operation=sum | measure=categoryShare
-  actualTarget: primaryTarget:category:Food & Drink:7C99F73E-E032-4604-81EF-DB7EB684047E
+  actualTarget: primaryTarget:category:Food & Drink:6FC9F622-8BEC-4B52-9942-A2C7302B39F3
   actualPrimaryDateRange: 2026-05-01..2026-06-01
   actualComparisonDateRange: nil
   aggregationPath: shared_pipeline
@@ -1716,7 +1716,7 @@ mode: shared_pipeline_heuristic
   sharedCandidateMeasure: categoryShare
   sharedCandidateSummary: family=analytics,requestShape=aggregateMetric,routeIntent=generic:variableExpenses:sum:categoryShare:category:aggregate,source=heuristic,operation=sum,measure=categoryShare,entities=primaryTarget:category:food & drink:medium,timeScopes=primary:nil:month:2026-05-01...2026-06-01,grouping=category:nil,responseHint=groupedBreakdown,validator=executable:sum:categoryShare:incomeStatus=nil:shape=groupedBreakdown,plan=metric=categorySpendShare,target=Food & Drink,date=2026-05-01..2026-06-01,comparison=nil,selectionRank=1,operationPreserved=true
   sharedUnresolvedEntityMentions: nil
-  sharedResolvedEntityStates: primaryTarget:category:Food & Drink:7C99F73E-E032-4604-81EF-DB7EB684047E
+  sharedResolvedEntityStates: primaryTarget:category:Food & Drink:6FC9F622-8BEC-4B52-9942-A2C7302B39F3
   sharedTimeScopes: primary:nil:month:2026-05-01..2026-06-01
   sharedValidatorOutcome: executable:sum:categoryShare
   sharedAggregationPlanSummary: operation=sum,measure=categoryShare,targets=primaryTarget:category:Food & Drink,primary=2026-05-01..2026-06-01,comparison=nil,grouping=category,ranking=nil,shape=groupedBreakdown
@@ -1739,7 +1739,7 @@ mode: shared_pipeline_heuristic
   modelSummary: nil
   fallbackSummary: nil
   actualMetricOperation: operation=compare | measure=remainingBudget
-  actualTarget: primaryTarget:category:Shopping:32DE63F6-C9F2-4D0E-B947-B26442A1C12C
+  actualTarget: primaryTarget:category:Shopping:43EE53DD-BEFE-4094-90A8-B09DFF6237BC
   actualPrimaryDateRange: nil
   actualComparisonDateRange: nil
   aggregationPath: none
@@ -1752,7 +1752,7 @@ mode: shared_pipeline_heuristic
   sharedCandidateMeasure: remainingBudget
   sharedCandidateSummary: family=analytics,requestShape=aggregateMetric,routeIntent=generic:budgets:compare:remainingBudget:nil:comparison,source=heuristic,operation=compare,measure=remainingBudget,entities=primaryTarget:category:shopping:medium,responseHint=unsupported,validator=unsupported:unsupportedCombination,selectionRank=5,operationPreserved=true
   sharedUnresolvedEntityMentions: nil
-  sharedResolvedEntityStates: primaryTarget:category:Shopping:32DE63F6-C9F2-4D0E-B947-B26442A1C12C
+  sharedResolvedEntityStates: primaryTarget:category:Shopping:43EE53DD-BEFE-4094-90A8-B09DFF6237BC
   sharedTimeScopes: nil
   sharedValidatorOutcome: unsupported:unsupportedCombination
   sharedAggregationPlanSummary: nil
@@ -1812,7 +1812,7 @@ mode: shared_pipeline_heuristic
   fallbackSummary: nil
   actualMetricOperation: operation=average | measure=spend
   actualTarget: nil
-  actualPrimaryDateRange: 2026-02-18..2026-05-19
+  actualPrimaryDateRange: 2026-02-19..2026-05-19
   actualComparisonDateRange: nil
   aggregationPath: none
   responseType: kind=message,title=I need one choice first,rows=1,responseShape=clarification,suggestions=0
@@ -1825,7 +1825,7 @@ mode: shared_pipeline_heuristic
   sharedCandidateSummary: family=analytics,requestShape=aggregateMetric,routeIntent=generic:variableExpenses:average:spend:week:aggregate,source=heuristic,operation=average,measure=spend,entities=primaryTarget:unknown:weekly:medium,timeScopes=lookbackWindow:nil:month:2026-02-15...2026-05-15,grouping=week:nil,responseHint=summaryCard,validator=clarification:missingTarget,selectionRank=3,operationPreserved=true
   sharedUnresolvedEntityMentions: primaryTarget:unknown:weekly:medium
   sharedResolvedEntityStates: nil
-  sharedTimeScopes: lookbackWindow:nil:month:2026-02-18..2026-05-19
+  sharedTimeScopes: lookbackWindow:nil:month:2026-02-19..2026-05-19
   sharedValidatorOutcome: clarification:missingTarget
   sharedAggregationPlanSummary: nil
   sharedExecutorResultShape: nil
@@ -1883,7 +1883,7 @@ mode: shared_pipeline_heuristic
   modelSummary: nil
   fallbackSummary: nil
   actualMetricOperation: operation=simulate | measure=remainingBudget
-  actualTarget: simulationInput:category:Shopping:32DE63F6-C9F2-4D0E-B947-B26442A1C12C;simulationOutput:category:Transportation:BFD1141C-E214-4E77-B90D-FAE6CDCF1070
+  actualTarget: simulationInput:category:Shopping:43EE53DD-BEFE-4094-90A8-B09DFF6237BC;simulationOutput:category:Transportation:130CF01E-97C3-4A66-805E-270F223F6724
   actualPrimaryDateRange: nil
   actualComparisonDateRange: nil
   aggregationPath: shared_pipeline
@@ -1896,7 +1896,7 @@ mode: shared_pipeline_heuristic
   sharedCandidateMeasure: remainingBudget
   sharedCandidateSummary: family=analytics,requestShape=aggregateMetric,routeIntent=generic:budgets:simulate:remainingBudget:nil:scenario,source=heuristic,operation=simulate,measure=remainingBudget,entities=simulationInput:category:shopping:medium;simulationOutput:category:transportation:medium,responseHint=summaryCard,validator=executable:simulate:remainingBudget:incomeStatus=nil:shape=summaryCard,plan=operation=simulate,measure=remainingBudget,targets=2,date=nil,comparison=nil,shape=summaryCard,selectionRank=1,operationPreserved=true
   sharedUnresolvedEntityMentions: nil
-  sharedResolvedEntityStates: simulationInput:category:Shopping:32DE63F6-C9F2-4D0E-B947-B26442A1C12C;simulationOutput:category:Transportation:BFD1141C-E214-4E77-B90D-FAE6CDCF1070
+  sharedResolvedEntityStates: simulationInput:category:Shopping:43EE53DD-BEFE-4094-90A8-B09DFF6237BC;simulationOutput:category:Transportation:130CF01E-97C3-4A66-805E-270F223F6724
   sharedTimeScopes: nil
   sharedValidatorOutcome: executable:simulate:remainingBudget
   sharedAggregationPlanSummary: operation=simulate,measure=remainingBudget,targets=simulationInput:category:Shopping;simulationOutput:category:Transportation,primary=nil,comparison=nil,grouping=nil,ranking=nil,shape=summaryCard

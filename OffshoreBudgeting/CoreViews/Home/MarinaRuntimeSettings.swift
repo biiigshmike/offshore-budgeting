@@ -44,6 +44,10 @@ struct MarinaRuntimeSettings: Equatable {
             "aiOptInEnvPresent=\(aiOptIn.environmentValueWasPresent)",
             "aiOptInArgPresent=\(aiOptIn.argumentValueWasPresent)",
             "aiOptInDefaultsPresent=\(aiOptIn.userDefaultsValueWasPresent)",
+            "foundationInterpretationPrompt=\(MarinaFoundationPromptVersion.interpretationV1.rawValue)",
+            "foundationPresentationPrompt=\(MarinaFoundationPromptVersion.presentationV1.rawValue)",
+            "foundationModelBand=\(MarinaFoundationModelBand.current.rawValue)",
+            "foundationLocale=\(Locale.current.identifier)",
             "fixedNow=\(fixedNow.map(Self.iso8601String(from:)) ?? "nil")",
             "traceOutputPathPresent=\((traceOutputPath?.isEmpty == false))"
         ].joined(separator: ",")

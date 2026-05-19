@@ -138,6 +138,21 @@ struct HomeAssistantPersonaTests {
         #expect(followUps[1].title == "Compare with last month")
     }
 
+    @Test func formatter_userVisibleMarinaRules_hideRulesModelFooter() throws {
+        let formatter = HomeAssistantPersonaFormatter(
+            variantIndexPicker: { _, _ in 0 },
+            responseRules: .marinaUserVisible
+        )
+        let styled = formatter.styledAnswer(
+            from: metricRawAnswer(),
+            userPrompt: "spend this month",
+            personaID: .marina
+        )
+
+        #expect(styled.subtitle?.contains("MarinaResponseRules") == false)
+        #expect(styled.subtitle?.contains("Rules/Model:") == false)
+    }
+
     @Test func formatter_followUpSuggestions_executedWeeklyCategoryPlan_usesPreviousWeekLabel() throws {
         let formatter = makeFixedFormatter()
         let answer = HomeAnswer(queryID: UUID(), kind: .metric, title: "Category Spend", subtitle: nil, primaryValue: "$42", rows: [])

@@ -7,6 +7,18 @@ enum MarinaSharedPipelineFallbackReason: String, Codable, Equatable {
     case modelServiceFailed
     case modelInvalidStructuredOutput
     case modelTimedOut
+    case modelAssetsUnavailable
+    case modelDecodingFailure
+    case modelContextWindowExceeded
+    case modelGuardrailViolation
+    case modelRateLimited
+    case modelRefusal
+    case modelConcurrentRequests
+    case modelUnsupportedGuide
+    case modelUnsupportedLanguageOrLocale
+    case modelToolCallFailed
+    case modelCancelled
+    case modelUnknownFailure
     case modelUnsupportedHeuristicExactMatch
     case modelClarificationHeuristicExactMatch
     case droppedExplicitConstraint
@@ -33,6 +45,11 @@ enum MarinaInterpreterSelectionReason: String, Codable, Equatable {
     case modelInvalidStructuredOutput
     case modelServiceFailed
     case modelTimedOut
+    case modelSafetyBlocked
+    case modelRateLimited
+    case modelUnsupportedLocale
+    case modelToolCallFailed
+    case modelConcurrentRequest
     case modelUnsupportedHeuristicExactMatch
     case modelClarificationHeuristicExactMatch
     case clarificationResume

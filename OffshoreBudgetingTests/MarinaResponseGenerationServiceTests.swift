@@ -22,7 +22,7 @@ struct MarinaResponseGenerationServiceTests {
             kind: raw.kind,
             userPrompt: raw.userPrompt,
             title: raw.title,
-            subtitle: "Quick read: this is where your month stands right now.\nRules/Model: MarinaResponseRules v1.0 (non-LLM)",
+            subtitle: "Quick read: this is where your month stands right now.",
             primaryValue: raw.primaryValue,
             rows: raw.rows,
             generatedAt: raw.generatedAt
@@ -47,9 +47,11 @@ struct MarinaResponseGenerationServiceTests {
 
         #expect(request.context.deterministicAnswer == raw)
         #expect(request.context.deterministicAnswer.subtitle == "May 1 - May 31")
-        #expect(request.context.presentationMode == .foundationModelsPersonalized)
+        #expect(request.context.presentationMode == .foundationModelsStreaming)
+        #expect(request.context.surfaceKind == .answer)
+        #expect(request.context.voiceProfile == .marina)
         #expect(request.fallbackApplication.answer == styled)
-        #expect(request.fallbackApplication.answer.subtitle?.contains("MarinaResponseRules") == true)
+        #expect(request.fallbackApplication.answer.subtitle?.contains("MarinaResponseRules") == false)
     }
 
     @Test func surfacePrompt_includesAIVoiceContextWithoutJSONPersonaSamples() throws {
@@ -69,6 +71,16 @@ struct MarinaResponseGenerationServiceTests {
             workspaceName: "Personal",
             routeSourceRaw: HomeAssistantPlanResolutionSource.sharedFoundationModels.rawValue,
             deterministicAnswer: answer,
+            presentationGrounding: MarinaPresentationGroundingBuilder().build(
+                userPrompt: "why is dining higher?",
+                answer: answer,
+                surfaceKind: .answer,
+                dateWindow: "2026-05-01...2026-05-31",
+                provenance: "Budget data",
+                validationOutcomeSummary: nil,
+                sourceSummary: "deterministic read answer",
+                clarificationChoices: []
+            ),
             dateWindow: "2026-05-01...2026-05-31",
             provenance: "Budget data",
             followUpCandidates: [
@@ -81,10 +93,17 @@ struct MarinaResponseGenerationServiceTests {
 
         let prompt = MarinaFoundationSurfacePromptBuilder.prompt(context: context)
 
-        #expect(prompt.contains("Presentation mode: foundationModelsPersonalized"))
+        #expect(prompt.contains("Presentation mode: foundationModelsStreaming"))
+        #expect(prompt.contains("Surface kind: answer"))
+        #expect(prompt.contains("Voice: Marina"))
+        #expect(prompt.contains("Allowed tone: warm, observant, practical, lightly witty, grounded"))
+        #expect(prompt.contains("User ask summary: why is dining higher?"))
+        #expect(prompt.contains("Answer highlights:"))
+        #expect(prompt.contains("Primary value: $68.00"))
         #expect(prompt.contains("User prompt: why is dining higher?"))
         #expect(prompt.contains("Status: Watch: spending is above the comparison period"))
         #expect(prompt.contains("Main Driver: Cafe ($60.00)"))
+        #expect(prompt.contains("Follow-up candidates:") == false)
         #expect(prompt.contains("Quick read:") == false)
         #expect(prompt.contains("MarinaResponseRules") == false)
     }
@@ -92,10 +111,11 @@ struct MarinaResponseGenerationServiceTests {
     @Test func surfaceInstructions_personalizeFoundationModelsWithoutJSONCopy() throws {
         let instructions = MarinaFoundationSurfacePromptBuilder.instructions()
 
-        #expect(instructions.contains("Warm, direct, and budget-bestie"))
-        #expect(instructions.contains("without sounding canned"))
+        #expect(instructions.contains("warm, observant, practical"))
+        #expect(instructions.contains("more alive than Basic Marina"))
         #expect(instructions.contains("Do not compute, change, or invent totals"))
         #expect(instructions.contains("Status, Compared With, Main Driver, Pattern, or Watch"))
+        #expect(instructions.contains("Do not rewrite follow-up suggestions"))
         #expect(instructions.contains("MarinaResponses") == false)
         #expect(instructions.contains("Quick read:") == false)
         #expect(instructions.contains("Bestie, this number") == false)
@@ -131,7 +151,7 @@ struct MarinaResponseGenerationServiceTests {
         #expect(applied.answer.id == answerID)
         #expect(applied.answer.queryID == queryID)
         #expect(applied.answer.kind == .metric)
-        #expect(applied.answer.title == "Your Month So Far")
+        #expect(applied.answer.title == raw.title)
         #expect(applied.answer.subtitle == generated.narrativeSubtitle)
         #expect(applied.answer.primaryValue == "$123.45")
         #expect(applied.answer.rows == raw.rows)
@@ -163,6 +183,7 @@ struct MarinaResponseGenerationServiceTests {
             ]
         )
 
+        #expect(applied.answer.title == raw.title)
         #expect(applied.answer.primaryValue == "$68.00")
         #expect(applied.answer.rows == raw.rows)
         #expect(applied.followUpSuggestions.map(\.query) == [followUpQuery])
@@ -194,10 +215,10 @@ struct MarinaResponseGenerationServiceTests {
         )
 
         #expect(applied.followUpSuggestions.count == 2)
-        #expect(applied.followUpSuggestions[0].title == "Compare this with last month")
-        #expect(applied.followUpSuggestions[0].query == second.query)
-        #expect(applied.followUpSuggestions[1].title == "Show the top categories")
-        #expect(applied.followUpSuggestions[1].query == first.query)
+        #expect(applied.followUpSuggestions[0].title == "Top categories this month")
+        #expect(applied.followUpSuggestions[0].query == first.query)
+        #expect(applied.followUpSuggestions[1].title == "Compare with last month")
+        #expect(applied.followUpSuggestions[1].query == second.query)
     }
 
     @Test func surfaceApplicator_rejectsInternalQuerySummarySuggestionTitles() throws {
@@ -220,6 +241,58 @@ struct MarinaResponseGenerationServiceTests {
         )
 
         #expect(applied.followUpSuggestions.map(\.title) == ["Spend this month"])
+    }
+
+    @Test func surfaceApplicator_rejectsTitleOnlyOrDebugGeneratedSurface() throws {
+        let answer = HomeAnswer(queryID: UUID(), kind: .message, title: "Fallback", subtitle: "Use me.")
+
+        #expect(throws: MarinaResponseGenerationError.invariantViolation) {
+            _ = try MarinaResponseSurfaceApplicator().apply(
+                generated: MarinaGeneratedSurfaceResponse(titleOverride: "Do not use this"),
+                to: answer,
+                deterministicFollowUps: []
+            )
+        }
+
+        #expect(throws: MarinaResponseGenerationError.invariantViolation) {
+            _ = try MarinaResponseSurfaceApplicator().apply(
+                generated: MarinaGeneratedSurfaceResponse(narrativeSubtitle: "{\"narrativeSubtitle\":\"Nope\"}"),
+                to: answer,
+                deterministicFollowUps: []
+            )
+        }
+    }
+
+    @Test func groundingBuilder_extractsCompactDeterministicFacts() throws {
+        let answer = HomeAnswer(
+            queryID: UUID(),
+            kind: .metric,
+            title: "Dining",
+            subtitle: "May 1 - May 31",
+            primaryValue: "$68.00",
+            rows: [
+                HomeAnswerRow(title: "Status", value: "Watch: spending is above the comparison period"),
+                HomeAnswerRow(title: "Main Driver", value: "Cafe ($60.00)"),
+                HomeAnswerRow(title: "Other", value: "Visible but not an insight row")
+            ]
+        )
+
+        let grounding = MarinaPresentationGroundingBuilder().build(
+            userPrompt: "why is dining higher?",
+            answer: answer,
+            surfaceKind: .answer,
+            dateWindow: "2026-05-01..2026-05-31",
+            provenance: "Budget data",
+            validationOutcomeSummary: "accepted",
+            sourceSummary: "shared foundation models",
+            clarificationChoices: []
+        )
+
+        #expect(grounding.userAskSummary == "why is dining higher?")
+        #expect(grounding.answerHighlights.contains("Primary value: $68.00"))
+        #expect(grounding.insightRows.contains("Status: Watch: spending is above the comparison period"))
+        #expect(grounding.insightRows.contains("Main Driver: Cafe ($60.00)"))
+        #expect(grounding.promptText.contains("Date/provenance: date=2026-05-01..2026-05-31; provenance=Budget data"))
     }
 
     @Test func surfaceApplicator_rejectsEmptyGeneratedSurface() throws {

@@ -238,7 +238,7 @@ struct HomeAssistantPanelView: View {
     private var personaFormatter: HomeAssistantPersonaFormatter {
         HomeAssistantPersonaFormatter(
             sessionSeed: personaSessionSeed,
-            responseRules: .marina,
+            responseRules: .marinaUserVisible,
             cooldownSessionID: personaCooldownSessionID
         )
     }
@@ -405,6 +405,7 @@ struct HomeAssistantPanelView: View {
             }
             .onAppear {
                 loadConversationIfNeeded()
+                prewarmFoundationModelsIfNeeded()
             }
             .accessibilityIdentifier("marina.panel")
             .overlay(alignment: .topLeading) {
@@ -570,6 +571,26 @@ struct HomeAssistantPanelView: View {
     private func toggleFoundationModelInterpreter() {
         marinaSharedPipelineEnabled = true
         marinaAIOptInEnabled.toggle()
+        prewarmFoundationModelsIfNeeded()
+    }
+
+    private func prewarmFoundationModelsIfNeeded() {
+        guard marinaAIOptInEnabled else { return }
+        #if canImport(FoundationModels)
+        if #available(iOS 26.0, macOS 26.0, *) {
+            Task {
+                let provider = MarinaFoundationModelsSessionProvider()
+                provider.prewarm(
+                    instructions: MarinaFoundationSurfacePromptBuilder.instructions(),
+                    promptPrefix: "User prompt:"
+                )
+                provider.prewarm(
+                    instructions: "Prompt version: \(MarinaFoundationPromptVersion.interpretationV1.rawValue)\nClassify Marina budgeting prompts for deterministic Offshore execution.",
+                    promptPrefix: "User prompt:"
+                )
+            }
+        }
+        #endif
     }
     
     private func creationGuidance(
@@ -1511,7 +1532,8 @@ struct HomeAssistantPanelView: View {
         userPrompt: String?,
         confidenceBand: HomeQueryConfidenceBand = .high,
         explanation: String? = nil,
-        executedPlan: HomeQueryPlan? = nil
+        executedPlan: HomeQueryPlan? = nil,
+        source: HomeAssistantPlanResolutionSource = .contextual
     ) {
         // Legacy reachable: suggestion chips and older resolved plans can carry a
         // prebuilt HomeQuery, so this still executes HomeQueryEngine directly until
@@ -1556,7 +1578,7 @@ struct HomeAssistantPanelView: View {
             visibleProvenance: visibleProvenance(for: query)
         )
         
-        updateSessionContext(after: executedPlan ?? HomeQueryPlan(
+        let executedPlanForMemory = executedPlan ?? HomeQueryPlan(
             metric: query.intent.metric,
             dateRange: query.dateRange,
             comparisonDateRange: query.comparisonDateRange,
@@ -1564,15 +1586,26 @@ struct HomeAssistantPanelView: View {
             confidenceBand: confidenceBand,
             targetName: query.targetName,
             periodUnit: query.periodUnit
-        ))
-        rememberAnswerContext(
-            for: query,
-            executedPlan: executedPlan,
-            rawAnswer: normalizedAnswer,
-            presentedAnswer: answer,
-            userPrompt: userPrompt
         )
-        appendAnswer(answer)
+        presentMarinaAnswer(
+            deterministicAnswer: explainedAnswer,
+            basicFallbackAnswer: answer,
+            rawPrompt: userPrompt ?? "",
+            source: source,
+            homeQueryPlan: executedPlanForMemory,
+            surfaceKind: explainedAnswer.primaryValue == nil && explainedAnswer.rows.isEmpty ? .noData : .answer,
+            groundingSummary: executedPlanForMemory.traceSummary,
+            followUpSuggestions: followUpSuggestions(for: answer, query: query)
+        ) { presentedAnswer in
+            updateSessionContext(after: executedPlanForMemory)
+            rememberAnswerContext(
+                for: query,
+                executedPlan: executedPlanForMemory,
+                rawAnswer: normalizedAnswer,
+                presentedAnswer: presentedAnswer,
+                userPrompt: userPrompt
+            )
+        }
     }
 
     private func handleSharedPipelineAnswer(
@@ -1604,15 +1637,15 @@ struct HomeAssistantPanelView: View {
                 personaID: selectedPersonaID
             )
         let deterministicFollowUps = followUpSuggestions(for: styled, query: query)
-        let surfaced = await surfaceGeneratedPresentation(
-            generationBaseAnswer: normalizedAnswer,
-            fallbackApplication: MarinaResponseSurfaceApplication(
-                answer: styled,
-                followUpSuggestions: deterministicFollowUps
-            ),
+        let surfaced = await presentMarinaAnswer(
+            deterministicAnswer: normalizedAnswer,
+            basicFallbackAnswer: styled,
             rawPrompt: rawPrompt,
             source: source,
-            homeQueryPlan: homeQueryPlan
+            homeQueryPlan: homeQueryPlan,
+            surfaceKind: normalizedAnswer.primaryValue == nil && normalizedAnswer.rows.isEmpty ? .noData : .answer,
+            groundingSummary: aggregationResult?.sourceAnswer?.traceSummary ?? normalizedAnswer.traceSummary,
+            followUpSuggestions: deterministicFollowUps
         )
 
         if let homeQueryPlan, let query {
@@ -1634,10 +1667,169 @@ struct HomeAssistantPanelView: View {
             plan: homeQueryPlan,
             notes: "shared_pipeline"
         )
-        if surfaced.followUpSuggestions.isEmpty == false {
-            generatedFollowUpSuggestionsByAnswerID[surfaced.answer.id] = surfaced.followUpSuggestions
+    }
+
+    private func marinaPresentationModeDecision() -> MarinaPresentationMode {
+        guard marinaRuntimeSettings.aiOptIn.isEnabled else {
+            return .basicDeterministic
         }
-        appendAnswer(surfaced.answer)
+
+        return MarinaModelAvailability().currentStatus() == .available
+            ? .foundationModelsStreaming
+            : .plainDeterministicFallback
+    }
+
+    @MainActor
+    @discardableResult
+    private func presentMarinaAnswer(
+        deterministicAnswer: HomeAnswer,
+        basicFallbackAnswer: HomeAnswer,
+        rawPrompt: String,
+        source: HomeAssistantPlanResolutionSource,
+        homeQueryPlan: HomeQueryPlan? = nil,
+        surfaceKind: MarinaPresentationSurfaceKind = .answer,
+        validationOutcomeSummary: String? = nil,
+        clarificationChoices: [String] = [],
+        groundingSummary: String? = nil,
+        allowedTone: String? = nil,
+        followUpSuggestions: [HomeAssistantSuggestion] = []
+    ) async -> MarinaResponseSurfaceApplication {
+        let presentationMode = marinaPresentationModeDecision()
+        let fallbackApplication: MarinaResponseSurfaceApplication
+        switch presentationMode {
+        case .foundationModelsStreaming, .basicDeterministic:
+            fallbackApplication = MarinaResponseSurfaceApplication(
+                answer: basicFallbackAnswer,
+                followUpSuggestions: followUpSuggestions
+            )
+        case .plainDeterministicFallback:
+            fallbackApplication = MarinaResponseSurfaceApplication(
+                answer: deterministicAnswer,
+                followUpSuggestions: followUpSuggestions
+            )
+        }
+
+        switch presentationMode {
+        case .foundationModelsStreaming:
+            appendAnswer(streamingPreparedAnswer(deterministicAnswer, surfaceKind: surfaceKind))
+            let surfaced = await surfaceGeneratedPresentation(
+                generationBaseAnswer: deterministicAnswer,
+                fallbackApplication: fallbackApplication,
+                rawPrompt: rawPrompt,
+                source: source,
+                homeQueryPlan: homeQueryPlan,
+                surfaceKind: surfaceKind,
+                validationOutcomeSummary: validationOutcomeSummary,
+                clarificationChoices: clarificationChoices,
+                groundingSummary: groundingSummary,
+                allowedTone: allowedTone,
+                streamingAnswerID: deterministicAnswer.id
+            )
+            replaceAnswerPreservingPrompt(surfaced.answer)
+            storeGeneratedFollowUps(surfaced.followUpSuggestions, for: surfaced.answer.id)
+            return surfaced
+
+        case .basicDeterministic:
+            MarinaTraceRecorder.shared.recordResponseSurface(
+                source: .deterministicSurfaceFallback,
+                fallbackReason: .aiOptOut
+            )
+            appendAnswer(fallbackApplication.answer)
+            storeGeneratedFollowUps(fallbackApplication.followUpSuggestions, for: fallbackApplication.answer.id)
+            return fallbackApplication
+
+        case .plainDeterministicFallback:
+            MarinaTraceRecorder.shared.recordResponseSurface(
+                source: .deterministicSurfaceFallback,
+                fallbackReason: .modelUnavailable
+            )
+            appendAnswer(fallbackApplication.answer)
+            storeGeneratedFollowUps(fallbackApplication.followUpSuggestions, for: fallbackApplication.answer.id)
+            return fallbackApplication
+        }
+    }
+
+    @MainActor
+    private func presentMarinaAnswer(
+        deterministicAnswer: HomeAnswer,
+        basicFallbackAnswer: HomeAnswer,
+        rawPrompt: String,
+        source: HomeAssistantPlanResolutionSource,
+        homeQueryPlan: HomeQueryPlan? = nil,
+        surfaceKind: MarinaPresentationSurfaceKind = .answer,
+        validationOutcomeSummary: String? = nil,
+        clarificationChoices: [String] = [],
+        groundingSummary: String? = nil,
+        allowedTone: String? = nil,
+        followUpSuggestions: [HomeAssistantSuggestion] = [],
+        onPresented: (@MainActor @Sendable (HomeAnswer) -> Void)? = nil
+    ) {
+        Task { @MainActor in
+            let surfaced = await presentMarinaAnswer(
+                deterministicAnswer: deterministicAnswer,
+                basicFallbackAnswer: basicFallbackAnswer,
+                rawPrompt: rawPrompt,
+                source: source,
+                homeQueryPlan: homeQueryPlan,
+                surfaceKind: surfaceKind,
+                validationOutcomeSummary: validationOutcomeSummary,
+                clarificationChoices: clarificationChoices,
+                groundingSummary: groundingSummary,
+                allowedTone: allowedTone,
+                followUpSuggestions: followUpSuggestions
+            )
+            onPresented?(surfaced.answer)
+        }
+    }
+
+    private func storeGeneratedFollowUps(
+        _ suggestions: [HomeAssistantSuggestion],
+        for answerID: UUID
+    ) {
+        guard suggestions.isEmpty == false else { return }
+        generatedFollowUpSuggestionsByAnswerID[answerID] = suggestions
+    }
+
+    private func streamingPreparedAnswer(
+        _ answer: HomeAnswer,
+        surfaceKind: MarinaPresentationSurfaceKind
+    ) -> HomeAnswer {
+        guard answer.subtitle?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true else {
+            return answer
+        }
+
+        return HomeAnswer(
+            id: answer.id,
+            queryID: answer.queryID,
+            kind: answer.kind,
+            userPrompt: answer.userPrompt,
+            title: answer.title,
+            subtitle: streamingPlaceholderSubtitle(for: surfaceKind),
+            primaryValue: answer.primaryValue,
+            rows: answer.rows,
+            attachment: answer.attachment,
+            explanation: answer.explanation,
+            generatedAt: answer.generatedAt
+        )
+    }
+
+    private func streamingPlaceholderSubtitle(
+        for surfaceKind: MarinaPresentationSurfaceKind
+    ) -> String {
+        switch surfaceKind {
+        case .clarification:
+            return "Let me frame the safest choice."
+        case .help:
+            return "Let me make the options easier to scan."
+        case .noData:
+            return "Let me check what the empty result means."
+        case .recovery:
+            return "Let me find the safest next step."
+        case .simulation:
+            return "Let me ground this what-if."
+        case .answer:
+            return "Let me read the signal in this."
+        }
     }
 
     private func shouldBypassPersonaStyling(for answer: HomeAnswer) -> Bool {
@@ -1667,10 +1859,18 @@ struct HomeAssistantPanelView: View {
         rawPrompt: String,
         source: HomeAssistantPlanResolutionSource,
         homeQueryPlan: HomeQueryPlan?,
+        surfaceKind: MarinaPresentationSurfaceKind = .answer,
         validationOutcomeSummary: String? = nil,
-        clarificationChoices: [String] = []
+        clarificationChoices: [String] = [],
+        groundingSummary: String? = nil,
+        allowedTone: String? = nil,
+        streamingAnswerID: UUID? = nil
     ) async -> MarinaResponseSurfaceApplication {
         let fallback = fallbackApplication
+        let plainDeterministicFallback = MarinaResponseSurfaceApplication(
+            answer: generationBaseAnswer,
+            followUpSuggestions: fallback.followUpSuggestions
+        )
         guard marinaRuntimeSettings.aiOptIn.isEnabled else {
             MarinaTraceRecorder.shared.recordResponseSurface(
                 source: .deterministicSurfaceFallback,
@@ -1689,12 +1889,27 @@ struct HomeAssistantPanelView: View {
         }
 
         do {
+            let grounding = presentationGrounding(
+                rawPrompt: rawPrompt,
+                answer: generationBaseAnswer,
+                surfaceKind: surfaceKind,
+                homeQueryPlan: homeQueryPlan,
+                validationOutcomeSummary: validationOutcomeSummary,
+                sourceSummary: groundingSummary,
+                clarificationChoices: clarificationChoices
+            )
             let request = MarinaResponseSurfaceRequestFactory.make(
                 userPrompt: rawPrompt,
                 workspaceName: workspace.name,
                 routeSourceRaw: source.rawValue,
                 generationBaseAnswer: generationBaseAnswer,
                 fallbackApplication: fallback,
+                presentationMode: .foundationModelsStreaming,
+                surfaceKind: surfaceKind,
+                voiceProfile: .marina,
+                presentationGrounding: grounding,
+                groundingSummary: groundingSummary,
+                allowedTone: allowedTone ?? MarinaAIVoiceProfile.marina.allowedTone,
                 dateWindow: homeQueryPlan?.dateRange?.traceSummary,
                 provenance: visibleProvenance(for: homeQueryPlan.map { [$0.query] } ?? []),
                 validationOutcomeSummary: validationOutcomeSummary,
@@ -1714,7 +1929,14 @@ struct HomeAssistantPanelView: View {
                     )
                 }
             )
-            let generated = try await responseGenerationService.generateSurfaceResponse(context: request.context)
+            let generated = try await responseGenerationService.generateSurfaceResponse(
+                context: request.context,
+                onPartialText: streamingAnswerID.map { answerID in
+                    { @MainActor @Sendable partialText in
+                        updateAnswerSubtitle(answerID: answerID, subtitle: partialText)
+                    }
+                }
+            )
             let applied = try MarinaResponseSurfaceApplicator().apply(
                 generated: generated,
                 to: request.context.deterministicAnswer,
@@ -1730,25 +1952,87 @@ struct HomeAssistantPanelView: View {
                 source: .deterministicSurfaceFallback,
                 fallbackReason: .modelUnavailable
             )
-            return fallback
+            return plainDeterministicFallback
         } catch MarinaResponseGenerationError.malformedResponse {
             MarinaTraceRecorder.shared.recordResponseSurface(
                 source: .deterministicSurfaceFallback,
                 fallbackReason: .malformedResponse
             )
-            return fallback
+            return plainDeterministicFallback
         } catch MarinaResponseGenerationError.invariantViolation {
             MarinaTraceRecorder.shared.recordResponseSurface(
                 source: .deterministicSurfaceFallback,
                 fallbackReason: .invariantViolation
             )
-            return fallback
+            return plainDeterministicFallback
+        } catch MarinaResponseGenerationError.generationFailed(let category) {
+            MarinaTraceRecorder.shared.recordResponseSurface(
+                source: .deterministicSurfaceFallback,
+                fallbackReason: responseSurfaceFallbackReason(for: category)
+            )
+            return plainDeterministicFallback
         } catch {
             MarinaTraceRecorder.shared.recordResponseSurface(
                 source: .deterministicSurfaceFallback,
                 fallbackReason: .modelServiceFailed
             )
-            return fallback
+            return plainDeterministicFallback
+        }
+    }
+
+    private func presentationGrounding(
+        rawPrompt: String,
+        answer: HomeAnswer,
+        surfaceKind: MarinaPresentationSurfaceKind,
+        homeQueryPlan: HomeQueryPlan?,
+        validationOutcomeSummary: String?,
+        sourceSummary: String?,
+        clarificationChoices: [String]
+    ) -> MarinaPresentationGrounding {
+        MarinaPresentationGroundingBuilder().build(
+            userPrompt: rawPrompt,
+            answer: answer,
+            surfaceKind: surfaceKind,
+            dateWindow: homeQueryPlan?.dateRange?.traceSummary,
+            provenance: visibleProvenance(for: homeQueryPlan.map { [$0.query] } ?? []),
+            validationOutcomeSummary: validationOutcomeSummary,
+            sourceSummary: sourceSummary,
+            clarificationChoices: clarificationChoices
+        )
+    }
+
+    private func responseSurfaceFallbackReason(
+        for category: MarinaFoundationModelsErrorCategory
+    ) -> MarinaResponseGenerationFallbackReason {
+        switch category {
+        case .unavailable:
+            return .modelUnavailable
+        case .assetsUnavailable:
+            return .assetsUnavailable
+        case .decodingFailure:
+            return .decodingFailure
+        case .exceededContextWindowSize:
+            return .exceededContextWindowSize
+        case .guardrailViolation:
+            return .guardrailViolation
+        case .rateLimited:
+            return .rateLimited
+        case .refusal:
+            return .refusal
+        case .concurrentRequests:
+            return .concurrentRequests
+        case .unsupportedGuide:
+            return .unsupportedGuide
+        case .unsupportedLanguageOrLocale:
+            return .unsupportedLanguageOrLocale
+        case .toolCallFailed:
+            return .toolCallFailed
+        case .malformedResponse:
+            return .malformedResponse
+        case .cancelled:
+            return .cancelled
+        case .unknown:
+            return .unknown
         }
     }
 
@@ -1892,15 +2176,22 @@ struct HomeAssistantPanelView: View {
             recoverySuggestions = []
             lastClarificationReasons = []
             activeClarificationContext = nil
-            appendAnswer(
-                HomeAnswer(
-                    queryID: UUID(),
-                    kind: .message,
-                    userPrompt: prompt,
-                    title: "What If needs one concrete change",
-                    subtitle: message,
-                    rows: []
-                )
+            let answer = HomeAnswer(
+                queryID: UUID(),
+                kind: .message,
+                userPrompt: prompt,
+                title: "What If needs one concrete change",
+                subtitle: message,
+                rows: []
+            )
+            presentMarinaAnswer(
+                deterministicAnswer: answer,
+                basicFallbackAnswer: answer,
+                rawPrompt: prompt,
+                source: .contextual,
+                surfaceKind: .clarification,
+                validationOutcomeSummary: "what_if_clarification",
+                groundingSummary: "what-if parser needs one concrete change"
             )
             return true
         case let .request(request):
@@ -1925,7 +2216,24 @@ struct HomeAssistantPanelView: View {
 
             pendingWhatIfContext = built.context
             pendingWhatIfCategoryMappingContext = nil
-            appendAnswer(styled)
+            presentMarinaAnswer(
+                deterministicAnswer: built.rawAnswer,
+                basicFallbackAnswer: styled,
+                rawPrompt: prompt,
+                source: .contextual,
+                homeQueryPlan: HomeQueryPlan(
+                    metric: built.primaryQuery.intent.metric,
+                    dateRange: built.primaryQuery.dateRange,
+                    comparisonDateRange: built.primaryQuery.comparisonDateRange,
+                    resultLimit: built.primaryQuery.resultLimit,
+                    confidenceBand: .high,
+                    targetName: built.primaryQuery.targetName,
+                    periodUnit: built.primaryQuery.periodUnit
+                ),
+                surfaceKind: .simulation,
+                groundingSummary: "deterministic what-if simulation",
+                followUpSuggestions: followUpSuggestions(for: styled, query: built.primaryQuery)
+            )
             return true
         }
     }
@@ -2081,7 +2389,14 @@ struct HomeAssistantPanelView: View {
                 userPrompt: prompt,
                 personaID: selectedPersonaID
             )
-            appendAnswer(styled)
+            presentMarinaAnswer(
+                deterministicAnswer: raw,
+                basicFallbackAnswer: styled,
+                rawPrompt: prompt,
+                source: .contextual,
+                surfaceKind: .help,
+                groundingSummary: "capability guide"
+            )
             return true
         }
         return false
@@ -2108,6 +2423,17 @@ struct HomeAssistantPanelView: View {
         }
         
         return false
+    }
+
+    private func plainUnresolvedAnswer(for prompt: String) -> HomeAnswer {
+        HomeAnswer(
+            queryID: UUID(),
+            kind: .message,
+            userPrompt: prompt,
+            title: "I need a clearer budgeting prompt",
+            subtitle: "Try asking about a total, a list, a comparison, or a named card, category, merchant, budget, income source, or preset.",
+            rows: []
+        )
     }
     
     private func handleCommandPlan(
@@ -4772,6 +5098,51 @@ struct HomeAssistantPanelView: View {
         answers.append(answerToAppend)
         conversationStore.saveAnswers(answers, workspaceID: workspace.id)
     }
+
+    private func updateAnswerSubtitle(answerID: UUID, subtitle: String) {
+        guard let index = answers.firstIndex(where: { $0.id == answerID }) else { return }
+        let answer = answers[index]
+        answers[index] = HomeAnswer(
+            id: answer.id,
+            queryID: answer.queryID,
+            kind: answer.kind,
+            userPrompt: answer.userPrompt,
+            title: answer.title,
+            subtitle: subtitle,
+            primaryValue: answer.primaryValue,
+            rows: answer.rows,
+            attachment: answer.attachment,
+            explanation: answer.explanation,
+            generatedAt: answer.generatedAt
+        )
+        conversationStore.saveAnswers(answers, workspaceID: workspace.id)
+    }
+
+    private func replaceAnswerPreservingPrompt(_ replacement: HomeAnswer) {
+        guard let index = answers.firstIndex(where: { $0.id == replacement.id }) else {
+            appendAnswer(replacement)
+            return
+        }
+        let existing = answers[index]
+        answers[index] = HomeAnswer(
+            id: existing.id,
+            queryID: replacement.queryID,
+            kind: replacement.kind,
+            userPrompt: replacement.userPrompt ?? existing.userPrompt,
+            title: replacement.title,
+            subtitle: replacement.subtitle,
+            primaryValue: replacement.primaryValue,
+            rows: replacement.rows,
+            attachment: replacement.attachment,
+            explanation: replacement.explanation,
+            generatedAt: replacement.generatedAt
+        )
+        MarinaTraceRecorder.shared.recordResponse(
+            type: answers[index].kind.rawValue,
+            finalAnswerSummary: answers[index].traceSummary
+        )
+        conversationStore.saveAnswers(answers, workspaceID: workspace.id)
+    }
     
     private func quickButtonAccordionAnimation(for index: Int) -> Animation {
         let count = EmptySuggestionGroup.allCases.count
@@ -4977,7 +5348,7 @@ struct HomeAssistantPanelView: View {
         }
 
         if allowsBroadBundle && shouldRunBroadOverviewBundle(for: rawPrompt, plan: executionPlan) {
-            runBroadOverviewBundle(userPrompt: rawPrompt, basePlan: executionPlan)
+            runBroadOverviewBundle(userPrompt: rawPrompt, basePlan: executionPlan, source: source)
             logFinalTurnOutcome(
                 .answer,
                 rawPrompt: rawPrompt,
@@ -4999,7 +5370,8 @@ struct HomeAssistantPanelView: View {
                 executionRoutedRequest,
                 userPrompt: rawPrompt,
                 explanation: reconciliation.explanation,
-                executedPlan: executionPlan
+                executedPlan: executionPlan,
+                source: source
             )
             logFinalTurnOutcome(
                 .answer,
@@ -5249,20 +5621,27 @@ struct HomeAssistantPanelView: View {
         lastClarificationReasons = []
         activeClarificationContext = nil
 
-        appendAnswer(
-            HomeAnswer(
-                queryID: UUID(),
-                kind: .message,
-                userPrompt: userPrompt,
-                title: "Try one of these",
-                subtitle: subtitle,
-                rows: suggestions.prefix(3).map {
-                    HomeAnswerRow(
-                        title: $0.suggestion.title,
-                        value: $0.reasoning
-                    )
-                }
-            )
+        let answer = HomeAnswer(
+            queryID: UUID(),
+            kind: .message,
+            userPrompt: userPrompt,
+            title: "Try one of these",
+            subtitle: subtitle,
+            rows: suggestions.prefix(3).map {
+                HomeAnswerRow(
+                    title: $0.suggestion.title,
+                    value: $0.reasoning
+                )
+            }
+        )
+        presentMarinaAnswer(
+            deterministicAnswer: answer,
+            basicFallbackAnswer: answer,
+            rawPrompt: userPrompt ?? "",
+            source: .contextual,
+            surfaceKind: .recovery,
+            validationOutcomeSummary: "recovery",
+            groundingSummary: "deterministic recovery suggestions"
         )
         MarinaDebugLogger.log(
             "[MarinaClarification] recovery count=\(suggestions.count) subtitle='\(subtitle)'"
@@ -5421,8 +5800,16 @@ struct HomeAssistantPanelView: View {
             primaryValue: nil,
             rows: []
         )
-        
-        appendAnswer(clarificationAnswer)
+        presentMarinaAnswer(
+            deterministicAnswer: clarificationAnswer,
+            basicFallbackAnswer: clarificationAnswer,
+            rawPrompt: userPrompt ?? "",
+            source: .contextual,
+            surfaceKind: .clarification,
+            validationOutcomeSummary: "clarification:\(clarificationPlan.reasons.map(\.rawValue).joined(separator: ","))",
+            clarificationChoices: clarificationPlan.suggestions.map(\.title),
+            groundingSummary: "deterministic clarification choices"
+        )
     }
 
     private func actionableClarificationPlan(
@@ -5939,7 +6326,7 @@ struct HomeAssistantPanelView: View {
                 priorContext: nlqExecutionContext,
                 now: runtimeSettings.now
             )
-            _ = handleNLQPipelineResult(pipelineResult, originalPrompt: prompt)
+            _ = await handleNLQPipelineResult(pipelineResult, originalPrompt: prompt)
             finishMarinaTrace()
             return
         }
@@ -5963,7 +6350,7 @@ struct HomeAssistantPanelView: View {
     private func handleNLQPipelineResult(
         _ result: MarinaNLQPipelineResult,
         originalPrompt: String
-    ) -> Bool {
+    ) async -> Bool {
         switch result {
         case .answer(let answer, let executionContext):
             MarinaTraceRecorder.shared.recordSelectedRoute(.nlq, reason: "nlq answer")
@@ -5992,11 +6379,14 @@ struct HomeAssistantPanelView: View {
                 userPrompt: answer.userPrompt ?? originalPrompt,
                 personaID: selectedPersonaID
             )
-            MarinaTraceRecorder.shared.recordResponse(
-                type: styled.kind.rawValue,
-                finalAnswerSummary: styled.traceSummary
+            _ = await presentMarinaAnswer(
+                deterministicAnswer: answer,
+                basicFallbackAnswer: styled,
+                rawPrompt: answer.userPrompt ?? originalPrompt,
+                source: .contextual,
+                surfaceKind: answer.primaryValue == nil && answer.rows.isEmpty ? .noData : .answer,
+                groundingSummary: executionContext.metric.rawValue
             )
-            appendAnswer(styled)
             return true
         case .clarification(let payload):
             MarinaTraceRecorder.shared.recordSelectedRoute(.clarification, reason: "nlq clarification")
@@ -6015,15 +6405,22 @@ struct HomeAssistantPanelView: View {
             recoverySuggestions = []
             lastClarificationReasons = [.lowConfidenceLanguage]
             activeClarificationContext = nil
-            appendAnswer(
-                HomeAnswer(
-                    queryID: UUID(),
-                    kind: .message,
-                    userPrompt: originalPrompt,
-                    title: String(localized: "assistant.quickClarification", defaultValue: "Quick clarification", comment: "Assistant clarification card title."),
-                    subtitle: payload.message,
-                    rows: []
-                )
+            let answer = HomeAnswer(
+                queryID: UUID(),
+                kind: .message,
+                userPrompt: originalPrompt,
+                title: String(localized: "assistant.quickClarification", defaultValue: "Quick clarification", comment: "Assistant clarification card title."),
+                subtitle: payload.message,
+                rows: []
+            )
+            _ = await presentMarinaAnswer(
+                deterministicAnswer: answer,
+                basicFallbackAnswer: answer,
+                rawPrompt: originalPrompt,
+                source: .contextual,
+                surfaceKind: .clarification,
+                validationOutcomeSummary: "nlq_clarification",
+                clarificationChoices: payload.options.map(\.displayLabel)
             )
             return true
         case .recovery(let message):
@@ -6035,15 +6432,22 @@ struct HomeAssistantPanelView: View {
             clearNLQClarificationState()
             clarificationSuggestions = []
             recoverySuggestions = []
-            appendAnswer(
-                HomeAnswer(
-                    queryID: UUID(),
-                    kind: .message,
-                    userPrompt: originalPrompt,
-                    title: "Try one of these",
-                    subtitle: message,
-                    rows: []
-                )
+            let answer = HomeAnswer(
+                queryID: UUID(),
+                kind: .message,
+                userPrompt: originalPrompt,
+                title: "Try one of these",
+                subtitle: message,
+                rows: []
+            )
+            _ = await presentMarinaAnswer(
+                deterministicAnswer: answer,
+                basicFallbackAnswer: answer,
+                rawPrompt: originalPrompt,
+                source: .contextual,
+                surfaceKind: .recovery,
+                validationOutcomeSummary: "nlq_recovery",
+                groundingSummary: "nlq recovery"
             )
             return true
         }
@@ -6093,19 +6497,17 @@ struct HomeAssistantPanelView: View {
                 subtitle: "I could not turn that into a safe clarification choice. Try asking for a total, a list, or a named object, like \"How much did I spend on Groceries?\"",
                 rows: []
             )
-        let surfaced = await surfaceGeneratedPresentation(
-            generationBaseAnswer: baseAnswer,
-            fallbackApplication: MarinaResponseSurfaceApplication(
-                answer: baseAnswer,
-                followUpSuggestions: []
-            ),
+        _ = await presentMarinaAnswer(
+            deterministicAnswer: baseAnswer,
+            basicFallbackAnswer: baseAnswer,
             rawPrompt: rawPrompt,
             source: source,
             homeQueryPlan: nil,
+            surfaceKind: .clarification,
             validationOutcomeSummary: "clarification:\(clarification.kind.rawValue)",
-            clarificationChoices: actionableChoices.map(sharedPipelineChoiceTitle)
+            clarificationChoices: actionableChoices.map(sharedPipelineChoiceTitle),
+            groundingSummary: "clarification:\(clarification.kind.rawValue)"
         )
-        appendAnswer(surfaced.answer)
     }
 
     @MainActor
@@ -6160,20 +6562,28 @@ struct HomeAssistantPanelView: View {
         lastClarificationReasons = [.lowConfidenceLanguage]
         activeClarificationContext = nil
 
-        appendAnswer(
-            HomeAnswer(
-                queryID: clarification.id,
-                kind: .message,
-                userPrompt: reply,
-                title: title,
-                subtitle: subtitle,
-                rows: actionableChoices.prefix(4).map { choice in
-                    HomeAnswerRow(
-                        title: sharedPipelineChoiceTitle(choice),
-                        value: choice.subtitle ?? choice.rawValue ?? choice.entityTypeHint?.rawValue ?? ""
-                    )
-                }
-            )
+        let answer = HomeAnswer(
+            queryID: clarification.id,
+            kind: .message,
+            userPrompt: reply,
+            title: title,
+            subtitle: subtitle,
+            rows: actionableChoices.prefix(4).map { choice in
+                HomeAnswerRow(
+                    title: sharedPipelineChoiceTitle(choice),
+                    value: choice.subtitle ?? choice.rawValue ?? choice.entityTypeHint?.rawValue ?? ""
+                )
+            }
+        )
+        presentMarinaAnswer(
+            deterministicAnswer: answer,
+            basicFallbackAnswer: answer,
+            rawPrompt: reply,
+            source: .sharedHeuristic,
+            surfaceKind: .clarification,
+            validationOutcomeSummary: "clarification_retry:\(clarification.kind.rawValue)",
+            clarificationChoices: actionableChoices.map(sharedPipelineChoiceTitle),
+            groundingSummary: "typed clarification retry"
         )
     }
 
@@ -6438,7 +6848,9 @@ struct HomeAssistantPanelView: View {
             priorContext: nlqExecutionContext,
             now: marinaRuntimeSettings.now
         )
-        _ = handleNLQPipelineResult(result, originalPrompt: typedInput)
+        Task { @MainActor in
+            _ = await handleNLQPipelineResult(result, originalPrompt: typedInput)
+        }
     }
 
     private func activeBudgetDateRange() -> HomeQueryDateRange? {
@@ -6542,7 +6954,15 @@ struct HomeAssistantPanelView: View {
                 plan: nil,
                 notes: "no_plan_resolved"
             )
-            appendAnswer(personaFormatter.unresolvedPromptAnswer(for: rawPrompt, personaID: selectedPersonaID))
+            presentMarinaAnswer(
+                deterministicAnswer: plainUnresolvedAnswer(for: rawPrompt),
+                basicFallbackAnswer: personaFormatter.unresolvedPromptAnswer(for: rawPrompt, personaID: selectedPersonaID),
+                rawPrompt: rawPrompt,
+                source: .contextual,
+                surfaceKind: .recovery,
+                validationOutcomeSummary: "unresolved",
+                groundingSummary: "no executable plan resolved"
+            )
         }
     }
 
@@ -6881,7 +7301,15 @@ struct HomeAssistantPanelView: View {
             rawPrompt: rawPrompt,
             notes: "no_executable_plan clarificationActionable=\(clarification.isActionable)"
         )
-        appendAnswer(personaFormatter.unresolvedPromptAnswer(for: rawPrompt, personaID: selectedPersonaID))
+        presentMarinaAnswer(
+            deterministicAnswer: plainUnresolvedAnswer(for: rawPrompt),
+            basicFallbackAnswer: personaFormatter.unresolvedPromptAnswer(for: rawPrompt, personaID: selectedPersonaID),
+            rawPrompt: rawPrompt,
+            source: source ?? .contextual,
+            surfaceKind: .recovery,
+            validationOutcomeSummary: "clarification_discarded_unresolved",
+            groundingSummary: "clarification could not become an executable plan"
+        )
     }
 
     private func logFinalTurnOutcome(
@@ -7310,20 +7738,28 @@ struct HomeAssistantPanelView: View {
         lastClarificationReasons = []
         activeClarificationContext = nil
 
-        appendAnswer(
-            HomeAnswer(
-                queryID: UUID(),
-                kind: .message,
-                userPrompt: userPrompt,
-                title: String(localized: "assistant.quickClarification", defaultValue: "Quick clarification", comment: "Assistant clarification card title."),
-                subtitle: "I found more than one recent answer this could refer to. Pick the one you want to continue from.",
-                rows: contexts.prefix(2).map { context in
-                    HomeAnswerRow(
-                        title: context.targetName ?? context.answerTitle,
-                        value: context.answerTitle
-                    )
-                }
-            )
+        let answer = HomeAnswer(
+            queryID: UUID(),
+            kind: .message,
+            userPrompt: userPrompt,
+            title: String(localized: "assistant.quickClarification", defaultValue: "Quick clarification", comment: "Assistant clarification card title."),
+            subtitle: "I found more than one recent answer this could refer to. Pick the one you want to continue from.",
+            rows: contexts.prefix(2).map { context in
+                HomeAnswerRow(
+                    title: context.targetName ?? context.answerTitle,
+                    value: context.answerTitle
+                )
+            }
+        )
+        presentMarinaAnswer(
+            deterministicAnswer: answer,
+            basicFallbackAnswer: answer,
+            rawPrompt: userPrompt,
+            source: .contextual,
+            surfaceKind: .clarification,
+            validationOutcomeSummary: "anchored_follow_up_ambiguous",
+            clarificationChoices: contexts.map { $0.targetName ?? $0.answerTitle },
+            groundingSummary: "recent answer context disambiguation"
         )
     }
     
@@ -8289,7 +8725,8 @@ struct HomeAssistantPanelView: View {
 
     private func runBroadOverviewBundle(
         userPrompt: String,
-        basePlan: HomeQueryPlan
+        basePlan: HomeQueryPlan,
+        source: HomeAssistantPlanResolutionSource = .contextual
     ) {
         let range = basePlan.dateRange
         let now = Date()
@@ -8423,22 +8860,33 @@ struct HomeAssistantPanelView: View {
             targetName: overviewQuery.targetName,
             periodUnit: overviewQuery.periodUnit
         )
-        updateSessionContext(after: overviewPlan)
-        rememberAnswerContext(
-            for: overviewQuery,
-            executedPlan: overviewPlan,
-            rawAnswer: bundled,
-            presentedAnswer: styled,
-            userPrompt: userPrompt
-        )
-        appendAnswer(styled)
+        presentMarinaAnswer(
+            deterministicAnswer: bundled,
+            basicFallbackAnswer: styled,
+            rawPrompt: userPrompt,
+            source: source,
+            homeQueryPlan: overviewPlan,
+            surfaceKind: rows.isEmpty ? .noData : .answer,
+            groundingSummary: "bundled budget check-in",
+            followUpSuggestions: followUpSuggestions(for: styled, query: overviewQuery)
+        ) { presentedAnswer in
+            updateSessionContext(after: overviewPlan)
+            rememberAnswerContext(
+                for: overviewQuery,
+                executedPlan: overviewPlan,
+                rawAnswer: bundled,
+                presentedAnswer: presentedAnswer,
+                userPrompt: userPrompt
+            )
+        }
     }
 
     private func runRoutedRequest(
         _ routedRequest: HomeAssistantRequestRoutingResolution,
         userPrompt: String,
         explanation: String? = nil,
-        executedPlan: HomeQueryPlan? = nil
+        executedPlan: HomeQueryPlan? = nil,
+        source: HomeAssistantPlanResolutionSource = .contextual
     ) {
         switch routedRequest.shape {
         case .single:
@@ -8447,22 +8895,23 @@ struct HomeAssistantPanelView: View {
                 userPrompt: userPrompt,
                 confidenceBand: routedRequest.plan.confidenceBand,
                 explanation: explanation,
-                executedPlan: executedPlan ?? routedRequest.plan
+                executedPlan: executedPlan ?? routedRequest.plan,
+                source: source
             )
         case .spendAndWhere:
-            runSpendWhereBundle(userPrompt: userPrompt, basePlan: routedRequest.plan)
+            runSpendWhereBundle(userPrompt: userPrompt, basePlan: routedRequest.plan, source: source)
         case .spendByDay:
-            runSpendByDayAnswer(userPrompt: userPrompt, basePlan: routedRequest.plan)
+            runSpendByDayAnswer(userPrompt: userPrompt, basePlan: routedRequest.plan, source: source)
         case .incomePeriodSummary:
-            runIncomePeriodSummaryAnswer(userPrompt: userPrompt, basePlan: routedRequest.plan)
+            runIncomePeriodSummaryAnswer(userPrompt: userPrompt, basePlan: routedRequest.plan, source: source)
         case .savingsDiagnostic:
-            runSavingsDiagnosticAnswer(userPrompt: userPrompt, basePlan: routedRequest.plan)
+            runSavingsDiagnosticAnswer(userPrompt: userPrompt, basePlan: routedRequest.plan, source: source)
         case .categoryAvailability:
-            runCategoryAvailabilityAnswer(userPrompt: userPrompt, basePlan: routedRequest.plan)
+            runCategoryAvailabilityAnswer(userPrompt: userPrompt, basePlan: routedRequest.plan, source: source)
         case .spendDrivers:
-            runSpendDriversAnswer(userPrompt: userPrompt, basePlan: routedRequest.plan)
+            runSpendDriversAnswer(userPrompt: userPrompt, basePlan: routedRequest.plan, source: source)
         case .cardSummary:
-            runCardSummaryAnswer(userPrompt: userPrompt, basePlan: routedRequest.plan)
+            runCardSummaryAnswer(userPrompt: userPrompt, basePlan: routedRequest.plan, source: source)
         }
     }
 
@@ -8495,7 +8944,8 @@ struct HomeAssistantPanelView: View {
 
     private func runSpendWhereBundle(
         userPrompt: String,
-        basePlan: HomeQueryPlan
+        basePlan: HomeQueryPlan,
+        source: HomeAssistantPlanResolutionSource = .contextual
     ) {
         let range = basePlan.dateRange
         let now = Date()
@@ -8531,7 +8981,12 @@ struct HomeAssistantPanelView: View {
         )
 
         guard merchantsAnswer.kind != .message, merchantsAnswer.rows.isEmpty == false else {
-            runQuery(spendQuery, userPrompt: userPrompt, confidenceBand: basePlan.confidenceBand)
+            runQuery(
+                spendQuery,
+                userPrompt: userPrompt,
+                confidenceBand: basePlan.confidenceBand,
+                source: source
+            )
             return
         }
 
@@ -8564,15 +9019,25 @@ struct HomeAssistantPanelView: View {
             targetName: spendQuery.targetName,
             periodUnit: spendQuery.periodUnit
         )
-        updateSessionContext(after: spendPlan)
-        rememberAnswerContext(
-            for: spendQuery,
-            executedPlan: spendPlan,
-            rawAnswer: bundled,
-            presentedAnswer: styled,
-            userPrompt: userPrompt
-        )
-        appendAnswer(styled)
+        presentMarinaAnswer(
+            deterministicAnswer: bundled,
+            basicFallbackAnswer: styled,
+            rawPrompt: userPrompt,
+            source: source,
+            homeQueryPlan: spendPlan,
+            surfaceKind: merchantsAnswer.rows.isEmpty ? .noData : .answer,
+            groundingSummary: "bundled spend and merchant rows",
+            followUpSuggestions: followUpSuggestions(for: styled, query: spendQuery)
+        ) { presentedAnswer in
+            updateSessionContext(after: spendPlan)
+            rememberAnswerContext(
+                for: spendQuery,
+                executedPlan: spendPlan,
+                rawAnswer: bundled,
+                presentedAnswer: presentedAnswer,
+                userPrompt: userPrompt
+            )
+        }
     }
 
     private func spendWhereBundleTitle(for prompt: String) -> String {
@@ -8585,7 +9050,8 @@ struct HomeAssistantPanelView: View {
 
     private func runSpendByDayAnswer(
         userPrompt: String,
-        basePlan: HomeQueryPlan
+        basePlan: HomeQueryPlan,
+        source: HomeAssistantPlanResolutionSource = .contextual
     ) {
         let range = basePlan.dateRange ?? monthRange(containing: Date())
         let query = HomeQuery(
@@ -8619,20 +9085,31 @@ struct HomeAssistantPanelView: View {
             targetName: query.targetName,
             periodUnit: query.periodUnit
         )
-        updateSessionContext(after: dailyPlan)
-        rememberAnswerContext(
-            for: query,
-            executedPlan: dailyPlan,
-            rawAnswer: rawAnswer,
-            presentedAnswer: answer,
-            userPrompt: userPrompt
-        )
-        appendAnswer(answer)
+        presentMarinaAnswer(
+            deterministicAnswer: rawAnswer,
+            basicFallbackAnswer: answer,
+            rawPrompt: userPrompt,
+            source: source,
+            homeQueryPlan: dailyPlan,
+            surfaceKind: rawAnswer.rows.isEmpty ? .noData : .answer,
+            groundingSummary: "deterministic daily spend rows",
+            followUpSuggestions: followUpSuggestions(for: answer, query: query)
+        ) { presentedAnswer in
+            updateSessionContext(after: dailyPlan)
+            rememberAnswerContext(
+                for: query,
+                executedPlan: dailyPlan,
+                rawAnswer: rawAnswer,
+                presentedAnswer: presentedAnswer,
+                userPrompt: userPrompt
+            )
+        }
     }
 
     private func runIncomePeriodSummaryAnswer(
         userPrompt: String,
-        basePlan: HomeQueryPlan
+        basePlan: HomeQueryPlan,
+        source: HomeAssistantPlanResolutionSource = .contextual
     ) {
         let range = basePlan.dateRange ?? monthRange(containing: Date())
         let query = HomeQuery(intent: .incomeAverageActual, dateRange: range)
@@ -8646,13 +9123,15 @@ struct HomeAssistantPanelView: View {
             rawAnswer,
             userPrompt: userPrompt,
             primaryQuery: query,
-            footerQueries: [query]
+            footerQueries: [query],
+            source: source
         )
     }
 
     private func runSavingsDiagnosticAnswer(
         userPrompt: String,
-        basePlan: HomeQueryPlan
+        basePlan: HomeQueryPlan,
+        source: HomeAssistantPlanResolutionSource = .contextual
     ) {
         let range = basePlan.dateRange ?? monthRange(containing: Date())
         let savingsQuery = HomeQuery(intent: .savingsStatus, dateRange: range)
@@ -8691,13 +9170,15 @@ struct HomeAssistantPanelView: View {
             rawAnswer,
             userPrompt: userPrompt,
             primaryQuery: savingsQuery,
-            footerQueries: [savingsQuery, categoriesQuery]
+            footerQueries: [savingsQuery, categoriesQuery],
+            source: source
         )
     }
 
     private func runCategoryAvailabilityAnswer(
         userPrompt: String,
-        basePlan: HomeQueryPlan
+        basePlan: HomeQueryPlan,
+        source: HomeAssistantPlanResolutionSource = .contextual
     ) {
         let range = basePlan.dateRange ?? monthRange(containing: Date())
         let query = HomeQuery(intent: .topCategoriesThisMonth, dateRange: range)
@@ -8714,13 +9195,15 @@ struct HomeAssistantPanelView: View {
             rawAnswer,
             userPrompt: userPrompt,
             primaryQuery: query,
-            footerQueries: [query]
+            footerQueries: [query],
+            source: source
         )
     }
 
     private func runSpendDriversAnswer(
         userPrompt: String,
-        basePlan: HomeQueryPlan
+        basePlan: HomeQueryPlan,
+        source: HomeAssistantPlanResolutionSource = .contextual
     ) {
         let range = basePlan.dateRange ?? monthRange(containing: Date())
         let categoryChangesQuery = HomeQuery(intent: .topCategoryChangesThisMonth, dateRange: range, resultLimit: 3)
@@ -8772,13 +9255,15 @@ struct HomeAssistantPanelView: View {
             rawAnswer,
             userPrompt: userPrompt,
             primaryQuery: categoryChangesQuery,
-            footerQueries: [categoryChangesQuery, cardChangesQuery, merchantsQuery]
+            footerQueries: [categoryChangesQuery, cardChangesQuery, merchantsQuery],
+            source: source
         )
     }
 
     private func runCardSummaryAnswer(
         userPrompt: String,
-        basePlan: HomeQueryPlan
+        basePlan: HomeQueryPlan,
+        source: HomeAssistantPlanResolutionSource = .contextual
     ) {
         let range = basePlan.dateRange ?? monthRange(containing: Date())
         let query = HomeQuery(intent: .cardSnapshotSummary, dateRange: range, targetName: basePlan.targetName)
@@ -8793,7 +9278,8 @@ struct HomeAssistantPanelView: View {
             rawAnswer,
             userPrompt: userPrompt,
             primaryQuery: query,
-            footerQueries: [query]
+            footerQueries: [query],
+            source: source
         )
     }
 
@@ -8801,7 +9287,8 @@ struct HomeAssistantPanelView: View {
         _ rawAnswer: HomeAnswer,
         userPrompt: String,
         primaryQuery: HomeQuery,
-        footerQueries: [HomeQuery]
+        footerQueries: [HomeQuery],
+        source: HomeAssistantPlanResolutionSource = .contextual
     ) {
         let styled = personaFormatter.styledAnswer(
             from: rawAnswer,
@@ -8822,15 +9309,25 @@ struct HomeAssistantPanelView: View {
             targetName: primaryQuery.targetName,
             periodUnit: primaryQuery.periodUnit
         )
-        updateSessionContext(after: routedPlan)
-        rememberAnswerContext(
-            for: primaryQuery,
-            executedPlan: routedPlan,
-            rawAnswer: rawAnswer,
-            presentedAnswer: styled,
-            userPrompt: userPrompt
-        )
-        appendAnswer(styled)
+        presentMarinaAnswer(
+            deterministicAnswer: rawAnswer,
+            basicFallbackAnswer: styled,
+            rawPrompt: userPrompt,
+            source: source,
+            homeQueryPlan: routedPlan,
+            surfaceKind: rawAnswer.primaryValue == nil && rawAnswer.rows.isEmpty ? .noData : .answer,
+            groundingSummary: "deterministic routed summary",
+            followUpSuggestions: followUpSuggestions(for: styled, query: primaryQuery)
+        ) { presentedAnswer in
+            updateSessionContext(after: routedPlan)
+            rememberAnswerContext(
+                for: primaryQuery,
+                executedPlan: routedPlan,
+                rawAnswer: rawAnswer,
+                presentedAnswer: presentedAnswer,
+                userPrompt: userPrompt
+            )
+        }
     }
 
     private func sectionRows(_ section: String, from answer: HomeAnswer, maxRows: Int) -> [HomeAnswerRow] {

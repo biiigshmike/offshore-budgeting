@@ -390,7 +390,7 @@ struct MarinaFoundationModelsInterpreterTests {
         #expect(candidate.responseShapeHint == .summaryCard)
     }
 
-    @Test func semanticCommand_lookupDetails_remainsTypedCandidateWithoutDatabaseBypass() {
+    @Test func semanticCommand_lookupDetails_buildsReadOnlyDatabaseLookupRequest() {
         let cases: [(MarinaSemanticCommandDataset, MarinaLookupObjectType, String)] = [
             (.budgets, .budget, "May"),
             (.cards, .card, "Apple Card"),
@@ -405,7 +405,7 @@ struct MarinaFoundationModelsInterpreterTests {
             (.assistantAliasRules, .assistantAliasRule, "groc")
         ]
 
-        for (dataset, _, searchText) in cases {
+        for (dataset, expectedType, searchText) in cases {
             let command = MarinaSemanticCommand(
                 family: .databaseLookup,
                 action: .lookupDetails,
@@ -432,7 +432,8 @@ struct MarinaFoundationModelsInterpreterTests {
 
             #expect(candidate.requestFamily == .databaseLookup)
             #expect(candidate.operation == .lookupDetails)
-            #expect(candidate.databaseLookupRequest == nil)
+            #expect(candidate.databaseLookupRequest?.searchText == searchText)
+            #expect(candidate.databaseLookupRequest?.objectTypes == [expectedType])
             #expect(candidate.entityMentions.first?.rawText == searchText)
             #expect(candidate.semanticCommand == command)
         }
@@ -593,7 +594,8 @@ struct MarinaFoundationModelsInterpreterTests {
         #expect(query.operation == .lookupDetails)
         #expect(query.subject == .cards)
         #expect(query.filters.first?.value == "Apple Card")
-        #expect(interpretation.compatibilityCandidate.databaseLookupRequest == nil)
+        #expect(interpretation.compatibilityCandidate.databaseLookupRequest?.searchText == "Apple Card")
+        #expect(interpretation.compatibilityCandidate.databaseLookupRequest?.objectTypes == [.card])
         #expect(interpretation.compatibilityCandidate.semanticCommand == command)
     }
 

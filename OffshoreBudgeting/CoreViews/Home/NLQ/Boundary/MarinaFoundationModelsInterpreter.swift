@@ -123,6 +123,9 @@ struct MarinaFoundationModelsInterpreter {
         let operation = operation(from: command.action)
         let measure = command.measure ?? measure(from: command)
         let responseShape = responseShapeHint(from: command, operation: operation, measure: measure)
+        let databaseLookupRequest = command.family == .databaseLookup
+            ? lookupRequest(from: command, prompt: prompt)
+            : nil
 
         return MarinaQueryPlanCandidate(
             requestFamily: command.family,
@@ -137,6 +140,7 @@ struct MarinaFoundationModelsInterpreter {
             limit: command.limit,
             responseShapeHint: responseShape,
             confidence: .high,
+            databaseLookupRequest: databaseLookupRequest,
             semanticCommand: command,
             insightIntent: command.insightIntent,
             softTimeHint: command.softTimeHint

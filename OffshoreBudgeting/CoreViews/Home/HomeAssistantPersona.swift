@@ -76,6 +76,11 @@ struct HomeAssistantPersonaResponseRules: Equatable {
         isMarinaEnabled: true,
         rulesFooterLine: String(localized: "assistant.persona.rulesFooter", defaultValue: "Rules/Model: MarinaResponseRules v1.0 (non-LLM)", comment: "Footer line showing Marina response rules model.")
     )
+
+    static let marinaUserVisible = HomeAssistantPersonaResponseRules(
+        isMarinaEnabled: true,
+        rulesFooterLine: ""
+    )
 }
 
 struct HomeAssistantPersonaSeedContext: Equatable {

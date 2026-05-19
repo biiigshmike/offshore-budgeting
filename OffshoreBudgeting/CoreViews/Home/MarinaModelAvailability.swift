@@ -34,6 +34,9 @@ private func availabilityStatus() -> MarinaModelAvailability.Status {
     let model = SystemLanguageModel.default
     switch model.availability {
     case .available:
+        guard model.supportsLocale(.current) else {
+            return .unavailable(reason: "unsupported_locale")
+        }
         return .available
     case .unavailable(let reason):
         switch reason {

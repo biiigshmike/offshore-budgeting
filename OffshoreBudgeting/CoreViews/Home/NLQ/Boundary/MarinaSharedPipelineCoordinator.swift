@@ -370,12 +370,49 @@ struct MarinaSharedPipelineCoordinator {
                 return .modelInvalidStructuredOutput
             case .unavailable:
                 return .modelUnavailable
+            case .generationFailed(let category):
+                return fallbackReason(for: category)
             }
         }
         if error is CancellationError {
-            return .modelTimedOut
+            return .modelCancelled
         }
         return .modelServiceFailed
+    }
+
+    private func fallbackReason(
+        for category: MarinaFoundationModelsErrorCategory
+    ) -> MarinaSharedPipelineFallbackReason {
+        switch category {
+        case .unavailable:
+            return .modelUnavailable
+        case .assetsUnavailable:
+            return .modelAssetsUnavailable
+        case .decodingFailure:
+            return .modelDecodingFailure
+        case .exceededContextWindowSize:
+            return .modelContextWindowExceeded
+        case .guardrailViolation:
+            return .modelGuardrailViolation
+        case .rateLimited:
+            return .modelRateLimited
+        case .refusal:
+            return .modelRefusal
+        case .concurrentRequests:
+            return .modelConcurrentRequests
+        case .unsupportedGuide:
+            return .modelUnsupportedGuide
+        case .unsupportedLanguageOrLocale:
+            return .modelUnsupportedLanguageOrLocale
+        case .toolCallFailed:
+            return .modelToolCallFailed
+        case .malformedResponse:
+            return .modelInvalidStructuredOutput
+        case .cancelled:
+            return .modelCancelled
+        case .unknown:
+            return .modelUnknownFailure
+        }
     }
 
     private func interpreterSelectionReason(
@@ -386,8 +423,18 @@ struct MarinaSharedPipelineCoordinator {
             return .modelInvalidStructuredOutput
         case .modelUnavailable:
             return .modelUnavailable
-        case .modelTimedOut:
+        case .modelTimedOut, .modelCancelled, .modelContextWindowExceeded:
             return .modelTimedOut
+        case .modelGuardrailViolation, .modelRefusal:
+            return .modelSafetyBlocked
+        case .modelRateLimited:
+            return .modelRateLimited
+        case .modelUnsupportedLanguageOrLocale:
+            return .modelUnsupportedLocale
+        case .modelToolCallFailed:
+            return .modelToolCallFailed
+        case .modelConcurrentRequests:
+            return .modelConcurrentRequest
         default:
             return .modelServiceFailed
         }

@@ -18,12 +18,25 @@ enum MarinaResponseGenerationFallbackReason: String, Codable, Equatable {
     case modelServiceFailed
     case malformedResponse
     case invariantViolation
+    case assetsUnavailable
+    case decodingFailure
+    case exceededContextWindowSize
+    case guardrailViolation
+    case rateLimited
+    case refusal
+    case concurrentRequests
+    case unsupportedGuide
+    case unsupportedLanguageOrLocale
+    case toolCallFailed
+    case cancelled
+    case unknown
 }
 
 enum MarinaResponseGenerationError: Error, Equatable {
     case unavailable
     case malformedResponse
     case invariantViolation
+    case generationFailed(MarinaFoundationModelsErrorCategory)
 }
 
 struct MarinaResponseSuggestionCandidate: Equatable {
@@ -38,16 +51,198 @@ struct MarinaRecentResponseSummary: Equatable {
     let primaryValue: String?
 }
 
-enum MarinaResponsePresentationMode: String, Codable, Equatable {
-    case foundationModelsPersonalized
+struct MarinaAIVoiceProfile: Equatable {
+    let name: String
+    let allowedTone: String
+    let instructionText: String
+
+    static let marina = MarinaAIVoiceProfile(
+        name: "Marina",
+        allowedTone: "warm, observant, practical, lightly witty, grounded",
+        instructionText: """
+        You are Marina, a private budgeting assistant inside Offshore.
+        Your voice is warm, observant, practical, and lightly witty. You should feel more alive than Basic Marina, but never theatrical.
+        Speak like a trusted person reading the user's actual budget evidence with them: notice the useful pattern, name the practical implication, and keep it concise.
+        Never invent, calculate, rename, or change totals, balances, percentages, dates, rows, entities, transactions, sources, query IDs, follow-up chips, or UI structure.
+        """
+    )
+}
+
+enum MarinaPresentationMode: String, Codable, Equatable {
+    case foundationModelsStreaming
+    case basicDeterministic
+    case plainDeterministicFallback
+}
+
+enum MarinaPresentationSurfaceKind: String, Codable, Equatable {
+    case answer
+    case clarification
+    case help
+    case noData
+    case recovery
+    case simulation
+}
+
+struct MarinaPresentationGrounding: Equatable {
+    let userAskSummary: String
+    let answerHighlights: [String]
+    let insightRows: [String]
+    let dateProvenanceSummary: String?
+    let validationSummary: String?
+    let sourceSummary: String?
+    let clarificationChoices: [String]
+
+    var promptText: String {
+        let highlightsText = answerHighlights.isEmpty ? "none" : answerHighlights.joined(separator: "\n")
+        let insightText = insightRows.isEmpty ? "none" : insightRows.joined(separator: "\n")
+        let choicesText = clarificationChoices.isEmpty ? "none" : clarificationChoices.joined(separator: ", ")
+
+        return """
+        User ask summary: \(userAskSummary)
+        Answer highlights:
+        \(highlightsText)
+        Insight rows:
+        \(insightText)
+        Date/provenance: \(dateProvenanceSummary ?? "none")
+        Validation: \(validationSummary ?? "none")
+        Source summary: \(sourceSummary ?? "none")
+        Clarification choices: \(choicesText)
+        """
+    }
+}
+
+struct MarinaPresentationGroundingBuilder {
+    func build(
+        userPrompt: String,
+        answer: HomeAnswer,
+        surfaceKind: MarinaPresentationSurfaceKind,
+        dateWindow: String?,
+        provenance: String?,
+        validationOutcomeSummary: String?,
+        sourceSummary: String?,
+        clarificationChoices: [String]
+    ) -> MarinaPresentationGrounding {
+        MarinaPresentationGrounding(
+            userAskSummary: userAskSummary(userPrompt, surfaceKind: surfaceKind),
+            answerHighlights: answerHighlights(answer, surfaceKind: surfaceKind),
+            insightRows: insightRows(answer.rows),
+            dateProvenanceSummary: dateProvenanceSummary(dateWindow: dateWindow, provenance: provenance),
+            validationSummary: validationOutcomeSummary?.nilIfBlankForMarinaPresentation,
+            sourceSummary: sourceSummary?.nilIfBlankForMarinaPresentation,
+            clarificationChoices: clarificationChoices.prefix(6).map {
+                trimmedOneLine($0, limit: 80)
+            }
+        )
+    }
+
+    private func userAskSummary(
+        _ userPrompt: String,
+        surfaceKind: MarinaPresentationSurfaceKind
+    ) -> String {
+        let trimmed = trimmedOneLine(userPrompt, limit: 120)
+        if trimmed.isEmpty == false {
+            return trimmed
+        }
+
+        switch surfaceKind {
+        case .answer:
+            return "Answer the current budget question."
+        case .clarification:
+            return "Ask for the missing detail needed to answer safely."
+        case .help:
+            return "Explain what Marina can help with."
+        case .noData:
+            return "Explain that no matching budget data was found."
+        case .recovery:
+            return "Offer the safest next step."
+        case .simulation:
+            return "Explain the deterministic what-if result."
+        }
+    }
+
+    private func answerHighlights(
+        _ answer: HomeAnswer,
+        surfaceKind: MarinaPresentationSurfaceKind
+    ) -> [String] {
+        var highlights: [String] = [
+            "Surface: \(surfaceKind.rawValue)",
+            "Title: \(trimmedOneLine(answer.title, limit: 90))"
+        ]
+
+        if let primaryValue = answer.primaryValue?.nilIfBlankForMarinaPresentation {
+            highlights.append("Primary value: \(trimmedOneLine(primaryValue, limit: 80))")
+        }
+
+        if let subtitle = answer.subtitle?.nilIfBlankForMarinaPresentation {
+            highlights.append("Deterministic subtitle: \(trimmedOneLine(subtitle, limit: 140))")
+        }
+
+        let visibleRows = answer.rows.prefix(5).map {
+            "\(trimmedOneLine($0.title, limit: 40)): \(trimmedOneLine($0.value, limit: 90))"
+        }
+        if visibleRows.isEmpty == false {
+            highlights.append("Visible rows: \(visibleRows.joined(separator: " | "))")
+        }
+
+        return Array(highlights.prefix(8))
+    }
+
+    private func insightRows(_ rows: [HomeAnswerRow]) -> [String] {
+        let insightTitles = [
+            "status",
+            "compared with",
+            "main driver",
+            "pattern",
+            "watch",
+            "top spend driver",
+            "category change",
+            "card change",
+            "merchant"
+        ]
+
+        return rows.compactMap { row in
+            let normalizedTitle = row.title.lowercased()
+            guard insightTitles.contains(where: normalizedTitle.contains) else { return nil }
+            return "\(trimmedOneLine(row.title, limit: 40)): \(trimmedOneLine(row.value, limit: 120))"
+        }.prefix(6).map { $0 }
+    }
+
+    private func dateProvenanceSummary(
+        dateWindow: String?,
+        provenance: String?
+    ) -> String? {
+        let parts = [
+            dateWindow?.nilIfBlankForMarinaPresentation.map { "date=\($0)" },
+            provenance?.nilIfBlankForMarinaPresentation.map { "provenance=\($0)" }
+        ].compactMap { $0 }
+
+        guard parts.isEmpty == false else { return nil }
+        return parts.joined(separator: "; ")
+    }
+
+    private func trimmedOneLine(_ value: String, limit: Int) -> String {
+        let normalized = value
+            .replacingOccurrences(of: "\n", with: " ")
+            .replacingOccurrences(of: "\t", with: " ")
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard normalized.count > limit else { return normalized }
+        let cutoff = normalized.index(normalized.startIndex, offsetBy: max(0, limit - 1))
+        return String(normalized[..<cutoff]).trimmingCharacters(in: .whitespacesAndNewlines) + "..."
+    }
 }
 
 struct MarinaResponseGenerationContext: Equatable {
     let userPrompt: String
     let workspaceName: String
     let routeSourceRaw: String
-    let presentationMode: MarinaResponsePresentationMode
+    let presentationMode: MarinaPresentationMode
+    let surfaceKind: MarinaPresentationSurfaceKind
     let deterministicAnswer: HomeAnswer
+    let voiceProfile: MarinaAIVoiceProfile
+    let presentationGrounding: MarinaPresentationGrounding?
+    let groundingSummary: String?
+    let allowedTone: String?
     let dateWindow: String?
     let provenance: String?
     let validationOutcomeSummary: String?
@@ -59,8 +254,13 @@ struct MarinaResponseGenerationContext: Equatable {
         userPrompt: String,
         workspaceName: String,
         routeSourceRaw: String,
-        presentationMode: MarinaResponsePresentationMode = .foundationModelsPersonalized,
+        presentationMode: MarinaPresentationMode = .foundationModelsStreaming,
+        surfaceKind: MarinaPresentationSurfaceKind = .answer,
         deterministicAnswer: HomeAnswer,
+        voiceProfile: MarinaAIVoiceProfile = .marina,
+        presentationGrounding: MarinaPresentationGrounding? = nil,
+        groundingSummary: String? = nil,
+        allowedTone: String? = nil,
         dateWindow: String? = nil,
         provenance: String? = nil,
         validationOutcomeSummary: String? = nil,
@@ -72,7 +272,12 @@ struct MarinaResponseGenerationContext: Equatable {
         self.workspaceName = workspaceName
         self.routeSourceRaw = routeSourceRaw
         self.presentationMode = presentationMode
+        self.surfaceKind = surfaceKind
         self.deterministicAnswer = deterministicAnswer
+        self.voiceProfile = voiceProfile
+        self.presentationGrounding = presentationGrounding
+        self.groundingSummary = groundingSummary
+        self.allowedTone = allowedTone
         self.dateWindow = dateWindow
         self.provenance = provenance
         self.validationOutcomeSummary = validationOutcomeSummary
@@ -85,24 +290,24 @@ struct MarinaResponseGenerationContext: Equatable {
 enum MarinaFoundationSurfacePromptBuilder {
     static func instructions() -> String {
         """
-        You are Marina, a private budgeting assistant inside Offshore.
-        This pass is presentation only. The app has already routed, validated, fetched, and calculated the answer.
+        Prompt version: \(MarinaFoundationPromptVersion.presentationV1.rawValue)
+        OS/model band: \(MarinaFoundationModelBand.current.rawValue)
+        Locale: \(Locale.current.identifier)
 
-        Voice:
-        - Warm, direct, and budget-bestie without sounding canned.
-        - Speak like a practical person reading the user's actual budget facts with them.
-        - Mention the user's ask when it helps the answer feel specific.
-        - Use light personality sparingly; never turn the response into generic hype.
+        \(MarinaAIVoiceProfile.marina.instructionText)
 
         Rules:
+        - This pass is presentation only. The app has already routed, validated, fetched, and calculated the answer.
         - Do not compute, change, or invent totals, balances, percentages, dates, rows, entities, transactions, or sources.
         - Use only the deterministic facts in the prompt.
         - Preserve the user's workspace boundary.
-        - Keep the response concise, natural, and specific to the facts.
+        - Keep the response to one or two natural sentences unless asking a clarification.
+        - Surface kind controls the job: answer explains a result, clarification asks one question, help explains capabilities, noData names the empty result plainly, recovery gives the safest next step, and simulation explains a deterministic what-if.
         - If rows include Status, Compared With, Main Driver, Pattern, or Watch, use them as insight context, not as new calculations.
         - If clarification choices are provided, rewrite only the clarification question; do not add or remove choices.
-        - Follow-up suggestions may only reference provided candidate indexes.
+        - Do not rewrite follow-up suggestions or mention chip indexes.
         - Avoid generic stock phrases when a concrete fact is available.
+        - Return plain text only: no JSON, markdown tables, labels, debug metadata, or internal rules.
         """
     }
 
@@ -111,21 +316,32 @@ enum MarinaFoundationSurfacePromptBuilder {
         let rows = answer.rows.prefix(8).enumerated().map { index, row in
             "\(index + 1). \(row.title): \(row.value)"
         }.joined(separator: "\n")
-        let suggestions = context.followUpCandidates.map {
-            "[\($0.index)] \($0.title) -> \($0.querySummary)"
-        }.joined(separator: "\n")
         let recent = context.recentResponses.prefix(3).map {
             "\($0.kindRaw): \($0.title)\($0.primaryValue.map { " \($0)" } ?? "")"
         }.joined(separator: "\n")
+        let grounding = context.presentationGrounding?.promptText ?? """
+        User ask summary: \(context.userPrompt)
+        Answer highlights:
+        \(context.groundingSummary ?? "none")
+        Insight rows:
+        none
+        Date/provenance: \(context.dateWindow ?? "none")
+        Validation: \(context.validationOutcomeSummary ?? "none")
+        Source summary: \(context.groundingSummary ?? "none")
+        Clarification choices: \(context.clarificationChoices.isEmpty ? "none" : context.clarificationChoices.joined(separator: ", "))
+        """
 
         return """
         User prompt: \(context.userPrompt)
         Workspace: \(context.workspaceName)
         Route/source: \(context.routeSourceRaw)
         Presentation mode: \(context.presentationMode.rawValue)
-        Validation: \(context.validationOutcomeSummary ?? "none")
-        Date window: \(context.dateWindow ?? "none")
-        Provenance: \(context.provenance ?? "none")
+        Surface kind: \(context.surfaceKind.rawValue)
+        Voice: \(context.voiceProfile.name)
+        Allowed tone: \(context.allowedTone ?? context.voiceProfile.allowedTone)
+
+        Deterministic grounding:
+        \(grounding)
 
         Deterministic answer:
         kind: \(answer.kind.rawValue)
@@ -138,13 +354,10 @@ enum MarinaFoundationSurfacePromptBuilder {
         Clarification choices:
         \(context.clarificationChoices.isEmpty ? "none" : context.clarificationChoices.joined(separator: ", "))
 
-        Follow-up candidates:
-        \(suggestions.isEmpty ? "none" : suggestions)
-
         Recent context:
         \(recent.isEmpty ? "none" : recent)
 
-        Return presentation fields only. For normal answers, provide narrativeSubtitle. For clarifications, provide clarificationMessage. For follow-ups, provide candidate indexes and rewritten chip titles only.
+        Return only the text that should become the narrative subtitle. For clarifications, return only the clarification question text. Do not return JSON, markdown tables, labels, chip indexes, title text, or follow-up suggestions.
         """
     }
 }
@@ -173,10 +386,21 @@ struct MarinaGeneratedSurfaceResponse: Equatable {
     }
 }
 
+typealias MarinaResponsePartialTextHandler = @MainActor @Sendable (String) -> Void
+
 protocol MarinaResponseGenerating {
     func generateSurfaceResponse(
-        context: MarinaResponseGenerationContext
+        context: MarinaResponseGenerationContext,
+        onPartialText: MarinaResponsePartialTextHandler?
     ) async throws -> MarinaGeneratedSurfaceResponse
+}
+
+extension MarinaResponseGenerating {
+    func generateSurfaceResponse(
+        context: MarinaResponseGenerationContext
+    ) async throws -> MarinaGeneratedSurfaceResponse {
+        try await generateSurfaceResponse(context: context, onPartialText: nil)
+    }
 }
 
 struct MarinaResponseSurfaceApplication: Equatable {
@@ -196,6 +420,12 @@ enum MarinaResponseSurfaceRequestFactory {
         routeSourceRaw: String,
         generationBaseAnswer: HomeAnswer,
         fallbackApplication: MarinaResponseSurfaceApplication,
+        presentationMode: MarinaPresentationMode = .foundationModelsStreaming,
+        surfaceKind: MarinaPresentationSurfaceKind = .answer,
+        voiceProfile: MarinaAIVoiceProfile = .marina,
+        presentationGrounding: MarinaPresentationGrounding? = nil,
+        groundingSummary: String? = nil,
+        allowedTone: String? = nil,
         dateWindow: String? = nil,
         provenance: String? = nil,
         validationOutcomeSummary: String? = nil,
@@ -208,8 +438,13 @@ enum MarinaResponseSurfaceRequestFactory {
                 userPrompt: userPrompt,
                 workspaceName: workspaceName,
                 routeSourceRaw: routeSourceRaw,
-                presentationMode: .foundationModelsPersonalized,
+                presentationMode: presentationMode,
+                surfaceKind: surfaceKind,
                 deterministicAnswer: generationBaseAnswer,
+                voiceProfile: voiceProfile,
+                presentationGrounding: presentationGrounding,
+                groundingSummary: groundingSummary,
+                allowedTone: allowedTone,
                 dateWindow: dateWindow,
                 provenance: provenance,
                 validationOutcomeSummary: validationOutcomeSummary,
@@ -229,9 +464,8 @@ struct MarinaResponseSurfaceApplicator {
         deterministicFollowUps: [HomeAssistantSuggestion]
     ) throws -> MarinaResponseSurfaceApplication {
         let generatedSubtitle = generated.clarificationMessage ?? generated.narrativeSubtitle
-        let title = generated.titleOverride ?? deterministicAnswer.title
 
-        guard generatedSubtitle != nil || generated.titleOverride != nil || generated.suggestionRewrites.isEmpty == false else {
+        guard let safeSubtitle = safeGeneratedSubtitle(generatedSubtitle) else {
             throw MarinaResponseGenerationError.invariantViolation
         }
 
@@ -240,8 +474,8 @@ struct MarinaResponseSurfaceApplicator {
             queryID: deterministicAnswer.queryID,
             kind: deterministicAnswer.kind,
             userPrompt: deterministicAnswer.userPrompt,
-            title: title,
-            subtitle: generatedSubtitle ?? deterministicAnswer.subtitle,
+            title: deterministicAnswer.title,
+            subtitle: safeSubtitle,
             primaryValue: deterministicAnswer.primaryValue,
             rows: deterministicAnswer.rows,
             attachment: deterministicAnswer.attachment,
@@ -251,11 +485,27 @@ struct MarinaResponseSurfaceApplicator {
 
         return MarinaResponseSurfaceApplication(
             answer: answer,
-            followUpSuggestions: rewrittenSuggestions(
-                generated.suggestionRewrites,
-                deterministicFollowUps: deterministicFollowUps
-            )
+            followUpSuggestions: deterministicFollowUps
         )
+    }
+
+    private func safeGeneratedSubtitle(_ subtitle: String?) -> String? {
+        guard let subtitle = subtitle?.nilIfBlank else { return nil }
+        let lowercased = subtitle.lowercased()
+        let blockedFragments = [
+            "marinaresponserules",
+            "rules/model:",
+            "```",
+            "\"narrativesubtitle\"",
+            "\"clarificationmessage\"",
+            "\"titleoverride\"",
+            "{",
+            "}"
+        ]
+        guard blockedFragments.contains(where: lowercased.contains) == false else {
+            return nil
+        }
+        return subtitle
     }
 
     private func rewrittenSuggestions(
@@ -308,11 +558,15 @@ struct MarinaResponseSurfaceApplicator {
 
 struct MarinaResponseGenerationService: MarinaResponseGenerating {
     func generateSurfaceResponse(
-        context: MarinaResponseGenerationContext
+        context: MarinaResponseGenerationContext,
+        onPartialText: MarinaResponsePartialTextHandler? = nil
     ) async throws -> MarinaGeneratedSurfaceResponse {
         #if canImport(FoundationModels)
         if #available(iOS 26.0, macOS 26.0, *) {
-            return try await generateWithFoundationModels(context: context)
+            return try await generateWithFoundationModels(
+                context: context,
+                onPartialText: onPartialText
+            )
         }
         throw MarinaResponseGenerationError.unavailable
         #else
@@ -326,95 +580,82 @@ private extension String {
         let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
     }
+
+    var nilIfBlankForMarinaPresentation: String? {
+        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
 }
 
 #if canImport(FoundationModels)
 import FoundationModels
 
 @available(iOS 26.0, macOS 26.0, *)
-private struct MarinaFoundationSurfaceFlatResponse {
-    let titleOverride: String?
-    let narrativeSubtitle: String?
-    let clarificationMessage: String?
-    let suggestionIndexes: [Int]
-    let suggestionTitles: [String]
-}
-
-@available(iOS 26.0, macOS 26.0, *)
 private func generateWithFoundationModels(
-    context: MarinaResponseGenerationContext
+    context: MarinaResponseGenerationContext,
+    onPartialText: MarinaResponsePartialTextHandler?
 ) async throws -> MarinaGeneratedSurfaceResponse {
-    let model = SystemLanguageModel.default
-    guard model.isAvailable else {
-        throw MarinaResponseGenerationError.unavailable
-    }
-
-    let session = LanguageModelSession(
-        model: model,
-        instructions: MarinaFoundationSurfacePromptBuilder.instructions()
-    )
-
-    let response = try await session.respond(
-        to: MarinaFoundationSurfacePromptBuilder.prompt(context: context),
-        schema: marinaSurfaceResponseSchema(),
-        includeSchemaInPrompt: true,
-        options: GenerationOptions(
-            sampling: .greedy,
-            maximumResponseTokens: 420
+    do {
+        let session = try MarinaFoundationModelsSessionProvider().makeSession(
+            instructions: MarinaFoundationSurfacePromptBuilder.instructions()
         )
-    )
+        let stream = session.streamResponse(
+            to: MarinaFoundationSurfacePromptBuilder.prompt(context: context),
+            options: marinaPresentationOptions(seed: marinaPresentationSeed(context: context))
+        )
 
-    let flat = try makeSurfaceFlatResponse(from: response.rawContent)
-    let rewrites: [MarinaGeneratedSuggestionRewrite] = flat.suggestionIndexes.enumerated().compactMap { pair in
-        let offset = pair.offset
-        let index = pair.element
-        guard flat.suggestionTitles.indices.contains(offset),
-              let title = flat.suggestionTitles[offset].nilIfBlank else {
-            return nil
+        var latestText = ""
+        for try await partial in stream {
+            latestText = partial.content
+            if let text = latestText.nilIfBlank {
+                await MainActor.run {
+                    onPartialText?(text)
+                }
+            }
         }
-        return MarinaGeneratedSuggestionRewrite(candidateIndex: index, title: title)
+
+        guard let text = latestText.nilIfBlank else {
+            throw MarinaResponseGenerationError.malformedResponse
+        }
+        if context.clarificationChoices.isEmpty == false {
+            return MarinaGeneratedSurfaceResponse(clarificationMessage: text)
+        }
+        return MarinaGeneratedSurfaceResponse(narrativeSubtitle: text)
+    } catch let error as MarinaResponseGenerationError {
+        throw error
+    } catch let error as MarinaFoundationModelsServiceError {
+        switch error {
+        case .unavailable:
+            throw MarinaResponseGenerationError.unavailable
+        case .malformedResponse:
+            throw MarinaResponseGenerationError.malformedResponse
+        case .generationFailed(let category):
+            throw MarinaResponseGenerationError.generationFailed(category)
+        }
+    } catch {
+        throw MarinaResponseGenerationError.generationFailed(.from(error))
     }
-
-    let generated = MarinaGeneratedSurfaceResponse(
-        titleOverride: flat.titleOverride,
-        narrativeSubtitle: flat.narrativeSubtitle,
-        clarificationMessage: flat.clarificationMessage,
-        suggestionRewrites: rewrites
-    )
-
-    guard generated.titleOverride != nil ||
-            generated.narrativeSubtitle != nil ||
-            generated.clarificationMessage != nil ||
-            generated.suggestionRewrites.isEmpty == false else {
-        throw MarinaResponseGenerationError.malformedResponse
-    }
-
-    return generated
 }
 
 @available(iOS 26.0, macOS 26.0, *)
-private func marinaSurfaceResponseSchema() -> GenerationSchema {
-    GenerationSchema(
-        type: GeneratedContent.self,
-        description: "Marina presentation-only response. It must not contain computed financial facts that are absent from the prompt.",
-        properties: [
-            .init(name: "titleOverride", description: "Optional concise title. Leave null unless it improves clarity without changing meaning.", type: String?.self),
-            .init(name: "narrativeSubtitle", description: "Natural answer text grounded only in deterministic facts.", type: String?.self),
-            .init(name: "clarificationMessage", description: "Natural clarification question grounded only in the provided choices.", type: String?.self),
-            .init(name: "suggestionIndexes", description: "Indexes of provided follow-up candidates, in preferred order.", type: [Int].self),
-            .init(name: "suggestionTitles", description: "Rewritten chip titles aligned with suggestionIndexes.", type: [String].self)
-        ]
+private func marinaPresentationOptions(seed: UInt64) -> GenerationOptions {
+    GenerationOptions(
+        sampling: .random(probabilityThreshold: 0.9, seed: seed),
+        temperature: 0.35,
+        maximumResponseTokens: 360
     )
 }
 
 @available(iOS 26.0, macOS 26.0, *)
-private func makeSurfaceFlatResponse(from content: GeneratedContent) throws -> MarinaFoundationSurfaceFlatResponse {
-    MarinaFoundationSurfaceFlatResponse(
-        titleOverride: try content.value(String?.self, forProperty: "titleOverride"),
-        narrativeSubtitle: try content.value(String?.self, forProperty: "narrativeSubtitle"),
-        clarificationMessage: try content.value(String?.self, forProperty: "clarificationMessage"),
-        suggestionIndexes: (try? content.value([Int].self, forProperty: "suggestionIndexes")) ?? [],
-        suggestionTitles: (try? content.value([String].self, forProperty: "suggestionTitles")) ?? []
-    )
+private func marinaPresentationSeed(context: MarinaResponseGenerationContext) -> UInt64 {
+    let seedMaterial = [
+        context.userPrompt,
+        context.workspaceName,
+        context.deterministicAnswer.id.uuidString,
+        context.deterministicAnswer.primaryValue ?? ""
+    ].joined(separator: "|")
+    return seedMaterial.utf8.reduce(1_469_598_103_934_665_603) { partial, byte in
+        (partial ^ UInt64(byte)) &* 1_099_511_628_211
+    }
 }
 #endif

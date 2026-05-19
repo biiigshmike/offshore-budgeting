@@ -10,6 +10,7 @@ import Foundation
 enum MarinaFoundationModelsServiceError: Error {
     case unavailable
     case malformedResponse
+    case generationFailed(MarinaFoundationModelsErrorCategory)
 }
 
 protocol MarinaStructuredIntentInterpreting {
@@ -40,99 +41,113 @@ struct MarinaFoundationModelsService: MarinaStructuredIntentInterpreting {
 import FoundationModels
 
 @available(iOS 26.0, macOS 26.0, *)
-private struct MarinaFoundationModelsFlatResponse {
-    let kindRaw: String?
-    let semanticFamilyRaw: String?
-    let semanticActionRaw: String?
-    let semanticDatasetsRaw: [String]
-    let semanticMeasureRaw: String?
-    let semanticIncludeFilterTexts: [String]
-    let semanticIncludeFilterTypeRaws: [String]
-    let semanticExcludeFilterTexts: [String]
-    let semanticExcludeFilterTypeRaws: [String]
-    let semanticGroupingRaw: String?
-    let semanticSortRaw: String?
-    let semanticRequestedDetailRaw: String?
-    let queryMetricRaw: String?
-    let queryTargetName: String?
-    let queryTargetTypeRaw: String?
-    let queryDateStart: String?
-    let queryDateEnd: String?
-    let queryComparisonDateStart: String?
-    let queryComparisonDateEnd: String?
-    let queryResultLimit: Int?
-    let queryPeriodUnitRaw: String?
-    let queryConfidenceRaw: String?
-    let insightIntentRaw: String?
-    let softTimeHintRaw: String?
-    let commandIntentRaw: String?
-    let commandConfidenceRaw: String?
-    let amount: Double?
-    let originalAmount: Double?
-    let commandDate: String?
-    let commandDateRangeStart: String?
-    let commandDateRangeEnd: String?
-    let notes: String?
-    let source: String?
-    let cardName: String?
-    let categoryName: String?
-    let entityName: String?
-    let updatedEntityName: String?
-    let isPlannedIncome: Bool?
-    let categoryColorHex: String?
-    let categoryColorName: String?
-    let cardThemeRaw: String?
-    let cardEffectRaw: String?
-    let recurrenceFrequencyRaw: String?
-    let recurrenceInterval: Int?
-    let weeklyWeekday: Int?
-    let monthlyDayOfMonth: Int?
-    let monthlyIsLastDay: Bool?
-    let yearlyMonth: Int?
-    let yearlyDayOfMonth: Int?
-    let recurrenceEndDate: String?
-    let plannedExpenseAmountTargetRaw: String?
-    let attachAllCards: Bool?
-    let attachAllPresets: Bool?
-    let selectedCardNames: [String]
-    let selectedPresetTitles: [String]
-    let clarificationSubtitle: String?
-    let clarificationMissingFields: [String]
-    let clarificationAmbiguousFields: [String]
-    let clarificationShouldRunBestEffort: Bool
-}
-
-@available(iOS 26.0, macOS 26.0, *)
 private func interpretWithFoundationModels(
     prompt: String,
     context: MarinaLanguageRouterContext
 ) async throws -> MarinaStructuredIntent {
-    let model = SystemLanguageModel.default
-    guard model.isAvailable else {
-        throw MarinaFoundationModelsServiceError.unavailable
-    }
-
-    let session = LanguageModelSession(
-        model: model,
-        instructions: marinaInstructions(context: context)
-    )
-
-    let response = try await session.respond(
-        to: prompt,
-        schema: marinaResponseSchema(),
-        includeSchemaInPrompt: true,
-        options: GenerationOptions(
-            sampling: .greedy,
-            maximumResponseTokens: 700
+    do {
+        let provider = MarinaFoundationModelsSessionProvider()
+        let routeSession = try provider.makeSession(
+            instructions: marinaRouteInstructions(context: context)
         )
-    )
+        let routeResponse = try await routeSession.respond(
+            to: marinaRoutePrompt(prompt: prompt, context: context),
+            generating: MarinaFoundationRouteIntent.self,
+            includeSchemaInPrompt: true,
+            options: marinaInterpretationOptions(maximumResponseTokens: 180)
+        )
+        let route = routeResponse.content
+        let routeKind = route.routeKind
+        let tools = provider.tools(for: routeKind, context: context)
+        let session = try provider.makeSession(
+            instructions: marinaInstructions(context: context, route: route),
+            tools: tools
+        )
 
-    let flat = try makeFlatResponse(from: response.rawContent)
-    return makeStructuredIntent(from: flat)
+        switch routeKind {
+        case .readQuery:
+            let response = try await session.respond(
+                to: marinaFocusedPrompt(prompt: prompt, route: route),
+                generating: MarinaFoundationReadQueryIntent.self,
+                includeSchemaInPrompt: true,
+                options: marinaInterpretationOptions(maximumResponseTokens: 360)
+            )
+            return makeStructuredIntent(from: response.content)
+        case .lookup:
+            let response = try await session.respond(
+                to: marinaFocusedPrompt(prompt: prompt, route: route),
+                generating: MarinaFoundationLookupIntent.self,
+                includeSchemaInPrompt: true,
+                options: marinaInterpretationOptions(maximumResponseTokens: 280)
+            )
+            return makeStructuredIntent(from: response.content)
+        case .clarification:
+            let response = try await session.respond(
+                to: marinaFocusedPrompt(prompt: prompt, route: route),
+                generating: MarinaFoundationClarificationIntent.self,
+                includeSchemaInPrompt: true,
+                options: marinaInterpretationOptions(maximumResponseTokens: 220)
+            )
+            return .clarification(response.content.structuredClarification)
+        case .help, .unsupported:
+            _ = try await session.respond(
+                to: marinaFocusedPrompt(prompt: prompt, route: route),
+                generating: MarinaFoundationUnsupportedIntent.self,
+                includeSchemaInPrompt: true,
+                options: marinaInterpretationOptions(maximumResponseTokens: 160)
+            )
+            return .unresolved
+        }
+    } catch let error as MarinaFoundationModelsServiceError {
+        throw error
+    } catch {
+        throw MarinaFoundationModelsServiceError.generationFailed(.from(error))
+    }
 }
 
 @available(iOS 26.0, macOS 26.0, *)
-private func marinaInstructions(context: MarinaLanguageRouterContext) -> String {
+private func marinaRouteInstructions(context: MarinaLanguageRouterContext) -> String {
+    """
+    Prompt version: \(MarinaFoundationPromptVersion.interpretationV1.rawValue)
+    You are Marina inside Offshore. Classify the user's budgeting prompt into exactly one route.
+
+    Routes:
+    - readQuery: totals, averages, comparisons, ranked lists, recent rows, breakdowns, insight questions.
+    - lookup: object details such as dates, linked cards, schedules, balances, membership, or specific records.
+    - clarification: missing or ambiguous target/date/details.
+    - help: capability or example questions.
+    - unsupported: CRUD commands, financial advice, unsupported simulations, or anything outside safe read-only interpretation.
+
+    Do not answer the user. Do not compute money. Preserve workspace: \(context.workspaceName).
+    """
+}
+
+@available(iOS 26.0, macOS 26.0, *)
+private func marinaRoutePrompt(prompt: String, context: MarinaLanguageRouterContext) -> String {
+    """
+    User prompt: \(prompt)
+    Default period unit: \(context.defaultPeriodUnit.rawValue)
+    Prior context: \(marinaPriorQuerySummary(context.priorQueryContext))
+    Classify this prompt for deterministic Offshore execution.
+    """
+}
+
+@available(iOS 26.0, macOS 26.0, *)
+private func marinaFocusedPrompt(prompt: String, route: MarinaFoundationRouteIntent) -> String {
+    """
+    User prompt: \(prompt)
+    Chosen route: \(route.routeRaw)
+    Focus text: \(route.focusText ?? "none")
+    Route reasoning: \(route.reasoning)
+    Generate only the requested structured contract. Do not include final answer text, totals, balances, percentages, rows, or entity IDs.
+    """
+}
+
+@available(iOS 26.0, macOS 26.0, *)
+private func marinaInstructions(
+    context: MarinaLanguageRouterContext,
+    route: MarinaFoundationRouteIntent
+) -> String {
     let aliasLines = context.aliasSummaries
         .prefix(20)
         .map { "\($0.entityTypeRaw): \($0.aliasKey) -> \($0.targetValue)" }
@@ -140,8 +155,9 @@ private func marinaInstructions(context: MarinaLanguageRouterContext) -> String 
     let priorQuerySummary = marinaPriorQuerySummary(context.priorQueryContext)
 
     return """
+    Prompt version: \(MarinaFoundationPromptVersion.interpretationV1.rawValue)
     You are Marina, a private budgeting assistant inside Offshore.
-    Your job here is interpretation only: return a structured query plan or a typed clarification/unsupported result.
+    Your job here is interpretation only for route \(route.routeRaw): return a small structured contract for deterministic Offshore validation.
 
     Safety rules:
     - Never calculate totals, averages, percentages, balances, row contents, or final answers.
@@ -161,11 +177,10 @@ private func marinaInstructions(context: MarinaLanguageRouterContext) -> String 
     forecast and simulate should be avoided unless the prompt explicitly requests them; they may be rejected by validation.
 
     Output rules:
-    - kind must be one of: semanticCommand, query, command, clarification, unresolved.
-    - Prefer semanticCommand for analytics with filters, grouping, sorting, limits, comparisons, or row lists.
-    - Row/list requests such as "last purchase" or "most recent purchases" use family analytics, action listRows, measure transactionAmount, grouping transaction, sort newest, and a limit.
-    - Object detail requests such as "show/tell/find details for X" use family databaseLookup and action lookupDetails.
-    - Use query only for simple existing HomeQueryMetric-style requests.
+    - Fill only the route-specific @Generable contract requested by the app.
+    - For analytics, set subjectRaw, operationRaw, measureRaw, include/exclude mentions, dates, grouping, ranking, and limit.
+    - Row/list requests such as "last purchase" or "most recent purchases" use operationRaw listRows, measureRaw transactionAmount, groupingRaw transaction, rankingRaw newest, and a limit.
+    - Object detail requests such as "show/tell/find details for X" use the lookup route.
     - For NLQ-only insight requests, set insightIntentRaw to changeSummary, contributorAnalysis, normalityCheck, watchOuts, explainBudgeting, or multiPartContributors.
     - Map words like "weird", "normal", or "lately" to normalityCheck; "worse", "changed", or "what changed" to changeSummary; "why higher" to contributorAnalysis; "watch" or "risk" to watchOuts; "explain" to explainBudgeting; and "biggest offenders" to multiPartContributors.
     - softTimeHintRaw may be lately, sincePayday, budgetCycle, or aroundTrip when the user uses fuzzy timing language.
@@ -183,6 +198,15 @@ private func marinaInstructions(context: MarinaLanguageRouterContext) -> String 
     - budgets: \(joinedList(context.budgetNames))
     - aliases: \(aliasLines.isEmpty ? "none" : aliasLines)
     """
+}
+
+@available(iOS 26.0, macOS 26.0, *)
+private func marinaInterpretationOptions(maximumResponseTokens: Int) -> GenerationOptions {
+    GenerationOptions(
+        sampling: .greedy,
+        temperature: nil,
+        maximumResponseTokens: maximumResponseTokens
+    )
 }
 
 @available(iOS 26.0, macOS 26.0, *)
@@ -225,296 +249,407 @@ private func joinedList(_ values: [String]) -> String {
 }
 
 @available(iOS 26.0, macOS 26.0, *)
-private func marinaResponseSchema() -> GenerationSchema {
-    GenerationSchema(
-        type: GeneratedContent.self,
-        description: "Marina structured interpretation output only. Do not include computed financial answers.",
-        properties: [
-            .init(name: "kind", description: "semanticCommand, query, command, clarification, or unresolved", type: String.self),
-            .init(name: "semanticFamilyRaw", description: "analytics, databaseLookup, or another existing semantic family; never a final answer.", type: String?.self),
-            .init(name: "semanticActionRaw", description: "Read-only operation such as sum, average, count, rank, compare, listRows, or lookupDetails.", type: String?.self),
-            .init(name: "semanticDatasetsRaw", description: "Catalog dataset names only.", type: [String].self),
-            .init(name: "semanticMeasureRaw", description: "Existing measure raw value only; no computed value.", type: String?.self),
-            .init(name: "semanticIncludeFilterTexts", description: "User-provided entity/filter text to resolve deterministically.", type: [String].self),
-            .init(name: "semanticIncludeFilterTypeRaws", description: "Catalog filter type hints aligned with include filter text.", type: [String].self),
-            .init(name: "semanticExcludeFilterTexts", description: "User-provided exclusion text; use only when explicit.", type: [String].self),
-            .init(name: "semanticExcludeFilterTypeRaws", description: "Catalog filter type hints aligned with exclusion text.", type: [String].self),
-            .init(name: "semanticGroupingRaw", description: "Grouping dimension raw value, if requested.", type: String?.self),
-            .init(name: "semanticSortRaw", description: "Sort/ranking hint raw value, if requested.", type: String?.self),
-            .init(name: "semanticRequestedDetailRaw", description: "Lookup detail field requested, not the answer.", type: String?.self),
-            .init(name: "queryMetricRaw", type: String?.self),
-            .init(name: "queryTargetName", type: String?.self),
-            .init(name: "queryTargetTypeRaw", type: String?.self),
-            .init(name: "queryDateStart", type: String?.self),
-            .init(name: "queryDateEnd", type: String?.self),
-            .init(name: "queryComparisonDateStart", type: String?.self),
-            .init(name: "queryComparisonDateEnd", type: String?.self),
-            .init(name: "queryResultLimit", type: Int?.self),
-            .init(name: "queryPeriodUnitRaw", type: String?.self),
-            .init(name: "queryConfidenceRaw", type: String?.self),
-            .init(name: "insightIntentRaw", description: "Optional NLQ insight request: changeSummary, contributorAnalysis, normalityCheck, watchOuts, explainBudgeting, or multiPartContributors.", type: String?.self),
-            .init(name: "softTimeHintRaw", description: "Optional fuzzy time hint: lately, sincePayday, budgetCycle, or aroundTrip.", type: String?.self),
-            .init(name: "commandIntentRaw", type: String?.self),
-            .init(name: "commandConfidenceRaw", type: String?.self),
-            .init(name: "amount", type: Double?.self),
-            .init(name: "originalAmount", type: Double?.self),
-            .init(name: "commandDate", type: String?.self),
-            .init(name: "commandDateRangeStart", type: String?.self),
-            .init(name: "commandDateRangeEnd", type: String?.self),
-            .init(name: "notes", type: String?.self),
-            .init(name: "source", type: String?.self),
-            .init(name: "cardName", type: String?.self),
-            .init(name: "categoryName", type: String?.self),
-            .init(name: "entityName", type: String?.self),
-            .init(name: "updatedEntityName", type: String?.self),
-            .init(name: "isPlannedIncome", type: Bool?.self),
-            .init(name: "categoryColorHex", type: String?.self),
-            .init(name: "categoryColorName", type: String?.self),
-            .init(name: "cardThemeRaw", type: String?.self),
-            .init(name: "cardEffectRaw", type: String?.self),
-            .init(name: "recurrenceFrequencyRaw", type: String?.self),
-            .init(name: "recurrenceInterval", type: Int?.self),
-            .init(name: "weeklyWeekday", type: Int?.self),
-            .init(name: "monthlyDayOfMonth", type: Int?.self),
-            .init(name: "monthlyIsLastDay", type: Bool?.self),
-            .init(name: "yearlyMonth", type: Int?.self),
-            .init(name: "yearlyDayOfMonth", type: Int?.self),
-            .init(name: "recurrenceEndDate", type: String?.self),
-            .init(name: "plannedExpenseAmountTargetRaw", type: String?.self),
-            .init(name: "attachAllCards", type: Bool?.self),
-            .init(name: "attachAllPresets", type: Bool?.self),
-            .init(name: "selectedCardNames", type: [String].self),
-            .init(name: "selectedPresetTitles", type: [String].self),
-            .init(name: "clarificationSubtitle", type: String?.self),
-            .init(name: "clarificationMissingFields", type: [String].self),
-            .init(name: "clarificationAmbiguousFields", type: [String].self),
-            .init(name: "clarificationShouldRunBestEffort", type: Bool.self)
-        ]
-    )
-}
-
-@available(iOS 26.0, macOS 26.0, *)
-private func makeFlatResponse(from content: GeneratedContent) throws -> MarinaFoundationModelsFlatResponse {
-    MarinaFoundationModelsFlatResponse(
-        kindRaw: try content.value(String?.self, forProperty: "kind"),
-        semanticFamilyRaw: try content.value(String?.self, forProperty: "semanticFamilyRaw"),
-        semanticActionRaw: try content.value(String?.self, forProperty: "semanticActionRaw"),
-        semanticDatasetsRaw: (try? content.value([String].self, forProperty: "semanticDatasetsRaw")) ?? [],
-        semanticMeasureRaw: try content.value(String?.self, forProperty: "semanticMeasureRaw"),
-        semanticIncludeFilterTexts: (try? content.value([String].self, forProperty: "semanticIncludeFilterTexts")) ?? [],
-        semanticIncludeFilterTypeRaws: (try? content.value([String].self, forProperty: "semanticIncludeFilterTypeRaws")) ?? [],
-        semanticExcludeFilterTexts: (try? content.value([String].self, forProperty: "semanticExcludeFilterTexts")) ?? [],
-        semanticExcludeFilterTypeRaws: (try? content.value([String].self, forProperty: "semanticExcludeFilterTypeRaws")) ?? [],
-        semanticGroupingRaw: try content.value(String?.self, forProperty: "semanticGroupingRaw"),
-        semanticSortRaw: try content.value(String?.self, forProperty: "semanticSortRaw"),
-        semanticRequestedDetailRaw: try content.value(String?.self, forProperty: "semanticRequestedDetailRaw"),
-        queryMetricRaw: try content.value(String?.self, forProperty: "queryMetricRaw"),
-        queryTargetName: try content.value(String?.self, forProperty: "queryTargetName"),
-        queryTargetTypeRaw: try content.value(String?.self, forProperty: "queryTargetTypeRaw"),
-        queryDateStart: try content.value(String?.self, forProperty: "queryDateStart"),
-        queryDateEnd: try content.value(String?.self, forProperty: "queryDateEnd"),
-        queryComparisonDateStart: try content.value(String?.self, forProperty: "queryComparisonDateStart"),
-        queryComparisonDateEnd: try content.value(String?.self, forProperty: "queryComparisonDateEnd"),
-        queryResultLimit: try content.value(Int?.self, forProperty: "queryResultLimit"),
-        queryPeriodUnitRaw: try content.value(String?.self, forProperty: "queryPeriodUnitRaw"),
-        queryConfidenceRaw: try content.value(String?.self, forProperty: "queryConfidenceRaw"),
-        insightIntentRaw: try content.value(String?.self, forProperty: "insightIntentRaw"),
-        softTimeHintRaw: try content.value(String?.self, forProperty: "softTimeHintRaw"),
-        commandIntentRaw: try content.value(String?.self, forProperty: "commandIntentRaw"),
-        commandConfidenceRaw: try content.value(String?.self, forProperty: "commandConfidenceRaw"),
-        amount: try content.value(Double?.self, forProperty: "amount"),
-        originalAmount: try content.value(Double?.self, forProperty: "originalAmount"),
-        commandDate: try content.value(String?.self, forProperty: "commandDate"),
-        commandDateRangeStart: try content.value(String?.self, forProperty: "commandDateRangeStart"),
-        commandDateRangeEnd: try content.value(String?.self, forProperty: "commandDateRangeEnd"),
-        notes: try content.value(String?.self, forProperty: "notes"),
-        source: try content.value(String?.self, forProperty: "source"),
-        cardName: try content.value(String?.self, forProperty: "cardName"),
-        categoryName: try content.value(String?.self, forProperty: "categoryName"),
-        entityName: try content.value(String?.self, forProperty: "entityName"),
-        updatedEntityName: try content.value(String?.self, forProperty: "updatedEntityName"),
-        isPlannedIncome: try content.value(Bool?.self, forProperty: "isPlannedIncome"),
-        categoryColorHex: try content.value(String?.self, forProperty: "categoryColorHex"),
-        categoryColorName: try content.value(String?.self, forProperty: "categoryColorName"),
-        cardThemeRaw: try content.value(String?.self, forProperty: "cardThemeRaw"),
-        cardEffectRaw: try content.value(String?.self, forProperty: "cardEffectRaw"),
-        recurrenceFrequencyRaw: try content.value(String?.self, forProperty: "recurrenceFrequencyRaw"),
-        recurrenceInterval: try content.value(Int?.self, forProperty: "recurrenceInterval"),
-        weeklyWeekday: try content.value(Int?.self, forProperty: "weeklyWeekday"),
-        monthlyDayOfMonth: try content.value(Int?.self, forProperty: "monthlyDayOfMonth"),
-        monthlyIsLastDay: try content.value(Bool?.self, forProperty: "monthlyIsLastDay"),
-        yearlyMonth: try content.value(Int?.self, forProperty: "yearlyMonth"),
-        yearlyDayOfMonth: try content.value(Int?.self, forProperty: "yearlyDayOfMonth"),
-        recurrenceEndDate: try content.value(String?.self, forProperty: "recurrenceEndDate"),
-        plannedExpenseAmountTargetRaw: try content.value(String?.self, forProperty: "plannedExpenseAmountTargetRaw"),
-        attachAllCards: try content.value(Bool?.self, forProperty: "attachAllCards"),
-        attachAllPresets: try content.value(Bool?.self, forProperty: "attachAllPresets"),
-        selectedCardNames: (try? content.value([String].self, forProperty: "selectedCardNames")) ?? [],
-        selectedPresetTitles: (try? content.value([String].self, forProperty: "selectedPresetTitles")) ?? [],
-        clarificationSubtitle: try content.value(String?.self, forProperty: "clarificationSubtitle"),
-        clarificationMissingFields: (try? content.value([String].self, forProperty: "clarificationMissingFields")) ?? [],
-        clarificationAmbiguousFields: (try? content.value([String].self, forProperty: "clarificationAmbiguousFields")) ?? [],
-        clarificationShouldRunBestEffort: (try? content.value(Bool.self, forProperty: "clarificationShouldRunBestEffort")) ?? false
-    )
-}
-
-@available(iOS 26.0, macOS 26.0, *)
-private func makeStructuredIntent(from flat: MarinaFoundationModelsFlatResponse) -> MarinaStructuredIntent {
-    let clarification = MarinaStructuredClarification(
-        subtitle: flat.clarificationSubtitle?.nilIfBlank,
-        missingFields: flat.clarificationMissingFields.compactMap(MarinaStructuredMissingField.init(rawValue:)),
-        ambiguities: flat.clarificationAmbiguousFields.compactMap { rawValue in
-            guard let field = MarinaStructuredMissingField(rawValue: rawValue) else { return nil }
-            return MarinaStructuredAmbiguity(field: field, candidates: [])
-        },
-        shouldRunBestEffort: flat.clarificationShouldRunBestEffort
-    )
-
-    let kindRaw = flat.kindRaw?.nilIfBlank
-    let structuredKind = kindRaw.flatMap(MarinaStructuredIntentKind.init(rawValue:))
-        ?? (kindRaw?.lowercased()).flatMap(MarinaStructuredIntentKind.init(rawValue:))
-    switch structuredKind {
-    case .semanticCommand:
-        guard let command = makeSemanticCommand(from: flat) else { return .unresolved }
-        return .semanticCommand(command)
-    case .query:
-        return .query(
-            MarinaStructuredQueryIntent(
-                metricRaw: flat.queryMetricRaw?.nilIfBlank,
-                targetName: flat.queryTargetName?.nilIfBlank,
-                targetTypeRaw: flat.queryTargetTypeRaw?.nilIfBlank,
-                dateStartISO8601: flat.queryDateStart?.nilIfBlank,
-                dateEndISO8601: flat.queryDateEnd?.nilIfBlank,
-                comparisonDateStartISO8601: flat.queryComparisonDateStart?.nilIfBlank,
-                comparisonDateEndISO8601: flat.queryComparisonDateEnd?.nilIfBlank,
-                resultLimit: flat.queryResultLimit,
-                periodUnitRaw: flat.queryPeriodUnitRaw?.nilIfBlank,
-                confidenceRaw: flat.queryConfidenceRaw?.nilIfBlank,
-                clarification: clarification.isActionable ? clarification : nil,
-                insightIntent: flat.insightIntent,
-                softTimeHint: flat.softTimeHint
-            )
-        )
-    case .command:
-        return .command(
-            MarinaStructuredCommandIntent(
-                intentRaw: flat.commandIntentRaw?.nilIfBlank,
-                confidenceRaw: flat.commandConfidenceRaw?.nilIfBlank,
-                amount: flat.amount,
-                originalAmount: flat.originalAmount,
-                dateISO8601: flat.commandDate?.nilIfBlank,
-                dateRangeStartISO8601: flat.commandDateRangeStart?.nilIfBlank,
-                dateRangeEndISO8601: flat.commandDateRangeEnd?.nilIfBlank,
-                notes: flat.notes?.nilIfBlank,
-                source: flat.source?.nilIfBlank,
-                cardName: flat.cardName?.nilIfBlank,
-                categoryName: flat.categoryName?.nilIfBlank,
-                entityName: flat.entityName?.nilIfBlank,
-                updatedEntityName: flat.updatedEntityName?.nilIfBlank,
-                isPlannedIncome: flat.isPlannedIncome,
-                categoryColorHex: flat.categoryColorHex?.nilIfBlank,
-                categoryColorName: flat.categoryColorName?.nilIfBlank,
-                cardThemeRaw: flat.cardThemeRaw?.nilIfBlank,
-                cardEffectRaw: flat.cardEffectRaw?.nilIfBlank,
-                recurrenceFrequencyRaw: flat.recurrenceFrequencyRaw?.nilIfBlank,
-                recurrenceInterval: flat.recurrenceInterval,
-                weeklyWeekday: flat.weeklyWeekday,
-                monthlyDayOfMonth: flat.monthlyDayOfMonth,
-                monthlyIsLastDay: flat.monthlyIsLastDay,
-                yearlyMonth: flat.yearlyMonth,
-                yearlyDayOfMonth: flat.yearlyDayOfMonth,
-                recurrenceEndDateISO8601: flat.recurrenceEndDate?.nilIfBlank,
-                plannedExpenseAmountTargetRaw: flat.plannedExpenseAmountTargetRaw?.nilIfBlank,
-                attachAllCards: flat.attachAllCards,
-                attachAllPresets: flat.attachAllPresets,
-                selectedCardNames: flat.selectedCardNames,
-                selectedPresetTitles: flat.selectedPresetTitles,
-                clarification: clarification.isActionable ? clarification : nil
-            )
-        )
-    case .clarification:
-        return .clarification(clarification)
-    case .unresolved, .none:
-        if let command = makeSemanticCommand(from: flat) {
-            return .semanticCommand(command)
-        }
+private func makeStructuredIntent(from intent: MarinaFoundationReadQueryIntent) -> MarinaStructuredIntent {
+    guard let action = semanticAction(from: intent.operationRaw),
+          let dataset = semanticDataset(from: intent.subjectRaw) else {
         return .unresolved
     }
-}
 
-@available(iOS 26.0, macOS 26.0, *)
-private func makeSemanticCommand(from flat: MarinaFoundationModelsFlatResponse) -> MarinaSemanticCommand? {
-    guard let action = MarinaSemanticCommandAction(rawValue: flat.semanticActionRaw?.nilIfBlank ?? ""),
-          let family = MarinaRequestFamily(rawValue: flat.semanticFamilyRaw?.nilIfBlank ?? MarinaRequestFamily.analytics.rawValue) else {
-        return nil
-    }
-
-    let datasets = flat.semanticDatasetsRaw.compactMap { MarinaSemanticCommandDataset(rawValue: $0) }
-    let periodUnit = HomeQueryPeriodUnit(rawValue: flat.queryPeriodUnitRaw ?? "")
-    return MarinaSemanticCommand(
-        family: family,
+    let command = MarinaSemanticCommand(
+        family: .analytics,
         action: action,
-        datasets: datasets,
-        measure: flat.semanticMeasureRaw.flatMap(MarinaCandidateMeasure.init(rawValue:)),
-        includeFilters: semanticFilters(texts: flat.semanticIncludeFilterTexts, types: flat.semanticIncludeFilterTypeRaws),
-        excludeFilters: semanticFilters(texts: flat.semanticExcludeFilterTexts, types: flat.semanticExcludeFilterTypeRaws),
-        grouping: flat.semanticGroupingRaw.flatMap(MarinaGroupingDimensionCandidate.init(rawValue:)),
-        sort: flat.semanticSortRaw.flatMap(MarinaSemanticCommandSort.init(rawValue:)),
-        dateRange: makeDateRange(start: flat.queryDateStart, end: flat.queryDateEnd),
-        comparisonDateRange: makeDateRange(start: flat.queryComparisonDateStart, end: flat.queryComparisonDateEnd),
-        periodUnit: periodUnit,
-        limit: flat.queryResultLimit,
-        incomeStatusScope: incomeStatusScope(from: flat),
-        requestedDetail: flat.semanticRequestedDetailRaw.flatMap(MarinaSemanticRequestedDetail.init(rawValue:)),
-        insightIntent: flat.insightIntent,
-        softTimeHint: flat.softTimeHint
+        datasets: [dataset],
+        measure: semanticMeasure(from: intent.measureRaw),
+        includeFilters: semanticFilters(from: intent.includeMentions),
+        excludeFilters: semanticFilters(from: intent.excludeMentions),
+        grouping: semanticGrouping(from: intent.groupingRaw),
+        sort: semanticSort(from: intent.rankingRaw),
+        dateRange: makeDateRange(from: intent.primaryDateRange),
+        comparisonDateRange: makeDateRange(from: intent.comparisonDateRange),
+        periodUnit: periodUnit(from: intent.primaryDateRange?.periodUnitRaw),
+        limit: intent.limit,
+        incomeStatusScope: incomeStatus(from: intent.incomeStatusRaw),
+        requestedDetail: requestedDetail(from: intent.requestedDetailRaw),
+        insightIntent: insightIntent(from: intent.insightIntentRaw),
+        softTimeHint: softTimeHint(from: intent.softTimeHintRaw)
     )
+    return .semanticCommand(command)
 }
 
 @available(iOS 26.0, macOS 26.0, *)
-private extension MarinaFoundationModelsFlatResponse {
-    var insightIntent: MarinaInsightIntent? {
-        insightIntentRaw?.nilIfBlank.flatMap(MarinaInsightIntent.init(rawValue:))
+private func makeStructuredIntent(from intent: MarinaFoundationLookupIntent) -> MarinaStructuredIntent {
+    guard let searchText = intent.searchText?.nilIfBlank else {
+        return .clarification(
+            MarinaStructuredClarification(
+                subtitle: "I need the name or text to look up.",
+                missingFields: [.targetName],
+                ambiguities: [],
+                shouldRunBestEffort: false
+            )
+        )
     }
 
-    var softTimeHint: MarinaInsightSoftTimeHint? {
-        softTimeHintRaw?.nilIfBlank.flatMap(MarinaInsightSoftTimeHint.init(rawValue:))
+    let datasets = intent.objectTypeRaws
+        .compactMap(semanticDataset(from:))
+    let command = MarinaSemanticCommand(
+        family: .databaseLookup,
+        action: .lookupDetails,
+        datasets: datasets.isEmpty ? [.variableExpenses] : datasets,
+        includeFilters: [
+            MarinaSemanticCommandFilter(
+                rawText: searchText,
+                allowedTypes: intent.objectTypeRaws.compactMap(entityTypeHint(from:))
+            )
+        ],
+        dateRange: makeDateRange(from: intent.dateRange),
+        limit: intent.limit,
+        requestedDetail: requestedDetail(from: intent.requestedDetailRaw)
+    )
+    return .semanticCommand(command)
+}
+
+@available(iOS 26.0, macOS 26.0, *)
+private func semanticAction(from rawValue: String?) -> MarinaSemanticCommandAction? {
+    if let exact = exactRawValue(rawValue, as: MarinaSemanticCommandAction.self) {
+        return exact
+    }
+    guard let normalized = normalizedToken(rawValue) else { return nil }
+    switch normalized {
+    case "sum", "total", "spend_total", "amount_total", "count", "minimum", "min", "maximum", "max":
+        return .total
+    case "average", "avg", "normally":
+        return .average
+    case "rank", "top", "largest", "biggest", "smallest", "bottom":
+        return .rank
+    case "breakdown", "group", "grouped", "grouped_breakdown":
+        return .group
+    case "compare", "comparison", "change":
+        return .compare
+    case "list", "list_rows", "rows", "recent", "latest", "newest":
+        return .listRows
+    case "lookup", "lookup_details", "details":
+        return .lookupDetails
+    case "simulate":
+        return .simulate
+    default:
+        return MarinaSemanticCommandAction(rawValue: normalized)
     }
 }
 
 @available(iOS 26.0, macOS 26.0, *)
-private func incomeStatusScope(from flat: MarinaFoundationModelsFlatResponse) -> MarinaIncomeStatusScope? {
-    guard flat.semanticDatasetsRaw.contains(MarinaSemanticCommandDataset.income.rawValue)
-        || flat.queryMetricRaw?.localizedCaseInsensitiveContains("income") == true else {
+private func semanticDataset(from rawValue: String?) -> MarinaSemanticCommandDataset? {
+    if let exact = exactRawValue(rawValue, as: MarinaSemanticCommandDataset.self) {
+        return exact
+    }
+    guard let normalized = normalizedToken(rawValue) else { return nil }
+    switch normalized {
+    case "variable_expenses", "variableexpenses", "expenses", "expense", "transactions", "transaction", "merchant":
+        return .variableExpenses
+    case "planned_expenses", "plannedexpenses", "planned_expense", "plannedexpense", "presets_due":
+        return .plannedExpenses
+    case "income", "income_source", "incomesource":
+        return .income
+    case "income_series", "incomeseries":
+        return .incomeSeries
+    case "cards", "card":
+        return .cards
+    case "categories", "category":
+        return .categories
+    case "presets", "preset":
+        return .presets
+    case "budgets", "budget":
+        return .budgets
+    case "savings", "savings_ledger", "savingsledger", "savings_ledger_entries", "savingsledgerentries":
+        return .savingsLedger
+    case "reconciliation", "reconciliation_accounts", "reconciliationaccounts", "allocation_account", "allocationaccount":
+        return .reconciliation
+    case "expense_allocations", "expenseallocations", "allocations":
+        return .expenseAllocations
+    case "import_merchant_rules", "importmerchantrules":
+        return .importMerchantRules
+    case "assistant_alias_rules", "assistantaliasrules", "aliases":
+        return .assistantAliasRules
+    default:
+        return MarinaSemanticCommandDataset(rawValue: normalized)
+    }
+}
+
+@available(iOS 26.0, macOS 26.0, *)
+private func entityTypeHint(from rawValue: String?) -> MarinaCandidateEntityTypeHint? {
+    if let exact = exactRawValue(rawValue, as: MarinaCandidateEntityTypeHint.self) {
+        return exact
+    }
+    guard let normalized = normalizedToken(rawValue) else { return nil }
+    switch normalized {
+    case "category", "categories":
+        return .category
+    case "merchant":
+        return .merchant
+    case "expense", "transaction", "transactions":
+        return .transaction
+    case "card", "cards":
+        return .card
+    case "budget", "budgets":
+        return .budget
+    case "preset", "presets":
+        return .preset
+    case "income_source", "incomesource", "income":
+        return .incomeSource
+    case "allocation_account", "allocationaccount", "reconciliation":
+        return .allocationAccount
+    case "savings_account", "savingsaccount", "savings":
+        return .savingsAccount
+    case "workspace":
+        return .workspace
+    default:
+        return MarinaCandidateEntityTypeHint(rawValue: normalized)
+    }
+}
+
+@available(iOS 26.0, macOS 26.0, *)
+private func semanticSort(from rawValue: String?) -> MarinaSemanticCommandSort? {
+    if let exact = exactRawValue(rawValue, as: MarinaSemanticCommandSort.self) {
+        return exact
+    }
+    guard let normalized = normalizedToken(rawValue) else { return nil }
+    switch normalized {
+    case "newest", "latest", "recent", "most_recent":
+        return .newest
+    case "largest", "biggest", "top", "highest":
+        return .largest
+    case "delta_descending", "changed", "change":
+        return .deltaDescending
+    case "grouped_total_descending", "breakdown":
+        return .groupedTotalDescending
+    default:
+        return MarinaSemanticCommandSort(rawValue: normalized)
+    }
+}
+
+@available(iOS 26.0, macOS 26.0, *)
+private func semanticMeasure(from rawValue: String?) -> MarinaCandidateMeasure? {
+    if let exact = exactRawValue(rawValue, as: MarinaCandidateMeasure.self) {
+        return exact
+    }
+    guard let normalized = normalizedToken(rawValue) else { return nil }
+    switch normalized {
+    case "spend", "spending", "total_spend", "expense_amount":
+        return .spend
+    case "income", "earnings", "received_income", "planned_income":
+        return .income
+    case "savings", "saved":
+        return .savings
+    case "remaining_budget", "remainingbudget", "safe_spend", "safespend":
+        return .remainingBudget
+    case "reconciliation_balance", "reconciliationbalance", "allocation_balance", "allocationbalance":
+        return .reconciliationBalance
+    case "category_share", "categoryshare", "share", "percentage":
+        return .categoryShare
+    case "transaction_amount", "transactionamount", "amount", "purchase_amount", "purchaseamount":
+        return .transactionAmount
+    case "transaction_frequency", "transactionfrequency", "frequency", "count":
+        return .transactionFrequency
+    case "preset_amount", "presetamount":
+        return .presetAmount
+    case "savings_movement", "savingsmovement":
+        return .savingsMovement
+    default:
         return nil
     }
-    if let isPlannedIncome = flat.isPlannedIncome {
-        return isPlannedIncome ? .planned : .actual
-    }
-    let joined = ([flat.queryTargetName, flat.semanticMeasureRaw, flat.queryMetricRaw] + flat.semanticIncludeFilterTexts)
-        .compactMap { $0 }
-        .joined(separator: " ")
-        .lowercased()
-    if joined.contains("planned") || joined.contains("expected") || joined.contains("projected") {
-        return .planned
-    }
-    if joined.contains("actual") || joined.contains("received") {
-        return .actual
-    }
-    return nil
 }
 
 @available(iOS 26.0, macOS 26.0, *)
-private func semanticFilters(texts: [String], types: [String]) -> [MarinaSemanticCommandFilter] {
-    texts.enumerated().compactMap { index, rawText in
-        let trimmed = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmed.isEmpty == false else { return nil }
-        let rawTypes = types.indices.contains(index) ? types[index] : ""
-        let allowed = rawTypes
-            .split(separator: "|")
-            .compactMap { MarinaCandidateEntityTypeHint(rawValue: String($0)) }
-        return MarinaSemanticCommandFilter(rawText: trimmed, allowedTypes: allowed)
+private func semanticGrouping(from rawValue: String?) -> MarinaGroupingDimensionCandidate? {
+    if let exact = exactRawValue(rawValue, as: MarinaGroupingDimensionCandidate.self) {
+        return exact
     }
+    guard let normalized = normalizedToken(rawValue) else { return nil }
+    switch normalized {
+    case "category", "categories":
+        return .category
+    case "merchant", "merchants":
+        return .merchant
+    case "card", "cards":
+        return .card
+    case "transaction", "transactions", "row", "rows":
+        return .transaction
+    case "income_source", "incomesource", "source":
+        return .incomeSource
+    case "preset", "presets":
+        return .preset
+    case "savings_ledger_entry", "savingsledgerentry", "savings_ledger":
+        return .savingsLedgerEntry
+    case "allocation_account", "allocationaccount", "reconciliation":
+        return .allocationAccount
+    case "day", "daily":
+        return .day
+    case "week", "weekly":
+        return .week
+    case "month", "monthly":
+        return .month
+    default:
+        return nil
+    }
+}
+
+@available(iOS 26.0, macOS 26.0, *)
+private func requestedDetail(from rawValue: String?) -> MarinaSemanticRequestedDetail? {
+    if let exact = exactRawValue(rawValue, as: MarinaSemanticRequestedDetail.self) {
+        return exact
+    }
+    guard let normalized = normalizedToken(rawValue) else { return nil }
+    switch normalized {
+    case "general", "summary", "details":
+        return .general
+    case "date", "when":
+        return .date
+    case "amount", "value":
+        return .amount
+    case "card":
+        return .card
+    case "category":
+        return .category
+    case "status":
+        return .status
+    case "schedule", "due":
+        return .schedule
+    case "recurrence", "repeat":
+        return .recurrence
+    case "account":
+        return .account
+    case "balance":
+        return .balance
+    case "linked_objects", "linkedobjects", "links":
+        return .linkedObjects
+    case "linked_cards", "linkedcards":
+        return .linkedCards
+    case "linked_presets", "linkedpresets":
+        return .linkedPresets
+    case "category_limits", "categorylimits":
+        return .categoryLimits
+    case "membership", "member":
+        return .membership
+    default:
+        return nil
+    }
+}
+
+@available(iOS 26.0, macOS 26.0, *)
+private func incomeStatus(from rawValue: String?) -> MarinaIncomeStatusScope? {
+    if let exact = exactRawValue(rawValue, as: MarinaIncomeStatusScope.self) {
+        return exact
+    }
+    guard let normalized = normalizedToken(rawValue) else { return nil }
+    switch normalized {
+    case "planned", "expected", "projected":
+        return .planned
+    case "actual", "received", "real":
+        return .actual
+    case "all", "both":
+        return .all
+    default:
+        return nil
+    }
+}
+
+@available(iOS 26.0, macOS 26.0, *)
+private func insightIntent(from rawValue: String?) -> MarinaInsightIntent? {
+    if let exact = exactRawValue(rawValue, as: MarinaInsightIntent.self) {
+        return exact
+    }
+    guard let normalized = normalizedToken(rawValue) else { return nil }
+    switch normalized {
+    case "change_summary", "changesummary", "changed":
+        return .changeSummary
+    case "contributor_analysis", "contributoranalysis", "driver", "why":
+        return .contributorAnalysis
+    case "normality_check", "normalitycheck", "normal", "weird":
+        return .normalityCheck
+    case "watch_outs", "watchouts", "watch", "risk":
+        return .watchOuts
+    case "explain_budgeting", "explainbudgeting", "explain":
+        return .explainBudgeting
+    case "multi_part_contributors", "multipartcontributors", "biggest_offenders", "biggestoffenders":
+        return .multiPartContributors
+    default:
+        return nil
+    }
+}
+
+@available(iOS 26.0, macOS 26.0, *)
+private func softTimeHint(from rawValue: String?) -> MarinaInsightSoftTimeHint? {
+    if let exact = exactRawValue(rawValue, as: MarinaInsightSoftTimeHint.self) {
+        return exact
+    }
+    guard let normalized = normalizedToken(rawValue) else { return nil }
+    switch normalized {
+    case "lately", "recently":
+        return .lately
+    case "since_payday", "sincepayday", "payday":
+        return .sincePayday
+    case "budget_cycle", "budgetcycle":
+        return .budgetCycle
+    case "around_trip", "aroundtrip", "trip":
+        return .aroundTrip
+    default:
+        return nil
+    }
+}
+
+@available(iOS 26.0, macOS 26.0, *)
+private func periodUnit(from rawValue: String?) -> HomeQueryPeriodUnit? {
+    if let exact = exactRawValue(rawValue, as: HomeQueryPeriodUnit.self) {
+        return exact
+    }
+    guard let normalized = normalizedToken(rawValue) else { return nil }
+    switch normalized {
+    case "day", "daily":
+        return .day
+    case "week", "weekly":
+        return .week
+    case "month", "monthly":
+        return .month
+    case "quarter", "quarterly":
+        return .quarter
+    case "year", "yearly", "annual":
+        return .year
+    default:
+        return nil
+    }
+}
+
+@available(iOS 26.0, macOS 26.0, *)
+private func semanticFilters(from mentions: [MarinaFoundationEntityMentionIntent]) -> [MarinaSemanticCommandFilter] {
+    mentions.compactMap { mention in
+        guard let rawText = mention.rawText?.nilIfBlank else { return nil }
+        let allowed = ([mention.typeRaw].compactMap { $0 } + mention.allowedTypeRaws)
+            .compactMap(entityTypeHint(from:))
+        return MarinaSemanticCommandFilter(rawText: rawText, allowedTypes: allowed)
+    }
+}
+
+@available(iOS 26.0, macOS 26.0, *)
+private func makeDateRange(from intent: MarinaFoundationDateRangeIntent?) -> HomeQueryDateRange? {
+    makeDateRange(start: intent?.startISO8601, end: intent?.endISO8601)
+}
+
+@available(iOS 26.0, macOS 26.0, *)
+private func exactRawValue<Value: RawRepresentable>(
+    _ rawValue: String?,
+    as _: Value.Type
+) -> Value? where Value.RawValue == String {
+    guard let rawValue = rawValue?.nilIfBlank else { return nil }
+    return Value(rawValue: rawValue)
+}
+
+@available(iOS 26.0, macOS 26.0, *)
+private func normalizedToken(_ rawValue: String?) -> String? {
+    guard let rawValue = rawValue?.nilIfBlank else { return nil }
+    return rawValue
+        .lowercased()
+        .replacingOccurrences(of: "[^a-z0-9]+", with: "_", options: .regularExpression)
+        .trimmingCharacters(in: CharacterSet(charactersIn: "_"))
+        .nilIfBlank
 }
 
 @available(iOS 26.0, macOS 26.0, *)
