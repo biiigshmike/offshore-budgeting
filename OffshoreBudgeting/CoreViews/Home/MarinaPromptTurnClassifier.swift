@@ -80,6 +80,7 @@ struct MarinaPromptTurnClassifier {
             "and ",
             "also ",
             "compare to ",
+            "compare with ",
             "compare this to ",
             "compare that",
             "compare it",

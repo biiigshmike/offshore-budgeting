@@ -631,6 +631,8 @@ private func generateWithFoundationModels(
             throw MarinaResponseGenerationError.malformedResponse
         case .generationFailed(let category):
             throw MarinaResponseGenerationError.generationFailed(category)
+        case .diagnosedGenerationFailure(let diagnostic):
+            throw MarinaResponseGenerationError.generationFailed(diagnostic.category)
         }
     } catch {
         throw MarinaResponseGenerationError.generationFailed(.from(error))

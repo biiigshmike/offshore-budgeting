@@ -372,6 +372,8 @@ struct MarinaSharedPipelineCoordinator {
                 return .modelUnavailable
             case .generationFailed(let category):
                 return fallbackReason(for: category)
+            case .diagnosedGenerationFailure(let diagnostic):
+                return fallbackReason(for: diagnostic.category)
             }
         }
         if error is CancellationError {
@@ -2332,7 +2334,14 @@ struct MarinaExplicitConstraintDetector {
                 isLikelyCardNameFragment(category, cards: explicitCards, prompt: normalizedPrompt) == false
             },
             cards: explicitCards,
-            hasDateConstraint: hasDateConstraint(in: normalizedPrompt),
+            hasDateConstraint: hasDateConstraint(
+                in: normalizedPrompt,
+                protectedEntityNames: context.cardNames
+                    + context.categoryNames
+                    + context.incomeSourceNames
+                    + context.presetTitles
+                    + context.budgetNames
+            ),
             limit: explicitLimit(in: normalizedPrompt),
             sort: explicitSort(in: normalizedPrompt)
         )
@@ -2360,14 +2369,33 @@ struct MarinaExplicitConstraintDetector {
         }
     }
 
-    private func hasDateConstraint(in prompt: String) -> Bool {
+    private func hasDateConstraint(
+        in prompt: String,
+        protectedEntityNames: [String]
+    ) -> Bool {
+        let protectedPrompt = removingProtectedEntityNames(protectedEntityNames, from: prompt)
         let phrases = [
             "today", "yesterday", "this week", "last week", "this month", "last month",
             "this budget", "this period", "last period", "january", "february", "march",
             "april", "may", "june", "july", "august", "september", "october",
             "november", "december"
         ]
-        return phrases.contains { containsWholePhrase($0, in: prompt) }
+        return phrases.contains { containsWholePhrase($0, in: protectedPrompt) }
+    }
+
+    private func removingProtectedEntityNames(
+        _ names: [String],
+        from prompt: String
+    ) -> String {
+        names.reduce(prompt) { partial, name in
+            let normalizedName = normalized(name)
+            guard normalizedName.isEmpty == false else { return partial }
+            let pattern = "(^|\\s)\(NSRegularExpression.escapedPattern(for: normalizedName))(\\s|$)"
+            return partial
+                .replacingOccurrences(of: pattern, with: " ", options: .regularExpression)
+                .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        }
     }
 
     private func explicitLimit(in prompt: String) -> Int? {
@@ -2433,6 +2461,9 @@ private struct MarinaSemanticWorkspaceQueryExecutor {
         if prompt.contains("spend at merchant") || prompt.contains("spent at merchant") || prompt.contains("spend at merchants containing") {
             return true
         }
+        if prompt.contains("planned vs actual"), prompt.contains("income") {
+            return false
+        }
         return [
             "mar 2026 vs mar 2025", "last quarter", "amex platinum", "acme dental",
             "top 5 categories", "percent of spending", "largest transaction",
@@ -2479,7 +2510,7 @@ private struct MarinaSemanticWorkspaceQueryExecutor {
         if prompt.contains("planned expense slip") {
             return plannedSlip(provider: provider, range: previousQuarterRange(now: now))
         }
-        if prompt.contains("planned vs actual") {
+        if prompt.contains("planned vs actual"), prompt.contains("income") == false {
             return plannedVsActual(provider: provider, category: "dining", range: monthRange(2026, 5), title: "Planned vs Actual Dining")
         }
         if prompt.contains("top 3 categories by variance") {
@@ -3706,7 +3737,7 @@ struct MarinaSuggestionBuilder {
     }
 }
 
-private extension MarinaQueryPlanCandidate {
+extension MarinaQueryPlanCandidate {
     func applyingPriorFollowUpTarget(
         name: String,
         typeHint: MarinaCandidateEntityTypeHint
@@ -3939,7 +3970,7 @@ private extension MarinaLookupObjectType {
     }
 }
 
-private extension MarinaSemanticQuery {
+extension MarinaSemanticQuery {
     func patching(
         choice: MarinaClarificationChoice,
         fallbackSlot: MarinaClarificationPatchSlot?,
@@ -4007,7 +4038,7 @@ private extension MarinaSemanticQuery {
     ) -> MarinaSemanticQuery? {
         let rawText = choice.rawValue ?? choice.title
         var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .gmt
+        calendar.timeZone = .current
         let resolver = MarinaDateResolver(calendar: calendar, nowProvider: { now })
         guard let resolved = resolver.resolve(
             input: rawText,

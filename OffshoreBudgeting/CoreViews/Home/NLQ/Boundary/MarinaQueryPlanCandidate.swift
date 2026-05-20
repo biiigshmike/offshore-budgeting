@@ -229,6 +229,7 @@ enum MarinaRouteIntentKind: String, Codable, Sendable, Equatable {
     case savingsStatus
     case savingsActivity
     case savingsMovementRanking
+    case incomePlannedVsActual
     case reconciliationBalance
     case allocationRows
     case settlementRows
@@ -273,6 +274,7 @@ enum MarinaSemanticCommandAction: String, Codable, Equatable, Sendable {
 }
 
 enum MarinaSemanticCommandDataset: String, Codable, Equatable, Sendable {
+    case workspaces
     case variableExpenses
     case plannedExpenses
     case income
@@ -682,6 +684,8 @@ extension MarinaRouteIntent {
     ) -> MarinaSubject {
         if let dataset = semanticCommand?.datasets.first {
             switch dataset {
+            case .workspaces:
+                return .workspaces
             case .variableExpenses:
                 return .variableExpenses
             case .plannedExpenses:
@@ -838,7 +842,7 @@ extension MarinaRouteIntent {
             return .databaseLookup
         case .budgetInventory, .budgetMembership, .budgetLinkedCards, .budgetLinkedPresets, .budgetCategoryLimits, .budgetCategoryLimit, .overBudgetCategories, .allocationRows, .settlementRows:
             return .composableWorkspace
-        case .savingsActivity, .savingsMovementRanking, .reconciliationBalance:
+        case .savingsActivity, .savingsMovementRanking, .incomePlannedVsActual, .reconciliationBalance:
             return .workspaceAggregation
         case .savingsStatus:
             return .homeAdapter
@@ -968,6 +972,14 @@ struct MarinaRoutePatternRegistry {
             measures: [.savings],
             groupings: [nil],
             requestedDetails: [nil, .general, .status, .balance, .account]
+        ),
+        RoutePattern(
+            kind: .incomePlannedVsActual,
+            preferredExecutorRoute: .workspaceAggregation,
+            operations: [.sum],
+            measures: [.income],
+            groupings: [nil],
+            requestedDetails: [.status]
         ),
         RoutePattern(
             kind: .settlementRows,
@@ -1106,6 +1118,9 @@ struct MarinaRoutePatternRegistry {
         }
         if subject == .savingsAccounts, operation == .lookupDetails {
             return .savingsStatus
+        }
+        if subject == .income, operation == .sum, measure == .income, requestedDetail == .status {
+            return .incomePlannedVsActual
         }
         if subject == .savingsLedgerEntries || measure == .savingsMovement {
             return operation == .rank ? .savingsMovementRanking : .savingsActivity

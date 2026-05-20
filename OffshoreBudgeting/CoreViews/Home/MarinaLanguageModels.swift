@@ -211,6 +211,7 @@ struct MarinaPriorQueryContext: Equatable {
 struct MarinaLanguageRouterContext {
     let workspaceName: String
     let defaultPeriodUnit: HomeQueryPeriodUnit
+    let ambientDateRange: HomeQueryDateRange?
     let sessionContext: HomeAssistantSessionContext
     let priorQueryContext: MarinaPriorQueryContext
     let cardNames: [String]
@@ -220,6 +221,34 @@ struct MarinaLanguageRouterContext {
     let budgetNames: [String]
     let aliasSummaries: [MarinaAliasSummary]
     let now: Date
+
+    init(
+        workspaceName: String,
+        defaultPeriodUnit: HomeQueryPeriodUnit,
+        ambientDateRange: HomeQueryDateRange? = nil,
+        sessionContext: HomeAssistantSessionContext,
+        priorQueryContext: MarinaPriorQueryContext,
+        cardNames: [String],
+        categoryNames: [String],
+        incomeSourceNames: [String],
+        presetTitles: [String],
+        budgetNames: [String],
+        aliasSummaries: [MarinaAliasSummary],
+        now: Date
+    ) {
+        self.workspaceName = workspaceName
+        self.defaultPeriodUnit = defaultPeriodUnit
+        self.ambientDateRange = ambientDateRange
+        self.sessionContext = sessionContext
+        self.priorQueryContext = priorQueryContext
+        self.cardNames = cardNames
+        self.categoryNames = categoryNames
+        self.incomeSourceNames = incomeSourceNames
+        self.presetTitles = presetTitles
+        self.budgetNames = budgetNames
+        self.aliasSummaries = aliasSummaries
+        self.now = now
+    }
 }
 
 struct MarinaAliasSummary: Equatable {

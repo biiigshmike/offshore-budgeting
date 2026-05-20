@@ -209,7 +209,6 @@ struct HomeAssistantPanelView: View {
     private let engine = HomeQueryEngine()
     private let parser = HomeAssistantTextParser()
     private let commandParser = HomeAssistantCommandParser()
-    private let languageRouter = MarinaLanguageRouter()
     private let conversationStore = HomeAssistantConversationStore()
     private let telemetryStore = HomeAssistantTelemetryStore()
     private let entityMatcher = HomeAssistantEntityMatcher()
@@ -386,6 +385,7 @@ struct HomeAssistantPanelView: View {
                 
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     foundationModelToggleButton
+                    smokeTraceShareButton
                     clearConversationButton
                 }
             }
@@ -543,6 +543,23 @@ struct HomeAssistantPanelView: View {
         .accessibilityIdentifier("marina.foundationModelToggle")
     }
 
+    @ViewBuilder
+    private var smokeTraceShareButton: some View {
+        #if DEBUG
+        if let exportURL = MarinaSmokeTraceStore.currentExportURL {
+            ShareLink(item: exportURL) {
+                Label("Export Marina Smoke Trace", systemImage: "square.and.arrow.up")
+                    .labelStyle(.iconOnly)
+                    .font(.body.weight(.semibold))
+                    .frame(width: 33, height: 33)
+            }
+            .modifier(AssistantPanelIconButtonModifier())
+            .accessibilityLabel("Export Marina Smoke Trace")
+            .accessibilityIdentifier("marina.smokeTraceShare")
+        }
+        #endif
+    }
+
     private var clearConversationButton: some View {
         Button {
             isShowingClearConversationAlert = true
@@ -585,7 +602,7 @@ struct HomeAssistantPanelView: View {
                     promptPrefix: "User prompt:"
                 )
                 provider.prewarm(
-                    instructions: "Prompt version: \(MarinaFoundationPromptVersion.interpretationV1.rawValue)\nClassify Marina budgeting prompts for deterministic Offshore execution.",
+                    instructions: "Prompt version: \(MarinaFoundationPromptVersion.interpretationV3.rawValue)\nExtract coarse Marina budgeting language for deterministic Offshore execution.",
                     promptPrefix: "User prompt:"
                 )
             }
@@ -1669,6 +1686,42 @@ struct HomeAssistantPanelView: View {
         )
     }
 
+    @MainActor
+    private func presentMarinaV2SystemAnswer(
+        _ answer: HomeAnswer,
+        rawPrompt: String,
+        surfaceKind: MarinaPresentationSurfaceKind,
+        validationOutcomeSummary: String
+    ) async {
+        clarificationSuggestions = []
+        recoverySuggestions = []
+        lastClarificationReasons = []
+        activeClarificationContext = nil
+        sharedPipelineClarification = nil
+        sharedPipelineClarificationChoiceContext = nil
+        sharedPipelineClarificationChoicesByID = [:]
+        sharedPipelineClarificationChoicesByTitle = [:]
+        clearNLQClarificationState()
+
+        _ = await presentMarinaAnswer(
+            deterministicAnswer: answer,
+            basicFallbackAnswer: answer,
+            rawPrompt: rawPrompt,
+            source: .sharedFoundationModels,
+            surfaceKind: surfaceKind,
+            validationOutcomeSummary: validationOutcomeSummary,
+            groundingSummary: validationOutcomeSummary
+        )
+
+        recordTelemetry(
+            for: rawPrompt,
+            outcome: .unresolved,
+            source: .sharedFoundationModels,
+            plan: nil,
+            notes: validationOutcomeSummary
+        )
+    }
+
     private func marinaPresentationModeDecision() -> MarinaPresentationMode {
         guard marinaRuntimeSettings.aiOptIn.isEnabled else {
             return .basicDeterministic
@@ -2061,7 +2114,16 @@ struct HomeAssistantPanelView: View {
         
         defer { promptText = "" }
         
-        if resolvePendingMutationTurn(with: prompt) {
+        if hasPendingMutationTurn {
+            clearMutationPendingState()
+            Task { @MainActor in
+                await presentMarinaV2SystemAnswer(
+                    MarinaV2TurnCoordinator.deferredCRUDAnswer(prompt: prompt),
+                    rawPrompt: prompt,
+                    surfaceKind: .recovery,
+                    validationOutcomeSummary: "marina_v2_pending_crud_deferred"
+                )
+            }
             return
         }
 
@@ -2123,35 +2185,19 @@ struct HomeAssistantPanelView: View {
             return
         }
 
-        if let command = HomeAssistantSharedPipelineCommandGuard(commandParser: commandParser).command(
+        if HomeAssistantSharedPipelineCommandGuard(commandParser: commandParser).command(
             for: prompt,
             defaultPeriodUnit: defaultQueryPeriodUnit
-        ) {
-            // Legacy reachable: command and mutation-style requests still use the
-            // established command handler while shared read-pipeline parity is proven.
-            handleInterpretedRequest(.command(command, source: .parser), rawPrompt: prompt)
+        ) != nil {
+            Task { @MainActor in
+                await presentMarinaV2SystemAnswer(
+                    MarinaV2TurnCoordinator.deferredCRUDAnswer(prompt: prompt),
+                    rawPrompt: prompt,
+                    surfaceKind: .recovery,
+                    validationOutcomeSummary: "marina_v2_crud_deferred"
+                )
+            }
             return
-        }
-
-        if runtimeSettings.sharedPipeline.isEnabled == false {
-            if resolvePendingWhatIfFollowUp(with: prompt) {
-                return
-            }
-
-            if handleWhatIfPrompt(prompt) {
-                return
-            }
-        }
-
-        if runtimeSettings.sharedPipeline.isEnabled == false,
-           runtimeSettings.nlqV1.isEnabled == false {
-            if handleAnchoredFollowUpPrompt(prompt) {
-                return
-            }
-
-            if handleUnsupportedPrompt(prompt) {
-                return
-            }
         }
 
         Task { @MainActor in
@@ -2599,6 +2645,31 @@ struct HomeAssistantPanelView: View {
         }
         
         return false
+    }
+
+    private var hasPendingMutationTurn: Bool {
+        pendingCategoryColorPlan != nil
+            || pendingCardStyleStep != nil
+            || pendingBudgetCreationPlan != nil
+            || pendingDeleteExpense != nil
+            || pendingDeleteIncome != nil
+            || pendingDeleteCard != nil
+            || pendingDeleteCategory != nil
+            || pendingDeletePreset != nil
+            || pendingDeleteBudget != nil
+            || pendingDeletePlannedExpense != nil
+            || pendingCardCandidates.isEmpty == false
+            || pendingCategoryCandidates.isEmpty == false
+            || pendingPresetCandidates.isEmpty == false
+            || pendingBudgetCandidates.isEmpty == false
+            || pendingExpenseCandidates.isEmpty == false
+            || pendingPlannedExpenseCandidates.isEmpty == false
+            || pendingIncomeCandidates.isEmpty == false
+            || pendingExpenseCardPlan != nil
+            || pendingPresetRecurrencePlan != nil
+            || pendingPresetCardPlan != nil
+            || pendingIncomeKindPlan != nil
+            || (pendingPlannedExpenseAmountPlan != nil && pendingPlannedExpenseAmountExpense != nil)
     }
     
     private func handleAddExpenseCommand(_ command: HomeAssistantCommandPlan) {
@@ -6213,14 +6284,16 @@ struct HomeAssistantPanelView: View {
             return
         }
 
-        if marinaRuntimeSettings.nlqV1.isEnabled, let payload = nlqClarificationPayload,
-           payload.options.contains(where: { $0.displayLabel == suggestion.title })
-        {
-            handleNLQClarificationInput(suggestion.title, payload: payload)
-            return
+        Task { @MainActor in
+            let turnClassification = MarinaPromptTurnClassifier(
+                commandGuard: HomeAssistantSharedPipelineCommandGuard(commandParser: commandParser)
+            ).classify(
+                suggestion.title,
+                defaultPeriodUnit: defaultQueryPeriodUnit,
+                hasActiveClarification: false
+            )
+            await interpretPrompt(suggestion.title, turnClassification: turnClassification)
         }
-
-        runQuery(suggestion.query, userPrompt: suggestion.title)
     }
 
     @discardableResult
@@ -6238,6 +6311,7 @@ struct HomeAssistantPanelView: View {
         turnClassification: MarinaPromptTurnClassification
     ) async {
         let runtimeSettings = marinaRuntimeSettings
+        latestTraceAccessibilityValue = ""
         MarinaTraceRecorder.shared.begin(
             prompt: prompt,
             routingMode: runtimeSettings.routingMode,
@@ -6246,104 +6320,72 @@ struct HomeAssistantPanelView: View {
         )
         MarinaDebugLogger.log("[MarinaRuntime] \(runtimeSettings.traceSummary)")
 
-        if runtimeSettings.sharedPipeline.isEnabled {
-            let provider = MarinaDataProvider(modelContext: modelContext, workspaceID: workspace.id)
-            let coordinator = MarinaSharedPipelineCoordinator()
-            let result = await coordinator.run(
-                prompt: prompt,
-                context: MarinaSharedPipelineContext(
-                    provider: provider,
-                    routerContext: makeMarinaRouterContext(turnClassification: turnClassification),
-                    defaultPeriodUnit: defaultQueryPeriodUnit,
-                    sharedPipelineEnabled: runtimeSettings.sharedPipeline.isEnabled,
-                    aiOptInEnabled: runtimeSettings.aiOptIn.isEnabled,
-                    turnClassification: turnClassification,
-                    now: runtimeSettings.now
-                )
-            )
-            MarinaTraceRecorder.shared.recordSharedPipelineTrace(result.trace)
-
-            switch result {
-            case .handled(let answer, let aggregationResult, let homeQueryPlan, let trace):
-                MarinaTraceRecorder.shared.recordSelectedRoute(
-                    trace.selectedPath == .sharedFoundationModels ? .sharedFoundationModels : .sharedHeuristic,
-                    reason: trace.compactSummary
-                )
-                MarinaTraceRecorder.shared.recordAggregation(
-                    path: "marina_shared_pipeline",
-                    summary: trace.executorResultSummary
-                )
-                await handleSharedPipelineAnswer(
-                    answer,
-                    aggregationResult: aggregationResult,
-                    rawPrompt: prompt,
-                    homeQueryPlan: homeQueryPlan,
-                    source: trace.interpreterSource == .foundationModels ? .sharedFoundationModels : .sharedHeuristic
-                )
-                finishMarinaTrace()
-                return
-            case .validationBlocked(let answer, let outcome, let trace):
-                MarinaTraceRecorder.shared.recordSelectedRoute(
-                    trace.selectedPath == .sharedFoundationModels ? .sharedFoundationModels : .sharedHeuristic,
-                    reason: trace.compactSummary
-                )
-                if case .clarification(let clarification) = outcome {
-                    await handleSharedPipelineClarification(
-                        answer,
-                        clarification: clarification,
-                        rawPrompt: prompt,
-                        source: trace.interpreterSource == .foundationModels ? .sharedFoundationModels : .sharedHeuristic
-                    )
-                    finishMarinaTrace()
-                    return
-                }
-                await handleSharedPipelineAnswer(
-                    answer,
-                    aggregationResult: nil,
-                    rawPrompt: prompt,
-                    homeQueryPlan: nil,
-                    source: trace.interpreterSource == .foundationModels ? .sharedFoundationModels : .sharedHeuristic
-                )
-                finishMarinaTrace()
-                return
-            case .fallbackToLegacy(let trace):
-                // Legacy reachable: when the shared pipeline explicitly declines a
-                // prompt, preserve the flagged NLQ/model-router fallthrough instead
-                // of silently changing non-AI or debug fallback behavior.
-                MarinaTraceRecorder.shared.recordSelectedRoute(.sharedFallback, reason: trace.compactSummary)
-            }
-        }
-
-        if runtimeSettings.nlqV1.isEnabled {
-            // Legacy reachable: NLQ v1 remains executable only through its feature
-            // flag and should be shimmed after shared-pipeline equivalence is tested.
-            let provider = MarinaDataProvider(modelContext: modelContext, workspaceID: workspace.id)
-            let pipeline = MarinaNLQPipeline(provider: provider, defaultPeriodUnit: defaultQueryPeriodUnit)
-
-            let pipelineResult = pipeline.run(
-                prompt: prompt,
-                activeBudgetPeriod: activeBudgetDateRange(),
-                priorContext: nlqExecutionContext,
-                now: runtimeSettings.now
-            )
-            _ = await handleNLQPipelineResult(pipelineResult, originalPrompt: prompt)
-            finishMarinaTrace()
-            return
-        }
-
-        // Legacy reachable: model-router fallback is selected only after the shared
-        // pipeline/NLQ gates allow it, and remains until its read-query behavior is
-        // replaced by tested shared-pipeline routes.
-        let interpreted = await languageRouter.interpret(
-            prompt: prompt,
-            context: makeMarinaRouterContext(turnClassification: turnClassification),
-            heuristicFallback: {
-                heuristicInterpretedRequest(for: prompt)
-            }
-        )
-
-        handleInterpretedRequest(interpreted, rawPrompt: prompt)
+        let result = await marinaV2PanelRuntime(turnClassification: turnClassification).run(prompt: prompt)
+        await handleMarinaV2TurnResult(result, rawPrompt: prompt)
         finishMarinaTrace()
+    }
+
+    @MainActor
+    private func marinaV2PanelRuntime(
+        turnClassification: MarinaPromptTurnClassification
+    ) -> MarinaV2PanelRuntime {
+        MarinaV2PanelRuntime(
+            modelContext: modelContext,
+            workspaceID: workspace.id,
+            defaultPeriodUnit: defaultQueryPeriodUnit,
+            runtimeSettings: marinaRuntimeSettings,
+            routerContext: makeMarinaRouterContext(turnClassification: turnClassification),
+            turnClassification: turnClassification
+        )
+    }
+
+    @MainActor
+    private func handleMarinaV2TurnResult(
+        _ result: MarinaV2TurnResult,
+        rawPrompt prompt: String
+    ) async {
+        switch result {
+        case .handled(let answer, let aggregationResult, let homeQueryPlan, let amountBasis, let executionRoute):
+            MarinaTraceRecorder.shared.recordSelectedRoute(.sharedFoundationModels, reason: "marina_v2")
+            MarinaTraceRecorder.shared.recordAggregation(
+                path: "marina_v2",
+                summary: [
+                    amountBasis.map { "amountBasis=\($0.rawValue)" },
+                    executionRoute.map { "route=\($0.traceName)" }
+                ].compactMap { $0 }.joined(separator: ",")
+            )
+            await handleSharedPipelineAnswer(
+                answer,
+                aggregationResult: aggregationResult,
+                rawPrompt: prompt,
+                homeQueryPlan: homeQueryPlan,
+                source: .sharedFoundationModels
+            )
+        case .clarification(let answer, let clarification):
+            MarinaTraceRecorder.shared.recordSelectedRoute(.clarification, reason: "marina_v2_clarification")
+            await handleSharedPipelineClarification(
+                answer,
+                clarification: clarification,
+                rawPrompt: prompt,
+                source: .sharedFoundationModels
+            )
+        case .blocked(let answer, let validationOutcome):
+            MarinaTraceRecorder.shared.recordSelectedRoute(.sharedFoundationModels, reason: "marina_v2_blocked")
+            await presentMarinaV2SystemAnswer(
+                answer,
+                rawPrompt: prompt,
+                surfaceKind: .recovery,
+                validationOutcomeSummary: validationOutcome.map { "\($0)" } ?? "marina_v2_blocked"
+            )
+        case .unavailable(let answer):
+            MarinaTraceRecorder.shared.recordSelectedRoute(.sharedFoundationModels, reason: "marina_v2_ai_unavailable")
+            await presentMarinaV2SystemAnswer(
+                answer,
+                rawPrompt: prompt,
+                surfaceKind: .recovery,
+                validationOutcomeSummary: "marina_v2_ai_unavailable"
+            )
+        }
     }
 
     @MainActor
@@ -6602,82 +6644,23 @@ struct HomeAssistantPanelView: View {
         )
         MarinaTraceRecorder.shared.recordSharedPipelineTurnClassification(.clarificationAnswer)
         MarinaTraceRecorder.shared.recordAggregation(
-            path: "marina_shared_pipeline_clarification_resume_start",
+            path: "marina_v2_clarification_resume_start",
             summary: "choice=\(sharedPipelineChoiceTitle(choice))"
         )
-        let provider = MarinaDataProvider(modelContext: modelContext, workspaceID: workspace.id)
-        let coordinator = MarinaSharedPipelineCoordinator()
-        let result = await coordinator.resume(
+        let result = await marinaV2PanelRuntime(turnClassification: .clarificationAnswer).resume(
             clarification: clarification,
-            choice: choice,
-            context: MarinaSharedPipelineContext(
-                provider: provider,
-                routerContext: makeMarinaRouterContext(turnClassification: .clarificationAnswer),
-                defaultPeriodUnit: defaultQueryPeriodUnit,
-                sharedPipelineEnabled: runtimeSettings.sharedPipeline.isEnabled,
-                aiOptInEnabled: runtimeSettings.aiOptIn.isEnabled,
-                turnClassification: .clarificationAnswer,
-                now: runtimeSettings.now
-            )
+            choice: choice
         )
-        MarinaTraceRecorder.shared.recordSharedPipelineTrace(result.trace)
-
-        switch result {
-        case .handled(let answer, let aggregationResult, let homeQueryPlan, let trace):
-            MarinaTraceRecorder.shared.recordSelectedRoute(
-                trace.selectedPath == .sharedFoundationModels ? .sharedFoundationModels : .sharedHeuristic,
-                reason: trace.compactSummary
-            )
-            MarinaTraceRecorder.shared.recordAggregation(
-                path: "marina_shared_pipeline_clarification_resume",
-                summary: trace.executorResultSummary
-            )
-            await handleSharedPipelineAnswer(
-                answer,
-                aggregationResult: aggregationResult,
-                rawPrompt: rawPrompt,
-                homeQueryPlan: homeQueryPlan,
-                source: trace.interpreterSource == .foundationModels ? .sharedFoundationModels : .sharedHeuristic
-            )
-            sharedPipelineClarification = nil
-            sharedPipelineClarificationChoiceContext = nil
-            sharedPipelineClarificationChoicesByID = [:]
-            sharedPipelineClarificationChoicesByTitle = [:]
+        await handleMarinaV2TurnResult(result, rawPrompt: rawPrompt)
+        if case .clarification = result {
             finishMarinaTrace()
-        case .validationBlocked(let answer, let outcome, let trace):
-            MarinaTraceRecorder.shared.recordSelectedRoute(
-                trace.selectedPath == .sharedFoundationModels ? .sharedFoundationModels : .sharedHeuristic,
-                reason: trace.compactSummary
-            )
-            if case .clarification(let nextClarification) = outcome {
-                await handleSharedPipelineClarification(
-                    answer,
-                    clarification: nextClarification,
-                    rawPrompt: rawPrompt,
-                    source: trace.interpreterSource == .foundationModels ? .sharedFoundationModels : .sharedHeuristic
-                )
-            } else {
-                await handleSharedPipelineAnswer(
-                    answer,
-                    aggregationResult: nil,
-                    rawPrompt: rawPrompt,
-                    homeQueryPlan: nil,
-                    source: trace.interpreterSource == .foundationModels ? .sharedFoundationModels : .sharedHeuristic
-                )
-                sharedPipelineClarification = nil
-                sharedPipelineClarificationChoiceContext = nil
-                sharedPipelineClarificationChoicesByID = [:]
-                sharedPipelineClarificationChoicesByTitle = [:]
-            }
-            finishMarinaTrace()
-        case .fallbackToLegacy(let trace):
-            MarinaTraceRecorder.shared.recordSelectedRoute(.sharedFallback, reason: trace.compactSummary)
-            sharedPipelineClarification = nil
-            sharedPipelineClarificationChoiceContext = nil
-            sharedPipelineClarificationChoicesByID = [:]
-            sharedPipelineClarificationChoicesByTitle = [:]
-            finishMarinaTrace()
+            return
         }
+        sharedPipelineClarification = nil
+        sharedPipelineClarificationChoiceContext = nil
+        sharedPipelineClarificationChoicesByID = [:]
+        sharedPipelineClarificationChoicesByTitle = [:]
+        finishMarinaTrace()
     }
 
     private func sharedPipelineChoiceTitle(_ choice: MarinaClarificationChoice) -> String {
@@ -6982,6 +6965,7 @@ struct HomeAssistantPanelView: View {
         return MarinaLanguageRouterContext(
             workspaceName: workspace.name,
             defaultPeriodUnit: defaultQueryPeriodUnit,
+            ambientDateRange: assistantDateRange,
             sessionContext: sessionContext,
             priorQueryContext: turnClassification == .followUp ? priorQueryContext : .empty,
             cardNames: cards.map(\.name).sorted(),

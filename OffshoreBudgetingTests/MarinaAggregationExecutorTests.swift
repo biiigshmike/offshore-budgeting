@@ -675,11 +675,13 @@ struct MarinaAggregationExecutorTests {
         let allocatedExpense = VariableExpense(descriptionText: "Dinner", amount: 120, transactionDate: date(2026, 5, 5), workspace: fixture.workspace, card: fixture.appleCard, category: food)
         fixture.context.insert(shared)
         fixture.context.insert(allocatedExpense)
-        fixture.context.insert(ExpenseAllocation(allocatedAmount: 60, workspace: fixture.workspace, account: shared, expense: allocatedExpense))
+        fixture.context.insert(ExpenseAllocation(allocatedAmount: 60, preservesGrossAmount: true, workspace: fixture.workspace, account: shared, expense: allocatedExpense))
         fixture.context.insert(VariableExpense(descriptionText: "May Groceries", amount: 300, transactionDate: date(2026, 5, 8), workspace: fixture.workspace, card: fixture.appleCard, category: food))
         fixture.context.insert(VariableExpense(descriptionText: "April Groceries", amount: 100, transactionDate: date(2026, 4, 8), workspace: fixture.workspace, card: fixture.appleCard, category: food))
+        fixture.context.insert(VariableExpense(descriptionText: "Backup Travel", amount: 10, transactionDate: date(2026, 5, 9), workspace: fixture.workspace, card: fixture.backupCard, category: fixture.travel))
         let budget = Budget(name: "May", startDate: date(2026, 5, 1), endDate: date(2026, 5, 31), workspace: fixture.workspace)
         fixture.context.insert(budget)
+        fixture.context.insert(BudgetCardLink(budget: budget, card: fixture.appleCard))
         fixture.context.insert(BudgetCategoryLimit(maxAmount: 350, budget: budget, category: food))
         fixture.context.insert(Income(source: "Planned", amount: 1_000, date: date(2026, 5, 1), isPlanned: true, workspace: fixture.workspace))
         try fixture.context.save()
@@ -744,6 +746,94 @@ struct MarinaAggregationExecutorTests {
         ))
         #expect(simulation.title == "What-If Budget Impact")
         #expect(simulation.rows.contains(where: { $0.label == "Category limit" }))
+        #expect(simulation.rows.contains(where: { $0.label == "Workspace spend after" && $0.amount == 410 }))
+
+        let budgetMention = mention("May Budget", .budget)
+        let budgetTarget = resolvedTarget(mention: budgetMention, role: .primaryTarget, entityType: .budget, displayName: "May", sourceID: budget.id)
+        let earnScenario = handledCard(executor.execute(
+            candidate: candidate(prompt: "If I earn $200 in May Budget, what happens?", operation: .simulate, measure: .remainingBudget, mentions: [budgetMention]),
+            resolved: resolvedCandidate(targets: [budgetTarget]),
+            plan: MarinaAggregationPlan(
+                operation: .simulate,
+                measure: .remainingBudget,
+                targets: [target(.budget, "May", sourceID: budget.id)]
+            ),
+            provider: fixture.provider,
+            now: date(2026, 5, 15)
+        ))
+        #expect(earnScenario.traceSummary.contains("kind=earn"))
+        #expect(earnScenario.primaryValue?.contains("Up") == true)
+        #expect(earnScenario.rows.contains(where: { $0.label == "Planned income after" && $0.amount == 1_200 }))
+
+        let cardMention = mention("Apple Card", .card)
+        let saveScenario = handledCard(executor.execute(
+            candidate: candidate(prompt: "If I save $100 from Apple Card this month, what happens?", operation: .simulate, measure: .remainingBudget, mentions: [cardMention]),
+            resolved: resolvedCandidate(targets: [
+                budgetTarget,
+                resolvedTarget(mention: cardMention, role: .filter, entityType: .card, displayName: "Apple Card", sourceID: fixture.appleCard.id)
+            ]),
+            plan: MarinaAggregationPlan(
+                operation: .simulate,
+                measure: .remainingBudget,
+                targets: [
+                    target(.budget, "May", sourceID: budget.id),
+                    target(.card, "Apple Card", sourceID: fixture.appleCard.id)
+                ],
+                dateRange: primary
+            ),
+            provider: fixture.provider,
+            now: date(2026, 5, 15)
+        ))
+        #expect(saveScenario.traceSummary.contains("kind=save"))
+        #expect(saveScenario.primaryValue?.contains("Down") == true)
+        #expect(saveScenario.rows.contains(where: { $0.label == "Savings scenario" && $0.amount == 100 }))
+    }
+
+    @Test func workspaceAggregationExecutor_reconciliationLookupDetailsReturnsTargetBalance() throws {
+        let fixture = try makeFixture()
+        let shared = AllocationAccount(name: "Roommate", workspace: fixture.workspace)
+        let dinner = VariableExpense(
+            descriptionText: "Dinner",
+            amount: 120,
+            transactionDate: date(2026, 5, 5),
+            workspace: fixture.workspace,
+            card: fixture.appleCard,
+            category: fixture.groceries
+        )
+        fixture.context.insert(shared)
+        fixture.context.insert(dinner)
+        fixture.context.insert(ExpenseAllocation(
+            allocatedAmount: 60,
+            preservesGrossAmount: true,
+            workspace: fixture.workspace,
+            account: shared,
+            expense: dinner
+        ))
+        fixture.context.insert(AllocationSettlement(
+            date: date(2026, 5, 20),
+            note: "Roommate paid back",
+            amount: -20,
+            workspace: fixture.workspace,
+            account: shared,
+            expense: dinner
+        ))
+        try fixture.context.save()
+
+        let executor = MarinaWorkspaceAggregationExecutor(calendar: Calendar(identifier: .gregorian))
+        let card = handledCard(executor.execute(
+            plan: MarinaAggregationPlan(
+                operation: .lookupDetails,
+                measure: .reconciliationBalance,
+                targets: [target(.allocationAccount, "Roommate", sourceID: shared.id)]
+            ),
+            provider: fixture.provider,
+            now: date(2026, 5, 15)
+        ))
+
+        #expect(card.title == "Roommate Balance")
+        #expect(card.primaryValue?.filter(\.isNumber).contains("40") == true)
+        #expect(card.rows.map(\.label).contains("Roommate"))
+        #expect(card.traceSummary.contains("sharedBalances"))
     }
 
     private func executable(_ plan: MarinaAggregationPlan) throws -> MarinaExecutableAggregationPlan {

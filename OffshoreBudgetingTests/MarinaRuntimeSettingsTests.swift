@@ -16,7 +16,7 @@ struct MarinaRuntimeSettingsTests {
         #expect(settings.routingMode == .sharedPipeline)
         #expect(settings.sharedPipeline.isEnabled)
         #expect(settings.sharedPipeline.source == .fallback)
-        #expect(settings.aiOptIn.isEnabled == false)
+        #expect(settings.aiOptIn.isEnabled)
         #expect(settings.aiOptIn.source == .fallback)
     }
 

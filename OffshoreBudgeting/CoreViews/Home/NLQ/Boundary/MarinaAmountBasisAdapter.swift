@@ -21,6 +21,10 @@ struct MarinaAmountBasisAdapter {
             return .reconciliationBalance
         }
 
+        if let field = semanticQuery?.amountField {
+            return basis(for: field, subject: semanticQuery?.subject)
+        }
+
         if plan.measure == .spend,
            plan.operation == .rank,
            plan.grouping?.dimension == .card {
@@ -29,10 +33,6 @@ struct MarinaAmountBasisAdapter {
 
         if plan.measure == .transactionAmount {
             return .budgetImpact
-        }
-
-        if let field = semanticQuery?.amountField {
-            return basis(for: field, subject: semanticQuery?.subject)
         }
 
         if plan.measure == .spend || plan.measure == .categoryShare {

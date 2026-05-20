@@ -398,6 +398,7 @@ struct MarinaFoundationModelsInterpreterTests {
             (.presets, .preset, "Rent"),
             (.income, .income, "Salary"),
             (.incomeSeries, .incomeSeries, "Salary"),
+            (.workspaces, .workspace, "Personal"),
             (.savingsLedger, .savingsLedgerEntry, "Manual adjustment"),
             (.reconciliation, .reconciliationAccount, "Roommate"),
             (.expenseAllocations, .expenseAllocation, "Dinner"),
@@ -876,13 +877,13 @@ struct MarinaFoundationModelsInterpreterTests {
 
     private func date(_ year: Int, _ month: Int, _ day: Int) -> Date {
         var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        calendar.timeZone = .current
         return calendar.date(from: DateComponents(year: year, month: month, day: day))!
     }
 
     private func endOfDay(_ date: Date) -> Date {
         var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        calendar.timeZone = .current
         return calendar.date(byAdding: DateComponents(day: 1, second: -1), to: calendar.startOfDay(for: date))!
     }
 

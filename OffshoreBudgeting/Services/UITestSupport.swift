@@ -83,6 +83,11 @@ enum UITestSupport {
     }
 
     private static func applyMarinaHarnessDefaults(_ defaults: UserDefaults) {
+        let arguments = ProcessInfo.processInfo.arguments
+        let aiOptInDefault = arguments.contains("-uiTestingMarinaAIOptOutDefault")
+            ? false
+            : MarinaRuntimeSettings.defaultAIOptInEnabled
+
         defaults.set(true, forKey: "didCompleteOnboarding")
         defaults.set(true, forKey: "onboarding_didChooseDataSource")
         defaults.set(true, forKey: "onboarding_didPressGetStarted")
@@ -104,7 +109,7 @@ enum UITestSupport {
 
         defaults.set(MarinaRuntimeSettings.defaultSharedPipelineEnabled, forKey: MarinaRuntimeSettings.sharedPipelineKey)
         defaults.set(MarinaRuntimeSettings.defaultNLQv1Enabled, forKey: MarinaRuntimeSettings.nlqV1Key)
-        defaults.set(MarinaRuntimeSettings.defaultAIOptInEnabled, forKey: MarinaRuntimeSettings.aiOptInKey)
+        defaults.set(aiOptInDefault, forKey: MarinaRuntimeSettings.aiOptInKey)
     }
 
     // MARK: - Data

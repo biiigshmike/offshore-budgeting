@@ -34,6 +34,9 @@ struct MarinaWorkspaceAggregationExecutor {
             return .handled(plannedExpensesByCard(plan: plan, provider: provider, now: now))
         case (.rank, .savingsMovement, .savingsLedgerEntry), (.listRows, .savingsMovement, .savingsLedgerEntry):
             return .handled(largestSavingsMovements(plan: plan, provider: provider, now: now))
+        case (.lookupDetails, .reconciliationBalance, nil),
+             (.lookupDetails, .reconciliationBalance, .allocationAccount):
+            return .handled(sharedBalances(plan: plan, provider: provider))
         case (.rank, .reconciliationBalance, .allocationAccount),
              (.sum, .reconciliationBalance, .allocationAccount),
              (.listRows, .reconciliationBalance, .allocationAccount):
@@ -64,7 +67,7 @@ struct MarinaWorkspaceAggregationExecutor {
         }
 
         return MarinaWorkspaceAggregationCard(
-            title: incomeSummaryTitle(for: plan.incomeStatusScope),
+            title: incomeSummaryTitle(for: plan),
             subtitle: rangeLabel(range),
             primaryValue: primaryValue,
             rows: compactRows([
@@ -382,8 +385,8 @@ struct MarinaWorkspaceAggregationExecutor {
             }
 
         return MarinaWorkspaceAggregationCard(
-            title: "Shared Balances",
-            subtitle: "Reconciliation accounts",
+            title: accountTargets.count == 1 ? "\(accountTargets[0].displayName) Balance" : "Shared Balances",
+            subtitle: accountTargets.count == 1 ? "Shared Balances" : "Reconciliation accounts",
             primaryValue: rows.first?.value,
             rows: Array(rows),
             traceSummary: "workspaceAggregation=sharedBalances,resultCount=\(rows.count)"
@@ -446,8 +449,11 @@ struct MarinaWorkspaceAggregationExecutor {
         }
     }
 
-    private func incomeSummaryTitle(for scope: MarinaIncomeStatusScope?) -> String {
-        switch scope {
+    private func incomeSummaryTitle(for plan: MarinaAggregationPlan) -> String {
+        if plan.routeIntent?.kind == .incomePlannedVsActual {
+            return "Planned vs Actual Income"
+        }
+        switch plan.incomeStatusScope {
         case .actual:
             return "Actual Income"
         case .planned:

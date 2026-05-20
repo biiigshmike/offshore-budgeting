@@ -332,7 +332,7 @@ struct MarinaQueryResolver {
         }
 
         var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .gmt
+        calendar.timeZone = .current
         let resolver = MarinaDateResolver(calendar: calendar, nowProvider: { now })
         return resolver.resolve(
             input: rawText,

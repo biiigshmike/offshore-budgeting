@@ -308,6 +308,8 @@ struct MarinaFoundationModelsInterpreter {
 
     private func lookupObjectType(from dataset: MarinaSemanticCommandDataset) -> MarinaLookupObjectType? {
         switch dataset {
+        case .workspaces:
+            return .workspace
         case .variableExpenses:
             return .variableExpense
         case .plannedExpenses:
@@ -704,12 +706,7 @@ struct MarinaFoundationModelsInterpreter {
     }
 
     private func makeDateRange(start: String?, end: String?) -> HomeQueryDateRange? {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
-        return MarinaDateResolver(calendar: calendar).resolveExplicitRange(
-            start: start,
-            end: end
-        )?.queryDateRange
+        MarinaDateOnlyRangeCodec.dateRange(start: start, end: end)
     }
 
     private func grouping(from metric: HomeQueryMetric?) -> MarinaGroupingCandidate? {

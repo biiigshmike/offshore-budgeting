@@ -11,6 +11,21 @@ struct MarinaExecutionTrace: Equatable {
     let modelOutputSummary: String?
     let modelPlanSummary: String?
     let modelValidationSummary: String?
+    let foundationModelFailureStep: String?
+    let foundationModelFailureCategory: String?
+    let foundationModelFailureDebugSummary: String?
+    let foundationRepairSummary: String?
+    let liveEnvelopeSummary: String?
+    let canonicalRouteSummary: String?
+    let routeOverrideSummary: String?
+    let routeGuardSummary: String?
+    let routeKeySummary: String?
+    let droppedTargetSummary: String?
+    let datePolicySummary: String?
+    let dateSourceSummary: String?
+    let effectiveDateRangeSummary: String?
+    let routeRescueSummary: String?
+    let blockedWrongQuery: Bool?
 
     let fallbackWasAttempted: Bool
     let fallbackOutputSummary: String?
@@ -172,6 +187,52 @@ final class MarinaTraceRecorder {
     func recordModelValidationSummary(_ summary: String?) {
         guard isEnabled else { return }
         mutate { $0.modelValidationSummary = summary }
+    }
+
+    func recordFoundationModelsFailure(_ diagnostic: MarinaFoundationModelsFailureDiagnostic) {
+        guard isEnabled else { return }
+        mutate { draft in
+            draft.foundationModelFailureStep = diagnostic.step.rawValue
+            draft.foundationModelFailureCategory = diagnostic.category.rawValue
+            draft.foundationModelFailureDebugSummary = diagnostic.debugSummary
+            draft.modelValidationSummary = diagnostic.traceSummary
+        }
+    }
+
+    func recordFoundationRepairSummary(_ summary: String?) {
+        guard isEnabled else { return }
+        mutate { draft in
+            draft.foundationRepairSummary = summary
+        }
+    }
+
+    func recordLiveRouteOwnership(
+        liveEnvelopeSummary: String?,
+        canonicalRouteSummary: String?,
+        routeOverrideSummary: String?,
+        routeGuardSummary: String?,
+        routeKeySummary: String?,
+        droppedTargetSummary: String?,
+        datePolicySummary: String?,
+        dateSourceSummary: String?,
+        effectiveDateRangeSummary: String?,
+        routeRescueSummary: String?,
+        blockedWrongQuery: Bool
+    ) {
+        guard isEnabled else { return }
+        mutate { draft in
+            draft.liveEnvelopeSummary = liveEnvelopeSummary
+            draft.canonicalRouteSummary = canonicalRouteSummary
+            draft.routeOverrideSummary = routeOverrideSummary
+            draft.routeGuardSummary = routeGuardSummary
+            draft.routeKeySummary = routeKeySummary
+            draft.droppedTargetSummary = droppedTargetSummary
+            draft.datePolicySummary = datePolicySummary
+            draft.dateSourceSummary = dateSourceSummary
+            draft.effectiveDateRangeSummary = effectiveDateRangeSummary
+            draft.routeRescueSummary = routeRescueSummary
+            draft.blockedWrongQuery = blockedWrongQuery
+        }
     }
 
     func recordFallbackAttempt(outputSummary: String?) {
@@ -341,6 +402,21 @@ private struct MarinaExecutionTraceDraft {
     var modelOutputSummary: String?
     var modelPlanSummary: String?
     var modelValidationSummary: String?
+    var foundationModelFailureStep: String?
+    var foundationModelFailureCategory: String?
+    var foundationModelFailureDebugSummary: String?
+    var foundationRepairSummary: String?
+    var liveEnvelopeSummary: String?
+    var canonicalRouteSummary: String?
+    var routeOverrideSummary: String?
+    var routeGuardSummary: String?
+    var routeKeySummary: String?
+    var droppedTargetSummary: String?
+    var datePolicySummary: String?
+    var dateSourceSummary: String?
+    var effectiveDateRangeSummary: String?
+    var routeRescueSummary: String?
+    var blockedWrongQuery: Bool?
 
     var fallbackWasAttempted: Bool = false
     var fallbackOutputSummary: String?
@@ -395,6 +471,21 @@ private struct MarinaExecutionTraceDraft {
             modelOutputSummary: modelOutputSummary,
             modelPlanSummary: modelPlanSummary,
             modelValidationSummary: modelValidationSummary,
+            foundationModelFailureStep: foundationModelFailureStep,
+            foundationModelFailureCategory: foundationModelFailureCategory,
+            foundationModelFailureDebugSummary: foundationModelFailureDebugSummary,
+            foundationRepairSummary: foundationRepairSummary,
+            liveEnvelopeSummary: liveEnvelopeSummary,
+            canonicalRouteSummary: canonicalRouteSummary,
+            routeOverrideSummary: routeOverrideSummary,
+            routeGuardSummary: routeGuardSummary,
+            routeKeySummary: routeKeySummary,
+            droppedTargetSummary: droppedTargetSummary,
+            datePolicySummary: datePolicySummary,
+            dateSourceSummary: dateSourceSummary,
+            effectiveDateRangeSummary: effectiveDateRangeSummary,
+            routeRescueSummary: routeRescueSummary,
+            blockedWrongQuery: blockedWrongQuery,
             fallbackWasAttempted: fallbackWasAttempted,
             fallbackOutputSummary: fallbackOutputSummary,
             fallbackSelectionReason: fallbackSelectionReason,
@@ -435,12 +526,31 @@ private struct MarinaExecutionTraceDraft {
 }
 
 struct MarinaExecutionTraceSnapshot: Codable, Equatable {
+    let capturedAtISO8601: String
     let originalPrompt: String
+    let promptVersion: String
     let routingMode: String
     let marinaNLQv1Enabled: Bool
     let runtimeSettingsSummary: String?
+    let modelWasAvailable: Bool
+    let modelAvailabilityReason: String?
     let selectedRoute: String
     let selectedRouteReason: String?
+    let foundationModelFailureStep: String?
+    let foundationModelFailureCategory: String?
+    let foundationModelFailureDebugSummary: String?
+    let foundationRepairSummary: String?
+    let liveEnvelopeSummary: String?
+    let canonicalRouteSummary: String?
+    let routeOverrideSummary: String?
+    let routeGuardSummary: String?
+    let routeKeySummary: String?
+    let droppedTargetSummary: String?
+    let datePolicySummary: String?
+    let dateSourceSummary: String?
+    let effectiveDateRangeSummary: String?
+    let routeRescueSummary: String?
+    let blockedWrongQuery: Bool?
     let aggregationPath: String?
     let responseType: String?
     let finalAnswerSummary: String?
@@ -462,14 +572,34 @@ struct MarinaExecutionTraceSnapshot: Codable, Equatable {
     let sharedPipelineDisagreementSummary: String?
     let turnClassification: String?
     let priorContextIncluded: Bool?
+    let dataWasQueried: Bool
 
     init(_ trace: MarinaExecutionTrace) {
+        self.capturedAtISO8601 = marinaTraceISO8601String(from: Date())
         self.originalPrompt = trace.originalPrompt
+        self.promptVersion = MarinaFoundationPromptVersion.interpretationV3.rawValue
         self.routingMode = trace.routingMode.rawValue
         self.marinaNLQv1Enabled = trace.marinaNLQv1Enabled
         self.runtimeSettingsSummary = trace.runtimeSettingsSummary
+        self.modelWasAvailable = trace.modelWasAvailable
+        self.modelAvailabilityReason = trace.modelAvailabilityReason
         self.selectedRoute = trace.selectedRoute.rawValue
         self.selectedRouteReason = trace.selectedRouteReason
+        self.foundationModelFailureStep = trace.foundationModelFailureStep
+        self.foundationModelFailureCategory = trace.foundationModelFailureCategory
+        self.foundationModelFailureDebugSummary = trace.foundationModelFailureDebugSummary.map(marinaSanitizedDebugSummary)
+        self.foundationRepairSummary = trace.foundationRepairSummary
+        self.liveEnvelopeSummary = trace.liveEnvelopeSummary
+        self.canonicalRouteSummary = trace.canonicalRouteSummary
+        self.routeOverrideSummary = trace.routeOverrideSummary
+        self.routeGuardSummary = trace.routeGuardSummary
+        self.routeKeySummary = trace.routeKeySummary
+        self.droppedTargetSummary = trace.droppedTargetSummary
+        self.datePolicySummary = trace.datePolicySummary
+        self.dateSourceSummary = trace.dateSourceSummary
+        self.effectiveDateRangeSummary = trace.effectiveDateRangeSummary
+        self.routeRescueSummary = trace.routeRescueSummary
+        self.blockedWrongQuery = trace.blockedWrongQuery
         self.aggregationPath = trace.aggregationPath
         self.responseType = trace.responseType
         self.finalAnswerSummary = trace.finalAnswerSummary
@@ -491,6 +621,7 @@ struct MarinaExecutionTraceSnapshot: Codable, Equatable {
         self.sharedPipelineDisagreementSummary = trace.sharedPipelineDisagreementSummary
         self.turnClassification = trace.sharedPipelineTurnClassification?.rawValue
         self.priorContextIncluded = trace.sharedPipelinePriorContextIncluded
+        self.dataWasQueried = trace.sharedPipelineExecutorSummary != nil
     }
 
     var accessibilityValue: String {
@@ -498,6 +629,20 @@ struct MarinaExecutionTraceSnapshot: Codable, Equatable {
             "prompt=\(originalPrompt)",
             "routingMode=\(routingMode)",
             "selectedRoute=\(selectedRoute)",
+            foundationModelFailureStep.map { "foundationStep=\($0)" },
+            foundationModelFailureCategory.map { "foundationCategory=\($0)" },
+            foundationRepairSummary.map { "foundationRepair=\($0)" },
+            liveEnvelopeSummary.map { "liveEnvelope=\($0)" },
+            canonicalRouteSummary.map { "canonicalRoute=\($0)" },
+            routeOverrideSummary.map { "routeOverride=\($0)" },
+            routeGuardSummary.map { "routeGuard=\($0)" },
+            routeKeySummary.map { "routeKey=\($0)" },
+            droppedTargetSummary.map { "droppedTarget=\($0)" },
+            datePolicySummary.map { "datePolicy=\($0)" },
+            dateSourceSummary.map { "dateSource=\($0)" },
+            effectiveDateRangeSummary.map { "effectiveDateRange=\($0)" },
+            routeRescueSummary.map { "routeRescue=\($0)" },
+            blockedWrongQuery.map { "blockedWrongQuery=\($0)" },
             sharedPipelinePath.map { "sharedPath=\($0)" },
             sharedPipelineInterpreterSource.map { "interpreter=\($0)" },
             turnClassification.map { "turnClassification=\($0)" },
@@ -519,6 +664,8 @@ struct MarinaExecutionTraceSnapshot: Codable, Equatable {
 enum MarinaTraceExporter {
     static func exportIfConfigured(_ trace: MarinaExecutionTrace) {
         #if DEBUG
+        MarinaSmokeTraceStore.exportIfEnabled(trace)
+
         let environment = ProcessInfo.processInfo.environment
         guard let path = environment[MarinaRuntimeSettings.traceOutputPathEnvironmentKey]?.trimmingCharacters(in: .whitespacesAndNewlines),
               path.isEmpty == false else {
@@ -549,6 +696,25 @@ enum MarinaTraceExporter {
     }
 }
 
+private func marinaTraceISO8601String(from date: Date) -> String {
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    return formatter.string(from: date)
+}
+
+private func marinaSanitizedDebugSummary(_ rawValue: String) -> String {
+    let collapsed = rawValue
+        .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+    let schemaOnly = collapsed
+        .replacingOccurrences(
+            of: #"Text:\s*\{.*"#,
+            with: "Text:{redacted-generated-content}",
+            options: .regularExpression
+        )
+    return String(schemaOnly.prefix(700))
+}
+
 extension MarinaExecutionTrace {
     var sanitizedLogLine: String {
         [
@@ -563,7 +729,10 @@ extension MarinaExecutionTrace {
             "metric=\(normalizedMetric ?? "nil")",
             "response=\(responseType ?? "nil")",
             "surface=\(responseSurfaceSource?.rawValue ?? "nil")",
-            "surfaceFallback=\(responseSurfaceFallbackReason?.rawValue ?? "nil")"
+            "surfaceFallback=\(responseSurfaceFallbackReason?.rawValue ?? "nil")",
+            foundationModelFailureStep.map { "foundationStep=\($0)" },
+            foundationModelFailureCategory.map { "foundationCategory=\($0)" },
+            foundationRepairSummary.map { "foundationRepair=\($0)" }
         ]
         .compactMap { $0 }
         .joined(separator: " | ")
@@ -572,12 +741,7 @@ extension MarinaExecutionTrace {
 
 extension HomeQueryDateRange {
     var traceSummary: String {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        formatter.dateFormat = "yyyy-MM-dd"
-        return "\(formatter.string(from: startDate))..\(formatter.string(from: endDate))"
+        MarinaDateOnlyRangeCodec.traceSummary(self) ?? "nil"
     }
 }
 

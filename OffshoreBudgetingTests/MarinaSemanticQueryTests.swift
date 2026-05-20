@@ -98,6 +98,7 @@ struct MarinaSemanticQueryTests {
 
         #expect(semanticQuery.subject == .budgets)
         #expect(semanticQuery.operation == .lookupDetails)
+        #expect(semanticQuery.amountField == .budgetImpactAmount)
         #expect(semanticQuery.requestedDetail == .linkedCards)
         #expect(semanticQuery.responseShape == .relationshipList)
         #expect(semanticQuery.filters.first?.entityTypeHint == .budget)
@@ -502,6 +503,20 @@ struct MarinaSemanticQueryTests {
                 ),
                 semanticQuery: MarinaSemanticQuery(subject: .cards, operation: .rank)
             ) == .budgetImpact
+        )
+        #expect(
+            adapter.basis(
+                plan: MarinaAggregationPlan(
+                    operation: .rank,
+                    measure: .spend,
+                    grouping: MarinaGroupingCandidate(dimension: .card)
+                ),
+                semanticQuery: MarinaSemanticQuery(
+                    subject: .cards,
+                    operation: .rank,
+                    amountField: .spendingAmount
+                )
+            ) == .cardDisplaySpend
         )
         #expect(
             adapter.basis(

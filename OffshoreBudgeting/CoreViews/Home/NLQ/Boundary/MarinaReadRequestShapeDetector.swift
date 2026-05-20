@@ -710,6 +710,8 @@ struct MarinaReadRequestShapeDetector {
 
     private func dataset(from objectType: MarinaLookupObjectType) -> MarinaSemanticCommandDataset? {
         switch objectType {
+        case .workspace:
+            return .workspaces
         case .budget:
             return .budgets
         case .income:
@@ -736,7 +738,7 @@ struct MarinaReadRequestShapeDetector {
             return .importMerchantRules
         case .assistantAliasRule:
             return .assistantAliasRules
-        case .savingsAccount, .workspace, .unknown:
+        case .savingsAccount, .unknown:
             return nil
         }
     }

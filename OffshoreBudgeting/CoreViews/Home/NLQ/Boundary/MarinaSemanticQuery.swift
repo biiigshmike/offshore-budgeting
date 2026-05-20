@@ -90,6 +90,17 @@ enum MarinaInterpretationResult: Codable, Equatable, Sendable {
 struct MarinaCanonicalReadInterpretation: Equatable, Sendable {
     let result: MarinaInterpretationResult
     let compatibilityCandidate: MarinaQueryPlanCandidate
+    let repairSummary: String?
+
+    init(
+        result: MarinaInterpretationResult,
+        compatibilityCandidate: MarinaQueryPlanCandidate,
+        repairSummary: String? = nil
+    ) {
+        self.result = result
+        self.compatibilityCandidate = compatibilityCandidate
+        self.repairSummary = repairSummary
+    }
 }
 
 enum MarinaSubject: String, Codable, Equatable, CaseIterable, Sendable {
@@ -459,7 +470,7 @@ struct MarinaSemanticQueryAdapter {
                             sourceID: nil
                         )
                     },
-                    amountField: nil,
+                    amountField: command.measure.flatMap { amountField(from: $0) },
                     dateRange: command.dateRange.map {
                         MarinaDateRangeRequest(role: .primary, rawText: nil, resolvedRange: $0, periodUnit: command.periodUnit)
                     },
@@ -529,6 +540,8 @@ struct MarinaSemanticQueryAdapter {
 
     private func subject(from dataset: MarinaSemanticCommandDataset?) -> MarinaSubject {
         switch dataset {
+        case .workspaces:
+            return .workspaces
         case .variableExpenses:
             return .variableExpenses
         case .plannedExpenses:

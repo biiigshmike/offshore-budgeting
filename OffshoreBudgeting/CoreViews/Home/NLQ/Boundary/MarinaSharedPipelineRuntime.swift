@@ -218,6 +218,7 @@ extension MarinaLanguageRouterContext {
         return MarinaLanguageRouterContext(
             workspaceName: workspaceName,
             defaultPeriodUnit: defaultPeriodUnit,
+            ambientDateRange: ambientDateRange,
             sessionContext: sessionContext,
             priorQueryContext: .empty,
             cardNames: cardNames,

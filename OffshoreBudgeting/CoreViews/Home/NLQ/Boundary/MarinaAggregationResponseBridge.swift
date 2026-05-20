@@ -15,7 +15,21 @@ struct MarinaAggregationResponseBridge {
     }
 
     func responseCompatibleAnswer(from clarification: MarinaTypedClarification) -> HomeAnswer {
-        HomeAnswer(
+        guard clarification.actionableChoices.count > 1 else {
+            return HomeAnswer(
+                queryID: clarification.id,
+                kind: .message,
+                title: "I need a clearer target",
+                subtitle: "Marina produced a clarification that was not actionable, so Offshore did not query your financial data.",
+                primaryValue: nil,
+                rows: [
+                    HomeAnswerRow(title: "Data safety", value: "Offshore did not query or change your financial records."),
+                    HomeAnswerRow(title: "Clarification shape", value: "\(clarification.kind.rawValue), choices=\(clarification.choices.count)")
+                ]
+            )
+        }
+
+        return HomeAnswer(
             queryID: clarification.id,
             kind: .message,
             title: "I need one choice first",

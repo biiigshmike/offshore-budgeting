@@ -258,6 +258,23 @@ final class MarinaAssistantUITests: XCTestCase {
 
         let toggle = driver.foundationModelToggle()
         XCTAssertTrue(toggle.waitForExistence(timeout: 5), "Expected the Marina Foundation Model toggle to be visible.")
+        XCTAssertTrue(
+            ["On", "On, unavailable"].contains(toggle.value as? String),
+            "Expected the Foundation Model toggle to default on for Marina V2."
+        )
+
+        toggle.tap()
+        XCTAssertEqual(toggle.value as? String, "Off")
+    }
+
+    func testMarinaFoundationModelToggle_canLaunchExplicitlyOptedOut() throws {
+        let app = XCUIApplication()
+        let driver = MarinaUITestDriver(app: app, testCase: self)
+
+        driver.launchHarness(aiOptIn: false)
+
+        let toggle = driver.foundationModelToggle()
+        XCTAssertTrue(toggle.waitForExistence(timeout: 5), "Expected the Marina Foundation Model toggle to be visible.")
         XCTAssertEqual(toggle.value as? String, "Off")
 
         toggle.tap()

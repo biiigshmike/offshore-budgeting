@@ -260,6 +260,15 @@ struct MarinaQueryCapabilityMatrix {
             requestedDetails: [nil, .general],
             preferredExecutorRoute: .workspaceAggregation
         ),
+        .incomePlannedVsActual: RouteCapabilityRecord(
+            kind: .incomePlannedVsActual,
+            operations: [.sum],
+            measures: [.income],
+            groupings: [nil],
+            targetTypes: [.incomeSource],
+            requestedDetails: [.status],
+            preferredExecutorRoute: .workspaceAggregation
+        ),
         .reconciliationBalance: RouteCapabilityRecord(
             kind: .reconciliationBalance,
             operations: [.sum, .rank, .listRows, .lookupDetails],

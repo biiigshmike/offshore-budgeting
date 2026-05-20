@@ -87,7 +87,7 @@ struct MarinaComposableWorkspaceQueryExecutor {
             }
         case .recentTransactionRows?:
             return .handled(recentFilteredTransactions(resolved: resolved, plan: plan, provider: provider, now: now, amountBasis: amountBasis))
-        case .databaseLookup?, .generic?, .broadSpend?, .savingsStatus?, .savingsActivity?, .savingsMovementRanking?, .reconciliationBalance?, nil:
+        case .databaseLookup?, .generic?, .broadSpend?, .savingsStatus?, .savingsActivity?, .savingsMovementRanking?, .incomePlannedVsActual?, .reconciliationBalance?, nil:
             break
         }
 
@@ -111,7 +111,7 @@ struct MarinaComposableWorkspaceQueryExecutor {
                 return .handled(settlementRows(resolved: resolved, plan: plan, provider: provider, now: now))
             case .recentTransactionRows:
                 return .handled(recentFilteredTransactions(resolved: resolved, plan: plan, provider: provider, now: now, amountBasis: amountBasis))
-            case .generic, .databaseLookup, .activeBudget, .budgetMembership, .budgetLinkedCards, .budgetLinkedPresets, .budgetCategoryLimits, .budgetCategoryLimit, .savingsStatus, .savingsActivity, .savingsMovementRanking, .reconciliationBalance, .broadSpend:
+            case .generic, .databaseLookup, .activeBudget, .budgetMembership, .budgetLinkedCards, .budgetLinkedPresets, .budgetCategoryLimits, .budgetCategoryLimit, .savingsStatus, .savingsActivity, .savingsMovementRanking, .incomePlannedVsActual, .reconciliationBalance, .broadSpend:
                 break
             }
         }
@@ -848,43 +848,19 @@ struct MarinaComposableWorkspaceQueryExecutor {
         provider: MarinaDataProvider,
         now: Date
     ) -> MarinaComposableWorkspaceQueryExecutionResult {
-        guard let amount = firstCurrencyAmount(in: candidate.rawPrompt),
-              let input = resolved.resolvedTargets.first(where: { $0.role == .simulationInput || $0.entityType == .category }) else {
+        guard let card = MarinaBudgetForecastScenarioSimulator(
+            calendar: calendar,
+            amountBasisAdapter: amountBasisAdapter
+        ).simulate(
+            candidate: candidate,
+            resolved: resolved,
+            plan: plan,
+            provider: provider,
+            now: now
+        ) else {
             return .unsupported
         }
-
-        let range = plan.dateRange ?? monthRange(containing: now)
-        let rows = spendingRows(provider: provider, range: range, amountBasis: .budgetImpact)
-        let totalBefore = rows.reduce(0.0) { $0 + $1.amount }
-        let categoryBefore = rows.filter { matches(row: $0, target: input) }.reduce(0.0) { $0 + $1.amount }
-        let budget = activeBudget(provider: provider, now: now, range: range)
-        let plannedIncome = provider.fetchAllIncomes()
-            .filter { $0.isPlanned && contains($0.date, in: range) }
-            .reduce(0.0) { $0 + $1.amount }
-        let budgetLimit = categoryLimit(for: input, budget: budget)
-        let categoryAfter = categoryBefore + amount
-        let totalAfter = totalBefore + amount
-
-        var answerRows: [MarinaWorkspaceAggregationCard.Row] = [
-            .init(label: "Category after", value: currency(categoryAfter), amount: categoryAfter, sortValue: categoryAfter),
-            .init(label: "Workspace spend after", value: currency(totalAfter), amount: totalAfter, sortValue: totalAfter)
-        ]
-        if plannedIncome > 0 {
-            answerRows.append(.init(label: "Remaining vs planned income", value: currency(plannedIncome - totalAfter), amount: plannedIncome - totalAfter, sortValue: plannedIncome - totalAfter))
-        }
-        if let budgetLimit, let maxAmount = budgetLimit.maxAmount {
-            answerRows.append(.init(label: "Category limit", value: "\(currency(maxAmount)) (\(categoryAfter > maxAmount ? "over" : "under"))", amount: maxAmount, sortValue: maxAmount))
-        }
-
-        return .handled(
-            MarinaWorkspaceAggregationCard(
-                title: "What-If Budget Impact",
-                subtitle: "Add \(currency(amount)) to \(input.displayName)",
-                primaryValue: currency(totalAfter - totalBefore),
-                rows: answerRows,
-                traceSummary: "composableWorkspace=simulation,amount=\(amount),target=\(input.displayName)"
-            )
-        )
+        return .handled(card)
     }
 
     // MARK: - Rows

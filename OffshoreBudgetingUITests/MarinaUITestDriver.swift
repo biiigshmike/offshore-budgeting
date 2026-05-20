@@ -14,17 +14,30 @@ struct MarinaUITestDriver {
             .appendingPathComponent("marina-ui-trace-\(UUID().uuidString).jsonl")
     }
 
-    func launchHarness() {
+    func launchHarness(
+        fakeAI: Bool = true,
+        aiOptIn: Bool? = nil
+    ) {
         try? FileManager.default.removeItem(at: traceOutputURL)
         app.launchArguments = [
             "-uiTesting",
             "-uiTestingReset",
             "-uiTestingMarinaHarness"
         ]
-        app.launchEnvironment = [
+        if aiOptIn == false {
+            app.launchArguments.append("-uiTestingMarinaAIOptOutDefault")
+        }
+        var environment = [
             "MARINA_UI_TRACE_OUTPUT_PATH": traceOutputURL.path,
             "MARINA_UI_FIXED_NOW_ISO8601": "2026-05-15T12:00:00Z"
         ]
+        if fakeAI {
+            environment["MARINA_UI_FAKE_AI_INTERPRETER"] = "1"
+        }
+        if let aiOptIn, aiOptIn {
+            environment["marina_ai_opt_in_enabled"] = aiOptIn ? "1" : "0"
+        }
+        app.launchEnvironment = environment
         app.launch()
 
         if promptField().waitForExistence(timeout: 8) == false {
@@ -330,10 +343,9 @@ struct MarinaUITestDriver {
         timeout: TimeInterval
     ) -> MarinaTraceSnapshot? {
         let deadline = Date().addingTimeInterval(timeout)
-        var latest: MarinaTraceSnapshot?
+        var latestNewTrace: MarinaTraceSnapshot?
         while Date() < deadline {
             let traces = readTraceLines()
-            latest = traces.last
             if traces.count > previousTraceCount {
                 let newTraces = traces.dropFirst(previousTraceCount)
                 if let matching = newTraces.last(where: {
@@ -341,16 +353,19 @@ struct MarinaUITestDriver {
                 }) {
                     return matching
                 }
-                latest = newTraces.last ?? latest
+                latestNewTrace = newTraces.last ?? latestNewTrace
             }
             RunLoop.current.run(until: Date().addingTimeInterval(0.2))
         }
 
         let traceElement = app.staticTexts["marina.trace.latest"].firstMatch
         if traceElement.exists {
-            return MarinaTraceSnapshot(accessibilityValue: traceElement.value as? String ?? "")
+            let fallback = MarinaTraceSnapshot(accessibilityValue: traceElement.value as? String ?? "")
+            if fallback.originalPrompt == prompt || fallback.originalPrompt.localizedCaseInsensitiveContains(prompt) {
+                return fallback
+            }
         }
-        return latest
+        return latestNewTrace
     }
 
     private func waitForNewTrace(

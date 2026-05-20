@@ -46,17 +46,19 @@ enum DebugFeatureFlagResolver {
     static func resolve(
         key: String,
         fallback: Bool,
+        environmentKey: String? = nil,
         defaults: UserDefaults = .standard,
         arguments: [String] = ProcessInfo.processInfo.arguments,
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) -> ResolvedFlag {
-        let environmentValueWasPresent = environment[key] != nil
+        let effectiveEnvironmentKey = environmentKey ?? key
+        let environmentValueWasPresent = environment[effectiveEnvironmentKey] != nil
         let argumentValue = valueForArgument(key: key, arguments: arguments)
         let argumentValueWasPresent = argumentValue != nil
         let storedValue = defaults.object(forKey: key)
         let userDefaultsValueWasPresent = storedValue != nil
 
-        if let environmentValue = environment[key],
+        if let environmentValue = environment[effectiveEnvironmentKey],
            let parsed = parseBool(environmentValue) {
             return ResolvedFlag(
                 key: key,
