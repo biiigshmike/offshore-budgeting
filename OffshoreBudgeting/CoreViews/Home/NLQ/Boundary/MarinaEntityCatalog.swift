@@ -94,6 +94,7 @@ struct MarinaEntityDescriptor: Codable, Equatable, Identifiable, Sendable {
     let id: String
     let entityName: String
     let displayName: String
+    let evidenceRowType: String
     let kind: MarinaEntityKind
     let lookupObjectType: MarinaLookupObjectType?
     let fields: [MarinaFieldDescriptor]
@@ -142,6 +143,7 @@ struct MarinaEntityDescriptor: Codable, Equatable, Identifiable, Sendable {
         lookupObjectType: MarinaLookupObjectType? = nil,
         displayFields: [String],
         searchableFields: [String]? = nil,
+        evidenceRowType: String? = nil,
         amountFields: [String] = [],
         derivedAmountFields: [String] = [],
         dateFields: [String] = [],
@@ -160,6 +162,7 @@ struct MarinaEntityDescriptor: Codable, Equatable, Identifiable, Sendable {
         self.id = entityName
         self.entityName = entityName
         self.displayName = displayName ?? entityName
+        self.evidenceRowType = evidenceRowType ?? entityName
         self.kind = kind
         self.lookupObjectType = lookupObjectType
 
@@ -180,16 +183,40 @@ struct MarinaEntityDescriptor: Codable, Equatable, Identifiable, Sendable {
         self.canBeTargetFilter = canBeTargetFilter
         self.canBeRelationshipFilter = canBeRelationshipFilter
         self.contributesToDerivedMetrics = contributesToDerivedMetrics
+        let supported = Self.universalSupportedOperations(
+            kind: kind,
+            isQueryable: isQueryable,
+            supportedOperations: supportedOperations
+        )
         self.operations =
-            supportedOperations.map { MarinaOperationDescriptor($0, support: .supported) }
+            supported.map { MarinaOperationDescriptor($0, support: .supported) }
             + missingOperations.map { MarinaOperationDescriptor($0, support: .missing) }
             + unsupportedOperations.map { MarinaOperationDescriptor($0, support: .unsupported) }
+    }
+
+    private static func universalSupportedOperations(
+        kind: MarinaEntityKind,
+        isQueryable: Bool,
+        supportedOperations: [String]
+    ) -> [String] {
+        var values = supportedOperations
+        if kind == .persistentModel, isQueryable {
+            values.append(contentsOf: ["lookupDetails", "list", "count", "filter"])
+        }
+        var seen: Set<String> = []
+        return values.filter { value in
+            let key = value.lowercased()
+            guard seen.contains(key) == false else { return false }
+            seen.insert(key)
+            return true
+        }
     }
 
     func capabilityRecord() -> MarinaEntityCapabilityRecord {
         MarinaEntityCapabilityRecord(
             id: entityName,
             entityName: entityName,
+            evidenceRowType: evidenceRowType,
             displayFields: displayFields,
             amountFields: amountFields,
             dateFields: dateFields,
@@ -256,8 +283,8 @@ struct MarinaEntityCatalog: Codable, Equatable, Sendable {
             descriptor("Budget", lookup: .budget, display: ["name"], dates: ["startDate", "endDate"], scope: "workspace", relationships: ["cardLinks", "presetLinks", "categoryLimits"], searchable: true, queryable: true, aggregatable: false, target: true, relationship: true, derived: true, supported: ["lookupDetails", "linkedObjectSummary", "derivedSpendSummary"], missing: ["remainingAvailable", "plannedActualProjected"], unsupported: ["directAmountAggregation"]),
             descriptor("BudgetCategoryLimit", display: ["category.name"], amounts: ["minAmount", "maxAmount"], scope: "budget.workspace/category.workspace", relationships: ["budget", "category"], searchable: false, queryable: true, aggregatable: false, target: false, relationship: true, derived: true, supported: ["linkedObjectSummary"], missing: ["remainingAvailable"], unsupported: ["spendAggregation"]),
             descriptor("Card", lookup: .card, display: ["name", "theme", "effect"], scope: "workspace", relationships: ["budgetLinks", "plannedExpenses", "variableExpenses", "income", "preset defaults"], searchable: true, queryable: true, aggregatable: false, target: true, relationship: true, derived: true, supported: ["lookupDetails", "total", "average", "compare", "rank", "filter"], missing: ["balanceStatus"], unsupported: ["directAmountAggregation"]),
-            descriptor("BudgetCardLink", display: ["budget.name", "card.name"], scope: "budget.workspace/card.workspace", relationships: ["budget", "card"], searchable: false, queryable: false, aggregatable: false, target: false, relationship: true, derived: true, supported: ["linkedObjectSummary"], missing: [], unsupported: ["standaloneLookup", "aggregation"]),
-            descriptor("BudgetPresetLink", display: ["budget.name", "preset.title"], scope: "budget.workspace/preset.workspace", relationships: ["budget", "preset"], searchable: false, queryable: false, aggregatable: false, target: false, relationship: true, derived: true, supported: ["linkedObjectSummary"], missing: [], unsupported: ["standaloneLookup", "aggregation"]),
+            descriptor("BudgetCardLink", display: ["budget.name", "card.name"], scope: "budget.workspace/card.workspace", relationships: ["budget", "card"], searchable: false, queryable: true, aggregatable: false, target: false, relationship: true, derived: true, supported: ["linkedObjectSummary"], missing: [], unsupported: ["aggregation"]),
+            descriptor("BudgetPresetLink", display: ["budget.name", "preset.title"], scope: "budget.workspace/preset.workspace", relationships: ["budget", "preset"], searchable: false, queryable: true, aggregatable: false, target: false, relationship: true, derived: true, supported: ["linkedObjectSummary"], missing: [], unsupported: ["aggregation"]),
             descriptor("Category", lookup: .category, display: ["name", "hexColor"], scope: "workspace", relationships: ["expenses", "presets", "limits", "importRules"], searchable: true, queryable: true, aggregatable: false, target: true, relationship: true, derived: true, supported: ["lookupDetails", "total", "average", "compare", "rank", "share", "filter"], missing: ["remainingAvailable"], unsupported: ["directAmountAggregation"]),
             descriptor("Preset", lookup: .preset, display: ["title"], amounts: ["plannedAmount"], dates: ["schedule fields", "archivedAt"], scope: "workspace", relationships: ["defaultCard", "defaultCategory", "budgetLinks"], searchable: true, queryable: true, aggregatable: false, target: true, relationship: true, derived: true, supported: ["lookupDetails", "rank", "plannedSummary"], missing: ["nextOccurrence"], unsupported: ["actualSpendWithoutMaterializedRows"]),
             descriptor("PlannedExpense", lookup: .plannedExpense, display: ["title"], amounts: ["plannedAmount", "actualAmount"], derivedAmounts: ["effectiveAmount"], dates: ["expenseDate"], scope: "workspace", relationships: ["card", "category", "allocation", "settlement", "savingsLedgerEntry"], searchable: true, queryable: true, aggregatable: true, target: true, relationship: true, derived: true, supported: ["lookupDetails", "listRows", "rank", "plannedAggregation"], missing: ["nextLatestPrevious"], unsupported: ["actualAmountZeroAsActualZero"]),

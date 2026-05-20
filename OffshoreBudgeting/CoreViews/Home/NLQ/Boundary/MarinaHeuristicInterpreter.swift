@@ -419,7 +419,6 @@ struct MarinaHeuristicInterpreter {
             return true
         }
         if normalizedTarget.isEmpty == false,
-           normalizedTarget.split(separator: " ").count > 1,
            normalizedPrompt.contains(" at \(normalizedTarget)")
             || normalizedPrompt.contains(" from \(normalizedTarget)") {
             return true
@@ -710,6 +709,16 @@ struct MarinaHeuristicInterpreter {
 
     private func protectedShape(from intent: NormalizedQueryIntent) -> ProtectedShape? {
         let prompt = normalized(intent.rawPrompt)
+
+        if isPlannedVsActualIncomePrompt(prompt) {
+            return ProtectedShape(
+                operation: .sum,
+                measure: .income,
+                entityMentions: [],
+                timeScopes: baseTimeScopes(from: intent, defaultPeriodUnit: .month),
+                responseShapeHint: .comparison
+            )
+        }
 
         if isSemanticWorkspacePrompt(prompt) {
             let shape = semanticWorkspaceProtectedShape(for: prompt)
@@ -1195,6 +1204,11 @@ struct MarinaHeuristicInterpreter {
             && prompt.contains("end of the period")
     }
 
+    private func isPlannedVsActualIncomePrompt(_ prompt: String) -> Bool {
+        (prompt.contains("planned vs actual") || prompt.contains("actual vs planned"))
+            && prompt.contains("income")
+    }
+
     private func isSemanticWorkspacePrompt(_ prompt: String) -> Bool {
         [
             "mar 2026 vs mar 2025",
@@ -1648,11 +1662,17 @@ struct MarinaHeuristicInterpreter {
     }
 
     private func isBreakdownPrompt(_ prompt: String) -> Bool {
-        prompt.contains("by category")
+        guard prompt.contains("planned expense") == false,
+              prompt.contains("planned expenses") == false,
+              prompt.contains("preset") == false,
+              prompt.contains("bill") == false else {
+            return false
+        }
+        return prompt.contains("category breakdown")
+            || (prompt.contains("breakdown") && prompt.contains("category"))
             || prompt.contains("down by category")
-            || prompt.contains("category breakdown")
-            || (prompt.contains("break down") && prompt.contains("by category"))
-            || (prompt.contains("break down") && prompt.contains("where my money went"))
+            || (prompt.contains("break down") && (prompt.contains("by category") || prompt.contains("where my money went")))
+            || ((prompt.contains("spend") || prompt.contains("spending") || prompt.contains("spent")) && prompt.contains("by category"))
     }
 
     private func isBroadCategoryRankingPrompt(_ prompt: String) -> Bool {

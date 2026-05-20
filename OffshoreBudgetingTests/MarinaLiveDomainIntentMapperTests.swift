@@ -64,6 +64,15 @@ struct MarinaLiveDomainIntentMapperTests {
         #expect(merchantSpend.routeKeySummary == "spendTotal")
         #expect(command(merchantSpend)?.includeFilters.first?.rawText == "Apple")
         #expect(command(merchantSpend)?.includeFilters.first?.allowedTypes == [.merchant])
+
+        let topOne = mapper.map(
+            payload: payload(route: "readQuery", intent: "topCategories", target: "categories", date: "this month"),
+            prompt: "What is my top 1 category this month?",
+            context: context
+        )
+        #expect(topOne.canonicalRouteSummary == "spending.topCategories")
+        #expect(command(topOne)?.limit == 1)
+        #expect(command(topOne)?.grouping == .category)
     }
 
     @Test func mapper_detectsRelationshipGrammarWithoutPhraseOrderDependency() {

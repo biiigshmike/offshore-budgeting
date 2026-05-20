@@ -112,6 +112,59 @@ struct MarinaReadRequestShapeDetector {
             )
         }
 
+        if isRecentTransactionList(normalizedPrompt) {
+            let limit = explicitLimit(in: normalizedPrompt) ?? 5
+            return MarinaQueryPlanCandidate(
+                source: .heuristic,
+                rawPrompt: prompt,
+                operation: .listRows,
+                measure: .transactionAmount,
+                timeScopes: dateScopes(prompt: prompt, defaultPeriodUnit: defaultPeriodUnit),
+                grouping: MarinaGroupingCandidate(dimension: .transaction),
+                ranking: MarinaRankingCandidate(direction: .newest, limit: limit),
+                limit: limit,
+                responseShapeHint: .rankedList,
+                confidence: .high,
+                requestShape: .ledgerRowList
+            )
+        }
+
+        if isCategoryBreakdown(normalizedPrompt) {
+            return MarinaQueryPlanCandidate(
+                source: .heuristic,
+                rawPrompt: prompt,
+                operation: .rank,
+                measure: .spend,
+                timeScopes: dateScopes(prompt: prompt, defaultPeriodUnit: defaultPeriodUnit),
+                grouping: MarinaGroupingCandidate(dimension: .category),
+                ranking: MarinaRankingCandidate(direction: .top, limit: explicitLimit(in: normalizedPrompt) ?? 10),
+                limit: explicitLimit(in: normalizedPrompt) ?? 10,
+                responseShapeHint: .groupedBreakdown,
+                confidence: .high
+            )
+        }
+
+        if let categoryName = dateScopedBareCategoryStatusTarget(in: normalizedPrompt),
+           dateScopes(prompt: prompt, defaultPeriodUnit: defaultPeriodUnit).isEmpty == false {
+            return MarinaQueryPlanCandidate(
+                source: .heuristic,
+                rawPrompt: prompt,
+                operation: .lookupDetails,
+                measure: .remainingBudget,
+                entityMentions: [
+                    MarinaUnresolvedEntityMention(
+                        role: .primaryTarget,
+                        rawText: categoryName,
+                        typeHint: .category,
+                        confidence: .medium
+                    )
+                ],
+                timeScopes: dateScopes(prompt: prompt, defaultPeriodUnit: defaultPeriodUnit),
+                responseShapeHint: .summaryCard,
+                confidence: .medium
+            )
+        }
+
         if isIncomeRowList(normalizedPrompt) {
             return MarinaQueryPlanCandidate(
                 source: .heuristic,
@@ -529,6 +582,53 @@ struct MarinaReadRequestShapeDetector {
             return nil
         }
         return target
+    }
+
+    private func isRecentTransactionList(_ prompt: String) -> Bool {
+        (prompt.hasPrefix("list ") || prompt.hasPrefix("show "))
+            && (prompt.contains("recent") || prompt.contains("latest") || prompt.contains("newest") || prompt.contains("last "))
+            && (prompt.contains("transaction") || prompt.contains("transactions") || prompt.contains("purchase") || prompt.contains("purchases"))
+    }
+
+    private func isCategoryBreakdown(_ prompt: String) -> Bool {
+        guard prompt.contains("planned expense") == false,
+              prompt.contains("planned expenses") == false,
+              prompt.contains("preset") == false,
+              prompt.contains("bill") == false else {
+            return false
+        }
+        return prompt.contains("category breakdown")
+            || (prompt.contains("breakdown") && prompt.contains("category"))
+            || prompt.contains("down by category")
+            || (prompt.contains("break down") && (prompt.contains("category") || prompt.contains("money went")))
+            || ((prompt.contains("spend") || prompt.contains("spending") || prompt.contains("spent")) && prompt.contains("by category"))
+    }
+
+    private func dateScopedBareCategoryStatusTarget(in prompt: String) -> String? {
+        guard (prompt.hasPrefix("show ") || prompt.hasPrefix("show my ")),
+              prompt.contains("this ") || prompt.contains("last ") || prompt.contains("today") || prompt.contains("yesterday") else {
+            return nil
+        }
+        guard prompt.contains("spend") == false,
+              prompt.contains("spent") == false,
+              prompt.contains("transaction") == false,
+              prompt.contains("purchase") == false,
+              prompt.contains("expense") == false,
+              prompt.contains("split") == false,
+              prompt.contains("allocation") == false,
+              prompt.contains("reconciliation") == false,
+              prompt.contains("income") == false,
+              prompt.contains("savings") == false,
+              prompt.contains("budget") == false else {
+            return nil
+        }
+        return firstCapture(
+            in: prompt,
+            patterns: [
+                #"\bshow\s+(?:my\s+)?(.+?)\s+(?:this|last|current|previous)\s+(?:month|week|year)\b"#,
+                #"\bshow\s+(?:my\s+)?(.+?)\s+(?:today|yesterday)\b"#
+            ]
+        ).map(cleanObjectName)
     }
 
     private func isIncomeRowList(_ prompt: String) -> Bool {

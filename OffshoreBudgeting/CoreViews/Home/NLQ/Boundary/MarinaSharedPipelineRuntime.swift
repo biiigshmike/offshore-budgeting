@@ -52,6 +52,7 @@ enum MarinaInterpreterSelectionReason: String, Codable, Equatable {
     case modelConcurrentRequest
     case modelUnsupportedHeuristicExactMatch
     case modelClarificationHeuristicExactMatch
+    case universalPreflight
     case clarificationResume
 }
 

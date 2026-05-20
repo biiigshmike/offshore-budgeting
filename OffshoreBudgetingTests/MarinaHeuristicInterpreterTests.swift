@@ -306,7 +306,7 @@ struct MarinaHeuristicInterpreterTests {
         }
     }
 
-    @Test func heuristic_shortNamedSpendTargetDoesNotForceMerchantHint() {
+    @Test func heuristic_shortNamedSpendTargetUsesMerchantCueForPayeePreposition() {
         let candidate = MarinaHeuristicInterpreter().interpret(
             prompt: "What did I spend at Apple?",
             defaultPeriodUnit: .month
@@ -316,7 +316,7 @@ struct MarinaHeuristicInterpreterTests {
         #expect(candidate.operation == .sum)
         #expect(candidate.measure == .spend)
         #expect(candidate.entityMentions.first?.rawText?.localizedCaseInsensitiveContains("Apple") == true)
-        #expect(candidate.entityMentions.first?.typeHint == nil)
+        #expect(candidate.entityMentions.first?.typeHint == .merchant)
     }
 
     @Test func heuristic_explicitMerchantSpendTargetKeepsMerchantHint() {

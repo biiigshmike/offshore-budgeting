@@ -87,11 +87,13 @@ struct MarinaAggregationResultMapper {
                 )
             )
         case .list:
+            let title = listTitle(answer: answer, executablePlan: executablePlan)
+            let sourceAnswer = title == answer.title ? answer : answerWithTitle(answer, title)
             let result = MarinaListAggregationResult(
-                title: answer.title,
+                title: title,
                 primaryRenderedValue: answer.primaryValue,
                 rows: rows(from: answer.rows),
-                sourceAnswer: answer
+                sourceAnswer: sourceAnswer
             )
             return executablePlan.aggregationPlan.responseShape == .groupedBreakdown
                 ? .groupedBreakdown(result)
@@ -144,5 +146,32 @@ struct MarinaAggregationResultMapper {
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard let value = Double(cleaned) else { return nil }
         return value / 100
+    }
+
+    private func listTitle(
+        answer: HomeAnswer,
+        executablePlan: MarinaExecutableAggregationPlan
+    ) -> String {
+        if executablePlan.aggregationPlan.responseShape == .groupedBreakdown,
+           executablePlan.aggregationPlan.grouping?.dimension == .category {
+            return "Spending by Category"
+        }
+        return answer.title
+    }
+
+    private func answerWithTitle(_ answer: HomeAnswer, _ title: String) -> HomeAnswer {
+        HomeAnswer(
+            id: answer.id,
+            queryID: answer.queryID,
+            kind: answer.kind,
+            userPrompt: answer.userPrompt,
+            title: title,
+            subtitle: answer.subtitle,
+            primaryValue: answer.primaryValue,
+            rows: answer.rows,
+            attachment: answer.attachment,
+            explanation: answer.explanation,
+            generatedAt: answer.generatedAt
+        )
     }
 }

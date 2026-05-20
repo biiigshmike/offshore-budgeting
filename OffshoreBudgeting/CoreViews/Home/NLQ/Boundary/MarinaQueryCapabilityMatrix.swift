@@ -46,6 +46,7 @@ struct MarinaEntityQuestionCapabilities: Codable, Equatable, Sendable {
 struct MarinaEntityCapabilityRecord: Codable, Equatable, Identifiable, Sendable {
     let id: String
     let entityName: String
+    let evidenceRowType: String
     let displayFields: [String]
     let amountFields: [String]
     let dateFields: [String]

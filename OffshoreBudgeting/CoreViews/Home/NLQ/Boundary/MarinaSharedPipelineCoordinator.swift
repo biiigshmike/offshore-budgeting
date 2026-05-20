@@ -89,6 +89,24 @@ struct MarinaSharedPipelineCoordinator {
             fallbackReason: nil
         )
 
+        if let universalEvaluation = universalPreflightEvaluation(
+            prompt: normalization.originalText,
+            provider: context.provider,
+            now: context.now,
+            defaultPeriodUnit: context.defaultPeriodUnit
+        ) {
+            selection.selectedInterpreter = .heuristic
+            selection.interpreterSelectionReason = .universalPreflight
+            selection.heuristicAttempted = true
+            return runtimeResult(
+                evaluation: universalEvaluation,
+                context: context,
+                modelAvailabilitySummary: modelAvailabilitySummary,
+                selection: selection,
+                disagreementSummary: nil
+            )
+        }
+
         if aiRouteEligible {
             selection.modelAttempted = true
             do {
@@ -741,6 +759,18 @@ struct MarinaSharedPipelineCoordinator {
             now: now,
             defaultPeriodUnit: defaultPeriodUnit
         )
+
+        if let universalEvaluation = executeUniversalQueryIfNeeded(
+            candidate: candidate,
+            resolved: resolved,
+            provider: provider,
+            now: now,
+            defaultPeriodUnit: defaultPeriodUnit,
+            interpretationResult: interpretation.result
+        ) {
+            return universalEvaluation
+        }
+
         let semanticResolved: MarinaResolvedSemanticQuery?
         let outcome: MarinaPlanValidationOutcome
 
@@ -1019,6 +1049,231 @@ struct MarinaSharedPipelineCoordinator {
             result: semanticAdapter.interpretationResult(from: repaired),
             compatibilityCandidate: repaired
         )
+    }
+
+    private func executeUniversalQueryIfNeeded(
+        candidate: MarinaQueryPlanCandidate,
+        resolved: MarinaResolvedQueryCandidate,
+        provider: MarinaDataProvider,
+        now: Date,
+        defaultPeriodUnit: HomeQueryPeriodUnit,
+        interpretationResult: MarinaInterpretationResult
+    ) -> CandidateEvaluation? {
+        guard let query = MarinaUniversalQueryDetector().detect(
+            prompt: candidate.rawPrompt,
+            candidate: candidate,
+            provider: provider,
+            now: now,
+            defaultPeriodUnit: defaultPeriodUnit
+        ) else {
+            return nil
+        }
+
+        return executeUniversalQuery(
+            query,
+            candidate: candidate,
+            resolved: resolved,
+            provider: provider,
+            interpretationResult: interpretationResult
+        )
+    }
+
+    private func universalPreflightEvaluation(
+        prompt: String,
+        provider: MarinaDataProvider,
+        now: Date,
+        defaultPeriodUnit: HomeQueryPeriodUnit
+    ) -> CandidateEvaluation? {
+        let seedCandidate = MarinaQueryPlanCandidate(
+            requestFamily: .databaseLookup,
+            source: .heuristic,
+            rawPrompt: prompt
+        )
+        guard let query = MarinaUniversalQueryDetector().detect(
+            prompt: prompt,
+            candidate: seedCandidate,
+            provider: provider,
+            now: now,
+            defaultPeriodUnit: defaultPeriodUnit
+        ) else {
+            return nil
+        }
+
+        let candidate = MarinaQueryPlanCandidate(
+            requestFamily: .databaseLookup,
+            source: .heuristic,
+            rawPrompt: prompt,
+            operation: universalCandidateOperation(for: query.operation),
+            measure: universalCandidateMeasure(for: query.modelName),
+            ranking: query.ranking.map { MarinaRankingCandidate(direction: $0, limit: query.limit) },
+            limit: query.limit,
+            responseShapeHint: universalResponseShapeHint(for: query.presentationShape)
+        )
+        let resolved = resolver.resolve(
+            candidate: candidate,
+            provider: provider,
+            now: now,
+            defaultPeriodUnit: defaultPeriodUnit
+        )
+        return executeUniversalQuery(
+            query,
+            candidate: candidate,
+            resolved: resolved,
+            provider: provider,
+            interpretationResult: semanticAdapter.interpretationResult(from: candidate)
+        )
+    }
+
+    private func executeUniversalQuery(
+        _ query: MarinaUniversalQueryIR,
+        candidate: MarinaQueryPlanCandidate,
+        resolved: MarinaResolvedQueryCandidate,
+        provider: MarinaDataProvider,
+        interpretationResult: MarinaInterpretationResult
+    ) -> CandidateEvaluation {
+        switch MarinaUniversalQueryExecutor().execute(query, provider: provider) {
+        case .handled(let card):
+            let plan = universalCompatibilityPlan(from: query)
+            let outcome = MarinaPlanValidationOutcome.executable(plan)
+            let result = MarinaAggregationResult.workspaceCard(card)
+            let answer = MarinaResponseBuilder(
+                aggregationBridge: responseBridge,
+                workspaceBridge: workspaceAggregationResponseBridge
+            ).responseCompatibleAnswer(from: result)
+            return CandidateEvaluation(
+                candidate: candidate,
+                resolved: resolved,
+                validationOutcome: outcome,
+                aggregationResult: result,
+                answer: answer,
+                workspaceAggregationCard: card,
+                interpretationResult: interpretationResult,
+                amountBasis: .budgetImpact,
+                executionRoute: universalExecutionRoute(for: query.operation)
+            )
+        case .unsupported(let unsupported):
+            let outcome = MarinaPlanValidationOutcome.unsupported(unsupported)
+            return CandidateEvaluation(
+                candidate: candidate,
+                resolved: resolved,
+                validationOutcome: outcome,
+                blockedAnswer: MarinaResponseBuilder().responseCompatibleAnswer(from: outcome),
+                runtimeFallbackReason: .executorUnsupported,
+                interpretationResult: interpretationResult,
+                amountBasis: .budgetImpact,
+                executionRoute: .unsupported(.unsupportedCombination)
+            )
+        }
+    }
+
+    private func universalCompatibilityPlan(
+        from query: MarinaUniversalQueryIR
+    ) -> MarinaAggregationPlan {
+        MarinaAggregationPlan(
+            status: .notExecutableShell,
+            operation: universalCandidateOperation(for: query.operation),
+            measure: universalCandidateMeasure(for: query.modelName),
+            targets: [],
+            dateRange: query.dateRange,
+            comparisonDateRange: nil,
+            grouping: nil,
+            ranking: query.ranking.map { MarinaRankingCandidate(direction: $0, limit: query.limit) },
+            limit: query.limit,
+            incomeStatusScope: nil,
+            responseShape: universalResponseShapeHint(for: query.presentationShape)
+        )
+    }
+
+    private func universalCandidateOperation(
+        for operation: MarinaUniversalQueryOperation
+    ) -> MarinaCandidateOperation {
+        switch operation {
+        case .count:
+            return .count
+        case .list:
+            return .listRows
+        case .lookup, .detail:
+            return .lookupDetails
+        case .sum:
+            return .sum
+        case .average:
+            return .average
+        case .rank:
+            return .rank
+        case .groupBreakdown:
+            return .rank
+        case .compare:
+            return .compare
+        case .simulate:
+            return .simulate
+        }
+    }
+
+    private func universalCandidateMeasure(
+        for modelName: String
+    ) -> MarinaCandidateMeasure {
+        switch modelName {
+        case "Income", "IncomeSeries":
+            return .income
+        case "SavingsAccount":
+            return .savings
+        case "SavingsLedgerEntry":
+            return .savingsMovement
+        case "Budget", "BudgetCategoryLimit", "BudgetCardLink", "BudgetPresetLink":
+            return .remainingBudget
+        case "Preset", "PlannedExpense":
+            return .presetAmount
+        case "AllocationAccount", "ExpenseAllocation", "AllocationSettlement":
+            return .reconciliationBalance
+        default:
+            return .transactionFrequency
+        }
+    }
+
+    private func universalResponseShapeHint(
+        for shape: MarinaResponseShape
+    ) -> MarinaResponseShapeHint {
+        switch shape {
+        case .scalarCurrency:
+            return .scalarCurrency
+        case .summaryCard:
+            return .summaryCard
+        case .relationshipList:
+            return .relationshipList
+        case .membershipStatus:
+            return .membershipStatus
+        case .comparison:
+            return .comparison
+        case .rankedList:
+            return .rankedList
+        case .groupedBreakdown:
+            return .groupedBreakdown
+        case .chartRows:
+            return .chartRows
+        case .clarification:
+            return .clarification
+        case .unsupported:
+            return .unsupported
+        }
+    }
+
+    private func universalExecutionRoute(
+        for operation: MarinaUniversalQueryOperation
+    ) -> MarinaSemanticExecutionRoute {
+        switch operation {
+        case .lookup, .detail:
+            return .lookupDetail
+        case .list:
+            return .list
+        case .count, .sum, .average:
+            return .aggregate
+        case .rank, .groupBreakdown:
+            return .groupedRanked
+        case .compare:
+            return .comparison
+        case .simulate:
+            return .scenario
+        }
     }
 
     private func semanticMerchantSpendPlan(

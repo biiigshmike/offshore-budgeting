@@ -164,7 +164,26 @@ struct MarinaLiveDomainIntentMapper {
                 datePolicy: nil,
                 blockedWrongQuery: false
             )
-        case .readQuery, .lookup, .scenario:
+        case .lookup:
+            if let target = payload.targetText?.nilIfBlankForV2,
+               isInvalidEntityTarget(target) == false {
+                return mappedLookup(
+                    payload: payload,
+                    envelopeSummary: envelopeSummary,
+                    routeKey: nil,
+                    canonicalRoute: "generic.lookup",
+                    searchText: target,
+                    objectTypes: MarinaLookupObjectType.safeDefaultSearchTypes.map(\.rawValue),
+                    requestedDetail: "general"
+                )
+            }
+            return blocked(
+                prompt: prompt,
+                payload: payload,
+                envelopeSummary: envelopeSummary,
+                reason: "unmappedLookupRoute"
+            )
+        case .readQuery, .scenario:
             return blocked(
                 prompt: prompt,
                 payload: payload,
@@ -353,7 +372,7 @@ struct MarinaLiveDomainIntentMapper {
                 grouping: "savingsLedgerEntry",
                 ranking: "newest",
                 limit: 10,
-                responseDate: dateIntent(from: payload.dateText, prompt: prompt, context: context, defaultMode: .ambient)
+                responseDate: dateIntent(from: payload.dateText, prompt: prompt, context: context, defaultMode: .none)
             )
 
         case .savingsStatus:
@@ -425,7 +444,7 @@ struct MarinaLiveDomainIntentMapper {
                 measure: "transactionAmount",
                 grouping: "transaction",
                 ranking: "newest",
-                limit: 10,
+                limit: explicitLimit(in: normalizedPrompt) ?? 10,
                 responseDate: dateIntent(from: payload.dateText, prompt: prompt, context: context, defaultMode: .none)
             )
 
@@ -441,7 +460,7 @@ struct MarinaLiveDomainIntentMapper {
                 measure: "spend",
                 grouping: "category",
                 ranking: "largest",
-                limit: 5,
+                limit: explicitLimit(in: normalizedPrompt) ?? 5,
                 responseDate: dateIntent(from: payload.dateText, prompt: prompt, context: context, defaultMode: .ambient)
             )
 
@@ -453,7 +472,7 @@ struct MarinaLiveDomainIntentMapper {
                 routeKey: routeKey,
                 canonicalRoute: "spending.categoryBreakdown",
                 subject: "variableExpenses",
-                operation: "rank",
+                operation: "group",
                 measure: "spend",
                 grouping: "category",
                 ranking: "largest",
@@ -504,8 +523,10 @@ struct MarinaLiveDomainIntentMapper {
         let signal = routeSignal(payload: payload)
         let normalizedSignal = normalized(signal)
 
-        if containsAny(["workspace am i in", "current workspace", "which workspace", "what workspace"], in: normalizedPrompt)
-            || containsAny(["workspace", "workspacelookup"], in: normalizedSignal) {
+        let asksWorkspaceInventory = containsAny(["workspaces", "how many workspace", "count workspace", "list workspace", "show my workspace"], in: normalizedPrompt)
+        if asksWorkspaceInventory == false,
+           containsAny(["workspace am i in", "current workspace", "which workspace", "what workspace"], in: normalizedPrompt)
+            || (asksWorkspaceInventory == false && containsAny(["workspace", "workspacelookup"], in: normalizedSignal)) {
             return .workspaceLookup
         }
 
@@ -1091,6 +1112,13 @@ struct MarinaLiveDomainIntentMapper {
             return "more"
         }
         return nil
+    }
+
+    private func explicitLimit(in normalizedPrompt: String) -> Int? {
+        guard let range = normalizedPrompt.range(of: #"\b\d{1,2}\b"#, options: .regularExpression) else {
+            return nil
+        }
+        return Int(normalizedPrompt[range])
     }
 
     private func phraseAfter(_ delimiters: [String], in prompt: String) -> String? {

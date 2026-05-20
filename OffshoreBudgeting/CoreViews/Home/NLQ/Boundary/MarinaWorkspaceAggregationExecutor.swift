@@ -324,10 +324,13 @@ struct MarinaWorkspaceAggregationExecutor {
         provider: MarinaDataProvider,
         now: Date
     ) -> MarinaWorkspaceAggregationCard {
-        let range = plan.dateRange ?? monthRange(containing: now)
         let activityList = plan.operation == .listRows || plan.ranking?.direction == .newest
+        let range = plan.dateRange
         let rows = provider.fetchAllSavingsLedgerEntries()
-            .filter { $0.date >= range.startDate && $0.date <= range.endDate }
+            .filter { entry in
+                guard let range else { return true }
+                return entry.date >= range.startDate && entry.date <= range.endDate
+            }
             .sorted { lhs, rhs in
                 if activityList {
                     if lhs.date == rhs.date { return lhs.note.localizedCaseInsensitiveCompare(rhs.note) == .orderedAscending }
@@ -350,7 +353,7 @@ struct MarinaWorkspaceAggregationExecutor {
 
         return MarinaWorkspaceAggregationCard(
             title: activityList ? "Savings Activity" : "Largest Savings Movements",
-            subtitle: rangeLabel(range),
+            subtitle: range.map(rangeLabel) ?? "Recent activity",
             primaryValue: rows.first?.value,
             rows: Array(rows),
             traceSummary: "workspaceAggregation=largestSavingsMovements,resultCount=\(rows.count)"
@@ -450,7 +453,7 @@ struct MarinaWorkspaceAggregationExecutor {
     }
 
     private func incomeSummaryTitle(for plan: MarinaAggregationPlan) -> String {
-        if plan.routeIntent?.kind == .incomePlannedVsActual {
+        if plan.routeIntent?.kind == .incomePlannedVsActual || plan.responseShape == .comparison {
             return "Planned vs Actual Income"
         }
         switch plan.incomeStatusScope {

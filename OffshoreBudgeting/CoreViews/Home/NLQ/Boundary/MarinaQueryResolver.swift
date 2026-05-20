@@ -373,7 +373,6 @@ struct MarinaQueryResolver {
         let hasOnlyCategoryExactMatch = Set(storedExactMatches.map(\.entityType)) == [.category]
         let shouldPreferExplicitMerchant = isExplicitMerchantCue
             && exactEntityTypes.contains(.merchant)
-            && exactEntityTypes.contains(.card) == false
         let hasMerchantPrefixCollision = matchEntityTypes.contains(.merchant)
             && exactEntityTypes.contains(.merchant) == false
         let hasStoredObjectPrefixCollision = matchEntityTypes.contains { type in
