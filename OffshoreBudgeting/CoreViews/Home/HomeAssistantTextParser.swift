@@ -664,6 +664,11 @@ struct HomeAssistantTextParser {
         let incomeKeywords = ["income", "source", "paycheck", "salary"]
         let cardKeywords = ["card", "cards"]
 
+        if containsAny(text, keywords: categoryKeywords)
+            && containsAny(text, keywords: ["share", "split", "portion", "percent", "percentage"]) {
+            return true
+        }
+
         let explicitCategoryShare = containsAny(text, keywords: categoryKeywords)
             && containsAny(text, keywords: spendKeywords)
             && containsAny(text, keywords: shareKeywords)
@@ -705,7 +710,7 @@ struct HomeAssistantTextParser {
     private func matchesPresetTopCategoryIntent(in text: String) -> Bool {
         let presetKeywords = ["preset", "presets", "recurring", "autopay", "auto pay"]
         let categoryKeywords = ["category", "categories"]
-        let assignmentKeywords = ["assigned", "most presets", "most preset", "most recurring", "most recurring charges", "most autopay"]
+        let assignmentKeywords = ["assigned", "top", "best", "biggest", "largest", "most presets", "most preset", "most recurring", "most recurring charges", "most autopay"]
 
         return containsAny(text, keywords: presetKeywords)
             && containsAny(text, keywords: categoryKeywords)
@@ -732,6 +737,11 @@ struct HomeAssistantTextParser {
         let reductionKeywords = ["reduce", "cut", "lower", "decrease"]
         let savingsKeywords = ["savings", "save", "potential savings"]
 
+        if containsAny(text, keywords: categoryKeywords)
+            && text.contains("potential savings") {
+            return true
+        }
+
         return containsAny(text, keywords: categoryKeywords)
             && containsAny(text, keywords: reductionKeywords)
             && containsAny(text, keywords: savingsKeywords)
@@ -739,9 +749,15 @@ struct HomeAssistantTextParser {
 
     private func matchesCategoryReallocationIntent(in text: String) -> Bool {
         let categoryKeywords = ["category", "categories", "this category", "other categories", "groceries", "shopping", "dining", "transportation", "utilities", "rent", "travel", "entertainment"]
-        let allocationKeywords = ["realistically spend", "what could i spend", "what can i spend", "other categories", "reallocate", "allocation", "rebalance", "redistribute"]
+        let allocationKeywords = ["realistically spend", "what could i spend", "what can i spend", "other categories", "reallocate", "reallocation", "allocation", "rebalance", "redistribute"]
         let spendKeywords = ["spend", "spending"]
         let reductionKeywords = ["reduce", "cut", "lower", "decrease"]
+
+        if containsAny(text, keywords: categoryKeywords)
+            && containsAny(text, keywords: ["reallocation", "reallocate", "rebalance", "redistribute"])
+            && containsAny(text, keywords: ["guidance", "advice", "recommendation", "suggestion"]) {
+            return true
+        }
 
         return containsAny(text, keywords: categoryKeywords)
             && containsAny(text, keywords: allocationKeywords)

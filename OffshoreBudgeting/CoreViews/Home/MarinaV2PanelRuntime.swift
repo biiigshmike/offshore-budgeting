@@ -36,6 +36,14 @@ struct MarinaV2PanelRuntime {
         )
     }
 
+    func run(query: HomeQuery, sourceTitle: String) async -> MarinaV2TurnResult {
+        await coordinator.run(
+            query: query,
+            sourceTitle: sourceTitle,
+            context: turnContext
+        )
+    }
+
     func resume(
         clarification: MarinaTypedClarification,
         choice: MarinaClarificationChoice

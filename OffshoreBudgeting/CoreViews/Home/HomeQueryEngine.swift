@@ -313,60 +313,7 @@ struct HomeQueryEngine {
     // MARK: - Suggestions
 
     func defaultSuggestions() -> [HomeAssistantSuggestion] {
-        [
-            HomeAssistantSuggestion(
-                title: "How am I doing this month?",
-                query: HomeQuery(intent: .periodOverview)
-            ),
-            HomeAssistantSuggestion(
-                title: "Spend this month",
-                query: HomeQuery(intent: .spendThisMonth)
-            ),
-            HomeAssistantSuggestion(
-                title: "Top categories this month",
-                query: HomeQuery(intent: .topCategoriesThisMonth)
-            ),
-            HomeAssistantSuggestion(
-                title: "Compare with last month",
-                query: HomeQuery(intent: .compareThisMonthToPreviousMonth)
-            ),
-            HomeAssistantSuggestion(
-                title: "Safe spend today",
-                query: HomeQuery(intent: .safeSpendToday)
-            ),
-            HomeAssistantSuggestion(
-                title: "Next planned expense",
-                query: HomeQuery(intent: .nextPlannedExpense)
-            ),
-            HomeAssistantSuggestion(
-                title: "Top merchants this month",
-                query: HomeQuery(intent: .topMerchantsThisMonth)
-            ),
-            HomeAssistantSuggestion(
-                title: "Largest recent expenses",
-                query: HomeQuery(intent: .largestRecentTransactions)
-            ),
-            HomeAssistantSuggestion(
-                title: "Variable spending habits by card",
-                query: HomeQuery(intent: .cardVariableSpendingHabits)
-            ),
-            HomeAssistantSuggestion(
-                title: "Average actual income this year",
-                query: HomeQuery(intent: .incomeAverageActual)
-            ),
-            HomeAssistantSuggestion(
-                title: "How am I doing this month with savings?",
-                query: HomeQuery(intent: .savingsStatus)
-            ),
-            HomeAssistantSuggestion(
-                title: "Income share by source this month",
-                query: HomeQuery(intent: .incomeSourceShare)
-            ),
-            HomeAssistantSuggestion(
-                title: "Do I have presets due soon?",
-                query: HomeQuery(intent: .presetDueSoon)
-            )
-        ]
+        HomeAssistantPresetPromptCatalog.defaultSuggestions()
     }
 
     // MARK: - Intent handlers

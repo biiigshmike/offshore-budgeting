@@ -42,6 +42,7 @@ private enum MarinaLiveRouteKey: String, Equatable, Sendable {
     case savingsActivity
     case savingsStatus
     case incomePlannedVsActual
+    case incomeAverageActual
     case incomeActual
     case incomePlanned
     case recentTransactions
@@ -404,6 +405,20 @@ struct MarinaLiveDomainIntentMapper {
                 responseDate: dateIntent(from: payload.dateText, prompt: prompt, context: context, defaultMode: .ambient)
             )
 
+        case .incomeAverageActual:
+            return mappedRead(
+                payload: payload,
+                prompt: prompt,
+                envelopeSummary: envelopeSummary,
+                routeKey: routeKey,
+                canonicalRoute: "income.averageActual",
+                subject: "income",
+                operation: "average",
+                measure: "income",
+                incomeStatus: "actual",
+                responseDate: dateIntent(from: payload.dateText, prompt: prompt, context: context, defaultMode: .ambient)
+            )
+
         case .incomeActual:
             return mappedRead(
                 payload: payload,
@@ -592,6 +607,11 @@ struct MarinaLiveDomainIntentMapper {
             || (normalizedPrompt.contains("income") && normalizedPrompt.contains("planned") && normalizedPrompt.contains("actual"))
             || containsAny(["incomecomparison", "plannedvsactualincome"], in: normalizedSignal) {
             return .incomePlannedVsActual
+        }
+
+        if (normalizedPrompt.contains("income") && containsAny(["average", "avg", "mean"], in: normalizedPrompt))
+            || containsAny(["incomeaverage", "averageincome", "incomeaverageactual"], in: normalizedSignal) {
+            return .incomeAverageActual
         }
 
         if normalizedPrompt.contains("actual income")

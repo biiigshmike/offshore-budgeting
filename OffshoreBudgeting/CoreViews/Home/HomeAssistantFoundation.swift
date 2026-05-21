@@ -58,51 +58,6 @@ struct HomeAssistantPanelView: View {
         let provenance: String?
     }
     
-    private enum EmptySuggestionGroup: String, CaseIterable, Identifiable {
-        case budget
-        case income
-        case card
-        case preset
-        case category
-        case trends
-        
-        var id: String { rawValue }
-        
-        var iconName: String {
-            switch self {
-            case .budget:
-                return "chart.pie.fill"
-            case .income:
-                return "calendar"
-            case .card:
-                return "creditcard"
-            case .preset:
-                return "list.bullet.rectangle"
-            case .category:
-                return "tag.fill"
-            case .trends:
-                return "chart.line.uptrend.xyaxis"
-            }
-        }
-        
-        var title: String {
-            switch self {
-            case .budget:
-                return "Budget Prompt Suggestions"
-            case .income:
-                return "Income Prompt Suggestions"
-            case .card:
-                return "Card Prompt Suggestions"
-            case .preset:
-                return "Preset Prompt Suggestions"
-            case .category:
-                return "Category Prompt Suggestions"
-            case .trends:
-                return "Trend Prompt Suggestions"
-            }
-        }
-    }
-    
     let workspace: Workspace
     let onDismiss: () -> Void
     let shouldUseLargeMinimumSize: Bool
@@ -137,7 +92,7 @@ struct HomeAssistantPanelView: View {
     @State private var sharedPipelineClarificationChoiceContext: MarinaTypedClarification? = nil
     @State private var sharedPipelineClarificationChoicesByID: [UUID: MarinaClarificationChoice] = [:]
     @State private var sharedPipelineClarificationChoicesByTitle: [String: MarinaClarificationChoice] = [:]
-    @State private var selectedEmptySuggestionGroup: EmptySuggestionGroup?
+    @State private var selectedEmptySuggestionGroup: HomeAssistantPresetPromptGroup?
     @State private var personaSessionSeed: UInt64 = UInt64.random(in: UInt64.min...UInt64.max)
     @State private var personaCooldownSessionID: String = UUID().uuidString
     @State private var pendingExpenseCardPlan: HomeAssistantCommandPlan? = nil
@@ -1107,7 +1062,7 @@ struct HomeAssistantPanelView: View {
             }
             
             HStack(spacing: 0) {
-                let groups = Array(EmptySuggestionGroup.allCases.enumerated())
+                let groups = Array(HomeAssistantPresetPromptGroup.allCases.enumerated())
                 let maxIndex = max(0, groups.count - 1)
                 
                 ForEach(groups, id: \.element.id) { index, group in
@@ -1157,51 +1112,11 @@ struct HomeAssistantPanelView: View {
         return sections
     }
     
-    private func emptyStateSuggestions(for group: EmptySuggestionGroup) -> [HomeAssistantSuggestion] {
-        switch group {
-        case .budget:
-            return [
-                HomeAssistantSuggestion(title: "How am I doing this month?", query: HomeQuery(intent: .periodOverview)),
-                HomeAssistantSuggestion(title: "Spend this month", query: HomeQuery(intent: .spendThisMonth)),
-                HomeAssistantSuggestion(title: "Compare with last month", query: HomeQuery(intent: .compareThisMonthToPreviousMonth)),
-                HomeAssistantSuggestion(title: "How am I doing with savings?", query: HomeQuery(intent: .savingsStatus))
-            ]
-        case .income:
-            return [
-                HomeAssistantSuggestion(title: "Average actual income this year", query: HomeQuery(intent: .incomeAverageActual)),
-                HomeAssistantSuggestion(title: "Income share by source this month", query: HomeQuery(intent: .incomeSourceShare)),
-                HomeAssistantSuggestion(title: "Income share trend (last 4 months)", query: HomeQuery(intent: .incomeSourceShareTrend, resultLimit: 4, periodUnit: .month)),
-                HomeAssistantSuggestion(title: "Savings average (last 4 periods)", query: HomeQuery(intent: .savingsAverageRecentPeriods, resultLimit: 4, periodUnit: defaultQueryPeriodUnit))
-            ]
-        case .card:
-            return [
-                HomeAssistantSuggestion(title: "Card spend total this month", query: HomeQuery(intent: .cardSpendTotal)),
-                HomeAssistantSuggestion(title: "Variable spending habits by card", query: HomeQuery(intent: .cardVariableSpendingHabits)),
-                HomeAssistantSuggestion(title: "Largest recent expenses", query: HomeQuery(intent: .largestRecentTransactions)),
-                HomeAssistantSuggestion(title: "Spend this month", query: HomeQuery(intent: .spendThisMonth))
-            ]
-        case .preset:
-            return [
-                HomeAssistantSuggestion(title: "Do I have presets due soon?", query: HomeQuery(intent: .presetDueSoon)),
-                HomeAssistantSuggestion(title: "Most expensive preset", query: HomeQuery(intent: .presetHighestCost)),
-                HomeAssistantSuggestion(title: "Top preset category", query: HomeQuery(intent: .presetTopCategory)),
-                HomeAssistantSuggestion(title: "Preset spend by category", query: HomeQuery(intent: .presetCategorySpend))
-            ]
-        case .category:
-            return [
-                HomeAssistantSuggestion(title: "Top categories this month", query: HomeQuery(intent: .topCategoriesThisMonth)),
-                HomeAssistantSuggestion(title: "Category spend share this month", query: HomeQuery(intent: .categorySpendShare)),
-                HomeAssistantSuggestion(title: "Potential savings by category", query: HomeQuery(intent: .categoryPotentialSavings)),
-                HomeAssistantSuggestion(title: "Category reallocation guidance", query: HomeQuery(intent: .categoryReallocationGuidance))
-            ]
-        case .trends:
-            return [
-                HomeAssistantSuggestion(title: "Compare with last month", query: HomeQuery(intent: .compareThisMonthToPreviousMonth)),
-                HomeAssistantSuggestion(title: "Income share trend (last 4 months)", query: HomeQuery(intent: .incomeSourceShareTrend, resultLimit: 4, periodUnit: .month)),
-                HomeAssistantSuggestion(title: "Category share trend (last 4 months)", query: HomeQuery(intent: .categorySpendShareTrend, resultLimit: 4, periodUnit: .month)),
-                HomeAssistantSuggestion(title: "Savings average (last 6 periods)", query: HomeQuery(intent: .savingsAverageRecentPeriods, resultLimit: 6, periodUnit: defaultQueryPeriodUnit))
-            ]
-        }
+    private func emptyStateSuggestions(for group: HomeAssistantPresetPromptGroup) -> [HomeAssistantSuggestion] {
+        HomeAssistantPresetPromptCatalog.suggestions(
+            for: group,
+            defaultPeriodUnit: defaultQueryPeriodUnit
+        )
     }
     
     private var selectedPersonaProfile: HomeAssistantPersonaProfile {
@@ -1646,22 +1561,30 @@ struct HomeAssistantPanelView: View {
         let normalizedAnswer = query.map {
             executedQueryAnswerNormalizer.normalize(answer, for: $0)
         } ?? answer
-        let styled = shouldBypassPersonaStyling(for: normalizedAnswer)
-            ? normalizedAnswer
+        let titledAnswer = query.map {
+            MarinaAnswerTitleResolver().applyingTitle(
+                to: normalizedAnswer,
+                query: $0,
+                userPrompt: rawPrompt,
+                now: marinaRuntimeSettings.now
+            )
+        } ?? normalizedAnswer
+        let styled = shouldBypassPersonaStyling(for: titledAnswer)
+            ? titledAnswer
             : personaFormatter.styledAnswer(
-                from: normalizedAnswer,
+                from: titledAnswer,
                 userPrompt: rawPrompt,
                 personaID: selectedPersonaID
             )
         let deterministicFollowUps = followUpSuggestions(for: styled, query: query)
         let surfaced = await presentMarinaAnswer(
-            deterministicAnswer: normalizedAnswer,
+            deterministicAnswer: titledAnswer,
             basicFallbackAnswer: styled,
             rawPrompt: rawPrompt,
             source: source,
             homeQueryPlan: homeQueryPlan,
-            surfaceKind: normalizedAnswer.primaryValue == nil && normalizedAnswer.rows.isEmpty ? .noData : .answer,
-            groundingSummary: aggregationResult?.sourceAnswer?.traceSummary ?? normalizedAnswer.traceSummary,
+            surfaceKind: titledAnswer.primaryValue == nil && titledAnswer.rows.isEmpty ? .noData : .answer,
+            groundingSummary: aggregationResult?.sourceAnswer?.traceSummary ?? titledAnswer.traceSummary,
             followUpSuggestions: deterministicFollowUps
         )
 
@@ -1670,7 +1593,7 @@ struct HomeAssistantPanelView: View {
             rememberAnswerContext(
                 for: query,
                 executedPlan: homeQueryPlan,
-                rawAnswer: normalizedAnswer,
+                rawAnswer: titledAnswer,
                 aggregationResult: aggregationResult,
                 presentedAnswer: surfaced.answer,
                 userPrompt: rawPrompt
@@ -5216,7 +5139,7 @@ struct HomeAssistantPanelView: View {
     }
     
     private func quickButtonAccordionAnimation(for index: Int) -> Animation {
-        let count = EmptySuggestionGroup.allCases.count
+        let count = HomeAssistantPresetPromptGroup.allCases.count
         let order = quickButtonsVisible ? index : max(0, count - 1 - index)
         let base = quickButtonsVisible
         ? Animation.easeOut(duration: 0.18)
@@ -6285,15 +6208,27 @@ struct HomeAssistantPanelView: View {
         }
 
         Task { @MainActor in
-            let turnClassification = MarinaPromptTurnClassifier(
-                commandGuard: HomeAssistantSharedPipelineCommandGuard(commandParser: commandParser)
-            ).classify(
-                suggestion.title,
-                defaultPeriodUnit: defaultQueryPeriodUnit,
-                hasActiveClarification: false
-            )
-            await interpretPrompt(suggestion.title, turnClassification: turnClassification)
+            await runPresetSuggestion(suggestion)
         }
+    }
+
+    @MainActor
+    private func runPresetSuggestion(_ suggestion: HomeAssistantSuggestion) async {
+        let runtimeSettings = marinaRuntimeSettings
+        latestTraceAccessibilityValue = ""
+        MarinaTraceRecorder.shared.begin(
+            prompt: suggestion.title,
+            routingMode: runtimeSettings.routingMode,
+            marinaNLQv1Enabled: runtimeSettings.nlqV1.isEnabled,
+            runtimeSettingsSummary: "\(runtimeSettings.traceSummary),presetPrompt=\(suggestion.query.intent.rawValue)"
+        )
+        MarinaDebugLogger.log("[MarinaPresetPrompt] title='\(suggestion.title)' query='\(suggestion.query.intent.rawValue)'")
+        let result = await marinaV2PanelRuntime(turnClassification: .freshQuestion).run(
+            query: suggestion.query,
+            sourceTitle: suggestion.title
+        )
+        await handleMarinaV2TurnResult(result, rawPrompt: suggestion.title)
+        finishMarinaTrace()
     }
 
     @discardableResult
@@ -8596,24 +8531,11 @@ struct HomeAssistantPanelView: View {
         query: HomeQuery,
         userPrompt: String?
     ) -> HomeAnswer {
-        let resolvedTitle = resolvedPromptAwareTitle(
-            defaultTitle: answer.title,
+        MarinaAnswerTitleResolver().applyingTitle(
+            to: answer,
             query: query,
-            userPrompt: userPrompt
-        )
-        guard resolvedTitle != answer.title else { return answer }
-        
-        return HomeAnswer(
-            id: answer.id,
-            queryID: answer.queryID,
-            kind: answer.kind,
-            userPrompt: answer.userPrompt,
-            title: resolvedTitle,
-            subtitle: answer.subtitle,
-            primaryValue: answer.primaryValue,
-            rows: answer.rows,
-            attachment: answer.attachment,
-            generatedAt: answer.generatedAt
+            userPrompt: userPrompt,
+            now: marinaRuntimeSettings.now
         )
     }
     

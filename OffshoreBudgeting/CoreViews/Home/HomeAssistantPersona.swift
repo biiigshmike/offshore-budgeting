@@ -280,6 +280,18 @@ struct HomeAssistantPersonaFormatter {
             )
         }
 
+        func contextSuggestions(_ suggestions: [HomeAssistantSuggestion], excluding executedQuery: HomeQuery) -> [HomeAssistantSuggestion] {
+            var unique: [HomeAssistantSuggestion] = []
+            var seen: Set<String> = []
+            for suggestion in suggestions where isSameQueryShape(suggestion.query, executedQuery) == false {
+                let key = suggestionKey(suggestion.query)
+                guard seen.insert(key).inserted else { continue }
+                unique.append(suggestion)
+                if unique.count == 3 { break }
+            }
+            return unique
+        }
+
         switch confidenceCue {
         case .low:
             return [
@@ -293,6 +305,86 @@ struct HomeAssistantPersonaFormatter {
             ]
         case .high:
             break
+        }
+
+        if let executedQuery {
+            let range = executedQuery.dateRange
+            let target = executedQuery.targetName
+            let period = executedQuery.periodUnit
+            let scopedTopCategories = makeSuggestion(
+                scopedFollowUpLabel(base: "Top categories", for: executedQuery),
+                query: HomeQuery(intent: .topCategoriesThisMonth, dateRange: range, resultLimit: 3, periodUnit: period)
+            )
+            let scopedTop3Categories = makeSuggestion(
+                scopedFollowUpLabel(base: "Top 3 categories", for: executedQuery),
+                query: HomeQuery(intent: .topCategoriesThisMonth, dateRange: range, resultLimit: 3, periodUnit: period)
+            )
+            let scopedLargestExpenses = makeSuggestion(
+                scopedFollowUpLabel(base: "Largest expenses", for: executedQuery),
+                query: HomeQuery(intent: .largestRecentTransactions, dateRange: range, resultLimit: 5, periodUnit: period)
+            )
+
+            switch executedQuery.intent {
+            case .incomeAverageActual:
+                var suggestions = [
+                    makeSuggestion(scopedFollowUpLabel(base: "Income share by source", for: executedQuery), query: HomeQuery(intent: .incomeSourceShare, dateRange: range, periodUnit: period)),
+                    makeSuggestion(scopedFollowUpLabel(base: "Income share trend", for: executedQuery), query: HomeQuery(intent: .incomeSourceShareTrend, dateRange: range, resultLimit: 4, periodUnit: period ?? .month))
+                ]
+                if target != nil {
+                    suggestions.append(
+                        makeSuggestion("Compare income source with previous period", query: HomeQuery(intent: .compareIncomeSourceThisMonthToPreviousMonth, dateRange: range, targetName: target, periodUnit: period))
+                    )
+                }
+                return contextSuggestions(suggestions, excluding: executedQuery)
+            case .incomeSourceShare, .incomeSourceShareTrend, .compareIncomeSourceThisMonthToPreviousMonth:
+                return contextSuggestions([
+                    makeSuggestion(scopedFollowUpLabel(base: "Average actual income", for: executedQuery), query: HomeQuery(intent: .incomeAverageActual, dateRange: range, targetName: target, periodUnit: period)),
+                    makeSuggestion(scopedFollowUpLabel(base: "Income share trend", for: executedQuery), query: HomeQuery(intent: .incomeSourceShareTrend, dateRange: range, resultLimit: max(4, executedQuery.resultLimit), targetName: target, periodUnit: period ?? .month)),
+                    makeSuggestion("Compare income with previous period", query: HomeQuery(intent: .compareIncomeSourceThisMonthToPreviousMonth, dateRange: range, targetName: target, periodUnit: period))
+                ], excluding: executedQuery)
+            case .savingsStatus, .savingsAverageRecentPeriods, .forecastSavings:
+                return contextSuggestions([
+                    makeSuggestion(scopedFollowUpLabel(base: "Average savings", for: executedQuery), query: HomeQuery(intent: .savingsAverageRecentPeriods, dateRange: range, resultLimit: max(6, executedQuery.resultLimit), periodUnit: period)),
+                    makeSuggestion(scopedFollowUpLabel(base: "Forecast savings", for: executedQuery), query: HomeQuery(intent: .forecastSavings, dateRange: range, periodUnit: period)),
+                    makeSuggestion(comparisonFollowUpLabel(for: executedQuery), query: HomeQuery(intent: .compareThisMonthToPreviousMonth, dateRange: range, periodUnit: period))
+                ], excluding: executedQuery)
+            case .presetDueSoon, .presetHighestCost, .presetTopCategory, .presetCategorySpend, .nextPlannedExpense:
+                return contextSuggestions([
+                    makeSuggestion("Presets due soon", query: HomeQuery(intent: .presetDueSoon, dateRange: range, resultLimit: 3, periodUnit: period)),
+                    makeSuggestion("Most expensive presets", query: HomeQuery(intent: .presetHighestCost, dateRange: range, resultLimit: 3, periodUnit: period)),
+                    makeSuggestion("Preset spend by category", query: HomeQuery(intent: .presetCategorySpend, dateRange: range, targetName: target, periodUnit: period))
+                ], excluding: executedQuery)
+            case .categorySpendTotal, .categorySpendShare, .categorySpendShareTrend, .compareCategoryThisMonthToPreviousMonth, .categoryPotentialSavings, .categoryReallocationGuidance, .topCategoriesThisMonth, .topCategoryChangesThisMonth:
+                return contextSuggestions([
+                    makeSuggestion(comparisonFollowUpLabel(for: executedQuery), query: HomeQuery(intent: .compareCategoryThisMonthToPreviousMonth, dateRange: range, targetName: target, periodUnit: period)),
+                    scopedTopCategories,
+                    scopedLargestExpenses
+                ], excluding: executedQuery)
+            case .merchantSpendTotal, .merchantSpendSummary, .compareMerchantThisMonthToPreviousMonth, .topMerchantsThisMonth:
+                return contextSuggestions([
+                    scopedLargestExpenses,
+                    makeSuggestion(scopedFollowUpLabel(base: "Top merchants", for: executedQuery), query: HomeQuery(intent: .topMerchantsThisMonth, dateRange: range, resultLimit: 3, periodUnit: period)),
+                    makeSuggestion(comparisonFollowUpLabel(for: executedQuery), query: HomeQuery(intent: .compareMerchantThisMonthToPreviousMonth, dateRange: range, targetName: target, periodUnit: period))
+                ], excluding: executedQuery)
+            case .cardSpendTotal, .cardVariableSpendingHabits, .compareCardThisMonthToPreviousMonth, .cardSnapshotSummary, .topCardChangesThisMonth:
+                return contextSuggestions([
+                    makeSuggestion(comparisonFollowUpLabel(for: executedQuery), query: HomeQuery(intent: .compareCardThisMonthToPreviousMonth, dateRange: range, targetName: target, periodUnit: period)),
+                    makeSuggestion(scopedFollowUpLabel(base: "Variable spending habits by card", for: executedQuery), query: HomeQuery(intent: .cardVariableSpendingHabits, dateRange: range, targetName: target, periodUnit: period)),
+                    scopedLargestExpenses
+                ], excluding: executedQuery)
+            case .compareThisMonthToPreviousMonth, .spendThisMonth, .periodOverview, .spendAveragePerPeriod, .spendTrendsSummary, .safeSpendToday:
+                return contextSuggestions([
+                    scopedTop3Categories,
+                    makeSuggestion(comparisonFollowUpLabel(for: executedQuery), query: HomeQuery(intent: .compareThisMonthToPreviousMonth, dateRange: range, periodUnit: period)),
+                    makeSuggestion(scopedFollowUpLabel(base: "Average spending", for: executedQuery), query: HomeQuery(intent: .spendAveragePerPeriod, dateRange: range, periodUnit: period))
+                ], excluding: executedQuery)
+            case .largestRecentTransactions, .mostFrequentTransactions:
+                return contextSuggestions([
+                    makeSuggestion(scopedFollowUpLabel(base: "Spend total", for: executedQuery), query: HomeQuery(intent: .spendThisMonth, dateRange: range, periodUnit: period)),
+                    scopedTopCategories,
+                    makeSuggestion(scopedFollowUpLabel(base: "Most frequent expenses", for: executedQuery), query: HomeQuery(intent: .mostFrequentTransactions, dateRange: range, resultLimit: 5, periodUnit: period))
+                ], excluding: executedQuery)
+            }
         }
 
         if answer.title.localizedCaseInsensitiveContains("Savings") {
@@ -454,6 +546,26 @@ struct HomeAssistantPersonaFormatter {
 
     private func followUpTitle(action: String) -> String {
         return action
+    }
+
+    private func suggestionKey(_ query: HomeQuery) -> String {
+        [
+            query.intent.rawValue,
+            query.dateRange?.traceSummary ?? "nil",
+            query.comparisonDateRange?.traceSummary ?? "nil",
+            "\(query.resultLimit)",
+            query.targetName ?? "nil",
+            query.periodUnit?.rawValue ?? "nil"
+        ].joined(separator: "|")
+    }
+
+    private func isSameQueryShape(_ lhs: HomeQuery, _ rhs: HomeQuery) -> Bool {
+        lhs.intent == rhs.intent
+            && lhs.dateRange == rhs.dateRange
+            && lhs.comparisonDateRange == rhs.comparisonDateRange
+            && lhs.resultLimit == rhs.resultLimit
+            && lhs.targetName == rhs.targetName
+            && lhs.periodUnit == rhs.periodUnit
     }
 
     private func comparisonFollowUpLabel(for executedQuery: HomeQuery) -> String {

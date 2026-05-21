@@ -285,6 +285,84 @@ struct MarinaV2TurnCoordinator {
         }
     }
 
+    func run(
+        query: HomeQuery,
+        sourceTitle: String,
+        context: MarinaV2TurnContext
+    ) async -> MarinaV2TurnResult {
+        let presetAdapter = HomeAssistantPresetPromptQueryAdapter()
+        let executablePlan = presetAdapter.executablePlan(for: query, sourceTitle: sourceTitle)
+        let candidate = presetAdapter.candidate(for: query, sourceTitle: sourceTitle)
+        let interpretation = MarinaCanonicalReadInterpretation(
+            result: semanticAdapter.interpretationResult(from: candidate),
+            compatibilityCandidate: candidate,
+            repairSummary: "typedPresetPrompt:\(query.intent.rawValue)"
+        )
+        let resolved = resolver.resolve(
+            candidate: candidate,
+            provider: context.provider,
+            now: context.now,
+            defaultPeriodUnit: context.defaultPeriodUnit
+        )
+        let validationOutcome = MarinaPlanValidationOutcome.executable(executablePlan.aggregationPlan)
+        let aggregationResult = MarinaAggregationExecutor().execute(
+            executablePlan,
+            provider: context.provider,
+            now: context.now
+        )
+
+        if case .unsupported(let unsupported) = aggregationResult {
+            let blockedOutcome = MarinaPlanValidationOutcome.unsupported(unsupported)
+            MarinaV2TraceBridge.record(
+                context: context,
+                interpretation: interpretation,
+                resolved: resolved,
+                semanticResolved: nil,
+                validationOutcome: blockedOutcome,
+                execution: nil
+            )
+            return .blocked(
+                answer: responseBuilder.responseCompatibleAnswer(from: blockedOutcome) ?? Self.blockedAnswer(
+                    prompt: sourceTitle,
+                    title: "Marina cannot run that preset yet",
+                    message: unsupported.message
+                ),
+                validationOutcome: blockedOutcome
+            )
+        }
+
+        let baseAnswer = responseBuilder.responseCompatibleAnswer(from: aggregationResult)
+        let titledAnswer = MarinaAnswerTitleResolver().applyingTitle(
+            to: baseAnswer,
+            query: query,
+            userPrompt: sourceTitle,
+            now: context.now
+        )
+        let execution = MarinaQueryExecution(
+            executablePlan: executablePlan,
+            aggregationResult: aggregationResult,
+            databaseLookupResponse: nil,
+            workspaceAggregationCard: nil,
+            amountBasis: MarinaAmountBasisAdapter().basis(plan: executablePlan.aggregationPlan, semanticQuery: nil),
+            executionRoute: executionRoute(for: executablePlan.aggregationPlan)
+        )
+        MarinaV2TraceBridge.record(
+            context: context,
+            interpretation: interpretation,
+            resolved: resolved,
+            semanticResolved: nil,
+            validationOutcome: validationOutcome,
+            execution: execution
+        )
+        return .handled(
+            answer: titledAnswer,
+            aggregationResult: aggregationResult,
+            homeQueryPlan: executablePlan.homeQueryPlan,
+            amountBasis: execution.amountBasis,
+            executionRoute: execution.executionRoute
+        )
+    }
+
     func resume(
         clarification: MarinaTypedClarification,
         choice: MarinaClarificationChoice,
@@ -549,6 +627,23 @@ struct MarinaV2TurnCoordinator {
 
     private func isResolverBacked(_ choice: MarinaClarificationChoice) -> Bool {
         choice.sourceID != nil
+    }
+
+    private func executionRoute(for plan: MarinaAggregationPlan) -> MarinaSemanticExecutionRoute {
+        switch plan.operation {
+        case .compare:
+            return plan.grouping == nil ? .comparison : .groupedRanked
+        case .rank:
+            return .groupedRanked
+        case .listRows, .lookupDetails:
+            return plan.operation == .lookupDetails ? .lookupDetail : .list
+        case .trend:
+            return .groupedRanked
+        case .simulate, .forecast:
+            return .scenario
+        case .sum, .average, .count, .minimum, .maximum:
+            return plan.grouping == nil ? .aggregate : .groupedRanked
+        }
     }
 
     private func interpretationByApplying(
