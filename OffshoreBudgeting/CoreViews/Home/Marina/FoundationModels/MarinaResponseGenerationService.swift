@@ -405,7 +405,7 @@ extension MarinaResponseGenerating {
 
 struct MarinaResponseSurfaceApplication: Equatable {
     let answer: HomeAnswer
-    let followUpSuggestions: [HomeAssistantSuggestion]
+    let followUpSuggestions: [MarinaSuggestion]
 }
 
 struct MarinaResponseSurfaceRequest: Equatable {
@@ -461,7 +461,7 @@ struct MarinaResponseSurfaceApplicator {
     func apply(
         generated: MarinaGeneratedSurfaceResponse,
         to deterministicAnswer: HomeAnswer,
-        deterministicFollowUps: [HomeAssistantSuggestion]
+        deterministicFollowUps: [MarinaSuggestion]
     ) throws -> MarinaResponseSurfaceApplication {
         let generatedSubtitle = generated.clarificationMessage ?? generated.narrativeSubtitle
 
@@ -510,12 +510,12 @@ struct MarinaResponseSurfaceApplicator {
 
     private func rewrittenSuggestions(
         _ rewrites: [MarinaGeneratedSuggestionRewrite],
-        deterministicFollowUps: [HomeAssistantSuggestion]
-    ) -> [HomeAssistantSuggestion] {
+        deterministicFollowUps: [MarinaSuggestion]
+    ) -> [MarinaSuggestion] {
         guard rewrites.isEmpty == false else { return deterministicFollowUps }
 
         var usedIndexes = Set<Int>()
-        var rewritten: [HomeAssistantSuggestion] = []
+        var rewritten: [MarinaSuggestion] = []
 
         for rewrite in rewrites {
             guard deterministicFollowUps.indices.contains(rewrite.candidateIndex),
@@ -525,7 +525,7 @@ struct MarinaResponseSurfaceApplicator {
             let original = deterministicFollowUps[rewrite.candidateIndex]
             let title = safeSuggestionTitle(rewrite.title, fallback: original.title)
             rewritten.append(
-                HomeAssistantSuggestion(
+                MarinaSuggestion(
                     id: original.id,
                     title: title,
                     query: original.query,

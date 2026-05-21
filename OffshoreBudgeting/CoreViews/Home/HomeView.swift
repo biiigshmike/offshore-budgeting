@@ -74,7 +74,7 @@ struct HomeView: View {
 
     @State private var isShowingWhatIfPlanner: Bool = false
     @State private var whatIfInitialScenarioID: UUID? = nil
-    @State private var whatIfInitialDraft: HomeAssistantWhatIfPlannerDraft? = nil
+    @State private var whatIfInitialDraft: WhatIfPlannerDraft? = nil
     @State private var isShowingAssistantPanel: Bool = false
     @State private var didAutoPresentAssistantForUITest: Bool = false
 
@@ -152,7 +152,7 @@ struct HomeView: View {
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
-    @Environment(\.homeAssistantToolbarContext) private var assistantToolbarContext
+    @Environment(\.marinaToolbarContext) private var assistantToolbarContext
     @Environment(\.appTabActivationContext) private var tabActivationContext
     @Environment(\.appCommandHub) private var commandHub
     @Environment(\.modelContext) private var modelContext
@@ -317,15 +317,14 @@ struct HomeView: View {
             )
         }
         .fullScreenCover(isPresented: $isShowingAssistantPanel, onDismiss: dismissAssistantPanel) {
-            HomeAssistantPanelView(
+            MarinaPanelView(
                 workspace: workspace,
                 onDismiss: dismissAssistantPanel,
                 shouldUseLargeMinimumSize: false,
-                assistantDateRange: HomeQueryDateRange(
+                ambientDateRange: HomeQueryDateRange(
                     startDate: appliedStartDate,
                     endDate: appliedEndDate
-                ),
-                onOpenWhatIfPlanner: openWhatIfPlanner
+                )
             )
         }
         .postBoardingTip(
@@ -477,7 +476,7 @@ struct HomeView: View {
         isShowingWhatIfPlanner = true
     }
 
-    private func openWhatIfPlanner(_ draft: HomeAssistantWhatIfPlannerDraft) {
+    private func openWhatIfPlanner(_ draft: WhatIfPlannerDraft) {
         whatIfInitialScenarioID = nil
         whatIfInitialDraft = draft
         if isShowingAssistantPanel {

@@ -65,11 +65,11 @@ struct MarinaExecutionTrace: Equatable {
 }
 
 enum MarinaExecutionRoutingMode: String, Equatable {
-    case foundationPipeline = "foundation_pipeline"
+    case foundationPipeline = "foundationPipeline"
 }
 
 enum MarinaExecutionSelectedRoute: String, Equatable {
-    case foundationModels = "foundation_models"
+    case foundationModels = "foundationModels"
     case clarification
     case recovery
     case unresolved
@@ -142,7 +142,7 @@ final class MarinaTraceRecorder {
                 draft.modelAvailabilityReason = nil
             case .unavailable(let reason):
                 draft.modelWasAvailable = false
-                draft.modelAvailabilityReason = reason
+                draft.modelAvailabilityReason = reason.rawValue
             }
         }
     }
@@ -605,8 +605,6 @@ struct MarinaExecutionTraceSnapshot: Codable, Equatable {
 enum MarinaTraceExporter {
     static func exportIfConfigured(_ trace: MarinaExecutionTrace) {
         #if DEBUG
-        MarinaSmokeTraceStore.exportIfEnabled(trace)
-
         let environment = ProcessInfo.processInfo.environment
         guard let path = environment[MarinaRuntimeSettings.traceOutputPathEnvironmentKey]?.trimmingCharacters(in: .whitespacesAndNewlines),
               path.isEmpty == false else {

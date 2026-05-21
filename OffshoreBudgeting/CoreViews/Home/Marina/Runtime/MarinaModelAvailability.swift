@@ -12,9 +12,33 @@ protocol MarinaModelAvailabilityProviding {
 }
 
 struct MarinaModelAvailability {
+    enum UnavailableReason: String, Equatable {
+        case deviceNotEligible = "device_not_eligible"
+        case appleIntelligenceNotEnabled = "apple_intelligence_not_enabled"
+        case modelNotReady = "model_not_ready"
+        case unsupportedLocale = "unsupported_locale"
+        case runtimeUnavailable = "runtime_unavailable"
+        case frameworkUnavailable = "framework_unavailable"
+        case unknown = "unknown"
+    }
+
     enum Status: Equatable {
         case available
-        case unavailable(reason: String)
+        case unavailable(reason: UnavailableReason)
+
+        var unavailableReason: UnavailableReason? {
+            guard case .unavailable(let reason) = self else { return nil }
+            return reason
+        }
+
+        var traceValue: String {
+            switch self {
+            case .available:
+                return "available"
+            case .unavailable(let reason):
+                return reason.rawValue
+            }
+        }
     }
 
     func currentStatus() -> Status {
@@ -22,7 +46,7 @@ struct MarinaModelAvailability {
         if #available(iOS 26.0, macOS 26.0, *) {
             return availabilityStatus()
         } else {
-            return .unavailable(reason: "runtime_unavailable")
+            return .unavailable(reason: .runtimeUnavailable)
         }
         #else
         availabilityStatus()
@@ -41,24 +65,24 @@ private func availabilityStatus() -> MarinaModelAvailability.Status {
     switch model.availability {
     case .available:
         guard model.supportsLocale(.current) else {
-            return .unavailable(reason: "unsupported_locale")
+            return .unavailable(reason: .unsupportedLocale)
         }
         return .available
     case .unavailable(let reason):
         switch reason {
         case .deviceNotEligible:
-            return .unavailable(reason: "device_not_eligible")
+            return .unavailable(reason: .deviceNotEligible)
         case .appleIntelligenceNotEnabled:
-            return .unavailable(reason: "apple_intelligence_not_enabled")
+            return .unavailable(reason: .appleIntelligenceNotEnabled)
         case .modelNotReady:
-            return .unavailable(reason: "model_not_ready")
+            return .unavailable(reason: .modelNotReady)
         @unknown default:
-            return .unavailable(reason: "unknown")
+            return .unavailable(reason: .unknown)
         }
     }
 }
 #else
 private func availabilityStatus() -> MarinaModelAvailability.Status {
-    .unavailable(reason: "framework_unavailable")
+    .unavailable(reason: .frameworkUnavailable)
 }
 #endif

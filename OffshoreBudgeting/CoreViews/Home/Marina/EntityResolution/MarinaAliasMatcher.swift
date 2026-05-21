@@ -1,5 +1,5 @@
 //
-//  HomeAssistantAliasMatcher.swift
+//  MarinaAliasMatcher.swift
 //  OffshoreBudgeting
 //
 //  Created by Michael Brown on 2/8/26.
@@ -9,12 +9,12 @@ import Foundation
 
 // MARK: - Alias Matcher
 
-struct HomeAssistantAliasMatcher {
-    private let entityMatcher = HomeAssistantEntityMatcher()
+struct MarinaAliasMatcher {
+    private let entityMatcher = MarinaEntityMatcher()
 
     func matchedTarget(
         in prompt: String,
-        entityType: HomeAssistantAliasEntityType,
+        entityType: MarinaAliasEntityType,
         rules: [AssistantAliasRule]
     ) -> String? {
         let scopedRules = rules.filter {

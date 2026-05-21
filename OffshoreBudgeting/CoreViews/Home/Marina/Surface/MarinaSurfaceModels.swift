@@ -1,5 +1,5 @@
 //
-//  HomeAssistantModels.swift
+//  MarinaModels.swift
 //  OffshoreBudgeting
 //
 //  Created by Michael Brown on 2/8/26.
@@ -346,24 +346,24 @@ extension HomeQueryIntent {
     }
 }
 
-struct HomeAssistantSessionContext {
+struct MarinaSessionContext {
     var lastQueryPlan: HomeQueryPlan?
     var lastMetric: HomeQueryMetric?
     var lastDateRange: HomeQueryDateRange?
     var lastResultLimit: Int?
     var lastTargetName: String?
     var lastPeriodUnit: HomeQueryPeriodUnit?
-    var recentAnswerContexts: [HomeAssistantAnswerContext] = []
+    var recentAnswerContexts: [MarinaAnswerContext] = []
 }
 
-enum HomeAssistantAnswerTargetType: String, Codable, Equatable {
+enum MarinaAnswerTargetType: String, Codable, Equatable {
     case category
     case card
     case incomeSource
     case merchant
 }
 
-enum HomeAssistantResolvedEntityType: String, Codable, Equatable, CaseIterable {
+enum MarinaResolvedEntityType: String, Codable, Equatable, CaseIterable {
     case category
     case card
     case merchant
@@ -372,7 +372,7 @@ enum HomeAssistantResolvedEntityType: String, Codable, Equatable, CaseIterable {
     case incomeSource
 }
 
-enum HomeAssistantResolutionConfidence: String, Codable, Equatable, Comparable {
+enum MarinaResolutionConfidence: String, Codable, Equatable, Comparable {
     case exact
     case high
     case medium
@@ -391,31 +391,31 @@ enum HomeAssistantResolutionConfidence: String, Codable, Equatable, Comparable {
         }
     }
 
-    static func < (lhs: HomeAssistantResolutionConfidence, rhs: HomeAssistantResolutionConfidence) -> Bool {
+    static func < (lhs: MarinaResolutionConfidence, rhs: MarinaResolutionConfidence) -> Bool {
         lhs.rank < rhs.rank
     }
 }
 
-enum HomeAssistantResolutionSource: String, Codable, Equatable {
+enum MarinaResolutionSource: String, Codable, Equatable {
     case exact
     case alias
     case fuzzy
 }
 
-struct HomeAssistantEntityMatch: Codable, Equatable, Identifiable {
+struct MarinaEntityMatch: Codable, Equatable, Identifiable {
     let id: UUID
     let name: String
-    let entityType: HomeAssistantResolvedEntityType
-    let confidence: HomeAssistantResolutionConfidence
-    let source: HomeAssistantResolutionSource
+    let entityType: MarinaResolvedEntityType
+    let confidence: MarinaResolutionConfidence
+    let source: MarinaResolutionSource
     let score: Double
 
     init(
         id: UUID = UUID(),
         name: String,
-        entityType: HomeAssistantResolvedEntityType,
-        confidence: HomeAssistantResolutionConfidence,
-        source: HomeAssistantResolutionSource,
+        entityType: MarinaResolvedEntityType,
+        confidence: MarinaResolutionConfidence,
+        source: MarinaResolutionSource,
         score: Double
     ) {
         self.id = id
@@ -427,15 +427,15 @@ struct HomeAssistantEntityMatch: Codable, Equatable, Identifiable {
     }
 }
 
-struct HomeAssistantRecoverySuggestion: Codable, Equatable, Identifiable {
+struct MarinaRecoverySuggestion: Codable, Equatable, Identifiable {
     let id: UUID
-    let suggestion: HomeAssistantSuggestion
+    let suggestion: MarinaSuggestion
     let confidenceScore: Double
     let reasoning: String
 
     init(
         id: UUID = UUID(),
-        suggestion: HomeAssistantSuggestion,
+        suggestion: MarinaSuggestion,
         confidenceScore: Double,
         reasoning: String
     ) {
@@ -446,15 +446,15 @@ struct HomeAssistantRecoverySuggestion: Codable, Equatable, Identifiable {
     }
 }
 
-struct HomeAssistantSuggestionSection: Equatable, Identifiable {
+struct MarinaSuggestionSection: Equatable, Identifiable {
     let id: String
     let title: String
-    let suggestions: [HomeAssistantSuggestion]
+    let suggestions: [MarinaSuggestion]
     let isRecovery: Bool
 
     init(
         title: String,
-        suggestions: [HomeAssistantSuggestion],
+        suggestions: [MarinaSuggestion],
         isRecovery: Bool
     ) {
         self.id = "\(title)|\(isRecovery)"
@@ -464,21 +464,21 @@ struct HomeAssistantSuggestionSection: Equatable, Identifiable {
     }
 }
 
-enum HomeAssistantSuggestionSectionBuilder {
+enum MarinaSuggestionSectionBuilder {
     static func build(
-        clarificationSuggestions: [HomeAssistantSuggestion],
+        clarificationSuggestions: [MarinaSuggestion],
         clarificationReasonCount: Int,
-        recoverySuggestions: [HomeAssistantRecoverySuggestion],
-        followUpSuggestions: [HomeAssistantSuggestion]
-    ) -> [HomeAssistantSuggestionSection] {
-        var sections: [HomeAssistantSuggestionSection] = []
+        recoverySuggestions: [MarinaRecoverySuggestion],
+        followUpSuggestions: [MarinaSuggestion]
+    ) -> [MarinaSuggestionSection] {
+        var sections: [MarinaSuggestionSection] = []
 
         if clarificationSuggestions.isEmpty == false {
             let title = clarificationReasonCount == 0
                 ? "Clarification"
                 : "Clarification (\(clarificationReasonCount))"
             sections.append(
-                HomeAssistantSuggestionSection(
+                MarinaSuggestionSection(
                     title: title,
                     suggestions: clarificationSuggestions,
                     isRecovery: false
@@ -488,7 +488,7 @@ enum HomeAssistantSuggestionSectionBuilder {
 
         if recoverySuggestions.isEmpty == false {
             sections.append(
-                HomeAssistantSuggestionSection(
+                MarinaSuggestionSection(
                     title: "Recovery",
                     suggestions: recoverySuggestions.map(\.suggestion),
                     isRecovery: true
@@ -498,7 +498,7 @@ enum HomeAssistantSuggestionSectionBuilder {
 
         if followUpSuggestions.isEmpty == false {
             sections.append(
-                HomeAssistantSuggestionSection(
+                MarinaSuggestionSection(
                     title: "Follow-Up Suggestions",
                     suggestions: followUpSuggestions,
                     isRecovery: false
@@ -510,27 +510,27 @@ enum HomeAssistantSuggestionSectionBuilder {
     }
 }
 
-struct HomeAssistantEntityResolution: Codable, Equatable {
+struct MarinaEntityResolution: Codable, Equatable {
     let resolvedPhrase: String
-    let bestMatch: HomeAssistantEntityMatch?
-    let ambiguityCandidates: [HomeAssistantEntityMatch]
-    let rankedCandidates: [HomeAssistantEntityMatch]
-    let confidence: HomeAssistantResolutionConfidence
-    let originalCandidates: [HomeAssistantEntityMatch]
+    let bestMatch: MarinaEntityMatch?
+    let ambiguityCandidates: [MarinaEntityMatch]
+    let rankedCandidates: [MarinaEntityMatch]
+    let confidence: MarinaResolutionConfidence
+    let originalCandidates: [MarinaEntityMatch]
     let rejectedCandidateNames: [String]
-    let recoverySuggestions: [HomeAssistantRecoverySuggestion]
+    let recoverySuggestions: [MarinaRecoverySuggestion]
     let explanation: String?
     let isTieAmbiguity: Bool
 
     init(
         resolvedPhrase: String,
-        bestMatch: HomeAssistantEntityMatch? = nil,
-        ambiguityCandidates: [HomeAssistantEntityMatch] = [],
-        rankedCandidates: [HomeAssistantEntityMatch] = [],
-        confidence: HomeAssistantResolutionConfidence = .low,
-        originalCandidates: [HomeAssistantEntityMatch] = [],
+        bestMatch: MarinaEntityMatch? = nil,
+        ambiguityCandidates: [MarinaEntityMatch] = [],
+        rankedCandidates: [MarinaEntityMatch] = [],
+        confidence: MarinaResolutionConfidence = .low,
+        originalCandidates: [MarinaEntityMatch] = [],
         rejectedCandidateNames: [String] = [],
-        recoverySuggestions: [HomeAssistantRecoverySuggestion] = [],
+        recoverySuggestions: [MarinaRecoverySuggestion] = [],
         explanation: String? = nil,
         isTieAmbiguity: Bool = false
     ) {
@@ -547,29 +547,29 @@ struct HomeAssistantEntityResolution: Codable, Equatable {
     }
 }
 
-struct HomeAssistantClarificationContext: Equatable {
-    let originalCandidates: [HomeAssistantEntityMatch]
-    let activeCandidates: [HomeAssistantEntityMatch]
+struct MarinaClarificationContext: Equatable {
+    let originalCandidates: [MarinaEntityMatch]
+    let activeCandidates: [MarinaEntityMatch]
     let rejectedCandidateNames: [String]
-    let currentBestMatch: HomeAssistantEntityMatch?
+    let currentBestMatch: MarinaEntityMatch?
     let originalPrompt: String
     let basePlan: HomeQueryPlan
-    let resolution: HomeAssistantEntityResolution
+    let resolution: MarinaEntityResolution
 }
 
-struct HomeAssistantAnswerContext: Identifiable, Codable, Equatable {
+struct MarinaAnswerContext: Identifiable, Codable, Equatable {
     let id: UUID
     let query: HomeQuery
     let answerTitle: String
     let answerKind: HomeAnswerKind
     let userPrompt: String?
     let targetName: String?
-    let targetType: HomeAssistantAnswerTargetType?
+    let targetType: MarinaAnswerTargetType?
     let rowTitles: [String]
     let rowValues: [String]
     let topRowTitle: String?
     let topRowValue: String?
-    let topRowTargetType: HomeAssistantAnswerTargetType?
+    let topRowTargetType: MarinaAnswerTargetType?
     let scenarioPercent: Double?
     let executedPlan: HomeQueryPlan?
     let generatedAt: Date
@@ -581,12 +581,12 @@ struct HomeAssistantAnswerContext: Identifiable, Codable, Equatable {
         answerKind: HomeAnswerKind,
         userPrompt: String? = nil,
         targetName: String? = nil,
-        targetType: HomeAssistantAnswerTargetType? = nil,
+        targetType: MarinaAnswerTargetType? = nil,
         rowTitles: [String] = [],
         rowValues: [String] = [],
         topRowTitle: String? = nil,
         topRowValue: String? = nil,
-        topRowTargetType: HomeAssistantAnswerTargetType? = nil,
+        topRowTargetType: MarinaAnswerTargetType? = nil,
         scenarioPercent: Double? = nil,
         executedPlan: HomeQueryPlan? = nil,
         generatedAt: Date = Date()
@@ -609,19 +609,19 @@ struct HomeAssistantAnswerContext: Identifiable, Codable, Equatable {
     }
 }
 
-enum HomeAssistantFollowUpAnchorDecision: Equatable {
+enum MarinaFollowUpAnchorDecision: Equatable {
     case none
-    case matched(HomeAssistantAnswerContext)
-    case ambiguous([HomeAssistantAnswerContext])
+    case matched(MarinaAnswerContext)
+    case ambiguous([MarinaAnswerContext])
 }
 
-struct HomeAssistantFollowUpAnchorResolver {
+struct MarinaFollowUpAnchorResolver {
     private static let recentContextLimit = 3
 
     func resolve(
         prompt: String,
-        recentContexts: [HomeAssistantAnswerContext]
-    ) -> HomeAssistantFollowUpAnchorDecision {
+        recentContexts: [MarinaAnswerContext]
+    ) -> MarinaFollowUpAnchorDecision {
         let normalizedPrompt = normalized(prompt)
         guard isFollowUpShaped(normalizedPrompt) else { return .none }
 
@@ -659,7 +659,7 @@ struct HomeAssistantFollowUpAnchorResolver {
     }
 
     private func score(
-        _ context: HomeAssistantAnswerContext,
+        _ context: MarinaAnswerContext,
         normalizedPrompt: String
     ) -> Int {
         var score = 0
@@ -706,7 +706,7 @@ struct HomeAssistantFollowUpAnchorResolver {
     }
 
     private func rowTokenOverlapScore(
-        context: HomeAssistantAnswerContext,
+        context: MarinaAnswerContext,
         promptTokens: Set<String>
     ) -> Int {
         let rowTokens = significantTokens(
@@ -717,7 +717,7 @@ struct HomeAssistantFollowUpAnchorResolver {
     }
 
     private func metricFamilyCueScore(
-        context: HomeAssistantAnswerContext,
+        context: MarinaAnswerContext,
         normalizedPrompt: String
     ) -> Int {
         switch context.query.intent.metric {
@@ -896,7 +896,7 @@ struct HomeAnswer: Identifiable, Codable, Equatable {
     let subtitle: String?
     let primaryValue: String?
     let rows: [HomeAnswerRow]
-    let attachment: HomeAssistantAttachment?
+    let attachment: MarinaAttachment?
     let explanation: String?
     let generatedAt: Date
 
@@ -909,7 +909,7 @@ struct HomeAnswer: Identifiable, Codable, Equatable {
         subtitle: String? = nil,
         primaryValue: String? = nil,
         rows: [HomeAnswerRow] = [],
-        attachment: HomeAssistantAttachment? = nil,
+        attachment: MarinaAttachment? = nil,
         explanation: String? = nil,
         generatedAt: Date = Date()
     ) {
@@ -927,7 +927,7 @@ struct HomeAnswer: Identifiable, Codable, Equatable {
     }
 }
 
-struct HomeAssistantExecutedQueryAnswerNormalizer {
+struct MarinaExecutedQueryAnswerNormalizer {
     func normalize(_ answer: HomeAnswer, for query: HomeQuery) -> HomeAnswer {
         guard isEmptyExecutedQueryAnswer(answer) else { return answer }
 
@@ -967,8 +967,8 @@ struct HomeAssistantExecutedQueryAnswerNormalizer {
     }
 }
 
-enum HomeAssistantAttachment: Codable, Equatable {
-    case inlineCreateForm(HomeAssistantInlineCreateForm)
+enum MarinaAttachment: Codable, Equatable {
+    case inlineCreateForm(MarinaInlineCreateForm)
 
     private enum CodingKeys: String, CodingKey {
         case kind
@@ -983,7 +983,7 @@ enum HomeAssistantAttachment: Codable, Equatable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         switch try container.decode(Kind.self, forKey: .kind) {
         case .inlineCreateForm:
-            self = .inlineCreateForm(try container.decode(HomeAssistantInlineCreateForm.self, forKey: .form))
+            self = .inlineCreateForm(try container.decode(MarinaInlineCreateForm.self, forKey: .form))
         }
     }
 
@@ -997,7 +997,7 @@ enum HomeAssistantAttachment: Codable, Equatable {
     }
 }
 
-enum HomeAssistantInlineCreateEntity: String, Codable, Equatable, CaseIterable, Identifiable {
+enum MarinaInlineCreateEntity: String, Codable, Equatable, CaseIterable, Identifiable {
     case expense
     case income
     case budget
@@ -1028,8 +1028,8 @@ enum HomeAssistantInlineCreateEntity: String, Codable, Equatable, CaseIterable, 
     }
 }
 
-struct HomeAssistantInlineCreateForm: Codable, Equatable {
-    let entity: HomeAssistantInlineCreateEntity
+struct MarinaInlineCreateForm: Codable, Equatable {
+    let entity: MarinaInlineCreateEntity
     var summary: String?
     var nameText: String
     var amountText: String
@@ -1055,7 +1055,7 @@ struct HomeAssistantInlineCreateForm: Codable, Equatable {
     var showsValidation: Bool
 
     init(
-        entity: HomeAssistantInlineCreateEntity,
+        entity: MarinaInlineCreateEntity,
         summary: String? = nil,
         nameText: String = "",
         amountText: String = "",
@@ -1109,7 +1109,7 @@ struct HomeAssistantInlineCreateForm: Codable, Equatable {
 
 // MARK: - Suggestions
 
-struct HomeAssistantSuggestion: Identifiable, Codable, Equatable {
+struct MarinaSuggestion: Identifiable, Codable, Equatable {
     let id: UUID
     let title: String
     let query: HomeQuery
@@ -1133,7 +1133,7 @@ struct HomeAssistantSuggestion: Identifiable, Codable, Equatable {
 
 // MARK: - Command Models
 
-enum HomeAssistantCommandIntent: String, Equatable {
+enum MarinaCommandIntent: String, Equatable {
     case addExpense
     case addIncome
     case addBudget
@@ -1162,20 +1162,20 @@ enum HomeAssistantCommandIntent: String, Equatable {
     case deleteLastIncome
 }
 
-enum HomeAssistantCommandConfidenceBand: String, Equatable {
+enum MarinaCommandConfidenceBand: String, Equatable {
     case high
     case medium
     case low
 }
 
-enum HomeAssistantPlannedExpenseAmountTarget: String, Equatable {
+enum MarinaPlannedExpenseAmountTarget: String, Equatable {
     case planned
     case actual
 }
 
-struct HomeAssistantCommandPlan: Equatable {
-    let intent: HomeAssistantCommandIntent
-    let confidenceBand: HomeAssistantCommandConfidenceBand
+struct MarinaCommandPlan: Equatable {
+    let intent: MarinaCommandIntent
+    let confidenceBand: MarinaCommandConfidenceBand
     let rawPrompt: String
     let amount: Double?
     let originalAmount: Double?
@@ -1200,15 +1200,15 @@ struct HomeAssistantCommandPlan: Equatable {
     let yearlyMonth: Int?
     let yearlyDayOfMonth: Int?
     let recurrenceEndDate: Date?
-    let plannedExpenseAmountTarget: HomeAssistantPlannedExpenseAmountTarget?
+    let plannedExpenseAmountTarget: MarinaPlannedExpenseAmountTarget?
     let attachAllCards: Bool?
     let attachAllPresets: Bool?
     let selectedCardNames: [String]
     let selectedPresetTitles: [String]
 
     init(
-        intent: HomeAssistantCommandIntent,
-        confidenceBand: HomeAssistantCommandConfidenceBand,
+        intent: MarinaCommandIntent,
+        confidenceBand: MarinaCommandConfidenceBand,
         rawPrompt: String,
         amount: Double? = nil,
         originalAmount: Double? = nil,
@@ -1233,7 +1233,7 @@ struct HomeAssistantCommandPlan: Equatable {
         yearlyMonth: Int? = nil,
         yearlyDayOfMonth: Int? = nil,
         recurrenceEndDate: Date? = nil,
-        plannedExpenseAmountTarget: HomeAssistantPlannedExpenseAmountTarget? = nil,
+        plannedExpenseAmountTarget: MarinaPlannedExpenseAmountTarget? = nil,
         attachAllCards: Bool? = nil,
         attachAllPresets: Bool? = nil,
         selectedCardNames: [String] = [],
@@ -1273,7 +1273,7 @@ struct HomeAssistantCommandPlan: Equatable {
     }
 }
 
-extension HomeAssistantCommandPlan {
+extension MarinaCommandPlan {
     func updating(
         cardName: String? = nil,
         categoryName: String? = nil,
@@ -1282,9 +1282,9 @@ extension HomeAssistantCommandPlan {
         isPlannedIncome: Bool? = nil,
         recurrenceFrequencyRaw: String? = nil,
         recurrenceInterval: Int? = nil,
-        plannedExpenseAmountTarget: HomeAssistantPlannedExpenseAmountTarget? = nil
-    ) -> HomeAssistantCommandPlan {
-        HomeAssistantCommandPlan(
+        plannedExpenseAmountTarget: MarinaPlannedExpenseAmountTarget? = nil
+    ) -> MarinaCommandPlan {
+        MarinaCommandPlan(
             intent: intent,
             confidenceBand: confidenceBand,
             rawPrompt: rawPrompt,
@@ -1320,7 +1320,7 @@ extension HomeAssistantCommandPlan {
     }
 }
 
-struct HomeAssistantMutationResult {
+struct MarinaMutationResult {
     let title: String
     let subtitle: String?
     let rows: [HomeAnswerRow]

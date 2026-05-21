@@ -312,8 +312,8 @@ struct HomeQueryEngine {
 
     // MARK: - Suggestions
 
-    func defaultSuggestions() -> [HomeAssistantSuggestion] {
-        HomeAssistantPresetPromptCatalog.defaultSuggestions()
+    func defaultSuggestions() -> [MarinaSuggestion] {
+        MarinaPresetPromptCatalog.defaultSuggestions()
     }
 
     // MARK: - Intent handlers

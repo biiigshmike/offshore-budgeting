@@ -1,5 +1,5 @@
 //
-//  HomeAssistantTelemetryStoreTests.swift
+//  MarinaTelemetryStoreTests.swift
 //  OffshoreBudgetingTests
 //
 //  Created by Michael Brown on 2/8/26.
@@ -10,7 +10,7 @@ import Testing
 @testable import Offshore
 
 @MainActor
-struct HomeAssistantTelemetryStoreTests {
+struct MarinaTelemetryStoreTests {
 
     @Test func loadEvents_returnsEmptyWhenNoDataExists() throws {
         let setup = makeStore()
@@ -43,7 +43,7 @@ struct HomeAssistantTelemetryStoreTests {
         defer { clearDefaults(setup.suiteName) }
 
         let workspaceID = UUID()
-        let total = HomeAssistantTelemetryStore.maxStoredEvents + 7
+        let total = MarinaTelemetryStore.maxStoredEvents + 7
 
         for index in 1...total {
             setup.store.appendEvent(makeEvent(index: index), workspaceID: workspaceID)
@@ -51,7 +51,7 @@ struct HomeAssistantTelemetryStoreTests {
 
         let loaded = setup.store.loadEvents(workspaceID: workspaceID)
 
-        #expect(loaded.count == HomeAssistantTelemetryStore.maxStoredEvents)
+        #expect(loaded.count == MarinaTelemetryStore.maxStoredEvents)
         #expect(loaded.first?.prompt == "Prompt 8")
         #expect(loaded.last?.prompt == "Prompt \(total)")
     }
@@ -89,12 +89,12 @@ struct HomeAssistantTelemetryStoreTests {
 
     // MARK: - Helpers
 
-    private func makeStore() -> (store: HomeAssistantTelemetryStore, suiteName: String) {
-        let suiteName = "HomeAssistantTelemetryStoreTests.\(UUID().uuidString)"
+    private func makeStore() -> (store: MarinaTelemetryStore, suiteName: String) {
+        let suiteName = "MarinaTelemetryStoreTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName) ?? .standard
 
         return (
-            store: HomeAssistantTelemetryStore(
+            store: MarinaTelemetryStore(
                 userDefaults: defaults,
                 storageKeyPrefix: "test.assistant.telemetry"
             ),
@@ -106,8 +106,8 @@ struct HomeAssistantTelemetryStoreTests {
         UserDefaults(suiteName: suiteName)?.removePersistentDomain(forName: suiteName)
     }
 
-    private func makeEvent(index: Int) -> HomeAssistantTelemetryEvent {
-        HomeAssistantTelemetryEvent(
+    private func makeEvent(index: Int) -> MarinaTelemetryEvent {
+        MarinaTelemetryEvent(
             id: UUID(uuidString: String(format: "90000000-0000-0000-0000-%012d", index)) ?? UUID(),
             timestamp: Date(timeIntervalSince1970: TimeInterval(index)),
             prompt: "Prompt \(index)",

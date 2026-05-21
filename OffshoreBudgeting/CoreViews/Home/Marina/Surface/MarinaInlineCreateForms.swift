@@ -1,7 +1,7 @@
 import SwiftUI
 
-struct HomeAssistantInlineCreateFormCard: View {
-    @Binding var form: HomeAssistantInlineCreateForm
+struct MarinaInlineCreateFormCard: View {
+    @Binding var form: MarinaInlineCreateForm
     let cards: [Card]
     let categories: [Category]
     let presets: [Preset]

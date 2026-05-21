@@ -1,5 +1,5 @@
 //
-//  HomeAssistantFollowUpSuggestionBuilder.swift
+//  MarinaFollowUpSuggestionBuilder.swift
 //  OffshoreBudgeting
 //
 //  Created by OpenAI Codex on 5/21/26.
@@ -7,22 +7,22 @@
 
 import Foundation
 
-struct HomeAssistantFollowUpSuggestionBuilder {
+struct MarinaFollowUpSuggestionBuilder {
     func suggestions(
         after answer: HomeAnswer,
         executedQuery: HomeQuery? = nil
-    ) -> [HomeAssistantSuggestion] {
+    ) -> [MarinaSuggestion] {
         let confidenceCue = confidenceCue(for: answer)
 
-        func makeSuggestion(_ action: String, query: HomeQuery) -> HomeAssistantSuggestion {
-            HomeAssistantSuggestion(
+        func makeSuggestion(_ action: String, query: HomeQuery) -> MarinaSuggestion {
+            MarinaSuggestion(
                 title: action,
                 query: query
             )
         }
 
-        func contextSuggestions(_ suggestions: [HomeAssistantSuggestion], excluding executedQuery: HomeQuery) -> [HomeAssistantSuggestion] {
-            var unique: [HomeAssistantSuggestion] = []
+        func contextSuggestions(_ suggestions: [MarinaSuggestion], excluding executedQuery: HomeQuery) -> [MarinaSuggestion] {
+            var unique: [MarinaSuggestion] = []
             var seen: Set<String> = []
             for suggestion in suggestions where isSameQueryShape(suggestion.query, executedQuery) == false {
                 let key = suggestionKey(suggestion.query)

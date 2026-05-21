@@ -44,7 +44,7 @@ struct WhatIfScenarioPlannerView: View {
     /// If provided, the planner will open with this scenario selected.
     /// Used by Home inline previews to jump straight into a pinned scenario.
     let initialScenarioID: UUID?
-    let initialDraft: HomeAssistantWhatIfPlannerDraft?
+    let initialDraft: WhatIfPlannerDraft?
     
     @State private var pinnedRefreshTick: Int = 0
 
@@ -790,7 +790,7 @@ struct WhatIfScenarioPlannerView: View {
         scenarios = store.listGlobalScenarios()
     }
 
-    private func applyTransientDraft(_ draft: HomeAssistantWhatIfPlannerDraft) {
+    private func applyTransientDraft(_ draft: WhatIfPlannerDraft) {
         var overrides: [UUID: WhatIfScenarioStore.WhatIfCategoryBounds] = [:]
 
         for (categoryID, scenarioSpend) in draft.categoryScenarioSpendByID {

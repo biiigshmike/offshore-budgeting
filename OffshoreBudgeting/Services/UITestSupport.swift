@@ -53,7 +53,7 @@ enum UITestSupport {
 
         if isMarinaHarnessEnabled {
             applyMarinaHarnessDefaults(defaults)
-            clearHomeAssistantConversationDefaults(defaults)
+            clearMarinaConversationDefaults(defaults)
             defaults.synchronize()
             return
         }
@@ -75,7 +75,7 @@ enum UITestSupport {
         defaults.set(0.0, forKey: "icloud_bootstrapStartedAt")
     }
 
-    private static func clearHomeAssistantConversationDefaults(_ defaults: UserDefaults) {
+    private static func clearMarinaConversationDefaults(_ defaults: UserDefaults) {
         let prefix = "home.assistant.answers."
         for key in defaults.dictionaryRepresentation().keys where key.hasPrefix(prefix) {
             defaults.removeObject(forKey: key)

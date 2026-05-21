@@ -454,14 +454,14 @@ struct MarinaUITestDriver {
                 reason: "Expected trace prompt '\(prompt)', saw '\(trace.originalPrompt)'."
             )
         }
-        guard trace.routingMode == "foundation_pipeline" else {
+        guard trace.routingMode == "foundationPipeline" else {
             if allowCommandOrUnsupportedTrace,
                expectation?.outcome == .typedUnsupported {
                 return MarinaSurfaceResult(passed: true, category: .pass, reason: "Prompt was handled outside the Foundation read route.")
             }
-            return MarinaSurfaceResult(passed: false, category: .wrongRuntimeRoute, reason: "Expected foundation_pipeline, saw \(trace.routingMode).")
+            return MarinaSurfaceResult(passed: false, category: .wrongRuntimeRoute, reason: "Expected foundationPipeline, saw \(trace.routingMode).")
         }
-        if trace.selectedRoute != "foundation_models" && trace.selectedRoute != "clarification" {
+        if trace.selectedRoute != "foundationModels" && trace.selectedRoute != "clarification" {
             return MarinaSurfaceResult(passed: false, category: .nonFoundationRouteInterception, reason: "Prompt did not select the Foundation Models route.")
         }
         if trace.foundationPipelinePath != "foundationModels" {

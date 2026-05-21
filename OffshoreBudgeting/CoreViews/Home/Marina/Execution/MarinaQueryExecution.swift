@@ -1207,7 +1207,7 @@ struct MarinaQueryExecutor {
             return .unsupported(
                 MarinaTypedUnsupportedResponse(
                     kind: kind,
-                    message: "No shared Marina executor supports this plan shape.",
+                    message: "No deterministic Marina executor supports this plan shape.",
                     candidate: candidate
                 )
             )
@@ -1386,7 +1386,7 @@ struct MarinaQueryExecutor {
         .unsupported(
             MarinaTypedUnsupportedResponse(
                 kind: .unsupportedCombination,
-                message: "No shared Marina executor supports this plan shape.",
+                message: "No deterministic Marina executor supports this plan shape.",
                 candidate: candidate
             )
         )

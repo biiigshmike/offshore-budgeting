@@ -883,7 +883,7 @@ struct MarinaFoundationModelsInterpreterTests {
         MarinaInterpretationContext(
             workspaceName: "Test Workspace",
             defaultPeriodUnit: .month,
-            sessionContext: HomeAssistantSessionContext(),
+            sessionContext: MarinaSessionContext(),
             priorQueryContext: MarinaPriorQueryContext(
                 lastQueryPlan: nil,
                 lastMetric: nil,

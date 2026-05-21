@@ -1,5 +1,5 @@
 //
-//  HomeAssistantConversationStoreTests.swift
+//  MarinaConversationStoreTests.swift
 //  OffshoreBudgetingTests
 //
 //  Created by Michael Brown on 2/8/26.
@@ -10,7 +10,7 @@ import Testing
 @testable import Offshore
 
 @MainActor
-struct HomeAssistantConversationStoreTests {
+struct MarinaConversationStoreTests {
 
     // MARK: - Load/Save
 
@@ -52,7 +52,7 @@ struct HomeAssistantConversationStoreTests {
                 title: "Create Expense",
                 subtitle: nil,
                 attachment: .inlineCreateForm(
-                    HomeAssistantInlineCreateForm(
+                    MarinaInlineCreateForm(
                         entity: .expense,
                         summary: "Prefilled from your message.",
                         amountText: "18",
@@ -84,7 +84,7 @@ struct HomeAssistantConversationStoreTests {
                 title: "Create Card",
                 subtitle: nil,
                 attachment: .inlineCreateForm(
-                    HomeAssistantInlineCreateForm(
+                    MarinaInlineCreateForm(
                         entity: .card,
                         summary: nil,
                         nameText: "Travel Card",
@@ -109,13 +109,13 @@ struct HomeAssistantConversationStoreTests {
         defer { clearDefaults(setup.suiteName) }
 
         let workspaceID = UUID()
-        let total = HomeAssistantConversationStore.maxStoredAnswers + 12
+        let total = MarinaConversationStore.maxStoredAnswers + 12
         let input = (1...total).map { makeAnswer(index: $0) }
 
         setup.store.saveAnswers(input, workspaceID: workspaceID)
         let loaded = setup.store.loadAnswers(workspaceID: workspaceID)
 
-        #expect(loaded.count == HomeAssistantConversationStore.maxStoredAnswers)
+        #expect(loaded.count == MarinaConversationStore.maxStoredAnswers)
         #expect(loaded.first?.title == "Answer 13")
         #expect(loaded.last?.title == "Answer \(total)")
     }
@@ -144,12 +144,12 @@ struct HomeAssistantConversationStoreTests {
 
     // MARK: - Helpers
 
-    private func makeStore() -> (store: HomeAssistantConversationStore, suiteName: String) {
-        let suiteName = "HomeAssistantConversationStoreTests.\(UUID().uuidString)"
+    private func makeStore() -> (store: MarinaConversationStore, suiteName: String) {
+        let suiteName = "MarinaConversationStoreTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName) ?? .standard
 
         return (
-            store: HomeAssistantConversationStore(
+            store: MarinaConversationStore(
                 userDefaults: defaults,
                 storageKeyPrefix: "test.assistant.answers"
             ),

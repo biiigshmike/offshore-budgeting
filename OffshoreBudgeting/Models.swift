@@ -1172,7 +1172,7 @@ final class ImportMerchantRule {
 
 // MARK: - Assistant Alias Rule
 
-enum HomeAssistantAliasEntityType: String, Codable, CaseIterable, Identifiable {
+enum MarinaAliasEntityType: String, Codable, CaseIterable, Identifiable {
     case card
     case category
     case incomeSource
@@ -1189,7 +1189,7 @@ final class AssistantAliasRule {
     var id: UUID = UUID()
     var aliasKey: String = ""
     var targetValue: String = ""
-    var entityTypeRaw: String = HomeAssistantAliasEntityType.category.rawValue
+    var entityTypeRaw: String = MarinaAliasEntityType.category.rawValue
 
     @Relationship(inverse: \Workspace.assistantAliasRules)
     var workspace: Workspace? = nil
@@ -1197,8 +1197,8 @@ final class AssistantAliasRule {
     var createdAt: Date = Date.now
     var updatedAt: Date = Date.now
 
-    var entityType: HomeAssistantAliasEntityType {
-        get { HomeAssistantAliasEntityType(rawValue: entityTypeRaw) ?? .category }
+    var entityType: MarinaAliasEntityType {
+        get { MarinaAliasEntityType(rawValue: entityTypeRaw) ?? .category }
         set { entityTypeRaw = newValue.rawValue }
     }
 
@@ -1206,7 +1206,7 @@ final class AssistantAliasRule {
         id: UUID = UUID(),
         aliasKey: String,
         targetValue: String,
-        entityType: HomeAssistantAliasEntityType,
+        entityType: MarinaAliasEntityType,
         workspace: Workspace? = nil,
         createdAt: Date = Date.now,
         updatedAt: Date = Date.now

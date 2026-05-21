@@ -19,7 +19,7 @@ struct MarinaCrudParityTests {
         let delete: Support
     }
 
-    private let mutationService = HomeAssistantMutationService()
+    private let mutationService = MarinaMutationService()
 
     private var coreCrudMatrix: [CrudParityRow] {
         [
@@ -62,10 +62,6 @@ struct MarinaCrudParityTests {
         try context.fetch(FetchDescriptor<T>())
     }
 
-    private func makeCommandParser() -> HomeAssistantCommandParser {
-        HomeAssistantCommandParser()
-    }
-
     private func makeWorkspace(in context: ModelContext) throws -> Workspace {
         let workspace = Workspace(name: "WS", hexColor: "#3B82F6")
         context.insert(workspace)
@@ -89,30 +85,35 @@ struct MarinaCrudParityTests {
         ])
     }
 
-    @Test func parser_supportedCrudPrompts_mapToCurrentCoreEntityIntents() {
-        let parser = makeCommandParser()
+    @Test func mutationIntentGuard_identifiesCrudPromptsForDeferralOnly() {
+        let guardrail = MarinaMutationIntentGuard()
+        let mutationPrompts = [
+            "add expense coffee $18",
+            "edit expense coffee $20",
+            "delete expense $20 coffee",
+            "add income paycheck $1200",
+            "edit income paycheck to $1400",
+            "delete income paycheck $1400",
+            "create card named Travel Card",
+            "edit card named Travel Card theme aqua",
+            "remove card named Travel Card",
+            "edit category groceries to dining",
+            "delete category groceries",
+            "edit preset rent to 1600",
+            "delete preset rent",
+            "edit budget March 2026 to April 2026",
+            "delete budget March 2026",
+            "create planned expense rent 1450 on 2026-03-01",
+            "edit planned expense rent actual to $1450",
+            "delete planned expense rent"
+        ]
 
-        #expect(parser.parse("add expense coffee $18")?.intent == .addExpense)
-        #expect(parser.parse("edit expense coffee $20")?.intent == .editExpense)
-        #expect(parser.parse("delete expense $20 coffee")?.intent == .deleteExpense)
+        for prompt in mutationPrompts {
+            #expect(guardrail.isMutationPrompt(prompt), "Expected mutation guard to catch \(prompt)")
+        }
 
-        #expect(parser.parse("add income paycheck $1200")?.intent == .addIncome)
-        #expect(parser.parse("edit income paycheck to $1400")?.intent == .editIncome)
-        #expect(parser.parse("delete income paycheck $1400")?.intent == .deleteIncome)
-
-        #expect(parser.parse("create card named Travel Card")?.intent == .addCard)
-        #expect(parser.parse("edit card named Travel Card theme aqua")?.intent == .editCard)
-        #expect(parser.parse("remove card named Travel Card")?.intent == .deleteCard)
-
-        #expect(parser.parse("edit category groceries to dining")?.intent == .editCategory)
-        #expect(parser.parse("delete category groceries")?.intent == .deleteCategory)
-        #expect(parser.parse("edit preset rent to 1600")?.intent == .editPreset)
-        #expect(parser.parse("delete preset rent")?.intent == .deletePreset)
-        #expect(parser.parse("edit budget March 2026 to April 2026")?.intent == .editBudget)
-        #expect(parser.parse("delete budget March 2026")?.intent == .deleteBudget)
-        #expect(parser.parse("create planned expense rent 1450 on 2026-03-01")?.intent == .addPlannedExpense)
-        #expect(parser.parse("edit planned expense rent actual to $1450")?.intent == .editPlannedExpense)
-        #expect(parser.parse("delete planned expense rent")?.intent == .deletePlannedExpense)
+        #expect(guardrail.isMutationPrompt("what did I spend this month") == false)
+        #expect(guardrail.isMutationPrompt("compare groceries to last month") == false)
     }
 
     @Test func expenseCrud_supportedMutationFlow_persistsCreateUpdateDeleteAndCategoryMove() throws {
@@ -143,7 +144,7 @@ struct MarinaCrudParityTests {
         #expect(expenses[0].descriptionText == "Coffee")
         #expect(expenses[0].category?.name == "Dining")
 
-        let editCommand = HomeAssistantCommandPlan(
+        let editCommand = MarinaCommandPlan(
             intent: .editExpense,
             confidenceBand: .high,
             rawPrompt: "edit expense coffee to $20",
@@ -194,7 +195,7 @@ struct MarinaCrudParityTests {
         #expect(incomes[0].source == "Paycheck")
         #expect(incomes[0].isPlanned)
 
-        let editCommand = HomeAssistantCommandPlan(
+        let editCommand = MarinaCommandPlan(
             intent: .editIncome,
             confidenceBand: .high,
             rawPrompt: "edit income paycheck to 1400 actual",
@@ -294,7 +295,7 @@ struct MarinaCrudParityTests {
         #expect(presetResult.title == "Preset created")
 
         let createdPreset = try #require(fetchAll(Preset.self, in: context).first(where: { $0.title == "Rent" }))
-        let presetEditCommand = HomeAssistantCommandPlan(
+        let presetEditCommand = MarinaCommandPlan(
             intent: .editPreset,
             confidenceBand: .high,
             rawPrompt: "edit preset rent to 1600",
@@ -325,7 +326,7 @@ struct MarinaCrudParityTests {
         #expect(budgetResult.title == "Budget created")
 
         let createdBudget = try #require(fetchAll(Budget.self, in: context).first(where: { $0.name == "March 2026" }))
-        let budgetEditCommand = HomeAssistantCommandPlan(
+        let budgetEditCommand = MarinaCommandPlan(
             intent: .editBudget,
             confidenceBand: .high,
             rawPrompt: "edit budget March 2026 to April 2026",
@@ -355,7 +356,7 @@ struct MarinaCrudParityTests {
         #expect(plannedExpenseResult.title == "Planned expense created")
 
         let plannedExpense = try #require(fetchAll(PlannedExpense.self, in: context).first(where: { $0.title == "Rent" }))
-        let plannedEditCommand = HomeAssistantCommandPlan(
+        let plannedEditCommand = MarinaCommandPlan(
             intent: .editPlannedExpense,
             confidenceBand: .high,
             rawPrompt: "edit planned expense rent actual to $1450",

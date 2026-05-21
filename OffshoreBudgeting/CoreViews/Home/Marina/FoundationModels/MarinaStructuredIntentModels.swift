@@ -1,5 +1,5 @@
 //
-//  MarinaLanguageModels.swift
+//  MarinaStructuredIntentModels.swift
 //  OffshoreBudgeting
 //
 //  Created by OpenAI Codex on 4/15/26.
@@ -160,7 +160,7 @@ struct MarinaPriorQueryContext: Equatable {
     let lastQueryPlan: HomeQueryPlan?
     let lastMetric: HomeQueryMetric?
     let lastTargetName: String?
-    let lastTargetType: HomeAssistantAnswerTargetType?
+    let lastTargetType: MarinaAnswerTargetType?
     let lastDateRange: HomeQueryDateRange?
     let lastResultLimit: Int?
     let lastPeriodUnit: HomeQueryPeriodUnit?
@@ -189,7 +189,7 @@ struct MarinaInterpretationContext {
     let workspaceName: String
     let defaultPeriodUnit: HomeQueryPeriodUnit
     let ambientDateRange: HomeQueryDateRange?
-    let sessionContext: HomeAssistantSessionContext
+    let sessionContext: MarinaSessionContext
     let priorQueryContext: MarinaPriorQueryContext
     let cardNames: [String]
     let categoryNames: [String]
@@ -203,7 +203,7 @@ struct MarinaInterpretationContext {
         workspaceName: String,
         defaultPeriodUnit: HomeQueryPeriodUnit,
         ambientDateRange: HomeQueryDateRange? = nil,
-        sessionContext: HomeAssistantSessionContext,
+        sessionContext: MarinaSessionContext,
         priorQueryContext: MarinaPriorQueryContext,
         cardNames: [String],
         categoryNames: [String],

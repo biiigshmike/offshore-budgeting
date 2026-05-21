@@ -85,7 +85,7 @@ final class MarinaAssistantUITests: XCTestCase {
             "clarificationAnswer",
             "Expected a clarificationAnswer trace after tapping a chip. latestTrace=\(String(describing: driver.latestTrace())) chips=\(driver.clarificationChipTitles())"
         )
-        XCTAssertTrue(["foundation_models", "clarification"].contains(resumedTrace?.selectedRoute ?? ""))
+        XCTAssertTrue(["foundationModels", "clarification"].contains(resumedTrace?.selectedRoute ?? ""))
         XCTAssertEqual(resumedTrace?.foundationPipelinePath, "foundationModels")
 
         reporter.attach(to: self)
@@ -108,7 +108,7 @@ final class MarinaAssistantUITests: XCTestCase {
 
         let resumedTrace = driver.typeClarificationReplyAndWaitForResume("category", timeout: 15)
         XCTAssertEqual(resumedTrace?.turnClassification, "clarificationAnswer")
-        XCTAssertTrue(["foundation_models", "clarification"].contains(resumedTrace?.selectedRoute ?? ""))
+        XCTAssertTrue(["foundationModels", "clarification"].contains(resumedTrace?.selectedRoute ?? ""))
         XCTAssertEqual(resumedTrace?.foundationPipelinePath, "foundationModels")
 
         reporter.attach(to: self)
@@ -134,7 +134,7 @@ final class MarinaAssistantUITests: XCTestCase {
 
         let resumedTrace = driver.typeClarificationReplyAndWaitForResume(chipTitle, timeout: 15)
         XCTAssertEqual(resumedTrace?.turnClassification, "clarificationAnswer")
-        XCTAssertTrue(["foundation_models", "clarification"].contains(resumedTrace?.selectedRoute ?? ""))
+        XCTAssertTrue(["foundationModels", "clarification"].contains(resumedTrace?.selectedRoute ?? ""))
         XCTAssertEqual(resumedTrace?.foundationPipelinePath, "foundationModels")
 
         reporter.attach(to: self)
@@ -209,7 +209,7 @@ final class MarinaAssistantUITests: XCTestCase {
             let report = driver.runPrompt(prompt.text, expectation: prompt.expectation, timeout: 8)
             reporter.record(report)
             XCTAssertTrue(report.result.passed, report.result.reason)
-            XCTAssertTrue(["foundation_models", "clarification"].contains(report.selectedRoute ?? ""))
+            XCTAssertTrue(["foundationModels", "clarification"].contains(report.selectedRoute ?? ""))
             XCTAssertEqual(report.trace?.foundationPipelinePath, "foundationModels")
         }
     }

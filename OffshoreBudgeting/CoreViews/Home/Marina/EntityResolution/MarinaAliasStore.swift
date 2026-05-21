@@ -1,5 +1,5 @@
 //
-//  HomeAssistantAliasStore.swift
+//  MarinaAliasStore.swift
 //  OffshoreBudgeting
 //
 //  Created by Michael Brown on 2/8/26.
@@ -11,12 +11,12 @@ import SwiftData
 // MARK: - Alias Store
 
 @MainActor
-struct HomeAssistantAliasStore {
+struct MarinaAliasStore {
 
     static func upsertRule(
         aliasKey: String,
         targetValue: String,
-        entityType: HomeAssistantAliasEntityType,
+        entityType: MarinaAliasEntityType,
         workspace: Workspace,
         modelContext: ModelContext
     ) {

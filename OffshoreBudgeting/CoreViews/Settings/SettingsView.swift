@@ -33,6 +33,9 @@ struct SettingsView: View {
         case quickActions
         case manageCategories
         case managePresets
+        #if DEBUG
+        case marinaDiagnostics
+        #endif
     }
 
     private struct SettingsRowModel: Identifiable {
@@ -250,6 +253,10 @@ struct SettingsView: View {
             ManageCategoriesView(workspace: workspace)
         case .managePresets:
             ManagePresetsView(workspace: workspace)
+        #if DEBUG
+        case .marinaDiagnostics:
+            MarinaFoundationReadinessView(workspace: workspace)
+        #endif
         }
     }
 
@@ -263,7 +270,7 @@ struct SettingsView: View {
     }
 
     private func buildSectionModels() -> [SettingsSectionModel] {
-        [
+        var sections = [
             SettingsSectionModel(
                 id: "about",
                 rows: [
@@ -304,6 +311,22 @@ struct SettingsView: View {
                 ]
             )
         ]
+        #if DEBUG
+        sections.append(
+            SettingsSectionModel(
+                id: "debug",
+                rows: [
+                    SettingsRowModel(
+                        id: .marinaDiagnostics,
+                        title: "Marina Diagnostics",
+                        systemImage: "apple.intelligence",
+                        tint: Color(.systemIndigo)
+                    )
+                ]
+            )
+        )
+        #endif
+        return sections
     }
 
     private func buildWorkspaceMenuItems() -> [WorkspaceMenuItemModel] {

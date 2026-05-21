@@ -8,15 +8,12 @@ enum MarinaPromptTurnClassification: String, Codable, Equatable, Sendable {
 }
 
 struct MarinaPromptTurnClassifier {
-    private let commandGuard: HomeAssistantFoundationPipelineCommandGuard
-    private let parser: HomeAssistantTextParser
+    private let mutationGuard: MarinaMutationIntentGuard
 
     init(
-        commandGuard: HomeAssistantFoundationPipelineCommandGuard = HomeAssistantFoundationPipelineCommandGuard(),
-        parser: HomeAssistantTextParser = HomeAssistantTextParser()
+        mutationGuard: MarinaMutationIntentGuard = MarinaMutationIntentGuard()
     ) {
-        self.commandGuard = commandGuard
-        self.parser = parser
+        self.mutationGuard = mutationGuard
     }
 
     func classify(
@@ -27,7 +24,7 @@ struct MarinaPromptTurnClassifier {
         let normalized = Self.normalized(prompt)
         guard normalized.isEmpty == false else { return .freshQuestion }
 
-        if commandGuard.command(for: prompt, defaultPeriodUnit: defaultPeriodUnit) != nil {
+        if mutationGuard.isMutationPrompt(prompt) {
             return .command
         }
 
@@ -35,7 +32,7 @@ struct MarinaPromptTurnClassifier {
             return .followUp
         }
 
-        if parser.parsePlan(prompt, defaultPeriodUnit: defaultPeriodUnit) != nil || isSelfContainedQuestion(normalized) {
+        if isSelfContainedQuestion(normalized) {
             return .freshQuestion
         }
 
@@ -83,8 +80,7 @@ struct MarinaPromptTurnClassifier {
             "compare with ",
             "compare this to ",
             "compare that",
-            "compare it",
-            "what if "
+            "compare it"
         ]
         if prefixes.contains(where: { normalized.hasPrefix($0) }) {
             return true

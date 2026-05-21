@@ -1,5 +1,5 @@
 //
-//  HomeAssistantPresentationResolver.swift
+//  MarinaPanelPresentationResolver.swift
 //  OffshoreBudgeting
 //
 //  Created by Michael Brown on 2/8/26.
@@ -9,14 +9,14 @@ import SwiftUI
 
 // MARK: - Assistant Presentation
 
-enum HomeAssistantPresentationMode: Equatable {
+enum MarinaPanelPresentationMode: Equatable {
     case inspector
     case sheet
     case fullScreen
 }
 
-struct HomeAssistantPresentationPlan: Equatable {
-    let mode: HomeAssistantPresentationMode
+struct MarinaPanelPresentationPlan: Equatable {
+    let mode: MarinaPanelPresentationMode
     let showsBottomLauncher: Bool
     let showsToolbarButton: Bool
     let detents: Set<PresentationDetent>
@@ -24,7 +24,7 @@ struct HomeAssistantPresentationPlan: Equatable {
     let prefersInlineInspectorWhenAvailable: Bool
 }
 
-enum HomeAssistantPresentationResolver {
+enum MarinaPanelPresentationResolver {
 
     // MARK: - Resolve
 
@@ -33,12 +33,12 @@ enum HomeAssistantPresentationResolver {
         supportsInlineInspector: Bool,
         dynamicTypeSize: DynamicTypeSize,
         voiceOverEnabled: Bool
-    ) -> HomeAssistantPresentationPlan {
+    ) -> MarinaPanelPresentationPlan {
         let width = max(0, containerWidth)
         let isAccessibilityLayout = voiceOverEnabled || dynamicTypeSize.isAccessibilitySize
 
         if isAccessibilityLayout || width < 540 {
-            return HomeAssistantPresentationPlan(
+            return MarinaPanelPresentationPlan(
                 mode: .fullScreen,
                 showsBottomLauncher: supportsInlineInspector == false,
                 showsToolbarButton: supportsInlineInspector,
@@ -49,7 +49,7 @@ enum HomeAssistantPresentationResolver {
         }
 
         if width < 900 {
-            return HomeAssistantPresentationPlan(
+            return MarinaPanelPresentationPlan(
                 mode: .sheet,
                 showsBottomLauncher: supportsInlineInspector == false,
                 showsToolbarButton: supportsInlineInspector,
@@ -60,7 +60,7 @@ enum HomeAssistantPresentationResolver {
         }
 
         if supportsInlineInspector {
-            return HomeAssistantPresentationPlan(
+            return MarinaPanelPresentationPlan(
                 mode: .inspector,
                 showsBottomLauncher: false,
                 showsToolbarButton: true,
@@ -70,7 +70,7 @@ enum HomeAssistantPresentationResolver {
             )
         }
 
-        return HomeAssistantPresentationPlan(
+        return MarinaPanelPresentationPlan(
             mode: .sheet,
             showsBottomLauncher: false,
             showsToolbarButton: true,

@@ -1,5 +1,5 @@
 //
-//  HomeAssistantTelemetryStore.swift
+//  MarinaTelemetryStore.swift
 //  OffshoreBudgeting
 //
 //  Created by Michael Brown on 2/8/26.
@@ -9,18 +9,18 @@ import Foundation
 
 // MARK: - Telemetry Models
 
-enum HomeAssistantTelemetryOutcome: String, Codable, Equatable {
+enum MarinaTelemetryOutcome: String, Codable, Equatable {
     case resolved
     case clarification
     case unresolved
 }
 
-struct HomeAssistantTelemetryEvent: Codable, Equatable, Identifiable {
+struct MarinaTelemetryEvent: Codable, Equatable, Identifiable {
     let id: UUID
     let timestamp: Date
     let prompt: String
     let normalizedPrompt: String
-    let outcome: HomeAssistantTelemetryOutcome
+    let outcome: MarinaTelemetryOutcome
     let source: String?
     let intentRawValue: String?
     let confidenceRawValue: String?
@@ -32,7 +32,7 @@ struct HomeAssistantTelemetryEvent: Codable, Equatable, Identifiable {
         timestamp: Date = Date(),
         prompt: String,
         normalizedPrompt: String,
-        outcome: HomeAssistantTelemetryOutcome,
+        outcome: MarinaTelemetryOutcome,
         source: String? = nil,
         intentRawValue: String? = nil,
         confidenceRawValue: String? = nil,
@@ -54,7 +54,7 @@ struct HomeAssistantTelemetryEvent: Codable, Equatable, Identifiable {
 
 // MARK: - Telemetry Store
 
-final class HomeAssistantTelemetryStore {
+final class MarinaTelemetryStore {
     static let maxStoredEvents = 300
 
     private let userDefaults: UserDefaults
@@ -70,18 +70,18 @@ final class HomeAssistantTelemetryStore {
         self.storageKeyPrefix = storageKeyPrefix
     }
 
-    func loadEvents(workspaceID: UUID) -> [HomeAssistantTelemetryEvent] {
+    func loadEvents(workspaceID: UUID) -> [MarinaTelemetryEvent] {
         let key = storageKey(for: workspaceID)
         guard let data = userDefaults.data(forKey: key) else { return [] }
 
         do {
-            return try decoder.decode([HomeAssistantTelemetryEvent].self, from: data)
+            return try decoder.decode([MarinaTelemetryEvent].self, from: data)
         } catch {
             return []
         }
     }
 
-    func appendEvent(_ event: HomeAssistantTelemetryEvent, workspaceID: UUID) {
+    func appendEvent(_ event: MarinaTelemetryEvent, workspaceID: UUID) {
         var events = loadEvents(workspaceID: workspaceID)
         events.append(event)
         saveEvents(events, workspaceID: workspaceID)
@@ -93,7 +93,7 @@ final class HomeAssistantTelemetryStore {
 
     // MARK: - Helpers
 
-    private func saveEvents(_ events: [HomeAssistantTelemetryEvent], workspaceID: UUID) {
+    private func saveEvents(_ events: [MarinaTelemetryEvent], workspaceID: UUID) {
         let trimmed = trim(events)
         let key = storageKey(for: workspaceID)
 
@@ -109,7 +109,7 @@ final class HomeAssistantTelemetryStore {
         "\(storageKeyPrefix).\(workspaceID.uuidString)"
     }
 
-    private func trim(_ events: [HomeAssistantTelemetryEvent]) -> [HomeAssistantTelemetryEvent] {
+    private func trim(_ events: [MarinaTelemetryEvent]) -> [MarinaTelemetryEvent] {
         guard events.count > Self.maxStoredEvents else { return events }
         return Array(events.suffix(Self.maxStoredEvents))
     }

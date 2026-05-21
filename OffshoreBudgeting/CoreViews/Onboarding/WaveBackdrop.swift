@@ -78,7 +78,7 @@ struct WaveBackdrop: View {
     /// iPhone needs slightly smaller, more frequent shapes.
     /// Big canvases can handle larger blobs.
     private var blobScale: Double {
-        // This is a simple heuristic that works well cross-device:
+        // This simple sizing rule works well cross-device:
         // smaller scale means more shapes visible on iPhone.
         return isExiting ? 1.0 : 0.92
     }

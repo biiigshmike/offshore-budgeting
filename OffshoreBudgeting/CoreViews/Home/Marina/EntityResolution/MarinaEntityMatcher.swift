@@ -1,5 +1,5 @@
 //
-//  HomeAssistantEntityMatcher.swift
+//  MarinaEntityMatcher.swift
 //  OffshoreBudgeting
 //
 //  Created by Michael Brown on 2/8/26.
@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct HomeAssistantEntityMatcher {
+struct MarinaEntityMatcher {
 
     func bestCardMatch(in prompt: String, cards: [Card]) -> String? {
         bestMatch(in: prompt, candidateNames: cards.map(\.name))

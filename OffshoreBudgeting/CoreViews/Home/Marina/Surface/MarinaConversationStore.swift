@@ -1,5 +1,5 @@
 //
-//  HomeAssistantConversationStore.swift
+//  MarinaConversationStore.swift
 //  OffshoreBudgeting
 //
 //  Created by Michael Brown on 2/8/26.
@@ -9,7 +9,7 @@ import Foundation
 
 // MARK: - Conversation Store
 
-final class HomeAssistantConversationStore {
+final class MarinaConversationStore {
     static let maxStoredAnswers = 50
 
     private let userDefaults: UserDefaults

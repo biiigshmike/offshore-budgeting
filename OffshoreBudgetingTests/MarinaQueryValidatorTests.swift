@@ -548,7 +548,7 @@ struct MarinaQueryValidatorTests {
         }
     }
 
-    @Test func validator_blocksStep5MutationsFromSharedReadPipeline() {
+    @Test func validator_blocksStep5MutationsFromFoundationReadPipeline() {
         let prompts = [
             "create settlement with Roommate for $20",
             "mark Roommate paid",

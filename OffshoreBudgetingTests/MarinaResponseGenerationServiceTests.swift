@@ -30,14 +30,14 @@ struct MarinaResponseGenerationServiceTests {
         let fallback = MarinaResponseSurfaceApplication(
             answer: styled,
             followUpSuggestions: [
-                HomeAssistantSuggestion(title: "Compare with last month", query: HomeQuery(intent: .compareThisMonthToPreviousMonth))
+                MarinaSuggestion(title: "Compare with last month", query: HomeQuery(intent: .compareThisMonthToPreviousMonth))
             ]
         )
 
         let request = MarinaResponseSurfaceRequestFactory.make(
             userPrompt: raw.userPrompt ?? "",
             workspaceName: "Personal",
-            routeSourceRaw: HomeAssistantPlanResolutionSource.foundationModels.rawValue,
+            routeSourceRaw: MarinaAnswerProvenance.foundationModels.rawValue,
             generationBaseAnswer: raw,
             deterministicApplication: fallback,
             followUpCandidates: [
@@ -69,7 +69,7 @@ struct MarinaResponseGenerationServiceTests {
         let context = MarinaResponseGenerationContext(
             userPrompt: "why is dining higher?",
             workspaceName: "Personal",
-            routeSourceRaw: HomeAssistantPlanResolutionSource.foundationModels.rawValue,
+            routeSourceRaw: MarinaAnswerProvenance.foundationModels.rawValue,
             deterministicAnswer: answer,
             presentationGrounding: MarinaPresentationGroundingBuilder().build(
                 userPrompt: "why is dining higher?",
@@ -179,7 +179,7 @@ struct MarinaResponseGenerationServiceTests {
             generated: generated,
             to: raw,
             deterministicFollowUps: [
-                HomeAssistantSuggestion(title: "Compare with last month", query: followUpQuery)
+                MarinaSuggestion(title: "Compare with last month", query: followUpQuery)
             ]
         )
 
@@ -191,11 +191,11 @@ struct MarinaResponseGenerationServiceTests {
 
     @Test func surfaceApplicator_rewritesAndRanksOnlyDeterministicFollowUps() throws {
         let answer = HomeAnswer(queryID: UUID(), kind: .metric, title: "Spend", primaryValue: "$1")
-        let first = HomeAssistantSuggestion(
+        let first = MarinaSuggestion(
             title: "Top categories this month",
             query: HomeQuery(intent: .topCategoriesThisMonth)
         )
-        let second = HomeAssistantSuggestion(
+        let second = MarinaSuggestion(
             title: "Compare with last month",
             query: HomeQuery(intent: .compareThisMonthToPreviousMonth)
         )
@@ -223,7 +223,7 @@ struct MarinaResponseGenerationServiceTests {
 
     @Test func surfaceApplicator_rejectsInternalQuerySummarySuggestionTitles() throws {
         let answer = HomeAnswer(queryID: UUID(), kind: .message, title: "Fallback")
-        let suggestion = HomeAssistantSuggestion(
+        let suggestion = MarinaSuggestion(
             title: "Spend this month",
             query: HomeQuery(intent: .spendThisMonth)
         )
@@ -284,7 +284,7 @@ struct MarinaResponseGenerationServiceTests {
             dateWindow: "2026-05-01..2026-05-31",
             provenance: "Budget data",
             validationOutcomeSummary: "accepted",
-            sourceSummary: "shared foundation models",
+            sourceSummary: "Foundation Models",
             clarificationChoices: []
         )
 

@@ -1442,7 +1442,7 @@ enum DebugSeeder {
     }
 
     private static func seedMarinaConversation(workspace: Workspace, now: Date) {
-        let store = HomeAssistantConversationStore()
+        let store = MarinaConversationStore()
         let engine = HomeQueryEngine()
         let monthRange = HomeQueryDateRange(
             startDate: startOfMonth(containing: now, calendar: .current),

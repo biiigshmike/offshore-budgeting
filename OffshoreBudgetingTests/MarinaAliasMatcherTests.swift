@@ -1,5 +1,5 @@
 //
-//  HomeAssistantAliasMatcherTests.swift
+//  MarinaAliasMatcherTests.swift
 //  OffshoreBudgetingTests
 //
 //  Created by Michael Brown on 2/8/26.
@@ -8,10 +8,10 @@
 import Testing
 @testable import Offshore
 
-struct HomeAssistantAliasMatcherTests {
+struct MarinaAliasMatcherTests {
 
     @Test func matchedTarget_exactAlias_returnsMappedTarget() throws {
-        let matcher = HomeAssistantAliasMatcher()
+        let matcher = MarinaAliasMatcher()
         let rules = [
             AssistantAliasRule(aliasKey: "groc", targetValue: "Groceries", entityType: .category),
             AssistantAliasRule(aliasKey: "salary", targetValue: "Primary Salary", entityType: .incomeSource)
@@ -27,7 +27,7 @@ struct HomeAssistantAliasMatcherTests {
     }
 
     @Test func matchedTarget_fuzzyAliasTypo_returnsMappedTarget() throws {
-        let matcher = HomeAssistantAliasMatcher()
+        let matcher = MarinaAliasMatcher()
         let rules = [
             AssistantAliasRule(aliasKey: "everyday", targetValue: "Everyday Card", entityType: .card)
         ]
@@ -42,7 +42,7 @@ struct HomeAssistantAliasMatcherTests {
     }
 
     @Test func matchedTarget_entityTypeScope_preventsCrossTypeMatch() throws {
-        let matcher = HomeAssistantAliasMatcher()
+        let matcher = MarinaAliasMatcher()
         let rules = [
             AssistantAliasRule(aliasKey: "salary", targetValue: "Primary Salary", entityType: .incomeSource)
         ]
@@ -57,7 +57,7 @@ struct HomeAssistantAliasMatcherTests {
     }
 
     @Test func matchedTarget_supportsMerchantAndBudgetScopes() throws {
-        let matcher = HomeAssistantAliasMatcher()
+        let matcher = MarinaAliasMatcher()
         let rules = [
             AssistantAliasRule(aliasKey: "starbs", targetValue: "Starbucks", entityType: .merchant),
             AssistantAliasRule(aliasKey: "trip fund", targetValue: "Travel Budget", entityType: .budget)

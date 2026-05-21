@@ -4,12 +4,12 @@ import Testing
 @testable import Offshore
 
 @MainActor
-struct HomeAssistantPresetPromptCatalogTests {
+struct MarinaPresetPromptCatalogTests {
     @Test func catalog_coversAllBuiltInPresetPromptGroupsAndDefaultSuggestions() {
-        let prompts = HomeAssistantPresetPromptCatalog.prompts(defaultPeriodUnit: .month)
+        let prompts = MarinaPresetPromptCatalog.prompts(defaultPeriodUnit: .month)
         let groups = Set(prompts.compactMap(\.group))
 
-        #expect(groups == Set(HomeAssistantPresetPromptGroup.allCases))
+        #expect(groups == Set(MarinaPresetPromptGroup.allCases))
         #expect(prompts.count >= 30)
 
         let intents = Set(prompts.map(\.query.intent))
@@ -49,7 +49,7 @@ struct HomeAssistantPresetPromptCatalogTests {
         try seedPresetPromptData(fixture)
         let coordinator = MarinaTurnCoordinator()
         let context = turnContext(fixture)
-        let prompts = HomeAssistantPresetPromptCatalog.prompts(defaultPeriodUnit: .month)
+        let prompts = MarinaPresetPromptCatalog.prompts(defaultPeriodUnit: .month)
 
         for preset in prompts {
             let result = await coordinator.run(
@@ -95,23 +95,6 @@ struct HomeAssistantPresetPromptCatalogTests {
         #expect(answer.primaryValue == "$2,200.00")
     }
 
-    @Test func catalogTitles_parseToTheirStoredIntentForManualPrompts() {
-        let parser = makeParser()
-        let prompts = HomeAssistantPresetPromptCatalog.prompts(defaultPeriodUnit: .month)
-
-        for preset in prompts {
-            let parsed = parser.parse(preset.title)
-            #expect(parsed?.intent == preset.query.intent, "Manual prompt should match catalog intent for \(preset.title)")
-            let defaultLimit = HomeQuery(intent: preset.query.intent).resultLimit
-            if preset.query.resultLimit != defaultLimit {
-                #expect(parsed?.resultLimit == preset.query.resultLimit, "Manual prompt should preserve limit for \(preset.title)")
-            }
-            if let expectedPeriodUnit = preset.query.periodUnit {
-                #expect(parsed?.periodUnit == expectedPeriodUnit, "Manual prompt should preserve period unit for \(preset.title)")
-            }
-        }
-    }
-
     @Test func liveDomainMapper_averageActualIncomeWinsBeforeActualIncomeTotal() {
         let mapper = MarinaLiveDomainIntentMapper(nowProvider: { foundationPipelineDate(2026, 5, 15) })
         let context = routerContext()
@@ -148,7 +131,7 @@ struct HomeAssistantPresetPromptCatalogTests {
     }
 
     @Test func followUps_areContextAwareAndDoNotRepeatCurrentQuery() {
-        let builder = HomeAssistantFollowUpSuggestionBuilder()
+        let builder = MarinaFollowUpSuggestionBuilder()
         let answer = HomeAnswer(
             queryID: UUID(),
             kind: .metric,
@@ -173,7 +156,7 @@ struct HomeAssistantPresetPromptCatalogTests {
             routerContext: MarinaInterpretationContext(
                 workspaceName: fixture.workspace.name,
                 defaultPeriodUnit: .month,
-                sessionContext: HomeAssistantSessionContext(),
+                sessionContext: MarinaSessionContext(),
                 priorQueryContext: .empty,
                 cardNames: ["Apple Card", "Backup Card"],
                 categoryNames: ["Groceries", "Travel"],
@@ -243,7 +226,7 @@ struct HomeAssistantPresetPromptCatalogTests {
         MarinaInterpretationContext(
             workspaceName: "Phase 5 Workspace",
             defaultPeriodUnit: .month,
-            sessionContext: HomeAssistantSessionContext(),
+            sessionContext: MarinaSessionContext(),
             priorQueryContext: .empty,
             cardNames: ["Apple Card"],
             categoryNames: ["Groceries"],
@@ -272,18 +255,6 @@ struct HomeAssistantPresetPromptCatalogTests {
             valueDirectionRaw: nil,
             confidenceRaw: "high",
             unsupportedReasonRaw: nil
-        )
-    }
-
-    private func makeParser() -> HomeAssistantTextParser {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .current
-        calendar.firstWeekday = 2
-        calendar.minimumDaysInFirstWeek = 4
-
-        return HomeAssistantTextParser(
-            calendar: calendar,
-            nowProvider: { foundationPipelineDate(2026, 5, 15) }
         )
     }
 

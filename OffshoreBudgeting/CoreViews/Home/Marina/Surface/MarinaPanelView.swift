@@ -1,5 +1,5 @@
 //
-//  HomeAssistantFoundation.swift
+//  MarinaFoundation.swift
 //  OffshoreBudgeting
 //
 //  Created by Michael Brown on 2/8/26.
@@ -10,27 +10,27 @@ import SwiftData
 
 // MARK: - Assistant State
 
-enum HomeAssistantState: Equatable {
+enum MarinaState: Equatable {
     case collapsed
     case presented
 }
 
-enum HomeAssistantPlanResolutionSource: String {
-    case model
-    case parser
-    case contextual
-    case entityAware
+enum MarinaAnswerProvenance: String {
     case foundationModels
+    case deterministicQuery
+    case explicitSuggestion
+    case capabilityHelp
+    case appleIntelligenceRequired
 }
 
 // MARK: - Presented Panel
 
-struct HomeAssistantPanelView: View {
+struct MarinaPanelView: View {
     private enum ScrollTarget {
         static let bottomAnchor = "assistant-bottom-anchor"
     }
     
-    private enum HomeAssistantCreateEntityKind {
+    private enum MarinaCreateEntityKind {
         case expense
         case budget
         case income
@@ -39,14 +39,14 @@ struct HomeAssistantPanelView: View {
         case category
     }
     
-    private enum HomeAssistantBudgetCreationStep {
+    private enum MarinaBudgetCreationStep {
         case cardsChoice
         case cardsSelection
         case presetsChoice
         case presetsSelection
     }
     
-    private enum HomeAssistantCardStyleStep {
+    private enum MarinaCardStyleStep {
         case offer
         case themeSelection
         case effectSelection
@@ -60,8 +60,7 @@ struct HomeAssistantPanelView: View {
     let workspace: Workspace
     let onDismiss: () -> Void
     let shouldUseLargeMinimumSize: Bool
-    let assistantDateRange: HomeQueryDateRange?
-    let onOpenWhatIfPlanner: (HomeAssistantWhatIfPlannerDraft) -> Void
+    let ambientDateRange: HomeQueryDateRange?
     
     @Query private var budgets: [Budget]
     @Query private var categories: [Category]
@@ -81,28 +80,28 @@ struct HomeAssistantPanelView: View {
     @State private var followUpsCollapsed = false
     @State private var hasLoadedConversation = false
     @State private var isShowingClearConversationAlert = false
-    @State private var sessionContext = HomeAssistantSessionContext()
-    @State private var clarificationSuggestions: [HomeAssistantSuggestion] = []
-    @State private var recoverySuggestions: [HomeAssistantRecoverySuggestion] = []
-    @State private var lastClarificationReasons: [HomeAssistantClarificationReason] = []
-    @State private var activeClarificationContext: HomeAssistantClarificationContext? = nil
+    @State private var sessionContext = MarinaSessionContext()
+    @State private var clarificationSuggestions: [MarinaSuggestion] = []
+    @State private var recoverySuggestions: [MarinaRecoverySuggestion] = []
+    @State private var lastClarificationReasons: [MarinaClarificationReason] = []
+    @State private var activeClarificationContext: MarinaClarificationContext? = nil
     @State private var foundationPipelineClarification: MarinaTypedClarification? = nil
     @State private var foundationPipelineClarificationChoiceContext: MarinaTypedClarification? = nil
     @State private var foundationPipelineClarificationChoicesByID: [UUID: MarinaClarificationChoice] = [:]
     @State private var foundationPipelineClarificationChoicesByTitle: [String: MarinaClarificationChoice] = [:]
-    @State private var selectedEmptySuggestionGroup: HomeAssistantPresetPromptGroup?
-    @State private var pendingExpenseCardPlan: HomeAssistantCommandPlan? = nil
+    @State private var selectedEmptySuggestionGroup: MarinaPresetPromptGroup?
+    @State private var pendingExpenseCardPlan: MarinaCommandPlan? = nil
     @State private var pendingExpenseCardOptions: [Card] = []
-    @State private var pendingPresetCardPlan: HomeAssistantCommandPlan? = nil
-    @State private var pendingPresetRecurrencePlan: HomeAssistantCommandPlan? = nil
-    @State private var pendingIncomeKindPlan: HomeAssistantCommandPlan? = nil
-    @State private var pendingExpenseDisambiguationPlan: HomeAssistantCommandPlan? = nil
-    @State private var pendingIncomeDisambiguationPlan: HomeAssistantCommandPlan? = nil
-    @State private var pendingCardDisambiguationPlan: HomeAssistantCommandPlan? = nil
-    @State private var pendingCategoryDisambiguationPlan: HomeAssistantCommandPlan? = nil
-    @State private var pendingPresetDisambiguationPlan: HomeAssistantCommandPlan? = nil
-    @State private var pendingBudgetDisambiguationPlan: HomeAssistantCommandPlan? = nil
-    @State private var pendingPlannedExpenseDisambiguationPlan: HomeAssistantCommandPlan? = nil
+    @State private var pendingPresetCardPlan: MarinaCommandPlan? = nil
+    @State private var pendingPresetRecurrencePlan: MarinaCommandPlan? = nil
+    @State private var pendingIncomeKindPlan: MarinaCommandPlan? = nil
+    @State private var pendingExpenseDisambiguationPlan: MarinaCommandPlan? = nil
+    @State private var pendingIncomeDisambiguationPlan: MarinaCommandPlan? = nil
+    @State private var pendingCardDisambiguationPlan: MarinaCommandPlan? = nil
+    @State private var pendingCategoryDisambiguationPlan: MarinaCommandPlan? = nil
+    @State private var pendingPresetDisambiguationPlan: MarinaCommandPlan? = nil
+    @State private var pendingBudgetDisambiguationPlan: MarinaCommandPlan? = nil
+    @State private var pendingPlannedExpenseDisambiguationPlan: MarinaCommandPlan? = nil
     @State private var pendingExpenseCandidates: [VariableExpense] = []
     @State private var pendingIncomeCandidates: [Income] = []
     @State private var pendingCardCandidates: [Card] = []
@@ -116,23 +115,21 @@ struct HomeAssistantPanelView: View {
     @State private var pendingDeletePreset: Preset? = nil
     @State private var pendingDeleteBudget: Budget? = nil
     @State private var pendingDeletePlannedExpense: PlannedExpense? = nil
-    @State private var pendingBudgetCreationPlan: HomeAssistantCommandPlan? = nil
-    @State private var pendingBudgetCreationStep: HomeAssistantBudgetCreationStep? = nil
+    @State private var pendingBudgetCreationPlan: MarinaCommandPlan? = nil
+    @State private var pendingBudgetCreationStep: MarinaBudgetCreationStep? = nil
     @State private var pendingBudgetSelectedCardIDs: Set<UUID> = []
     @State private var pendingBudgetSelectedPresetIDs: Set<UUID> = []
     @State private var pendingBudgetMatchingPresets: [Preset] = []
-    @State private var pendingCategoryColorPlan: HomeAssistantCommandPlan? = nil
+    @State private var pendingCategoryColorPlan: MarinaCommandPlan? = nil
     @State private var pendingCategoryColorHex: String? = nil
     @State private var pendingCategoryColorName: String? = nil
     @State private var pendingCardStyleCardName: String? = nil
-    @State private var pendingCardStyleStep: HomeAssistantCardStyleStep? = nil
+    @State private var pendingCardStyleStep: MarinaCardStyleStep? = nil
     @State private var pendingCardStyleTheme: CardThemeOption? = nil
-    @State private var pendingPlannedExpenseAmountPlan: HomeAssistantCommandPlan? = nil
+    @State private var pendingPlannedExpenseAmountPlan: MarinaCommandPlan? = nil
     @State private var pendingPlannedExpenseAmountExpense: PlannedExpense? = nil
     @State private var pendingPlannedExpenseCandidates: [PlannedExpense] = []
-    @State private var pendingWhatIfContext: HomeAssistantWhatIfContext? = nil
-    @State private var pendingWhatIfCategoryMappingContext: HomeAssistantWhatIfContext? = nil
-    @State private var generatedFollowUpSuggestionsByAnswerID: [UUID: [HomeAssistantSuggestion]] = [:]
+    @State private var generatedFollowUpSuggestionsByAnswerID: [UUID: [MarinaSuggestion]] = [:]
     @FocusState private var isPromptFieldFocused: Bool
     @AppStorage("general_defaultBudgetingPeriod")
     private var defaultBudgetingPeriodRaw: String = BudgetingPeriod.monthly.rawValue
@@ -149,32 +146,17 @@ struct HomeAssistantPanelView: View {
     
     @Environment(\.modelContext) private var modelContext
     private let engine = HomeQueryEngine()
-    private let parser = HomeAssistantTextParser()
-    private let commandParser = HomeAssistantCommandParser()
-    private let conversationStore = HomeAssistantConversationStore()
-    private let telemetryStore = HomeAssistantTelemetryStore()
-    private let entityMatcher = HomeAssistantEntityMatcher()
-    private let aliasMatcher = HomeAssistantAliasMatcher()
-    private let entityResolutionResolver = HomeAssistantEntityResolver()
-    private let planReconciler = HomeAssistantPlanReconciler()
-    private let requestRoutingResolver = HomeAssistantRequestRoutingResolver()
-    private let executedQueryAnswerNormalizer = HomeAssistantExecutedQueryAnswerNormalizer()
-    private let whatIfParser = HomeAssistantWhatIfParser()
-    private let whatIfAnswerBuilder = HomeAssistantWhatIfAnswerBuilder()
-    private let dailySpendAnswerBuilder = HomeAssistantDailySpendAnswerBuilder()
-    private let incomePeriodSummaryAnswerBuilder = HomeAssistantIncomePeriodSummaryAnswerBuilder()
-    private let categoryAvailabilityAnswerBuilder = HomeAssistantCategoryAvailabilityAnswerBuilder()
-    private let cardSummaryAnswerBuilder = HomeAssistantCardSummaryAnswerBuilder()
+    private let dateRangeTextResolver = MarinaDateRangeTextResolver()
+    private let resultLimitExtractor = MarinaResultLimitExtractor()
+    private let mutationIntentGuard = MarinaMutationIntentGuard()
+    private let conversationStore = MarinaConversationStore()
+    private let telemetryStore = MarinaTelemetryStore()
+    private let entityMatcher = MarinaEntityMatcher()
+    private let aliasMatcher = MarinaAliasMatcher()
+    private let executedQueryAnswerNormalizer = MarinaExecutedQueryAnswerNormalizer()
     private let responseGenerationService: any MarinaResponseGenerating = MarinaResponseGenerationService()
-    private let followUpSuggestionBuilder = HomeAssistantFollowUpSuggestionBuilder()
-    private let mutationService = HomeAssistantMutationService()
-    private var intentBuilder: HomeAssistantIntentBuilder {
-        HomeAssistantIntentBuilder(
-            categoryNames: categories.map(\.name),
-            cardNames: cards.map(\.name),
-            incomeSourceNames: Array(Set(incomes.map(\.source)))
-        )
-    }
+    private let followUpSuggestionBuilder = MarinaFollowUpSuggestionBuilder()
+    private let mutationService = MarinaMutationService()
     
     private var defaultQueryPeriodUnit: HomeQueryPeriodUnit {
         let period = BudgetingPeriod(rawValue: defaultBudgetingPeriodRaw) ?? .monthly
@@ -189,14 +171,12 @@ struct HomeAssistantPanelView: View {
         workspace: Workspace,
         onDismiss: @escaping () -> Void,
         shouldUseLargeMinimumSize: Bool,
-        assistantDateRange: HomeQueryDateRange? = nil,
-        onOpenWhatIfPlanner: @escaping (HomeAssistantWhatIfPlannerDraft) -> Void = { _ in }
+        ambientDateRange: HomeQueryDateRange? = nil
     ) {
         self.workspace = workspace
         self.onDismiss = onDismiss
         self.shouldUseLargeMinimumSize = shouldUseLargeMinimumSize
-        self.assistantDateRange = assistantDateRange
-        self.onOpenWhatIfPlanner = onOpenWhatIfPlanner
+        self.ambientDateRange = ambientDateRange
         
         let workspaceID = workspace.id
 
@@ -319,7 +299,6 @@ struct HomeAssistantPanelView: View {
                 
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     foundationModelToggleButton
-                    smokeTraceShareButton
                     clearConversationButton
                 }
             }
@@ -435,7 +414,7 @@ struct HomeAssistantPanelView: View {
         #endif
     }
     
-    private func handleCreateMenuSelection(_ kind: HomeAssistantCreateEntityKind) {
+    private func handleCreateMenuSelection(_ kind: MarinaCreateEntityKind) {
         appendInlineCreateForm(
             makeInlineCreateForm(
                 for: {
@@ -475,23 +454,6 @@ struct HomeAssistantPanelView: View {
         .accessibilityLabel(String(localized: "assistant.foundationModel.toggle", defaultValue: "Foundation Model", comment: "Accessibility label for toggling Foundation Models in Marina."))
         .accessibilityValue(foundationModelToggleAccessibilityValue)
         .accessibilityIdentifier("marina.foundationModelToggle")
-    }
-
-    @ViewBuilder
-    private var smokeTraceShareButton: some View {
-        #if DEBUG
-        if let exportURL = MarinaSmokeTraceStore.currentExportURL {
-            ShareLink(item: exportURL) {
-                Label("Export Marina Smoke Trace", systemImage: "square.and.arrow.up")
-                    .labelStyle(.iconOnly)
-                    .font(.body.weight(.semibold))
-                    .frame(width: 33, height: 33)
-            }
-            .modifier(AssistantPanelIconButtonModifier())
-            .accessibilityLabel("Export Marina Smoke Trace")
-            .accessibilityIdentifier("marina.smokeTraceShare")
-        }
-        #endif
     }
 
     private var clearConversationButton: some View {
@@ -544,7 +506,7 @@ struct HomeAssistantPanelView: View {
     }
     
     private func creationGuidance(
-        for kind: HomeAssistantCreateEntityKind
+        for kind: MarinaCreateEntityKind
     ) -> (title: String, subtitle: String, rows: [HomeAnswerRow]) {
         switch kind {
         case .expense:
@@ -604,7 +566,7 @@ struct HomeAssistantPanelView: View {
         }
     }
 
-    private func appendInlineCreateForm(_ form: HomeAssistantInlineCreateForm) {
+    private func appendInlineCreateForm(_ form: MarinaInlineCreateForm) {
         clearMutationPendingState()
         appendAnswer(
             HomeAnswer(
@@ -617,7 +579,7 @@ struct HomeAssistantPanelView: View {
         )
     }
 
-    private func inlineCreateFormBinding(for answerID: UUID) -> Binding<HomeAssistantInlineCreateForm>? {
+    private func inlineCreateFormBinding(for answerID: UUID) -> Binding<MarinaInlineCreateForm>? {
         guard currentInlineCreateForm(for: answerID) != nil else { return nil }
         return Binding(
             get: { currentInlineCreateForm(for: answerID) ?? makeInlineCreateForm(for: .expense, command: nil) },
@@ -627,7 +589,7 @@ struct HomeAssistantPanelView: View {
         )
     }
 
-    private func currentInlineCreateForm(for answerID: UUID) -> HomeAssistantInlineCreateForm? {
+    private func currentInlineCreateForm(for answerID: UUID) -> MarinaInlineCreateForm? {
         guard let answer = answers.first(where: { $0.id == answerID }),
               case let .inlineCreateForm(form)? = answer.attachment else {
             return nil
@@ -635,7 +597,7 @@ struct HomeAssistantPanelView: View {
         return form
     }
 
-    private func updateInlineCreateForm(answerID: UUID, form: HomeAssistantInlineCreateForm) {
+    private func updateInlineCreateForm(answerID: UUID, form: MarinaInlineCreateForm) {
         guard let index = answers.firstIndex(where: { $0.id == answerID }) else { return }
         let answer = answers[index]
         answers[index] = HomeAnswer(
@@ -708,10 +670,10 @@ struct HomeAssistantPanelView: View {
     }
 
     private func missingSelectionError(_ description: String) -> NSError {
-        NSError(domain: "HomeAssistantInlineCreateForm", code: 400, userInfo: [NSLocalizedDescriptionKey: description])
+        NSError(domain: "MarinaInlineCreateForm", code: 400, userInfo: [NSLocalizedDescriptionKey: description])
     }
 
-    private func executeInlineCreateForm(_ form: HomeAssistantInlineCreateForm) throws -> HomeAssistantMutationResult {
+    private func executeInlineCreateForm(_ form: MarinaInlineCreateForm) throws -> MarinaMutationResult {
         switch form.entity {
         case .expense:
             guard let amount = CurrencyFormatter.parseAmount(form.amountText), amount > 0 else {
@@ -801,7 +763,7 @@ struct HomeAssistantPanelView: View {
         }
     }
 
-    private func inlineCreateSummaryRows(for form: HomeAssistantInlineCreateForm) -> [HomeAnswerRow] {
+    private func inlineCreateSummaryRows(for form: MarinaInlineCreateForm) -> [HomeAnswerRow] {
         switch form.entity {
         case .expense:
             return [
@@ -864,9 +826,9 @@ struct HomeAssistantPanelView: View {
     }
 
     private func makeInlineCreateForm(
-        for entity: HomeAssistantInlineCreateEntity,
-        command: HomeAssistantCommandPlan?
-    ) -> HomeAssistantInlineCreateForm {
+        for entity: MarinaInlineCreateEntity,
+        command: MarinaCommandPlan?
+    ) -> MarinaInlineCreateForm {
         let now = calendarStartOfDay(Date())
         let periodRange = defaultBudgetingPeriod.defaultRange(containing: now, calendar: .current)
         let seededRange = command?.dateRange ?? HomeQueryDateRange(startDate: periodRange.start, endDate: periodRange.end)
@@ -880,7 +842,7 @@ struct HomeAssistantPanelView: View {
 
         switch entity {
         case .expense:
-            return HomeAssistantInlineCreateForm(
+            return MarinaInlineCreateForm(
                 entity: .expense,
                 summary: command == nil ? nil : "I prefilled the expense details from your message.",
                 amountText: amountInputString(command?.amount),
@@ -890,7 +852,7 @@ struct HomeAssistantPanelView: View {
                 selectedCategoryID: resolvedCategoryID
             )
         case .income:
-            return HomeAssistantInlineCreateForm(
+            return MarinaInlineCreateForm(
                 entity: .income,
                 summary: command == nil ? nil : "I prefilled the income details from your message.",
                 amountText: amountInputString(command?.amount),
@@ -907,7 +869,7 @@ struct HomeAssistantPanelView: View {
                 yearlyDayOfMonth: command?.yearlyDayOfMonth ?? 15
             )
         case .budget:
-            return HomeAssistantInlineCreateForm(
+            return MarinaInlineCreateForm(
                 entity: .budget,
                 summary: command == nil ? nil : "I prefilled the budget details from your message.",
                 nameText: command?.entityName ?? BudgetNameSuggestion.suggestedName(start: seededRange.startDate, end: seededRange.endDate, calendar: .current),
@@ -917,7 +879,7 @@ struct HomeAssistantPanelView: View {
                 selectedPresetIDs: command?.attachAllPresets == true ? presets.map(\.id) : resolvedSelectedPresetIDs(from: command)
             )
         case .card:
-            return HomeAssistantInlineCreateForm(
+            return MarinaInlineCreateForm(
                 entity: .card,
                 summary: command == nil ? nil : "I prefilled the card details from your message.",
                 nameText: command?.entityName ?? command?.notes ?? "",
@@ -925,7 +887,7 @@ struct HomeAssistantPanelView: View {
                 cardEffectRaw: command?.cardEffectRaw ?? CardEffectOption.plastic.rawValue
             )
         case .preset:
-            return HomeAssistantInlineCreateForm(
+            return MarinaInlineCreateForm(
                 entity: .preset,
                 summary: command == nil ? nil : "I prefilled the preset details from your message.",
                 nameText: command?.entityName ?? command?.notes ?? "",
@@ -941,14 +903,14 @@ struct HomeAssistantPanelView: View {
                 yearlyDayOfMonth: command?.yearlyDayOfMonth ?? 15
             )
         case .category:
-            return HomeAssistantInlineCreateForm(
+            return MarinaInlineCreateForm(
                 entity: .category,
                 summary: command == nil ? nil : "I prefilled the category details from your message.",
                 nameText: command?.entityName ?? command?.notes ?? "",
                 categoryColorHex: colorResolution.hex
             )
         case .plannedExpense:
-            return HomeAssistantInlineCreateForm(
+            return MarinaInlineCreateForm(
                 entity: .plannedExpense,
                 summary: command == nil ? nil : "I prefilled the planned expense details from your message.",
                 nameText: command?.entityName ?? command?.notes ?? "",
@@ -960,14 +922,14 @@ struct HomeAssistantPanelView: View {
         }
     }
 
-    private func resolvedSelectedCardIDs(from command: HomeAssistantCommandPlan?) -> [UUID] {
+    private func resolvedSelectedCardIDs(from command: MarinaCommandPlan?) -> [UUID] {
         guard let command else { return [] }
         return command.selectedCardNames.compactMap { name in
             resolveCard(from: name)?.id
         }
     }
 
-    private func resolvedSelectedPresetIDs(from command: HomeAssistantCommandPlan?) -> [UUID] {
+    private func resolvedSelectedPresetIDs(from command: MarinaCommandPlan?) -> [UUID] {
         guard let command else { return [] }
         return command.selectedPresetTitles.compactMap { title in
             presets.first(where: { $0.title.compare(title, options: .caseInsensitive) == .orderedSame })?.id
@@ -1040,7 +1002,7 @@ struct HomeAssistantPanelView: View {
             }
             
             HStack(spacing: 0) {
-                let groups = Array(HomeAssistantPresetPromptGroup.allCases.enumerated())
+                let groups = Array(MarinaPresetPromptGroup.allCases.enumerated())
                 let maxIndex = max(0, groups.count - 1)
                 
                 ForEach(groups, id: \.element.id) { index, group in
@@ -1069,7 +1031,7 @@ struct HomeAssistantPanelView: View {
     
     private func inlineConversationSuggestionSections(
         for answer: HomeAnswer
-    ) -> [HomeAssistantSuggestionSection] {
+    ) -> [MarinaSuggestionSection] {
         let groundedQuery = sessionContext.recentAnswerContexts.last?.executedPlan?.query
             ?? sessionContext.recentAnswerContexts.last?.query
         let followUps = generatedFollowUpSuggestionsByAnswerID[answer.id]
@@ -1077,7 +1039,7 @@ struct HomeAssistantPanelView: View {
                 after: answer,
                 executedQuery: groundedQuery
             )
-        let sections = HomeAssistantSuggestionSectionBuilder.build(
+        let sections = MarinaSuggestionSectionBuilder.build(
             clarificationSuggestions: clarificationSuggestions,
             clarificationReasonCount: lastClarificationReasons.count,
             recoverySuggestions: recoverySuggestions,
@@ -1089,8 +1051,8 @@ struct HomeAssistantPanelView: View {
         return sections
     }
     
-    private func emptyStateSuggestions(for group: HomeAssistantPresetPromptGroup) -> [HomeAssistantSuggestion] {
-        HomeAssistantPresetPromptCatalog.suggestions(
+    private func emptyStateSuggestions(for group: MarinaPresetPromptGroup) -> [MarinaSuggestion] {
+        MarinaPresetPromptCatalog.suggestions(
             for: group,
             defaultPeriodUnit: defaultQueryPeriodUnit
         )
@@ -1133,7 +1095,7 @@ struct HomeAssistantPanelView: View {
     }
     
     private func assistantFollowUpRail(
-        sections: [HomeAssistantSuggestionSection]
+        sections: [MarinaSuggestionSection]
     ) -> some View {
         let hasPrioritySections = sections.contains { $0.title != "Follow-Up Suggestions" }
         
@@ -1287,7 +1249,7 @@ struct HomeAssistantPanelView: View {
                 }
 
                 if let formBinding = inlineCreateFormBinding(for: answer.id) {
-                    HomeAssistantInlineCreateFormCard(
+                    MarinaInlineCreateFormCard(
                         form: formBinding,
                         cards: cards,
                         categories: categories,
@@ -1365,7 +1327,7 @@ struct HomeAssistantPanelView: View {
     }
 
     private func suggestionAccessibilityIdentifier(
-        section: HomeAssistantSuggestionSection,
+        section: MarinaSuggestionSection,
         index: Int
     ) -> String {
         if section.isRecovery {
@@ -1434,7 +1396,7 @@ struct HomeAssistantPanelView: View {
         confidenceBand: HomeQueryConfidenceBand = .high,
         explanation: String? = nil,
         executedPlan: HomeQueryPlan? = nil,
-        source: HomeAssistantPlanResolutionSource = .contextual
+        source: MarinaAnswerProvenance = .deterministicQuery
     ) {
         // Query chips and prebuilt HomeQuery actions still execute through the
         // deterministic HomeQueryEngine path; live natural-language reads stay in Marina.
@@ -1501,7 +1463,7 @@ struct HomeAssistantPanelView: View {
         aggregationResult: MarinaAggregationResult?,
         rawPrompt: String,
         homeQueryPlan: HomeQueryPlan?,
-        source: HomeAssistantPlanResolutionSource
+        source: MarinaAnswerProvenance
     ) async {
         clarificationSuggestions = []
         recoverySuggestions = []
@@ -1553,7 +1515,7 @@ struct HomeAssistantPanelView: View {
             outcome: .resolved,
             source: source,
             plan: homeQueryPlan,
-            notes: "foundation_pipeline"
+            notes: "foundationPipeline"
         )
     }
 
@@ -1608,14 +1570,14 @@ struct HomeAssistantPanelView: View {
         deterministicAnswer: HomeAnswer,
         deterministicRecoveryAnswer: HomeAnswer,
         rawPrompt: String,
-        source: HomeAssistantPlanResolutionSource,
+        source: MarinaAnswerProvenance,
         homeQueryPlan: HomeQueryPlan? = nil,
         surfaceKind: MarinaPresentationSurfaceKind = .answer,
         validationOutcomeSummary: String? = nil,
         clarificationChoices: [String] = [],
         groundingSummary: String? = nil,
         allowedTone: String? = nil,
-        followUpSuggestions: [HomeAssistantSuggestion] = []
+        followUpSuggestions: [MarinaSuggestion] = []
     ) async -> MarinaResponseSurfaceApplication {
         let presentationMode = marinaPresentationModeDecision()
         let deterministicApplication: MarinaResponseSurfaceApplication
@@ -1677,14 +1639,14 @@ struct HomeAssistantPanelView: View {
         deterministicAnswer: HomeAnswer,
         deterministicRecoveryAnswer: HomeAnswer,
         rawPrompt: String,
-        source: HomeAssistantPlanResolutionSource,
+        source: MarinaAnswerProvenance,
         homeQueryPlan: HomeQueryPlan? = nil,
         surfaceKind: MarinaPresentationSurfaceKind = .answer,
         validationOutcomeSummary: String? = nil,
         clarificationChoices: [String] = [],
         groundingSummary: String? = nil,
         allowedTone: String? = nil,
-        followUpSuggestions: [HomeAssistantSuggestion] = [],
+        followUpSuggestions: [MarinaSuggestion] = [],
         onPresented: (@MainActor @Sendable (HomeAnswer) -> Void)? = nil
     ) {
         Task { @MainActor in
@@ -1706,7 +1668,7 @@ struct HomeAssistantPanelView: View {
     }
 
     private func storeGeneratedFollowUps(
-        _ suggestions: [HomeAssistantSuggestion],
+        _ suggestions: [MarinaSuggestion],
         for answerID: UUID
     ) {
         guard suggestions.isEmpty == false else { return }
@@ -1755,7 +1717,7 @@ struct HomeAssistantPanelView: View {
         }
     }
 
-    private func followUpSuggestions(for answer: HomeAnswer, query: HomeQuery?) -> [HomeAssistantSuggestion] {
+    private func followUpSuggestions(for answer: HomeAnswer, query: HomeQuery?) -> [MarinaSuggestion] {
         followUpSuggestionBuilder.suggestions(
             after: answer,
             executedQuery: query
@@ -1766,7 +1728,7 @@ struct HomeAssistantPanelView: View {
         generationBaseAnswer: HomeAnswer,
         deterministicApplication: MarinaResponseSurfaceApplication,
         rawPrompt: String,
-        source: HomeAssistantPlanResolutionSource,
+        source: MarinaAnswerProvenance,
         homeQueryPlan: HomeQueryPlan?,
         surfaceKind: MarinaPresentationSurfaceKind = .answer,
         validationOutcomeSummary: String? = nil,
@@ -1983,10 +1945,7 @@ struct HomeAssistantPanelView: View {
             return
         }
 
-        let runtimeSettings = marinaRuntimeSettings
-        let turnClassifier = MarinaPromptTurnClassifier(
-            commandGuard: HomeAssistantFoundationPipelineCommandGuard(commandParser: commandParser)
-        )
+        let turnClassifier = MarinaPromptTurnClassifier(mutationGuard: mutationIntentGuard)
         let turnClassification = turnClassifier.classify(
             prompt,
             defaultPeriodUnit: defaultQueryPeriodUnit,
@@ -2023,10 +1982,7 @@ struct HomeAssistantPanelView: View {
             return
         }
 
-        if HomeAssistantFoundationPipelineCommandGuard(commandParser: commandParser).command(
-            for: prompt,
-            defaultPeriodUnit: defaultQueryPeriodUnit
-        ) != nil {
+        if mutationIntentGuard.isMutationPrompt(prompt) {
             Task { @MainActor in
                 await presentMarinaSystemAnswer(
                     MarinaTurnCoordinator.deferredCRUDAnswer(prompt: prompt),
@@ -2043,198 +1999,6 @@ struct HomeAssistantPanelView: View {
         }
     }
 
-    private func handleWhatIfPrompt(_ prompt: String) -> Bool {
-        guard let result = whatIfParser.parse(
-            prompt,
-            categories: categories,
-            fallbackDateRange: assistantDateRange,
-            dateParser: parser,
-            defaultPeriodUnit: defaultQueryPeriodUnit
-        ) else {
-            return false
-        }
-
-        switch result {
-        case let .clarification(message):
-            clarificationSuggestions = []
-            recoverySuggestions = []
-            lastClarificationReasons = []
-            activeClarificationContext = nil
-            let answer = HomeAnswer(
-                queryID: UUID(),
-                kind: .message,
-                userPrompt: prompt,
-                title: "What If needs one concrete change",
-                subtitle: message,
-                rows: []
-            )
-            presentMarinaAnswer(
-                deterministicAnswer: answer,
-                deterministicRecoveryAnswer: answer,
-                rawPrompt: prompt,
-                source: .contextual,
-                surfaceKind: .clarification,
-                validationOutcomeSummary: "what_if_clarification",
-                groundingSummary: "what-if parser needs one concrete change"
-            )
-            return true
-        case let .request(request):
-            let built = whatIfAnswerBuilder.makeAnswer(
-                queryID: UUID(),
-                userPrompt: prompt,
-                request: request,
-                categories: categories,
-                plannedExpenses: plannedExpenses,
-                variableExpenses: variableExpenses,
-                incomes: incomes
-            )
-
-            pendingWhatIfContext = built.context
-            pendingWhatIfCategoryMappingContext = nil
-            presentMarinaAnswer(
-                deterministicAnswer: built.rawAnswer,
-                deterministicRecoveryAnswer: built.rawAnswer,
-                rawPrompt: prompt,
-                source: .contextual,
-                homeQueryPlan: HomeQueryPlan(
-                    metric: built.primaryQuery.intent.metric,
-                    dateRange: built.primaryQuery.dateRange,
-                    comparisonDateRange: built.primaryQuery.comparisonDateRange,
-                    resultLimit: built.primaryQuery.resultLimit,
-                    confidenceBand: .high,
-                    targetName: built.primaryQuery.targetName,
-                    periodUnit: built.primaryQuery.periodUnit
-                ),
-                surfaceKind: .simulation,
-                groundingSummary: "deterministic what-if simulation",
-                followUpSuggestions: followUpSuggestions(for: built.rawAnswer, query: built.primaryQuery)
-            )
-            return true
-        }
-    }
-
-    private func resolvePendingWhatIfFollowUp(with prompt: String) -> Bool {
-        if let pendingWhatIfCategoryMappingContext {
-            return resolvePendingWhatIfCategoryMapping(prompt, context: pendingWhatIfCategoryMappingContext)
-        }
-
-        guard let pendingWhatIfContext else { return false }
-        let normalized = normalizedPrompt(prompt)
-        let wantsPlannerHandoff = [
-            "open this in what if",
-            "open this in planner",
-            "open in what if",
-            "open in planner",
-            "put this in what if",
-            "put this in planner",
-            "add this to what if",
-            "use this in what if",
-            "save this to what if",
-            "move this to what if"
-        ].contains(where: normalized.contains)
-
-        guard wantsPlannerHandoff else { return false }
-
-        if pendingWhatIfContext.requiresExactCadenceSelection {
-            appendAnswer(
-                HomeAnswer(
-                    queryID: UUID(),
-                    kind: .message,
-                    userPrompt: prompt,
-                    title: "Pick one cadence first",
-                    subtitle: "I can open the planner after you tell me which interval to use.",
-                    rows: []
-                )
-            )
-            return true
-        }
-
-        if let draft = pendingWhatIfContext.directPlannerDraft {
-            onOpenWhatIfPlanner(draft)
-            appendAnswer(
-                HomeAnswer(
-                    queryID: UUID(),
-                    kind: .message,
-                    userPrompt: prompt,
-                    title: "Opening What If planner",
-                    subtitle: "I carried this hypothetical over as a temporary draft. Nothing is saved until you save it there.",
-                    rows: []
-                )
-            )
-            return true
-        }
-
-        if pendingWhatIfContext.requiresPlannerCategoryName,
-           pendingWhatIfContext.exactAdditionalSpendForPlanner != nil {
-            pendingWhatIfCategoryMappingContext = pendingWhatIfContext
-            appendAnswer(
-                HomeAnswer(
-                    queryID: UUID(),
-                    kind: .message,
-                    userPrompt: prompt,
-                    title: "Which category should I map this to?",
-                    subtitle: "The planner is category-based, so tell me the category you want this merchant scenario applied to.",
-                    rows: []
-                )
-            )
-            return true
-        }
-
-        return false
-    }
-
-    private func resolvePendingWhatIfCategoryMapping(
-        _ prompt: String,
-        context: HomeAssistantWhatIfContext
-    ) -> Bool {
-        guard let matchedCategory = aliasTarget(in: prompt, entityType: .category)
-                ?? entityMatcher.bestCategoryMatch(in: prompt, categories: categories)
-        else {
-            appendAnswer(
-                HomeAnswer(
-                    queryID: UUID(),
-                    kind: .message,
-                    userPrompt: prompt,
-                    title: "I still need the category",
-                    subtitle: "Tell me which category should absorb this hypothetical so I can open the planner with the right draft.",
-                    rows: []
-                )
-            )
-            return true
-        }
-
-        guard let additionalSpend = context.exactAdditionalSpendForPlanner,
-              let category = categories.first(where: { $0.name == matchedCategory })
-        else {
-            return false
-        }
-
-        let baselineByCategoryID = whatIfBaselineSpendByCategoryID(in: context.resolvedDateRange)
-        let projectedCategorySpend = baselineByCategoryID[category.id, default: 0] + additionalSpend
-        let draft = HomeAssistantWhatIfPlannerDraft(
-            categoryScenarioSpendByID: [category.id: CurrencyFormatter.roundedToCurrency(projectedCategorySpend)],
-            plannedIncomeOverride: nil,
-            actualIncomeOverride: nil,
-            sourcePrompt: context.request.targetName ?? matchedCategory,
-            summary: "Mapped Marina What If to \(matchedCategory)."
-        )
-
-        pendingWhatIfCategoryMappingContext = nil
-        pendingWhatIfContext = context
-        onOpenWhatIfPlanner(draft)
-        appendAnswer(
-            HomeAnswer(
-                queryID: UUID(),
-                kind: .message,
-                userPrompt: prompt,
-                title: "Opening What If planner",
-                subtitle: "I mapped this hypothetical into \(matchedCategory) as a temporary draft. Nothing is saved until you save it there.",
-                rows: []
-            )
-        )
-        return true
-    }
-    
     private func handleConversationalPrompt(_ prompt: String) -> Bool {
         let normalized = normalizedPrompt(prompt)
         let tokens = normalized.split(separator: " ").map(String.init)
@@ -2263,7 +2027,7 @@ struct HomeAssistantPanelView: View {
                 deterministicAnswer: raw,
                 deterministicRecoveryAnswer: raw,
                 rawPrompt: prompt,
-                source: .contextual,
+                source: .capabilityHelp,
                 surfaceKind: .help,
                 groundingSummary: "capability guide"
             )
@@ -2318,9 +2082,9 @@ struct HomeAssistantPanelView: View {
     }
     
     private func handleCommandPlan(
-        _ command: HomeAssistantCommandPlan,
+        _ command: MarinaCommandPlan,
         rawPrompt: String,
-        source: HomeAssistantPlanResolutionSource? = nil
+        source: MarinaAnswerProvenance? = nil
     ) {
         clarificationSuggestions = []
         recoverySuggestions = []
@@ -2507,31 +2271,31 @@ struct HomeAssistantPanelView: View {
             || (pendingPlannedExpenseAmountPlan != nil && pendingPlannedExpenseAmountExpense != nil)
     }
     
-    private func handleAddExpenseCommand(_ command: HomeAssistantCommandPlan) {
+    private func handleAddExpenseCommand(_ command: MarinaCommandPlan) {
         appendInlineCreateForm(makeInlineCreateForm(for: .expense, command: command))
     }
     
-    private func handleAddIncomeCommand(_ command: HomeAssistantCommandPlan) {
+    private func handleAddIncomeCommand(_ command: MarinaCommandPlan) {
         appendInlineCreateForm(makeInlineCreateForm(for: .income, command: command))
     }
     
-    private func handleAddBudgetCommand(_ command: HomeAssistantCommandPlan) {
+    private func handleAddBudgetCommand(_ command: MarinaCommandPlan) {
         appendInlineCreateForm(makeInlineCreateForm(for: .budget, command: command))
     }
     
-    private func handleAddCardCommand(_ command: HomeAssistantCommandPlan) {
+    private func handleAddCardCommand(_ command: MarinaCommandPlan) {
         appendInlineCreateForm(makeInlineCreateForm(for: .card, command: command))
     }
     
-    private func handleAddPresetCommand(_ command: HomeAssistantCommandPlan) {
+    private func handleAddPresetCommand(_ command: MarinaCommandPlan) {
         appendInlineCreateForm(makeInlineCreateForm(for: .preset, command: command))
     }
     
-    private func handleAddCategoryCommand(_ command: HomeAssistantCommandPlan) {
+    private func handleAddCategoryCommand(_ command: MarinaCommandPlan) {
         appendInlineCreateForm(makeInlineCreateForm(for: .category, command: command))
     }
 
-    private func handleEditCategoryCommand(_ command: HomeAssistantCommandPlan) {
+    private func handleEditCategoryCommand(_ command: MarinaCommandPlan) {
         guard command.updatedEntityName != nil || command.categoryColorHex != nil || command.categoryColorName != nil else {
             appendMutationMessage(
                 title: "Need category edit details",
@@ -2561,7 +2325,7 @@ struct HomeAssistantPanelView: View {
         executeCategoryEdit(matches[0], using: command)
     }
 
-    private func handleDeleteCategoryCommand(_ command: HomeAssistantCommandPlan) {
+    private func handleDeleteCategoryCommand(_ command: MarinaCommandPlan) {
         let matches = matchedCategories(for: command)
         guard matches.isEmpty == false else {
             appendMutationMessage(
@@ -2582,7 +2346,7 @@ struct HomeAssistantPanelView: View {
         executeCategoryDelete(matches[0])
     }
 
-    private func handleEditPresetCommand(_ command: HomeAssistantCommandPlan) {
+    private func handleEditPresetCommand(_ command: MarinaCommandPlan) {
         let hasRecurrenceEdit = command.recurrenceFrequencyRaw != nil
         guard command.updatedEntityName != nil
             || command.amount != nil
@@ -2618,7 +2382,7 @@ struct HomeAssistantPanelView: View {
         executePresetEdit(matches[0], using: command)
     }
 
-    private func handleDeletePresetCommand(_ command: HomeAssistantCommandPlan) {
+    private func handleDeletePresetCommand(_ command: MarinaCommandPlan) {
         let matches = matchedPresets(for: command)
         guard matches.isEmpty == false else {
             appendMutationMessage(
@@ -2639,7 +2403,7 @@ struct HomeAssistantPanelView: View {
         executePresetDelete(matches[0])
     }
 
-    private func handleEditBudgetCommand(_ command: HomeAssistantCommandPlan) {
+    private func handleEditBudgetCommand(_ command: MarinaCommandPlan) {
         guard command.updatedEntityName != nil || command.dateRange != nil else {
             appendMutationMessage(
                 title: "Need budget edit details",
@@ -2669,7 +2433,7 @@ struct HomeAssistantPanelView: View {
         executeBudgetEdit(matches[0], using: command)
     }
 
-    private func handleDeleteBudgetCommand(_ command: HomeAssistantCommandPlan) {
+    private func handleDeleteBudgetCommand(_ command: MarinaCommandPlan) {
         let matches = matchedBudgets(for: command)
         guard matches.isEmpty == false else {
             appendMutationMessage(
@@ -2690,7 +2454,7 @@ struct HomeAssistantPanelView: View {
         executeBudgetDelete(matches[0])
     }
 
-    private func handleAddPlannedExpenseCommand(_ command: HomeAssistantCommandPlan) {
+    private func handleAddPlannedExpenseCommand(_ command: MarinaCommandPlan) {
         let amountLine: String
         if let amount = command.amount {
             amountLine = CurrencyFormatter.string(from: amount)
@@ -2708,7 +2472,7 @@ struct HomeAssistantPanelView: View {
         )
     }
 
-    private func handleEditPlannedExpenseCommand(_ command: HomeAssistantCommandPlan) {
+    private func handleEditPlannedExpenseCommand(_ command: MarinaCommandPlan) {
         guard command.updatedEntityName != nil
             || command.amount != nil
             || command.date != nil
@@ -2750,7 +2514,7 @@ struct HomeAssistantPanelView: View {
         executePlannedExpenseEdit(matches[0], using: command)
     }
 
-    private func handleDeletePlannedExpenseCommand(_ command: HomeAssistantCommandPlan) {
+    private func handleDeletePlannedExpenseCommand(_ command: MarinaCommandPlan) {
         let matches = mutationService.matchedPlannedExpenses(for: command, plannedExpenses: plannedExpenses)
         guard matches.isEmpty == false else {
             appendMutationMessage(
@@ -2771,7 +2535,7 @@ struct HomeAssistantPanelView: View {
         executePlannedExpenseDelete(matches[0])
     }
     
-    private func handleEditCardCommand(_ command: HomeAssistantCommandPlan) {
+    private func handleEditCardCommand(_ command: MarinaCommandPlan) {
         guard command.cardThemeRaw != nil || command.cardEffectRaw != nil || command.updatedEntityName != nil else {
             appendMutationMessage(
                 title: "Need card edit details",
@@ -2801,7 +2565,7 @@ struct HomeAssistantPanelView: View {
         executeCardEdit(matches[0], using: command)
     }
     
-    private func handleDeleteCardCommand(_ command: HomeAssistantCommandPlan) {
+    private func handleDeleteCardCommand(_ command: MarinaCommandPlan) {
         let matches = matchedCards(for: command)
         guard matches.isEmpty == false else {
             appendMutationMessage(
@@ -2822,7 +2586,7 @@ struct HomeAssistantPanelView: View {
         executeCardDelete(matches[0])
     }
     
-    private func handleEditExpenseCommand(_ command: HomeAssistantCommandPlan) {
+    private func handleEditExpenseCommand(_ command: MarinaCommandPlan) {
         guard command.amount != nil || command.date != nil || command.notes != nil else {
             appendMutationMessage(
                 title: "Need edit details",
@@ -2852,7 +2616,7 @@ struct HomeAssistantPanelView: View {
         executeExpenseEdit(matches[0], using: command)
     }
     
-    private func handleDeleteExpenseCommand(_ command: HomeAssistantCommandPlan) {
+    private func handleDeleteExpenseCommand(_ command: MarinaCommandPlan) {
         let matches = mutationService.matchedExpenses(for: command, expenses: variableExpenses)
         guard matches.isEmpty == false else {
             appendMutationMessage(
@@ -2873,7 +2637,7 @@ struct HomeAssistantPanelView: View {
         executeExpenseDelete(matches[0])
     }
     
-    private func handleEditIncomeCommand(_ command: HomeAssistantCommandPlan) {
+    private func handleEditIncomeCommand(_ command: MarinaCommandPlan) {
         guard command.amount != nil || command.date != nil || command.source != nil else {
             appendMutationMessage(
                 title: "Need edit details",
@@ -2903,7 +2667,7 @@ struct HomeAssistantPanelView: View {
         executeIncomeEdit(matches[0], using: command)
     }
     
-    private func handleDeleteIncomeCommand(_ command: HomeAssistantCommandPlan) {
+    private func handleDeleteIncomeCommand(_ command: MarinaCommandPlan) {
         let matches = mutationService.matchedIncomes(for: command, incomes: incomes)
         guard matches.isEmpty == false else {
             appendMutationMessage(
@@ -2924,7 +2688,7 @@ struct HomeAssistantPanelView: View {
         executeIncomeDelete(matches[0])
     }
     
-    private func handleMarkIncomeReceivedCommand(_ command: HomeAssistantCommandPlan) {
+    private func handleMarkIncomeReceivedCommand(_ command: MarinaCommandPlan) {
         let matches = mutationService
             .matchedIncomes(for: command, incomes: incomes)
             .filter(\.isPlanned)
@@ -2947,7 +2711,7 @@ struct HomeAssistantPanelView: View {
         executeMarkIncomeReceived(matches[0])
     }
     
-    private func handleMoveExpenseCategoryCommand(_ command: HomeAssistantCommandPlan) {
+    private func handleMoveExpenseCategoryCommand(_ command: MarinaCommandPlan) {
         guard let categoryName = command.categoryName,
               let category = resolveCategory(from: categoryName) else {
             appendMutationMessage(
@@ -2978,7 +2742,7 @@ struct HomeAssistantPanelView: View {
         executeMoveExpenseCategory(matches[0], category: category)
     }
     
-    private func handleUpdatePlannedExpenseAmountCommand(_ command: HomeAssistantCommandPlan) {
+    private func handleUpdatePlannedExpenseAmountCommand(_ command: MarinaCommandPlan) {
         guard let amount = command.amount, amount > 0 else {
             appendMutationMessage(
                 title: "Need planned expense amount",
@@ -3015,7 +2779,7 @@ struct HomeAssistantPanelView: View {
         executePlannedExpenseAmountUpdate(matches[0], amount: amount, target: target)
     }
     
-    private func handleDeleteLastExpenseCommand(_ command: HomeAssistantCommandPlan) {
+    private func handleDeleteLastExpenseCommand(_ command: MarinaCommandPlan) {
         let candidates = Array(variableExpenses.sorted(by: { $0.transactionDate > $1.transactionDate }).prefix(3))
         guard candidates.isEmpty == false else {
             appendMutationMessage(
@@ -3037,7 +2801,7 @@ struct HomeAssistantPanelView: View {
         )
     }
     
-    private func handleDeleteLastIncomeCommand(_ command: HomeAssistantCommandPlan) {
+    private func handleDeleteLastIncomeCommand(_ command: MarinaCommandPlan) {
         let candidates = Array(incomes.sorted(by: { $0.date > $1.date }).prefix(3))
         guard candidates.isEmpty == false else {
             appendMutationMessage(
@@ -3059,7 +2823,7 @@ struct HomeAssistantPanelView: View {
         )
     }
     
-    private func executeAddExpense(_ command: HomeAssistantCommandPlan) {
+    private func executeAddExpense(_ command: MarinaCommandPlan) {
         guard
             let amount = command.amount,
             let notes = command.notes,
@@ -3097,7 +2861,7 @@ struct HomeAssistantPanelView: View {
         }
     }
     
-    private func executeAddIncome(_ command: HomeAssistantCommandPlan) {
+    private func executeAddIncome(_ command: MarinaCommandPlan) {
         guard let amount = command.amount else {
             appendMutationMessage(
                 title: "Need income amount",
@@ -3148,7 +2912,7 @@ struct HomeAssistantPanelView: View {
         }
     }
     
-    private func executeAddPreset(_ command: HomeAssistantCommandPlan) {
+    private func executeAddPreset(_ command: MarinaCommandPlan) {
         guard let amount = command.amount, amount > 0 else {
             appendMutationMessage(
                 title: "Need preset amount",
@@ -3214,7 +2978,7 @@ struct HomeAssistantPanelView: View {
         }
     }
 
-    private func executeAddPlannedExpense(_ command: HomeAssistantCommandPlan) {
+    private func executeAddPlannedExpense(_ command: MarinaCommandPlan) {
         guard let amount = command.amount, amount > 0 else {
             appendMutationMessage(title: "Need planned expense amount", subtitle: "Tell me the amount to save.", rows: [])
             return
@@ -3243,7 +3007,7 @@ struct HomeAssistantPanelView: View {
         }
     }
     
-    private func executeExpenseEdit(_ expense: VariableExpense, using command: HomeAssistantCommandPlan) {
+    private func executeExpenseEdit(_ expense: VariableExpense, using command: MarinaCommandPlan) {
         do {
             let result = try mutationService.editExpense(
                 expense,
@@ -3262,7 +3026,7 @@ struct HomeAssistantPanelView: View {
         }
     }
     
-    private func executeIncomeEdit(_ income: Income, using command: HomeAssistantCommandPlan) {
+    private func executeIncomeEdit(_ income: Income, using command: MarinaCommandPlan) {
         do {
             let result = try mutationService.editIncome(
                 income,
@@ -3280,7 +3044,7 @@ struct HomeAssistantPanelView: View {
         }
     }
     
-    private func executeCardEdit(_ card: Card, using command: HomeAssistantCommandPlan) {
+    private func executeCardEdit(_ card: Card, using command: MarinaCommandPlan) {
         do {
             let result = try mutationService.editCard(
                 card: card,
@@ -3300,7 +3064,7 @@ struct HomeAssistantPanelView: View {
         }
     }
 
-    private func executeCategoryEdit(_ category: Category, using command: HomeAssistantCommandPlan) {
+    private func executeCategoryEdit(_ category: Category, using command: MarinaCommandPlan) {
         let colorResolution = MarinaColorResolver.resolve(
             rawPrompt: command.rawPrompt,
             parserHex: command.categoryColorHex,
@@ -3321,7 +3085,7 @@ struct HomeAssistantPanelView: View {
         }
     }
 
-    private func executePresetEdit(_ preset: Preset, using command: HomeAssistantCommandPlan) {
+    private func executePresetEdit(_ preset: Preset, using command: MarinaCommandPlan) {
         do {
             let result = try mutationService.editPreset(
                 preset,
@@ -3338,7 +3102,7 @@ struct HomeAssistantPanelView: View {
         }
     }
 
-    private func executeBudgetEdit(_ budget: Budget, using command: HomeAssistantCommandPlan) {
+    private func executeBudgetEdit(_ budget: Budget, using command: MarinaCommandPlan) {
         do {
             let result = try mutationService.editBudget(
                 budget,
@@ -3353,7 +3117,7 @@ struct HomeAssistantPanelView: View {
         }
     }
 
-    private func executePlannedExpenseEdit(_ expense: PlannedExpense, using command: HomeAssistantCommandPlan) {
+    private func executePlannedExpenseEdit(_ expense: PlannedExpense, using command: MarinaCommandPlan) {
         do {
             let result = try mutationService.editPlannedExpense(
                 expense,
@@ -3564,7 +3328,7 @@ struct HomeAssistantPanelView: View {
     private func executePlannedExpenseAmountUpdate(
         _ expense: PlannedExpense,
         amount: Double,
-        target: HomeAssistantPlannedExpenseAmountTarget
+        target: MarinaPlannedExpenseAmountTarget
     ) {
         do {
             let result = try mutationService.updatePlannedExpenseAmount(
@@ -3902,7 +3666,7 @@ struct HomeAssistantPanelView: View {
         }
     }
     
-    private func executePendingBudgetCreation(plan: HomeAssistantCommandPlan) {
+    private func executePendingBudgetCreation(plan: MarinaCommandPlan) {
         let range = plan.dateRange ?? monthRange(containing: Date())
         var budgetName = (plan.entityName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         if budgetName.hasPrefix("for ") {
@@ -4141,7 +3905,7 @@ struct HomeAssistantPanelView: View {
         return CardEffectOption.allCases.first(where: { normalized.contains($0.rawValue) })
     }
     
-    private func matchingPresets(for command: HomeAssistantCommandPlan) -> [Preset] {
+    private func matchingPresets(for command: MarinaCommandPlan) -> [Preset] {
         let range = command.dateRange ?? monthRange(containing: Date())
         let probe = Budget(
             name: "Marina Probe",
@@ -4231,7 +3995,7 @@ struct HomeAssistantPanelView: View {
               amount > 0 else { return }
         
         let normalized = prompt.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-        let target: HomeAssistantPlannedExpenseAmountTarget?
+        let target: MarinaPlannedExpenseAmountTarget?
         if normalized.contains("planned") || normalized == "1" {
             target = .planned
         } else if normalized.contains("actual") || normalized.contains("effective") || normalized == "2" {
@@ -4451,7 +4215,7 @@ struct HomeAssistantPanelView: View {
         )
     }
     
-    private func presentCardSelectionPrompt(for command: HomeAssistantCommandPlan) {
+    private func presentCardSelectionPrompt(for command: MarinaCommandPlan) {
         let rows = pendingExpenseCardOptions.enumerated().prefix(5).map { index, card in
             HomeAnswerRow(title: "\(index + 1)", value: card.name)
         }
@@ -4671,7 +4435,7 @@ struct HomeAssistantPanelView: View {
         pendingCardStyleTheme = nil
     }
     
-    private func matchedCards(for command: HomeAssistantCommandPlan) -> [Card] {
+    private func matchedCards(for command: MarinaCommandPlan) -> [Card] {
         guard cards.isEmpty == false else { return [] }
         let candidateNames = cards.map(\.name)
         
@@ -4692,7 +4456,7 @@ struct HomeAssistantPanelView: View {
         return rankedFromPrompt.compactMap { name in cards.first(where: { $0.name == name }) }
     }
 
-    private func matchedCategories(for command: HomeAssistantCommandPlan) -> [Category] {
+    private func matchedCategories(for command: MarinaCommandPlan) -> [Category] {
         guard categories.isEmpty == false else { return [] }
         let explicitName = (command.entityName ?? command.categoryName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         if explicitName.isEmpty == false {
@@ -4710,7 +4474,7 @@ struct HomeAssistantPanelView: View {
         return ranked.compactMap { name in categories.first(where: { $0.name == name }) }
     }
 
-    private func matchedPresets(for command: HomeAssistantCommandPlan) -> [Preset] {
+    private func matchedPresets(for command: MarinaCommandPlan) -> [Preset] {
         guard presets.isEmpty == false else { return [] }
         let explicitName = (command.entityName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         if explicitName.isEmpty == false {
@@ -4728,7 +4492,7 @@ struct HomeAssistantPanelView: View {
         return ranked.compactMap { name in presets.first(where: { $0.title == name }) }
     }
 
-    private func matchedBudgets(for command: HomeAssistantCommandPlan) -> [Budget] {
+    private func matchedBudgets(for command: MarinaCommandPlan) -> [Budget] {
         guard budgets.isEmpty == false else { return [] }
         let explicitName = (command.entityName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         if explicitName.isEmpty == false {
@@ -4778,6 +4542,22 @@ struct HomeAssistantPanelView: View {
         let effect = CardEffectOption(rawValue: card.effect)?.displayName ?? "Plastic"
         return "\(card.name) • \(theme) • \(effect)"
     }
+
+    private func categoryDisplayLabel(_ category: Category) -> String {
+        category.name
+    }
+
+    private func presetDisplayLabel(_ preset: Preset) -> String {
+        "\(preset.title) • \(CurrencyFormatter.string(from: preset.plannedAmount))"
+    }
+
+    private func budgetDisplayLabel(_ budget: Budget) -> String {
+        "\(budget.name) • \(shortDate(budget.startDate)) - \(shortDate(budget.endDate))"
+    }
+
+    private func plannedExpenseDisplayLabel(_ expense: PlannedExpense) -> String {
+        "\(CurrencyFormatter.string(from: expense.effectiveAmount())) • \(expense.title) • \(shortDate(expense.expenseDate))"
+    }
     
     private func shortDate(_ date: Date) -> String {
         AppDateFormat.shortDate(date)
@@ -4785,7 +4565,7 @@ struct HomeAssistantPanelView: View {
     
     private func aliasTarget(
         in prompt: String,
-        entityType: HomeAssistantAliasEntityType
+        entityType: MarinaAliasEntityType
     ) -> String? {
         aliasMatcher.matchedTarget(
             in: prompt,
@@ -4796,12 +4576,12 @@ struct HomeAssistantPanelView: View {
     
     private func recordTelemetry(
         for prompt: String,
-        outcome: HomeAssistantTelemetryOutcome,
-        source: HomeAssistantPlanResolutionSource?,
+        outcome: MarinaTelemetryOutcome,
+        source: MarinaAnswerProvenance?,
         plan: HomeQueryPlan?,
         notes: String?
     ) {
-        let event = HomeAssistantTelemetryEvent(
+        let event = MarinaTelemetryEvent(
             prompt: prompt,
             normalizedPrompt: normalizedPrompt(prompt),
             outcome: outcome,
@@ -4892,7 +4672,7 @@ struct HomeAssistantPanelView: View {
     }
     
     private func quickButtonAccordionAnimation(for index: Int) -> Animation {
-        let count = HomeAssistantPresetPromptGroup.allCases.count
+        let count = MarinaPresetPromptGroup.allCases.count
         let order = quickButtonsVisible ? index : max(0, count - 1 - index)
         let base = quickButtonsVisible
         ? Animation.easeOut(duration: 0.18)
@@ -4929,753 +4709,13 @@ struct HomeAssistantPanelView: View {
     private func clearConversation() {
         answers.removeAll()
         pendingUserPromptForNextAnswer = nil
-        sessionContext = HomeAssistantSessionContext()
+        sessionContext = MarinaSessionContext()
         clarificationSuggestions = []
         recoverySuggestions = []
         lastClarificationReasons = []
         activeClarificationContext = nil
-        pendingWhatIfContext = nil
-        pendingWhatIfCategoryMappingContext = nil
         clearMutationPendingState()
         conversationStore.saveAnswers([], workspaceID: workspace.id)
-    }
-    
-    private func resolveEntityResolution(
-        for plan: HomeQueryPlan,
-        rawPrompt: String,
-        rejectedCandidateNames: [String] = []
-    ) -> HomeAssistantEntityResolution {
-        entityResolutionResolver.resolve(
-            input: HomeAssistantEntityResolutionInput(
-                prompt: rawPrompt,
-                targetPhrase: plan.targetName ?? extractedSignalTarget(for: rawPrompt) ?? rawPrompt,
-                categories: categories.map(\.name).sorted(),
-                cards: cards.map(\.name).sorted(),
-                merchants: merchantCandidateNames(),
-                presets: presets.map(\.title).sorted(),
-                budgets: budgets.map(\.name).sorted(),
-                incomeSources: Array(Set(incomes.map(\.source))).sorted(),
-                aliasRules: assistantAliasRules,
-                rejectedCandidateNames: rejectedCandidateNames
-            )
-        )
-    }
-
-    @MainActor
-    private func merchantCandidateNames() -> [String] {
-        Array(
-            Set(
-                variableExpenses
-                    .map(\.descriptionText)
-                    .map(MerchantNormalizer.displayName)
-                    .filter { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false }
-            )
-        ).sorted()
-    }
-
-    private func resolutionWithRecoverySuggestions(
-        _ resolution: HomeAssistantEntityResolution,
-        basePlan: HomeQueryPlan,
-        rawPrompt: String,
-        explanation: String?
-    ) -> HomeAssistantEntityResolution {
-        let recovery = buildRecoverySuggestions(from: resolution, basePlan: basePlan, rawPrompt: rawPrompt)
-        return HomeAssistantEntityResolution(
-            resolvedPhrase: resolution.resolvedPhrase,
-            bestMatch: resolution.bestMatch,
-            ambiguityCandidates: resolution.ambiguityCandidates,
-            rankedCandidates: resolution.rankedCandidates,
-            confidence: resolution.confidence,
-            originalCandidates: resolution.originalCandidates,
-            rejectedCandidateNames: resolution.rejectedCandidateNames,
-            recoverySuggestions: recovery,
-            explanation: explanation,
-            isTieAmbiguity: resolution.isTieAmbiguity
-        )
-    }
-
-    private func requiredFieldClarificationPlan(
-        for basePlan: HomeQueryPlan,
-        rawPrompt: String
-    ) -> HomeAssistantClarificationPlan? {
-        guard let derivedPlan = clarificationPlan(for: basePlan, rawPrompt: rawPrompt) else {
-            return nil
-        }
-
-        let allowedReasons: Set<HomeAssistantClarificationReason> = [
-            .missingDate,
-            .missingComparisonDate,
-            .missingCategoryTarget,
-            .missingCardTarget,
-            .missingIncomeSourceTarget,
-            .missingMerchantTarget
-        ]
-        let filteredReasons = derivedPlan.reasons.filter { allowedReasons.contains($0) }
-        guard filteredReasons.isEmpty == false else { return nil }
-
-        return HomeAssistantClarificationPlan(
-            reasons: filteredReasons,
-            subtitle: derivedPlan.subtitle,
-            suggestions: clarificationSuggestions(
-                for: basePlan,
-                reasons: filteredReasons,
-                normalizedPrompt: normalizedPrompt(rawPrompt)
-            ),
-            shouldRunBestEffort: derivedPlan.shouldRunBestEffort
-        )
-    }
-
-    private func ambiguityClarificationPlan(
-        for basePlan: HomeQueryPlan,
-        resolution: HomeAssistantEntityResolution
-    ) -> HomeAssistantClarificationPlan? {
-        guard resolution.ambiguityCandidates.isEmpty == false else { return nil }
-
-        let suggestions = resolution.ambiguityCandidates.prefix(4).map { match in
-            suggestionForMatch(match, basePlan: basePlan)
-        }
-
-        return HomeAssistantClarificationPlan(
-            reasons: [.lowConfidenceLanguage],
-            subtitle: "I found a few close matches. Pick one to continue.",
-            suggestions: suggestions,
-            shouldRunBestEffort: resolution.isTieAmbiguity == false
-        )
-    }
-
-    private func mergeClarificationPlans(
-        _ lhs: HomeAssistantClarificationPlan?,
-        _ rhs: HomeAssistantClarificationPlan?
-    ) -> HomeAssistantClarificationPlan? {
-        switch (lhs, rhs) {
-        case (nil, nil):
-            return nil
-        case let (plan?, nil), let (nil, plan?):
-            return plan
-        case let (left?, right?):
-            let reasons = uniqueClarificationReasons(left.reasons + right.reasons)
-            var suggestions: [HomeAssistantSuggestion] = []
-            var seenTitles: Set<String> = []
-            for suggestion in left.suggestions + right.suggestions {
-                if seenTitles.insert(suggestion.title).inserted {
-                    suggestions.append(suggestion)
-                }
-            }
-            return HomeAssistantClarificationPlan(
-                reasons: reasons,
-                subtitle: right.subtitle,
-                suggestions: Array(suggestions.prefix(4)),
-                shouldRunBestEffort: left.shouldRunBestEffort || right.shouldRunBestEffort
-            )
-        }
-    }
-
-    private func clarificationContext(
-        for plan: HomeQueryPlan,
-        rawPrompt: String,
-        resolution: HomeAssistantEntityResolution
-    ) -> HomeAssistantClarificationContext? {
-        guard resolution.originalCandidates.isEmpty == false else { return nil }
-        return HomeAssistantClarificationContext(
-            originalCandidates: resolution.originalCandidates,
-            activeCandidates: resolution.ambiguityCandidates.isEmpty ? resolution.originalCandidates : resolution.ambiguityCandidates,
-            rejectedCandidateNames: resolution.rejectedCandidateNames,
-            currentBestMatch: resolution.bestMatch,
-            originalPrompt: rawPrompt,
-            basePlan: plan,
-            resolution: resolution
-        )
-    }
-
-    private func suggestionForMatch(
-        _ match: HomeAssistantEntityMatch,
-        basePlan: HomeQueryPlan
-    ) -> HomeAssistantSuggestion {
-        let resolution = HomeAssistantEntityResolution(
-            resolvedPhrase: match.name,
-            bestMatch: match,
-            rankedCandidates: [match],
-            confidence: match.confidence
-        )
-        let reconciled = planReconciler.reconcile(plan: basePlan, resolution: resolution).plan
-        return HomeAssistantSuggestion(
-            title: match.name,
-            query: reconciled.query,
-            confidenceScore: match.score,
-            reasoning: "Matched as \(match.entityType.rawValue) via \(match.source.rawValue)."
-        )
-    }
-
-    private func buildRecoverySuggestions(
-        from resolution: HomeAssistantEntityResolution,
-        basePlan: HomeQueryPlan,
-        rawPrompt: String
-    ) -> [HomeAssistantRecoverySuggestion] {
-        var suggestions: [HomeAssistantRecoverySuggestion] = resolution.rankedCandidates.prefix(3).map { match in
-            HomeAssistantRecoverySuggestion(
-                suggestion: suggestionForMatch(match, basePlan: basePlan),
-                confidenceScore: match.score,
-                reasoning: "Likely \(match.entityType.rawValue) match from \(match.source.rawValue)."
-            )
-        }
-
-        let broadFallback = HomeAssistantRecoverySuggestion(
-            suggestion: HomeAssistantSuggestion(
-                title: "Show all results for this period",
-                query: basePlan.updating(
-                    metric: basePlan.metric == .monthComparison ? .monthComparison : .spendTotal,
-                    targetName: .some(nil),
-                    targetTypeRaw: .some(nil)
-                ).query,
-                confidenceScore: 0.1,
-                reasoning: "Broad fallback across the current period."
-            ),
-            confidenceScore: 0.1,
-            reasoning: "Broad fallback across the current period."
-        )
-
-        if suggestions.allSatisfy({ $0.confidenceScore < 0.45 }) {
-            suggestions.append(broadFallback)
-        }
-
-        return suggestions.sorted { lhs, rhs in
-            if lhs.confidenceScore == rhs.confidenceScore {
-                return lhs.suggestion.title.localizedCaseInsensitiveCompare(rhs.suggestion.title) == .orderedAscending
-            }
-            return lhs.confidenceScore > rhs.confidenceScore
-        }
-    }
-
-    private func presentRecoveryTurn(
-        _ suggestions: [HomeAssistantRecoverySuggestion],
-        userPrompt: String?,
-        subtitle: String
-    ) {
-        clarificationSuggestions = []
-        recoverySuggestions = suggestions
-        lastClarificationReasons = []
-        activeClarificationContext = nil
-
-        let answer = HomeAnswer(
-            queryID: UUID(),
-            kind: .message,
-            userPrompt: userPrompt,
-            title: "Try one of these",
-            subtitle: subtitle,
-            rows: suggestions.prefix(3).map {
-                HomeAnswerRow(
-                    title: $0.suggestion.title,
-                    value: $0.reasoning
-                )
-            }
-        )
-        presentMarinaAnswer(
-            deterministicAnswer: answer,
-            deterministicRecoveryAnswer: answer,
-            rawPrompt: userPrompt ?? "",
-            source: .contextual,
-            surfaceKind: .recovery,
-            validationOutcomeSummary: "recovery",
-            groundingSummary: "deterministic recovery suggestions"
-        )
-        MarinaDebugLogger.log(
-            "[MarinaClarification] recovery count=\(suggestions.count) subtitle='\(subtitle)'"
-        )
-    }
-    
-    private func entityDisambiguationPlan(
-        for plan: HomeQueryPlan,
-        rawPrompt: String
-    ) -> HomeAssistantClarificationPlan? {
-        guard plan.targetName == nil else { return nil }
-        
-        let normalized = normalizedPrompt(rawPrompt)
-        
-        if requiresCardTarget(plan.metric), normalized.contains("all cards") == false {
-            let candidates = entityMatcher.rankedMatches(
-                in: rawPrompt,
-                candidateNames: cards.map(\.name),
-                limit: 3
-            )
-            if candidates.count >= 2 {
-                return disambiguationPlan(
-                    for: plan,
-                    reasons: [.missingCardTarget],
-                    options: candidates,
-                    allTitle: "All cards"
-                )
-            }
-        }
-        
-        if requiresCategoryTarget(plan.metric), normalized.contains("all categories") == false {
-            let candidates = entityMatcher.rankedMatches(
-                in: rawPrompt,
-                candidateNames: categories.map(\.name),
-                limit: 3
-            )
-            if candidates.count >= 2 {
-                return disambiguationPlan(
-                    for: plan,
-                    reasons: [.missingCategoryTarget],
-                    options: candidates,
-                    allTitle: "All categories"
-                )
-            }
-        }
-        
-        if requiresIncomeTarget(plan.metric),
-           normalized.contains("all sources") == false,
-           normalized.contains("all income") == false
-        {
-            let uniqueSources = Array(Set(incomes.map(\.source))).sorted()
-            let candidates = entityMatcher.rankedMatches(
-                in: rawPrompt,
-                candidateNames: uniqueSources,
-                limit: 3
-            )
-            if candidates.count >= 2 {
-                return disambiguationPlan(
-                    for: plan,
-                    reasons: [.missingIncomeSourceTarget],
-                    options: candidates,
-                    allTitle: "All income sources"
-                )
-            }
-        }
-        
-        return nil
-    }
-    
-    private func disambiguationPlan(
-        for plan: HomeQueryPlan,
-        reasons: [HomeAssistantClarificationReason],
-        options: [String],
-        allTitle: String
-    ) -> HomeAssistantClarificationPlan {
-        var suggestions: [HomeAssistantSuggestion] = options.map { option in
-            HomeAssistantSuggestion(
-                title: option,
-                query: queryFromPlan(plan, overridingTargetName: option)
-            )
-        }
-        
-        suggestions.append(
-            HomeAssistantSuggestion(
-                title: allTitle,
-                query: queryFromPlan(plan, overridingTargetName: nil)
-            )
-        )
-        
-        return HomeAssistantClarificationPlan(
-            reasons: reasons,
-            subtitle: "I found a few close matches. Pick one to continue.",
-            suggestions: suggestions,
-            shouldRunBestEffort: false
-        )
-    }
-    
-    private func clarificationPlan(
-        for plan: HomeQueryPlan,
-        rawPrompt: String
-    ) -> HomeAssistantClarificationPlan? {
-        guard plan.confidenceBand != .high else { return nil }
-        
-        let normalized = normalizedPrompt(rawPrompt)
-        let reasons = clarificationReasons(for: plan, normalizedPrompt: normalized)
-        
-        // Medium confidence with no concrete ambiguity can still proceed without interruption.
-        if reasons.isEmpty, plan.confidenceBand == .medium {
-            return nil
-        }
-        
-        let subtitle = clarificationSubtitle(for: reasons, confidenceBand: plan.confidenceBand)
-        let suggestions = clarificationSuggestions(
-            for: plan,
-            reasons: reasons,
-            normalizedPrompt: normalized
-        )
-        
-        let shouldRunBestEffort = plan.confidenceBand == .medium
-            && reasons.contains(.missingComparisonDate) == false
-            && reasons.contains(.missingMerchantTarget) == false
-
-        return HomeAssistantClarificationPlan(
-            reasons: reasons,
-            subtitle: subtitle,
-            suggestions: suggestions,
-            shouldRunBestEffort: shouldRunBestEffort
-        )
-    }
-    
-    private func presentClarificationTurn(
-        _ clarificationPlan: HomeAssistantClarificationPlan,
-        userPrompt: String?,
-        context: HomeAssistantClarificationContext? = nil
-    ) {
-        guard clarificationPlan.suggestions.isEmpty == false else {
-            MarinaDebugLogger.log(
-                "[MarinaClarification] skipped empty clarification subtitle='\(clarificationPlan.subtitle)'"
-            )
-            return
-        }
-        clarificationSuggestions = clarificationPlan.suggestions
-        recoverySuggestions = []
-        lastClarificationReasons = clarificationPlan.reasons
-        activeClarificationContext = context
-        MarinaDebugLogger.log(
-            "[MarinaClarification] present reasons=\(clarificationPlan.reasons.map(\.rawValue)) suggestions=\(clarificationPlan.suggestions.count)"
-        )
-        
-        let clarificationAnswer = HomeAnswer(
-            queryID: UUID(),
-            kind: .message,
-            userPrompt: userPrompt,
-            title: String(localized: "assistant.quickClarification", defaultValue: "Quick clarification", comment: "Assistant clarification card title."),
-            subtitle: clarificationPlan.subtitle,
-            primaryValue: nil,
-            rows: []
-        )
-        presentMarinaAnswer(
-            deterministicAnswer: clarificationAnswer,
-            deterministicRecoveryAnswer: clarificationAnswer,
-            rawPrompt: userPrompt ?? "",
-            source: .contextual,
-            surfaceKind: .clarification,
-            validationOutcomeSummary: "clarification:\(clarificationPlan.reasons.map(\.rawValue).joined(separator: ","))",
-            clarificationChoices: clarificationPlan.suggestions.map(\.title),
-            groundingSummary: "deterministic clarification choices"
-        )
-    }
-
-    private func actionableClarificationPlan(
-        _ plan: HomeAssistantClarificationPlan?,
-        basePlan: HomeQueryPlan,
-        rawPrompt: String
-    ) -> HomeAssistantClarificationPlan? {
-        guard let plan else { return nil }
-        if plan.suggestions.isEmpty == false {
-            MarinaDebugLogger.log(
-                "[MarinaClarification] actionable existing reasons=\(plan.reasons.map(\.rawValue)) suggestions=\(plan.suggestions.count)"
-            )
-            return plan
-        }
-
-        guard plan.reasons.contains(where: \.requiresUserResolution) else {
-            MarinaDebugLogger.log(
-                "[MarinaClarification] discarded non-actionable clarification reasons=\(plan.reasons.map(\.rawValue))"
-            )
-            return nil
-        }
-
-        let synthesized = clarificationSuggestions(
-            for: basePlan,
-            reasons: plan.reasons,
-            normalizedPrompt: normalizedPrompt(rawPrompt)
-        )
-        MarinaDebugLogger.log(
-            "[MarinaClarification] synthesized reasons=\(plan.reasons.map(\.rawValue)) suggestions=\(synthesized.count)"
-        )
-        guard synthesized.isEmpty == false else { return nil }
-        return HomeAssistantClarificationPlan(
-            reasons: plan.reasons,
-            subtitle: plan.subtitle,
-            suggestions: synthesized,
-            shouldRunBestEffort: plan.shouldRunBestEffort
-        )
-    }
-
-    private func clarificationReasons(
-        for plan: HomeQueryPlan,
-        normalizedPrompt: String
-    ) -> [HomeAssistantClarificationReason] {
-        var reasons: [HomeAssistantClarificationReason] = []
-        let eligibility = HomeAssistantExecutionEligibilityEvaluator.evaluate(
-            plan: plan,
-            normalizedPrompt: normalizedPrompt,
-            activeBudgetDateRange: activeBudgetDateRange(),
-            now: Date()
-        )
-        let executionPolicy = plan.metric.executionPolicy
-        
-        if plan.confidenceBand == .low {
-            reasons.append(.lowConfidenceLanguage)
-        }
-
-        if eligibility.unresolvedRequirements.contains(.comparisonDateScope) {
-            reasons.append(.missingComparisonDate)
-        }
-        
-        if eligibility.unresolvedRequirements.contains(.dateScope)
-            && hasExplicitDatePhrase(in: normalizedPrompt) == false
-        {
-            reasons.append(.missingDate)
-        }
-        
-        if plan.metric == .overview
-            && plan.dateRange == nil
-            && isBroadOverviewPrompt(normalizedPrompt)
-        {
-            reasons.append(.broadPrompt)
-        }
-        
-        if executionPolicy.requiresTarget && plan.targetName == nil {
-            if requiresCategoryTarget(plan.metric) && normalizedPrompt.contains("all categories") == false {
-                reasons.append(.missingCategoryTarget)
-            } else if requiresCardTarget(plan.metric) && normalizedPrompt.contains("all cards") == false {
-                reasons.append(.missingCardTarget)
-            } else if requiresIncomeTarget(plan.metric)
-                        && normalizedPrompt.contains("all income") == false
-                        && normalizedPrompt.contains("all sources") == false
-            {
-                reasons.append(.missingIncomeSourceTarget)
-            } else if requiresMerchantTarget(plan.metric) {
-                reasons.append(.missingMerchantTarget)
-            }
-        }
-        
-        return uniqueClarificationReasons(reasons)
-    }
-    
-    private func clarificationSubtitle(
-        for reasons: [HomeAssistantClarificationReason],
-        confidenceBand: HomeQueryConfidenceBand
-    ) -> String {
-        let reasonLines = reasons.map(\.promptLine).prefix(2)
-        let reasonBody = reasonLines.joined(separator: " ")
-        
-        switch confidenceBand {
-        case .high:
-            return "I have enough detail to run this now."
-        case .medium:
-            if reasonBody.isEmpty {
-                return "Likely match complete. If you want it tighter, pick one option below."
-            }
-            return "Likely match complete. \(reasonBody)"
-        case .low:
-            if reasonBody.isEmpty {
-                return "I need one more detail before I run this. Pick an option below."
-            }
-            return "I need one more detail before I run this. \(reasonBody)"
-        }
-    }
-    
-    private func clarificationSuggestions(
-        for plan: HomeQueryPlan,
-        reasons: [HomeAssistantClarificationReason],
-        normalizedPrompt: String
-    ) -> [HomeAssistantSuggestion] {
-        var suggestions: [HomeAssistantSuggestion] = []
-        let now = Date()
-        
-        if reasons.contains(.missingDate) {
-            suggestions.append(
-                HomeAssistantSuggestion(
-                    title: "Use this month",
-                    query: queryFromPlan(plan, overridingDateRange: monthRange(containing: now))
-                )
-            )
-            suggestions.append(
-                HomeAssistantSuggestion(
-                    title: "Use last month",
-                    query: queryFromPlan(plan, overridingDateRange: previousMonthRange(from: now))
-                )
-            )
-        }
-
-        if reasons.contains(.missingComparisonDate) {
-            suggestions.append(
-                HomeAssistantSuggestion(
-                    title: "Compare this month vs last month",
-                    query: HomeQuery(
-                        intent: plan.metric.intent,
-                        dateRange: monthRange(containing: now),
-                        resultLimit: plan.resultLimit,
-                        targetName: plan.targetName,
-                        periodUnit: plan.periodUnit
-                    )
-                )
-            )
-            suggestions.append(
-                HomeAssistantSuggestion(
-                    title: "Use this month",
-                    query: queryFromPlan(plan, overridingDateRange: monthRange(containing: now))
-                )
-            )
-        }
-        
-        if reasons.contains(.missingCategoryTarget) {
-            suggestions.append(
-                HomeAssistantSuggestion(
-                    title: "All categories",
-                    query: queryFromPlan(plan, overridingTargetName: nil)
-                )
-            )
-            suggestions.append(
-                HomeAssistantSuggestion(
-                    title: "Top categories first",
-                    query: HomeQuery(
-                        intent: .topCategoriesThisMonth,
-                        dateRange: plan.dateRange ?? monthRange(containing: now),
-                        resultLimit: 3
-                    )
-                )
-            )
-        }
-        
-        if reasons.contains(.missingCardTarget) {
-            suggestions.append(
-                HomeAssistantSuggestion(
-                    title: "All cards",
-                    query: queryFromPlan(plan, overridingTargetName: nil)
-                )
-            )
-            suggestions.append(
-                HomeAssistantSuggestion(
-                    title: "Card habits (all cards)",
-                    query: HomeQuery(
-                        intent: .cardVariableSpendingHabits,
-                        dateRange: plan.dateRange ?? monthRange(containing: now),
-                        resultLimit: 3
-                    )
-                )
-            )
-        }
-        
-        if reasons.contains(.missingIncomeSourceTarget) {
-            suggestions.append(
-                HomeAssistantSuggestion(
-                    title: "All income sources",
-                    query: queryFromPlan(plan, overridingTargetName: nil)
-                )
-            )
-            suggestions.append(
-                HomeAssistantSuggestion(
-                    title: "Average actual income",
-                    query: HomeQuery(intent: .incomeAverageActual, dateRange: yearRange(containing: now))
-                )
-            )
-        }
-
-        if reasons.contains(.missingMerchantTarget) {
-            suggestions.append(
-                HomeAssistantSuggestion(
-                    title: "Top merchants",
-                    query: HomeQuery(
-                        intent: .topMerchantsThisMonth,
-                        dateRange: plan.dateRange ?? monthRange(containing: now),
-                        resultLimit: 3
-                    )
-                )
-            )
-            suggestions.append(
-                HomeAssistantSuggestion(
-                    title: "Largest recent expenses",
-                    query: HomeQuery(
-                        intent: .largestRecentTransactions,
-                        dateRange: plan.dateRange ?? monthRange(containing: now),
-                        resultLimit: 5
-                    )
-                )
-            )
-        }
-        
-        if reasons.contains(.broadPrompt) {
-            suggestions.append(
-                HomeAssistantSuggestion(
-                    title: "Spend this month",
-                    query: HomeQuery(intent: .spendThisMonth, dateRange: monthRange(containing: now))
-                )
-            )
-            suggestions.append(
-                HomeAssistantSuggestion(
-                    title: "Top categories this month",
-                    query: HomeQuery(intent: .topCategoriesThisMonth, dateRange: monthRange(containing: now), resultLimit: 3)
-                )
-            )
-            suggestions.append(
-                HomeAssistantSuggestion(
-                    title: "Compare with last month",
-                    query: HomeQuery(intent: .compareThisMonthToPreviousMonth, dateRange: monthRange(containing: now))
-                )
-            )
-        }
-        
-        if reasons.contains(.lowConfidenceLanguage) && suggestions.isEmpty {
-            suggestions.append(
-                HomeAssistantSuggestion(
-                    title: "How am I doing this month?",
-                    query: HomeQuery(intent: .periodOverview, dateRange: monthRange(containing: now))
-                )
-            )
-            suggestions.append(
-                HomeAssistantSuggestion(
-                    title: "Top 3 categories this month",
-                    query: HomeQuery(intent: .topCategoriesThisMonth, dateRange: monthRange(containing: now), resultLimit: 3)
-                )
-            )
-        }
-        
-        if suggestions.isEmpty {
-            suggestions = fallbackClarificationSuggestions(plan: plan, now: now, normalizedPrompt: normalizedPrompt)
-        }
-        
-        var unique: [HomeAssistantSuggestion] = []
-        var seenTitles: Set<String> = []
-        for suggestion in suggestions {
-            if seenTitles.insert(suggestion.title).inserted {
-                unique.append(suggestion)
-            }
-            if unique.count == 4 {
-                break
-            }
-        }
-        
-        return unique
-    }
-    
-    private func fallbackClarificationSuggestions(
-        plan: HomeQueryPlan,
-        now: Date,
-        normalizedPrompt: String
-    ) -> [HomeAssistantSuggestion] {
-        let range = plan.dateRange ?? monthRange(containing: now)
-        let periodRange = yearRange(containing: now)
-        
-        return [
-            HomeAssistantSuggestion(
-                title: "Use this month",
-                query: queryFromPlan(plan, overridingDateRange: range)
-            ),
-            HomeAssistantSuggestion(
-                title: "Use this year",
-                query: queryFromPlan(plan, overridingDateRange: periodRange)
-            ),
-            HomeAssistantSuggestion(
-                title: "Spend this month",
-                query: HomeQuery(intent: .spendThisMonth, dateRange: range)
-            ),
-            HomeAssistantSuggestion(
-                title: normalizedPrompt.contains("income") ? "Income share this month" : "Top categories this month",
-                query: normalizedPrompt.contains("income")
-                ? HomeQuery(intent: .incomeSourceShare, dateRange: range)
-                : HomeQuery(intent: .topCategoriesThisMonth, dateRange: range, resultLimit: 3)
-            )
-        ]
-    }
-    
-    private func queryFromPlan(
-        _ plan: HomeQueryPlan,
-        overridingDateRange: HomeQueryDateRange? = nil,
-        overridingTargetName: String? = nil
-    ) -> HomeQuery {
-        HomeQuery(
-            intent: plan.metric.intent,
-            dateRange: overridingDateRange ?? plan.dateRange,
-            comparisonDateRange: plan.comparisonDateRange,
-            resultLimit: plan.resultLimit,
-            targetName: overridingTargetName ?? plan.targetName,
-            periodUnit: plan.periodUnit
-        )
     }
     
     private func normalizedPrompt(_ rawPrompt: String) -> String {
@@ -5686,7 +4726,7 @@ struct HomeAssistantPanelView: View {
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private func handleSuggestionTap(_ suggestion: HomeAssistantSuggestion) {
+    private func handleSuggestionTap(_ suggestion: MarinaSuggestion) {
         if let choice = foundationPipelineClarificationChoicesByID[suggestion.id]
             ?? foundationPipelineClarificationChoice(matching: suggestion.title),
            let clarification = foundationPipelineClarification ?? foundationPipelineClarificationChoiceContext {
@@ -5700,7 +4740,7 @@ struct HomeAssistantPanelView: View {
         if clarificationSuggestions.contains(where: { $0.title == suggestion.title }) {
             emitFoundationPipelineClarificationDiagnostic(
                 title: suggestion.title,
-                reason: "missing_pending_foundation_pipeline_clarification"
+                reason: "missing_pending_foundationPipeline_clarification"
             )
             return
         }
@@ -5711,7 +4751,7 @@ struct HomeAssistantPanelView: View {
     }
 
     @MainActor
-    private func runPresetSuggestion(_ suggestion: HomeAssistantSuggestion) async {
+    private func runPresetSuggestion(_ suggestion: MarinaSuggestion) async {
         let runtimeSettings = marinaRuntimeSettings
         latestTraceAccessibilityValue = ""
         MarinaTraceRecorder.shared.begin(
@@ -5824,7 +4864,7 @@ struct HomeAssistantPanelView: View {
         _ answer: HomeAnswer,
         clarification: MarinaTypedClarification,
         rawPrompt: String,
-        source: HomeAssistantPlanResolutionSource
+        source: MarinaAnswerProvenance
     ) async {
         let actionable = clarification.isActionable(for: rawPrompt)
         let actionableChoices = clarification.actionableChoices(for: rawPrompt)
@@ -5835,7 +4875,7 @@ struct HomeAssistantPanelView: View {
             : [:]
         foundationPipelineClarificationChoicesByTitle = actionable ? foundationPipelineChoiceLookup(for: actionableChoices) : [:]
         clarificationSuggestions = actionable ? actionableChoices.map { choice in
-            HomeAssistantSuggestion(
+            MarinaSuggestion(
                 id: choice.id,
                 title: foundationPipelineChoiceTitle(choice),
                 query: HomeQuery(intent: .spendThisMonth)
@@ -5850,7 +4890,7 @@ struct HomeAssistantPanelView: View {
             outcome: .clarification,
             source: source,
             plan: nil,
-            notes: "foundation_pipeline_clarification"
+            notes: "foundationPipeline_clarification"
         )
         let baseAnswer = actionable || actionableChoices.isEmpty == false
             ? answer
@@ -5917,7 +4957,7 @@ struct HomeAssistantPanelView: View {
         foundationPipelineClarificationChoicesByID = Dictionary(uniqueKeysWithValues: actionableChoices.map { ($0.id, $0) })
         foundationPipelineClarificationChoicesByTitle = foundationPipelineChoiceLookup(for: actionableChoices)
         clarificationSuggestions = actionableChoices.map { choice in
-            HomeAssistantSuggestion(
+            MarinaSuggestion(
                 id: choice.id,
                 title: foundationPipelineChoiceTitle(choice),
                 query: HomeQuery(intent: .spendThisMonth)
@@ -6111,7 +5151,7 @@ struct HomeAssistantPanelView: View {
         MarinaTraceRecorder.shared.recordFoundationPipelineTurnClassification(.clarificationAnswer)
         MarinaTraceRecorder.shared.recordSelectedRoute(.clarification, reason: reason)
         MarinaTraceRecorder.shared.recordAggregation(
-            path: "marina_foundation_pipeline_clarification_diagnostic",
+            path: "marina_foundationPipeline_clarification_diagnostic",
             summary: "title=\(title),reason=\(reason)"
         )
         MarinaTraceRecorder.shared.recordResponse(
@@ -6159,7 +5199,7 @@ struct HomeAssistantPanelView: View {
         return MarinaInterpretationContext(
             workspaceName: workspace.name,
             defaultPeriodUnit: defaultQueryPeriodUnit,
-            ambientDateRange: assistantDateRange,
+            ambientDateRange: ambientDateRange,
             sessionContext: sessionContext,
             priorQueryContext: turnClassification == .followUp ? priorQueryContext : .empty,
             cardNames: cards.map(\.name).sorted(),
@@ -6178,69 +5218,6 @@ struct HomeAssistantPanelView: View {
         )
     }
 
-    private func logFinalTurnOutcome(
-        _ outcome: MarinaTurnFinalOutcome,
-        rawPrompt: String,
-        notes: String
-    ) {
-        MarinaDebugLogger.log(
-            "[MarinaFinalization] outcome=\(outcome.rawValue) prompt='\(rawPrompt)' \(notes)"
-        )
-    }
-    
-    private func isDateExpected(for metric: HomeQueryMetric) -> Bool {
-        metric.executionPolicy.requiresDateScope
-    }
-    
-    private func hasExplicitDatePhrase(in normalizedPrompt: String) -> Bool {
-        if normalizedPrompt.contains("today")
-            || normalizedPrompt.contains("yesterday")
-            || normalizedPrompt.contains("this month")
-            || normalizedPrompt.contains("last month")
-            || normalizedPrompt.contains("this year")
-            || normalizedPrompt.contains("last year")
-            || normalizedPrompt.contains("past ")
-            || normalizedPrompt.contains("last ")
-            || normalizedPrompt.contains("from ")
-            || normalizedPrompt.contains("between ")
-        {
-            return true
-        }
-        
-        return normalizedPrompt.range(of: "\\b\\d{4}-\\d{1,2}-\\d{1,2}\\b", options: .regularExpression) != nil
-    }
-    
-    private func isBroadOverviewPrompt(_ normalizedPrompt: String) -> Bool {
-        let broadOverviewPhrases = [
-            "how am i doing",
-            "how are we doing",
-            "how did i do",
-            "budget check in",
-            "budget checkin",
-            "overview",
-            "summary",
-            "snapshot"
-        ]
-        
-        return broadOverviewPhrases.contains { normalizedPrompt.contains($0) }
-    }
-    
-    private func requiresCategoryTarget(_ metric: HomeQueryMetric) -> Bool {
-        metric.executionPolicy.targetRequirement == .category
-    }
-    
-    private func requiresCardTarget(_ metric: HomeQueryMetric) -> Bool {
-        metric.executionPolicy.targetRequirement == .card
-    }
-    
-    private func requiresIncomeTarget(_ metric: HomeQueryMetric) -> Bool {
-        metric.executionPolicy.targetRequirement == .incomeSource
-    }
-
-    private func requiresMerchantTarget(_ metric: HomeQueryMetric) -> Bool {
-        metric.executionPolicy.targetRequirement == .merchant
-    }
-    
     private func monthRange(containing date: Date) -> HomeQueryDateRange {
         let calendar = Calendar.current
         let start = calendar.date(from: calendar.dateComponents([.year, .month], from: date)) ?? date
@@ -6263,10 +5240,10 @@ struct HomeAssistantPanelView: View {
     }
     
     private func uniqueClarificationReasons(
-        _ reasons: [HomeAssistantClarificationReason]
-    ) -> [HomeAssistantClarificationReason] {
-        var unique: [HomeAssistantClarificationReason] = []
-        var seen: Set<HomeAssistantClarificationReason> = []
+        _ reasons: [MarinaClarificationReason]
+    ) -> [MarinaClarificationReason] {
+        var unique: [MarinaClarificationReason] = []
+        var seen: Set<MarinaClarificationReason> = []
         
         for reason in reasons {
             if seen.insert(reason).inserted {
@@ -6349,7 +5326,7 @@ struct HomeAssistantPanelView: View {
         let inferredTargetType = targetType(for: query.intent.metric) ?? topRow?.targetType
         let inferredTargetName = query.targetName
             ?? inferredTargetName(for: query.intent.metric, rows: contextRows)
-        let context = HomeAssistantAnswerContext(
+        let context = MarinaAnswerContext(
             query: query,
             answerTitle: presentedAnswer.title,
             answerKind: rawAnswer.kind,
@@ -6375,7 +5352,7 @@ struct HomeAssistantPanelView: View {
     private struct AssistantAnswerContextRow {
         let title: String
         let value: String
-        let targetType: HomeAssistantAnswerTargetType?
+        let targetType: MarinaAnswerTargetType?
     }
 
     private func answerContextRows(
@@ -6434,7 +5411,7 @@ struct HomeAssistantPanelView: View {
         }
     }
 
-    private func targetType(for objectType: MarinaLookupObjectType?) -> HomeAssistantAnswerTargetType? {
+    private func targetType(for objectType: MarinaLookupObjectType?) -> MarinaAnswerTargetType? {
         switch objectType {
         case .category:
             return .category
@@ -6451,7 +5428,7 @@ struct HomeAssistantPanelView: View {
         }
     }
 
-    private func targetType(for metric: HomeQueryMetric) -> HomeAssistantAnswerTargetType? {
+    private func targetType(for metric: HomeQueryMetric) -> MarinaAnswerTargetType? {
         switch metric {
         case .categorySpendTotal, .topCategories, .categorySpendShare, .categorySpendShareTrend, .categoryPotentialSavings, .categoryReallocationGuidance, .categoryMonthComparison, .topCategoryChanges:
             return .category
@@ -6479,806 +5456,6 @@ struct HomeAssistantPanelView: View {
         return Double(normalized[valueRange])
     }
 
-    private func contextualPlan(for rawPrompt: String) -> HomeQueryPlan? {
-        guard let lastMetric = sessionContext.lastMetric else { return nil }
-        
-        let normalized = rawPrompt
-            .lowercased()
-            .replacingOccurrences(of: "[^a-z0-9\\s]", with: " ", options: .regularExpression)
-            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        guard normalized.isEmpty == false else { return nil }
-        
-        let continuationPhrases = [
-            "how about", "what about", "and last", "and this", "same", "again", "for that", "for this"
-        ]
-        let hasContinuationPhrase = continuationPhrases.contains { normalized.contains($0) }
-        let hasDatePhrase = parser.parseDateRange(rawPrompt, defaultPeriodUnit: defaultQueryPeriodUnit) != nil
-        
-        guard hasContinuationPhrase || hasDatePhrase else { return nil }
-        
-        return HomeQueryPlan(
-            metric: lastMetric,
-            dateRange: parser.parseDateRange(rawPrompt, defaultPeriodUnit: defaultQueryPeriodUnit) ?? sessionContext.lastDateRange,
-            resultLimit: parser.parseLimit(rawPrompt) ?? sessionContext.lastResultLimit,
-            confidenceBand: .medium,
-            targetName: sessionContext.lastTargetName,
-            periodUnit: sessionContext.lastPeriodUnit
-        )
-    }
-    
-    private func enrichPlanWithEntities(_ plan: HomeQueryPlan, rawPrompt: String) -> HomeQueryPlan {
-        let normalized = rawPrompt
-            .lowercased()
-            .replacingOccurrences(of: "[^a-z0-9\\s]", with: " ", options: .regularExpression)
-            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        switch plan.metric {
-        case .cardSpendTotal, .cardVariableSpendingHabits, .cardMonthComparison, .nextPlannedExpense, .spendTrendsSummary, .cardSnapshotSummary, .topCardChanges:
-            let isAllCards = normalized.contains("all cards")
-            let card = isAllCards
-            ? nil
-            : (aliasTarget(
-                in: rawPrompt,
-                entityType: .card
-            ) ?? entityMatcher.bestCardMatch(in: rawPrompt, cards: cards))
-            return HomeQueryPlan(
-                metric: plan.metric,
-                dateRange: plan.dateRange,
-                comparisonDateRange: plan.comparisonDateRange,
-                resultLimit: plan.resultLimit,
-                confidenceBand: card == nil ? plan.confidenceBand : .high,
-                targetName: card,
-                periodUnit: plan.periodUnit
-            )
-            
-        case .incomeAverageActual, .incomeSourceShare, .incomeSourceShareTrend, .incomeSourceMonthComparison:
-            let isAllSources = normalized.contains("all sources") || normalized.contains("all income")
-            let source = isAllSources
-            ? nil
-            : (aliasTarget(
-                in: rawPrompt,
-                entityType: .incomeSource
-            ) ?? entityMatcher.bestIncomeSourceMatch(in: rawPrompt, incomes: incomes))
-            return HomeQueryPlan(
-                metric: plan.metric,
-                dateRange: plan.dateRange,
-                comparisonDateRange: plan.comparisonDateRange,
-                resultLimit: plan.resultLimit,
-                confidenceBand: source == nil ? plan.confidenceBand : .high,
-                targetName: source,
-                periodUnit: plan.periodUnit
-            )
-            
-        case .categorySpendTotal, .categorySpendShare, .categorySpendShareTrend, .categoryPotentialSavings, .categoryReallocationGuidance, .categoryMonthComparison:
-            let isAllCategories = normalized.contains("all categories")
-            let category = isAllCategories
-            ? nil
-            : (aliasTarget(
-                in: rawPrompt,
-                entityType: .category
-            ) ?? entityMatcher.bestCategoryMatch(in: rawPrompt, categories: categories) ?? {
-                if normalized.contains("this category") {
-                    return sessionContext.lastTargetName
-                }
-                return nil
-            }())
-            return HomeQueryPlan(
-                metric: plan.metric,
-                dateRange: plan.dateRange,
-                comparisonDateRange: plan.comparisonDateRange,
-                resultLimit: plan.resultLimit,
-                confidenceBand: category == nil ? plan.confidenceBand : .high,
-                targetName: category,
-                periodUnit: plan.periodUnit
-            )
-            
-        case .presetCategorySpend:
-            let isAllCategories = normalized.contains("all categories")
-            let category = isAllCategories
-            ? nil
-            : (aliasTarget(
-                in: rawPrompt,
-                entityType: .category
-            ) ?? entityMatcher.bestCategoryMatch(in: rawPrompt, categories: categories))
-            return HomeQueryPlan(
-                metric: plan.metric,
-                dateRange: plan.dateRange,
-                comparisonDateRange: plan.comparisonDateRange,
-                resultLimit: plan.resultLimit,
-                confidenceBand: category == nil ? plan.confidenceBand : .high,
-                targetName: category,
-                periodUnit: plan.periodUnit
-            )
-
-        case .merchantSpendTotal, .merchantSpendSummary, .merchantMonthComparison:
-            let merchant = extractedMerchantTarget(from: rawPrompt)
-            return HomeQueryPlan(
-                metric: plan.metric,
-                dateRange: plan.dateRange,
-                comparisonDateRange: plan.comparisonDateRange,
-                resultLimit: plan.resultLimit,
-                confidenceBand: merchant == nil ? plan.confidenceBand : .high,
-                targetName: merchant,
-                periodUnit: plan.periodUnit
-            )
-            
-        case .overview, .spendTotal, .spendAveragePerPeriod, .topCategories, .monthComparison, .largestTransactions, .mostFrequentTransactions, .savingsStatus, .savingsAverageRecentPeriods, .presetDueSoon, .presetHighestCost, .presetTopCategory, .safeSpendToday, .forecastSavings, .topMerchants, .topCategoryChanges:
-            return plan
-        }
-    }
-
-    private func parsedSignals(
-        for rawPrompt: String,
-        fallbackPlan: HomeQueryPlan
-    ) -> HomeAssistantParsedSignals {
-        let comparisonRanges = extractedComparisonDateRanges(for: rawPrompt)
-        let signalTarget = extractedSignalTarget(for: rawPrompt)
-        let comparisonDetected = detectComparison(rawPrompt)
-        let targetSource = extractedSignalTargetSource(for: rawPrompt)
-        let signalMetric: HomeQueryMetric?
-        if targetSource == .merchantPhrase, signalTarget != nil {
-            if fallbackPlan.metric == .merchantSpendSummary {
-                signalMetric = .merchantSpendSummary
-            } else {
-                signalMetric = comparisonDetected ? .merchantMonthComparison : .merchantSpendTotal
-            }
-        } else if targetSource == .weakMerchantPhrase, comparisonDetected {
-            signalMetric = .merchantMonthComparison
-        } else {
-            signalMetric = nil
-        }
-        return HomeAssistantParsedSignals(
-            metric: signalMetric,
-            targetName: signalTarget,
-            targetSource: targetSource,
-            dateRange: comparisonRanges?.primary ?? extractedSignalDateRange(for: rawPrompt),
-            comparisonDateRange: comparisonRanges?.comparison,
-            comparisonDetected: comparisonDetected,
-            rawPrompt: rawPrompt
-        )
-    }
-
-    private func detectComparison(_ text: String) -> Bool {
-        let keywords = ["compare", "vs", "versus", "difference", "changed"]
-        let normalized = text.lowercased()
-        return keywords.contains { normalized.contains($0) }
-    }
-
-    private func extractedSignalTarget(for rawPrompt: String) -> String? {
-        let normalized = normalizedPrompt(rawPrompt)
-        let targetPromptView = targetExtractionPromptView(for: rawPrompt)
-        if hasExplicitGlobalComparisonScope(in: normalized)
-            || normalized.contains("all cards")
-            || normalized.contains("all categories")
-            || normalized.contains("all sources")
-            || normalized.contains("all income")
-        {
-            return nil
-        }
-
-        if let category = aliasTarget(in: targetPromptView, entityType: .category)
-            ?? entityMatcher.bestCategoryMatch(in: targetPromptView, categories: categories)
-        {
-            return category
-        }
-
-        if let card = aliasTarget(in: targetPromptView, entityType: .card)
-            ?? entityMatcher.bestCardMatch(in: targetPromptView, cards: cards)
-        {
-            return card
-        }
-
-        if let source = aliasTarget(in: targetPromptView, entityType: .incomeSource)
-            ?? entityMatcher.bestIncomeSourceMatch(in: targetPromptView, incomes: incomes)
-        {
-            return source
-        }
-
-        if let merchant = extractedMerchantTarget(from: targetPromptView) {
-            return merchant
-        }
-
-        if detectComparison(rawPrompt),
-           appearsToRequestExplicitComparisonDates(in: normalized) == false,
-           let unmatchedTarget = unmatchedComparisonTarget(in: targetPromptView)
-        {
-            return unmatchedTarget
-        }
-
-        return nil
-    }
-
-    private func categoryDisplayLabel(_ category: Category) -> String {
-        "\(category.name) • \(category.hexColor)"
-    }
-
-    private func presetDisplayLabel(_ preset: Preset) -> String {
-        "\(preset.title) • \(CurrencyFormatter.string(from: preset.plannedAmount)) • \(preset.frequency.displayName)"
-    }
-
-    private func budgetDisplayLabel(_ budget: Budget) -> String {
-        "\(budget.name) • \(shortDate(budget.startDate)) – \(shortDate(budget.endDate))"
-    }
-
-    private func plannedExpenseDisplayLabel(_ expense: PlannedExpense) -> String {
-        "\(expense.title) • \(CurrencyFormatter.string(from: expense.plannedAmount)) • \(shortDate(expense.expenseDate))"
-    }
-
-    private func extractedMerchantTarget(from rawPrompt: String) -> String? {
-        let normalized = normalizedPrompt(rawPrompt)
-
-        let explicitPatterns = [
-            "\\bat\\s+([a-z0-9 '&\\-\\.]+?)(?:\\s+(this|last|in|from|vs|versus|please|so|year|month|week|today|yesterday|for)\\b|$)",
-            "\\bwith\\s+([a-z0-9 '&\\-\\.]+?)(?:\\s+(this|last|in|from|vs|versus|please|so|year|month|week|today|yesterday|for)\\b|$)",
-            "\\bto\\s+([a-z0-9 '&\\-\\.]+?)(?:\\s+(this|last|in|from|vs|versus|please|so|year|month|week|today|yesterday|for)\\b|$)",
-            "\\bmerchant\\s+([a-z0-9 '&\\-\\.]+?)(?:\\s+(this|last|in|from|vs|versus|please|so|year|month|week|today|yesterday|for)\\b|$)",
-            "\\bstore\\s+([a-z0-9 '&\\-\\.]+?)(?:\\s+(this|last|in|from|vs|versus|please|so|year|month|week|today|yesterday|for)\\b|$)",
-            "\\bpayee\\s+([a-z0-9 '&\\-\\.]+?)(?:\\s+(this|last|in|from|vs|versus|please|so|year|month|week|today|yesterday|for)\\b|$)",
-            "\\bvendor\\s+([a-z0-9 '&\\-\\.]+?)(?:\\s+(this|last|in|from|vs|versus|please|so|year|month|week|today|yesterday|for)\\b|$)",
-            "\\b(?:spent|spend|spending|expense|expenses)\\s+on\\s+([a-z0-9 '&\\-\\.]+?)(?:\\s+(this|last|in|from|vs|versus|please|so|year|month|week|today|yesterday|for)\\b|$)",
-            "\\b(?:spent|spend|spending|expense|expenses)\\s+with\\s+([a-z0-9 '&\\-\\.]+?)(?:\\s+(this|last|in|from|vs|versus|please|so|year|month|week|today|yesterday|for)\\b|$)",
-            "\\b(?:how much\\s+)?went\\s+to\\s+([a-z0-9 '&\\-\\.]+?)(?:\\s+(this|last|in|from|vs|versus|please|so|year|month|week|today|yesterday|for)\\b|$)",
-            "\\b(?:paid|pay)\\s+(?:to\\s+)?([a-z0-9 '&\\-\\.]+?)(?:\\s+(this|last|in|from|vs|versus|please|so|year|month|week|today|yesterday|for)\\b|$)",
-            "\\bbuy\\s+from\\s+([a-z0-9 '&\\-\\.]+?)(?:\\s+(this|last|in|from|vs|versus|please|so|year|month|week|today|yesterday|for)\\b|$)",
-            "\\b(?:summarize|summary of)\\s+(?:my\\s+)?([a-z0-9 '&\\-\\.]+?)\\s+(?:spend|spending|expense|expenses)\\b",
-            "\\bcompare\\s+([a-z][a-z0-9 '&\\-\\.]*?)\\s+(?:spend|spending|expense|expenses)\\s+(?:from|between|vs|versus|this|last|in)\\b",
-            "\\bcompare\\s+([a-z][a-z0-9 '&\\-\\.]*?)\\s+(?:from|between|vs|versus|this|last|in)\\b",
-            "^([a-z][a-z0-9 '&\\-\\.]*?)\\s+(?:spend|spending|expense|expenses)\\s+(?:from|between|vs|versus|this|last|in)\\b"
-        ]
-
-        for pattern in explicitPatterns {
-            guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else {
-                continue
-            }
-            let searchRange = NSRange(normalized.startIndex..., in: normalized)
-            guard let match = regex.firstMatch(in: normalized, options: [], range: searchRange),
-                  let valueRange = Range(match.range(at: 1), in: normalized) else {
-                continue
-            }
-
-            let candidate = String(normalized[valueRange]).trimmingCharacters(in: .whitespacesAndNewlines)
-            if merchantCandidateIsMeaningful(candidate),
-               merchantCandidateConflictsWithKnownEntity(candidate) == false {
-                return MerchantNormalizer.displayName(candidate)
-            }
-        }
-
-        return nil
-    }
-
-    private func extractedSignalTargetSource(for rawPrompt: String) -> HomeAssistantSignalTargetSource? {
-        let normalized = normalizedPrompt(rawPrompt)
-        let targetPromptView = targetExtractionPromptView(for: rawPrompt)
-        if hasExplicitGlobalComparisonScope(in: normalized) {
-            return nil
-        }
-
-        if aliasTarget(in: targetPromptView, entityType: .category) != nil
-            || entityMatcher.bestCategoryMatch(in: targetPromptView, categories: categories) != nil
-            || aliasTarget(in: targetPromptView, entityType: .card) != nil
-            || entityMatcher.bestCardMatch(in: targetPromptView, cards: cards) != nil
-            || aliasTarget(in: targetPromptView, entityType: .incomeSource) != nil
-            || entityMatcher.bestIncomeSourceMatch(in: targetPromptView, incomes: incomes) != nil
-        {
-            return .matchedEntity
-        }
-
-        if extractedMerchantTarget(from: targetPromptView) != nil {
-            return .merchantPhrase
-        }
-
-        if hasWeakMerchantComparisonPrompt(in: rawPrompt) {
-            return .weakMerchantPhrase
-        }
-
-        if detectComparison(rawPrompt),
-           appearsToRequestExplicitComparisonDates(in: normalized) == false,
-           unmatchedComparisonTarget(in: targetPromptView) != nil
-        {
-            return .inferredComparisonText
-        }
-
-        return nil
-    }
-
-    private func merchantCandidateIsMeaningful(_ candidate: String) -> Bool {
-        let normalized = candidate
-            .lowercased()
-            .replacingOccurrences(of: "[^a-z0-9\\s]", with: " ", options: .regularExpression)
-            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        guard normalized.isEmpty == false else { return false }
-
-        let genericFillers: Set<String> = [
-            "spend", "spent", "spending", "expense", "expenses",
-            "amount", "total", "totals", "year", "month", "week",
-            "today", "yesterday", "so far", "all categories", "all spending"
-        ]
-        return genericFillers.contains(normalized) == false
-    }
-
-    private func merchantCandidateConflictsWithKnownEntity(_ candidate: String) -> Bool {
-        aliasTarget(in: candidate, entityType: .category) != nil
-            || entityMatcher.bestCategoryMatch(in: candidate, categories: categories) != nil
-            || aliasTarget(in: candidate, entityType: .card) != nil
-            || entityMatcher.bestCardMatch(in: candidate, cards: cards) != nil
-            || aliasTarget(in: candidate, entityType: .incomeSource) != nil
-            || entityMatcher.bestIncomeSourceMatch(in: candidate, incomes: incomes) != nil
-    }
-
-    private func hasWeakMerchantComparisonPrompt(in rawPrompt: String) -> Bool {
-        let normalized = normalizedPrompt(rawPrompt)
-        guard detectComparison(rawPrompt) else { return false }
-        guard hasExplicitGlobalComparisonScope(in: normalized) == false else { return false }
-        guard extractedMerchantTarget(from: rawPrompt) == nil else { return false }
-        guard aliasTarget(in: rawPrompt, entityType: .category) == nil,
-              entityMatcher.bestCategoryMatch(in: rawPrompt, categories: categories) == nil,
-              aliasTarget(in: rawPrompt, entityType: .card) == nil,
-              entityMatcher.bestCardMatch(in: rawPrompt, cards: cards) == nil,
-              aliasTarget(in: rawPrompt, entityType: .incomeSource) == nil,
-              entityMatcher.bestIncomeSourceMatch(in: rawPrompt, incomes: incomes) == nil else {
-            return false
-        }
-
-        let weakPatterns = [
-            "\\bcompare\\s+(?:merchant|store)\\s+(?:spend|spending|expense|expenses)?\\s*(?:from|between|vs|versus|this|last|in)\\b",
-            "\\bcompare\\s+[a-z][a-z0-9 '&\\-\\.]*\\s+(?:spend|spending|expense|expenses)\\s+(?:from|between|vs|versus|this|last|in)\\b"
-        ]
-
-        return weakPatterns.contains { pattern in
-            normalized.range(of: pattern, options: .regularExpression) != nil
-        }
-    }
-
-    private func unmatchedComparisonTarget(in rawPrompt: String) -> String? {
-        let normalized = normalizedPrompt(rawPrompt)
-
-        let candidate: String
-        if let vsRange = normalized.range(of: " vs ") ?? normalized.range(of: " versus ") {
-            candidate = String(normalized[..<vsRange.lowerBound])
-        } else {
-            candidate = normalized
-        }
-
-        let fillerPhrases = [
-            "compare my ", "compare ", "this month", "last month",
-            "spending", "spend", "income", "difference", "changed",
-            "change", "month"
-        ]
-
-        let reduced = fillerPhrases.reduce(candidate) { partial, phrase in
-            partial.replacingOccurrences(of: phrase, with: " ")
-        }
-            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-
-        guard reduced.isEmpty == false,
-              merchantCandidateIsMeaningful(reduced) else { return nil }
-        return reduced
-            .split(separator: " ")
-            .map { $0.capitalized }
-            .joined(separator: " ")
-    }
-
-    private func targetExtractionPromptView(for rawPrompt: String) -> String {
-        var view = normalizedPrompt(rawPrompt)
-
-        view = view.replacingOccurrences(
-            of: "\\bcompared\\s+to\\s+.+$",
-            with: "",
-            options: [.regularExpression, .caseInsensitive]
-        )
-        view = view.replacingOccurrences(
-            of: "\\b(?:vs|versus)\\s+.+$",
-            with: "",
-            options: [.regularExpression, .caseInsensitive]
-        )
-        view = view.replacingOccurrences(
-            of: "\\bcompare\\s+(.+?)\\s+to\\s+.+$",
-            with: "compare $1",
-            options: [.regularExpression, .caseInsensitive]
-        )
-        view = view.replacingOccurrences(
-            of: "\\s+from\\s+.+?\\s+to\\s+.+$",
-            with: "",
-            options: [.regularExpression, .caseInsensitive]
-        )
-        view = view.replacingOccurrences(
-            of: "\\s+between\\s+.+?\\s+and\\s+.+$",
-            with: "",
-            options: [.regularExpression, .caseInsensitive]
-        )
-        view = view.replacingOccurrences(
-            of: "\\s+in\\s+(?:jan|january|feb|february|mar|march|apr|april|may|jun|june|jul|july|aug|august|sep|sept|september|oct|october|nov|november|dec|december|\\d{4}|this\\s+(?:month|period|week|year)|last\\s+(?:month|period|week|year)|previous\\s+(?:month|period|week|year)).*$",
-            with: "",
-            options: [.regularExpression, .caseInsensitive]
-        )
-        view = view.replacingOccurrences(
-            of: "\\s+(?:this|last|previous|current)\\s+(?:month|period|week|year)$",
-            with: "",
-            options: [.regularExpression, .caseInsensitive]
-        )
-
-        return view
-            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private func extractedSignalDateRange(for rawPrompt: String) -> HomeQueryDateRange? {
-        parser.parseDateRange(rawPrompt, defaultPeriodUnit: defaultQueryPeriodUnit)
-    }
-
-    private func extractedComparisonDateRanges(
-        for rawPrompt: String
-    ) -> (primary: HomeQueryDateRange, comparison: HomeQueryDateRange)? {
-        guard detectComparison(rawPrompt) else { return nil }
-        let normalized = normalizedPrompt(rawPrompt)
-
-        let candidatePairs: [(String, String)] = [
-            capturedComparisonSnippets(
-                normalizedPrompt: normalized,
-                pattern: "\\bfrom\\s+(.+?)\\s+to\\s+(.+)$"
-            ),
-            capturedComparisonSnippets(
-                normalizedPrompt: normalized,
-                pattern: "\\bbetween\\s+(.+?)\\s+and\\s+(.+)$"
-            ),
-            capturedComparisonSnippets(
-                normalizedPrompt: normalized,
-                pattern: "\\bcompare\\s+(.+?)\\s+(?:vs|versus)\\s+(.+)$"
-            ),
-            comparisonSnippetsSeparatedByTo(normalizedPrompt: normalized)
-        ].compactMap { $0 }
-
-        for (firstSnippet, secondSnippet) in candidatePairs {
-            guard let firstRange = parser.parseDateRange(firstSnippet, defaultPeriodUnit: defaultQueryPeriodUnit),
-                  let secondRange = parser.parseDateRange(secondSnippet, defaultPeriodUnit: defaultQueryPeriodUnit),
-                  firstRange != secondRange else {
-                continue
-            }
-
-            return (firstRange, secondRange)
-        }
-
-        return nil
-    }
-
-    private func capturedComparisonSnippets(
-        normalizedPrompt: String,
-        pattern: String
-    ) -> (String, String)? {
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else {
-            return nil
-        }
-
-        let fullRange = NSRange(normalizedPrompt.startIndex..., in: normalizedPrompt)
-        guard let match = regex.firstMatch(in: normalizedPrompt, options: [], range: fullRange),
-              match.numberOfRanges == 3,
-              let firstRange = Range(match.range(at: 1), in: normalizedPrompt),
-              let secondRange = Range(match.range(at: 2), in: normalizedPrompt) else {
-            return nil
-        }
-
-        return (
-            String(normalizedPrompt[firstRange]),
-            String(normalizedPrompt[secondRange])
-        )
-    }
-
-    private func appearsToRequestExplicitComparisonDates(in normalizedPrompt: String) -> Bool {
-        let explicitDateTokenPattern = "\\b(jan|january|feb|february|mar|march|apr|april|may|jun|june|jul|july|aug|august|sep|sept|september|oct|october|nov|november|dec|december|q[1-4]|\\d{4}-\\d{1,2}-\\d{1,2}|\\d{4})\\b"
-        let hasExplicitDateToken = normalizedPrompt.range(
-            of: explicitDateTokenPattern,
-            options: .regularExpression
-        ) != nil
-        let explicitDateTokenCount = regexMatchCount(
-            pattern: explicitDateTokenPattern,
-            in: normalizedPrompt
-        )
-        let hasComparisonVerb = normalizedPrompt.contains("compare")
-        let hasComparisonBridge = normalizedPrompt.range(
-            of: "\\b(from .+ to|between .+ and|vs|versus)\\b",
-            options: .regularExpression
-        ) != nil
-        let hasToBridge = hasComparisonVerb
-            && normalizedPrompt.contains(" to ")
-            && explicitDateTokenCount >= 2
-        return hasExplicitDateToken && (hasComparisonBridge || hasToBridge)
-    }
-
-    private func comparisonSnippetsSeparatedByTo(
-        normalizedPrompt: String
-    ) -> (String, String)? {
-        guard normalizedPrompt.contains("compare"),
-              let separatorRange = normalizedPrompt.range(of: " to ") else {
-            return nil
-        }
-
-        let leadingSegment = String(normalizedPrompt[..<separatorRange.lowerBound])
-        let trailingSegment = String(normalizedPrompt[separatorRange.upperBound...])
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trailingSegment.isEmpty == false else { return nil }
-
-        let prefixes = [
-            "compare spending in ",
-            "compare spending ",
-            "compare spend in ",
-            "compare spend ",
-            "compare income in ",
-            "compare income ",
-            "compare expenses in ",
-            "compare expenses ",
-            "compare in ",
-            "compare "
-        ]
-
-        guard let matchedPrefix = prefixes.first(where: { leadingSegment.hasPrefix($0) }) else {
-            return nil
-        }
-
-        let firstSnippet = String(leadingSegment.dropFirst(matchedPrefix.count))
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        guard firstSnippet.isEmpty == false else { return nil }
-
-        return (firstSnippet, trailingSegment)
-    }
-
-    private func regexMatchCount(
-        pattern: String,
-        in text: String
-    ) -> Int {
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else {
-            return 0
-        }
-
-        let range = NSRange(text.startIndex..., in: text)
-        return regex.numberOfMatches(in: text, options: [], range: range)
-    }
-
-    private func hasExplicitGlobalComparisonScope(in normalizedPrompt: String) -> Bool {
-        let phrases = [
-            "across all categories",
-            "all categories",
-            "overall",
-            "total spending",
-            "total spend",
-            "all spending"
-        ]
-        return phrases.contains { normalizedPrompt.contains($0) }
-    }
-    
-    private func entityAwarePlan(for rawPrompt: String) -> HomeQueryPlan? {
-        let normalized = rawPrompt
-            .lowercased()
-            .replacingOccurrences(of: "[^a-z0-9\\s]", with: " ", options: .regularExpression)
-            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        guard normalized.isEmpty == false else { return nil }
-        
-        let range = parser.parseDateRange(rawPrompt, defaultPeriodUnit: defaultQueryPeriodUnit)
-        
-        if normalized.contains("income") && (normalized.contains("average") || normalized.contains("avg")) {
-            let source = aliasTarget(
-                in: rawPrompt,
-                entityType: .incomeSource
-            ) ?? entityMatcher.bestIncomeSourceMatch(in: rawPrompt, incomes: incomes)
-            
-            return HomeQueryPlan(
-                metric: .incomeAverageActual,
-                dateRange: range,
-                resultLimit: nil,
-                confidenceBand: source == nil ? .medium : .high,
-                targetName: source
-            )
-        }
-        
-        if normalized.contains("income") && (normalized.contains("share") || normalized.contains("comes from") || normalized.contains("how much")) {
-            let isAllSources = normalized.contains("all sources") || normalized.contains("all income")
-            let source = isAllSources
-            ? nil
-            : (aliasTarget(
-                in: rawPrompt,
-                entityType: .incomeSource
-            ) ?? entityMatcher.bestIncomeSourceMatch(in: rawPrompt, incomes: incomes))
-            
-            return HomeQueryPlan(
-                metric: .incomeSourceShare,
-                dateRange: range,
-                resultLimit: nil,
-                confidenceBand: source == nil ? .medium : .high,
-                targetName: source
-            )
-        }
-        
-        let spendKeywords = ["spend", "spent", "spending", "total spent", "charges"]
-        let aliasCard = aliasTarget(in: rawPrompt, entityType: .card)
-        let mentionsCardContext = normalized.contains("card")
-        || normalized.contains("cards")
-        || normalized.contains("all cards")
-        || aliasCard != nil
-        || entityMatcher.bestCardMatch(in: rawPrompt, cards: cards) != nil
-        
-        if spendKeywords.contains(where: { normalized.contains($0) }) && mentionsCardContext {
-            let cardName = normalized.contains("all cards")
-            ? nil
-            : (aliasCard ?? entityMatcher.bestCardMatch(in: rawPrompt, cards: cards))
-            
-            return HomeQueryPlan(
-                metric: .cardSpendTotal,
-                dateRange: range,
-                resultLimit: nil,
-                confidenceBand: cardName == nil ? .medium : .high,
-                targetName: cardName
-            )
-        }
-        
-        if normalized.contains("card")
-            && (normalized.contains("habit")
-                || normalized.contains("habits")
-                || normalized.contains("pattern")
-                || normalized.contains("variable spending")
-                || normalized.contains("trend"))
-        {
-            let isAllCards = normalized.contains("all cards")
-            let cardName = isAllCards
-            ? nil
-            : (aliasCard ?? entityMatcher.bestCardMatch(in: rawPrompt, cards: cards))
-            
-            return HomeQueryPlan(
-                metric: .cardVariableSpendingHabits,
-                dateRange: range,
-                resultLimit: parser.parseLimit(rawPrompt),
-                confidenceBand: cardName == nil ? .medium : .high,
-                targetName: cardName
-            )
-        }
-        
-        if normalized.contains("category")
-            && spendKeywords.contains(where: { normalized.contains($0) })
-            && (normalized.contains("share") || normalized.contains("percent") || normalized.contains("percentage") || normalized.contains("how much"))
-        {
-            let isAllCategories = normalized.contains("all categories")
-            let category = isAllCategories
-            ? nil
-            : (aliasTarget(
-                in: rawPrompt,
-                entityType: .category
-            ) ?? entityMatcher.bestCategoryMatch(in: rawPrompt, categories: categories))
-            
-            return HomeQueryPlan(
-                metric: .categorySpendShare,
-                dateRange: range,
-                resultLimit: nil,
-                confidenceBand: category == nil ? .medium : .high,
-                targetName: category
-            )
-        }
-        
-        if normalized.contains("category")
-            && (normalized.contains("reduce")
-                || normalized.contains("lower")
-                || normalized.contains("decrease")
-                || normalized.contains("cut"))
-            && (normalized.contains("savings") || normalized.contains("save"))
-        {
-            let isAllCategories = normalized.contains("all categories")
-            let category = isAllCategories
-            ? nil
-            : (aliasTarget(
-                in: rawPrompt,
-                entityType: .category
-            ) ?? entityMatcher.bestCategoryMatch(in: rawPrompt, categories: categories) ?? {
-                if normalized.contains("this category") {
-                    return sessionContext.lastTargetName
-                }
-                return nil
-            }())
-            
-            return HomeQueryPlan(
-                metric: .categoryPotentialSavings,
-                dateRange: range,
-                resultLimit: parser.parseLimit(rawPrompt),
-                confidenceBand: category == nil ? .medium : .high,
-                targetName: category
-            )
-        }
-        
-        if normalized.contains("category")
-            && (normalized.contains("other categories")
-                || normalized.contains("reallocate")
-                || normalized.contains("realistically spend")
-                || normalized.contains("what could i spend")
-                || normalized.contains("what can i spend"))
-        {
-            let isAllCategories = normalized.contains("all categories")
-            let category = isAllCategories
-            ? nil
-            : (aliasTarget(
-                in: rawPrompt,
-                entityType: .category
-            ) ?? entityMatcher.bestCategoryMatch(in: rawPrompt, categories: categories) ?? {
-                if normalized.contains("this category") {
-                    return sessionContext.lastTargetName
-                }
-                return nil
-            }())
-            
-            return HomeQueryPlan(
-                metric: .categoryReallocationGuidance,
-                dateRange: range,
-                resultLimit: parser.parseLimit(rawPrompt),
-                confidenceBand: category == nil ? .medium : .high,
-                targetName: category
-            )
-        }
-        
-        if normalized.contains("preset")
-            && normalized.contains("due")
-        {
-            return HomeQueryPlan(
-                metric: .presetDueSoon,
-                dateRange: range,
-                resultLimit: parser.parseLimit(rawPrompt),
-                confidenceBand: .high
-            )
-        }
-        
-        if normalized.contains("preset")
-            && (normalized.contains("most expensive")
-                || normalized.contains("costs me the most")
-                || normalized.contains("highest cost"))
-        {
-            return HomeQueryPlan(
-                metric: .presetHighestCost,
-                dateRange: nil,
-                resultLimit: parser.parseLimit(rawPrompt),
-                confidenceBand: .high
-            )
-        }
-        
-        if normalized.contains("preset")
-            && normalized.contains("category")
-            && (normalized.contains("assigned") || normalized.contains("most presets"))
-        {
-            return HomeQueryPlan(
-                metric: .presetTopCategory,
-                dateRange: nil,
-                resultLimit: parser.parseLimit(rawPrompt),
-                confidenceBand: .high
-            )
-        }
-        
-        if normalized.contains("preset")
-            && normalized.contains("category")
-            && (normalized.contains("spend")
-                || normalized.contains("cost")
-                || normalized.contains("how much")
-                || normalized.contains("per period"))
-        {
-            let isAllCategories = normalized.contains("all categories")
-            let category = isAllCategories
-            ? nil
-            : (aliasTarget(
-                in: rawPrompt,
-                entityType: .category
-            ) ?? entityMatcher.bestCategoryMatch(in: rawPrompt, categories: categories))
-            
-            return HomeQueryPlan(
-                metric: .presetCategorySpend,
-                dateRange: nil,
-                resultLimit: nil,
-                confidenceBand: category == nil ? .medium : .high,
-                targetName: category
-            )
-        }
-        
-        return nil
-    }
-    
     private func applyConfidenceTone(
         to answer: HomeAnswer,
         confidenceBand: HomeQueryConfidenceBand
@@ -7400,634 +5577,8 @@ struct HomeAssistantPanelView: View {
         return nil
     }
     
-    private func shouldRunBroadOverviewBundle(
-        for prompt: String,
-        plan: HomeQueryPlan
-    ) -> Bool {
-        guard plan.metric == .overview else { return false }
-        
-        let normalized = prompt
-            .lowercased()
-            .replacingOccurrences(of: "[^a-z0-9\\s]", with: " ", options: .regularExpression)
-            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        let broadOverviewPhrases = [
-            "how am i doing",
-            "how are we doing",
-            "how did i do",
-            "budget check in",
-            "budget checkin",
-            "overview",
-            "summary",
-            "snapshot"
-        ]
-        
-        return broadOverviewPhrases.contains { normalized.contains($0) }
-    }
-
-    private func runBroadOverviewBundle(
-        userPrompt: String,
-        basePlan: HomeQueryPlan,
-        source: HomeAssistantPlanResolutionSource = .contextual
-    ) {
-        let range = basePlan.dateRange
-        let now = Date()
-        
-        let overviewQuery = HomeQuery(intent: .periodOverview, dateRange: range)
-        let savingsQuery = HomeQuery(intent: .savingsStatus, dateRange: range)
-        let categoriesQuery = HomeQuery(intent: .topCategoriesThisMonth, dateRange: range, resultLimit: 3)
-        let cardsQuery = HomeQuery(intent: .cardVariableSpendingHabits, dateRange: range, resultLimit: 3)
-        
-        let overview = applyConfidenceTone(
-            to: engine.execute(
-                query: overviewQuery,
-                categories: categories,
-                presets: presets,
-                plannedExpenses: plannedExpenses,
-                variableExpenses: variableExpenses,
-                incomes: incomes,
-                savingsEntries: savingsEntries,
-                now: now
-            ),
-            confidenceBand: basePlan.confidenceBand
-        )
-        let savings = applyConfidenceTone(
-            to: engine.execute(
-                query: savingsQuery,
-                categories: categories,
-                presets: presets,
-                plannedExpenses: plannedExpenses,
-                variableExpenses: variableExpenses,
-                incomes: incomes,
-                savingsEntries: savingsEntries,
-                now: now
-            ),
-            confidenceBand: basePlan.confidenceBand
-        )
-        let categoriesAnswer = applyConfidenceTone(
-            to: engine.execute(
-                query: categoriesQuery,
-                categories: categories,
-                presets: presets,
-                plannedExpenses: plannedExpenses,
-                variableExpenses: variableExpenses,
-                incomes: incomes,
-                savingsEntries: savingsEntries,
-                now: now
-            ),
-            confidenceBand: basePlan.confidenceBand
-        )
-        let cardsAnswer = applyConfidenceTone(
-            to: engine.execute(
-                query: cardsQuery,
-                categories: categories,
-                presets: presets,
-                plannedExpenses: plannedExpenses,
-                variableExpenses: variableExpenses,
-                incomes: incomes,
-                savingsEntries: savingsEntries,
-                now: now
-            ),
-            confidenceBand: basePlan.confidenceBand
-        )
-        
-        var rows: [HomeAnswerRow] = []
-        var subtitle = overview.subtitle ?? savings.subtitle
-        
-        switch basePlan.confidenceBand {
-        case .high:
-            rows.append(contentsOf: sectionRows("Spend", from: overview, maxRows: 2))
-            rows.append(contentsOf: sectionRows("Savings", from: savings, maxRows: 2))
-            rows.append(contentsOf: sectionRows("Categories", from: categoriesAnswer, maxRows: 3))
-            rows.append(contentsOf: sectionRows("Cards", from: cardsAnswer, maxRows: 3))
-            
-        case .medium:
-            rows.append(contentsOf: sectionRows("Spend", from: overview, maxRows: 2))
-            rows.append(contentsOf: sectionRows("Savings", from: savings, maxRows: 2))
-            rows.append(contentsOf: sectionRows("Categories", from: categoriesAnswer, maxRows: 3))
-            subtitle = mergedBundleSubtitle(
-                base: subtitle,
-                appended: "Likely match for your request."
-            )
-            
-        case .low:
-            rows.append(contentsOf: sectionRows("Spend", from: overview, maxRows: 2))
-            rows.append(contentsOf: sectionRows("Categories", from: categoriesAnswer, maxRows: 2))
-            subtitle = mergedBundleSubtitle(
-                base: subtitle,
-                appended: "Best-effort summary. Use follow-up chips to narrow this."
-            )
-        }
-        
-        let bundled = HomeAnswer(
-            queryID: overviewQuery.id,
-            kind: .list,
-            userPrompt: userPrompt,
-            title: "Budget Check-In",
-            subtitle: subtitle,
-            primaryValue: overview.primaryValue ?? savings.primaryValue,
-            rows: rows
-        )
-        
-        let overviewPlan = HomeQueryPlan(
-            metric: overviewQuery.intent.metric,
-            dateRange: overviewQuery.dateRange,
-            comparisonDateRange: overviewQuery.comparisonDateRange,
-            resultLimit: overviewQuery.resultLimit,
-            confidenceBand: .high,
-            targetName: overviewQuery.targetName,
-            periodUnit: overviewQuery.periodUnit
-        )
-        presentMarinaAnswer(
-            deterministicAnswer: bundled,
-            deterministicRecoveryAnswer: bundled,
-            rawPrompt: userPrompt,
-            source: source,
-            homeQueryPlan: overviewPlan,
-            surfaceKind: rows.isEmpty ? .noData : .answer,
-            groundingSummary: "bundled budget check-in",
-            followUpSuggestions: followUpSuggestions(for: bundled, query: overviewQuery)
-        ) { presentedAnswer in
-            updateSessionContext(after: overviewPlan)
-            rememberAnswerContext(
-                for: overviewQuery,
-                executedPlan: overviewPlan,
-                rawAnswer: bundled,
-                presentedAnswer: presentedAnswer,
-                userPrompt: userPrompt
-            )
-        }
-    }
-
-    private func runRoutedRequest(
-        _ routedRequest: HomeAssistantRequestRoutingResolution,
-        userPrompt: String,
-        explanation: String? = nil,
-        executedPlan: HomeQueryPlan? = nil,
-        source: HomeAssistantPlanResolutionSource = .contextual
-    ) {
-        switch routedRequest.shape {
-        case .single:
-            runQuery(
-                routedRequest.plan.query,
-                userPrompt: userPrompt,
-                confidenceBand: routedRequest.plan.confidenceBand,
-                explanation: explanation,
-                executedPlan: executedPlan ?? routedRequest.plan,
-                source: source
-            )
-        case .spendAndWhere:
-            runSpendWhereBundle(userPrompt: userPrompt, basePlan: routedRequest.plan, source: source)
-        case .spendByDay:
-            runSpendByDayAnswer(userPrompt: userPrompt, basePlan: routedRequest.plan, source: source)
-        case .incomePeriodSummary:
-            runIncomePeriodSummaryAnswer(userPrompt: userPrompt, basePlan: routedRequest.plan, source: source)
-        case .savingsDiagnostic:
-            runSavingsDiagnosticAnswer(userPrompt: userPrompt, basePlan: routedRequest.plan, source: source)
-        case .categoryAvailability:
-            runCategoryAvailabilityAnswer(userPrompt: userPrompt, basePlan: routedRequest.plan, source: source)
-        case .spendDrivers:
-            runSpendDriversAnswer(userPrompt: userPrompt, basePlan: routedRequest.plan, source: source)
-        case .cardSummary:
-            runCardSummaryAnswer(userPrompt: userPrompt, basePlan: routedRequest.plan, source: source)
-        }
-    }
-
-    private func bundledRoutingTelemetryNote(
-        for shape: HomeAssistantRequestShape,
-        hasClarificationPlan: Bool
-    ) -> String {
-        let base: String
-        switch shape {
-        case .single:
-            base = "single"
-        case .spendAndWhere:
-            base = "spend_where_bundle"
-        case .spendByDay:
-            base = "spend_by_day"
-        case .incomePeriodSummary:
-            base = "income_period_summary"
-        case .savingsDiagnostic:
-            base = "savings_diagnostic"
-        case .categoryAvailability:
-            base = "category_availability"
-        case .spendDrivers:
-            base = "spend_drivers"
-        case .cardSummary:
-            base = "card_summary"
-        }
-
-        return hasClarificationPlan ? "\(base)_with_clarification_chips" : base
-    }
-
-    private func runSpendWhereBundle(
-        userPrompt: String,
-        basePlan: HomeQueryPlan,
-        source: HomeAssistantPlanResolutionSource = .contextual
-    ) {
-        let range = basePlan.dateRange
-        let now = Date()
-
-        let spendQuery = HomeQuery(intent: .spendThisMonth, dateRange: range)
-        let merchantsQuery = HomeQuery(intent: .topMerchantsThisMonth, dateRange: range, resultLimit: 5)
-
-        let spendAnswer = applyConfidenceTone(
-            to: engine.execute(
-                query: spendQuery,
-                categories: categories,
-                presets: presets,
-                plannedExpenses: plannedExpenses,
-                variableExpenses: variableExpenses,
-                incomes: incomes,
-                savingsEntries: savingsEntries,
-                now: now
-            ),
-            confidenceBand: basePlan.confidenceBand
-        )
-        let merchantsAnswer = applyConfidenceTone(
-            to: engine.execute(
-                query: merchantsQuery,
-                categories: categories,
-                presets: presets,
-                plannedExpenses: plannedExpenses,
-                variableExpenses: variableExpenses,
-                incomes: incomes,
-                savingsEntries: savingsEntries,
-                now: now
-            ),
-            confidenceBand: basePlan.confidenceBand
-        )
-
-        guard merchantsAnswer.kind != .message, merchantsAnswer.rows.isEmpty == false else {
-            runQuery(
-                spendQuery,
-                userPrompt: userPrompt,
-                confidenceBand: basePlan.confidenceBand,
-                source: source
-            )
-            return
-        }
-
-        let bundled = HomeAnswer(
-            queryID: spendQuery.id,
-            kind: .list,
-            userPrompt: userPrompt,
-            title: spendWhereBundleTitle(for: userPrompt),
-            subtitle: spendAnswer.subtitle ?? merchantsAnswer.subtitle,
-            primaryValue: spendAnswer.primaryValue,
-            rows: merchantsAnswer.rows
-        )
-
-        let spendPlan = HomeQueryPlan(
-            metric: spendQuery.intent.metric,
-            dateRange: spendQuery.dateRange,
-            comparisonDateRange: spendQuery.comparisonDateRange,
-            resultLimit: spendQuery.resultLimit,
-            confidenceBand: basePlan.confidenceBand,
-            targetName: spendQuery.targetName,
-            periodUnit: spendQuery.periodUnit
-        )
-        presentMarinaAnswer(
-            deterministicAnswer: bundled,
-            deterministicRecoveryAnswer: bundled,
-            rawPrompt: userPrompt,
-            source: source,
-            homeQueryPlan: spendPlan,
-            surfaceKind: merchantsAnswer.rows.isEmpty ? .noData : .answer,
-            groundingSummary: "bundled spend and merchant rows",
-            followUpSuggestions: followUpSuggestions(for: bundled, query: spendQuery)
-        ) { presentedAnswer in
-            updateSessionContext(after: spendPlan)
-            rememberAnswerContext(
-                for: spendQuery,
-                executedPlan: spendPlan,
-                rawAnswer: bundled,
-                presentedAnswer: presentedAnswer,
-                userPrompt: userPrompt
-            )
-        }
-    }
-
-    private func spendWhereBundleTitle(for prompt: String) -> String {
-        let normalized = normalizedPrompt(prompt)
-        if let scopeSuffix = promptTimeScopeSuffix(normalizedPrompt: normalized) {
-            return "Spend \(scopeSuffix) and Where"
-        }
-        return "Spend and Where"
-    }
-
-    private func runSpendByDayAnswer(
-        userPrompt: String,
-        basePlan: HomeQueryPlan,
-        source: HomeAssistantPlanResolutionSource = .contextual
-    ) {
-        let range = basePlan.dateRange ?? monthRange(containing: Date())
-        let query = HomeQuery(
-            intent: .spendThisMonth,
-            dateRange: range,
-            resultLimit: basePlan.resultLimit
-        )
-        let rawAnswer = dailySpendAnswerBuilder.makeAnswer(
-            queryID: query.id,
-            userPrompt: userPrompt,
-            dateRange: range,
-            plannedExpenses: plannedExpenses,
-            variableExpenses: variableExpenses
-        )
-        let dailyPlan = HomeQueryPlan(
-            metric: query.intent.metric,
-            dateRange: query.dateRange,
-            comparisonDateRange: query.comparisonDateRange,
-            resultLimit: query.resultLimit,
-            confidenceBand: basePlan.confidenceBand,
-            targetName: query.targetName,
-            periodUnit: query.periodUnit
-        )
-        presentMarinaAnswer(
-            deterministicAnswer: rawAnswer,
-            deterministicRecoveryAnswer: rawAnswer,
-            rawPrompt: userPrompt,
-            source: source,
-            homeQueryPlan: dailyPlan,
-            surfaceKind: rawAnswer.rows.isEmpty ? .noData : .answer,
-            groundingSummary: "deterministic daily spend rows",
-            followUpSuggestions: followUpSuggestions(for: rawAnswer, query: query)
-        ) { presentedAnswer in
-            updateSessionContext(after: dailyPlan)
-            rememberAnswerContext(
-                for: query,
-                executedPlan: dailyPlan,
-                rawAnswer: rawAnswer,
-                presentedAnswer: presentedAnswer,
-                userPrompt: userPrompt
-            )
-        }
-    }
-
-    private func runIncomePeriodSummaryAnswer(
-        userPrompt: String,
-        basePlan: HomeQueryPlan,
-        source: HomeAssistantPlanResolutionSource = .contextual
-    ) {
-        let range = basePlan.dateRange ?? monthRange(containing: Date())
-        let query = HomeQuery(intent: .incomeAverageActual, dateRange: range)
-        let rawAnswer = incomePeriodSummaryAnswerBuilder.makeAnswer(
-            queryID: query.id,
-            userPrompt: userPrompt,
-            dateRange: range,
-            incomes: incomes
-        )
-        appendRoutedAnswer(
-            rawAnswer,
-            userPrompt: userPrompt,
-            primaryQuery: query,
-            footerQueries: [query],
-            source: source
-        )
-    }
-
-    private func runSavingsDiagnosticAnswer(
-        userPrompt: String,
-        basePlan: HomeQueryPlan,
-        source: HomeAssistantPlanResolutionSource = .contextual
-    ) {
-        let range = basePlan.dateRange ?? monthRange(containing: Date())
-        let savingsQuery = HomeQuery(intent: .savingsStatus, dateRange: range)
-        let categoriesQuery = HomeQuery(intent: .topCategoriesThisMonth, dateRange: range, resultLimit: 3)
-        let savings = engine.execute(
-            query: savingsQuery,
-            categories: categories,
-            presets: presets,
-            plannedExpenses: plannedExpenses,
-            variableExpenses: variableExpenses,
-            incomes: incomes,
-            savingsEntries: savingsEntries
-        )
-        let topCategories = engine.execute(
-            query: categoriesQuery,
-            categories: categories,
-            presets: presets,
-            plannedExpenses: plannedExpenses,
-            variableExpenses: variableExpenses,
-            incomes: incomes,
-            savingsEntries: savingsEntries
-        )
-
-        var rows = savings.rows
-        rows.append(contentsOf: sectionRows("Top spend driver", from: topCategories, maxRows: 3))
-        let rawAnswer = HomeAnswer(
-            queryID: savingsQuery.id,
-            kind: .list,
-            userPrompt: userPrompt,
-            title: "Savings Diagnostic",
-            subtitle: savings.subtitle ?? topCategories.subtitle,
-            primaryValue: savings.primaryValue,
-            rows: rows
-        )
-        appendRoutedAnswer(
-            rawAnswer,
-            userPrompt: userPrompt,
-            primaryQuery: savingsQuery,
-            footerQueries: [savingsQuery, categoriesQuery],
-            source: source
-        )
-    }
-
-    private func runCategoryAvailabilityAnswer(
-        userPrompt: String,
-        basePlan: HomeQueryPlan,
-        source: HomeAssistantPlanResolutionSource = .contextual
-    ) {
-        let range = basePlan.dateRange ?? monthRange(containing: Date())
-        let query = HomeQuery(intent: .topCategoriesThisMonth, dateRange: range)
-        let rawAnswer = categoryAvailabilityAnswerBuilder.makeAnswer(
-            queryID: query.id,
-            userPrompt: userPrompt,
-            dateRange: range,
-            budgets: budgets,
-            categories: categories,
-            plannedExpenses: plannedExpenses,
-            variableExpenses: variableExpenses
-        )
-        appendRoutedAnswer(
-            rawAnswer,
-            userPrompt: userPrompt,
-            primaryQuery: query,
-            footerQueries: [query],
-            source: source
-        )
-    }
-
-    private func runSpendDriversAnswer(
-        userPrompt: String,
-        basePlan: HomeQueryPlan,
-        source: HomeAssistantPlanResolutionSource = .contextual
-    ) {
-        let range = basePlan.dateRange ?? monthRange(containing: Date())
-        let categoryChangesQuery = HomeQuery(intent: .topCategoryChangesThisMonth, dateRange: range, resultLimit: 3)
-        let cardChangesQuery = HomeQuery(intent: .topCardChangesThisMonth, dateRange: range, resultLimit: 3)
-        let merchantsQuery = HomeQuery(intent: .topMerchantsThisMonth, dateRange: range, resultLimit: 3)
-        let categoryChanges = engine.execute(
-            query: categoryChangesQuery,
-            categories: categories,
-            presets: presets,
-            plannedExpenses: plannedExpenses,
-            variableExpenses: variableExpenses,
-            incomes: incomes,
-            savingsEntries: savingsEntries
-        )
-        let cardChanges = engine.execute(
-            query: cardChangesQuery,
-            categories: categories,
-            presets: presets,
-            plannedExpenses: plannedExpenses,
-            variableExpenses: variableExpenses,
-            incomes: incomes,
-            savingsEntries: savingsEntries
-        )
-        let merchants = engine.execute(
-            query: merchantsQuery,
-            categories: categories,
-            presets: presets,
-            plannedExpenses: plannedExpenses,
-            variableExpenses: variableExpenses,
-            incomes: incomes,
-            savingsEntries: savingsEntries
-        )
-
-        var rows: [HomeAnswerRow] = []
-        rows.append(contentsOf: sectionRows("Category change", from: categoryChanges, maxRows: 3))
-        rows.append(contentsOf: sectionRows("Card change", from: cardChanges, maxRows: 3))
-        rows.append(contentsOf: sectionRows("Merchant", from: merchants, maxRows: 3))
-
-        let rawAnswer = HomeAnswer(
-            queryID: categoryChangesQuery.id,
-            kind: rows.isEmpty ? .message : .list,
-            userPrompt: userPrompt,
-            title: "Spending Drivers",
-            subtitle: rows.isEmpty ? "No driver signals in this range yet." : categoryChanges.subtitle,
-            primaryValue: categoryChanges.primaryValue,
-            rows: rows
-        )
-        appendRoutedAnswer(
-            rawAnswer,
-            userPrompt: userPrompt,
-            primaryQuery: categoryChangesQuery,
-            footerQueries: [categoryChangesQuery, cardChangesQuery, merchantsQuery],
-            source: source
-        )
-    }
-
-    private func runCardSummaryAnswer(
-        userPrompt: String,
-        basePlan: HomeQueryPlan,
-        source: HomeAssistantPlanResolutionSource = .contextual
-    ) {
-        let range = basePlan.dateRange ?? monthRange(containing: Date())
-        let query = HomeQuery(intent: .cardSnapshotSummary, dateRange: range, targetName: basePlan.targetName)
-        let rawAnswer = cardSummaryAnswerBuilder.makeAnswer(
-            queryID: query.id,
-            userPrompt: userPrompt,
-            dateRange: range,
-            cards: cards,
-            targetName: basePlan.targetName
-        )
-        appendRoutedAnswer(
-            rawAnswer,
-            userPrompt: userPrompt,
-            primaryQuery: query,
-            footerQueries: [query],
-            source: source
-        )
-    }
-
-    private func appendRoutedAnswer(
-        _ rawAnswer: HomeAnswer,
-        userPrompt: String,
-        primaryQuery: HomeQuery,
-        footerQueries: [HomeQuery],
-        source: HomeAssistantPlanResolutionSource = .contextual
-    ) {
-        let routedPlan = HomeQueryPlan(
-            metric: primaryQuery.intent.metric,
-            dateRange: primaryQuery.dateRange,
-            comparisonDateRange: primaryQuery.comparisonDateRange,
-            resultLimit: primaryQuery.resultLimit,
-            confidenceBand: .high,
-            targetName: primaryQuery.targetName,
-            periodUnit: primaryQuery.periodUnit
-        )
-        presentMarinaAnswer(
-            deterministicAnswer: rawAnswer,
-            deterministicRecoveryAnswer: rawAnswer,
-            rawPrompt: userPrompt,
-            source: source,
-            homeQueryPlan: routedPlan,
-            surfaceKind: rawAnswer.primaryValue == nil && rawAnswer.rows.isEmpty ? .noData : .answer,
-            groundingSummary: "deterministic routed summary",
-            followUpSuggestions: followUpSuggestions(for: rawAnswer, query: primaryQuery)
-        ) { presentedAnswer in
-            updateSessionContext(after: routedPlan)
-            rememberAnswerContext(
-                for: primaryQuery,
-                executedPlan: routedPlan,
-                rawAnswer: rawAnswer,
-                presentedAnswer: presentedAnswer,
-                userPrompt: userPrompt
-            )
-        }
-    }
-
-    private func sectionRows(_ section: String, from answer: HomeAnswer, maxRows: Int) -> [HomeAnswerRow] {
-        var rows: [HomeAnswerRow] = []
-        
-        if let primaryValue = answer.primaryValue {
-            rows.append(
-                HomeAnswerRow(
-                    title: "\(section) Summary",
-                    value: primaryValue
-                )
-            )
-        }
-        
-        rows.append(
-            contentsOf: answer.rows.prefix(maxRows).map { row in
-                HomeAnswerRow(
-                    title: "\(section): \(row.title)",
-                    value: row.value
-                )
-            }
-        )
-        
-        return rows
-    }
-    
-    private func mergedBundleSubtitle(base: String?, appended: String) -> String {
-        guard let base, base.isEmpty == false else { return appended }
-        return "\(base) • \(appended)"
-    }
-    
     private var trimmedPromptText: String {
         promptText.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private func whatIfBaselineSpendByCategoryID(
-        in range: HomeQueryDateRange
-    ) -> [UUID: Double] {
-        var totals: [UUID: Double] = [:]
-
-        for expense in plannedExpenses where expense.expenseDate >= range.startDate && expense.expenseDate <= range.endDate {
-            guard let category = expense.category else { continue }
-            totals[category.id, default: 0] += max(0, CurrencyFormatter.roundedToCurrency(expense.effectiveAmount()))
-        }
-
-        for expense in variableExpenses where expense.transactionDate >= range.startDate && expense.transactionDate <= range.endDate {
-            guard let category = expense.category else { continue }
-            totals[category.id, default: 0] += expense.ledgerSignedAmount()
-        }
-
-        return totals.mapValues { CurrencyFormatter.roundedToCurrency(max(0, $0)) }
     }
 
     private func visibleProvenance(for query: HomeQuery) -> String? {
@@ -8341,7 +5892,7 @@ private enum MarinaColorResolver {
 }
 
 @MainActor
-final class HomeAssistantMutationService {
+final class MarinaMutationService {
     private let transactionEntryService = TransactionEntryService()
     
     func addBudget(
@@ -8351,7 +5902,7 @@ final class HomeAssistantMutationService {
         presets: [Preset],
         workspace: Workspace,
         modelContext: ModelContext
-    ) throws -> HomeAssistantMutationResult {
+    ) throws -> MarinaMutationResult {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.isEmpty == false else {
             throw TransactionEntryService.ValidationError.missingDescription
@@ -8391,7 +5942,7 @@ final class HomeAssistantMutationService {
             )
         }
         
-        return HomeAssistantMutationResult(
+        return MarinaMutationResult(
             title: "Budget created",
             subtitle: "Saved budget \(trimmed).",
             rows: [
@@ -8409,7 +5960,7 @@ final class HomeAssistantMutationService {
         effectRaw: String?,
         workspace: Workspace,
         modelContext: ModelContext
-    ) throws -> HomeAssistantMutationResult {
+    ) throws -> MarinaMutationResult {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.isEmpty == false else {
             throw TransactionEntryService.ValidationError.missingDescription
@@ -8421,7 +5972,7 @@ final class HomeAssistantMutationService {
         modelContext.insert(card)
         try modelContext.save()
         
-        return HomeAssistantMutationResult(
+        return MarinaMutationResult(
             title: "Card created",
             subtitle: "Saved card \(trimmed).",
             rows: [
@@ -8436,7 +5987,7 @@ final class HomeAssistantMutationService {
         colorHex: String?,
         workspace: Workspace,
         modelContext: ModelContext
-    ) throws -> HomeAssistantMutationResult {
+    ) throws -> MarinaMutationResult {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.isEmpty == false else {
             throw TransactionEntryService.ValidationError.missingDescription
@@ -8447,7 +5998,7 @@ final class HomeAssistantMutationService {
         modelContext.insert(category)
         try modelContext.save()
         
-        return HomeAssistantMutationResult(
+        return MarinaMutationResult(
             title: "Category created",
             subtitle: "Saved category \(trimmed).",
             rows: [HomeAnswerRow(title: "Color", value: resolvedHex)]
@@ -8468,7 +6019,7 @@ final class HomeAssistantMutationService {
         category: Category?,
         workspace: Workspace,
         modelContext: ModelContext
-    ) throws -> HomeAssistantMutationResult {
+    ) throws -> MarinaMutationResult {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.isEmpty == false else {
             throw TransactionEntryService.ValidationError.missingDescription
@@ -8495,7 +6046,7 @@ final class HomeAssistantMutationService {
         modelContext.insert(preset)
         try modelContext.save()
         
-        return HomeAssistantMutationResult(
+        return MarinaMutationResult(
             title: "Preset created",
             subtitle: "Saved preset \(trimmed).",
             rows: [
@@ -8514,7 +6065,7 @@ final class HomeAssistantMutationService {
         category: Category?,
         workspace: Workspace,
         modelContext: ModelContext
-    ) throws -> HomeAssistantMutationResult {
+    ) throws -> MarinaMutationResult {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.isEmpty == false else {
             throw TransactionEntryService.ValidationError.missingDescription
@@ -8535,7 +6086,7 @@ final class HomeAssistantMutationService {
         modelContext.insert(expense)
         try modelContext.save()
 
-        return HomeAssistantMutationResult(
+        return MarinaMutationResult(
             title: "Planned expense created",
             subtitle: "Saved planned expense \(trimmed).",
             rows: [
@@ -8554,7 +6105,7 @@ final class HomeAssistantMutationService {
         category: Category?,
         workspace: Workspace,
         modelContext: ModelContext
-    ) throws -> HomeAssistantMutationResult {
+    ) throws -> MarinaMutationResult {
         _ = try transactionEntryService.addExpense(
             notes: notes,
             amount: amount,
@@ -8565,7 +6116,7 @@ final class HomeAssistantMutationService {
             modelContext: modelContext
         )
         
-        return HomeAssistantMutationResult(
+        return MarinaMutationResult(
             title: "Expense logged",
             subtitle: "Saved \(CurrencyFormatter.string(from: amount)) on \(card.name).",
             rows: [
@@ -8591,13 +6142,13 @@ final class HomeAssistantMutationService {
         recurrenceEndDate: Date? = nil,
         workspace: Workspace,
         modelContext: ModelContext
-    ) throws -> HomeAssistantMutationResult {
+    ) throws -> MarinaMutationResult {
         let resolvedFrequency = RecurrenceFrequency(rawValue: recurrenceFrequencyRaw ?? RecurrenceFrequency.none.rawValue) ?? .none
 
         if resolvedFrequency != .none {
             guard let recurrenceEndDate else {
                 throw NSError(
-                    domain: "HomeAssistantMutationService",
+                    domain: "MarinaMutationService",
                     code: 400,
                     userInfo: [NSLocalizedDescriptionKey: "Repeat income needs an end date."]
                 )
@@ -8607,7 +6158,7 @@ final class HomeAssistantMutationService {
             let endDay = Calendar.current.startOfDay(for: recurrenceEndDate)
             guard endDay >= startDay else {
                 throw NSError(
-                    domain: "HomeAssistantMutationService",
+                    domain: "MarinaMutationService",
                     code: 400,
                     userInfo: [NSLocalizedDescriptionKey: "Repeat income end date must be on or after the start date."]
                 )
@@ -8646,7 +6197,7 @@ final class HomeAssistantMutationService {
 
             try modelContext.save()
 
-            return HomeAssistantMutationResult(
+            return MarinaMutationResult(
                 title: "Income logged",
                 subtitle: "Saved recurring \(isPlanned ? "planned" : "actual") income for \(source).",
                 rows: [
@@ -8666,7 +6217,7 @@ final class HomeAssistantMutationService {
             modelContext: modelContext
         )
         
-        return HomeAssistantMutationResult(
+        return MarinaMutationResult(
             title: "Income logged",
             subtitle: "Saved \(CurrencyFormatter.string(from: amount)) as \(isPlanned ? "planned" : "actual") income.",
             rows: [
@@ -8683,7 +6234,7 @@ final class HomeAssistantMutationService {
         themeRaw: String,
         effectRaw: String,
         modelContext: ModelContext
-    ) throws -> HomeAssistantMutationResult {
+    ) throws -> MarinaMutationResult {
         let trimmed = cardName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.isEmpty == false else {
             throw TransactionEntryService.ValidationError.missingDescription
@@ -8698,7 +6249,7 @@ final class HomeAssistantMutationService {
         
         guard let card = try modelContext.fetch(descriptor).first else {
             throw NSError(
-                domain: "HomeAssistantMutationService",
+                domain: "MarinaMutationService",
                 code: 404,
                 userInfo: [NSLocalizedDescriptionKey: "Could not find the card to update."]
             )
@@ -8708,7 +6259,7 @@ final class HomeAssistantMutationService {
         card.effect = CardEffectOption(rawValue: effectRaw)?.rawValue ?? CardEffectOption.plastic.rawValue
         try modelContext.save()
         
-        return HomeAssistantMutationResult(
+        return MarinaMutationResult(
             title: "Card style updated",
             subtitle: "Updated \(trimmed) with your selected theme and effect.",
             rows: [
@@ -8723,7 +6274,7 @@ final class HomeAssistantMutationService {
         themeRaw: String?,
         effectRaw: String?,
         modelContext: ModelContext
-    ) throws -> HomeAssistantMutationResult {
+    ) throws -> MarinaMutationResult {
         guard themeRaw != nil || effectRaw != nil else {
             throw TransactionEntryService.ValidationError.missingDescription
         }
@@ -8738,7 +6289,7 @@ final class HomeAssistantMutationService {
         
         try modelContext.save()
         
-        return HomeAssistantMutationResult(
+        return MarinaMutationResult(
             title: "Card updated",
             subtitle: "Updated \(card.name).",
             rows: [
@@ -8754,7 +6305,7 @@ final class HomeAssistantMutationService {
         themeRaw: String?,
         effectRaw: String?,
         modelContext: ModelContext
-    ) throws -> HomeAssistantMutationResult {
+    ) throws -> MarinaMutationResult {
         if let newName {
             let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmed.isEmpty == false {
@@ -8772,7 +6323,7 @@ final class HomeAssistantMutationService {
 
         try modelContext.save()
 
-        return HomeAssistantMutationResult(
+        return MarinaMutationResult(
             title: "Card updated",
             subtitle: "Updated \(card.name).",
             rows: [
@@ -8788,7 +6339,7 @@ final class HomeAssistantMutationService {
         newName: String?,
         colorHex: String?,
         modelContext: ModelContext
-    ) throws -> HomeAssistantMutationResult {
+    ) throws -> MarinaMutationResult {
         if let newName {
             let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmed.isEmpty == false {
@@ -8802,7 +6353,7 @@ final class HomeAssistantMutationService {
 
         try modelContext.save()
 
-        return HomeAssistantMutationResult(
+        return MarinaMutationResult(
             title: "Category updated",
             subtitle: "Updated \(category.name).",
             rows: [
@@ -8814,12 +6365,12 @@ final class HomeAssistantMutationService {
 
     func editPreset(
         _ preset: Preset,
-        command: HomeAssistantCommandPlan,
+        command: MarinaCommandPlan,
         card: Card?,
         category: Category?,
         workspace: Workspace,
         modelContext: ModelContext
-    ) throws -> HomeAssistantMutationResult {
+    ) throws -> MarinaMutationResult {
         if let newName = command.updatedEntityName?.trimmingCharacters(in: .whitespacesAndNewlines), newName.isEmpty == false {
             preset.title = newName
         }
@@ -8855,7 +6406,7 @@ final class HomeAssistantMutationService {
         syncGeneratedPlannedExpenses(for: preset, workspace: workspace, modelContext: modelContext)
         try modelContext.save()
 
-        return HomeAssistantMutationResult(
+        return MarinaMutationResult(
             title: "Preset updated",
             subtitle: "Updated \(preset.title).",
             rows: [
@@ -8868,10 +6419,10 @@ final class HomeAssistantMutationService {
 
     func editBudget(
         _ budget: Budget,
-        command: HomeAssistantCommandPlan,
+        command: MarinaCommandPlan,
         workspace: Workspace,
         modelContext: ModelContext
-    ) throws -> HomeAssistantMutationResult {
+    ) throws -> MarinaMutationResult {
         if let newName = command.updatedEntityName?.trimmingCharacters(in: .whitespacesAndNewlines), newName.isEmpty == false {
             budget.name = newName
         }
@@ -8883,7 +6434,7 @@ final class HomeAssistantMutationService {
         syncGeneratedPlannedExpenses(for: budget, workspace: workspace, modelContext: modelContext)
         try modelContext.save()
 
-        return HomeAssistantMutationResult(
+        return MarinaMutationResult(
             title: "Budget updated",
             subtitle: "Updated \(budget.name).",
             rows: [
@@ -8959,10 +6510,10 @@ final class HomeAssistantMutationService {
     
     func editExpense(
         _ expense: VariableExpense,
-        command: HomeAssistantCommandPlan,
+        command: MarinaCommandPlan,
         card: Card?,
         modelContext: ModelContext
-    ) throws -> HomeAssistantMutationResult {
+    ) throws -> MarinaMutationResult {
         if let amount = command.amount, amount > 0 {
             expense.amount = amount
         }
@@ -8978,7 +6529,7 @@ final class HomeAssistantMutationService {
         
         try modelContext.save()
         
-        return HomeAssistantMutationResult(
+        return MarinaMutationResult(
             title: "Expense updated",
             subtitle: "Your expense entry was updated.",
             rows: [
@@ -8991,9 +6542,9 @@ final class HomeAssistantMutationService {
     
     func editIncome(
         _ income: Income,
-        command: HomeAssistantCommandPlan,
+        command: MarinaCommandPlan,
         modelContext: ModelContext
-    ) throws -> HomeAssistantMutationResult {
+    ) throws -> MarinaMutationResult {
         if let amount = command.amount, amount > 0 {
             income.amount = amount
         }
@@ -9009,7 +6560,7 @@ final class HomeAssistantMutationService {
         
         try modelContext.save()
         
-        return HomeAssistantMutationResult(
+        return MarinaMutationResult(
             title: "Income updated",
             subtitle: "Your income entry was updated.",
             rows: [
@@ -9024,11 +6575,11 @@ final class HomeAssistantMutationService {
         expense: VariableExpense,
         category: Category,
         modelContext: ModelContext
-    ) throws -> HomeAssistantMutationResult {
+    ) throws -> MarinaMutationResult {
         expense.category = category
         try modelContext.save()
         
-        return HomeAssistantMutationResult(
+        return MarinaMutationResult(
             title: "Expense category updated",
             subtitle: "Moved this expense to \(category.name).",
             rows: [
@@ -9041,9 +6592,9 @@ final class HomeAssistantMutationService {
     func updatePlannedExpenseAmount(
         expense: PlannedExpense,
         amount: Double,
-        target: HomeAssistantPlannedExpenseAmountTarget,
+        target: MarinaPlannedExpenseAmountTarget,
         modelContext: ModelContext
-    ) throws -> HomeAssistantMutationResult {
+    ) throws -> MarinaMutationResult {
         switch target {
         case .planned:
             expense.plannedAmount = amount
@@ -9053,7 +6604,7 @@ final class HomeAssistantMutationService {
         
         try modelContext.save()
         
-        return HomeAssistantMutationResult(
+        return MarinaMutationResult(
             title: "Planned expense updated",
             subtitle: "Updated \(expense.title).",
             rows: [
@@ -9065,11 +6616,11 @@ final class HomeAssistantMutationService {
 
     func editPlannedExpense(
         _ expense: PlannedExpense,
-        command: HomeAssistantCommandPlan,
+        command: MarinaCommandPlan,
         card: Card?,
         category: Category?,
         modelContext: ModelContext
-    ) throws -> HomeAssistantMutationResult {
+    ) throws -> MarinaMutationResult {
         if let newName = command.updatedEntityName?.trimmingCharacters(in: .whitespacesAndNewlines), newName.isEmpty == false {
             expense.title = newName
         }
@@ -9093,7 +6644,7 @@ final class HomeAssistantMutationService {
 
         try modelContext.save()
 
-        return HomeAssistantMutationResult(
+        return MarinaMutationResult(
             title: "Planned expense updated",
             subtitle: "Updated \(expense.title).",
             rows: [
@@ -9107,11 +6658,11 @@ final class HomeAssistantMutationService {
     func deleteExpense(
         _ expense: VariableExpense,
         modelContext: ModelContext
-    ) throws -> HomeAssistantMutationResult {
+    ) throws -> MarinaMutationResult {
         VariableExpenseDeletionService.delete(expense, modelContext: modelContext)
         try modelContext.save()
         
-        return HomeAssistantMutationResult(
+        return MarinaMutationResult(
             title: "Expense deleted",
             subtitle: "The expense was removed.",
             rows: []
@@ -9121,11 +6672,11 @@ final class HomeAssistantMutationService {
     func deleteIncome(
         _ income: Income,
         modelContext: ModelContext
-    ) throws -> HomeAssistantMutationResult {
+    ) throws -> MarinaMutationResult {
         modelContext.delete(income)
         try modelContext.save()
         
-        return HomeAssistantMutationResult(
+        return MarinaMutationResult(
             title: "Income deleted",
             subtitle: "The income entry was removed.",
             rows: []
@@ -9136,7 +6687,7 @@ final class HomeAssistantMutationService {
         _ card: Card,
         workspace: Workspace,
         modelContext: ModelContext
-    ) throws -> HomeAssistantMutationResult {
+    ) throws -> MarinaMutationResult {
         let workspaceID = workspace.id
         let cardID = card.id
         
@@ -9170,7 +6721,7 @@ final class HomeAssistantMutationService {
         modelContext.delete(card)
         try modelContext.save()
         
-        return HomeAssistantMutationResult(
+        return MarinaMutationResult(
             title: "Card deleted",
             subtitle: "Removed \(card.name) and its linked entries.",
             rows: []
@@ -9180,7 +6731,7 @@ final class HomeAssistantMutationService {
     func deleteCategory(
         _ category: Category,
         modelContext: ModelContext
-    ) throws -> HomeAssistantMutationResult {
+    ) throws -> MarinaMutationResult {
         if let variableExpenses = category.variableExpenses {
             for expense in variableExpenses {
                 expense.category = nil
@@ -9204,7 +6755,7 @@ final class HomeAssistantMutationService {
         modelContext.delete(category)
         try modelContext.save()
 
-        return HomeAssistantMutationResult(
+        return MarinaMutationResult(
             title: "Category deleted",
             subtitle: "Removed \(category.name).",
             rows: []
@@ -9214,7 +6765,7 @@ final class HomeAssistantMutationService {
     func deletePreset(
         _ preset: Preset,
         modelContext: ModelContext
-    ) throws -> HomeAssistantMutationResult {
+    ) throws -> MarinaMutationResult {
         if let links = preset.budgetPresetLinks {
             for link in links {
                 modelContext.delete(link)
@@ -9223,7 +6774,7 @@ final class HomeAssistantMutationService {
         modelContext.delete(preset)
         try modelContext.save()
 
-        return HomeAssistantMutationResult(
+        return MarinaMutationResult(
             title: "Preset deleted",
             subtitle: "Removed \(preset.title).",
             rows: []
@@ -9233,9 +6784,9 @@ final class HomeAssistantMutationService {
     func deleteBudget(
         _ budget: Budget,
         modelContext: ModelContext
-    ) throws -> HomeAssistantMutationResult {
+    ) throws -> MarinaMutationResult {
         try BudgetDeletionService.deleteBudgetAndGeneratedPlannedExpenses(budget, modelContext: modelContext)
-        return HomeAssistantMutationResult(
+        return MarinaMutationResult(
             title: "Budget deleted",
             subtitle: "Removed \(budget.name).",
             rows: []
@@ -9245,11 +6796,11 @@ final class HomeAssistantMutationService {
     func deletePlannedExpense(
         _ expense: PlannedExpense,
         modelContext: ModelContext
-    ) throws -> HomeAssistantMutationResult {
+    ) throws -> MarinaMutationResult {
         PlannedExpenseDeletionService.delete(expense, modelContext: modelContext)
         try modelContext.save()
 
-        return HomeAssistantMutationResult(
+        return MarinaMutationResult(
             title: "Planned expense deleted",
             subtitle: "The planned expense was removed.",
             rows: []
@@ -9257,7 +6808,7 @@ final class HomeAssistantMutationService {
     }
     
     func matchedExpenses(
-        for command: HomeAssistantCommandPlan,
+        for command: MarinaCommandPlan,
         expenses: [VariableExpense]
     ) -> [VariableExpense] {
         var ranked: [(VariableExpense, Int)] = []
@@ -9314,7 +6865,7 @@ final class HomeAssistantMutationService {
     }
     
     func matchedIncomes(
-        for command: HomeAssistantCommandPlan,
+        for command: MarinaCommandPlan,
         incomes: [Income]
     ) -> [Income] {
         var ranked: [(Income, Int)] = []
@@ -9368,7 +6919,7 @@ final class HomeAssistantMutationService {
     }
     
     func matchedPlannedExpenses(
-        for command: HomeAssistantCommandPlan,
+        for command: MarinaCommandPlan,
         plannedExpenses: [PlannedExpense]
     ) -> [PlannedExpense] {
         var ranked: [(PlannedExpense, Int)] = []

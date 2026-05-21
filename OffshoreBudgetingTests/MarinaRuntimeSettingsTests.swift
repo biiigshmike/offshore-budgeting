@@ -17,6 +17,8 @@ struct MarinaRuntimeSettingsTests {
         #expect(settings.aiOptIn.isEnabled)
         #expect(settings.aiOptIn.source == .fallback)
         #expect(settings.traceSummary.contains("foundationPipeline=true"))
+        #expect(settings.traceSummary.contains("realDeviceSmoke") == false)
+        #expect(settings.traceSummary.contains("MARINA_REAL_DEVICE_SMOKE") == false)
     }
 
     @Test func aiOptIn_canBeDisabledWithoutChangingFoundationPipeline() throws {
@@ -72,6 +74,7 @@ struct MarinaRuntimeSettingsTests {
         #expect(settings.aiOptIn.source == .environment)
         #expect(settings.fixedNow != nil)
         #expect(settings.traceSummary.contains("fixedNow=2026-05-15T12:34:56Z"))
+        #expect(settings.traceSummary.contains("realDeviceSmoke") == false)
     }
 
     @Test func traceRecorder_capturesRuntimeSettingsSummary() {

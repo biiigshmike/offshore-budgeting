@@ -1188,7 +1188,7 @@ struct MarinaRoutePatternRegistry {
 
         return MarinaReadOnlyMutationViolation(
             domain: domain,
-            message: "That looks like a \(domain.displayName) change. Marina's shared read pipeline is read-only for this area, so I won't approximate it as a lookup."
+            message: "That looks like a \(domain.displayName) change. Marina's Foundation read pipeline is read-only for this area, so I won't approximate it as a lookup."
         )
     }
 

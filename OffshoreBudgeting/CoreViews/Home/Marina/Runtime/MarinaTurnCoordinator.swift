@@ -290,7 +290,7 @@ struct MarinaTurnCoordinator {
         sourceTitle: String,
         context: MarinaTurnContext
     ) async -> MarinaTurnResult {
-        let presetAdapter = HomeAssistantPresetPromptQueryAdapter()
+        let presetAdapter = MarinaPresetPromptQueryAdapter()
         let executablePlan = presetAdapter.executablePlan(for: query, sourceTitle: sourceTitle)
         let candidate = presetAdapter.candidate(for: query, sourceTitle: sourceTitle)
         let interpretation = MarinaCanonicalReadInterpretation(
@@ -801,12 +801,6 @@ struct MarinaTurnCoordinator {
         if let availabilityReason = diagnostic.availabilityReason {
             rows.append(HomeAnswerRow(title: "Availability", value: availabilityReason))
         }
-        #if DEBUG
-        if MarinaRuntimeSettings.resolve().realDeviceSmoke.isEnabled {
-            let exportPath = MarinaSmokeTraceStore.currentExportURL?.path ?? "enabled"
-            rows.append(HomeAnswerRow(title: "Smoke trace", value: exportPath))
-        }
-        #endif
 
         return HomeAnswer(
             queryID: UUID(),
@@ -895,7 +889,7 @@ struct MarinaTurnCoordinator {
         case .available:
             return "available"
         case .unavailable(let reason):
-            return reason
+            return reason.rawValue
         }
     }
 }

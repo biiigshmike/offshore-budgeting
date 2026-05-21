@@ -1,5 +1,5 @@
 //
-//  HomeAssistantHost.swift
+//  MarinaHost.swift
 //  OffshoreBudgeting
 //
 //  Created by Michael Brown on 2/17/26.
@@ -7,23 +7,23 @@
 
 import SwiftUI
 
-struct HomeAssistantToolbarContext {
+struct MarinaToolbarContext {
     var isToolbarButtonVisible: Bool = false
     var openAssistant: () -> Void = {}
 }
 
-private struct HomeAssistantToolbarContextKey: EnvironmentKey {
-    static let defaultValue = HomeAssistantToolbarContext()
+private struct MarinaToolbarContextKey: EnvironmentKey {
+    static let defaultValue = MarinaToolbarContext()
 }
 
 extension EnvironmentValues {
-    var homeAssistantToolbarContext: HomeAssistantToolbarContext {
-        get { self[HomeAssistantToolbarContextKey.self] }
-        set { self[HomeAssistantToolbarContextKey.self] = newValue }
+    var marinaToolbarContext: MarinaToolbarContext {
+        get { self[MarinaToolbarContextKey.self] }
+        set { self[MarinaToolbarContextKey.self] = newValue }
     }
 }
 
-struct HomeAssistantHostModifier: ViewModifier {
+struct MarinaHostModifier: ViewModifier {
 
     let workspace: Workspace
     let isEnabled: Bool
@@ -57,7 +57,7 @@ struct HomeAssistantHostModifier: ViewModifier {
                 isPresented: assistantSheetPresentedBinding,
                 onDismiss: dismissAssistant
             ) {
-                HomeAssistantPanelView(
+                MarinaPanelView(
                     workspace: workspace,
                     onDismiss: dismissAssistant,
                     shouldUseLargeMinimumSize: assistantPresentationPlan.usesExpandedPanelSizing
@@ -69,7 +69,7 @@ struct HomeAssistantHostModifier: ViewModifier {
                 isEnabled: shouldMountInspectorPresenter,
                 isPresented: assistantInspectorPresentedBinding
             ) {
-                HomeAssistantPanelView(
+                MarinaPanelView(
                     workspace: workspace,
                     onDismiss: dismissAssistant,
                     shouldUseLargeMinimumSize: false
@@ -80,7 +80,7 @@ struct HomeAssistantHostModifier: ViewModifier {
                 isPresented: assistantFullScreenPresentedBinding,
                 onDismiss: dismissAssistant
             ) {
-                HomeAssistantPanelView(
+                MarinaPanelView(
                     workspace: workspace,
                     onDismiss: dismissAssistant,
                     shouldUseLargeMinimumSize: false
@@ -97,7 +97,7 @@ struct HomeAssistantHostModifier: ViewModifier {
                         }
                 }
             }
-            .environment(\.homeAssistantToolbarContext, assistantToolbarContext)
+            .environment(\.marinaToolbarContext, assistantToolbarContext)
             .onChange(of: isEnabled) { _, enabled in
                 if enabled == false {
                     dismissAssistant()
@@ -158,7 +158,7 @@ struct HomeAssistantHostModifier: ViewModifier {
         assistantRoute = nil
     }
 
-    private func route(for mode: HomeAssistantPresentationMode) -> AssistantPresentationRoute {
+    private func route(for mode: MarinaPanelPresentationMode) -> AssistantPresentationRoute {
         switch mode {
         case .inspector:
             return .inspector
@@ -169,8 +169,8 @@ struct HomeAssistantHostModifier: ViewModifier {
         }
     }
 
-    private var assistantPresentationPlan: HomeAssistantPresentationPlan {
-        let basePlan = HomeAssistantPresentationResolver.resolve(
+    private var assistantPresentationPlan: MarinaPanelPresentationPlan {
+        let basePlan = MarinaPanelPresentationResolver.resolve(
             containerWidth: containerWidth,
             supportsInlineInspector: supportsInlineInspector,
             dynamicTypeSize: dynamicTypeSize,
@@ -178,7 +178,7 @@ struct HomeAssistantHostModifier: ViewModifier {
         )
 
         guard isPhone == false else {
-            return HomeAssistantPresentationPlan(
+            return MarinaPanelPresentationPlan(
                 mode: .fullScreen,
                 showsBottomLauncher: false,
                 showsToolbarButton: true,
@@ -189,7 +189,7 @@ struct HomeAssistantHostModifier: ViewModifier {
         }
 
         guard usesCompactPhoneHeight == false else {
-            return HomeAssistantPresentationPlan(
+            return MarinaPanelPresentationPlan(
                 mode: basePlan.mode,
                 showsBottomLauncher: false,
                 showsToolbarButton: true,
@@ -226,8 +226,8 @@ struct HomeAssistantHostModifier: ViewModifier {
         return assistantRoute == nil
     }
 
-    private var assistantToolbarContext: HomeAssistantToolbarContext {
-        HomeAssistantToolbarContext(
+    private var assistantToolbarContext: MarinaToolbarContext {
+        MarinaToolbarContext(
             isToolbarButtonVisible: shouldShowToolbarButton,
             openAssistant: presentAssistant
         )
@@ -255,8 +255,8 @@ struct HomeAssistantHostModifier: ViewModifier {
 }
 
 extension View {
-    func homeAssistantHost(workspace: Workspace, isEnabled: Bool = true) -> some View {
-        modifier(HomeAssistantHostModifier(workspace: workspace, isEnabled: isEnabled))
+    func marinaHost(workspace: Workspace, isEnabled: Bool = true) -> some View {
+        modifier(MarinaHostModifier(workspace: workspace, isEnabled: isEnabled))
     }
 }
 

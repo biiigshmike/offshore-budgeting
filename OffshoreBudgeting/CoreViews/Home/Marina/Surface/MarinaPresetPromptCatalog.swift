@@ -1,6 +1,6 @@
 import Foundation
 
-enum HomeAssistantPresetPromptGroup: String, CaseIterable, Identifiable {
+enum MarinaPresetPromptGroup: String, CaseIterable, Identifiable {
     case budget
     case income
     case card
@@ -45,9 +45,9 @@ enum HomeAssistantPresetPromptGroup: String, CaseIterable, Identifiable {
     }
 }
 
-struct HomeAssistantPresetPrompt: Identifiable, Equatable {
+struct MarinaPresetPrompt: Identifiable, Equatable {
     let id: String
-    let group: HomeAssistantPresetPromptGroup?
+    let group: MarinaPresetPromptGroup?
     let title: String
     let query: HomeQuery
     let expectedMetric: HomeQueryMetric
@@ -55,7 +55,7 @@ struct HomeAssistantPresetPrompt: Identifiable, Equatable {
     let expectedTitleFamily: String
 
     init(
-        group: HomeAssistantPresetPromptGroup?,
+        group: MarinaPresetPromptGroup?,
         title: String,
         query: HomeQuery,
         expectedAnswerKind: HomeAnswerKind?,
@@ -70,8 +70,8 @@ struct HomeAssistantPresetPrompt: Identifiable, Equatable {
         self.expectedTitleFamily = expectedTitleFamily
     }
 
-    var suggestion: HomeAssistantSuggestion {
-        HomeAssistantSuggestion(
+    var suggestion: MarinaSuggestion {
+        MarinaSuggestion(
             title: title,
             query: query,
             reasoning: "preset_prompt:\(id)"
@@ -79,30 +79,30 @@ struct HomeAssistantPresetPrompt: Identifiable, Equatable {
     }
 }
 
-enum HomeAssistantPresetPromptCatalog {
-    static func prompts(defaultPeriodUnit: HomeQueryPeriodUnit) -> [HomeAssistantPresetPrompt] {
+enum MarinaPresetPromptCatalog {
+    static func prompts(defaultPeriodUnit: HomeQueryPeriodUnit) -> [MarinaPresetPrompt] {
         emptyStatePrompts(defaultPeriodUnit: defaultPeriodUnit) + defaultPrompts()
     }
 
     static func prompts(
-        for group: HomeAssistantPresetPromptGroup,
+        for group: MarinaPresetPromptGroup,
         defaultPeriodUnit: HomeQueryPeriodUnit
-    ) -> [HomeAssistantPresetPrompt] {
+    ) -> [MarinaPresetPrompt] {
         emptyStatePrompts(defaultPeriodUnit: defaultPeriodUnit).filter { $0.group == group }
     }
 
     static func suggestions(
-        for group: HomeAssistantPresetPromptGroup,
+        for group: MarinaPresetPromptGroup,
         defaultPeriodUnit: HomeQueryPeriodUnit
-    ) -> [HomeAssistantSuggestion] {
+    ) -> [MarinaSuggestion] {
         prompts(for: group, defaultPeriodUnit: defaultPeriodUnit).map(\.suggestion)
     }
 
-    static func defaultSuggestions() -> [HomeAssistantSuggestion] {
+    static func defaultSuggestions() -> [MarinaSuggestion] {
         defaultPrompts().map(\.suggestion)
     }
 
-    private static func emptyStatePrompts(defaultPeriodUnit: HomeQueryPeriodUnit) -> [HomeAssistantPresetPrompt] {
+    private static func emptyStatePrompts(defaultPeriodUnit: HomeQueryPeriodUnit) -> [MarinaPresetPrompt] {
         [
             prompt(.budget, "How am I doing this month?", .periodOverview, .list, "Budget Overview"),
             prompt(.budget, "Spend this month", .spendThisMonth, .metric, "Spend"),
@@ -166,7 +166,7 @@ enum HomeAssistantPresetPromptCatalog {
         ]
     }
 
-    private static func defaultPrompts() -> [HomeAssistantPresetPrompt] {
+    private static func defaultPrompts() -> [MarinaPresetPrompt] {
         [
             prompt(nil, "How am I doing this month?", .periodOverview, .list, "Budget Overview"),
             prompt(nil, "Spend this month", .spendThisMonth, .metric, "Spend"),
@@ -185,12 +185,12 @@ enum HomeAssistantPresetPromptCatalog {
     }
 
     private static func prompt(
-        _ group: HomeAssistantPresetPromptGroup?,
+        _ group: MarinaPresetPromptGroup?,
         _ title: String,
         _ intent: HomeQueryIntent,
         _ expectedAnswerKind: HomeAnswerKind?,
         _ expectedTitleFamily: String
-    ) -> HomeAssistantPresetPrompt {
+    ) -> MarinaPresetPrompt {
         prompt(
             group,
             title,
@@ -201,13 +201,13 @@ enum HomeAssistantPresetPromptCatalog {
     }
 
     private static func prompt(
-        _ group: HomeAssistantPresetPromptGroup?,
+        _ group: MarinaPresetPromptGroup?,
         _ title: String,
         _ query: HomeQuery,
         _ expectedAnswerKind: HomeAnswerKind?,
         _ expectedTitleFamily: String
-    ) -> HomeAssistantPresetPrompt {
-        HomeAssistantPresetPrompt(
+    ) -> MarinaPresetPrompt {
+        MarinaPresetPrompt(
             group: group,
             title: title,
             query: query,
@@ -217,7 +217,7 @@ enum HomeAssistantPresetPromptCatalog {
     }
 }
 
-struct HomeAssistantPresetPromptQueryAdapter {
+struct MarinaPresetPromptQueryAdapter {
     func executablePlan(
         for query: HomeQuery,
         sourceTitle: String

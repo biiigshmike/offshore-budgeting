@@ -286,7 +286,7 @@ struct MarinaLiveDomainIntentMapperTests {
             workspaceName: "Personal",
             defaultPeriodUnit: defaultPeriodUnit,
             ambientDateRange: ambientDateRange,
-            sessionContext: HomeAssistantSessionContext(),
+            sessionContext: MarinaSessionContext(),
             priorQueryContext: .empty,
             cardNames: ["Apple Card", "Backup Card"],
             categoryNames: ["Groceries", "Dining"],

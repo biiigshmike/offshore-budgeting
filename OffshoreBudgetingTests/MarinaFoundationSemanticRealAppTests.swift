@@ -272,7 +272,7 @@ struct MarinaFoundationSemanticRealAppTests {
             routerContext: MarinaInterpretationContext(
                 workspaceName: fixture.workspace.name,
                 defaultPeriodUnit: .month,
-                sessionContext: HomeAssistantSessionContext(),
+                sessionContext: MarinaSessionContext(),
                 priorQueryContext: .empty,
                 cardNames: cardNames,
                 categoryNames: categoryNames,

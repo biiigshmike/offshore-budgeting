@@ -431,7 +431,7 @@ struct AppRootView: View {
             .environment(\.appTabActivationContext, context)
             .id(selectedSection)
         }
-        .homeAssistantHost(
+        .marinaHost(
             workspace: workspace,
             isEnabled: selectedSection == .home
         )

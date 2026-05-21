@@ -35,7 +35,7 @@ struct MarinaTurnCoordinatorTests {
     @Test func run_whenModelUnavailable_returnsSpecificAvailabilityCard() async throws {
         let fixture = try makeFixture()
         let coordinator = MarinaTurnCoordinator(
-            availability: FakeMarinaAvailability(status: .unavailable(reason: "model_not_ready")),
+            availability: FakeMarinaAvailability(status: .unavailable(reason: .modelNotReady)),
             interpreter: MarinaFakeCanonicalAIInterpreter(interpretationsByPrompt: [:])
         )
 
@@ -316,7 +316,7 @@ struct MarinaTurnCoordinatorTests {
             routerContext: MarinaInterpretationContext(
                 workspaceName: "Phase 5 Workspace",
                 defaultPeriodUnit: .month,
-                sessionContext: HomeAssistantSessionContext(),
+                sessionContext: MarinaSessionContext(),
                 priorQueryContext: .empty,
                 cardNames: cardNames,
                 categoryNames: categoryNames,

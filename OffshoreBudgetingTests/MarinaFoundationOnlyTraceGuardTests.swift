@@ -243,7 +243,7 @@ struct MarinaFoundationOnlyTraceGuardTests {
         let fixture = try makeFixture()
         let prompt = "How much did I spend on Groceries this month?"
         let coordinator = MarinaTurnCoordinator(
-            availability: FoundationOnlyAvailability(status: .unavailable(reason: "model_not_ready")),
+            availability: FoundationOnlyAvailability(status: .unavailable(reason: .modelNotReady)),
             interpreter: MarinaFakeCanonicalAIInterpreter(interpretationsByPrompt: [:])
         )
 
@@ -412,7 +412,7 @@ struct MarinaFoundationOnlyTraceGuardTests {
             routerContext: MarinaInterpretationContext(
                 workspaceName: "Foundation Only Workspace",
                 defaultPeriodUnit: .month,
-                sessionContext: HomeAssistantSessionContext(),
+                sessionContext: MarinaSessionContext(),
                 priorQueryContext: priorQueryContext,
                 cardNames: ["Apple Card", "Backup Card"],
                 categoryNames: ["Groceries", "Travel"],

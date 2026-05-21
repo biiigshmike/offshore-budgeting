@@ -328,7 +328,7 @@ struct MarinaFoundationModelsContractsTests {
         MarinaInterpretationContext(
             workspaceName: "Personal",
             defaultPeriodUnit: .month,
-            sessionContext: HomeAssistantSessionContext(),
+            sessionContext: MarinaSessionContext(),
             priorQueryContext: .empty,
             cardNames: ["Apple Card"],
             categoryNames: ["Dining"],

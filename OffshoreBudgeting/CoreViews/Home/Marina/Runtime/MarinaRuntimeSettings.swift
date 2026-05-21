@@ -4,17 +4,12 @@ struct MarinaRuntimeSettings: Equatable {
     static let aiOptInKey = "marina_ai_opt_in_enabled"
     static let fixedNowEnvironmentKey = "MARINA_UI_FIXED_NOW_ISO8601"
     static let traceOutputPathEnvironmentKey = "MARINA_UI_TRACE_OUTPUT_PATH"
-    static let realDeviceSmokeEnvironmentKey = "MARINA_REAL_DEVICE_SMOKE"
-    static let realDeviceSmokeOutputPathEnvironmentKey = "MARINA_REAL_DEVICE_SMOKE_OUTPUT_PATH"
-    static let realDeviceSmokeKey = "debug_marina_real_device_smoke_enabled"
     static let uiFakeAIInterpreterEnvironmentKey = "MARINA_UI_FAKE_AI_INTERPRETER"
     static let defaultAIOptInEnabled = true
 
     let aiOptIn: DebugFeatureFlagResolver.ResolvedFlag
-    let realDeviceSmoke: DebugFeatureFlagResolver.ResolvedFlag
     let fixedNow: Date?
     let traceOutputPath: String?
-    let realDeviceSmokeOutputPath: String?
 
     var now: Date {
         fixedNow ?? Date()
@@ -32,15 +27,12 @@ struct MarinaRuntimeSettings: Equatable {
             "aiOptInEnvPresent=\(aiOptIn.environmentValueWasPresent)",
             "aiOptInArgPresent=\(aiOptIn.argumentValueWasPresent)",
             "aiOptInDefaultsPresent=\(aiOptIn.userDefaultsValueWasPresent)",
-            "realDeviceSmoke=\(realDeviceSmoke.isEnabled)",
-            "realDeviceSmokeSource=\(realDeviceSmoke.source.rawValue)",
             "foundationInterpretationPrompt=\(MarinaFoundationPromptVersion.interpretation.rawValue)",
             "foundationPresentationPrompt=\(MarinaFoundationPromptVersion.presentation.rawValue)",
             "foundationModelBand=\(MarinaFoundationModelBand.current.rawValue)",
             "foundationLocale=\(Locale.current.identifier)",
             "fixedNow=\(fixedNow.map(Self.iso8601String(from:)) ?? "nil")",
-            "traceOutputPathPresent=\((traceOutputPath?.isEmpty == false))",
-            "realDeviceSmokeOutputPathPresent=\((realDeviceSmokeOutputPath?.isEmpty == false))"
+            "traceOutputPathPresent=\((traceOutputPath?.isEmpty == false))"
         ].joined(separator: ",")
     }
 
@@ -52,7 +44,6 @@ struct MarinaRuntimeSettings: Equatable {
     ) -> MarinaRuntimeSettings {
         let fixedNow = environment[fixedNowEnvironmentKey].flatMap(Self.date(fromISO8601:))
         let traceOutputPath = environment[traceOutputPathEnvironmentKey]?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let realDeviceSmokeOutputPath = environment[realDeviceSmokeOutputPathEnvironmentKey]?.trimmingCharacters(in: .whitespacesAndNewlines)
 
         return MarinaRuntimeSettings(
             aiOptIn: DebugFeatureFlagResolver.resolve(
@@ -62,17 +53,8 @@ struct MarinaRuntimeSettings: Equatable {
                 arguments: arguments,
                 environment: environment
             ),
-            realDeviceSmoke: DebugFeatureFlagResolver.resolve(
-                key: realDeviceSmokeKey,
-                fallback: false,
-                environmentKey: realDeviceSmokeEnvironmentKey,
-                defaults: defaults,
-                arguments: arguments,
-                environment: environment
-            ),
             fixedNow: fixedNow,
-            traceOutputPath: traceOutputPath?.isEmpty == false ? traceOutputPath : nil,
-            realDeviceSmokeOutputPath: realDeviceSmokeOutputPath?.isEmpty == false ? realDeviceSmokeOutputPath : nil
+            traceOutputPath: traceOutputPath?.isEmpty == false ? traceOutputPath : nil
         )
     }
 
