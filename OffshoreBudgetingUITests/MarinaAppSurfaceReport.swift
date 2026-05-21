@@ -54,6 +54,8 @@ struct MarinaTraceSnapshot: Codable {
     let sharedPipelineEnabled: Bool?
     let sharedPipelinePath: String?
     let sharedPipelineInterpreterSource: String?
+    let sharedPipelineHeuristicAttempted: Bool?
+    let sharedPipelineHeuristicUsedAsFallback: Bool?
     let sharedPipelineCandidateSummary: String?
     let sharedPipelineResolverSummary: String?
     let sharedPipelineValidatorSummary: String?
@@ -91,6 +93,8 @@ struct MarinaTraceSnapshot: Codable {
         self.sharedPipelineEnabled = nil
         self.sharedPipelinePath = fields["sharedPath"]
         self.sharedPipelineInterpreterSource = fields["interpreter"]
+        self.sharedPipelineHeuristicAttempted = fields["heuristicAttempted"].flatMap(Bool.init)
+        self.sharedPipelineHeuristicUsedAsFallback = fields["heuristicUsedAsFallback"].flatMap(Bool.init)
         self.sharedPipelineCandidateSummary = fields["candidate"]
         self.sharedPipelineResolverSummary = nil
         self.sharedPipelineValidatorSummary = nil

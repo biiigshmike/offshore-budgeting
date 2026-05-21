@@ -136,9 +136,6 @@ struct HomeAssistantPanelView: View {
     @State private var pendingPlannedExpenseCandidates: [PlannedExpense] = []
     @State private var pendingWhatIfContext: HomeAssistantWhatIfContext? = nil
     @State private var pendingWhatIfCategoryMappingContext: HomeAssistantWhatIfContext? = nil
-    @State private var nlqClarificationPayload: MarinaNLQClarificationPayload? = nil
-    @State private var nlqClarificationOriginalPrompt: String? = nil
-    @State private var nlqExecutionContext: MarinaNLQExecutionContext? = nil
     @State private var generatedFollowUpSuggestionsByAnswerID: [UUID: [HomeAssistantSuggestion]] = [:]
     @FocusState private var isPromptFieldFocused: Bool
     @AppStorage("general_defaultBudgetingPeriod")
@@ -1478,7 +1475,6 @@ struct HomeAssistantPanelView: View {
         sharedPipelineClarificationChoiceContext = nil
         sharedPipelineClarificationChoicesByID = [:]
         sharedPipelineClarificationChoicesByTitle = [:]
-        clearNLQClarificationState()
         
         let baseAnswer = engine.execute(
             query: query,
@@ -1555,7 +1551,6 @@ struct HomeAssistantPanelView: View {
         sharedPipelineClarificationChoiceContext = nil
         sharedPipelineClarificationChoicesByID = [:]
         sharedPipelineClarificationChoicesByTitle = [:]
-        clearNLQClarificationState()
 
         let query = homeQueryPlan?.query
         let normalizedAnswer = query.map {
@@ -1624,7 +1619,6 @@ struct HomeAssistantPanelView: View {
         sharedPipelineClarificationChoiceContext = nil
         sharedPipelineClarificationChoicesByID = [:]
         sharedPipelineClarificationChoicesByTitle = [:]
-        clearNLQClarificationState()
 
         _ = await presentMarinaAnswer(
             deterministicAnswer: answer,
@@ -2057,17 +2051,8 @@ struct HomeAssistantPanelView: View {
         let turnClassification = turnClassifier.classify(
             prompt,
             defaultPeriodUnit: defaultQueryPeriodUnit,
-            hasActiveClarification: sharedPipelineClarification != nil || nlqClarificationPayload != nil
+            hasActiveClarification: sharedPipelineClarification != nil
         )
-
-        if runtimeSettings.sharedPipeline.isEnabled == false,
-           runtimeSettings.nlqV1.isEnabled,
-           let nlqPayload = nlqClarificationPayload {
-            // Legacy reachable: NLQ v1 clarification remains behind its flag until
-            // shared-pipeline clarification resume has parity coverage for this flow.
-            handleNLQClarificationInput(prompt, payload: nlqPayload)
-            return
-        }
 
         if handleClarificationRejection(prompt) {
             return
@@ -5181,7 +5166,6 @@ struct HomeAssistantPanelView: View {
         recoverySuggestions = []
         lastClarificationReasons = []
         activeClarificationContext = nil
-        clearNLQClarificationState()
         pendingWhatIfContext = nil
         pendingWhatIfCategoryMappingContext = nil
         clearMutationPendingState()
@@ -6183,11 +6167,6 @@ struct HomeAssistantPanelView: View {
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private func clearNLQClarificationState() {
-        nlqClarificationPayload = nil
-        nlqClarificationOriginalPrompt = nil
-    }
-
     private func handleSuggestionTap(_ suggestion: HomeAssistantSuggestion) {
         if let choice = sharedPipelineClarificationChoicesByID[suggestion.id]
             ?? sharedPipelineClarificationChoice(matching: suggestion.title),
@@ -6324,113 +6303,6 @@ struct HomeAssistantPanelView: View {
     }
 
     @MainActor
-    private func handleNLQPipelineResult(
-        _ result: MarinaNLQPipelineResult,
-        originalPrompt: String
-    ) async -> Bool {
-        switch result {
-        case .answer(let answer, let executionContext):
-            MarinaTraceRecorder.shared.recordSelectedRoute(.nlq, reason: "nlq answer")
-            MarinaTraceRecorder.shared.recordNormalized(
-                metric: executionContext.metric.rawValue,
-                operation: executionContext.metric.traceOperation,
-                presentationIntent: "answer"
-            )
-            MarinaTraceRecorder.shared.recordTarget(
-                targetText: nil,
-                targetType: executionContext.resolvedTargetType?.rawValue,
-                resolvedTargetSummary: executionContext.resolvedTargetNames.joined(separator: ", ")
-            )
-            MarinaTraceRecorder.shared.recordDateRanges(
-                primary: executionContext.dateRange,
-                comparison: executionContext.comparisonDateRange
-            )
-            clearNLQClarificationState()
-            nlqExecutionContext = executionContext
-            clarificationSuggestions = []
-            recoverySuggestions = []
-            lastClarificationReasons = []
-            activeClarificationContext = nil
-            let styled = personaFormatter.styledAnswer(
-                from: answer,
-                userPrompt: answer.userPrompt ?? originalPrompt,
-                personaID: selectedPersonaID
-            )
-            _ = await presentMarinaAnswer(
-                deterministicAnswer: answer,
-                basicFallbackAnswer: styled,
-                rawPrompt: answer.userPrompt ?? originalPrompt,
-                source: .contextual,
-                surfaceKind: answer.primaryValue == nil && answer.rows.isEmpty ? .noData : .answer,
-                groundingSummary: executionContext.metric.rawValue
-            )
-            return true
-        case .clarification(let payload):
-            MarinaTraceRecorder.shared.recordSelectedRoute(.clarification, reason: "nlq clarification")
-            MarinaTraceRecorder.shared.recordResponse(
-                type: HomeAnswerKind.message.rawValue,
-                finalAnswerSummary: "nlq clarification"
-            )
-            nlqClarificationPayload = payload
-            nlqClarificationOriginalPrompt = originalPrompt
-            clarificationSuggestions = payload.options.map { option in
-                HomeAssistantSuggestion(
-                    title: option.displayLabel,
-                    query: HomeQuery(intent: .spendThisMonth)
-                )
-            }
-            recoverySuggestions = []
-            lastClarificationReasons = [.lowConfidenceLanguage]
-            activeClarificationContext = nil
-            let answer = HomeAnswer(
-                queryID: UUID(),
-                kind: .message,
-                userPrompt: originalPrompt,
-                title: String(localized: "assistant.quickClarification", defaultValue: "Quick clarification", comment: "Assistant clarification card title."),
-                subtitle: payload.message,
-                rows: []
-            )
-            _ = await presentMarinaAnswer(
-                deterministicAnswer: answer,
-                basicFallbackAnswer: answer,
-                rawPrompt: originalPrompt,
-                source: .contextual,
-                surfaceKind: .clarification,
-                validationOutcomeSummary: "nlq_clarification",
-                clarificationChoices: payload.options.map(\.displayLabel)
-            )
-            return true
-        case .recovery(let message):
-            MarinaTraceRecorder.shared.recordSelectedRoute(.recovery, reason: "nlq recovery")
-            MarinaTraceRecorder.shared.recordResponse(
-                type: HomeAnswerKind.message.rawValue,
-                finalAnswerSummary: message
-            )
-            clearNLQClarificationState()
-            clarificationSuggestions = []
-            recoverySuggestions = []
-            let answer = HomeAnswer(
-                queryID: UUID(),
-                kind: .message,
-                userPrompt: originalPrompt,
-                title: "Try one of these",
-                subtitle: message,
-                rows: []
-            )
-            _ = await presentMarinaAnswer(
-                deterministicAnswer: answer,
-                basicFallbackAnswer: answer,
-                rawPrompt: originalPrompt,
-                source: .contextual,
-                surfaceKind: .recovery,
-                validationOutcomeSummary: "nlq_recovery",
-                groundingSummary: "nlq recovery"
-            )
-            return true
-        }
-    }
-
-    @MainActor
     private func handleSharedPipelineClarification(
         _ answer: HomeAnswer,
         clarification: MarinaTypedClarification,
@@ -6455,7 +6327,6 @@ struct HomeAssistantPanelView: View {
         recoverySuggestions = []
         lastClarificationReasons = [.lowConfidenceLanguage]
         activeClarificationContext = nil
-        clearNLQClarificationState()
 
         recordTelemetry(
             for: rawPrompt,
@@ -6747,30 +6618,6 @@ struct HomeAssistantPanelView: View {
         _ = finishMarinaTrace()
     }
 
-    @MainActor
-    private func handleNLQClarificationInput(
-        _ typedInput: String,
-        payload: MarinaNLQClarificationPayload
-    ) {
-        // Legacy reachable: this resumes the NLQ v1 clarification state directly,
-        // so do not remove it until the shared clarification path covers the same
-        // prompt, context, and trace behavior.
-        let provider = MarinaDataProvider(modelContext: modelContext, workspaceID: workspace.id)
-        let pipeline = MarinaNLQPipeline(provider: provider, defaultPeriodUnit: defaultQueryPeriodUnit)
-        let seedPrompt = nlqClarificationOriginalPrompt ?? typedInput
-        let result = pipeline.resolveClarificationResponse(
-            typedInput: typedInput,
-            payload: payload,
-            prompt: seedPrompt,
-            activeBudgetPeriod: activeBudgetDateRange(),
-            priorContext: nlqExecutionContext,
-            now: marinaRuntimeSettings.now
-        )
-        Task { @MainActor in
-            _ = await handleNLQPipelineResult(result, originalPrompt: typedInput)
-        }
-    }
-
     private func activeBudgetDateRange() -> HomeQueryDateRange? {
         let now = marinaRuntimeSettings.now
         if let activeBudget = budgets.first(where: { budget in
@@ -6779,109 +6626,6 @@ struct HomeAssistantPanelView: View {
             return HomeQueryDateRange(startDate: activeBudget.startDate, endDate: activeBudget.endDate)
         }
         return nil
-    }
-
-    private func heuristicInterpretedRequest(for prompt: String) -> MarinaInterpretedRequest {
-        // Legacy reachable: this closure feeds the model-router fallback path. The
-        // parser and intent builder stay in place until their outputs are mapped to
-        // shared semantic queries with equivalent tests.
-        if let command = commandParser.parse(prompt, defaultPeriodUnit: defaultQueryPeriodUnit) {
-            let interpreted: MarinaInterpretedRequest = .command(command, source: .parser)
-            MarinaTraceRecorder.shared.recordFallbackAttempt(outputSummary: interpreted.traceSummary)
-            return interpreted
-        }
-
-        if let resolved = resolvedPlan(for: prompt) {
-            let interpreted: MarinaInterpretedRequest = .query(resolved.plan, source: resolved.source)
-            MarinaTraceRecorder.shared.recordFallbackAttempt(outputSummary: interpreted.traceSummary)
-            return interpreted
-        }
-
-        MarinaTraceRecorder.shared.recordFallbackAttempt(outputSummary: MarinaInterpretedRequest.unresolved.traceSummary)
-        return .unresolved
-    }
-
-    @MainActor
-    private func handleInterpretedRequest(
-        _ interpreted: MarinaInterpretedRequest,
-        rawPrompt: String
-    ) {
-        if marinaRuntimeSettings.nlqV1.isEnabled {
-            if case .query(_, .model) = interpreted {
-                MarinaDebugLogger.log("[MarinaNLQ] blocked model query in NLQ-authoritative mode")
-                return
-            }
-            if case .clarification(_, .some(.model)) = interpreted {
-                MarinaDebugLogger.log("[MarinaNLQ] blocked model clarification in NLQ-authoritative mode")
-                return
-            }
-        }
-
-        switch interpreted {
-        case .query(let plan, let source):
-            MarinaTraceRecorder.shared.recordSelectedRoute(source == .model ? .model : .fallback, reason: "query source=\(source.rawValue)")
-            MarinaTraceRecorder.shared.recordNormalized(
-                metric: plan.metric.rawValue,
-                operation: plan.metric.traceOperation,
-                presentationIntent: plan.metric.intent.rawValue
-            )
-            MarinaTraceRecorder.shared.recordTarget(
-                targetText: plan.targetName,
-                targetType: plan.targetTypeRaw,
-                resolvedTargetSummary: plan.targetName
-            )
-            MarinaTraceRecorder.shared.recordDateRanges(
-                primary: plan.dateRange,
-                comparison: plan.comparisonDateRange
-            )
-            MarinaTraceRecorder.shared.recordAggregation(path: "home_query_engine", summary: plan.traceSummary)
-            let effectivePlan = source == .model
-                ? normalizedModelQueryPlan(plan, rawPrompt: rawPrompt)
-                : plan
-            handleResolvedPlan(
-                effectivePlan,
-                rawPrompt: rawPrompt,
-                allowsBroadBundle: allowsBroadBundle(for: source),
-                source: source
-            )
-        case .command(let command, let source):
-            MarinaTraceRecorder.shared.recordSelectedRoute(source == .model ? .model : .fallback, reason: "command source=\(source.rawValue)")
-            MarinaTraceRecorder.shared.recordResponse(type: "command", finalAnswerSummary: command.intent.rawValue)
-            let effectiveCommand = source == .model
-                ? normalizedModelCommandPlan(command, rawPrompt: rawPrompt)
-                : command
-            handleCommandPlan(effectiveCommand, rawPrompt: rawPrompt, source: source)
-        case .clarification(let clarification, let source):
-            MarinaTraceRecorder.shared.recordSelectedRoute(.clarification, reason: "interpreted clarification source=\(source?.rawValue ?? "nil")")
-            handleMarinaClarification(
-                clarification,
-                rawPrompt: rawPrompt,
-                source: source
-            )
-        case .unresolved:
-            MarinaTraceRecorder.shared.recordSelectedRoute(.unresolved, reason: "interpreted unresolved")
-            MarinaTraceRecorder.shared.recordResponse(type: HomeAnswerKind.message.rawValue, finalAnswerSummary: "unresolved")
-            clarificationSuggestions = []
-            recoverySuggestions = []
-            lastClarificationReasons = []
-            activeClarificationContext = nil
-            recordTelemetry(
-                for: rawPrompt,
-                outcome: .unresolved,
-                source: nil,
-                plan: nil,
-                notes: "no_plan_resolved"
-            )
-            presentMarinaAnswer(
-                deterministicAnswer: plainUnresolvedAnswer(for: rawPrompt),
-                basicFallbackAnswer: personaFormatter.unresolvedPromptAnswer(for: rawPrompt, personaID: selectedPersonaID),
-                rawPrompt: rawPrompt,
-                source: .contextual,
-                surfaceKind: .recovery,
-                validationOutcomeSummary: "unresolved",
-                groundingSummary: "no executable plan resolved"
-            )
-        }
     }
 
     private func makeMarinaRouterContext(
@@ -6916,318 +6660,6 @@ struct HomeAssistantPanelView: View {
                 )
             },
             now: marinaRuntimeSettings.now
-        )
-    }
-
-    private func allowsBroadBundle(for source: HomeAssistantPlanResolutionSource) -> Bool {
-        source == .parser || source == .model
-    }
-
-    private func normalizedModelQueryPlan(
-        _ plan: HomeQueryPlan,
-        rawPrompt: String
-    ) -> HomeQueryPlan {
-        plan.updating(
-            targetName: .some(plan.targetName?.trimmingCharacters(in: .whitespacesAndNewlines)),
-            targetTypeRaw: .some(plan.targetTypeRaw?.trimmingCharacters(in: .whitespacesAndNewlines))
-        )
-    }
-
-    @MainActor
-    private func canonicalizedModelTargetPlan(
-        _ plan: HomeQueryPlan,
-        rawPrompt: String
-    ) -> HomeQueryPlan {
-        guard let targetName = plan.targetName?.trimmingCharacters(in: .whitespacesAndNewlines),
-              targetName.isEmpty == false else {
-            return plan
-        }
-
-        switch plan.metric {
-        case .cardSpendTotal, .cardVariableSpendingHabits, .cardMonthComparison, .cardSnapshotSummary, .nextPlannedExpense, .spendTrendsSummary, .topCardChanges:
-            let canonical = aliasTarget(in: targetName, entityType: .card)
-                ?? entityMatcher.bestCardMatch(in: targetName, cards: cards)
-                ?? aliasTarget(in: rawPrompt, entityType: .card)
-                ?? entityMatcher.bestCardMatch(in: rawPrompt, cards: cards)
-            return HomeQueryPlan(
-                metric: plan.metric,
-                dateRange: plan.dateRange,
-                comparisonDateRange: plan.comparisonDateRange,
-                resultLimit: plan.resultLimit,
-                confidenceBand: canonical == nil ? plan.confidenceBand : .high,
-                targetName: canonical ?? plan.targetName,
-                periodUnit: plan.periodUnit
-            )
-        case .incomeAverageActual, .incomeSourceShare, .incomeSourceShareTrend, .incomeSourceMonthComparison:
-            let canonical = aliasTarget(in: targetName, entityType: .incomeSource)
-                ?? entityMatcher.bestIncomeSourceMatch(in: targetName, incomes: incomes)
-                ?? aliasTarget(in: rawPrompt, entityType: .incomeSource)
-                ?? entityMatcher.bestIncomeSourceMatch(in: rawPrompt, incomes: incomes)
-            return HomeQueryPlan(
-                metric: plan.metric,
-                dateRange: plan.dateRange,
-                comparisonDateRange: plan.comparisonDateRange,
-                resultLimit: plan.resultLimit,
-                confidenceBand: canonical == nil ? plan.confidenceBand : .high,
-                targetName: canonical ?? plan.targetName,
-                periodUnit: plan.periodUnit
-            )
-        case .categorySpendTotal, .categorySpendShare, .categorySpendShareTrend, .categoryPotentialSavings, .categoryReallocationGuidance, .categoryMonthComparison, .presetCategorySpend:
-            let canonical = aliasTarget(in: targetName, entityType: .category)
-                ?? entityMatcher.bestCategoryMatch(in: targetName, categories: categories)
-                ?? aliasTarget(in: rawPrompt, entityType: .category)
-                ?? entityMatcher.bestCategoryMatch(in: rawPrompt, categories: categories)
-            return HomeQueryPlan(
-                metric: plan.metric,
-                dateRange: plan.dateRange,
-                comparisonDateRange: plan.comparisonDateRange,
-                resultLimit: plan.resultLimit,
-                confidenceBand: canonical == nil ? plan.confidenceBand : .high,
-                targetName: canonical ?? plan.targetName,
-                periodUnit: plan.periodUnit
-            )
-        case .merchantSpendTotal, .merchantSpendSummary, .merchantMonthComparison:
-            let merchant = MerchantNormalizer.displayName(targetName)
-            return HomeQueryPlan(
-                metric: plan.metric,
-                dateRange: plan.dateRange,
-                comparisonDateRange: plan.comparisonDateRange,
-                resultLimit: plan.resultLimit,
-                confidenceBand: plan.confidenceBand,
-                targetName: merchant,
-                periodUnit: plan.periodUnit
-            )
-        case .overview, .spendTotal, .topCategories, .monthComparison, .largestTransactions, .mostFrequentTransactions, .spendAveragePerPeriod, .savingsStatus, .savingsAverageRecentPeriods, .presetDueSoon, .presetHighestCost, .presetTopCategory, .safeSpendToday, .forecastSavings, .topMerchants, .topCategoryChanges:
-            return plan
-        }
-    }
-
-    private func normalizedModelCommandPlan(
-        _ command: HomeAssistantCommandPlan,
-        rawPrompt: String
-    ) -> HomeAssistantCommandPlan {
-        command.updating(
-            cardName: normalizedModelCommandCardName(command.cardName, rawPrompt: rawPrompt),
-            categoryName: normalizedModelCommandCategoryName(command.categoryName, rawPrompt: rawPrompt),
-            entityName: normalizedModelCommandEntityName(command.entityName, intent: command.intent, rawPrompt: rawPrompt),
-            updatedEntityName: command.updatedEntityName?.trimmingCharacters(in: .whitespacesAndNewlines),
-            isPlannedIncome: command.isPlannedIncome
-        )
-    }
-
-    private func normalizedModelCommandCardName(_ rawValue: String?, rawPrompt: String) -> String? {
-        if let rawValue,
-           let canonical = aliasTarget(in: rawValue, entityType: .card)
-            ?? entityMatcher.bestCardMatch(in: rawValue, cards: cards) {
-            return canonical
-        }
-
-        return aliasTarget(in: rawPrompt, entityType: .card)
-            ?? entityMatcher.bestCardMatch(in: rawPrompt, cards: cards)
-            ?? rawValue
-    }
-
-    private func normalizedModelCommandCategoryName(_ rawValue: String?, rawPrompt: String) -> String? {
-        if let rawValue,
-           let canonical = aliasTarget(in: rawValue, entityType: .category)
-            ?? entityMatcher.bestCategoryMatch(in: rawValue, categories: categories) {
-            return canonical
-        }
-
-        return aliasTarget(in: rawPrompt, entityType: .category)
-            ?? entityMatcher.bestCategoryMatch(in: rawPrompt, categories: categories)
-            ?? rawValue
-    }
-
-    private func normalizedModelCommandEntityName(
-        _ rawValue: String?,
-        intent: HomeAssistantCommandIntent,
-        rawPrompt: String
-    ) -> String? {
-        let trimmed = rawValue?.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let trimmed, trimmed.isEmpty == false else {
-            return entityNameFromPrompt(for: intent, rawPrompt: rawPrompt)
-        }
-
-        return entityNameFromString(trimmed, for: intent) ?? entityNameFromPrompt(for: intent, rawPrompt: rawPrompt) ?? trimmed
-    }
-
-    private func entityNameFromPrompt(
-        for intent: HomeAssistantCommandIntent,
-        rawPrompt: String
-    ) -> String? {
-        let command = commandParser.parse(rawPrompt, defaultPeriodUnit: defaultQueryPeriodUnit)
-        return entityNameFromString(command?.entityName, for: intent) ?? command?.entityName
-    }
-
-    private func entityNameFromString(
-        _ rawValue: String?,
-        for intent: HomeAssistantCommandIntent
-    ) -> String? {
-        guard let rawValue else { return nil }
-
-        switch intent {
-        case .addCard, .editCard, .deleteCard:
-            return aliasTarget(in: rawValue, entityType: .card)
-                ?? entityMatcher.bestCardMatch(in: rawValue, cards: cards)
-                ?? rawValue
-        case .addCategory, .editCategory, .deleteCategory, .moveExpenseCategory:
-            return aliasTarget(in: rawValue, entityType: .category)
-                ?? entityMatcher.bestCategoryMatch(in: rawValue, categories: categories)
-                ?? rawValue
-        case .addPreset, .editPreset, .deletePreset:
-            return aliasTarget(in: rawValue, entityType: .preset)
-                ?? entityMatcher.bestPresetMatch(in: rawValue, presets: presets)
-                ?? rawValue
-        case .addBudget, .editBudget, .deleteBudget:
-            return matchedBudgetName(in: rawValue) ?? rawValue
-        case .addExpense, .editExpense, .deleteExpense, .deleteLastExpense:
-            return rawValue
-        case .addIncome, .editIncome, .deleteIncome, .deleteLastIncome, .markIncomeReceived:
-            return entityMatcher.bestIncomeSourceMatch(in: rawValue, incomes: incomes) ?? rawValue
-        case .addPlannedExpense, .editPlannedExpense, .deletePlannedExpense, .updatePlannedExpenseAmount:
-            return rawValue
-        }
-    }
-
-    private func matchedBudgetName(in rawValue: String) -> String? {
-        let normalized = normalizedPrompt(rawValue)
-        return budgets.first {
-            normalizedPrompt($0.name) == normalized
-        }?.name ?? budgets.first {
-            normalizedPrompt($0.name).contains(normalized) || normalized.contains(normalizedPrompt($0.name))
-        }?.name
-    }
-
-    @MainActor
-    private func handleMarinaClarification(
-        _ clarification: MarinaClarificationRequest,
-        rawPrompt: String,
-        source: HomeAssistantPlanResolutionSource?
-    ) {
-        MarinaTraceRecorder.shared.recordSelectedRoute(.clarification, reason: "handleMarinaClarification")
-        if let commandPlan = clarification.commandPlan {
-            let effectiveCommand = source == .model
-                ? normalizedModelCommandPlan(commandPlan, rawPrompt: rawPrompt)
-                : commandPlan
-            MarinaTraceRecorder.shared.recordResponse(type: "command", finalAnswerSummary: commandPlan.intent.rawValue)
-            handleCommandPlan(effectiveCommand, rawPrompt: rawPrompt, source: source)
-            return
-        }
-
-        if let queryPlan = clarification.queryPlan {
-            let effectiveSource = source ?? .model
-            let effectivePlan = effectiveSource == .model
-                ? normalizedModelQueryPlan(queryPlan, rawPrompt: rawPrompt)
-                : queryPlan
-            MarinaDebugLogger.log(
-                "[MarinaFinalization] modelClarification queryPlanExists=true actionable=\(clarification.isActionable) reconciledCandidate=true"
-            )
-            let customPlan = clarification.isActionable
-                ? HomeAssistantClarificationPlan(
-                    reasons: clarification.reasons,
-                    subtitle: clarification.subtitle,
-                    suggestions: clarificationSuggestions(
-                        for: effectivePlan,
-                        reasons: clarification.reasons,
-                        normalizedPrompt: normalizedPrompt(rawPrompt)
-                    ),
-                    shouldRunBestEffort: clarification.shouldRunBestEffort
-                )
-                : nil
-            handleResolvedPlan(
-                effectivePlan,
-                rawPrompt: rawPrompt,
-                allowsBroadBundle: allowsBroadBundle(for: effectiveSource),
-                source: effectiveSource,
-                overrideClarificationPlan: customPlan
-            )
-            return
-        }
-
-        let fallback = heuristicInterpretedRequest(for: rawPrompt)
-        MarinaTraceRecorder.shared.recordFallbackSelection(
-            reason: .manualClarificationFallback,
-            replacedModelOutput: true
-        )
-        MarinaDebugLogger.log(
-            "[MarinaFinalization] modelClarification queryPlanExists=false actionable=\(clarification.isActionable) fallbackQueryExists=\(fallback.executableQueryPlan != nil)"
-        )
-        if case let .query(fallbackPlan, fallbackSource) = fallback {
-            MarinaDebugLogger.log(
-                "[MarinaFinalization] proceeding_after_clarification_skip prompt='\(rawPrompt)' source=\(fallbackSource.rawValue)"
-            )
-            handleResolvedPlan(
-                fallbackPlan,
-                rawPrompt: rawPrompt,
-                allowsBroadBundle: allowsBroadBundle(for: fallbackSource),
-                source: fallbackSource
-            )
-            return
-        }
-
-        if clarification.isActionable,
-           let basePlan = resolvedPlan(for: rawPrompt)?.plan ?? sessionContext.lastQueryPlan {
-            let customPlan = actionableClarificationPlan(
-                HomeAssistantClarificationPlan(
-                    reasons: clarification.reasons,
-                    subtitle: clarification.subtitle,
-                    suggestions: clarificationSuggestions(
-                        for: basePlan,
-                        reasons: clarification.reasons,
-                        normalizedPrompt: normalizedPrompt(rawPrompt)
-                    ),
-                    shouldRunBestEffort: clarification.shouldRunBestEffort
-                ),
-                basePlan: basePlan,
-                rawPrompt: rawPrompt
-            )
-
-            if let customPlan {
-                recordTelemetry(
-                    for: rawPrompt,
-                    outcome: .clarification,
-                    source: source,
-                    plan: basePlan,
-                    notes: "model_clarification"
-                )
-                presentClarificationTurn(
-                    customPlan,
-                    userPrompt: rawPrompt
-                )
-                logFinalTurnOutcome(
-                    .clarification,
-                    rawPrompt: rawPrompt,
-                    notes: "actionable_model_clarification"
-                )
-                return
-            }
-        }
-
-        clarificationSuggestions = []
-        recoverySuggestions = []
-        lastClarificationReasons = []
-        activeClarificationContext = nil
-        recordTelemetry(
-            for: rawPrompt,
-            outcome: .unresolved,
-            source: source,
-            plan: nil,
-            notes: "clarification_discarded_unresolved"
-        )
-        logFinalTurnOutcome(
-            .unresolved,
-            rawPrompt: rawPrompt,
-            notes: "no_executable_plan clarificationActionable=\(clarification.isActionable)"
-        )
-        presentMarinaAnswer(
-            deterministicAnswer: plainUnresolvedAnswer(for: rawPrompt),
-            basicFallbackAnswer: personaFormatter.unresolvedPromptAnswer(for: rawPrompt, personaID: selectedPersonaID),
-            rawPrompt: rawPrompt,
-            source: source ?? .contextual,
-            surfaceKind: .recovery,
-            validationOutcomeSummary: "clarification_discarded_unresolved",
-            groundingSummary: "clarification could not become an executable plan"
         )
     }
 

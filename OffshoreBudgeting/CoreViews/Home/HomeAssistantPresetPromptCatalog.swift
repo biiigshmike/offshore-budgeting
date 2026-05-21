@@ -302,7 +302,7 @@ struct HomeAssistantPresetPromptQueryAdapter {
         ].compactMap { $0 }
 
         return MarinaQueryPlanCandidate(
-            source: .heuristic,
+            source: .foundationModels,
             rawPrompt: sourceTitle,
             operation: spec.operation,
             measure: spec.measure,

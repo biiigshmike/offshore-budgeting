@@ -39,7 +39,7 @@ struct MarinaRuntimeSettingsTests {
         #expect(settings.traceSummary.contains("aiOptInDefaultsPresent=true"))
     }
 
-    @Test func explicitSharedPipelineDefault_canStillForceLegacyRouteForDebugging() throws {
+    @Test func explicitSharedPipelineDefault_noLongerForcesLegacyRouteForDebugging() throws {
         let defaults = try makeDefaults(suiteName: "MarinaRuntimeSettingsTests.sharedPipelineDefaultDisabled")
         defer { defaults.removePersistentDomain(forName: "MarinaRuntimeSettingsTests.sharedPipelineDefaultDisabled") }
         defaults.set(false, forKey: MarinaRuntimeSettings.sharedPipelineKey)
@@ -51,7 +51,7 @@ struct MarinaRuntimeSettingsTests {
             environment: [:]
         )
 
-        #expect(settings.routingMode == .modelRouter)
+        #expect(settings.routingMode == .sharedPipeline)
         #expect(settings.sharedPipeline.isEnabled == false)
         #expect(settings.sharedPipeline.source == .userDefaults)
         #expect(settings.aiOptIn.isEnabled)
@@ -110,7 +110,7 @@ struct MarinaRuntimeSettingsTests {
         #expect(settings.traceSummary.contains("sharedPipelineSource=environment"))
     }
 
-    @Test func runtimeSettings_defaultsToModelRouterWhenSharedPipelineDisabled() throws {
+    @Test func runtimeSettings_staysFoundationOnlyWhenSharedPipelineDisabled() throws {
         let defaults = try makeDefaults(suiteName: "MarinaRuntimeSettingsTests.modelRouter")
         defer { defaults.removePersistentDomain(forName: "MarinaRuntimeSettingsTests.modelRouter") }
 
@@ -123,7 +123,7 @@ struct MarinaRuntimeSettingsTests {
             environment: [:]
         )
 
-        #expect(settings.routingMode == .modelRouter)
+        #expect(settings.routingMode == .sharedPipeline)
         #expect(settings.sharedPipeline.isEnabled == false)
     }
 

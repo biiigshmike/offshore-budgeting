@@ -461,8 +461,13 @@ struct MarinaUITestDriver {
             }
             return MarinaSurfaceResult(passed: false, category: .wrongRuntimeRoute, reason: "Expected shared_pipeline, saw \(trace.routingMode).")
         }
-        if trace.selectedRoute == "shared_fallback" || trace.sharedPipelinePath == "legacy" {
-            return MarinaSurfaceResult(passed: false, category: .legacyRouteInterception, reason: "Prompt fell through to legacy path.")
+        let blockedRoutes: Set<String> = ["fallback", "nlq", "shared_heuristic", "shared_fallback"]
+        let blockedPaths: Set<String> = ["legacy", "sharedHeuristic", "sharedAttemptedThenLegacyFallback"]
+        if blockedRoutes.contains(trace.selectedRoute)
+            || trace.sharedPipelinePath.map(blockedPaths.contains) == true
+            || trace.sharedPipelineHeuristicAttempted == true
+            || trace.sharedPipelineHeuristicUsedAsFallback == true {
+            return MarinaSurfaceResult(passed: false, category: .legacyRouteInterception, reason: "Prompt selected a legacy or heuristic route.")
         }
         if trace.turnClassification == "freshQuestion", trace.priorContextIncluded == true {
             return MarinaSurfaceResult(passed: false, category: .stalePriorContext, reason: "Fresh question included prior context.")

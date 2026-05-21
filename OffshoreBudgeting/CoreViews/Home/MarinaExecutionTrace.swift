@@ -55,6 +55,8 @@ struct MarinaExecutionTrace: Equatable {
     let sharedPipelineEnabled: Bool?
     let sharedPipelinePath: MarinaSharedPipelineRuntimePath?
     let sharedPipelineInterpreterSource: MarinaInterpreterSource?
+    let sharedPipelineHeuristicAttempted: Bool?
+    let sharedPipelineHeuristicUsedAsFallback: Bool?
     let sharedPipelineCandidateSummary: String?
     let sharedPipelineResolverSummary: String?
     let sharedPipelineValidatorSummary: String?
@@ -346,6 +348,8 @@ final class MarinaTraceRecorder {
             draft.sharedPipelineEnabled = trace.sharedPipelineEnabled
             draft.sharedPipelinePath = trace.selectedPath
             draft.sharedPipelineInterpreterSource = trace.interpreterSource
+            draft.sharedPipelineHeuristicAttempted = trace.heuristicAttempted
+            draft.sharedPipelineHeuristicUsedAsFallback = trace.heuristicUsedAsFallback
             draft.sharedPipelineCandidateSummary = trace.candidateSummary
             draft.sharedPipelineResolverSummary = trace.resolverSummary
             draft.sharedPipelineValidatorSummary = trace.validatorOutcomeSummary
@@ -446,6 +450,8 @@ private struct MarinaExecutionTraceDraft {
     var sharedPipelineEnabled: Bool?
     var sharedPipelinePath: MarinaSharedPipelineRuntimePath?
     var sharedPipelineInterpreterSource: MarinaInterpreterSource?
+    var sharedPipelineHeuristicAttempted: Bool?
+    var sharedPipelineHeuristicUsedAsFallback: Bool?
     var sharedPipelineCandidateSummary: String?
     var sharedPipelineResolverSummary: String?
     var sharedPipelineValidatorSummary: String?
@@ -508,6 +514,8 @@ private struct MarinaExecutionTraceDraft {
             sharedPipelineEnabled: sharedPipelineEnabled,
             sharedPipelinePath: sharedPipelinePath,
             sharedPipelineInterpreterSource: sharedPipelineInterpreterSource,
+            sharedPipelineHeuristicAttempted: sharedPipelineHeuristicAttempted,
+            sharedPipelineHeuristicUsedAsFallback: sharedPipelineHeuristicUsedAsFallback,
             sharedPipelineCandidateSummary: sharedPipelineCandidateSummary,
             sharedPipelineResolverSummary: sharedPipelineResolverSummary,
             sharedPipelineValidatorSummary: sharedPipelineValidatorSummary,
@@ -559,6 +567,8 @@ struct MarinaExecutionTraceSnapshot: Codable, Equatable {
     let sharedPipelineEnabled: Bool?
     let sharedPipelinePath: String?
     let sharedPipelineInterpreterSource: String?
+    let sharedPipelineHeuristicAttempted: Bool?
+    let sharedPipelineHeuristicUsedAsFallback: Bool?
     let sharedPipelineCandidateSummary: String?
     let sharedPipelineResolverSummary: String?
     let sharedPipelineValidatorSummary: String?
@@ -608,6 +618,8 @@ struct MarinaExecutionTraceSnapshot: Codable, Equatable {
         self.sharedPipelineEnabled = trace.sharedPipelineEnabled
         self.sharedPipelinePath = trace.sharedPipelinePath?.rawValue
         self.sharedPipelineInterpreterSource = trace.sharedPipelineInterpreterSource?.rawValue
+        self.sharedPipelineHeuristicAttempted = trace.sharedPipelineHeuristicAttempted
+        self.sharedPipelineHeuristicUsedAsFallback = trace.sharedPipelineHeuristicUsedAsFallback
         self.sharedPipelineCandidateSummary = trace.sharedPipelineCandidateSummary
         self.sharedPipelineResolverSummary = trace.sharedPipelineResolverSummary
         self.sharedPipelineValidatorSummary = trace.sharedPipelineValidatorSummary
@@ -645,6 +657,8 @@ struct MarinaExecutionTraceSnapshot: Codable, Equatable {
             blockedWrongQuery.map { "blockedWrongQuery=\($0)" },
             sharedPipelinePath.map { "sharedPath=\($0)" },
             sharedPipelineInterpreterSource.map { "interpreter=\($0)" },
+            sharedPipelineHeuristicAttempted.map { "heuristicAttempted=\($0)" },
+            sharedPipelineHeuristicUsedAsFallback.map { "heuristicUsedAsFallback=\($0)" },
             turnClassification.map { "turnClassification=\($0)" },
             priorContextIncluded.map { "priorContextIncluded=\($0)" },
             sharedPipelineCandidateSummary.map { "candidate=\($0)" },

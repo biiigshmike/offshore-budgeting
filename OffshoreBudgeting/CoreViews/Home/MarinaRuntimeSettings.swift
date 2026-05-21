@@ -27,13 +27,7 @@ struct MarinaRuntimeSettings: Equatable {
     }
 
     var routingMode: MarinaExecutionRoutingMode {
-        if sharedPipeline.isEnabled {
-            return .sharedPipeline
-        }
-        if nlqV1.isEnabled {
-            return .nlqAuthoritative
-        }
-        return .modelRouter
+        .sharedPipeline
     }
 
     var traceSummary: String {
