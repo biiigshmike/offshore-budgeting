@@ -7,6 +7,9 @@
 
 import SwiftUI
 import SwiftData
+#if os(iOS)
+import UIKit
+#endif
 
 // MARK: - Assistant State
 
@@ -232,11 +235,7 @@ struct MarinaPanelView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 14) {
                         if answers.isEmpty {
-                            ContentUnavailableView(
-                                "Marina",
-                                systemImage: "figure.wave",
-                                description: Text(marinaEmptyStateDescription)
-                            )
+                            marinaEmptyState
                         } else {
                             answersSection
                         }
@@ -285,20 +284,15 @@ struct MarinaPanelView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button(action: onDismiss) {
-                        Label(
-                            String(localized: "assistant.close", defaultValue: "Close Assistant", comment: "Accessibility label for closing assistant."),
-                            systemImage: "xmark"
-                        )
-                        .labelStyle(.iconOnly)
-                        .font(.body.weight(.semibold))
-                        .frame(width: 33, height: 33)
+                        Image(systemName: "xmark")
+                            .font(.body.weight(.semibold))
+                            .frame(width: 33, height: 33)
                     }
                     .modifier(AssistantPanelIconButtonModifier())
                     .accessibilityLabel(String(localized: "assistant.close", defaultValue: "Close Assistant", comment: "Accessibility label for closing assistant."))
                 }
                 
-                ToolbarItemGroup(placement: .topBarTrailing) {
-                    foundationModelToggleButton
+                ToolbarItem(placement: .topBarTrailing) {
                     clearConversationButton
                 }
             }
@@ -438,24 +432,6 @@ struct MarinaPanelView: View {
         )
     }
 
-    private var foundationModelToggleButton: some View {
-        Button {
-            toggleFoundationModelInterpreter()
-        } label: {
-            Label(
-                String(localized: "assistant.foundationModel.toggle", defaultValue: "Foundation Model", comment: "Accessibility label for toggling Foundation Models in Marina."),
-                systemImage: "apple.intelligence"
-            )
-            .labelStyle(.iconOnly)
-            .font(.body.weight(.semibold))
-            .frame(width: 33, height: 33)
-        }
-        .modifier(AssistantToggleIconButtonModifier(isActive: marinaAIOptInEnabled))
-        .accessibilityLabel(String(localized: "assistant.foundationModel.toggle", defaultValue: "Foundation Model", comment: "Accessibility label for toggling Foundation Models in Marina."))
-        .accessibilityValue(foundationModelToggleAccessibilityValue)
-        .accessibilityIdentifier("marina.foundationModelToggle")
-    }
-
     private var clearConversationButton: some View {
         Button {
             isShowingClearConversationAlert = true
@@ -463,27 +439,9 @@ struct MarinaPanelView: View {
             Text(String(localized: "common.clear", defaultValue: "Clear", comment: "Action to clear a selection."))
                 .frame(height: 33)
         }
-        .modifier(AssistantActionButtonModifier(prominent: false))
+        .modifier(AssistantPanelActionButtonModifier())
         .disabled(answers.isEmpty)
         .accessibilityLabel(String(localized: "assistant.clearChat", defaultValue: "Clear Chat", comment: "Accessibility label for clearing assistant chat."))
-    }
-
-    private var foundationModelToggleAccessibilityValue: String {
-        guard marinaAIOptInEnabled else {
-            return String(localized: "common.off", defaultValue: "Off", comment: "Accessibility value for a disabled toggle.")
-        }
-
-        switch MarinaModelAvailability().currentStatus() {
-        case .available:
-            return String(localized: "common.on", defaultValue: "On", comment: "Accessibility value for an enabled toggle.")
-        case .unavailable:
-            return String(localized: "assistant.foundationModel.onUnavailable", defaultValue: "On, unavailable", comment: "Accessibility value when Foundation Models are enabled but unavailable.")
-        }
-    }
-
-    private func toggleFoundationModelInterpreter() {
-        marinaAIOptInEnabled.toggle()
-        prewarmFoundationModelsIfNeeded()
     }
 
     private func prewarmFoundationModelsIfNeeded() {
@@ -1056,6 +1014,79 @@ struct MarinaPanelView: View {
             for: group,
             defaultPeriodUnit: defaultQueryPeriodUnit
         )
+    }
+
+    private var marinaEmptyState: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "figure.wave")
+                .font(.system(size: 44, weight: .regular))
+                .foregroundStyle(.secondary)
+
+            Text("Marina")
+                .font(.title2.weight(.semibold))
+
+            Text(marinaEmptyStateDescription)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: 340)
+
+            marinaAppleIntelligenceRequirementBadge
+        }
+        .frame(maxWidth: .infinity, minHeight: 260, alignment: .center)
+        .padding(.vertical, 32)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("marina.emptyState")
+    }
+
+    private var marinaAppleIntelligenceRequirementBadge: some View {
+        Label {
+            Text(
+                String(
+                    localized: "assistant.marina.appleIntelligenceRequirement",
+                    defaultValue: "Requires Apple Intelligence with \(marinaRequiredPlatformDisplayName) or higher",
+                    comment: "Requirement badge shown on Marina's empty assistant state."
+                )
+            )
+        } icon: {
+            Image(systemName: "apple.intelligence")
+        }
+        .font(.caption.weight(.semibold))
+        .foregroundStyle(Color("AccentColor"))
+        .lineLimit(2)
+        .minimumScaleFactor(0.82)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .background(.ultraThinMaterial, in: Capsule())
+        .overlay {
+            Capsule()
+                .stroke(Color("AccentColor").opacity(0.24), lineWidth: 1)
+        }
+        .accessibilityIdentifier("marina.appleIntelligenceRequirementBadge")
+    }
+
+    private var marinaRequiredPlatformDisplayName: String {
+#if os(macOS)
+        return "macOS 26"
+#elseif targetEnvironment(macCatalyst)
+        return "macOS 26"
+#elseif os(iOS)
+        if ProcessInfo.processInfo.isiOSAppOnMac {
+            return "macOS 26"
+        }
+
+        switch UIDevice.current.userInterfaceIdiom {
+        case .pad:
+            return "iPadOS 26"
+        case .mac:
+            return "macOS 26"
+        default:
+            return "iOS 26"
+        }
+#else
+        return "iOS 26"
+#endif
     }
     
     private var marinaEmptyStateDescription: String {
@@ -7133,6 +7164,27 @@ final class MarinaMutationService {
 
 // MARK: - Assistant Button Modifiers
 
+private enum AssistantPanelToolbarStyle {
+    static var usesNativeLiquidGlass: Bool {
+#if targetEnvironment(macCatalyst)
+        return false
+#elseif os(iOS)
+        guard ProcessInfo.processInfo.isiOSAppOnMac == false else {
+            return false
+        }
+
+        switch UIDevice.current.userInterfaceIdiom {
+        case .phone, .pad:
+            return true
+        default:
+            return false
+        }
+#else
+        return false
+#endif
+    }
+}
+
 private struct AssistantChipButtonModifier: ViewModifier {
     func body(content: Content) -> some View {
         if #available(iOS 26.0, *) {
@@ -7174,6 +7226,23 @@ private struct AssistantActionButtonModifier: ViewModifier {
     }
 }
 
+private struct AssistantPanelActionButtonModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *), AssistantPanelToolbarStyle.usesNativeLiquidGlass {
+            content
+                .buttonStyle(.automatic)
+                .buttonBorderShape(.capsule)
+        } else if #available(iOS 26.0, *) {
+            content
+                .buttonStyle(.glass)
+                .buttonBorderShape(.capsule)
+        } else {
+            content
+                .buttonStyle(.bordered)
+        }
+    }
+}
+
 private struct AssistantIconButtonModifier: ViewModifier {
     func body(content: Content) -> some View {
         if #available(iOS 26.0, *) {
@@ -7189,7 +7258,11 @@ private struct AssistantIconButtonModifier: ViewModifier {
 
 private struct AssistantPanelIconButtonModifier: ViewModifier {
     func body(content: Content) -> some View {
-        if #available(iOS 26.0, *) {
+        if #available(iOS 26.0, *), AssistantPanelToolbarStyle.usesNativeLiquidGlass {
+            content
+                .buttonStyle(.automatic)
+                .buttonBorderShape(.circle)
+        } else if #available(iOS 26.0, *) {
             content
                 .buttonStyle(.glass)
                 .buttonBorderShape(.circle)
@@ -7197,34 +7270,6 @@ private struct AssistantPanelIconButtonModifier: ViewModifier {
             content
                 .buttonStyle(.bordered)
                 .buttonBorderShape(.circle)
-        }
-    }
-}
-
-private struct AssistantToggleIconButtonModifier: ViewModifier {
-    let isActive: Bool
-
-    func body(content: Content) -> some View {
-        if #available(iOS 26.0, *) {
-            if isActive {
-                content
-                    .buttonStyle(.glassProminent)
-                    .buttonBorderShape(.circle)
-            } else {
-                content
-                    .buttonStyle(.glass)
-                    .buttonBorderShape(.circle)
-            }
-        } else {
-            if isActive {
-                content
-                    .buttonStyle(.borderedProminent)
-                    .buttonBorderShape(.circle)
-            } else {
-                content
-                    .buttonStyle(.bordered)
-                    .buttonBorderShape(.circle)
-            }
         }
     }
 }

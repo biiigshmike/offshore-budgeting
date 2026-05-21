@@ -5434,26 +5434,14 @@
         }
       }
     },
-    "assistant.foundationModel.onUnavailable" : {
-      "comment" : "Accessibility value when Foundation Models are enabled but unavailable.",
+    "assistant.marina.appleIntelligenceRequirement" : {
+      "comment" : "Requirement badge shown on Marina's empty assistant state.",
       "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "On, unavailable"
-          }
-        }
-      }
-    },
-    "assistant.foundationModel.toggle" : {
-      "comment" : "Accessibility label for toggling Foundation Models in Marina.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Foundation Model"
+            "value" : "Requires Apple Intelligence with %@ or higher"
           }
         }
       }
@@ -13327,18 +13315,6 @@
         }
       }
     },
-    "common.off" : {
-      "comment" : "Accessibility value for a disabled toggle.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Off"
-          }
-        }
-      }
-    },
     "common.ok" : {
       "comment" : "OK action label.",
       "extractionState" : "extracted_with_value",
@@ -13383,18 +13359,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "好的"
-          }
-        }
-      }
-    },
-    "common.on" : {
-      "comment" : "Accessibility value for an enabled toggle.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "On"
           }
         }
       }
