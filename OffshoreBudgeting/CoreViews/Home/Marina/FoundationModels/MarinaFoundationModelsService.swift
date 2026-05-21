@@ -56,7 +56,8 @@ private func interpretWithFoundationModels(
     do {
         let provider = MarinaFoundationModelsSessionProvider()
         let routeSession = try provider.makeSession(
-            instructions: marinaInstructions(context: context)
+            instructions: marinaInstructions(context: context),
+            tools: provider.tools(for: .readQuery, context: context)
         )
         let response = try await routeSession.respond(
             to: marinaEnvelopePrompt(prompt: prompt, context: context),
@@ -126,7 +127,7 @@ private func marinaInstructions(context: MarinaInterpretationContext) -> String 
     - scenario: explicit what-if/hypothetical prompts.
     - help: capability or example questions.
     - unsupported: CRUD commands, advice, or anything outside read-only budgeting.
-    - clarification: only when the user explicitly asks Marina to clarify a previous choice.
+    - clarification: when the current user request has multiple plausible safe readings, or when the user is answering a previous clarification.
 
     Envelope rules:
     - Fill one MarinaFoundationIntentEnvelope only.
@@ -134,7 +135,7 @@ private func marinaInstructions(context: MarinaInterpretationContext) -> String 
     - Use only scalar strings/numbers in the provided fields. Leave unused optional fields as actual null values.
     - Never put placeholder words like "null", "nil", "none", "n/a", "unknown", or empty JSON fragments into string fields.
     - No field named reasoning exists; do not invent one.
-    - intentRaw is a short hint, not the final route. Examples: workspace, activeBudget, linkedCards, linkedPresets, categoryLimit, spendTotal, recentTransactions, topCategories, categoryBreakdown, spendComparison, incomeActual, incomePlanned, incomeCompare, savingsStatus, savingsActivity, reconciliationBalance, allocationRows, settlementRows, whatIf, lookup, unsupported.
+    - intentRaw is a short hint, not the final route. Examples: workspace, activeBudget, budgetInventory, upcomingBudgets, plannedExpenseRows, presetTemplates, linkedCards, linkedPresets, categoryLimit, spendTotal, recentTransactions, topCategories, categoryBreakdown, spendComparison, incomeActual, incomePlanned, incomeCompare, savingsStatus, savingsActivity, reconciliationBalance, allocationRows, settlementRows, whatIf, lookup, unsupported.
     - targetText is only the concrete user-named object or filter, such as Apple Card, Groceries, Salary, May Budget, Dining, Roommate, or Apple.
     - Do not put generic concepts such as "spending", "total spending", "income", "actual income", "active budget", "savings", "budget", "transactions", or "uncategorized spending" into targetText.
     - For relationships, copy the relationship words into relationshipText, such as linked cards, linked presets, budget limit, allocation rows, settlement rows, status, or balance.

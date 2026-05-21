@@ -201,6 +201,7 @@ struct MarinaTurnCoordinator {
     private let responseBuilder: MarinaResponseBuilder
     private let recoveryPolicy = MarinaQueryRecoveryPolicy()
     private let semanticAdapter = MarinaSemanticQueryAdapter()
+    private let conversationalPlanner = MarinaConversationalQueryPlanner()
 
     init(
         availability: MarinaModelAvailabilityProviding? = nil,
@@ -383,7 +384,13 @@ struct MarinaTurnCoordinator {
         let result: MarinaInterpretationResult
         let compatibilityCandidate: MarinaQueryPlanCandidate
 
-        if let databaseLookupCandidate = resumedCandidate.replacingDatabaseLookupRequest(
+        if let resumeInterpretation = interpretation(from: choice.resumeIntent, fallbackCandidate: resumedCandidate) {
+            return evaluate(
+                resumeInterpretation,
+                context: context,
+                explicitConstraints: MarinaExplicitPromptConstraints()
+            )
+        } else if let databaseLookupCandidate = resumedCandidate.replacingDatabaseLookupRequest(
             with: choice,
             fallbackRequest: candidate.databaseLookupRequest
         ) {
@@ -489,6 +496,26 @@ struct MarinaTurnCoordinator {
             resolvedQuery: semanticResolved,
             outcome: outcome
         ) {
+            if let clarification = conversationalPlanner.clarificationForDroppedConstraints(
+                candidate: candidate,
+                context: context,
+                explicitConstraints: explicitConstraints,
+                unsupported: unsupported
+            ) {
+                let clarificationOutcome = MarinaPlanValidationOutcome.clarification(clarification)
+                MarinaFoundationTraceBridge.record(
+                    context: context,
+                    interpretation: interpretation,
+                    resolved: resolved,
+                    semanticResolved: semanticResolved,
+                    validationOutcome: clarificationOutcome,
+                    execution: nil
+                )
+                return .clarification(
+                    answer: responseBuilder.aggregationBridge.responseCompatibleAnswer(from: clarification),
+                    clarification: clarification
+                )
+            }
             let blockedOutcome = MarinaPlanValidationOutcome.unsupported(unsupported)
             MarinaFoundationTraceBridge.record(
                 context: context,
@@ -505,6 +532,27 @@ struct MarinaTurnCoordinator {
                     message: unsupported.message
                 ),
                 validationOutcome: blockedOutcome
+            )
+        }
+
+        if let clarification = conversationalPlanner.clarification(
+            candidate: candidate,
+            outcome: outcome,
+            context: context,
+            explicitConstraints: explicitConstraints
+        ) {
+            let clarificationOutcome = MarinaPlanValidationOutcome.clarification(clarification)
+            MarinaFoundationTraceBridge.record(
+                context: context,
+                interpretation: interpretation,
+                resolved: resolved,
+                semanticResolved: semanticResolved,
+                validationOutcome: clarificationOutcome,
+                execution: nil
+            )
+            return .clarification(
+                answer: responseBuilder.aggregationBridge.responseCompatibleAnswer(from: clarification),
+                clarification: clarification
             )
         }
 
@@ -626,7 +674,7 @@ struct MarinaTurnCoordinator {
     }
 
     private func isResolverBacked(_ choice: MarinaClarificationChoice) -> Bool {
-        choice.sourceID != nil
+        choice.sourceID != nil || choice.resumeIntent != nil
     }
 
     private func executionRoute(for plan: MarinaAggregationPlan) -> MarinaSemanticExecutionRoute {
@@ -657,7 +705,9 @@ struct MarinaTurnCoordinator {
         let result: MarinaInterpretationResult
         let compatibilityCandidate: MarinaQueryPlanCandidate
 
-        if let databaseLookupCandidate = resumedCandidate.replacingDatabaseLookupRequest(
+        if let resumeInterpretation = interpretation(from: choice.resumeIntent, fallbackCandidate: resumedCandidate) {
+            return resumeInterpretation
+        } else if let databaseLookupCandidate = resumedCandidate.replacingDatabaseLookupRequest(
             with: choice,
             fallbackRequest: candidate.databaseLookupRequest
         ) {
@@ -681,6 +731,25 @@ struct MarinaTurnCoordinator {
             result: result,
             compatibilityCandidate: compatibilityCandidate,
             repairSummary: "autoAppliedSingleClarification"
+        )
+    }
+
+    private func interpretation(
+        from resumeIntent: MarinaClarificationResumeIntent?,
+        fallbackCandidate: MarinaQueryPlanCandidate
+    ) -> MarinaCanonicalReadInterpretation? {
+        guard let resumeIntent else { return nil }
+        let compatibilityCandidate = resumeIntent.candidate ?? fallbackCandidate
+        let result: MarinaInterpretationResult
+        if let semanticQuery = resumeIntent.semanticQuery {
+            result = .query(semanticQuery)
+        } else {
+            result = semanticAdapter.interpretationResult(from: compatibilityCandidate)
+        }
+        return MarinaCanonicalReadInterpretation(
+            result: result,
+            compatibilityCandidate: compatibilityCandidate,
+            repairSummary: "clarificationResumeIntent"
         )
     }
 

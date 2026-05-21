@@ -226,6 +226,11 @@ enum MarinaRouteIntentKind: String, Codable, Sendable, Equatable {
     case budgetCategoryLimits
     case budgetCategoryLimit
     case overBudgetCategories
+    case plannedExpenseRows
+    case presetTemplateRows
+    case plannedExpenseByCategory
+    case plannedExpenseByCard
+    case plannedExpenseByPreset
     case savingsStatus
     case savingsActivity
     case savingsMovementRanking
@@ -842,6 +847,8 @@ extension MarinaRouteIntent {
             return .databaseLookup
         case .budgetInventory, .budgetMembership, .budgetLinkedCards, .budgetLinkedPresets, .budgetCategoryLimits, .budgetCategoryLimit, .overBudgetCategories, .allocationRows, .settlementRows:
             return .composableWorkspace
+        case .plannedExpenseRows, .presetTemplateRows, .plannedExpenseByCategory, .plannedExpenseByCard, .plannedExpenseByPreset:
+            return .workspaceAggregation
         case .savingsActivity, .savingsMovementRanking, .incomePlannedVsActual, .reconciliationBalance:
             return .workspaceAggregation
         case .savingsStatus:
@@ -948,6 +955,46 @@ struct MarinaRoutePatternRegistry {
             measures: [.remainingBudget],
             groupings: [.category],
             requestedDetails: [nil, .general]
+        ),
+        RoutePattern(
+            kind: .plannedExpenseRows,
+            preferredExecutorRoute: .workspaceAggregation,
+            operations: [.listRows, .rank],
+            measures: [.presetAmount],
+            groupings: [.transaction],
+            requestedDetails: [nil, .general, .date, .amount]
+        ),
+        RoutePattern(
+            kind: .presetTemplateRows,
+            preferredExecutorRoute: .workspaceAggregation,
+            operations: [.listRows, .rank],
+            measures: [.presetAmount],
+            groupings: [.preset],
+            requestedDetails: [nil, .general, .schedule, .recurrence, .amount]
+        ),
+        RoutePattern(
+            kind: .plannedExpenseByCategory,
+            preferredExecutorRoute: .workspaceAggregation,
+            operations: [.sum, .rank],
+            measures: [.presetAmount],
+            groupings: [.category],
+            requestedDetails: [nil, .general, .amount]
+        ),
+        RoutePattern(
+            kind: .plannedExpenseByCard,
+            preferredExecutorRoute: .workspaceAggregation,
+            operations: [.sum, .rank],
+            measures: [.presetAmount],
+            groupings: [.card],
+            requestedDetails: [nil, .general, .amount]
+        ),
+        RoutePattern(
+            kind: .plannedExpenseByPreset,
+            preferredExecutorRoute: .workspaceAggregation,
+            operations: [.sum],
+            measures: [.presetAmount],
+            groupings: [.preset],
+            requestedDetails: [nil, .general, .amount]
         ),
         RoutePattern(
             kind: .savingsMovementRanking,
@@ -1062,6 +1109,21 @@ struct MarinaRoutePatternRegistry {
            matchesCatalog(.budgetInventory, operation: operation, measure: measure, grouping: grouping, requestedDetail: requestedDetail) {
             return .budgetInventory
         }
+        if matchesCatalog(.plannedExpenseRows, operation: operation, measure: measure, grouping: grouping, requestedDetail: requestedDetail) {
+            return .plannedExpenseRows
+        }
+        if matchesCatalog(.plannedExpenseByCategory, operation: operation, measure: measure, grouping: grouping, requestedDetail: requestedDetail) {
+            return .plannedExpenseByCategory
+        }
+        if matchesCatalog(.plannedExpenseByCard, operation: operation, measure: measure, grouping: grouping, requestedDetail: requestedDetail) {
+            return .plannedExpenseByCard
+        }
+        if matchesCatalog(.plannedExpenseByPreset, operation: operation, measure: measure, grouping: grouping, requestedDetail: requestedDetail) {
+            return .plannedExpenseByPreset
+        }
+        if matchesCatalog(.presetTemplateRows, operation: operation, measure: measure, grouping: grouping, requestedDetail: requestedDetail) {
+            return .presetTemplateRows
+        }
         if operation == .lookupDetails, measure == .remainingBudget, grouping == nil {
             return .generic
         }
@@ -1121,6 +1183,23 @@ struct MarinaRoutePatternRegistry {
         }
         if subject == .income, operation == .sum, measure == .income, requestedDetail == .status {
             return .incomePlannedVsActual
+        }
+        if subject == .plannedExpenses, measure == .presetAmount {
+            switch grouping {
+            case .transaction:
+                return .plannedExpenseRows
+            case .category:
+                return .plannedExpenseByCategory
+            case .card:
+                return .plannedExpenseByCard
+            case .preset:
+                return .plannedExpenseByPreset
+            default:
+                break
+            }
+        }
+        if subject == .presets, measure == .presetAmount, grouping == .preset {
+            return .presetTemplateRows
         }
         if subject == .savingsLedgerEntries || measure == .savingsMovement {
             return operation == .rank ? .savingsMovementRanking : .savingsActivity
@@ -1193,8 +1272,22 @@ struct MarinaRoutePatternRegistry {
     }
 
     private nonisolated static func isBudgetInventoryPrompt(_ prompt: String) -> Bool {
-        (prompt.contains("budget") || prompt.contains("budgets"))
-            && (prompt.contains("do i have") || prompt.contains("have this") || prompt.contains("have in"))
+        let asksRelationship = prompt.contains("linked")
+            || prompt.contains("link")
+            || prompt.contains("attached")
+            || prompt.contains("objects")
+            || prompt.contains("membership")
+            || prompt.contains("limit")
+        return asksRelationship == false
+            && (prompt.contains("budget") || prompt.contains("budgets"))
+            && (prompt.contains("do i have")
+                || prompt.contains("have this")
+                || prompt.contains("have in")
+                || prompt.contains("upcoming")
+                || prompt.contains("future")
+                || prompt.hasPrefix("list ")
+                || prompt.hasPrefix("show ")
+                || prompt.hasPrefix("what are"))
     }
 
     private nonisolated static func isOverBudgetCategoriesPrompt(_ prompt: String) -> Bool {

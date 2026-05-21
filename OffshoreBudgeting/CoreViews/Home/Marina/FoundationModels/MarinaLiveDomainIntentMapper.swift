@@ -32,9 +32,12 @@ struct MarinaLiveDomainIntentMapping: Equatable, Sendable {
 private enum MarinaLiveRouteKey: String, Equatable, Sendable {
     case workspaceLookup
     case activeBudget
+    case budgetInventory
     case budgetLinkedCards
     case budgetLinkedPresets
     case budgetCategoryLimit
+    case plannedExpenseRows
+    case presetTemplateRows
     case budgetForecastScenario
     case allocationRows
     case settlementRows
@@ -236,6 +239,19 @@ struct MarinaLiveDomainIntentMapper {
                 responseDate: .none
             )
 
+        case .budgetInventory:
+            return mappedRead(
+                payload: payload,
+                prompt: prompt,
+                envelopeSummary: envelopeSummary,
+                routeKey: routeKey,
+                canonicalRoute: "budget.inventory",
+                subject: "budgets",
+                operation: "listRows",
+                measure: "remainingBudget",
+                responseDate: dateIntent(from: payload.dateText, prompt: prompt, context: context, defaultMode: .none)
+            )
+
         case .budgetLinkedCards:
             return mappedRead(
                 payload: payload,
@@ -282,6 +298,40 @@ struct MarinaLiveDomainIntentMapper {
                 targetType: "category",
                 requestedDetail: "amount",
                 responseDate: dateIntent(from: payload.dateText, prompt: prompt, context: context, defaultMode: .none)
+            )
+
+        case .plannedExpenseRows:
+            return mappedRead(
+                payload: payload,
+                prompt: prompt,
+                envelopeSummary: envelopeSummary,
+                routeKey: routeKey,
+                canonicalRoute: "plannedExpenses.rows",
+                subject: "plannedExpenses",
+                operation: "listRows",
+                measure: "presetAmount",
+                target: plannedExpenseTarget(payload: payload, prompt: prompt, context: context)?.name,
+                targetType: plannedExpenseTarget(payload: payload, prompt: prompt, context: context)?.type,
+                grouping: "transaction",
+                ranking: "newest",
+                limit: explicitLimit(in: normalizedPrompt) ?? 10,
+                responseDate: dateIntent(from: payload.dateText, prompt: prompt, context: context, defaultMode: .none)
+            )
+
+        case .presetTemplateRows:
+            return mappedRead(
+                payload: payload,
+                prompt: prompt,
+                envelopeSummary: envelopeSummary,
+                routeKey: routeKey,
+                canonicalRoute: "presets.templates",
+                subject: "presets",
+                operation: "listRows",
+                measure: "presetAmount",
+                grouping: "preset",
+                ranking: "newest",
+                limit: explicitLimit(in: normalizedPrompt) ?? 10,
+                responseDate: .none
             )
 
         case .budgetForecastScenario:
@@ -551,6 +601,10 @@ struct MarinaLiveDomainIntentMapper {
             return .activeBudget
         }
 
+        if isBudgetInventoryPrompt(normalizedPrompt: normalizedPrompt, normalizedSignal: normalizedSignal) {
+            return .budgetInventory
+        }
+
         if isBudgetLinkedRelationship(
             normalizedPrompt: normalizedPrompt,
             normalizedSignal: normalizedSignal,
@@ -570,6 +624,14 @@ struct MarinaLiveDomainIntentMapper {
         if normalizedPrompt.contains("limit"),
            normalizedPrompt.contains("budget") || normalizedPrompt.contains("category") {
             return .budgetCategoryLimit
+        }
+
+        if isPlannedExpenseRowsPrompt(normalizedPrompt: normalizedPrompt, normalizedSignal: normalizedSignal) {
+            return .plannedExpenseRows
+        }
+
+        if isPresetTemplateRowsPrompt(normalizedPrompt: normalizedPrompt, normalizedSignal: normalizedSignal) {
+            return .presetTemplateRows
         }
 
         if containsAny(["what if", "if i "], in: normalizedPrompt)
@@ -680,6 +742,45 @@ struct MarinaLiveDomainIntentMapper {
         let mentionsObject = objectWords.contains { normalizedPrompt.contains($0) }
         let mentionsRelationship = containsAny(["linked", "link", "attached", "included", "member", "membership"], in: normalizedPrompt)
         return mentionsBudget && mentionsObject && mentionsRelationship
+    }
+
+    private func isBudgetInventoryPrompt(
+        normalizedPrompt: String,
+        normalizedSignal: String
+    ) -> Bool {
+        let mentionsBudget = normalizedPrompt.contains("budget") || normalizedSignal.contains("budgetinventory")
+        guard mentionsBudget else { return false }
+        guard containsAny(["linked", "link", "attached", "objects", "membership", "limit"], in: normalizedPrompt) == false else {
+            return false
+        }
+        if containsAny(["upcoming budget", "upcoming budgets", "future budget", "future budgets"], in: normalizedPrompt) {
+            return true
+        }
+        return containsAny(["list budgets", "show budgets", "show my budgets", "what budgets", "which budgets"], in: normalizedPrompt)
+    }
+
+    private func isPlannedExpenseRowsPrompt(
+        normalizedPrompt: String,
+        normalizedSignal: String
+    ) -> Bool {
+        if normalizedSignal.contains("plannedexpenses") || normalizedSignal.contains("plannedexpense") {
+            return true
+        }
+        if containsAny(["planned expense", "planned expenses"], in: normalizedPrompt) {
+            return true
+        }
+        return (normalizedPrompt.contains("preset") || normalizedPrompt.contains("presets"))
+            && containsAny(["due", "upcoming", "next month", "this month"], in: normalizedPrompt)
+    }
+
+    private func isPresetTemplateRowsPrompt(
+        normalizedPrompt: String,
+        normalizedSignal: String
+    ) -> Bool {
+        guard normalizedPrompt.contains("preset") || normalizedPrompt.contains("presets") || normalizedSignal.contains("presets") else {
+            return false
+        }
+        return containsAny(["list", "show", "templates", "active presets"], in: normalizedPrompt)
     }
 
     private func mappedRead(
@@ -898,6 +999,23 @@ struct MarinaLiveDomainIntentMapper {
         return (cleanSpendTarget(fallback), fallbackType)
     }
 
+    private func plannedExpenseTarget(
+        payload: MarinaFoundationIntentEnvelopePayload,
+        prompt: String,
+        context: MarinaInterpretationContext
+    ) -> (name: String, type: String)? {
+        if let preset = namedTarget(context.presetTitles, in: prompt, fallback: payload.targetText) {
+            return (preset, "preset")
+        }
+        if let category = namedTarget(context.categoryNames, in: prompt, fallback: payload.targetText) {
+            return (category, "category")
+        }
+        if let card = namedTarget(context.cardNames, in: prompt, fallback: payload.targetText) {
+            return (card, "card")
+        }
+        return nil
+    }
+
     private func scenarioTarget(
         payload: MarinaFoundationIntentEnvelopePayload,
         prompt: String,
@@ -1105,7 +1223,7 @@ struct MarinaLiveDomainIntentMapper {
     private func explicitDatePhrase(in prompt: String) -> String? {
         let normalizedPrompt = normalized(prompt)
         let phrases = [
-            "this month", "current month", "month to date", "last month", "previous month",
+            "this month", "current month", "month to date", "last month", "previous month", "next month",
             "this week", "last week", "today", "yesterday", "this year", "last year"
         ]
         return phrases.first { normalizedPrompt.contains($0) }
@@ -1185,7 +1303,7 @@ struct MarinaLiveDomainIntentMapper {
 
     private var relativeDatePhrases: [String] {
         [
-            "this month", "current month", "month to date", "last month", "previous month",
+            "this month", "current month", "month to date", "last month", "previous month", "next month",
             "this week", "last week", "today", "yesterday", "this year", "last year"
         ]
     }

@@ -26,8 +26,10 @@ struct MarinaWorkspaceAggregationExecutor {
             return .handled(incomeComparison(plan: plan, provider: provider, now: now))
         case (.rank, .presetAmount, .transaction), (.listRows, .presetAmount, .transaction):
             return .handled(upcomingPlannedExpenses(plan: plan, provider: provider, now: now))
-        case (.rank, .presetAmount, .preset):
-            return .handled(highestCostPresets(plan: plan, provider: provider))
+        case (.rank, .presetAmount, .preset), (.listRows, .presetAmount, .preset):
+            return .handled(presetTemplateRows(plan: plan, provider: provider))
+        case (.sum, .presetAmount, .preset):
+            return .handled(plannedExpensesByPreset(plan: plan, provider: provider, now: now))
         case (.sum, .presetAmount, .category), (.rank, .presetAmount, .category):
             return .handled(plannedExpensesByCategory(plan: plan, provider: provider, now: now))
         case (.sum, .presetAmount, .card), (.rank, .presetAmount, .card):
@@ -191,8 +193,10 @@ struct MarinaWorkspaceAggregationExecutor {
     ) -> MarinaWorkspaceAggregationCard {
         let range = plan.dateRange ?? nextDaysRange(from: now, days: 30)
         let newestFirst = plan.operation == .listRows || plan.ranking?.direction == .newest
+        let presetTitlesByID = Dictionary(uniqueKeysWithValues: provider.fetchAllPresets().map { ($0.id, $0.title) })
         let rows = provider.fetchAllPlannedExpenses()
             .filter { $0.expenseDate >= range.startDate && $0.expenseDate <= range.endDate }
+            .filter { plannedExpense($0, matches: plan.targets, presetTitlesByID: presetTitlesByID) }
             .sorted { lhs, rhs in
                 if newestFirst {
                     if lhs.expenseDate == rhs.expenseDate { return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending }
@@ -205,9 +209,12 @@ struct MarinaWorkspaceAggregationExecutor {
             }
             .prefix(limit(for: plan))
             .map { expense in
-                MarinaWorkspaceAggregationCard.Row(
+                let presetSuffix = expense.sourcePresetID
+                    .flatMap { presetTitlesByID[$0] }
+                    .flatMap { $0 == expense.title ? nil : " • preset \($0)" } ?? ""
+                return MarinaWorkspaceAggregationCard.Row(
                     label: expense.title,
-                    value: "\(currency(expense.effectiveAmount())) • \(shortDate(expense.expenseDate))",
+                    value: "\(currency(expense.effectiveAmount())) • \(shortDate(expense.expenseDate))\(presetSuffix)",
                     amount: expense.effectiveAmount(),
                     date: expense.expenseDate,
                     objectType: .plannedExpense,
@@ -218,11 +225,47 @@ struct MarinaWorkspaceAggregationExecutor {
 
         return MarinaWorkspaceAggregationCard(
             title: newestFirst ? "Planned Expenses Due" : "Upcoming Bills",
-            subtitle: rangeLabel(range),
+            subtitle: rows.isEmpty
+                ? "No planned expenses are due in \(rangeLabel(range)). Ask Marina to show active presets if you want the templates instead."
+                : rangeLabel(range),
             primaryValue: rows.first?.value,
             rows: Array(rows),
             traceSummary: "workspaceAggregation=upcomingPlannedExpenses,resultCount=\(rows.count)"
         )
+    }
+
+    private func plannedExpense(
+        _ expense: PlannedExpense,
+        matches targets: [MarinaResolvedAggregationTarget],
+        presetTitlesByID: [UUID: String]
+    ) -> Bool {
+        let filters = targets.filter { target in
+            switch target.role {
+            case .filter, .primaryTarget:
+                return true
+            case .comparisonTarget, .simulationInput, .simulationOutput, .excludeFilter, .groupingDimension:
+                return false
+            }
+        }
+        guard filters.isEmpty == false else { return true }
+        return filters.allSatisfy { target in
+            switch target.entityType {
+            case .category:
+                return expense.category?.id == target.sourceID
+                    || normalized(expense.category?.name ?? "") == normalized(target.displayName)
+            case .card:
+                return expense.card?.id == target.sourceID
+                    || normalized(expense.card?.name ?? "") == normalized(target.displayName)
+            case .preset:
+                return expense.sourcePresetID == target.sourceID
+                    || expense.sourcePresetID.flatMap { presetTitlesByID[$0] }.map { normalized($0) == normalized(target.displayName) } == true
+                    || normalized(expense.title) == normalized(target.displayName)
+            case .expense, .transaction:
+                return expense.id == target.sourceID || normalized(expense.title).contains(normalized(target.displayName))
+            case .merchant, .budget, .incomeSource, .allocationAccount, .savingsAccount, .workspace:
+                return true
+            }
+        }
     }
 
     private func plannedExpensesByCategory(
@@ -240,13 +283,17 @@ struct MarinaWorkspaceAggregationExecutor {
         )
     }
 
-    private func highestCostPresets(
+    private func presetTemplateRows(
         plan: MarinaAggregationPlan,
         provider: MarinaDataProvider
     ) -> MarinaWorkspaceAggregationCard {
+        let listRows = plan.operation == .listRows || plan.ranking?.direction == .newest
         let rows = provider.fetchAllPresets()
             .filter { $0.isArchived == false && $0.plannedAmount > 0 }
             .sorted { lhs, rhs in
+                if listRows {
+                    return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
+                }
                 if lhs.plannedAmount == rhs.plannedAmount {
                     return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
                 }
@@ -265,7 +312,7 @@ struct MarinaWorkspaceAggregationExecutor {
             }
 
         return MarinaWorkspaceAggregationCard(
-            title: "Highest Preset Costs",
+            title: listRows ? "Preset Templates" : "Highest Preset Costs",
             subtitle: "Active presets",
             primaryValue: rows.first?.value,
             rows: Array(rows),
@@ -285,6 +332,28 @@ struct MarinaWorkspaceAggregationExecutor {
             now: now,
             key: { $0.card?.name ?? "No Card" },
             traceName: "plannedExpensesByCard"
+        )
+    }
+
+    private func plannedExpensesByPreset(
+        plan: MarinaAggregationPlan,
+        provider: MarinaDataProvider,
+        now: Date
+    ) -> MarinaWorkspaceAggregationCard {
+        let presetTitlesByID = Dictionary(uniqueKeysWithValues: provider.fetchAllPresets().map { ($0.id, $0.title) })
+        return groupedPlannedExpenses(
+            title: "Planned Expenses by Preset",
+            plan: plan,
+            provider: provider,
+            now: now,
+            key: { expense in
+                if let sourcePresetID = expense.sourcePresetID,
+                   let presetTitle = presetTitlesByID[sourcePresetID] {
+                    return presetTitle
+                }
+                return expense.title
+            },
+            traceName: "plannedExpensesByPreset"
         )
     }
 
@@ -532,6 +601,14 @@ struct MarinaWorkspaceAggregationExecutor {
 
     private func currency(_ value: Double) -> String {
         CurrencyFormatter.string(from: value)
+    }
+
+    private func normalized(_ value: String) -> String {
+        value
+            .lowercased()
+            .replacingOccurrences(of: "[^a-z0-9\\s&]", with: " ", options: .regularExpression)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private func delta(_ value: Double) -> String {

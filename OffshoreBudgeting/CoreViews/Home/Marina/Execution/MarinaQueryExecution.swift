@@ -173,7 +173,7 @@ struct MarinaExplicitConstraintDetector {
         let protectedPrompt = removingProtectedEntityNames(protectedEntityNames, from: prompt)
         let phrases = [
             "today", "yesterday", "this week", "last week", "this month", "last month",
-            "this budget", "this period", "last period", "january", "february", "march",
+            "next month", "this budget", "this period", "last period", "january", "february", "march",
             "april", "may", "june", "july", "august", "september", "october",
             "november", "december"
         ]

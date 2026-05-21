@@ -171,6 +171,22 @@ struct MarinaFoundationModelsInterpreter {
     private func measure(from command: MarinaSemanticCommand) -> MarinaCandidateMeasure? {
         switch command.action {
         case .listRows:
+            if (command.datasets.contains(.plannedExpenses) || command.datasets.contains(.presets)),
+               command.datasets.contains(.variableExpenses) == false {
+                return .presetAmount
+            }
+            if command.datasets.contains(.income) {
+                return .income
+            }
+            if command.datasets.contains(.savingsLedger) {
+                return .savingsMovement
+            }
+            if command.datasets.contains(.reconciliation) || command.datasets.contains(.expenseAllocations) {
+                return .reconciliationBalance
+            }
+            if command.datasets.contains(.budgets) {
+                return .remainingBudget
+            }
             return .transactionAmount
         case .simulate:
             return .remainingBudget

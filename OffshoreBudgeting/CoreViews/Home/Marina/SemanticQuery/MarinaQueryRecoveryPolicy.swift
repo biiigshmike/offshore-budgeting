@@ -50,6 +50,45 @@ struct MarinaQueryRecoveryPolicy {
             )
         }
 
+        if isPlannedExpenseRowsPrompt(prompt) {
+            operation = .listRows
+            measure = .presetAmount
+            grouping = MarinaGroupingCandidate(dimension: .transaction, rawText: "planned expenses")
+            ranking = MarinaRankingCandidate(direction: .newest, limit: limit ?? 10, rawText: "due")
+            limit = limit ?? 10
+            responseShapeHint = .rankedList
+            timeScopes = repairedPrimaryDateScopes(
+                existingScopes: timeScopes,
+                prompt: prompt,
+                now: now,
+                defaultPeriodUnit: defaultPeriodUnit
+            )
+        }
+
+        if isPresetTemplateRowsPrompt(prompt) {
+            operation = .listRows
+            measure = .presetAmount
+            grouping = MarinaGroupingCandidate(dimension: .preset, rawText: "presets")
+            ranking = MarinaRankingCandidate(direction: .newest, limit: limit ?? 10, rawText: "presets")
+            limit = limit ?? 10
+            responseShapeHint = .rankedList
+        }
+
+        if isBudgetInventoryPrompt(prompt) {
+            operation = .listRows
+            measure = .remainingBudget
+            responseShapeHint = .rankedList
+        }
+
+        if isSavingsActivityPrompt(prompt) {
+            operation = .listRows
+            measure = .savingsMovement
+            grouping = MarinaGroupingCandidate(dimension: .savingsLedgerEntry, rawText: "activity")
+            ranking = MarinaRankingCandidate(direction: .newest, limit: limit ?? 10, rawText: "activity")
+            limit = limit ?? 10
+            responseShapeHint = .rankedList
+        }
+
         repairedShape = operation != candidate.operation
             || measure != candidate.measure
             || grouping != candidate.grouping
@@ -128,6 +167,35 @@ struct MarinaQueryRecoveryPolicy {
             || prompt.contains("biggest offenders")
     }
 
+    private func isPlannedExpenseRowsPrompt(_ prompt: String) -> Bool {
+        if prompt.contains("planned expense") || prompt.contains("planned expenses") {
+            return true
+        }
+        return (prompt.contains("preset") || prompt.contains("presets"))
+            && (prompt.contains("due") || prompt.contains("upcoming") || prompt.contains("next month") || prompt.contains("this month"))
+    }
+
+    private func isPresetTemplateRowsPrompt(_ prompt: String) -> Bool {
+        guard prompt.contains("preset") || prompt.contains("presets") else { return false }
+        guard isPlannedExpenseRowsPrompt(prompt) == false else { return false }
+        return prompt.hasPrefix("show ") || prompt.hasPrefix("list ") || prompt.contains("active presets")
+    }
+
+    private func isBudgetInventoryPrompt(_ prompt: String) -> Bool {
+        guard prompt.contains("budget") || prompt.contains("budgets") else { return false }
+        return prompt.contains("upcoming")
+            || prompt.contains("future")
+            || prompt.contains("what are my budgets")
+            || prompt.contains("show budgets")
+            || prompt.contains("show my budgets")
+            || prompt.contains("list budgets")
+    }
+
+    private func isSavingsActivityPrompt(_ prompt: String) -> Bool {
+        (prompt.contains("savings") || prompt.contains("saving"))
+            && (prompt.contains("activity") || prompt.contains("ledger") || prompt.contains("movements") || prompt.contains("transactions"))
+    }
+
     private func repairedComparisonScopes(
         existingScopes: [MarinaUnresolvedTimeScope],
         prompt: String,
@@ -164,6 +232,39 @@ struct MarinaQueryRecoveryPolicy {
             )
         }
 
+        return scopes
+    }
+
+    private func repairedPrimaryDateScopes(
+        existingScopes: [MarinaUnresolvedTimeScope],
+        prompt: String,
+        now: Date,
+        defaultPeriodUnit: HomeQueryPeriodUnit
+    ) -> [MarinaUnresolvedTimeScope] {
+        guard existingScopes.contains(where: { $0.role == .primary }) == false else {
+            return existingScopes
+        }
+        guard let rawText = primaryDatePhrase(in: prompt),
+              let range = MarinaDateResolver(
+                calendar: Calendar(identifier: .gregorian),
+                nowProvider: { now }
+              ).resolve(
+                input: rawText,
+                modelStartISO8601: nil,
+                modelEndISO8601: nil,
+                defaultPeriodUnit: defaultPeriodUnit
+              )?.queryDateRange else {
+            return existingScopes
+        }
+        var scopes = existingScopes
+        scopes.append(
+            MarinaUnresolvedTimeScope(
+                role: .primary,
+                rawText: rawText,
+                resolvedRangeHint: range,
+                periodUnitHint: defaultPeriodUnit
+            )
+        )
         return scopes
     }
 
@@ -294,6 +395,14 @@ struct MarinaQueryRecoveryPolicy {
         }
 
         return prompt.range(of: "\\blast\\s+\\d+\\b", options: .regularExpression) != nil
+    }
+
+    private func primaryDatePhrase(in prompt: String) -> String? {
+        [
+            "next month", "this month", "current month", "month to date",
+            "last month", "previous month", "this week", "last week",
+            "today", "yesterday", "this year", "last year"
+        ].first { prompt.contains($0) }
     }
 
     private func normalized(_ text: String) -> String {

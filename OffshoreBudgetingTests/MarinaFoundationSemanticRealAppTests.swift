@@ -169,6 +169,128 @@ struct MarinaFoundationSemanticRealAppTests {
         assertFoundationOnly(resumedTrace)
     }
 
+    @Test func semanticRealApp_bareShowCategoryClarifiesWithRunnableChoices() async throws {
+        let fixture = try makeFixture()
+        try fixture.seedSpendData()
+
+        let prompt = "Show Groceries"
+        let candidate = unsupportedCandidate(prompt: prompt)
+        let coordinator = coordinator(for: [
+            prompt: canonicalInterpretation(candidate)
+        ])
+
+        let (initial, _) = await tracedTurn(prompt: prompt) {
+            await coordinator.run(prompt: prompt, context: turnContext(fixture))
+        }
+
+        guard case .clarification(_, let clarification) = initial else {
+            Issue.record("Expected bare category prompt to ask a clarification.")
+            return
+        }
+
+        #expect(clarification.choices.contains { $0.title == "Groceries spending" && $0.resumeIntent != nil })
+        #expect(clarification.choices.contains { $0.title == "Groceries expenses" && $0.resumeIntent != nil })
+
+        let choice = try #require(clarification.choices.first { $0.title == "Groceries spending" })
+        let (resumed, _) = await tracedTurn(prompt: choice.title) {
+            await coordinator.resume(
+                clarification: clarification,
+                choice: choice,
+                context: turnContext(fixture, turnClassification: .clarificationAnswer)
+            )
+        }
+
+        guard case .handled(let answer, _, _, _, _) = resumed else {
+            Issue.record("Expected clarification choice to execute.")
+            return
+        }
+
+        #expect(answer.rows.contains { $0.title == "Matched" && $0.value.localizedCaseInsensitiveContains("Groceries") })
+    }
+
+    @Test func semanticRealApp_upcomingBudgetsRecoverFromUnsupported() async throws {
+        let fixture = try makeFixture()
+        fixture.context.insert(Budget(name: "April Budget", startDate: date(2026, 4, 1), endDate: date(2026, 4, 30), workspace: fixture.workspace))
+        fixture.context.insert(Budget(name: "May Budget", startDate: date(2026, 5, 1), endDate: date(2026, 5, 31), workspace: fixture.workspace))
+        fixture.context.insert(Budget(name: "June Budget", startDate: date(2026, 6, 1), endDate: date(2026, 6, 30), workspace: fixture.workspace))
+        try fixture.context.save()
+
+        let prompt = "What are my upcoming budgets?"
+        let coordinator = coordinator(for: [
+            prompt: canonicalInterpretation(unsupportedCandidate(prompt: prompt))
+        ])
+
+        let (result, _) = await tracedTurn(prompt: prompt) {
+            await coordinator.run(
+                prompt: prompt,
+                context: turnContext(fixture, budgetNames: ["April Budget", "May Budget", "June Budget"])
+            )
+        }
+
+        guard case .handled(let answer, _, _, _, _) = result else {
+            Issue.record("Expected upcoming budgets to execute.")
+            return
+        }
+
+        #expect(answer.title == "Upcoming Budgets")
+        #expect(answer.rows.contains { $0.title == "May Budget" })
+        #expect(answer.rows.contains { $0.title == "June Budget" })
+        #expect(answer.rows.contains { $0.title == "April Budget" } == false)
+    }
+
+    @Test func semanticRealApp_plannedExpensesNextMonthRecoverFromUnsupported() async throws {
+        let fixture = try makeFixture()
+        let rent = Preset(title: "Rent", plannedAmount: 1_500, workspace: fixture.workspace, defaultCard: fixture.appleCard, defaultCategory: fixture.groceries)
+        fixture.context.insert(rent)
+        fixture.context.insert(PlannedExpense(title: "Rent Bill", plannedAmount: 1_500, expenseDate: date(2026, 6, 3), workspace: fixture.workspace, card: fixture.appleCard, category: fixture.groceries, sourcePresetID: rent.id))
+        fixture.context.insert(PlannedExpense(title: "May Only", plannedAmount: 80, expenseDate: date(2026, 5, 20), workspace: fixture.workspace, card: fixture.appleCard, category: fixture.groceries))
+        try fixture.context.save()
+
+        let prompt = "What are my planned expenses for next month?"
+        let coordinator = coordinator(for: [
+            prompt: canonicalInterpretation(unsupportedCandidate(prompt: prompt))
+        ])
+
+        let (result, _) = await tracedTurn(prompt: prompt) {
+            await coordinator.run(prompt: prompt, context: turnContext(fixture, presetTitles: ["Rent"]))
+        }
+
+        guard case .handled(let answer, _, _, _, let route) = result else {
+            Issue.record("Expected planned expenses next month to execute.")
+            return
+        }
+
+        #expect(answer.title == "Planned Expenses Due")
+        #expect(answer.rows.contains { $0.title == "Rent Bill" && $0.value.contains("preset Rent") })
+        #expect(answer.rows.contains { $0.title == "May Only" } == false)
+        #expect(route?.traceName == "aggregate")
+    }
+
+    @Test func semanticRealApp_savingsActivityUsesLedgerRows() async throws {
+        let fixture = try makeFixture()
+        let account = SavingsAccount(name: "True Savings", total: 0, workspace: fixture.workspace)
+        fixture.context.insert(account)
+        fixture.context.insert(SavingsLedgerEntry(date: date(2026, 5, 10), amount: 125, note: "Manual deposit", kindRaw: SavingsLedgerEntryKind.manualAdjustment.rawValue, workspace: fixture.workspace, account: account))
+        try fixture.context.save()
+
+        let prompt = "Show savings activity"
+        let coordinator = coordinator(for: [
+            prompt: canonicalInterpretation(unsupportedCandidate(prompt: prompt))
+        ])
+
+        let (result, _) = await tracedTurn(prompt: prompt) {
+            await coordinator.run(prompt: prompt, context: turnContext(fixture))
+        }
+
+        guard case .handled(let answer, _, _, _, _) = result else {
+            Issue.record("Expected savings activity to execute.")
+            return
+        }
+
+        #expect(answer.title == "Savings Activity")
+        #expect(answer.rows.contains { $0.title == "Manual deposit" })
+    }
+
     private func coordinator(for interpretations: [String: MarinaCanonicalReadInterpretation]) -> MarinaTurnCoordinator {
         MarinaTurnCoordinator(
             availability: AvailableMarinaModel(),
@@ -238,6 +360,16 @@ struct MarinaFoundationSemanticRealAppTests {
         )
     }
 
+    private func unsupportedCandidate(prompt: String) -> MarinaQueryPlanCandidate {
+        MarinaQueryPlanCandidate(
+            source: .foundationModels,
+            rawPrompt: prompt,
+            responseShapeHint: .unsupported,
+            confidence: .medium,
+            unsupportedHint: .unsupportedOperation
+        )
+    }
+
     private func mention(
         _ rawText: String,
         _ type: MarinaCandidateEntityTypeHint
@@ -264,6 +396,7 @@ struct MarinaFoundationSemanticRealAppTests {
         _ fixture: MarinaPhase5Fixture,
         cardNames: [String] = ["Apple Card", "Backup Card"],
         categoryNames: [String] = ["Groceries", "Travel"],
+        presetTitles: [String] = [],
         budgetNames: [String] = [],
         turnClassification: MarinaPromptTurnClassification = .freshQuestion
     ) -> MarinaTurnContext {
@@ -277,7 +410,7 @@ struct MarinaFoundationSemanticRealAppTests {
                 cardNames: cardNames,
                 categoryNames: categoryNames,
                 incomeSourceNames: [],
-                presetTitles: [],
+                presetTitles: presetTitles,
                 budgetNames: budgetNames,
                 aliasSummaries: [],
                 now: date(2026, 5, 15)

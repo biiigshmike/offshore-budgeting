@@ -694,7 +694,7 @@ struct MarinaSemanticQueryAdapter {
             return .income
         case .savingsAmount:
             if semanticQuery.subject == .savingsLedgerEntries,
-               semanticQuery.operation == .rank {
+               semanticQuery.operation == .rank || semanticQuery.operation == .list {
                 return .savingsMovement
             }
             return .savings

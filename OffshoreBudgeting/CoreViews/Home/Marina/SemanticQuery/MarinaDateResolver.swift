@@ -135,6 +135,12 @@ struct MarinaDateResolver {
             return monthRange(containing: previousMonthDate)
         }
 
+        if normalized.contains("next month") {
+            let currentMonthStart = monthRange(containing: now).start
+            let nextMonthDate = calendar.date(byAdding: .month, value: 1, to: currentMonthStart) ?? currentMonthStart
+            return monthRange(containing: nextMonthDate)
+        }
+
         if normalized.contains("this month") || normalized.contains("current month") || normalized.contains("month to date") {
             return monthRange(containing: now)
         }

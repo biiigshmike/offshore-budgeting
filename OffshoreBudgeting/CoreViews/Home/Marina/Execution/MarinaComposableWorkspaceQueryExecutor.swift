@@ -68,7 +68,7 @@ struct MarinaComposableWorkspaceQueryExecutor {
 
         switch candidate.routeIntent?.kind ?? plan.routeIntent?.kind {
         case .budgetInventory?:
-            return .handled(budgetsOverlappingRange(plan: plan, provider: provider, now: now))
+            return .handled(budgetsOverlappingRange(prompt: candidate.rawPrompt, plan: plan, provider: provider, now: now))
         case .overBudgetCategories?:
             return .handled(overBudgetCategories(plan: plan, provider: provider, now: now, amountBasis: amountBasis))
         case .allocationRows?:
@@ -87,7 +87,7 @@ struct MarinaComposableWorkspaceQueryExecutor {
             }
         case .recentTransactionRows?:
             return .handled(recentFilteredTransactions(resolved: resolved, plan: plan, provider: provider, now: now, amountBasis: amountBasis))
-        case .databaseLookup?, .generic?, .broadSpend?, .savingsStatus?, .savingsActivity?, .savingsMovementRanking?, .incomePlannedVsActual?, .reconciliationBalance?, nil:
+        case .databaseLookup?, .generic?, .broadSpend?, .plannedExpenseRows?, .presetTemplateRows?, .plannedExpenseByCategory?, .plannedExpenseByCard?, .plannedExpenseByPreset?, .savingsStatus?, .savingsActivity?, .savingsMovementRanking?, .incomePlannedVsActual?, .reconciliationBalance?, nil:
             break
         }
 
@@ -102,7 +102,7 @@ struct MarinaComposableWorkspaceQueryExecutor {
            ) {
             switch fallbackKind {
             case .budgetInventory:
-                return .handled(budgetsOverlappingRange(plan: plan, provider: provider, now: now))
+                return .handled(budgetsOverlappingRange(prompt: candidate.rawPrompt, plan: plan, provider: provider, now: now))
             case .overBudgetCategories:
                 return .handled(overBudgetCategories(plan: plan, provider: provider, now: now, amountBasis: amountBasis))
             case .allocationRows:
@@ -111,7 +111,7 @@ struct MarinaComposableWorkspaceQueryExecutor {
                 return .handled(settlementRows(resolved: resolved, plan: plan, provider: provider, now: now))
             case .recentTransactionRows:
                 return .handled(recentFilteredTransactions(resolved: resolved, plan: plan, provider: provider, now: now, amountBasis: amountBasis))
-            case .generic, .databaseLookup, .activeBudget, .budgetMembership, .budgetLinkedCards, .budgetLinkedPresets, .budgetCategoryLimits, .budgetCategoryLimit, .savingsStatus, .savingsActivity, .savingsMovementRanking, .incomePlannedVsActual, .reconciliationBalance, .broadSpend:
+            case .generic, .databaseLookup, .activeBudget, .budgetMembership, .budgetLinkedCards, .budgetLinkedPresets, .budgetCategoryLimits, .budgetCategoryLimit, .plannedExpenseRows, .presetTemplateRows, .plannedExpenseByCategory, .plannedExpenseByCard, .plannedExpenseByPreset, .savingsStatus, .savingsActivity, .savingsMovementRanking, .incomePlannedVsActual, .reconciliationBalance, .broadSpend:
                 break
             }
         }
@@ -169,14 +169,30 @@ struct MarinaComposableWorkspaceQueryExecutor {
     // MARK: - Budgets
 
     private func budgetsOverlappingRange(
+        prompt: String,
         plan: MarinaAggregationPlan,
         provider: MarinaDataProvider,
         now: Date
     ) -> MarinaWorkspaceAggregationCard {
         let range = plan.dateRange ?? monthRange(containing: now)
+        let inventoryMode = budgetInventoryMode(prompt: prompt, plan: plan)
         let rows = provider.fetchAllBudgets()
-            .filter { $0.startDate <= range.endDate && $0.endDate >= range.startDate }
+            .filter { budget in
+                switch inventoryMode {
+                case .upcoming:
+                    return budget.endDate >= calendar.startOfDay(for: now)
+                case .all:
+                    return true
+                case .overlappingRange:
+                    return budget.startDate <= range.endDate && budget.endDate >= range.startDate
+                }
+            }
             .sorted { lhs, rhs in
+                if inventoryMode == .upcoming {
+                    let lhsActive = lhs.startDate <= now && lhs.endDate >= now
+                    let rhsActive = rhs.startDate <= now && rhs.endDate >= now
+                    if lhsActive != rhsActive { return lhsActive }
+                }
                 if lhs.startDate == rhs.startDate { return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending }
                 return lhs.startDate < rhs.startDate
             }
@@ -193,12 +209,44 @@ struct MarinaComposableWorkspaceQueryExecutor {
             }
 
         return MarinaWorkspaceAggregationCard(
-            title: "Budgets",
-            subtitle: rangeLabel(range),
+            title: inventoryMode == .upcoming ? "Upcoming Budgets" : "Budgets",
+            subtitle: budgetInventorySubtitle(mode: inventoryMode, range: range),
             primaryValue: rows.first?.label,
             rows: Array(rows),
             traceSummary: "composableWorkspace=budgetInventory;route=budgetsOverlappingRange,resultCount=\(rows.count)"
         )
+    }
+
+    private enum BudgetInventoryMode: Equatable {
+        case overlappingRange
+        case upcoming
+        case all
+    }
+
+    private func budgetInventoryMode(prompt: String, plan: MarinaAggregationPlan) -> BudgetInventoryMode {
+        let normalizedPrompt = normalized(prompt)
+        if normalizedPrompt.contains("upcoming") || normalizedPrompt.contains("future") {
+            return .upcoming
+        }
+        if plan.dateRange == nil,
+           normalizedPrompt.contains("all budgets")
+            || normalizedPrompt == "list budgets"
+            || normalizedPrompt == "show budgets"
+            || normalizedPrompt == "show my budgets" {
+            return .all
+        }
+        return .overlappingRange
+    }
+
+    private func budgetInventorySubtitle(mode: BudgetInventoryMode, range: HomeQueryDateRange) -> String {
+        switch mode {
+        case .upcoming:
+            return "Active and future budgets"
+        case .all:
+            return "All budgets"
+        case .overlappingRange:
+            return rangeLabel(range)
+        }
     }
 
     private func budgetLinkedSummary(

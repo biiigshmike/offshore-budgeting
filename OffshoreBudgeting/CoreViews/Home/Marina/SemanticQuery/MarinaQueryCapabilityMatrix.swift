@@ -234,6 +234,51 @@ struct MarinaQueryCapabilityMatrix {
             requestedDetails: [nil, .general],
             preferredExecutorRoute: .composableWorkspace
         ),
+        .plannedExpenseRows: RouteCapabilityRecord(
+            kind: .plannedExpenseRows,
+            operations: [.listRows, .rank],
+            measures: [.presetAmount],
+            groupings: [.transaction],
+            targetTypes: [.preset, .category, .card, .transaction, .expense],
+            requestedDetails: [nil, .general, .date, .amount],
+            preferredExecutorRoute: .workspaceAggregation
+        ),
+        .presetTemplateRows: RouteCapabilityRecord(
+            kind: .presetTemplateRows,
+            operations: [.listRows, .rank],
+            measures: [.presetAmount],
+            groupings: [.preset],
+            targetTypes: [.preset, .category, .card],
+            requestedDetails: [nil, .general, .schedule, .recurrence, .amount],
+            preferredExecutorRoute: .workspaceAggregation
+        ),
+        .plannedExpenseByCategory: RouteCapabilityRecord(
+            kind: .plannedExpenseByCategory,
+            operations: [.sum, .rank],
+            measures: [.presetAmount],
+            groupings: [.category],
+            targetTypes: [.category, .card, .preset],
+            requestedDetails: [nil, .general, .amount],
+            preferredExecutorRoute: .workspaceAggregation
+        ),
+        .plannedExpenseByCard: RouteCapabilityRecord(
+            kind: .plannedExpenseByCard,
+            operations: [.sum, .rank],
+            measures: [.presetAmount],
+            groupings: [.card],
+            targetTypes: [.card, .category, .preset],
+            requestedDetails: [nil, .general, .amount],
+            preferredExecutorRoute: .workspaceAggregation
+        ),
+        .plannedExpenseByPreset: RouteCapabilityRecord(
+            kind: .plannedExpenseByPreset,
+            operations: [.sum],
+            measures: [.presetAmount],
+            groupings: [.preset],
+            targetTypes: [.preset, .category, .card],
+            requestedDetails: [nil, .general, .amount],
+            preferredExecutorRoute: .workspaceAggregation
+        ),
         .savingsStatus: RouteCapabilityRecord(
             kind: .savingsStatus,
             operations: [.lookupDetails],
