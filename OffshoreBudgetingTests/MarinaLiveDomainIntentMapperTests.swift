@@ -257,6 +257,118 @@ struct MarinaLiveDomainIntentMapperTests {
         #expect(scenarioIntent.valueModeRaw == "less")
     }
 
+    @Test func mapper_mapsSupportedPromptsFromMinimalFoundationEnvelope() {
+        let mapper = MarinaLiveDomainIntentMapper(nowProvider: { fixedNow })
+        let context = routerContext()
+
+        let actualIncome = mapper.map(
+            payload: minimalPayload(route: "readQuery"),
+            prompt: "What is my actual income so far this month?",
+            context: context
+        )
+        #expect(actualIncome.canonicalRouteSummary == "income.actual")
+        #expect(command(actualIncome)?.datasets == [.income])
+        #expect(command(actualIncome)?.incomeStatusScope == .actual)
+        #expect(command(actualIncome)?.dateRange?.startDate == date(2026, 5, 1))
+
+        let cardSpend = mapper.map(
+            payload: minimalPayload(route: "readQuery"),
+            prompt: "What did I spend on Apple Card this month?",
+            context: context
+        )
+        #expect(cardSpend.canonicalRouteSummary == "spending.total.card")
+        #expect(command(cardSpend)?.includeFilters.first?.rawText == "Apple Card")
+        #expect(command(cardSpend)?.includeFilters.first?.allowedTypes == [.card])
+
+        let linkedCards = mapper.map(
+            payload: minimalPayload(route: "lookup"),
+            prompt: "Which cards are linked to May Budget?",
+            context: context
+        )
+        #expect(linkedCards.canonicalRouteSummary == "budget.linkedCards")
+        #expect(command(linkedCards)?.includeFilters.first?.rawText == "May Budget")
+        #expect(command(linkedCards)?.requestedDetail == .linkedCards)
+
+        let plannedRows = mapper.map(
+            payload: minimalPayload(route: "readQuery"),
+            prompt: "What planned expenses came from Rent?",
+            context: context
+        )
+        #expect(plannedRows.canonicalRouteSummary == "plannedExpenses.rows")
+        #expect(command(plannedRows)?.includeFilters.first?.rawText == "Rent")
+        #expect(command(plannedRows)?.includeFilters.first?.allowedTypes == [.preset])
+
+        let categoryComparison = mapper.map(
+            payload: minimalPayload(route: "readQuery"),
+            prompt: "Compare Dining this month to last month.",
+            context: context
+        )
+        #expect(categoryComparison.canonicalRouteSummary == "spending.categoryComparison")
+        #expect(command(categoryComparison)?.action == .compare)
+        #expect(command(categoryComparison)?.includeFilters.first?.rawText == "Dining")
+
+        let scenario = mapper.map(
+            payload: minimalPayload(route: "scenario", amount: "200", direction: "less"),
+            prompt: "What if I spend 200 less on Dining?",
+            context: context
+        )
+        #expect(scenario.canonicalRouteSummary == "scenario.budgetForecast")
+        guard case .scenario(let scenarioIntent) = scenario.intent else {
+            Issue.record("Expected scenario intent.")
+            return
+        }
+        #expect(scenarioIntent.targetName == "Dining")
+        #expect(scenarioIntent.amount == 200)
+        #expect(scenarioIntent.valueModeRaw == "less")
+    }
+
+    @Test func mapper_preservesAllocationAccountAndCategoryForAllocatedSpend() {
+        let mapper = MarinaLiveDomainIntentMapper(nowProvider: { fixedNow })
+        let context = routerContext(
+            categoryNames: ["Cannabis", "Dining", "Groceries"],
+            allocationAccountNames: ["Alejandro"]
+        )
+
+        let allocatedSpend = mapper.map(
+            payload: minimalPayload(route: "readQuery"),
+            prompt: "What had Alejandro spent on cannabis?",
+            context: context
+        )
+        let allocatedCommand = command(allocatedSpend)
+        #expect(allocatedSpend.canonicalRouteSummary == "spending.allocated.category")
+        #expect(allocatedCommand?.datasets == [.variableExpenses])
+        #expect(allocatedCommand?.measure == .spend)
+        #expect(allocatedCommand?.includeFilters.map(\.rawText) == ["Alejandro", "Cannabis"])
+        #expect(allocatedCommand?.includeFilters.map(\.allowedTypes) == [[.allocationAccount, .merchant, .expense], [.category]])
+
+        let grossCategorySpend = mapper.map(
+            payload: minimalPayload(route: "readQuery"),
+            prompt: "What did I spend on cannabis?",
+            context: context
+        )
+        #expect(grossCategorySpend.canonicalRouteSummary == "spending.total.category")
+        #expect(command(grossCategorySpend)?.includeFilters.map(\.rawText) == ["Cannabis"])
+        #expect(command(grossCategorySpend)?.includeFilters.map(\.allowedTypes) == [[.category]])
+
+        let allocationRows = mapper.map(
+            payload: minimalPayload(route: "readQuery"),
+            prompt: "Show Alejandro allocation rows for Cannabis.",
+            context: context
+        )
+        #expect(allocationRows.canonicalRouteSummary == "reconciliation.allocationRows")
+        #expect(command(allocationRows)?.includeFilters.map(\.rawText) == ["Alejandro", "Cannabis"])
+        #expect(command(allocationRows)?.includeFilters.map(\.allowedTypes) == [[.allocationAccount, .merchant, .expense], [.category]])
+
+        let balance = mapper.map(
+            payload: minimalPayload(route: "lookup"),
+            prompt: "What is Alejandro's balance?",
+            context: context
+        )
+        #expect(balance.canonicalRouteSummary == "reconciliation.balance")
+        #expect(command(balance)?.includeFilters.map(\.rawText) == ["Alejandro"])
+        #expect(command(balance)?.includeFilters.map(\.allowedTypes) == [[.allocationAccount]])
+    }
+
     @Test func mapper_blocksUnmappedLiveReadRoutesBeforeDataQuery() {
         let mapper = MarinaLiveDomainIntentMapper(nowProvider: { fixedNow })
         let result = mapper.map(
@@ -280,7 +392,9 @@ struct MarinaLiveDomainIntentMapperTests {
 
     private func routerContext(
         ambientDateRange: HomeQueryDateRange? = nil,
-        defaultPeriodUnit: HomeQueryPeriodUnit = .month
+        defaultPeriodUnit: HomeQueryPeriodUnit = .month,
+        categoryNames: [String] = ["Groceries", "Dining"],
+        allocationAccountNames: [String] = []
     ) -> MarinaInterpretationContext {
         MarinaInterpretationContext(
             workspaceName: "Personal",
@@ -289,10 +403,11 @@ struct MarinaLiveDomainIntentMapperTests {
             sessionContext: MarinaSessionContext(),
             priorQueryContext: .empty,
             cardNames: ["Apple Card", "Backup Card"],
-            categoryNames: ["Groceries", "Dining"],
+            categoryNames: categoryNames,
             incomeSourceNames: ["Salary"],
             presetTitles: ["Rent"],
             budgetNames: ["May Budget"],
+            allocationAccountNames: allocationAccountNames,
             aliasSummaries: [],
             now: fixedNow
         )
@@ -321,6 +436,20 @@ struct MarinaLiveDomainIntentMapperTests {
             valueDirectionRaw: direction,
             confidenceRaw: "high",
             unsupportedReasonRaw: nil
+        )
+    }
+
+    private func minimalPayload(
+        route: String,
+        amount: String? = nil,
+        direction: String? = nil
+    ) -> MarinaFoundationIntentEnvelopePayload {
+        payload(
+            route: route,
+            intent: nil,
+            target: nil,
+            amount: amount,
+            direction: direction
         )
     }
 

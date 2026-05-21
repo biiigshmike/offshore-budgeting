@@ -138,6 +138,7 @@ struct MarinaExplicitConstraintDetector {
                     + context.incomeSourceNames
                     + context.presetTitles
                     + context.budgetNames
+                    + context.allocationAccountNames
             ),
             limit: explicitLimit(in: normalizedPrompt),
             sort: explicitSort(in: normalizedPrompt)

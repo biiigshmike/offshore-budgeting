@@ -673,9 +673,12 @@ struct MarinaAggregationExecutorTests {
         let food = fixture.groceries
         let shared = AllocationAccount(name: "Roommate", workspace: fixture.workspace)
         let allocatedExpense = VariableExpense(descriptionText: "Dinner", amount: 120, transactionDate: date(2026, 5, 5), workspace: fixture.workspace, card: fixture.appleCard, category: food)
+        let allocatedTravelExpense = VariableExpense(descriptionText: "Shared Taxi", amount: 80, transactionDate: date(2026, 5, 6), workspace: fixture.workspace, card: fixture.backupCard, category: fixture.travel)
         fixture.context.insert(shared)
         fixture.context.insert(allocatedExpense)
+        fixture.context.insert(allocatedTravelExpense)
         fixture.context.insert(ExpenseAllocation(allocatedAmount: 60, preservesGrossAmount: true, workspace: fixture.workspace, account: shared, expense: allocatedExpense))
+        fixture.context.insert(ExpenseAllocation(allocatedAmount: 25, preservesGrossAmount: true, workspace: fixture.workspace, account: shared, expense: allocatedTravelExpense))
         fixture.context.insert(VariableExpense(descriptionText: "May Groceries", amount: 300, transactionDate: date(2026, 5, 8), workspace: fixture.workspace, card: fixture.appleCard, category: food))
         fixture.context.insert(VariableExpense(descriptionText: "April Groceries", amount: 100, transactionDate: date(2026, 4, 8), workspace: fixture.workspace, card: fixture.appleCard, category: food))
         fixture.context.insert(VariableExpense(descriptionText: "Backup Travel", amount: 10, transactionDate: date(2026, 5, 9), workspace: fixture.workspace, card: fixture.backupCard, category: fixture.travel))
@@ -728,6 +731,29 @@ struct MarinaAggregationExecutorTests {
             now: date(2026, 5, 15)
         ))
         #expect(allocated.primaryValue?.filter(\.isNumber).contains("60") == true)
+        #expect(allocated.rows.map(\.label) == ["Dinner"])
+
+        let allocationRows = handledCard(executor.execute(
+            candidate: candidate(prompt: "Show Roommate allocation rows for Groceries", operation: .listRows, measure: .reconciliationBalance, mentions: [accountMention, categoryMention], grouping: .allocationAccount),
+            resolved: resolvedCandidate(targets: [
+                resolvedTarget(mention: accountMention, role: .filter, entityType: .allocationAccount, displayName: "Roommate", sourceID: shared.id),
+                resolvedTarget(mention: categoryMention, role: .filter, entityType: .category, displayName: "Groceries", sourceID: food.id)
+            ]),
+            plan: MarinaAggregationPlan(
+                operation: .listRows,
+                measure: .reconciliationBalance,
+                targets: [
+                    target(.allocationAccount, "Roommate", sourceID: shared.id),
+                    target(.category, "Groceries", sourceID: food.id)
+                ],
+                dateRange: primary,
+                grouping: MarinaGroupingCandidate(dimension: .allocationAccount)
+            ),
+            provider: fixture.provider,
+            now: date(2026, 5, 15)
+        ))
+        #expect(allocationRows.rows.map(\.label) == ["Dinner"])
+        #expect(allocationRows.primaryValue?.contains("$60.00") == true)
 
         let simulationMention = mention("groceries", .category, role: .simulationInput)
         let simulation = handledCard(executor.execute(
@@ -891,6 +917,7 @@ struct MarinaAggregationExecutorTests {
         measure: MarinaCandidateMeasure,
         mentions: [MarinaUnresolvedEntityMention] = [],
         requestedDetail: MarinaSemanticRequestedDetail? = nil,
+        grouping: MarinaGroupingDimensionCandidate? = nil,
         responseShapeHint: MarinaResponseShapeHint? = nil
     ) -> MarinaQueryPlanCandidate {
         MarinaQueryPlanCandidate(
@@ -899,6 +926,7 @@ struct MarinaAggregationExecutorTests {
             operation: operation,
             measure: measure,
             entityMentions: mentions,
+            grouping: grouping.map { MarinaGroupingCandidate(dimension: $0) },
             responseShapeHint: responseShapeHint,
             semanticCommand: requestedDetail.map {
                 MarinaSemanticCommand(

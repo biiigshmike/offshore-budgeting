@@ -70,6 +70,7 @@ struct MarinaPanelView: View {
     @Query private var cards: [Card]
     @Query private var presets: [Preset]
     @Query private var incomes: [Income]
+    @Query private var allocationAccounts: [AllocationAccount]
     @Query private var assistantAliasRules: [AssistantAliasRule]
     @Query private var plannedExpenses: [PlannedExpense]
     @Query private var variableExpenses: [VariableExpense]
@@ -221,6 +222,11 @@ struct MarinaPanelView: View {
         _incomes = Query(
             filter: #Predicate<Income> { $0.workspace?.id == workspaceID },
             sort: [SortDescriptor(\Income.date, order: .forward)]
+        )
+
+        _allocationAccounts = Query(
+            filter: #Predicate<AllocationAccount> { $0.workspace?.id == workspaceID },
+            sort: [SortDescriptor(\AllocationAccount.name, order: .forward)]
         )
         
         _assistantAliasRules = Query(
@@ -5238,6 +5244,7 @@ struct MarinaPanelView: View {
             incomeSourceNames: Array(Set(incomes.map(\.source))).sorted(),
             presetTitles: presets.map(\.title).sorted(),
             budgetNames: budgets.map(\.name).sorted(),
+            allocationAccountNames: allocationAccounts.map(\.name).sorted(),
             aliasSummaries: assistantAliasRules.map {
                 MarinaAliasSummary(
                     entityTypeRaw: $0.entityType.rawValue,

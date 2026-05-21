@@ -64,6 +64,76 @@ struct MarinaQueryResolverTests {
         #expect(resolved.unresolvedMentions.isEmpty)
     }
 
+    @Test func resolver_resolvesAllocationAccountAndCategoryFiltersTogether() throws {
+        let fixture = try makeFixture()
+        let account = AllocationAccount(name: "Alejandro", workspace: fixture.workspace)
+        let cannabis = Category(name: "Cannabis", hexColor: "#225522", workspace: fixture.workspace)
+        fixture.context.insert(account)
+        fixture.context.insert(cannabis)
+        try fixture.context.save()
+
+        let candidate = MarinaQueryPlanCandidate(
+            source: .foundationModels,
+            rawPrompt: "What had Alejandro spent on Cannabis?",
+            operation: .sum,
+            measure: .spend,
+            entityMentions: [
+                MarinaUnresolvedEntityMention(role: .filter, rawText: "Alejandro", typeHint: .allocationAccount),
+                MarinaUnresolvedEntityMention(role: .filter, rawText: "Cannabis", typeHint: .category)
+            ],
+            confidence: .high
+        )
+
+        let resolved = MarinaQueryResolver().resolve(candidate: candidate, provider: fixture.provider)
+
+        #expect(resolved.resolvedTargets.count == 2)
+        #expect(resolved.resolvedTargets.map(\.entityType) == [.allocationAccount, .category])
+        #expect(resolved.resolvedTargets.map(\.displayName) == ["Alejandro", "Cannabis"])
+        #expect(resolved.unresolvedMentions.isEmpty)
+        #expect(resolved.ambiguousMentions.isEmpty)
+    }
+
+    @Test func resolver_clarifiesAllocationAccountVersusMerchantCollision() throws {
+        let fixture = try makeFixture()
+        let account = AllocationAccount(name: "Alejandro", workspace: fixture.workspace)
+        let card = Card(name: "Apple Card", workspace: fixture.workspace)
+        fixture.context.insert(account)
+        fixture.context.insert(card)
+        fixture.context.insert(VariableExpense(
+            descriptionText: "Alejandro",
+            amount: 42,
+            transactionDate: Date(),
+            workspace: fixture.workspace,
+            card: card
+        ))
+        try fixture.context.save()
+
+        let candidate = MarinaQueryPlanCandidate(
+            source: .foundationModels,
+            rawPrompt: "What had Alejandro spent?",
+            operation: .sum,
+            measure: .spend,
+            entityMentions: [
+                MarinaUnresolvedEntityMention(
+                    role: .filter,
+                    rawText: "Alejandro",
+                    typeHint: nil,
+                    allowedTypeHints: [.allocationAccount, .merchant, .expense],
+                    confidence: .high
+                )
+            ],
+            confidence: .high
+        )
+
+        let resolved = MarinaQueryResolver().resolve(candidate: candidate, provider: fixture.provider)
+        let choiceTypes = resolved.ambiguousMentions.first?.choices.compactMap(\.entityTypeHint).sorted { $0.rawValue < $1.rawValue } ?? []
+
+        #expect(resolved.resolvedTargets.isEmpty)
+        #expect(resolved.unresolvedMentions.isEmpty)
+        #expect(resolved.ambiguousMentions.count == 1)
+        #expect(choiceTypes == [.allocationAccount, .merchant])
+    }
+
     @Test func resolver_preservesUnresolvedMentionWhenNoWorkspaceMatchExists() throws {
         let fixture = try makeFixture()
         let candidate = MarinaQueryPlanCandidate(

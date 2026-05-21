@@ -329,7 +329,7 @@ struct MarinaQueryCapabilityMatrix {
             operations: [.listRows, .rank],
             measures: [.reconciliationBalance],
             groupings: [.allocationAccount],
-            targetTypes: [.allocationAccount],
+            targetTypes: [.allocationAccount, .card, .category, .merchant, .expense, .transaction, .preset],
             requestedDetails: [nil, .general, .amount],
             preferredExecutorRoute: .composableWorkspace
         ),

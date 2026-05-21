@@ -369,6 +369,8 @@ struct MarinaLiveDomainIntentMapper {
             )
 
         case .allocationRows:
+            let accountTarget = allocationTarget(payload: payload, prompt: prompt, context: context)
+            let spendFilter = allocationSpendFilter(payload: payload, prompt: prompt, context: context)
             return mappedRead(
                 payload: payload,
                 prompt: prompt,
@@ -378,8 +380,11 @@ struct MarinaLiveDomainIntentMapper {
                 subject: "expenseAllocations",
                 operation: "listRows",
                 measure: "reconciliationBalance",
-                target: allocationTarget(payload: payload, prompt: prompt),
-                targetType: allocationTarget(payload: payload, prompt: prompt) == nil ? nil : "allocationAccount",
+                target: accountTarget,
+                targetType: nil,
+                targetAllowedTypes: accountTarget == nil ? [] : allocationSpendSubjectAllowedTypes,
+                secondaryTarget: spendFilter?.name,
+                secondaryTargetType: spendFilter?.type,
                 grouping: "allocationAccount",
                 ranking: "newest",
                 limit: 10,
@@ -387,6 +392,7 @@ struct MarinaLiveDomainIntentMapper {
             )
 
         case .settlementRows:
+            let accountTarget = allocationTarget(payload: payload, prompt: prompt, context: context)
             return mappedRead(
                 payload: payload,
                 prompt: prompt,
@@ -396,8 +402,8 @@ struct MarinaLiveDomainIntentMapper {
                 subject: "reconciliation",
                 operation: "listRows",
                 measure: "reconciliationBalance",
-                target: allocationTarget(payload: payload, prompt: prompt),
-                targetType: allocationTarget(payload: payload, prompt: prompt) == nil ? nil : "allocationAccount",
+                target: accountTarget,
+                targetType: accountTarget == nil ? nil : "allocationAccount",
                 grouping: "allocationAccount",
                 ranking: "newest",
                 limit: 10,
@@ -414,7 +420,7 @@ struct MarinaLiveDomainIntentMapper {
                 subject: "reconciliation",
                 operation: "lookupDetails",
                 measure: "reconciliationBalance",
-                target: allocationTarget(payload: payload, prompt: prompt),
+                target: allocationTarget(payload: payload, prompt: prompt, context: context),
                 targetType: "allocationAccount",
                 requestedDetail: "balance",
                 responseDate: .none
@@ -573,17 +579,24 @@ struct MarinaLiveDomainIntentMapper {
 
         case .spendTotal:
             let spendTarget = spendingTarget(payload: payload, prompt: prompt, context: context)
+            let accountTarget = allocationAccountTarget(payload: payload, prompt: prompt, context: context)
+            let accountSpendFilter = accountTarget == nil ? nil : allocationSpendFilter(payload: payload, prompt: prompt, context: context)
             return mappedRead(
                 payload: payload,
                 prompt: prompt,
                 envelopeSummary: envelopeSummary,
                 routeKey: routeKey,
-                canonicalRoute: spendTarget.map { "spending.total.\($0.type)" } ?? "spending.total.workspace",
+                canonicalRoute: accountTarget == nil
+                    ? (spendTarget.map { "spending.total.\($0.type)" } ?? "spending.total.workspace")
+                    : (accountSpendFilter.map { "spending.allocated.\($0.type)" } ?? "spending.allocated.account"),
                 subject: "variableExpenses",
                 operation: "sum",
                 measure: "spend",
-                target: spendTarget?.name,
-                targetType: spendTarget?.type,
+                target: accountTarget ?? spendTarget?.name,
+                targetType: accountTarget == nil ? spendTarget?.type : nil,
+                targetAllowedTypes: accountTarget == nil ? [] : allocationSpendSubjectAllowedTypes,
+                secondaryTarget: accountSpendFilter?.name,
+                secondaryTargetType: accountSpendFilter?.type,
                 responseDate: dateIntent(from: payload.dateText, prompt: prompt, context: context, defaultMode: .ambient)
             )
         }
@@ -661,6 +674,7 @@ struct MarinaLiveDomainIntentMapper {
 
         if containsAny(["reconciliation balance", "shared balance"], in: normalizedPrompt)
             || (normalizedPrompt.contains("balance") && normalizedPrompt.contains("roommate"))
+            || (normalizedPrompt.contains("balance") && allocationAccountTarget(payload: payload, prompt: prompt, context: context) != nil)
             || containsAny(["reconciliationbalance", "sharedbalance"], in: normalizedSignal) {
             return .reconciliationBalance
         }
@@ -722,6 +736,11 @@ struct MarinaLiveDomainIntentMapper {
            normalizedPrompt.contains("income") == false,
            containsAny(context.categoryNames.map { normalized($0) }, in: normalizedPrompt) {
             return .categoryComparison
+        }
+
+        if allocationAccountTarget(payload: payload, prompt: prompt, context: context) != nil,
+           containsAny(["spend", "spent", "spending", "share", "split", "owe", "owed"], in: normalizedPrompt) {
+            return .spendTotal
         }
 
         if promptAsksForSpend {
@@ -804,8 +823,10 @@ struct MarinaLiveDomainIntentMapper {
         measure: String,
         target: String? = nil,
         targetType: String? = nil,
+        targetAllowedTypes: [String] = [],
         secondaryTarget: String? = nil,
         secondaryTargetType: String? = nil,
+        secondaryTargetAllowedTypes: [String] = [],
         grouping: String? = nil,
         ranking: String? = nil,
         requestedDetail: String? = nil,
@@ -822,8 +843,8 @@ struct MarinaLiveDomainIntentMapper {
                     operationRaw: operation,
                     measureRaw: measure,
                     includeMentions: [
-                        entityMention(name: target, type: targetType),
-                        entityMention(name: secondaryTarget, type: secondaryTargetType)
+                        entityMention(name: target, type: targetType, allowedTypes: targetAllowedTypes),
+                        entityMention(name: secondaryTarget, type: secondaryTargetType, allowedTypes: secondaryTargetAllowedTypes)
                     ].compactMap { $0 },
                     excludeMentions: [],
                     primaryDateRange: responseDate.intent,
@@ -969,13 +990,21 @@ struct MarinaLiveDomainIntentMapper {
         )
     }
 
-    private func entityMention(name: String?, type: String?) -> MarinaAIEntityMention? {
+    private var allocationSpendSubjectAllowedTypes: [String] {
+        ["allocationAccount", "merchant", "expense"]
+    }
+
+    private func entityMention(
+        name: String?,
+        type: String?,
+        allowedTypes: [String] = []
+    ) -> MarinaAIEntityMention? {
         guard let name = name?.marinaNilIfBlank else { return nil }
         return MarinaAIEntityMention(
             roleRaw: "filter",
             rawText: name,
-            typeRaw: type,
-            allowedTypeRaws: []
+            typeRaw: allowedTypes.isEmpty ? type : nil,
+            allowedTypeRaws: allowedTypes
         )
     }
 
@@ -1051,10 +1080,75 @@ struct MarinaLiveDomainIntentMapper {
         return (cleanSpendTarget(target), "category")
     }
 
+    private func allocationAccountTarget(
+        payload: MarinaFoundationIntentEnvelopePayload,
+        prompt: String,
+        context: MarinaInterpretationContext
+    ) -> String? {
+        namedTarget(context.allocationAccountNames, in: prompt, fallback: payload.targetText)
+            ?? namedTarget(context.allocationAccountNames, in: prompt, fallback: payload.secondaryTargetText)
+    }
+
+    private func allocationSpendFilter(
+        payload: MarinaFoundationIntentEnvelopePayload,
+        prompt: String,
+        context: MarinaInterpretationContext
+    ) -> (name: String, type: String)? {
+        let account = allocationAccountTarget(payload: payload, prompt: prompt, context: context).map(normalized)
+        let normalizedPrompt = normalized(prompt)
+
+        if normalizedPrompt.contains(" at "),
+           let merchant = phraseAfter([" at "], in: prompt).map(cleanSpendTarget),
+           account != normalized(merchant),
+           isInvalidEntityTarget(merchant) == false {
+            return (merchant, "merchant")
+        }
+
+        if let category = namedTarget(context.categoryNames, in: prompt, fallback: payload.targetText),
+           account != normalized(category) {
+            return (category, "category")
+        }
+        if let category = namedTarget(context.categoryNames, in: prompt, fallback: payload.secondaryTargetText),
+           account != normalized(category) {
+            return (category, "category")
+        }
+        if let card = namedTarget(context.cardNames, in: prompt, fallback: payload.targetText),
+           account != normalized(card) {
+            return (card, "card")
+        }
+        if let card = namedTarget(context.cardNames, in: prompt, fallback: payload.secondaryTargetText),
+           account != normalized(card) {
+            return (card, "card")
+        }
+        if let preset = namedTarget(context.presetTitles, in: prompt, fallback: payload.targetText),
+           account != normalized(preset) {
+            return (preset, "preset")
+        }
+        if let preset = namedTarget(context.presetTitles, in: prompt, fallback: payload.secondaryTargetText),
+           account != normalized(preset) {
+            return (preset, "preset")
+        }
+
+        for fallback in [payload.targetText, payload.secondaryTargetText].compactMap({ $0?.marinaNilIfBlank }) {
+            let cleaned = cleanSpendTarget(fallback)
+            guard account != normalized(cleaned),
+                  isInvalidEntityTarget(cleaned) == false else {
+                continue
+            }
+            return (cleaned, "merchant")
+        }
+
+        return nil
+    }
+
     private func allocationTarget(
         payload: MarinaFoundationIntentEnvelopePayload,
-        prompt: String
+        prompt: String,
+        context: MarinaInterpretationContext
     ) -> String? {
+        if let account = allocationAccountTarget(payload: payload, prompt: prompt, context: context) {
+            return account
+        }
         if let target = payload.targetText?.marinaNilIfBlank,
            isInvalidEntityTarget(target) == false {
             let cleaned = cleanReconciliationTarget(target)

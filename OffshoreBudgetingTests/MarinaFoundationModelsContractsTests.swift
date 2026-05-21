@@ -85,6 +85,57 @@ struct MarinaFoundationModelsContractsTests {
         #expect(settings.traceSummary.contains("foundationLocale="))
     }
 
+    @Test func interpretationPrompt_excludesWorkspaceEntityListsFromModelVisibleContext() {
+        let emptyContext = routerContext(
+            cardNames: [],
+            categoryNames: [],
+            incomeSourceNames: [],
+            presetTitles: [],
+            budgetNames: [],
+            aliasSummaries: []
+        )
+        let largeContext = routerContext(
+            cardNames: generatedNames(prefix: "Generated Card", count: 80),
+            categoryNames: generatedNames(prefix: "Generated Category", count: 80),
+            incomeSourceNames: generatedNames(prefix: "Generated Income Source", count: 80),
+            presetTitles: generatedNames(prefix: "Generated Preset", count: 80),
+            budgetNames: generatedNames(prefix: "Generated Budget", count: 80),
+            aliasSummaries: [
+                MarinaAliasSummary(
+                    entityTypeRaw: "category",
+                    aliasKey: "generated-alias",
+                    targetValue: "Generated Category 1"
+                )
+            ]
+        )
+
+        let emptyInstructions = MarinaFoundationInterpretationPromptBuilder.instructions(context: emptyContext)
+        let largeInstructions = MarinaFoundationInterpretationPromptBuilder.instructions(context: largeContext)
+
+        #expect(largeInstructions == emptyInstructions)
+        #expect(largeInstructions.contains("Personal"))
+        #expect(largeInstructions.contains("default period unit: month"))
+        #expect(largeInstructions.contains("prior query: none"))
+        #expect(largeInstructions.contains("Generated Card 1") == false)
+        #expect(largeInstructions.contains("Generated Category 1") == false)
+        #expect(largeInstructions.contains("Generated Income Source 1") == false)
+        #expect(largeInstructions.contains("Generated Preset 1") == false)
+        #expect(largeInstructions.contains("Generated Budget 1") == false)
+        #expect(largeInstructions.contains("generated-alias") == false)
+    }
+
+    @Test func interpretationPrompt_keepsPerTurnPromptTinyAndUnduplicated() {
+        let prompt = MarinaFoundationInterpretationPromptBuilder.prompt(
+            userPrompt: "What is my actual income this month?"
+        )
+
+        #expect(MarinaFoundationInterpretationPromptBuilder.maximumResponseTokens == 256)
+        #expect(prompt.contains("User prompt: What is my actual income this month?"))
+        #expect(prompt.contains("Produce the typed envelope only."))
+        #expect(prompt.contains("Default period unit") == false)
+        #expect(prompt.contains("Prior context") == false)
+    }
+
     @Test func typedReadQuery_bridgesToSemanticCommand() {
         let intent = MarinaAIIntent.readQuery(
             MarinaAIReadQueryIntent(
@@ -400,20 +451,31 @@ struct MarinaFoundationModelsContractsTests {
         MarinaFoundationRouteKind(routeRaw: raw)
     }
 
-    private func routerContext() -> MarinaInterpretationContext {
+    private func routerContext(
+        cardNames: [String] = ["Apple Card"],
+        categoryNames: [String] = ["Dining"],
+        incomeSourceNames: [String] = ["Salary"],
+        presetTitles: [String] = [],
+        budgetNames: [String] = [],
+        aliasSummaries: [MarinaAliasSummary] = []
+    ) -> MarinaInterpretationContext {
         MarinaInterpretationContext(
             workspaceName: "Personal",
             defaultPeriodUnit: .month,
             sessionContext: MarinaSessionContext(),
             priorQueryContext: .empty,
-            cardNames: ["Apple Card"],
-            categoryNames: ["Dining"],
-            incomeSourceNames: ["Salary"],
-            presetTitles: [],
-            budgetNames: [],
-            aliasSummaries: [],
+            cardNames: cardNames,
+            categoryNames: categoryNames,
+            incomeSourceNames: incomeSourceNames,
+            presetTitles: presetTitles,
+            budgetNames: budgetNames,
+            aliasSummaries: aliasSummaries,
             now: Date(timeIntervalSince1970: 1_779_465_600)
         )
+    }
+
+    private func generatedNames(prefix: String, count: Int) -> [String] {
+        (1...count).map { "\(prefix) \($0)" }
     }
 
     @available(iOS 26.0, macOS 26.0, *)

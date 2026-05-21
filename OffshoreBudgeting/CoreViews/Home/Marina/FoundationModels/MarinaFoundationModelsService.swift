@@ -45,6 +45,72 @@ struct MarinaFoundationModelsService: MarinaStructuredIntentInterpreting, Marina
     }
 }
 
+enum MarinaFoundationInterpretationPromptBuilder {
+    static let maximumResponseTokens = 256
+
+    static func instructions(context: MarinaInterpretationContext) -> String {
+        """
+        Prompt version: \(MarinaFoundationPromptVersion.interpretation.rawValue)
+        You are Marina inside Offshore. Extract one tiny typed envelope for deterministic Swift execution.
+        Swift validates workspace scope, resolves entities, reads data, computes math, and writes the final answer.
+
+        Rules:
+        - Return only MarinaFoundationIntentEnvelope fields.
+        - routeRaw must be readQuery, lookup, clarification, scenario, help, or unsupported.
+        - Use null for unused optional fields; never write placeholder strings like null, nil, none, n/a, or unknown.
+        - Never calculate totals, balances, rows, percentages, or final answer text.
+        - Preserve date phrases exactly in dateText or comparisonDateText; if no date appears, leave dateText null.
+        - targetText is only a concrete named object or filter. Do not put generic concepts like spending, income, actual income, active budget, savings, budget, transactions, or uncategorized spending in targetText.
+        - For relationships, copy words like linked cards, linked presets, budget limit, allocation rows, settlement rows, status, or balance into relationshipText.
+        - For explicit what-if prompts, copy the amount phrase into amountText and use valueDirectionRaw more, less, set, increase, or decrease when obvious.
+        - For CRUD commands, set routeRaw unsupported and unsupportedReasonRaw crud.
+
+        Route hints:
+        - readQuery: totals, averages, comparisons, ranked lists, rows, breakdowns, insights.
+        - lookup: object details, relationships, balances, memberships, records.
+        - scenario: explicit what-if prompts.
+        - help: capability questions.
+        - clarification: ambiguous request or answer to a prior clarification.
+        - unsupported: anything outside safe read-only budgeting.
+
+        Context:
+        - workspace: \(context.workspaceName)
+        - default period unit: \(context.defaultPeriodUnit.rawValue)
+        - prior query: \(priorQuerySummary(context.priorQueryContext))
+        """
+    }
+
+    static func prompt(userPrompt: String) -> String {
+        """
+        User prompt: \(userPrompt)
+        Produce the typed envelope only.
+        """
+    }
+
+    private static func priorQuerySummary(_ context: MarinaPriorQueryContext) -> String {
+        guard context.hasContext else { return "none" }
+
+        let dateSummary: String = {
+            guard let range = context.lastDateRange else { return "none" }
+            return "\(isoDateString(range.startDate)) to \(isoDateString(range.endDate))"
+        }()
+
+        return [
+            "metric=\(context.lastQueryPlan?.metric.rawValue ?? context.lastMetric?.rawValue ?? "none")",
+            "target=\(context.lastTargetName ?? "none")",
+            "targetType=\(context.lastTargetType?.rawValue ?? "none")",
+            "dateRange=\(dateSummary)",
+            "resultLimit=\(context.lastResultLimit.map(String.init) ?? "none")",
+            "periodUnit=\(context.lastQueryPlan?.periodUnit?.rawValue ?? context.lastPeriodUnit?.rawValue ?? "none")"
+        ]
+        .joined(separator: ", ")
+    }
+
+    private static func isoDateString(_ date: Date) -> String {
+        MarinaDateOnlyRangeCodec.dateOnlyString(from: date)
+    }
+}
+
 #if canImport(FoundationModels)
 import FoundationModels
 
@@ -56,14 +122,13 @@ private func interpretWithFoundationModels(
     do {
         let provider = MarinaFoundationModelsSessionProvider()
         let routeSession = try provider.makeSession(
-            instructions: marinaInstructions(context: context),
-            tools: provider.tools(for: .readQuery, context: context)
+            instructions: MarinaFoundationInterpretationPromptBuilder.instructions(context: context)
         )
         let response = try await routeSession.respond(
-            to: marinaEnvelopePrompt(prompt: prompt, context: context),
+            to: MarinaFoundationInterpretationPromptBuilder.prompt(userPrompt: prompt),
             generating: MarinaFoundationIntentEnvelope.self,
             includeSchemaInPrompt: true,
-            options: marinaInterpretationOptions(maximumResponseTokens: 900)
+            options: marinaInterpretationOptions(maximumResponseTokens: MarinaFoundationInterpretationPromptBuilder.maximumResponseTokens)
         )
         let mapping = MarinaLiveDomainIntentMapper(nowProvider: { context.now }).map(
             payload: response.content.payload,
@@ -98,118 +163,12 @@ private func interpretWithFoundationModels(
 }
 
 @available(iOS 26.0, macOS 26.0, *)
-private func marinaInstructions(context: MarinaInterpretationContext) -> String {
-    let aliasLines = context.aliasSummaries
-        .prefix(20)
-        .map { "\($0.entityTypeRaw): \($0.aliasKey) -> \($0.targetValue)" }
-        .joined(separator: ", ")
-    let priorQuerySummary = marinaPriorQuerySummary(context.priorQueryContext)
-
-    return """
-    Prompt version: \(MarinaFoundationPromptVersion.interpretation.rawValue)
-    You are Marina, a private budgeting assistant inside Offshore.
-    Return exactly one tiny typed language envelope for deterministic Offshore execution.
-    Do not include prose, explanation, chain-of-thought, raw reasoning, final answer text, rows, totals, or calculations.
-    Your job is coarse language extraction only. Swift chooses the exact finance route, validates entities, reads data, computes math, and writes the final answer.
-
-    Safety rules:
-    - Never calculate totals, averages, percentages, balances, row contents, or final answers.
-    - Never invent transactions, entities, fields, relationships, amounts, balances, or dates.
-    - Never query app data directly. The app validates, resolves, scopes, fetches, and computes deterministically.
-    - Always preserve the current workspace boundary.
-    - If no date is supplied, leave dateText null so Swift's default date policy applies.
-    - If the user says "this month", "last month", "today", or similar, copy that phrase into dateText or comparisonDateText. Do not make ISO dates.
-    - For CRUD prompts, return routeRaw unsupported with unsupportedReasonRaw crud.
-
-    routeRaw values:
-    - readQuery: totals, averages, comparisons, ranked lists, recent rows, breakdowns, insights.
-    - lookup: object details, relationships, balances, memberships, records.
-    - scenario: explicit what-if/hypothetical prompts.
-    - help: capability or example questions.
-    - unsupported: CRUD commands, advice, or anything outside read-only budgeting.
-    - clarification: when the current user request has multiple plausible safe readings, or when the user is answering a previous clarification.
-
-    Envelope rules:
-    - Fill one MarinaFoundationIntentEnvelope only.
-    - routeRaw must be readQuery, lookup, clarification, scenario, help, or unsupported.
-    - Use only scalar strings/numbers in the provided fields. Leave unused optional fields as actual null values.
-    - Never put placeholder words like "null", "nil", "none", "n/a", "unknown", or empty JSON fragments into string fields.
-    - No field named reasoning exists; do not invent one.
-    - intentRaw is a short hint, not the final route. Examples: workspace, activeBudget, budgetInventory, upcomingBudgets, plannedExpenseRows, presetTemplates, linkedCards, linkedPresets, categoryLimit, spendTotal, recentTransactions, topCategories, categoryBreakdown, spendComparison, incomeActual, incomePlanned, incomeCompare, savingsStatus, savingsActivity, reconciliationBalance, allocationRows, settlementRows, whatIf, lookup, unsupported.
-    - formulaFamilyRaw is optional. Use only: list, detail, count, sum, average, rank, compare, threshold, runway, anomaly, whatIf, trend, forecast.
-    - formulaRecipeRaw is optional. Use only one executable recipe: categoryLimitBurnRate, cardSavingsDrag, earlyPlannedExpenseStress, recurringChargeAnomaly, expenseOnlySavingsRunway. Backlog recipe names may be emitted only when clearly requested: netCashFlow, plannedVsActualVariance, thresholdRows, zeroActivityBuckets, recurringFrequency, periodChangeDrivers, forecastPeriodicSpend, medianAmount.
-    - formulaRaw remains a legacy recipe alias; prefer formulaFamilyRaw plus formulaRecipeRaw. Swift executes all math and rejects invented recipes.
-    - Use formula facets sparingly: thresholdRaw for numeric/limit cutoffs, baselineRaw for comparison baseline, assumptionRaw for user-stated assumptions, excludeIncome when the user says to ignore income.
-    - targetText is only the concrete user-named object or filter, such as Apple Card, Groceries, Salary, May Budget, Dining, Roommate, or Apple.
-    - Do not put generic concepts such as "spending", "total spending", "income", "actual income", "active budget", "savings", "budget", "transactions", or "uncategorized spending" into targetText.
-    - For relationships, copy the relationship words into relationshipText, such as linked cards, linked presets, budget limit, allocation rows, settlement rows, status, or balance.
-    - For what-if prompts, copy the amount phrase into amountText and use valueDirectionRaw more, less, set, increase, or decrease when obvious.
-    - Final answer text, typed subject/operation/measure fields, totals, balances, percentages, rows, and ISO dates must not be included.
-
-    Current workspace:
-    - workspace name: \(context.workspaceName)
-    - default period unit: \(context.defaultPeriodUnit.rawValue)
-    - prior query context: \(priorQuerySummary)
-    - cards: \(joinedList(context.cardNames))
-    - categories: \(joinedList(context.categoryNames))
-    - income sources: \(joinedList(context.incomeSourceNames))
-    - presets: \(joinedList(context.presetTitles))
-    - budgets: \(joinedList(context.budgetNames))
-    - aliases: \(aliasLines.isEmpty ? "none" : aliasLines)
-    """
-}
-
-@available(iOS 26.0, macOS 26.0, *)
-private func marinaEnvelopePrompt(prompt: String, context: MarinaInterpretationContext) -> String {
-    """
-    User prompt: \(prompt)
-    Default period unit: \(context.defaultPeriodUnit.rawValue)
-    Prior context: \(marinaPriorQuerySummary(context.priorQueryContext))
-    Produce the typed envelope only.
-    """
-}
-
-@available(iOS 26.0, macOS 26.0, *)
 private func marinaInterpretationOptions(maximumResponseTokens: Int) -> GenerationOptions {
     GenerationOptions(
         sampling: .greedy,
         temperature: nil,
         maximumResponseTokens: maximumResponseTokens
     )
-}
-
-@available(iOS 26.0, macOS 26.0, *)
-private func marinaPriorQuerySummary(_ context: MarinaPriorQueryContext) -> String {
-    guard context.hasContext else { return "none" }
-
-    let dateSummary: String = {
-        guard let range = context.lastDateRange else { return "none" }
-        return "\(isoDateString(range.startDate)) to \(isoDateString(range.endDate))"
-    }()
-
-    return [
-        "metric=\(context.lastQueryPlan?.metric.rawValue ?? context.lastMetric?.rawValue ?? "none")",
-        "target=\(context.lastTargetName ?? "none")",
-        "targetType=\(context.lastTargetType?.rawValue ?? "none")",
-        "dateRange=\(dateSummary)",
-        "resultLimit=\(context.lastResultLimit.map(String.init) ?? "none")",
-        "periodUnit=\(context.lastQueryPlan?.periodUnit?.rawValue ?? context.lastPeriodUnit?.rawValue ?? "none")"
-    ]
-    .joined(separator: ", ")
-}
-
-@available(iOS 26.0, macOS 26.0, *)
-private func isoDateString(_ date: Date) -> String {
-    MarinaDateOnlyRangeCodec.dateOnlyString(from: date)
-}
-
-@available(iOS 26.0, macOS 26.0, *)
-private func joinedList(_ values: [String]) -> String {
-    let cleaned = values
-        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-        .filter { $0.isEmpty == false }
-        .prefix(30)
-    return cleaned.isEmpty ? "none" : cleaned.joined(separator: ", ")
 }
 
 #else

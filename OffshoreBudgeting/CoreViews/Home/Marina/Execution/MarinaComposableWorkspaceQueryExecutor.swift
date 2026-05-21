@@ -815,12 +815,39 @@ struct MarinaComposableWorkspaceQueryExecutor {
     ) -> MarinaWorkspaceAggregationCard {
         let range = plan.dateRange ?? monthRange(containing: now)
         let accountFilters = resolved.resolvedTargets.filter { $0.entityType == .allocationAccount }
+        let otherFilters = resolved.resolvedTargets.filter { $0.entityType != .allocationAccount }
         let rows = provider.fetchAllExpenseAllocations()
             .filter { allocation in
                 accountFilters.isEmpty
                     || accountFilters.contains { $0.sourceID == allocation.account?.id || $0.displayName.localizedCaseInsensitiveCompare(allocation.account?.name ?? "") == .orderedSame }
             }
             .compactMap { allocation -> MarinaWorkspaceAggregationCard.Row? in
+                let spendingRow: SpendingRow?
+                if let expense = allocation.expense {
+                    spendingRow = row(for: expense, amount: max(0, allocation.allocatedAmount))
+                } else if let expense = allocation.plannedExpense {
+                    spendingRow = row(for: expense, amount: max(0, allocation.allocatedAmount))
+                } else {
+                    spendingRow = nil
+                }
+                if let spendingRow {
+                    guard contains(spendingRow.date, in: range) else { return nil }
+                    guard otherFilters.isEmpty || otherFilters.allSatisfy({ matches(row: spendingRow, target: $0) }) else {
+                        return nil
+                    }
+                    let accountName = allocation.account?.name ?? "Reconciliation"
+                    return MarinaWorkspaceAggregationCard.Row(
+                        label: spendingRow.title,
+                        value: "\(currency(spendingRow.amount)) • \(accountName) • \(shortDate(spendingRow.date))",
+                        amount: spendingRow.amount,
+                        date: spendingRow.date,
+                        objectType: .expenseAllocation,
+                        sourceID: allocation.id,
+                        sortValue: spendingRow.date.timeIntervalSince1970
+                    )
+                }
+
+                guard otherFilters.isEmpty else { return nil }
                 let linkedDate = allocation.expense?.transactionDate ?? allocation.plannedExpense?.expenseDate ?? allocation.createdAt
                 guard contains(linkedDate, in: range) else { return nil }
                 let title = allocation.expense?.descriptionText ?? allocation.plannedExpense?.title ?? "Allocation"

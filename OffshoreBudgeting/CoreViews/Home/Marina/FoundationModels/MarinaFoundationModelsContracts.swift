@@ -354,15 +354,15 @@ struct MarinaFoundationRouteEnvelope: Codable, Equatable, Sendable {
 #endif
 struct MarinaFoundationIntentEnvelope: Codable, Equatable, Sendable {
     #if canImport(FoundationModels)
-    @Guide(description: "Required coarse route only: readQuery, lookup, clarification, unsupported, scenario, or help.")
+    @Guide(description: "readQuery, lookup, clarification, unsupported, scenario, or help.")
     #endif
     let routeRaw: String
     #if canImport(FoundationModels)
-    @Guide(description: "Short intent hint such as spendTotal, activeBudget, linkedCards, incomeActual, allocationRows, settlementRows, reconciliationBalance, savingsStatus, savingsActivity, whatIf, lookup, or unsupported.")
+    @Guide(description: "Short hint, such as spendTotal, incomeActual, linkedCards, whatIf, or unsupported.")
     #endif
     let intentRaw: String?
     #if canImport(FoundationModels)
-    @Guide(description: "Exact user phrase for the main named object or filter. Leave null for generic subjects such as spending, income, budget, or savings.")
+    @Guide(description: "Literal named object/filter; null for generic subjects.")
     #endif
     let targetText: String?
     let secondaryTargetText: String?
