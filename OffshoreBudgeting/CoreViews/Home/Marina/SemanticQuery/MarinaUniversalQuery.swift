@@ -497,7 +497,7 @@ private struct UniversalRow: Equatable {
 }
 
 private extension String {
-    var nilIfBlankForV2: String? {
+    var marinaNilIfBlank: String? {
         let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
     }
@@ -814,7 +814,7 @@ struct MarinaUniversalQueryDetector {
         prompt
             .replacingOccurrences(of: #"(?i)^\s*(show|find|lookup)\s+(my\s+)?"#, with: "", options: .regularExpression)
             .trimmingCharacters(in: CharacterSet(charactersIn: " ?."))
-            .nilIfBlankForV2
+            .marinaNilIfBlank
     }
 
     private func isOnlyModelReference(
@@ -832,7 +832,7 @@ struct MarinaUniversalQueryDetector {
                 return String(suffix)
                     .replacingOccurrences(of: #"^(a|an|the)\s+"#, with: "", options: .regularExpression)
                     .trimmingCharacters(in: .whitespacesAndNewlines)
-                    .nilIfBlankForV2
+                    .marinaNilIfBlank
             }
         }
         return nil

@@ -3,7 +3,6 @@ import Foundation
 struct MarinaExecutionTrace: Equatable {
     let originalPrompt: String
     let routingMode: MarinaExecutionRoutingMode
-    let marinaNLQv1Enabled: Bool
     let runtimeSettingsSummary: String?
 
     let modelWasAvailable: Bool
@@ -27,11 +26,6 @@ struct MarinaExecutionTrace: Equatable {
     let routeRescueSummary: String?
     let blockedWrongQuery: Bool?
 
-    let fallbackWasAttempted: Bool
-    let fallbackOutputSummary: String?
-    let fallbackSelectionReason: MarinaExecutionFallbackReason?
-    let fallbackReplacedModelOutput: Bool
-
     let selectedRoute: MarinaExecutionSelectedRoute
     let selectedRouteReason: String?
 
@@ -50,54 +44,35 @@ struct MarinaExecutionTrace: Equatable {
     let responseType: String?
     let finalAnswerSummary: String?
     let responseSurfaceSource: MarinaResponseSurfaceSource?
-    let responseSurfaceFallbackReason: MarinaResponseGenerationFallbackReason?
+    let responseSurfaceRecoveryReason: MarinaResponseGenerationRecoveryReason?
 
-    let sharedPipelineEnabled: Bool?
-    let sharedPipelinePath: MarinaSharedPipelineRuntimePath?
-    let sharedPipelineInterpreterSource: MarinaInterpreterSource?
-    let sharedPipelineHeuristicAttempted: Bool?
-    let sharedPipelineHeuristicUsedAsFallback: Bool?
-    let sharedPipelineCandidateSummary: String?
-    let sharedPipelineResolverSummary: String?
-    let sharedPipelineValidatorSummary: String?
-    let sharedPipelineExecutorSummary: String?
-    let sharedPipelineResponseBridgeSummary: String?
-    let sharedPipelineResponseShapeSummary: String?
-    let sharedPipelineSemanticInterpretationSummary: String?
-    let sharedPipelineSemanticResolverSummary: String?
-    let sharedPipelineSemanticValidationSummary: String?
-    let sharedPipelineFallbackReason: MarinaSharedPipelineFallbackReason?
-    let sharedPipelineDisagreementSummary: String?
-    let sharedPipelineTurnClassification: MarinaPromptTurnClassification?
-    let sharedPipelinePriorContextIncluded: Bool?
+    let foundationPipelineEnabled: Bool?
+    let foundationPipelinePath: MarinaFoundationPipelineRuntimePath?
+    let foundationPipelineInterpreterSource: MarinaInterpretationSource?
+    let foundationPipelineCandidateSummary: String?
+    let foundationPipelineResolverSummary: String?
+    let foundationPipelineValidatorSummary: String?
+    let foundationPipelineExecutorSummary: String?
+    let foundationPipelineResponseBridgeSummary: String?
+    let foundationPipelineResponseShapeSummary: String?
+    let foundationPipelineSemanticInterpretationSummary: String?
+    let foundationPipelineSemanticResolverSummary: String?
+    let foundationPipelineSemanticValidationSummary: String?
+    let foundationPipelineRecoveryReason: MarinaFoundationPipelineRecoveryReason?
+    let foundationPipelineDisagreementSummary: String?
+    let foundationPipelineTurnClassification: MarinaPromptTurnClassification?
+    let foundationPipelinePriorContextIncluded: Bool?
 }
 
 enum MarinaExecutionRoutingMode: String, Equatable {
-    case modelRouter = "model_router"
-    case nlqAuthoritative = "nlq_authoritative"
-    case sharedPipeline = "shared_pipeline"
+    case foundationPipeline = "foundation_pipeline"
 }
 
 enum MarinaExecutionSelectedRoute: String, Equatable {
-    case model
-    case fallback
-    case nlq
-    case sharedHeuristic = "shared_heuristic"
-    case sharedFoundationModels = "shared_foundation_models"
-    case sharedFallback = "shared_fallback"
+    case foundationModels = "foundation_models"
     case clarification
     case recovery
     case unresolved
-}
-
-enum MarinaExecutionFallbackReason: String, Equatable {
-    case modelUnavailable = "model_unavailable"
-    case modelError = "model_error"
-    case modelUnresolved = "model_unresolved"
-    case modelQueryInvalid = "model_query_invalid"
-    case preferHeuristicQuery = "prefer_heuristic_query"
-    case preferHeuristicClarificationBypass = "prefer_heuristic_clarification_bypass"
-    case manualClarificationFallback = "manual_clarification_fallback"
 }
 
 final class MarinaTraceRecorder {
@@ -129,7 +104,6 @@ final class MarinaTraceRecorder {
     func begin(
         prompt: String,
         routingMode: MarinaExecutionRoutingMode,
-        marinaNLQv1Enabled: Bool,
         runtimeSettingsSummary: String? = nil
     ) {
         guard isEnabled else { return }
@@ -138,7 +112,6 @@ final class MarinaTraceRecorder {
         currentDraft = MarinaExecutionTraceDraft(
             originalPrompt: prompt,
             routingMode: routingMode,
-            marinaNLQv1Enabled: marinaNLQv1Enabled,
             runtimeSettingsSummary: runtimeSettingsSummary
         )
     }
@@ -146,7 +119,6 @@ final class MarinaTraceRecorder {
     func ensure(
         prompt: String,
         routingMode: MarinaExecutionRoutingMode,
-        marinaNLQv1Enabled: Bool,
         runtimeSettingsSummary: String? = nil
     ) {
         guard isEnabled else { return }
@@ -156,7 +128,6 @@ final class MarinaTraceRecorder {
             currentDraft = MarinaExecutionTraceDraft(
                 originalPrompt: prompt,
                 routingMode: routingMode,
-                marinaNLQv1Enabled: marinaNLQv1Enabled,
                 runtimeSettingsSummary: runtimeSettingsSummary
             )
         }
@@ -237,25 +208,6 @@ final class MarinaTraceRecorder {
         }
     }
 
-    func recordFallbackAttempt(outputSummary: String?) {
-        guard isEnabled else { return }
-        mutate { draft in
-            draft.fallbackWasAttempted = true
-            draft.fallbackOutputSummary = outputSummary
-        }
-    }
-
-    func recordFallbackSelection(
-        reason: MarinaExecutionFallbackReason,
-        replacedModelOutput: Bool
-    ) {
-        guard isEnabled else { return }
-        mutate { draft in
-            draft.fallbackSelectionReason = reason
-            draft.fallbackReplacedModelOutput = replacedModelOutput
-        }
-    }
-
     func recordSelectedRoute(_ route: MarinaExecutionSelectedRoute, reason: String?) {
         guard isEnabled else { return }
         mutate { draft in
@@ -316,12 +268,12 @@ final class MarinaTraceRecorder {
 
     func recordResponseSurface(
         source: MarinaResponseSurfaceSource,
-        fallbackReason: MarinaResponseGenerationFallbackReason?
+        recoveryReason: MarinaResponseGenerationRecoveryReason?
     ) {
         guard isEnabled else { return }
         mutate { draft in
             draft.responseSurfaceSource = source
-            draft.responseSurfaceFallbackReason = fallbackReason
+            draft.responseSurfaceRecoveryReason = recoveryReason
         }
     }
 
@@ -335,34 +287,32 @@ final class MarinaTraceRecorder {
         }
     }
 
-    func recordSharedPipelineTurnClassification(_ turnClassification: MarinaPromptTurnClassification) {
+    func recordFoundationPipelineTurnClassification(_ turnClassification: MarinaPromptTurnClassification) {
         guard isEnabled else { return }
         mutate { draft in
-            draft.sharedPipelineTurnClassification = turnClassification
+            draft.foundationPipelineTurnClassification = turnClassification
         }
     }
 
-    func recordSharedPipelineTrace(_ trace: MarinaSharedPipelineTrace) {
+    func recordFoundationPipelineTrace(_ trace: MarinaFoundationPipelineTrace) {
         guard isEnabled else { return }
         mutate { draft in
-            draft.sharedPipelineEnabled = trace.sharedPipelineEnabled
-            draft.sharedPipelinePath = trace.selectedPath
-            draft.sharedPipelineInterpreterSource = trace.interpreterSource
-            draft.sharedPipelineHeuristicAttempted = trace.heuristicAttempted
-            draft.sharedPipelineHeuristicUsedAsFallback = trace.heuristicUsedAsFallback
-            draft.sharedPipelineCandidateSummary = trace.candidateSummary
-            draft.sharedPipelineResolverSummary = trace.resolverSummary
-            draft.sharedPipelineValidatorSummary = trace.validatorOutcomeSummary
-            draft.sharedPipelineExecutorSummary = trace.executorResultSummary
-            draft.sharedPipelineResponseBridgeSummary = trace.responseBridgeSummary
-            draft.sharedPipelineResponseShapeSummary = trace.responseShapeSummary
-            draft.sharedPipelineSemanticInterpretationSummary = trace.semanticInterpretationSummary
-            draft.sharedPipelineSemanticResolverSummary = trace.semanticResolverSummary
-            draft.sharedPipelineSemanticValidationSummary = trace.semanticValidationSummary
-            draft.sharedPipelineFallbackReason = trace.fallbackReason
-            draft.sharedPipelineDisagreementSummary = trace.disagreementSummary
-            draft.sharedPipelineTurnClassification = trace.turnClassification
-            draft.sharedPipelinePriorContextIncluded = trace.priorContextIncluded
+            draft.foundationPipelineEnabled = trace.foundationPipelineEnabled
+            draft.foundationPipelinePath = trace.selectedPath
+            draft.foundationPipelineInterpreterSource = trace.interpreterSource
+            draft.foundationPipelineCandidateSummary = trace.candidateSummary
+            draft.foundationPipelineResolverSummary = trace.resolverSummary
+            draft.foundationPipelineValidatorSummary = trace.validatorOutcomeSummary
+            draft.foundationPipelineExecutorSummary = trace.executorResultSummary
+            draft.foundationPipelineResponseBridgeSummary = trace.responseBridgeSummary
+            draft.foundationPipelineResponseShapeSummary = trace.responseShapeSummary
+            draft.foundationPipelineSemanticInterpretationSummary = trace.semanticInterpretationSummary
+            draft.foundationPipelineSemanticResolverSummary = trace.semanticResolverSummary
+            draft.foundationPipelineSemanticValidationSummary = trace.semanticValidationSummary
+            draft.foundationPipelineRecoveryReason = trace.recoveryReason
+            draft.foundationPipelineDisagreementSummary = trace.disagreementSummary
+            draft.foundationPipelineTurnClassification = trace.turnClassification
+            draft.foundationPipelinePriorContextIncluded = trace.priorContextIncluded
         }
     }
 
@@ -398,7 +348,6 @@ final class MarinaTraceRecorder {
 private struct MarinaExecutionTraceDraft {
     let originalPrompt: String
     let routingMode: MarinaExecutionRoutingMode
-    let marinaNLQv1Enabled: Bool
     let runtimeSettingsSummary: String?
 
     var modelWasAvailable: Bool = false
@@ -422,11 +371,6 @@ private struct MarinaExecutionTraceDraft {
     var routeRescueSummary: String?
     var blockedWrongQuery: Bool?
 
-    var fallbackWasAttempted: Bool = false
-    var fallbackOutputSummary: String?
-    var fallbackSelectionReason: MarinaExecutionFallbackReason?
-    var fallbackReplacedModelOutput: Bool = false
-
     var selectedRoute: MarinaExecutionSelectedRoute = .unresolved
     var selectedRouteReason: String?
 
@@ -445,32 +389,29 @@ private struct MarinaExecutionTraceDraft {
     var responseType: String?
     var finalAnswerSummary: String?
     var responseSurfaceSource: MarinaResponseSurfaceSource?
-    var responseSurfaceFallbackReason: MarinaResponseGenerationFallbackReason?
+    var responseSurfaceRecoveryReason: MarinaResponseGenerationRecoveryReason?
 
-    var sharedPipelineEnabled: Bool?
-    var sharedPipelinePath: MarinaSharedPipelineRuntimePath?
-    var sharedPipelineInterpreterSource: MarinaInterpreterSource?
-    var sharedPipelineHeuristicAttempted: Bool?
-    var sharedPipelineHeuristicUsedAsFallback: Bool?
-    var sharedPipelineCandidateSummary: String?
-    var sharedPipelineResolverSummary: String?
-    var sharedPipelineValidatorSummary: String?
-    var sharedPipelineExecutorSummary: String?
-    var sharedPipelineResponseBridgeSummary: String?
-    var sharedPipelineResponseShapeSummary: String?
-    var sharedPipelineSemanticInterpretationSummary: String?
-    var sharedPipelineSemanticResolverSummary: String?
-    var sharedPipelineSemanticValidationSummary: String?
-    var sharedPipelineFallbackReason: MarinaSharedPipelineFallbackReason?
-    var sharedPipelineDisagreementSummary: String?
-    var sharedPipelineTurnClassification: MarinaPromptTurnClassification?
-    var sharedPipelinePriorContextIncluded: Bool?
+    var foundationPipelineEnabled: Bool?
+    var foundationPipelinePath: MarinaFoundationPipelineRuntimePath?
+    var foundationPipelineInterpreterSource: MarinaInterpretationSource?
+    var foundationPipelineCandidateSummary: String?
+    var foundationPipelineResolverSummary: String?
+    var foundationPipelineValidatorSummary: String?
+    var foundationPipelineExecutorSummary: String?
+    var foundationPipelineResponseBridgeSummary: String?
+    var foundationPipelineResponseShapeSummary: String?
+    var foundationPipelineSemanticInterpretationSummary: String?
+    var foundationPipelineSemanticResolverSummary: String?
+    var foundationPipelineSemanticValidationSummary: String?
+    var foundationPipelineRecoveryReason: MarinaFoundationPipelineRecoveryReason?
+    var foundationPipelineDisagreementSummary: String?
+    var foundationPipelineTurnClassification: MarinaPromptTurnClassification?
+    var foundationPipelinePriorContextIncluded: Bool?
 
     func freeze() -> MarinaExecutionTrace {
         MarinaExecutionTrace(
             originalPrompt: originalPrompt,
             routingMode: routingMode,
-            marinaNLQv1Enabled: marinaNLQv1Enabled,
             runtimeSettingsSummary: runtimeSettingsSummary,
             modelWasAvailable: modelWasAvailable,
             modelAvailabilityReason: modelAvailabilityReason,
@@ -492,10 +433,6 @@ private struct MarinaExecutionTraceDraft {
             effectiveDateRangeSummary: effectiveDateRangeSummary,
             routeRescueSummary: routeRescueSummary,
             blockedWrongQuery: blockedWrongQuery,
-            fallbackWasAttempted: fallbackWasAttempted,
-            fallbackOutputSummary: fallbackOutputSummary,
-            fallbackSelectionReason: fallbackSelectionReason,
-            fallbackReplacedModelOutput: fallbackReplacedModelOutput,
             selectedRoute: selectedRoute,
             selectedRouteReason: selectedRouteReason,
             normalizedMetric: normalizedMetric,
@@ -510,25 +447,23 @@ private struct MarinaExecutionTraceDraft {
             responseType: responseType,
             finalAnswerSummary: finalAnswerSummary,
             responseSurfaceSource: responseSurfaceSource,
-            responseSurfaceFallbackReason: responseSurfaceFallbackReason,
-            sharedPipelineEnabled: sharedPipelineEnabled,
-            sharedPipelinePath: sharedPipelinePath,
-            sharedPipelineInterpreterSource: sharedPipelineInterpreterSource,
-            sharedPipelineHeuristicAttempted: sharedPipelineHeuristicAttempted,
-            sharedPipelineHeuristicUsedAsFallback: sharedPipelineHeuristicUsedAsFallback,
-            sharedPipelineCandidateSummary: sharedPipelineCandidateSummary,
-            sharedPipelineResolverSummary: sharedPipelineResolverSummary,
-            sharedPipelineValidatorSummary: sharedPipelineValidatorSummary,
-            sharedPipelineExecutorSummary: sharedPipelineExecutorSummary,
-            sharedPipelineResponseBridgeSummary: sharedPipelineResponseBridgeSummary,
-            sharedPipelineResponseShapeSummary: sharedPipelineResponseShapeSummary,
-            sharedPipelineSemanticInterpretationSummary: sharedPipelineSemanticInterpretationSummary,
-            sharedPipelineSemanticResolverSummary: sharedPipelineSemanticResolverSummary,
-            sharedPipelineSemanticValidationSummary: sharedPipelineSemanticValidationSummary,
-            sharedPipelineFallbackReason: sharedPipelineFallbackReason,
-            sharedPipelineDisagreementSummary: sharedPipelineDisagreementSummary,
-            sharedPipelineTurnClassification: sharedPipelineTurnClassification,
-            sharedPipelinePriorContextIncluded: sharedPipelinePriorContextIncluded
+            responseSurfaceRecoveryReason: responseSurfaceRecoveryReason,
+            foundationPipelineEnabled: foundationPipelineEnabled,
+            foundationPipelinePath: foundationPipelinePath,
+            foundationPipelineInterpreterSource: foundationPipelineInterpreterSource,
+            foundationPipelineCandidateSummary: foundationPipelineCandidateSummary,
+            foundationPipelineResolverSummary: foundationPipelineResolverSummary,
+            foundationPipelineValidatorSummary: foundationPipelineValidatorSummary,
+            foundationPipelineExecutorSummary: foundationPipelineExecutorSummary,
+            foundationPipelineResponseBridgeSummary: foundationPipelineResponseBridgeSummary,
+            foundationPipelineResponseShapeSummary: foundationPipelineResponseShapeSummary,
+            foundationPipelineSemanticInterpretationSummary: foundationPipelineSemanticInterpretationSummary,
+            foundationPipelineSemanticResolverSummary: foundationPipelineSemanticResolverSummary,
+            foundationPipelineSemanticValidationSummary: foundationPipelineSemanticValidationSummary,
+            foundationPipelineRecoveryReason: foundationPipelineRecoveryReason,
+            foundationPipelineDisagreementSummary: foundationPipelineDisagreementSummary,
+            foundationPipelineTurnClassification: foundationPipelineTurnClassification,
+            foundationPipelinePriorContextIncluded: foundationPipelinePriorContextIncluded
         )
     }
 }
@@ -538,7 +473,6 @@ struct MarinaExecutionTraceSnapshot: Codable, Equatable {
     let originalPrompt: String
     let promptVersion: String
     let routingMode: String
-    let marinaNLQv1Enabled: Bool
     let runtimeSettingsSummary: String?
     let modelWasAvailable: Bool
     let modelAvailabilityReason: String?
@@ -563,23 +497,21 @@ struct MarinaExecutionTraceSnapshot: Codable, Equatable {
     let responseType: String?
     let finalAnswerSummary: String?
     let responseSurfaceSource: String?
-    let responseSurfaceFallbackReason: String?
-    let sharedPipelineEnabled: Bool?
-    let sharedPipelinePath: String?
-    let sharedPipelineInterpreterSource: String?
-    let sharedPipelineHeuristicAttempted: Bool?
-    let sharedPipelineHeuristicUsedAsFallback: Bool?
-    let sharedPipelineCandidateSummary: String?
-    let sharedPipelineResolverSummary: String?
-    let sharedPipelineValidatorSummary: String?
-    let sharedPipelineExecutorSummary: String?
-    let sharedPipelineResponseBridgeSummary: String?
-    let sharedPipelineResponseShapeSummary: String?
-    let sharedPipelineSemanticInterpretationSummary: String?
-    let sharedPipelineSemanticResolverSummary: String?
-    let sharedPipelineSemanticValidationSummary: String?
-    let sharedPipelineFallbackReason: String?
-    let sharedPipelineDisagreementSummary: String?
+    let responseSurfaceRecoveryReason: String?
+    let foundationPipelineEnabled: Bool?
+    let foundationPipelinePath: String?
+    let foundationPipelineInterpreterSource: String?
+    let foundationPipelineCandidateSummary: String?
+    let foundationPipelineResolverSummary: String?
+    let foundationPipelineValidatorSummary: String?
+    let foundationPipelineExecutorSummary: String?
+    let foundationPipelineResponseBridgeSummary: String?
+    let foundationPipelineResponseShapeSummary: String?
+    let foundationPipelineSemanticInterpretationSummary: String?
+    let foundationPipelineSemanticResolverSummary: String?
+    let foundationPipelineSemanticValidationSummary: String?
+    let foundationPipelineRecoveryReason: String?
+    let foundationPipelineDisagreementSummary: String?
     let turnClassification: String?
     let priorContextIncluded: Bool?
     let dataWasQueried: Bool
@@ -587,9 +519,8 @@ struct MarinaExecutionTraceSnapshot: Codable, Equatable {
     init(_ trace: MarinaExecutionTrace) {
         self.capturedAtISO8601 = marinaTraceISO8601String(from: Date())
         self.originalPrompt = trace.originalPrompt
-        self.promptVersion = MarinaFoundationPromptVersion.interpretationV3.rawValue
+        self.promptVersion = MarinaFoundationPromptVersion.interpretation.rawValue
         self.routingMode = trace.routingMode.rawValue
-        self.marinaNLQv1Enabled = trace.marinaNLQv1Enabled
         self.runtimeSettingsSummary = trace.runtimeSettingsSummary
         self.modelWasAvailable = trace.modelWasAvailable
         self.modelAvailabilityReason = trace.modelAvailabilityReason
@@ -614,26 +545,24 @@ struct MarinaExecutionTraceSnapshot: Codable, Equatable {
         self.responseType = trace.responseType
         self.finalAnswerSummary = trace.finalAnswerSummary
         self.responseSurfaceSource = trace.responseSurfaceSource?.rawValue
-        self.responseSurfaceFallbackReason = trace.responseSurfaceFallbackReason?.rawValue
-        self.sharedPipelineEnabled = trace.sharedPipelineEnabled
-        self.sharedPipelinePath = trace.sharedPipelinePath?.rawValue
-        self.sharedPipelineInterpreterSource = trace.sharedPipelineInterpreterSource?.rawValue
-        self.sharedPipelineHeuristicAttempted = trace.sharedPipelineHeuristicAttempted
-        self.sharedPipelineHeuristicUsedAsFallback = trace.sharedPipelineHeuristicUsedAsFallback
-        self.sharedPipelineCandidateSummary = trace.sharedPipelineCandidateSummary
-        self.sharedPipelineResolverSummary = trace.sharedPipelineResolverSummary
-        self.sharedPipelineValidatorSummary = trace.sharedPipelineValidatorSummary
-        self.sharedPipelineExecutorSummary = trace.sharedPipelineExecutorSummary
-        self.sharedPipelineResponseBridgeSummary = trace.sharedPipelineResponseBridgeSummary
-        self.sharedPipelineResponseShapeSummary = trace.sharedPipelineResponseShapeSummary
-        self.sharedPipelineSemanticInterpretationSummary = trace.sharedPipelineSemanticInterpretationSummary
-        self.sharedPipelineSemanticResolverSummary = trace.sharedPipelineSemanticResolverSummary
-        self.sharedPipelineSemanticValidationSummary = trace.sharedPipelineSemanticValidationSummary
-        self.sharedPipelineFallbackReason = trace.sharedPipelineFallbackReason?.rawValue
-        self.sharedPipelineDisagreementSummary = trace.sharedPipelineDisagreementSummary
-        self.turnClassification = trace.sharedPipelineTurnClassification?.rawValue
-        self.priorContextIncluded = trace.sharedPipelinePriorContextIncluded
-        self.dataWasQueried = trace.sharedPipelineExecutorSummary != nil
+        self.responseSurfaceRecoveryReason = trace.responseSurfaceRecoveryReason?.rawValue
+        self.foundationPipelineEnabled = trace.foundationPipelineEnabled
+        self.foundationPipelinePath = trace.foundationPipelinePath?.rawValue
+        self.foundationPipelineInterpreterSource = trace.foundationPipelineInterpreterSource?.rawValue
+        self.foundationPipelineCandidateSummary = trace.foundationPipelineCandidateSummary
+        self.foundationPipelineResolverSummary = trace.foundationPipelineResolverSummary
+        self.foundationPipelineValidatorSummary = trace.foundationPipelineValidatorSummary
+        self.foundationPipelineExecutorSummary = trace.foundationPipelineExecutorSummary
+        self.foundationPipelineResponseBridgeSummary = trace.foundationPipelineResponseBridgeSummary
+        self.foundationPipelineResponseShapeSummary = trace.foundationPipelineResponseShapeSummary
+        self.foundationPipelineSemanticInterpretationSummary = trace.foundationPipelineSemanticInterpretationSummary
+        self.foundationPipelineSemanticResolverSummary = trace.foundationPipelineSemanticResolverSummary
+        self.foundationPipelineSemanticValidationSummary = trace.foundationPipelineSemanticValidationSummary
+        self.foundationPipelineRecoveryReason = trace.foundationPipelineRecoveryReason?.rawValue
+        self.foundationPipelineDisagreementSummary = trace.foundationPipelineDisagreementSummary
+        self.turnClassification = trace.foundationPipelineTurnClassification?.rawValue
+        self.priorContextIncluded = trace.foundationPipelinePriorContextIncluded
+        self.dataWasQueried = trace.foundationPipelineExecutorSummary != nil
     }
 
     var accessibilityValue: String {
@@ -655,20 +584,18 @@ struct MarinaExecutionTraceSnapshot: Codable, Equatable {
             effectiveDateRangeSummary.map { "effectiveDateRange=\($0)" },
             routeRescueSummary.map { "routeRescue=\($0)" },
             blockedWrongQuery.map { "blockedWrongQuery=\($0)" },
-            sharedPipelinePath.map { "sharedPath=\($0)" },
-            sharedPipelineInterpreterSource.map { "interpreter=\($0)" },
-            sharedPipelineHeuristicAttempted.map { "heuristicAttempted=\($0)" },
-            sharedPipelineHeuristicUsedAsFallback.map { "heuristicUsedAsFallback=\($0)" },
+            foundationPipelinePath.map { "foundationPath=\($0)" },
+            foundationPipelineInterpreterSource.map { "interpreter=\($0)" },
             turnClassification.map { "turnClassification=\($0)" },
             priorContextIncluded.map { "priorContextIncluded=\($0)" },
-            sharedPipelineCandidateSummary.map { "candidate=\($0)" },
+            foundationPipelineCandidateSummary.map { "candidate=\($0)" },
             aggregationPath.map { "aggregationPath=\($0)" },
             responseType.map { "responseType=\($0)" },
             responseSurfaceSource.map { "responseSurface=\($0)" },
-            responseSurfaceFallbackReason.map { "responseSurfaceFallback=\($0)" },
-            sharedPipelineExecutorSummary.map { "executor=\($0)" },
-            sharedPipelineResponseBridgeSummary.map { "bridge=\($0)" },
-            sharedPipelineFallbackReason.map { "fallback=\($0)" }
+            responseSurfaceRecoveryReason.map { "responseSurfaceRecovery=\($0)" },
+            foundationPipelineExecutorSummary.map { "executor=\($0)" },
+            foundationPipelineResponseBridgeSummary.map { "bridge=\($0)" },
+            foundationPipelineRecoveryReason.map { "foundationRecovery=\($0)" }
         ]
         .compactMap { $0 }
         .joined(separator: " | ")
@@ -736,14 +663,12 @@ extension MarinaExecutionTrace {
             "mode=\(routingMode.rawValue)",
             runtimeSettingsSummary.map { "runtime=\($0)" },
             "route=\(selectedRoute.rawValue)",
-            "fallback=\(fallbackWasAttempted)",
-            "fallbackReason=\(fallbackSelectionReason?.rawValue ?? "none")",
-            "sharedPath=\(sharedPipelinePath?.rawValue ?? "none")",
-            "sharedFallback=\(sharedPipelineFallbackReason?.rawValue ?? "none")",
+            "foundationPath=\(foundationPipelinePath?.rawValue ?? "none")",
+            "foundationRecovery=\(foundationPipelineRecoveryReason?.rawValue ?? "none")",
             "metric=\(normalizedMetric ?? "nil")",
             "response=\(responseType ?? "nil")",
             "surface=\(responseSurfaceSource?.rawValue ?? "nil")",
-            "surfaceFallback=\(responseSurfaceFallbackReason?.rawValue ?? "nil")",
+            "surfaceRecovery=\(responseSurfaceRecoveryReason?.rawValue ?? "nil")",
             foundationModelFailureStep.map { "foundationStep=\($0)" },
             foundationModelFailureCategory.map { "foundationCategory=\($0)" },
             foundationRepairSummary.map { "foundationRepair=\($0)" }
@@ -756,21 +681,6 @@ extension MarinaExecutionTrace {
 extension HomeQueryDateRange {
     var traceSummary: String {
         MarinaDateOnlyRangeCodec.traceSummary(self) ?? "nil"
-    }
-}
-
-extension MarinaInterpretedRequest {
-    var traceSummary: String {
-        switch self {
-        case .query(let plan, let source):
-            return "query(source=\(source.rawValue),metric=\(plan.metric.rawValue),target=\(plan.targetName ?? "nil"))"
-        case .command(let command, let source):
-            return "command(source=\(source.rawValue),intent=\(command.intent.rawValue))"
-        case .clarification(_, let source):
-            return "clarification(source=\(source?.rawValue ?? "nil"))"
-        case .unresolved:
-            return "unresolved"
-        }
     }
 }
 

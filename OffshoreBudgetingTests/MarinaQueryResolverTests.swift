@@ -17,7 +17,7 @@ struct MarinaQueryResolverTests {
         try fixture.context.save()
 
         let candidate = MarinaQueryPlanCandidate(
-            source: .heuristic,
+            source: .deterministic,
             rawPrompt: "total groceries",
             operation: .sum,
             measure: .spend,
@@ -67,7 +67,7 @@ struct MarinaQueryResolverTests {
     @Test func resolver_preservesUnresolvedMentionWhenNoWorkspaceMatchExists() throws {
         let fixture = try makeFixture()
         let candidate = MarinaQueryPlanCandidate(
-            source: .heuristic,
+            source: .deterministic,
             rawPrompt: "spend on Travel",
             operation: .sum,
             measure: .spend,
@@ -209,7 +209,7 @@ struct MarinaQueryResolverTests {
         try fixture.context.save()
 
         let candidate = MarinaQueryPlanCandidate(
-            source: .heuristic,
+            source: .deterministic,
             rawPrompt: "How much did I spend on Groceries?",
             operation: .sum,
             measure: .spend,
@@ -250,7 +250,7 @@ struct MarinaQueryResolverTests {
         try fixture.context.save()
 
         let candidate = MarinaQueryPlanCandidate(
-            source: .heuristic,
+            source: .deterministic,
             rawPrompt: "Show Groceries",
             operation: .lookupDetails,
             measure: .spend,
@@ -357,7 +357,7 @@ struct MarinaQueryResolverTests {
     @Test func resolver_noTargetRankingHasNoResolutionProblems() throws {
         let fixture = try makeFixture()
         let candidate = MarinaQueryPlanCandidate(
-            source: .heuristic,
+            source: .deterministic,
             rawPrompt: "where is my money going?",
             operation: .rank,
             measure: .spend,
@@ -399,7 +399,7 @@ struct MarinaQueryResolverTests {
         try fixture.context.save()
 
         let candidate = MarinaQueryPlanCandidate(
-            source: .heuristic,
+            source: .deterministic,
             rawPrompt: "Compare Starbucks in March to February.",
             operation: .compare,
             measure: .spend,
@@ -443,7 +443,7 @@ struct MarinaQueryResolverTests {
         try fixture.context.save()
 
         let candidate = MarinaQueryPlanCandidate(
-            source: .heuristic,
+            source: .deterministic,
             rawPrompt: "Compare Target in March to February.",
             operation: .compare,
             measure: .spend,
@@ -478,7 +478,7 @@ struct MarinaQueryResolverTests {
         try fixture.context.save()
 
         let candidate = MarinaQueryPlanCandidate(
-            source: .heuristic,
+            source: .deterministic,
             rawPrompt: "What did I spend at Apple?",
             operation: .sum,
             measure: .spend,
@@ -519,7 +519,7 @@ struct MarinaQueryResolverTests {
         try fixture.context.save()
 
         let candidate = MarinaQueryPlanCandidate(
-            source: .heuristic,
+            source: .deterministic,
             rawPrompt: "What did I spend at Apple?",
             operation: .sum,
             measure: .spend,
@@ -562,7 +562,7 @@ struct MarinaQueryResolverTests {
         try fixture.context.save()
 
         let candidate = MarinaQueryPlanCandidate(
-            source: .heuristic,
+            source: .deterministic,
             rawPrompt: "What did I spend at Apple?",
             operation: .sum,
             measure: .spend,
@@ -588,7 +588,7 @@ struct MarinaQueryResolverTests {
         try fixture.context.save()
 
         let candidate = MarinaQueryPlanCandidate(
-            source: .heuristic,
+            source: .deterministic,
             rawPrompt: "Show Salary",
             operation: .lookupDetails,
             measure: .spend,
@@ -624,7 +624,7 @@ struct MarinaQueryResolverTests {
         try fixture.context.save()
 
         let candidate = MarinaQueryPlanCandidate(
-            source: .heuristic,
+            source: .deterministic,
             rawPrompt: "Compare merchant Starbucks in March to February.",
             operation: .compare,
             measure: .spend,

@@ -281,8 +281,8 @@ struct MarinaLiveDomainIntentMapperTests {
     private func routerContext(
         ambientDateRange: HomeQueryDateRange? = nil,
         defaultPeriodUnit: HomeQueryPeriodUnit = .month
-    ) -> MarinaLanguageRouterContext {
-        MarinaLanguageRouterContext(
+    ) -> MarinaInterpretationContext {
+        MarinaInterpretationContext(
             workspaceName: "Personal",
             defaultPeriodUnit: defaultPeriodUnit,
             ambientDateRange: ambientDateRange,
@@ -308,8 +308,8 @@ struct MarinaLiveDomainIntentMapperTests {
         comparison: String? = nil,
         amount: String? = nil,
         direction: String? = nil
-    ) -> MarinaFoundationIntentEnvelopeV3Payload {
-        MarinaFoundationIntentEnvelopeV3Payload(
+    ) -> MarinaFoundationIntentEnvelopePayload {
+        MarinaFoundationIntentEnvelopePayload(
             routeRaw: route,
             intentRaw: intent,
             targetText: target,

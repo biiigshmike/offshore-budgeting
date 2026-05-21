@@ -1,6 +1,6 @@
 import Foundation
 
-struct HomeAssistantSharedPipelineCommandGuard {
+struct HomeAssistantFoundationPipelineCommandGuard {
     let commandParser: HomeAssistantCommandParser
 
     init(commandParser: HomeAssistantCommandParser = HomeAssistantCommandParser()) {

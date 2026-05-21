@@ -682,7 +682,7 @@ struct MarinaQueryValidator {
     private func compatibilityCandidate(from query: MarinaSemanticQuery) -> MarinaQueryPlanCandidate {
         let plan = semanticAdapter.aggregationPlan(from: query)
         return MarinaQueryPlanCandidate(
-            source: .heuristic,
+            source: .deterministic,
             rawPrompt: "semantic query",
             operation: plan.operation,
             measure: plan.measure,

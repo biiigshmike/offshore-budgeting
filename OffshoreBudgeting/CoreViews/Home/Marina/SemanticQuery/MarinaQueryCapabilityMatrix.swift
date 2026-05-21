@@ -499,7 +499,7 @@ struct MarinaQueryCapabilityMatrix {
         surface(
             id: "budget.linked.summary",
             surfaceName: "Budget linked summary",
-            sourcePath: "OffshoreBudgeting/CoreViews/Home/NLQ/Boundary/MarinaComposableWorkspaceQueryExecutor.swift",
+            sourcePath: "OffshoreBudgeting/CoreViews/Home/Marina/Execution/MarinaComposableWorkspaceQueryExecutor.swift",
             sourceTypeName: "MarinaComposableWorkspaceQueryExecutor",
             sourceFunctionOrProperty: "budgetLinkedSummary(budget:plan:provider:)",
             displayedMetric: "Budget linked cards, presets, limits, variable/planned spend",
@@ -513,7 +513,7 @@ struct MarinaQueryCapabilityMatrix {
         surface(
             id: "reconciliation.shared.balances",
             surfaceName: "Shared balances summary",
-            sourcePath: "OffshoreBudgeting/CoreViews/Home/NLQ/Boundary/MarinaWorkspaceAggregationExecutor.swift",
+            sourcePath: "OffshoreBudgeting/CoreViews/Home/Marina/Execution/MarinaWorkspaceAggregationExecutor.swift",
             sourceTypeName: "MarinaWorkspaceAggregationExecutor",
             sourceFunctionOrProperty: "sharedBalances(plan:provider:)",
             displayedMetric: "Reconciliation account balances",
@@ -527,7 +527,7 @@ struct MarinaQueryCapabilityMatrix {
         surface(
             id: "whatif.simulation",
             surfaceName: "What If simulation",
-            sourcePath: "OffshoreBudgeting/CoreViews/Home/NLQ/Boundary/MarinaComposableWorkspaceQueryExecutor.swift",
+            sourcePath: "OffshoreBudgeting/CoreViews/Home/Marina/Execution/MarinaComposableWorkspaceQueryExecutor.swift",
             sourceTypeName: "MarinaComposableWorkspaceQueryExecutor",
             sourceFunctionOrProperty: "simulate(candidate:resolved:plan:provider:now:)",
             displayedMetric: "Scenario budget impact",

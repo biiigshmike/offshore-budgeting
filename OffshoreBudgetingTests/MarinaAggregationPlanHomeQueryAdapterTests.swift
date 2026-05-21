@@ -111,7 +111,7 @@ struct MarinaAggregationPlanHomeQueryAdapterTests {
     }
 
     @Test func adapter_rejectsClarificationAndUnsupportedValidationOutcomes() {
-        let candidate = MarinaQueryPlanCandidate(source: .heuristic, rawPrompt: "spend on something")
+        let candidate = MarinaQueryPlanCandidate(source: .deterministic, rawPrompt: "spend on something")
         let clarification = MarinaPlanValidationOutcome.clarification(
             MarinaTypedClarification(kind: .missingTarget, message: "Pick a target.", candidate: candidate)
         )

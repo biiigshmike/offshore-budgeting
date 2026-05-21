@@ -2,23 +2,23 @@ import Foundation
 import SwiftData
 
 @MainActor
-struct MarinaV2PanelRuntime {
+struct MarinaPanelRuntime {
     let modelContext: ModelContext
     let workspaceID: UUID
     let defaultPeriodUnit: HomeQueryPeriodUnit
     let runtimeSettings: MarinaRuntimeSettings
-    let routerContext: MarinaLanguageRouterContext
+    let routerContext: MarinaInterpretationContext
     let turnClassification: MarinaPromptTurnClassification
-    let coordinator: MarinaV2TurnCoordinator
+    let coordinator: MarinaTurnCoordinator
 
     init(
         modelContext: ModelContext,
         workspaceID: UUID,
         defaultPeriodUnit: HomeQueryPeriodUnit,
         runtimeSettings: MarinaRuntimeSettings,
-        routerContext: MarinaLanguageRouterContext,
+        routerContext: MarinaInterpretationContext,
         turnClassification: MarinaPromptTurnClassification = .freshQuestion,
-        coordinator: MarinaV2TurnCoordinator? = nil
+        coordinator: MarinaTurnCoordinator? = nil
     ) {
         self.modelContext = modelContext
         self.workspaceID = workspaceID
@@ -29,14 +29,14 @@ struct MarinaV2PanelRuntime {
         self.coordinator = coordinator ?? Self.defaultCoordinator()
     }
 
-    func run(prompt: String) async -> MarinaV2TurnResult {
+    func run(prompt: String) async -> MarinaTurnResult {
         await coordinator.run(
             prompt: prompt,
             context: turnContext
         )
     }
 
-    func run(query: HomeQuery, sourceTitle: String) async -> MarinaV2TurnResult {
+    func run(query: HomeQuery, sourceTitle: String) async -> MarinaTurnResult {
         await coordinator.run(
             query: query,
             sourceTitle: sourceTitle,
@@ -47,7 +47,7 @@ struct MarinaV2PanelRuntime {
     func resume(
         clarification: MarinaTypedClarification,
         choice: MarinaClarificationChoice
-    ) async -> MarinaV2TurnResult {
+    ) async -> MarinaTurnResult {
         await coordinator.resume(
             clarification: clarification,
             choice: choice,
@@ -55,8 +55,8 @@ struct MarinaV2PanelRuntime {
         )
     }
 
-    private var turnContext: MarinaV2TurnContext {
-        MarinaV2TurnContext(
+    private var turnContext: MarinaTurnContext {
+        MarinaTurnContext(
             provider: MarinaDataProvider(modelContext: modelContext, workspaceID: workspaceID),
             routerContext: routerContext,
             defaultPeriodUnit: defaultPeriodUnit,
@@ -66,15 +66,15 @@ struct MarinaV2PanelRuntime {
         )
     }
 
-    private static func defaultCoordinator() -> MarinaV2TurnCoordinator {
+    private static func defaultCoordinator() -> MarinaTurnCoordinator {
         #if DEBUG
-        if MarinaV2UIFixtureAIInterpreter.isEnabled {
-            return MarinaV2TurnCoordinator(
-                availability: MarinaV2UIFixtureAvailability(),
-                interpreter: MarinaV2UIFixtureAIInterpreter()
+        if MarinaTypedFixtureInterpreter.isEnabled {
+            return MarinaTurnCoordinator(
+                availability: MarinaTypedFixtureAvailability(),
+                interpreter: MarinaTypedFixtureInterpreter()
             )
         }
         #endif
-        return MarinaV2TurnCoordinator()
+        return MarinaTurnCoordinator()
     }
 }

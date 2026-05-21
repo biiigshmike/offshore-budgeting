@@ -121,7 +121,7 @@ struct MarinaExplicitPromptConstraints: Equatable {
 struct MarinaExplicitConstraintDetector {
     func constraints(
         in prompt: String,
-        context: MarinaLanguageRouterContext
+        context: MarinaInterpretationContext
     ) -> MarinaExplicitPromptConstraints {
         let normalizedPrompt = normalized(prompt)
         let explicitCards = explicitNames(context.cardNames, in: normalizedPrompt)

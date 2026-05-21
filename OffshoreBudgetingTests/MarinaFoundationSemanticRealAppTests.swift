@@ -5,7 +5,7 @@ import Testing
 
 @MainActor
 @Suite(.serialized)
-struct MarinaV2SemanticRealAppTests {
+struct MarinaFoundationSemanticRealAppTests {
     @Test func semanticRealApp_foundationTypedSpendExecutesWithEvidence() async throws {
         let fixture = try makeFixture()
         try fixture.seedSpendData()
@@ -24,7 +24,7 @@ struct MarinaV2SemanticRealAppTests {
         }
 
         guard case .handled(let answer, _, _, let amountBasis, let route) = result else {
-            Issue.record("Expected handled V2 semantic answer.")
+            Issue.record("Expected handled Foundation semantic answer.")
             return
         }
 
@@ -48,9 +48,9 @@ struct MarinaV2SemanticRealAppTests {
         fixture.context.insert(BudgetCardLink(budget: budget, card: fixture.backupCard))
         try fixture.context.save()
         let prompt = "Which cards are linked to May Budget?"
-        let coordinator = MarinaV2TurnCoordinator(
+        let coordinator = MarinaTurnCoordinator(
             availability: AvailableMarinaModel(),
-            interpreter: MarinaV2UIFixtureAIInterpreter()
+            interpreter: MarinaTypedFixtureInterpreter()
         )
 
         let (result, trace) = await tracedTurn(prompt: prompt) {
@@ -65,7 +65,7 @@ struct MarinaV2SemanticRealAppTests {
         }
 
         guard case .handled(let answer, _, _, _, let route) = result else {
-            Issue.record("Expected linked-card relationship prompt to execute through V2.")
+            Issue.record("Expected linked-card relationship prompt to execute through Foundation.")
             return
         }
 
@@ -169,8 +169,8 @@ struct MarinaV2SemanticRealAppTests {
         assertFoundationOnly(resumedTrace)
     }
 
-    private func coordinator(for interpretations: [String: MarinaCanonicalReadInterpretation]) -> MarinaV2TurnCoordinator {
-        MarinaV2TurnCoordinator(
+    private func coordinator(for interpretations: [String: MarinaCanonicalReadInterpretation]) -> MarinaTurnCoordinator {
+        MarinaTurnCoordinator(
             availability: AvailableMarinaModel(),
             interpreter: MarinaFakeCanonicalAIInterpreter(interpretationsByPrompt: interpretations)
         )
@@ -178,21 +178,20 @@ struct MarinaV2SemanticRealAppTests {
 
     private func tracedTurn(
         prompt: String,
-        turn: () async -> MarinaV2TurnResult
-    ) async -> (MarinaV2TurnResult, MarinaExecutionTrace?) {
+        turn: () async -> MarinaTurnResult
+    ) async -> (MarinaTurnResult, MarinaExecutionTrace?) {
         MarinaTraceRecorder.shared.reset()
         MarinaTraceRecorder.shared.begin(
             prompt: prompt,
-            routingMode: .sharedPipeline,
-            marinaNLQv1Enabled: false,
-            runtimeSettingsSummary: "v2SemanticRealApp=true"
+            routingMode: .foundationPipeline,
+            runtimeSettingsSummary: "foundationSemanticRealApp=true"
         )
         let result = await turn()
         switch result {
         case .clarification:
-            MarinaTraceRecorder.shared.recordSelectedRoute(.clarification, reason: "v2_semantic_real_app")
+            MarinaTraceRecorder.shared.recordSelectedRoute(.clarification, reason: "foundation_semantic_real_app")
         case .handled, .blocked, .unavailable:
-            MarinaTraceRecorder.shared.recordSelectedRoute(.sharedFoundationModels, reason: "v2_semantic_real_app")
+            MarinaTraceRecorder.shared.recordSelectedRoute(.foundationModels, reason: "foundation_semantic_real_app")
         }
         return (result, MarinaTraceRecorder.shared.finish())
     }
@@ -206,16 +205,11 @@ struct MarinaV2SemanticRealAppTests {
             return
         }
         let allowedRoutes: [MarinaExecutionSelectedRoute] = allowsClarificationRoute
-            ? [.sharedFoundationModels, .clarification]
-            : [.sharedFoundationModels]
+            ? [.foundationModels, .clarification]
+            : [.foundationModels]
         #expect(allowedRoutes.contains(trace.selectedRoute))
-        #expect(trace.sharedPipelinePath == .sharedFoundationModels)
-        #expect(trace.sharedPipelinePath != .legacy)
-        #expect(trace.sharedPipelinePath != .sharedHeuristic)
-        #expect(trace.sharedPipelinePath != .sharedAttemptedThenLegacyFallback)
-        #expect(trace.sharedPipelineInterpreterSource == .foundationModels)
-        #expect(trace.sharedPipelineHeuristicAttempted != true)
-        #expect(trace.sharedPipelineHeuristicUsedAsFallback != true)
+        #expect(trace.foundationPipelinePath == .foundationModels)
+        #expect(trace.foundationPipelineInterpreterSource == .foundationModels)
     }
 
     private func canonicalInterpretation(
@@ -272,10 +266,10 @@ struct MarinaV2SemanticRealAppTests {
         categoryNames: [String] = ["Groceries", "Travel"],
         budgetNames: [String] = [],
         turnClassification: MarinaPromptTurnClassification = .freshQuestion
-    ) -> MarinaV2TurnContext {
-        MarinaV2TurnContext(
+    ) -> MarinaTurnContext {
+        MarinaTurnContext(
             provider: fixture.provider,
-            routerContext: MarinaLanguageRouterContext(
+            routerContext: MarinaInterpretationContext(
                 workspaceName: fixture.workspace.name,
                 defaultPeriodUnit: .month,
                 sessionContext: HomeAssistantSessionContext(),

@@ -1,9 +1,9 @@
 import Foundation
 
 @MainActor
-enum MarinaV2TraceBridge {
+enum MarinaFoundationTraceBridge {
     static func record(
-        context: MarinaV2TurnContext,
+        context: MarinaTurnContext,
         interpretation: MarinaCanonicalReadInterpretation,
         resolved: MarinaResolvedQueryCandidate,
         semanticResolved: MarinaResolvedSemanticQuery?,
@@ -12,9 +12,9 @@ enum MarinaV2TraceBridge {
     ) {
         let candidate = interpretation.compatibilityCandidate
         MarinaTraceRecorder.shared.recordFoundationRepairSummary(interpretation.repairSummary)
-        MarinaTraceRecorder.shared.recordSharedPipelineTrace(
-            MarinaSharedPipelineTrace(
-                sharedPipelineEnabled: true,
+        MarinaTraceRecorder.shared.recordFoundationPipelineTrace(
+            MarinaFoundationPipelineTrace(
+                foundationPipelineEnabled: true,
                 aiOptInEnabled: context.aiEnabled,
                 aiAvailable: true,
                 aiOptIn: context.aiEnabled,
@@ -22,10 +22,8 @@ enum MarinaV2TraceBridge {
                 selectedInterpreter: .foundationModels,
                 interpreterSelectionReason: .modelEligible,
                 modelAttempted: true,
-                heuristicAttempted: false,
-                heuristicUsedAsFallback: false,
                 modelAvailabilitySummary: "available",
-                selectedPath: .sharedFoundationModels,
+                selectedPath: .foundationModels,
                 interpreterSource: candidate.source,
                 candidateSummary: MarinaCandidateTrace(
                     candidate: candidate,
@@ -46,7 +44,7 @@ enum MarinaV2TraceBridge {
                     execution: execution
                 ),
                 responseShapeSummary: responseShapeSummary(validationOutcome),
-                fallbackReason: nil,
+                recoveryReason: nil,
                 disagreementSummary: interpretation.repairSummary.map { "foundationRepair=\($0)" },
                 selectionRank: nil,
                 rejectedReason: nil,
@@ -57,10 +55,10 @@ enum MarinaV2TraceBridge {
         )
     }
 
-    static func recordUnavailable(context: MarinaV2TurnContext, reason: String) {
-        MarinaTraceRecorder.shared.recordSharedPipelineTrace(
-            MarinaSharedPipelineTrace(
-                sharedPipelineEnabled: true,
+    static func recordUnavailable(context: MarinaTurnContext, reason: String) {
+        MarinaTraceRecorder.shared.recordFoundationPipelineTrace(
+            MarinaFoundationPipelineTrace(
+                foundationPipelineEnabled: true,
                 aiOptInEnabled: context.aiEnabled,
                 aiAvailable: false,
                 aiOptIn: context.aiEnabled,
@@ -68,15 +66,13 @@ enum MarinaV2TraceBridge {
                 selectedInterpreter: nil,
                 interpreterSelectionReason: context.aiEnabled ? .modelUnavailable : .aiOptOut,
                 modelAttempted: false,
-                heuristicAttempted: false,
-                heuristicUsedAsFallback: false,
                 modelAvailabilitySummary: reason,
-                selectedPath: .sharedFoundationModels,
+                selectedPath: .foundationModels,
                 interpreterSource: nil,
                 validatorOutcomeSummary: "unavailable:\(reason)",
                 responseBridgeSummary: "kind=message,responseShape=unsupported,suggestions=0",
                 responseShapeSummary: MarinaResponseShapeHint.unsupported.rawValue,
-                fallbackReason: context.aiEnabled ? .modelUnavailable : .aiOptOut,
+                recoveryReason: context.aiEnabled ? .modelUnavailable : .aiOptOut,
                 turnClassification: context.turnClassification,
                 priorContextIncluded: context.routerContext.priorQueryContext.hasContext
             )
@@ -84,12 +80,12 @@ enum MarinaV2TraceBridge {
     }
 
     static func recordFoundationFailure(
-        context: MarinaV2TurnContext,
+        context: MarinaTurnContext,
         diagnostic: MarinaFoundationModelsFailureDiagnostic
     ) {
-        MarinaTraceRecorder.shared.recordSharedPipelineTrace(
-            MarinaSharedPipelineTrace(
-                sharedPipelineEnabled: true,
+        MarinaTraceRecorder.shared.recordFoundationPipelineTrace(
+            MarinaFoundationPipelineTrace(
+                foundationPipelineEnabled: true,
                 aiOptInEnabled: context.aiEnabled,
                 aiAvailable: true,
                 aiOptIn: context.aiEnabled,
@@ -97,16 +93,14 @@ enum MarinaV2TraceBridge {
                 selectedInterpreter: .foundationModels,
                 interpreterSelectionReason: interpreterReason(for: diagnostic.category),
                 modelAttempted: true,
-                heuristicAttempted: false,
-                heuristicUsedAsFallback: false,
                 modelAvailabilitySummary: diagnostic.availabilityReason ?? "available",
-                selectedPath: .sharedFoundationModels,
+                selectedPath: .foundationModels,
                 interpreterSource: .foundationModels,
                 validatorOutcomeSummary: diagnostic.traceSummary,
                 semanticValidationSummary: diagnostic.traceSummary,
                 responseBridgeSummary: "kind=message,responseShape=unsupported,suggestions=0",
                 responseShapeSummary: MarinaResponseShapeHint.unsupported.rawValue,
-                fallbackReason: fallbackReason(for: diagnostic.category),
+                recoveryReason: recoveryReason(for: diagnostic.category),
                 turnClassification: context.turnClassification,
                 priorContextIncluded: context.routerContext.priorQueryContext.hasContext
             )
@@ -235,7 +229,7 @@ enum MarinaV2TraceBridge {
 
     private static func interpreterReason(
         for category: MarinaFoundationModelsErrorCategory
-    ) -> MarinaInterpreterSelectionReason {
+    ) -> MarinaInterpretationSelectionReason {
         switch category {
         case .decodingFailure, .malformedResponse:
             return .modelInvalidStructuredOutput
@@ -258,9 +252,9 @@ enum MarinaV2TraceBridge {
         }
     }
 
-    private static func fallbackReason(
+    private static func recoveryReason(
         for category: MarinaFoundationModelsErrorCategory
-    ) -> MarinaSharedPipelineFallbackReason {
+    ) -> MarinaFoundationPipelineRecoveryReason {
         switch category {
         case .assetsUnavailable:
             return .modelAssetsUnavailable

@@ -138,10 +138,10 @@ struct MarinaUITestDriver {
             followUpChips: chips.followUp,
             runtimePath: trace?.routingMode,
             selectedRoute: trace?.selectedRoute,
-            interpreter: trace?.sharedPipelineInterpreterSource,
+            interpreter: trace?.foundationPipelineInterpreterSource,
             turnClassification: trace?.turnClassification,
             priorContextUsed: trace?.priorContextIncluded,
-            executorRoute: trace?.sharedPipelineExecutorSummary,
+            executorRoute: trace?.foundationPipelineExecutorSummary,
             diagnostics: diagnostics(from: trace),
             trace: trace,
             result: result
@@ -438,7 +438,7 @@ struct MarinaUITestDriver {
             if allowCommandOrUnsupportedTrace,
                expectation?.outcome == .typedUnsupported,
                looksUnsupported {
-                return MarinaSurfaceResult(passed: true, category: .pass, reason: "Typed unsupported response was visible without a prompt-specific shared-read trace.")
+                return MarinaSurfaceResult(passed: true, category: .pass, reason: "Typed unsupported response was visible without a prompt-specific Foundation trace.")
             }
             return MarinaSurfaceResult(passed: false, category: .traceUnavailable, reason: "No Marina trace was exported or surfaced.")
         }
@@ -454,30 +454,32 @@ struct MarinaUITestDriver {
                 reason: "Expected trace prompt '\(prompt)', saw '\(trace.originalPrompt)'."
             )
         }
-        guard trace.routingMode == "shared_pipeline" else {
+        guard trace.routingMode == "foundation_pipeline" else {
             if allowCommandOrUnsupportedTrace,
                expectation?.outcome == .typedUnsupported {
-                return MarinaSurfaceResult(passed: true, category: .pass, reason: "Prompt was handled outside the shared read route.")
+                return MarinaSurfaceResult(passed: true, category: .pass, reason: "Prompt was handled outside the Foundation read route.")
             }
-            return MarinaSurfaceResult(passed: false, category: .wrongRuntimeRoute, reason: "Expected shared_pipeline, saw \(trace.routingMode).")
+            return MarinaSurfaceResult(passed: false, category: .wrongRuntimeRoute, reason: "Expected foundation_pipeline, saw \(trace.routingMode).")
         }
-        let blockedRoutes: Set<String> = ["fallback", "nlq", "shared_heuristic", "shared_fallback"]
-        let blockedPaths: Set<String> = ["legacy", "sharedHeuristic", "sharedAttemptedThenLegacyFallback"]
-        if blockedRoutes.contains(trace.selectedRoute)
-            || trace.sharedPipelinePath.map(blockedPaths.contains) == true
-            || trace.sharedPipelineHeuristicAttempted == true
-            || trace.sharedPipelineHeuristicUsedAsFallback == true {
-            return MarinaSurfaceResult(passed: false, category: .legacyRouteInterception, reason: "Prompt selected a legacy or heuristic route.")
+        if trace.selectedRoute != "foundation_models" && trace.selectedRoute != "clarification" {
+            return MarinaSurfaceResult(passed: false, category: .nonFoundationRouteInterception, reason: "Prompt did not select the Foundation Models route.")
+        }
+        if trace.foundationPipelinePath != "foundationModels" {
+            return MarinaSurfaceResult(passed: false, category: .nonFoundationRouteInterception, reason: "Trace did not use the Foundation Models pipeline path.")
+        }
+        if let interpreter = trace.foundationPipelineInterpreterSource,
+           interpreter != "foundationModels" {
+            return MarinaSurfaceResult(passed: false, category: .nonFoundationRouteInterception, reason: "Trace did not use the Foundation Models interpreter.")
         }
         if answer.text.localizedCaseInsensitiveContains("MarinaResponseRules")
             || answer.text.localizedCaseInsensitiveContains("MarinaResponses")
             || answer.text.localizedCaseInsensitiveContains("bestie") {
-            return MarinaSurfaceResult(passed: false, category: .legacyRouteInterception, reason: "Prompt surfaced legacy canned persona copy.")
+            return MarinaSurfaceResult(passed: false, category: .nonFoundationRouteInterception, reason: "Prompt surfaced old canned copy.")
         }
         if trace.turnClassification == "freshQuestion", trace.priorContextIncluded == true {
             return MarinaSurfaceResult(passed: false, category: .stalePriorContext, reason: "Fresh question included prior context.")
         }
-        let bridge = trace.sharedPipelineResponseBridgeSummary ?? ""
+        let bridge = trace.foundationPipelineResponseBridgeSummary ?? ""
         let isUnsupported = bridge.localizedCaseInsensitiveContains("responseShape=unsupported")
             || answer.text.localizedCaseInsensitiveContains("different way")
             || answer.text.localizedCaseInsensitiveContains("Reason\nunsupported")
@@ -493,21 +495,21 @@ struct MarinaUITestDriver {
             return MarinaSurfaceResult(
                 passed: false,
                 category: .ambiguityCollapsedToUnsupported,
-                reason: "Expected typed clarification, but candidate resolved/validated as unsupported. candidate=\(trace.sharedPipelineCandidateSummary ?? "nil"); resolver=\(trace.sharedPipelineResolverSummary ?? "nil"); semanticResolver=\(trace.sharedPipelineSemanticResolverSummary ?? "nil"); validator=\(trace.sharedPipelineValidatorSummary ?? "nil")"
+                reason: "Expected typed clarification, but candidate resolved/validated as unsupported. candidate=\(trace.foundationPipelineCandidateSummary ?? "nil"); resolver=\(trace.foundationPipelineResolverSummary ?? "nil"); semanticResolver=\(trace.foundationPipelineSemanticResolverSummary ?? "nil"); validator=\(trace.foundationPipelineValidatorSummary ?? "nil")"
             )
         }
         if expectation?.outcome == .clarification, isClarification == false {
             return MarinaSurfaceResult(
                 passed: false,
                 category: .ambiguityCollapsedToSingleType,
-                reason: "Expected typed clarification, but the prompt resolved to a handled response. responseType=\(trace.responseType ?? "nil"); candidate=\(trace.sharedPipelineCandidateSummary ?? "nil"); resolver=\(trace.sharedPipelineResolverSummary ?? "nil"); semanticResolver=\(trace.sharedPipelineSemanticResolverSummary ?? "nil"); executor=\(trace.sharedPipelineExecutorSummary ?? "nil")"
+                reason: "Expected typed clarification, but the prompt resolved to a handled response. responseType=\(trace.responseType ?? "nil"); candidate=\(trace.foundationPipelineCandidateSummary ?? "nil"); resolver=\(trace.foundationPipelineResolverSummary ?? "nil"); semanticResolver=\(trace.foundationPipelineSemanticResolverSummary ?? "nil"); executor=\(trace.foundationPipelineExecutorSummary ?? "nil")"
             )
         }
         if expectation?.outcome == .clarification, chips.clarification.isEmpty {
             return MarinaSurfaceResult(passed: false, category: .missingClarificationChips, reason: "Expected actionable clarification chips.")
         }
         if let expectedShape = expectation?.requestShape {
-            let candidate = trace.sharedPipelineCandidateSummary ?? ""
+            let candidate = trace.foundationPipelineCandidateSummary ?? ""
             if candidate.localizedCaseInsensitiveContains("requestShape=\(expectedShape.rawValue)") == false {
                 return MarinaSurfaceResult(
                     passed: false,
@@ -549,19 +551,19 @@ struct MarinaUITestDriver {
     private func diagnostics(from trace: MarinaTraceSnapshot?) -> MarinaSurfaceDiagnostics? {
         guard let trace else { return nil }
         return MarinaSurfaceDiagnostics(
-            candidateSummary: trace.sharedPipelineCandidateSummary,
-            resolverSummary: trace.sharedPipelineResolverSummary,
-            semanticResolverSummary: trace.sharedPipelineSemanticResolverSummary,
-            validatorSummary: trace.sharedPipelineValidatorSummary,
+            candidateSummary: trace.foundationPipelineCandidateSummary,
+            resolverSummary: trace.foundationPipelineResolverSummary,
+            semanticResolverSummary: trace.foundationPipelineSemanticResolverSummary,
+            validatorSummary: trace.foundationPipelineValidatorSummary,
             unsupportedReason: unsupportedReason(from: trace)
         )
     }
 
     private func unsupportedReason(from trace: MarinaTraceSnapshot) -> String? {
         [
-            trace.sharedPipelineValidatorSummary,
-            trace.sharedPipelineSemanticValidationSummary,
-            trace.sharedPipelineResponseBridgeSummary,
+            trace.foundationPipelineValidatorSummary,
+            trace.foundationPipelineSemanticValidationSummary,
+            trace.foundationPipelineResponseBridgeSummary,
             trace.selectedRouteReason
         ]
         .compactMap { $0 }

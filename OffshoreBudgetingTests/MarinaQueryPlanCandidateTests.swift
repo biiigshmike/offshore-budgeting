@@ -5,7 +5,7 @@ import Testing
 struct MarinaQueryPlanCandidateTests {
     @Test func candidate_totalSpendOnAppleCard_representsCardFilter() {
         let candidate = MarinaQueryPlanCandidate(
-            source: .heuristic,
+            source: .deterministic,
             rawPrompt: "total spend on my Apple Card",
             operation: .sum,
             measure: .spend,
@@ -21,7 +21,7 @@ struct MarinaQueryPlanCandidateTests {
             confidence: .high
         )
 
-        #expect(candidate.source == .heuristic)
+        #expect(candidate.source == .deterministic)
         #expect(candidate.operation == .sum)
         #expect(candidate.measure == .spend)
         #expect(candidate.entityMentions.count == 1)
@@ -80,7 +80,7 @@ struct MarinaQueryPlanCandidateTests {
             endDate: date(2026, 4, 30)
         )
         let candidate = MarinaQueryPlanCandidate(
-            source: .heuristic,
+            source: .deterministic,
             rawPrompt: "compare groceries this month to last month",
             operation: .compare,
             measure: .spend,
@@ -144,7 +144,7 @@ struct MarinaQueryPlanCandidateTests {
 
     @Test func candidate_whereIsMyMoneyGoing_representsGroupingAndRankingWithoutSpecificTarget() {
         let candidate = MarinaQueryPlanCandidate(
-            source: .heuristic,
+            source: .deterministic,
             rawPrompt: "where is my money going?",
             operation: .rank,
             measure: .spend,
@@ -185,7 +185,7 @@ struct MarinaQueryPlanCandidateTests {
 
     @Test func typedValidationOutcome_canRepresentExecutableClarificationAndUnsupportedShells() {
         let candidate = MarinaQueryPlanCandidate(
-            source: .heuristic,
+            source: .deterministic,
             rawPrompt: "average Food & Drink",
             operation: .average,
             measure: .spend,

@@ -524,12 +524,12 @@ struct MarinaQueryResolver {
         guard let allowedTypes else {
             return matches
         }
-        let nlqTypes = allowedTypes.compactMap(nlqType)
-        guard nlqTypes.isEmpty == false else { return matches }
-        return matches.filter { nlqTypes.contains($0.entityType) }
+        let entityCandidateTypes = allowedTypes.compactMap(entityCandidateType)
+        guard entityCandidateTypes.isEmpty == false else { return matches }
+        return matches.filter { entityCandidateTypes.contains($0.entityType) }
     }
 
-    private func nlqType(from hint: MarinaCandidateEntityTypeHint) -> MarinaEntityCandidateTargetType? {
+    private func entityCandidateType(from hint: MarinaCandidateEntityTypeHint) -> MarinaEntityCandidateTargetType? {
         switch hint {
         case .category:
             return .category

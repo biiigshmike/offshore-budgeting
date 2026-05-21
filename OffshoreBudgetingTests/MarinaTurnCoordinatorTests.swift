@@ -5,10 +5,10 @@ import Testing
 
 @MainActor
 @Suite(.serialized)
-struct MarinaV2TurnCoordinatorTests {
+struct MarinaTurnCoordinatorTests {
     @Test func run_whenAISettingIsOff_returnsAppleIntelligenceRequiredWithoutQuerying() async throws {
         let fixture = try makeFixture()
-        let coordinator = MarinaV2TurnCoordinator(
+        let coordinator = MarinaTurnCoordinator(
             availability: FakeMarinaAvailability(status: .available),
             interpreter: MarinaFakeCanonicalAIInterpreter(interpretationsByPrompt: [:])
         )
@@ -19,7 +19,7 @@ struct MarinaV2TurnCoordinatorTests {
         )
 
         guard case .unavailable(let answer) = result else {
-            Issue.record("Expected unavailable result when Marina v2 AI setting is off.")
+            Issue.record("Expected unavailable result when Marina AI setting is off.")
             return
         }
 
@@ -34,7 +34,7 @@ struct MarinaV2TurnCoordinatorTests {
 
     @Test func run_whenModelUnavailable_returnsSpecificAvailabilityCard() async throws {
         let fixture = try makeFixture()
-        let coordinator = MarinaV2TurnCoordinator(
+        let coordinator = MarinaTurnCoordinator(
             availability: FakeMarinaAvailability(status: .unavailable(reason: "model_not_ready")),
             interpreter: MarinaFakeCanonicalAIInterpreter(interpretationsByPrompt: [:])
         )
@@ -63,7 +63,7 @@ struct MarinaV2TurnCoordinatorTests {
             step: .typedEnvelope,
             debugSummary: "schema mismatch"
         )
-        let coordinator = MarinaV2TurnCoordinator(
+        let coordinator = MarinaTurnCoordinator(
             availability: FakeMarinaAvailability(status: .available),
             interpreter: ThrowingCanonicalAIInterpreter(error: MarinaFoundationModelsServiceError.diagnosedGenerationFailure(diagnostic))
         )
@@ -116,14 +116,14 @@ struct MarinaV2TurnCoordinatorTests {
         try fixture.context.save()
 
         let prompt = "What is my actual income so far this month?"
-        let scriptedIntent = MarinaAIIntentV2.readQuery(
-            MarinaAIReadQueryIntentV2(
+        let scriptedIntent = MarinaAIIntent.readQuery(
+            MarinaAIReadQueryIntent(
                 reasoning: "Generic income target mistake.",
                 subjectRaw: "income",
                 operationRaw: "sum",
                 measureRaw: "income",
                 includeMentions: [
-                    MarinaAIEntityMentionV2(
+                    MarinaAIEntityMention(
                         roleRaw: "primaryTarget",
                         rawText: "income",
                         typeRaw: "incomeSource",
@@ -131,7 +131,7 @@ struct MarinaV2TurnCoordinatorTests {
                     )
                 ],
                 excludeMentions: [],
-                primaryDateRange: MarinaAIDateRangeV2(
+                primaryDateRange: MarinaAIDateRange(
                     startISO8601: "2026-05-01",
                     endISO8601: "2026-05-31",
                     rawText: "this month",
@@ -149,15 +149,15 @@ struct MarinaV2TurnCoordinatorTests {
             )
         )
         let fakeAI = MarinaFakeAIInterpreter(scriptedIntents: [prompt: scriptedIntent])
-        let liveInterpreter = MarinaV2FoundationAIInterpreter(aiInterpreter: fakeAI)
-        let repairedInterpretation = try await liveInterpreter.interpretCanonicalV2(
+        let liveInterpreter = MarinaFoundationAIInterpreter(aiInterpreter: fakeAI)
+        let repairedInterpretation = try await liveInterpreter.interpretCanonical(
             prompt: prompt,
             context: turnContext(
                 provider: fixture.provider,
                 incomeSourceNames: ["Salary"]
             ).routerContext
         )
-        let coordinator = MarinaV2TurnCoordinator(
+        let coordinator = MarinaTurnCoordinator(
             availability: FakeMarinaAvailability(status: .available),
             interpreter: liveInterpreter
         )
@@ -222,7 +222,7 @@ struct MarinaV2TurnCoordinatorTests {
             result: semanticResult,
             compatibilityCandidate: candidate
         )
-        let coordinator = MarinaV2TurnCoordinator(
+        let coordinator = MarinaTurnCoordinator(
             availability: FakeMarinaAvailability(status: .available),
             interpreter: MarinaFakeCanonicalAIInterpreter(interpretationsByPrompt: [prompt: interpretation])
         )
@@ -233,7 +233,7 @@ struct MarinaV2TurnCoordinatorTests {
         )
 
         guard case .handled(let answer, _, _, let amountBasis, let route) = result else {
-            Issue.record("Expected handled Marina v2 answer.")
+            Issue.record("Expected handled Marina answer.")
             return
         }
 
@@ -267,9 +267,9 @@ struct MarinaV2TurnCoordinatorTests {
         try fixture.context.save()
 
         let prompt = "Which cards are linked to May Budget?"
-        let coordinator = MarinaV2TurnCoordinator(
+        let coordinator = MarinaTurnCoordinator(
             availability: FakeMarinaAvailability(status: .available),
-            interpreter: MarinaV2UIFixtureAIInterpreter()
+            interpreter: MarinaTypedFixtureInterpreter()
         )
 
         let result = await coordinator.run(
@@ -282,7 +282,7 @@ struct MarinaV2TurnCoordinatorTests {
         )
 
         guard case .handled(let answer, _, _, _, let route) = result else {
-            Issue.record("Expected the UI fixture linked-card prompt to execute through V2.")
+            Issue.record("Expected the UI fixture linked-card prompt to execute through Foundation.")
             return
         }
 
@@ -294,9 +294,9 @@ struct MarinaV2TurnCoordinatorTests {
     #endif
 
     @Test func deferredCRUDAnswer_makesRuntimeReadOnlyBoundaryVisible() {
-        let answer = MarinaV2TurnCoordinator.deferredCRUDAnswer(prompt: "Add coffee")
+        let answer = MarinaTurnCoordinator.deferredCRUDAnswer(prompt: "Add coffee")
 
-        #expect(answer.title == "Marina v2 is read-only for now")
+        #expect(answer.title == "Marina is read-only for now")
         let hasStatusRow = answer.rows.contains { row in
             row.title == "Status" && row.value == "CRUD deferred"
         }
@@ -310,10 +310,10 @@ struct MarinaV2TurnCoordinatorTests {
         categoryNames: [String] = ["Groceries"],
         incomeSourceNames: [String] = [],
         budgetNames: [String] = []
-    ) -> MarinaV2TurnContext {
-        MarinaV2TurnContext(
+    ) -> MarinaTurnContext {
+        MarinaTurnContext(
             provider: provider,
-            routerContext: MarinaLanguageRouterContext(
+            routerContext: MarinaInterpretationContext(
                 workspaceName: "Phase 5 Workspace",
                 defaultPeriodUnit: .month,
                 sessionContext: HomeAssistantSessionContext(),
@@ -355,9 +355,9 @@ private struct FakeMarinaAvailability: MarinaModelAvailabilityProviding {
 private struct ThrowingCanonicalAIInterpreter: MarinaCanonicalAIInterpreting {
     let error: Error
 
-    func interpretCanonicalV2(
+    func interpretCanonical(
         prompt _: String,
-        context _: MarinaLanguageRouterContext
+        context _: MarinaInterpretationContext
     ) async throws -> MarinaCanonicalReadInterpretation {
         throw error
     }

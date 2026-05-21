@@ -1,11 +1,11 @@
 import Foundation
 
 #if DEBUG
-struct MarinaV2UIFixtureAvailability: MarinaModelAvailabilityProviding {
+struct MarinaTypedFixtureAvailability: MarinaModelAvailabilityProviding {
     func currentStatus() -> MarinaModelAvailability.Status { .available }
 }
 
-struct MarinaV2UIFixtureAIInterpreter: MarinaCanonicalAIInterpreting {
+struct MarinaTypedFixtureInterpreter: MarinaCanonicalAIInterpreting {
     enum FixtureError: Error {
         case missingInterpretation(String)
     }
@@ -20,9 +20,9 @@ struct MarinaV2UIFixtureAIInterpreter: MarinaCanonicalAIInterpreting {
 
     private let adapter = MarinaSemanticQueryAdapter()
 
-    func interpretCanonicalV2(
+    func interpretCanonical(
         prompt: String,
-        context: MarinaLanguageRouterContext
+        context: MarinaInterpretationContext
     ) async throws -> MarinaCanonicalReadInterpretation {
         guard let interpretation = interpretation(for: prompt, context: context) else {
             throw FixtureError.missingInterpretation(prompt)
@@ -32,7 +32,7 @@ struct MarinaV2UIFixtureAIInterpreter: MarinaCanonicalAIInterpreting {
 
     private func interpretation(
         for prompt: String,
-        context: MarinaLanguageRouterContext
+        context: MarinaInterpretationContext
     ) -> MarinaCanonicalReadInterpretation? {
         switch canonicalPrompt(prompt) {
         case "what workspace am i in":

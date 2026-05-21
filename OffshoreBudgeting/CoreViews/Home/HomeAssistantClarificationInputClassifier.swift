@@ -4,7 +4,7 @@ struct HomeAssistantClarificationInputClassifier {
     private let turnClassifier: MarinaPromptTurnClassifier
 
     init(
-        commandGuard: HomeAssistantSharedPipelineCommandGuard = HomeAssistantSharedPipelineCommandGuard(),
+        commandGuard: HomeAssistantFoundationPipelineCommandGuard = HomeAssistantFoundationPipelineCommandGuard(),
         parser: HomeAssistantTextParser = HomeAssistantTextParser()
     ) {
         self.turnClassifier = MarinaPromptTurnClassifier(

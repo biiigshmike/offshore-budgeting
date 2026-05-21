@@ -47,7 +47,7 @@ struct HomeAssistantPresetPromptCatalogTests {
     @Test func catalogedPresetPrompts_executeStoredQueriesThroughTypedRuntime() async throws {
         let fixture = try makeFixture()
         try seedPresetPromptData(fixture)
-        let coordinator = MarinaV2TurnCoordinator()
+        let coordinator = MarinaTurnCoordinator()
         let context = turnContext(fixture)
         let prompts = HomeAssistantPresetPromptCatalog.prompts(defaultPeriodUnit: .month)
 
@@ -78,7 +78,7 @@ struct HomeAssistantPresetPromptCatalogTests {
     @Test func typedPresetPrompt_usesStoredQueryWhenVisibleTitleIsAmbiguous() async throws {
         let fixture = try makeFixture()
         try fixture.seedIncomeData()
-        let result = await MarinaV2TurnCoordinator().run(
+        let result = await MarinaTurnCoordinator().run(
             query: HomeQuery(intent: .incomeAverageActual),
             sourceTitle: "What is my actual income this year?",
             context: turnContext(fixture)
@@ -113,7 +113,7 @@ struct HomeAssistantPresetPromptCatalogTests {
     }
 
     @Test func liveDomainMapper_averageActualIncomeWinsBeforeActualIncomeTotal() {
-        let mapper = MarinaLiveDomainIntentMapper(nowProvider: { sharedPipelineDate(2026, 5, 15) })
+        let mapper = MarinaLiveDomainIntentMapper(nowProvider: { foundationPipelineDate(2026, 5, 15) })
         let context = routerContext()
         let mapped = mapper.map(
             payload: payload(route: "readQuery", intent: "incomeActual", target: "income"),
@@ -141,7 +141,7 @@ struct HomeAssistantPresetPromptCatalogTests {
             to: answer,
             query: HomeQuery(intent: .incomeAverageActual),
             userPrompt: "Average actual income this year",
-            now: sharedPipelineDate(2026, 5, 15)
+            now: foundationPipelineDate(2026, 5, 15)
         )
 
         #expect(titled.title == "Average Actual Income This Year")
@@ -167,10 +167,10 @@ struct HomeAssistantPresetPromptCatalogTests {
         #expect(suggestions.contains { $0.query.intent == .incomeSourceShare })
     }
 
-    private func turnContext(_ fixture: MarinaPhase5Fixture) -> MarinaV2TurnContext {
-        MarinaV2TurnContext(
+    private func turnContext(_ fixture: MarinaPhase5Fixture) -> MarinaTurnContext {
+        MarinaTurnContext(
             provider: fixture.provider,
-            routerContext: MarinaLanguageRouterContext(
+            routerContext: MarinaInterpretationContext(
                 workspaceName: fixture.workspace.name,
                 defaultPeriodUnit: .month,
                 sessionContext: HomeAssistantSessionContext(),
@@ -181,11 +181,11 @@ struct HomeAssistantPresetPromptCatalogTests {
                 presetTitles: ["Rent", "Gym"],
                 budgetNames: ["May"],
                 aliasSummaries: [],
-                now: sharedPipelineDate(2026, 5, 15)
+                now: foundationPipelineDate(2026, 5, 15)
             ),
             defaultPeriodUnit: .month,
             aiEnabled: false,
-            now: sharedPipelineDate(2026, 5, 15)
+            now: foundationPipelineDate(2026, 5, 15)
         )
     }
 
@@ -195,8 +195,8 @@ struct HomeAssistantPresetPromptCatalogTests {
 
         let budget = Budget(
             name: "May",
-            startDate: sharedPipelineDate(2026, 5, 1),
-            endDate: sharedPipelineDate(2026, 5, 31),
+            startDate: foundationPipelineDate(2026, 5, 1),
+            endDate: foundationPipelineDate(2026, 5, 31),
             workspace: fixture.workspace
         )
         let rent = Preset(
@@ -220,7 +220,7 @@ struct HomeAssistantPresetPromptCatalogTests {
         fixture.context.insert(BudgetPresetLink(budget: budget, preset: rent))
         fixture.context.insert(BudgetPresetLink(budget: budget, preset: gym))
         fixture.context.insert(SavingsLedgerEntry(
-            date: sharedPipelineDate(2026, 5, 2),
+            date: foundationPipelineDate(2026, 5, 2),
             amount: 100,
             note: "Manual save",
             kindRaw: SavingsLedgerEntryKind.manualAdjustment.rawValue,
@@ -231,7 +231,7 @@ struct HomeAssistantPresetPromptCatalogTests {
         fixture.context.insert(VariableExpense(
             descriptionText: "Apple Store",
             amount: 129,
-            transactionDate: sharedPipelineDate(2026, 5, 6),
+            transactionDate: foundationPipelineDate(2026, 5, 6),
             workspace: fixture.workspace,
             card: fixture.appleCard,
             category: fixture.travel
@@ -239,8 +239,8 @@ struct HomeAssistantPresetPromptCatalogTests {
         try fixture.context.save()
     }
 
-    private func routerContext() -> MarinaLanguageRouterContext {
-        MarinaLanguageRouterContext(
+    private func routerContext() -> MarinaInterpretationContext {
+        MarinaInterpretationContext(
             workspaceName: "Phase 5 Workspace",
             defaultPeriodUnit: .month,
             sessionContext: HomeAssistantSessionContext(),
@@ -251,7 +251,7 @@ struct HomeAssistantPresetPromptCatalogTests {
             presetTitles: ["Rent"],
             budgetNames: ["May"],
             aliasSummaries: [],
-            now: sharedPipelineDate(2026, 5, 15)
+            now: foundationPipelineDate(2026, 5, 15)
         )
     }
 
@@ -259,8 +259,8 @@ struct HomeAssistantPresetPromptCatalogTests {
         route: String,
         intent: String?,
         target: String?
-    ) -> MarinaFoundationIntentEnvelopeV3Payload {
-        MarinaFoundationIntentEnvelopeV3Payload(
+    ) -> MarinaFoundationIntentEnvelopePayload {
+        MarinaFoundationIntentEnvelopePayload(
             routeRaw: route,
             intentRaw: intent,
             targetText: target,
@@ -283,7 +283,7 @@ struct HomeAssistantPresetPromptCatalogTests {
 
         return HomeAssistantTextParser(
             calendar: calendar,
-            nowProvider: { sharedPipelineDate(2026, 5, 15) }
+            nowProvider: { foundationPipelineDate(2026, 5, 15) }
         )
     }
 

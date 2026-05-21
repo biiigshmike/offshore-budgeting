@@ -73,29 +73,27 @@ struct MarinaFoundationModelsContractsTests {
 
     @Test func runtimeTraceSummary_includesFoundationPromptVersioning() {
         let settings = MarinaRuntimeSettings.resolve(
-            nlqV1Fallback: false,
-            sharedPipelineFallback: true,
             aiOptInFallback: true,
             defaults: UserDefaults(suiteName: "MarinaFoundationModelsContractsTests")!,
             arguments: [],
             environment: [:]
         )
 
-        #expect(settings.traceSummary.contains(MarinaFoundationPromptVersion.interpretationV3.rawValue))
-        #expect(settings.traceSummary.contains(MarinaFoundationPromptVersion.presentationV1.rawValue))
+        #expect(settings.traceSummary.contains(MarinaFoundationPromptVersion.interpretation.rawValue))
+        #expect(settings.traceSummary.contains(MarinaFoundationPromptVersion.presentation.rawValue))
         #expect(settings.traceSummary.contains("foundationModelBand="))
         #expect(settings.traceSummary.contains("foundationLocale="))
     }
 
-    @Test func v2ReadQuery_bridgesToLegacySemanticCommand() {
-        let intent = MarinaAIIntentV2.readQuery(
-            MarinaAIReadQueryIntentV2(
+    @Test func typedReadQuery_bridgesToSemanticCommand() {
+        let intent = MarinaAIIntent.readQuery(
+            MarinaAIReadQueryIntent(
                 reasoning: "Total card spend.",
                 subjectRaw: "variableExpenses",
                 operationRaw: "sum",
                 measureRaw: "spend",
                 includeMentions: [
-                    MarinaAIEntityMentionV2(
+                    MarinaAIEntityMention(
                         roleRaw: "filter",
                         rawText: "Apple Card",
                         typeRaw: "card",
@@ -103,7 +101,7 @@ struct MarinaFoundationModelsContractsTests {
                     )
                 ],
                 excludeMentions: [],
-                primaryDateRange: MarinaAIDateRangeV2(
+                primaryDateRange: MarinaAIDateRange(
                     startISO8601: "2026-05-01",
                     endISO8601: "2026-05-31",
                     rawText: "May",
@@ -122,7 +120,7 @@ struct MarinaFoundationModelsContractsTests {
         )
 
         guard case .semanticCommand(let command) = intent.structuredIntent else {
-            Issue.record("Expected V2 read query to bridge to semantic command.")
+            Issue.record("Expected Foundation read query to bridge to semantic command.")
             return
         }
 
@@ -136,15 +134,15 @@ struct MarinaFoundationModelsContractsTests {
         #expect(command.periodUnit == .month)
     }
 
-    @Test func v2ReadQuery_treatsLiteralNullAndNonePlaceholdersAsMissing() {
-        let intent = MarinaAIIntentV2.readQuery(
-            MarinaAIReadQueryIntentV2(
+    @Test func typedReadQuery_treatsLiteralNullAndNonePlaceholdersAsMissing() {
+        let intent = MarinaAIIntent.readQuery(
+            MarinaAIReadQueryIntent(
                 reasoning: "Live model placeholder cleanup.",
                 subjectRaw: "income",
                 operationRaw: "sum",
                 measureRaw: "income",
                 includeMentions: [
-                    MarinaAIEntityMentionV2(
+                    MarinaAIEntityMention(
                         roleRaw: "primaryTarget",
                         rawText: "null",
                         typeRaw: "none",
@@ -152,7 +150,7 @@ struct MarinaFoundationModelsContractsTests {
                     )
                 ],
                 excludeMentions: [],
-                primaryDateRange: MarinaAIDateRangeV2(
+                primaryDateRange: MarinaAIDateRange(
                     startISO8601: "null",
                     endISO8601: "none",
                     rawText: "n/a",
@@ -184,7 +182,7 @@ struct MarinaFoundationModelsContractsTests {
     }
 
     @available(iOS 26.0, macOS 26.0, *)
-    @Test func foundationEnvelopeV2_bridgesAllRuntimeRoutesToV2Intents() {
+    @Test func foundationRouteEnvelope_bridgesAllRuntimeRoutesToTypedIntents() {
         let read = envelope(
             routeRaw: "readQuery",
             subjectRaw: "variableExpenses",
@@ -256,9 +254,9 @@ struct MarinaFoundationModelsContractsTests {
         #expect(clarificationIntent.ambiguousFieldRaws == ["target"])
     }
 
-    @Test func v2Scenario_bridgesToBudgetForecastSemanticCommand() {
-        let scenario = MarinaAIIntentV2.scenario(
-            MarinaAIScenarioIntentV2(
+    @Test func typedScenario_bridgesToBudgetForecastSemanticCommand() {
+        let scenario = MarinaAIIntent.scenario(
+            MarinaAIScenarioIntent(
                 reasoning: "Hypothetical scenario.",
                 scenarioRaw: "whatIf",
                 targetTypeRaw: "category",
@@ -284,9 +282,9 @@ struct MarinaFoundationModelsContractsTests {
         #expect(command.includeFilters.first?.allowedTypes == [.category])
     }
 
-    @Test func v2Unsupported_bridgesToUnresolvedForLegacyPipeline() {
-        let unsupported = MarinaAIIntentV2.unsupported(
-            MarinaAIUnsupportedIntentV2(
+    @Test func typedUnsupported_bridgesToUnresolvedForFoundationPipeline() {
+        let unsupported = MarinaAIIntent.unsupported(
+            MarinaAIUnsupportedIntent(
                 reasoning: "CRUD is outside this contract.",
                 reasonRaw: "crud",
                 message: "I cannot do that here."
@@ -298,8 +296,8 @@ struct MarinaFoundationModelsContractsTests {
     }
 
     @Test func fakeAIInterpreter_returnsScriptedIntentDeterministically() async throws {
-        let scriptedIntent = MarinaAIIntentV2.lookup(
-            MarinaAILookupIntentV2(
+        let scriptedIntent = MarinaAIIntent.lookup(
+            MarinaAILookupIntent(
                 reasoning: "Find card details.",
                 objectTypeRaws: ["card"],
                 searchText: "Apple Card",
@@ -326,8 +324,8 @@ struct MarinaFoundationModelsContractsTests {
         MarinaFoundationRouteKind(routeRaw: raw)
     }
 
-    private func routerContext() -> MarinaLanguageRouterContext {
-        MarinaLanguageRouterContext(
+    private func routerContext() -> MarinaInterpretationContext {
+        MarinaInterpretationContext(
             workspaceName: "Personal",
             defaultPeriodUnit: .month,
             sessionContext: HomeAssistantSessionContext(),
@@ -378,8 +376,8 @@ struct MarinaFoundationModelsContractsTests {
         unsupportedReasonRaw: String? = nil,
         unsupportedMessage: String? = nil,
         confidenceRaw: String? = "high"
-    ) -> MarinaFoundationIntentEnvelopeV2 {
-        MarinaFoundationIntentEnvelopeV2(
+    ) -> MarinaFoundationRouteEnvelope {
+        MarinaFoundationRouteEnvelope(
             routeRaw: routeRaw,
             subjectRaw: subjectRaw,
             operationRaw: operationRaw,

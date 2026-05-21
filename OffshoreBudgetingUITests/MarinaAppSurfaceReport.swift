@@ -44,29 +44,26 @@ struct MarinaVisibleAnswer: Codable {
 struct MarinaTraceSnapshot: Codable {
     let originalPrompt: String
     let routingMode: String
-    let marinaNLQv1Enabled: Bool?
     let runtimeSettingsSummary: String?
     let selectedRoute: String
     let selectedRouteReason: String?
     let aggregationPath: String?
     let responseType: String?
     let finalAnswerSummary: String?
-    let sharedPipelineEnabled: Bool?
-    let sharedPipelinePath: String?
-    let sharedPipelineInterpreterSource: String?
-    let sharedPipelineHeuristicAttempted: Bool?
-    let sharedPipelineHeuristicUsedAsFallback: Bool?
-    let sharedPipelineCandidateSummary: String?
-    let sharedPipelineResolverSummary: String?
-    let sharedPipelineValidatorSummary: String?
-    let sharedPipelineExecutorSummary: String?
-    let sharedPipelineResponseBridgeSummary: String?
-    let sharedPipelineResponseShapeSummary: String?
-    let sharedPipelineSemanticInterpretationSummary: String?
-    let sharedPipelineSemanticResolverSummary: String?
-    let sharedPipelineSemanticValidationSummary: String?
-    let sharedPipelineFallbackReason: String?
-    let sharedPipelineDisagreementSummary: String?
+    let foundationPipelineEnabled: Bool?
+    let foundationPipelinePath: String?
+    let foundationPipelineInterpreterSource: String?
+    let foundationPipelineCandidateSummary: String?
+    let foundationPipelineResolverSummary: String?
+    let foundationPipelineValidatorSummary: String?
+    let foundationPipelineExecutorSummary: String?
+    let foundationPipelineResponseBridgeSummary: String?
+    let foundationPipelineResponseShapeSummary: String?
+    let foundationPipelineSemanticInterpretationSummary: String?
+    let foundationPipelineSemanticResolverSummary: String?
+    let foundationPipelineSemanticValidationSummary: String?
+    let foundationPipelineRecoveryReason: String?
+    let foundationPipelineDisagreementSummary: String?
     let turnClassification: String?
     let priorContextIncluded: Bool?
 
@@ -83,29 +80,26 @@ struct MarinaTraceSnapshot: Codable {
         )
         self.originalPrompt = fields["prompt"] ?? ""
         self.routingMode = fields["routingMode"] ?? ""
-        self.marinaNLQv1Enabled = nil
         self.runtimeSettingsSummary = nil
         self.selectedRoute = fields["selectedRoute"] ?? ""
         self.selectedRouteReason = nil
         self.aggregationPath = fields["aggregationPath"]
         self.responseType = fields["responseType"]
         self.finalAnswerSummary = nil
-        self.sharedPipelineEnabled = nil
-        self.sharedPipelinePath = fields["sharedPath"]
-        self.sharedPipelineInterpreterSource = fields["interpreter"]
-        self.sharedPipelineHeuristicAttempted = fields["heuristicAttempted"].flatMap(Bool.init)
-        self.sharedPipelineHeuristicUsedAsFallback = fields["heuristicUsedAsFallback"].flatMap(Bool.init)
-        self.sharedPipelineCandidateSummary = fields["candidate"]
-        self.sharedPipelineResolverSummary = nil
-        self.sharedPipelineValidatorSummary = nil
-        self.sharedPipelineExecutorSummary = fields["executor"]
-        self.sharedPipelineResponseBridgeSummary = fields["bridge"]
-        self.sharedPipelineResponseShapeSummary = nil
-        self.sharedPipelineSemanticInterpretationSummary = nil
-        self.sharedPipelineSemanticResolverSummary = nil
-        self.sharedPipelineSemanticValidationSummary = nil
-        self.sharedPipelineFallbackReason = fields["fallback"]
-        self.sharedPipelineDisagreementSummary = nil
+        self.foundationPipelineEnabled = nil
+        self.foundationPipelinePath = fields["foundationPath"]
+        self.foundationPipelineInterpreterSource = fields["interpreter"]
+        self.foundationPipelineCandidateSummary = fields["candidate"]
+        self.foundationPipelineResolverSummary = nil
+        self.foundationPipelineValidatorSummary = nil
+        self.foundationPipelineExecutorSummary = fields["executor"]
+        self.foundationPipelineResponseBridgeSummary = fields["bridge"]
+        self.foundationPipelineResponseShapeSummary = nil
+        self.foundationPipelineSemanticInterpretationSummary = nil
+        self.foundationPipelineSemanticResolverSummary = nil
+        self.foundationPipelineSemanticValidationSummary = nil
+        self.foundationPipelineRecoveryReason = fields["foundationRecovery"]
+        self.foundationPipelineDisagreementSummary = nil
         self.turnClassification = fields["turnClassification"]
         self.priorContextIncluded = fields["priorContextIncluded"].flatMap(Bool.init)
     }
@@ -139,7 +133,7 @@ enum MarinaSurfaceFailureCategory: String, Codable {
     case suggestionChipRecursion
     case fixtureDataMismatch
     case foundationModelsNondeterminism
-    case legacyRouteInterception
+    case nonFoundationRouteInterception
     case traceUnavailable
     case responseShapeMismatch
     case requestShapeMismatch

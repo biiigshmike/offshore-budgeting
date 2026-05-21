@@ -37,9 +37,9 @@ struct MarinaResponseGenerationServiceTests {
         let request = MarinaResponseSurfaceRequestFactory.make(
             userPrompt: raw.userPrompt ?? "",
             workspaceName: "Personal",
-            routeSourceRaw: HomeAssistantPlanResolutionSource.sharedFoundationModels.rawValue,
+            routeSourceRaw: HomeAssistantPlanResolutionSource.foundationModels.rawValue,
             generationBaseAnswer: raw,
-            fallbackApplication: fallback,
+            deterministicApplication: fallback,
             followUpCandidates: [
                 MarinaResponseSuggestionCandidate(index: 0, title: "Compare with last month", querySummary: "intent=compareThisMonthToPreviousMonth")
             ]
@@ -50,11 +50,11 @@ struct MarinaResponseGenerationServiceTests {
         #expect(request.context.presentationMode == .foundationModelsStreaming)
         #expect(request.context.surfaceKind == .answer)
         #expect(request.context.voiceProfile == .marina)
-        #expect(request.fallbackApplication.answer == styled)
-        #expect(request.fallbackApplication.answer.subtitle?.contains("MarinaResponseRules") == false)
+        #expect(request.deterministicApplication.answer == styled)
+        #expect(request.deterministicApplication.answer.subtitle?.contains("MarinaResponseRules") == false)
     }
 
-    @Test func surfacePrompt_includesAIVoiceContextWithoutJSONPersonaSamples() throws {
+    @Test func surfacePrompt_includesAIVoiceContextWithoutJSONSamples() throws {
         let answer = HomeAnswer(
             queryID: UUID(),
             kind: .metric,
@@ -69,7 +69,7 @@ struct MarinaResponseGenerationServiceTests {
         let context = MarinaResponseGenerationContext(
             userPrompt: "why is dining higher?",
             workspaceName: "Personal",
-            routeSourceRaw: HomeAssistantPlanResolutionSource.sharedFoundationModels.rawValue,
+            routeSourceRaw: HomeAssistantPlanResolutionSource.foundationModels.rawValue,
             deterministicAnswer: answer,
             presentationGrounding: MarinaPresentationGroundingBuilder().build(
                 userPrompt: "why is dining higher?",
@@ -108,7 +108,7 @@ struct MarinaResponseGenerationServiceTests {
         #expect(prompt.contains("MarinaResponseRules") == false)
     }
 
-    @Test func surfaceInstructions_personalizeFoundationModelsWithoutJSONCopy() throws {
+    @Test func surfaceInstructions_shapeFoundationModelsWithoutJSONCopy() throws {
         let instructions = MarinaFoundationSurfacePromptBuilder.instructions()
 
         #expect(instructions.contains("warm, observant, practical"))

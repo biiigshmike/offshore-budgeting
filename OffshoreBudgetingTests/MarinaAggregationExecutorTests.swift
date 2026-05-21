@@ -576,7 +576,7 @@ struct MarinaAggregationExecutorTests {
         )
         let budgetInventory = handledCard(executor.execute(
             candidate: MarinaQueryPlanCandidate(
-                source: .heuristic,
+                source: .deterministic,
                 rawPrompt: "What budgets do I have this month?",
                 operation: .lookupDetails,
                 measure: .remainingBudget,
@@ -596,7 +596,7 @@ struct MarinaAggregationExecutorTests {
 
         let overBudget = handledCard(executor.execute(
             candidate: MarinaQueryPlanCandidate(
-                source: .heuristic,
+                source: .deterministic,
                 rawPrompt: "Which categories are over budget?",
                 operation: .rank,
                 measure: .remainingBudget,
@@ -635,7 +635,7 @@ struct MarinaAggregationExecutorTests {
 
         let allocations = handledCard(executor.execute(
             candidate: MarinaQueryPlanCandidate(
-                source: .heuristic,
+                source: .deterministic,
                 rawPrompt: "Show split expenses with Roommate",
                 operation: .rank,
                 measure: .reconciliationBalance,
@@ -652,7 +652,7 @@ struct MarinaAggregationExecutorTests {
 
         let settlements = handledCard(executor.execute(
             candidate: MarinaQueryPlanCandidate(
-                source: .heuristic,
+                source: .deterministic,
                 rawPrompt: "When did Roommate last pay me back?",
                 operation: .rank,
                 measure: .reconciliationBalance,
@@ -894,7 +894,7 @@ struct MarinaAggregationExecutorTests {
         responseShapeHint: MarinaResponseShapeHint? = nil
     ) -> MarinaQueryPlanCandidate {
         MarinaQueryPlanCandidate(
-            source: .heuristic,
+            source: .deterministic,
             rawPrompt: prompt,
             operation: operation,
             measure: measure,

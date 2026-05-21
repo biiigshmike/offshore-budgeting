@@ -12,24 +12,22 @@ import FoundationModels
 #endif
 
 enum MarinaFoundationPromptVersion: String, Codable, Equatable, Sendable {
-    case interpretationV1 = "marina.foundation.interpretation.v1"
-    case interpretationV2 = "marina.foundation.interpretation.v2"
-    case interpretationV3 = "marina.foundation.interpretation.v3"
-    case presentationV1 = "marina.foundation.presentation.v1"
+    case interpretation = "marina.foundation.interpretation"
+    case presentation = "marina.foundation.presentation"
 }
 
 enum MarinaFoundationModelBand: String, Codable, Equatable, Sendable {
     case pre26 = "pre-26"
-    case v26_0To26_3 = "26.0-26.3"
-    case v26_4Plus = "26.4+"
+    case iOS26_0To26_3 = "26.0-26.3"
+    case iOS26_4Plus = "26.4+"
 
     static var current: MarinaFoundationModelBand {
         let version = ProcessInfo.processInfo.operatingSystemVersion
         guard version.majorVersion >= 26 else { return .pre26 }
         if version.majorVersion > 26 || version.minorVersion >= 4 {
-            return .v26_4Plus
+            return .iOS26_4Plus
         }
-        return .v26_0To26_3
+        return .iOS26_0To26_3
     }
 }
 
@@ -134,7 +132,7 @@ struct MarinaFoundationModelsFailureDiagnostic: Codable, Equatable, Sendable {
         case .exceededContextWindowSize:
             return "The prompt plus Marina context was too large for the on-device model."
         case .toolCallFailed:
-            return "A Foundation Models tool call failed. The live V2 path should avoid tools until smoke tests pass."
+            return "A Foundation Models tool call failed. The live Foundation path should avoid tools until smoke tests pass."
         case .cancelled:
             return "The interpretation task was cancelled before Offshore queried your data."
         case .unknown:
@@ -155,11 +153,11 @@ enum MarinaFoundationRouteKind: String, Codable, Equatable, Sendable {
 protocol MarinaAIInterpreter {
     func interpretAI(
         prompt: String,
-        context: MarinaLanguageRouterContext
-    ) async throws -> MarinaAIIntentV2
+        context: MarinaInterpretationContext
+    ) async throws -> MarinaAIIntent
 }
 
-enum MarinaAIIntentKindV2: String, Codable, Equatable, Sendable {
+enum MarinaAIIntentKind: String, Codable, Equatable, Sendable {
     case readQuery
     case lookup
     case clarification
@@ -167,14 +165,14 @@ enum MarinaAIIntentKindV2: String, Codable, Equatable, Sendable {
     case scenario
 }
 
-enum MarinaAIIntentV2: Codable, Equatable, Sendable {
-    case readQuery(MarinaAIReadQueryIntentV2)
-    case lookup(MarinaAILookupIntentV2)
-    case clarification(MarinaAIClarificationIntentV2)
-    case unsupported(MarinaAIUnsupportedIntentV2)
-    case scenario(MarinaAIScenarioIntentV2)
+enum MarinaAIIntent: Codable, Equatable, Sendable {
+    case readQuery(MarinaAIReadQueryIntent)
+    case lookup(MarinaAILookupIntent)
+    case clarification(MarinaAIClarificationIntent)
+    case unsupported(MarinaAIUnsupportedIntent)
+    case scenario(MarinaAIScenarioIntent)
 
-    var kind: MarinaAIIntentKindV2 {
+    var kind: MarinaAIIntentKind {
         switch self {
         case .readQuery:
             return .readQuery
@@ -210,14 +208,14 @@ struct MarinaFoundationRouteIntent: Codable, Equatable, Sendable {
     let focusText: String?
 }
 
-struct MarinaAIEntityMentionV2: Codable, Equatable, Sendable {
+struct MarinaAIEntityMention: Codable, Equatable, Sendable {
     let roleRaw: String?
     let rawText: String?
     let typeRaw: String?
     let allowedTypeRaws: [String]
 }
 
-struct MarinaAIDateRangeV2: Codable, Equatable, Sendable {
+struct MarinaAIDateRange: Codable, Equatable, Sendable {
     let startISO8601: String?
     let endISO8601: String?
     let rawText: String?
@@ -228,7 +226,7 @@ struct MarinaAIDateRangeV2: Codable, Equatable, Sendable {
 @available(iOS 26.0, macOS 26.0, *)
 @Generable
 #endif
-struct MarinaFoundationIntentEnvelope: Codable, Equatable, Sendable {
+struct MarinaFoundationDetailedIntentEnvelope: Codable, Equatable, Sendable {
     #if canImport(FoundationModels)
     @Guide(description: "Short private interpretation reason; never answer the user.")
     #endif
@@ -287,7 +285,7 @@ struct MarinaFoundationIntentEnvelope: Codable, Equatable, Sendable {
 @available(iOS 26.0, macOS 26.0, *)
 @Generable
 #endif
-struct MarinaFoundationIntentEnvelopeV2: Codable, Equatable, Sendable {
+struct MarinaFoundationRouteEnvelope: Codable, Equatable, Sendable {
     #if canImport(FoundationModels)
     @Guide(description: "Required route only: readQuery, lookup, clarification, unsupported, scenario, or help.")
     #endif
@@ -340,7 +338,7 @@ struct MarinaFoundationIntentEnvelopeV2: Codable, Equatable, Sendable {
 @available(iOS 26.0, macOS 26.0, *)
 @Generable
 #endif
-struct MarinaFoundationIntentEnvelopeV3: Codable, Equatable, Sendable {
+struct MarinaFoundationIntentEnvelope: Codable, Equatable, Sendable {
     #if canImport(FoundationModels)
     @Guide(description: "Required coarse route only: readQuery, lookup, clarification, unsupported, scenario, or help.")
     #endif
@@ -362,8 +360,8 @@ struct MarinaFoundationIntentEnvelopeV3: Codable, Equatable, Sendable {
     let confidenceRaw: String?
     let unsupportedReasonRaw: String?
 
-    var payload: MarinaFoundationIntentEnvelopeV3Payload {
-        MarinaFoundationIntentEnvelopeV3Payload(
+    var payload: MarinaFoundationIntentEnvelopePayload {
+        MarinaFoundationIntentEnvelopePayload(
             routeRaw: routeRaw,
             intentRaw: intentRaw,
             targetText: targetText,
@@ -401,15 +399,15 @@ struct MarinaFoundationDateRangeIntent: Codable, Equatable, Sendable {
     let periodUnitRaw: String?
 }
 
-struct MarinaAIReadQueryIntentV2: Codable, Equatable, Sendable {
+struct MarinaAIReadQueryIntent: Codable, Equatable, Sendable {
     let reasoning: String
     let subjectRaw: String?
     let operationRaw: String?
     let measureRaw: String?
-    let includeMentions: [MarinaAIEntityMentionV2]
-    let excludeMentions: [MarinaAIEntityMentionV2]
-    let primaryDateRange: MarinaAIDateRangeV2?
-    let comparisonDateRange: MarinaAIDateRangeV2?
+    let includeMentions: [MarinaAIEntityMention]
+    let excludeMentions: [MarinaAIEntityMention]
+    let primaryDateRange: MarinaAIDateRange?
+    let comparisonDateRange: MarinaAIDateRange?
     let groupingRaw: String?
     let rankingRaw: String?
     let requestedDetailRaw: String?
@@ -420,17 +418,17 @@ struct MarinaAIReadQueryIntentV2: Codable, Equatable, Sendable {
     let confidenceRaw: String?
 }
 
-struct MarinaAILookupIntentV2: Codable, Equatable, Sendable {
+struct MarinaAILookupIntent: Codable, Equatable, Sendable {
     let reasoning: String
     let objectTypeRaws: [String]
     let searchText: String?
     let requestedDetailRaw: String?
-    let dateRange: MarinaAIDateRangeV2?
+    let dateRange: MarinaAIDateRange?
     let limit: Int?
     let confidenceRaw: String?
 }
 
-struct MarinaAIClarificationIntentV2: Codable, Equatable, Sendable {
+struct MarinaAIClarificationIntent: Codable, Equatable, Sendable {
     let reasoning: String
     let kindRaw: String?
     let message: String?
@@ -440,13 +438,13 @@ struct MarinaAIClarificationIntentV2: Codable, Equatable, Sendable {
     let shouldRunBestEffort: Bool
 }
 
-struct MarinaAIUnsupportedIntentV2: Codable, Equatable, Sendable {
+struct MarinaAIUnsupportedIntent: Codable, Equatable, Sendable {
     let reasoning: String
     let reasonRaw: String?
     let message: String?
 }
 
-struct MarinaAIScenarioIntentV2: Codable, Equatable, Sendable {
+struct MarinaAIScenarioIntent: Codable, Equatable, Sendable {
     let reasoning: String
     let scenarioRaw: String?
     let targetTypeRaw: String?
@@ -454,7 +452,7 @@ struct MarinaAIScenarioIntentV2: Codable, Equatable, Sendable {
     let valueModeRaw: String?
     let amount: Double?
     let percent: Double?
-    let dateRange: MarinaAIDateRangeV2?
+    let dateRange: MarinaAIDateRange?
     let confidenceRaw: String?
 }
 
@@ -548,8 +546,8 @@ extension MarinaFoundationRouteIntent {
 #if canImport(FoundationModels)
 @available(iOS 26.0, macOS 26.0, *)
 extension MarinaFoundationReadQueryIntent {
-    var aiIntent: MarinaAIReadQueryIntentV2 {
-        MarinaAIReadQueryIntentV2(
+    var aiIntent: MarinaAIReadQueryIntent {
+        MarinaAIReadQueryIntent(
             reasoning: reasoning,
             subjectRaw: subjectRaw,
             operationRaw: operationRaw,
@@ -572,8 +570,8 @@ extension MarinaFoundationReadQueryIntent {
 
 @available(iOS 26.0, macOS 26.0, *)
 extension MarinaFoundationLookupIntent {
-    var aiIntent: MarinaAILookupIntentV2 {
-        MarinaAILookupIntentV2(
+    var aiIntent: MarinaAILookupIntent {
+        MarinaAILookupIntent(
             reasoning: reasoning,
             objectTypeRaws: objectTypeRaws,
             searchText: searchText,
@@ -587,8 +585,8 @@ extension MarinaFoundationLookupIntent {
 
 @available(iOS 26.0, macOS 26.0, *)
 extension MarinaFoundationClarificationIntent {
-    var aiIntent: MarinaAIClarificationIntentV2 {
-        MarinaAIClarificationIntentV2(
+    var aiIntent: MarinaAIClarificationIntent {
+        MarinaAIClarificationIntent(
             reasoning: reasoning,
             kindRaw: kindRaw,
             message: message,
@@ -606,8 +604,8 @@ extension MarinaFoundationClarificationIntent {
 
 @available(iOS 26.0, macOS 26.0, *)
 extension MarinaFoundationUnsupportedIntent {
-    var aiIntent: MarinaAIUnsupportedIntentV2 {
-        MarinaAIUnsupportedIntentV2(
+    var aiIntent: MarinaAIUnsupportedIntent {
+        MarinaAIUnsupportedIntent(
             reasoning: reasoning,
             reasonRaw: reasonRaw,
             message: message
@@ -617,8 +615,8 @@ extension MarinaFoundationUnsupportedIntent {
 
 @available(iOS 26.0, macOS 26.0, *)
 extension MarinaFoundationScenarioIntent {
-    var aiIntent: MarinaAIScenarioIntentV2 {
-        MarinaAIScenarioIntentV2(
+    var aiIntent: MarinaAIScenarioIntent {
+        MarinaAIScenarioIntent(
             reasoning: reasoning,
             scenarioRaw: scenarioRaw,
             targetTypeRaw: targetTypeRaw,
@@ -634,8 +632,8 @@ extension MarinaFoundationScenarioIntent {
 
 @available(iOS 26.0, macOS 26.0, *)
 private extension MarinaFoundationEntityMentionIntent {
-    var aiMention: MarinaAIEntityMentionV2 {
-        MarinaAIEntityMentionV2(
+    var aiMention: MarinaAIEntityMention {
+        MarinaAIEntityMention(
             roleRaw: roleRaw,
             rawText: rawText,
             typeRaw: typeRaw,
@@ -646,8 +644,8 @@ private extension MarinaFoundationEntityMentionIntent {
 
 @available(iOS 26.0, macOS 26.0, *)
 private extension MarinaFoundationDateRangeIntent {
-    var aiDateRange: MarinaAIDateRangeV2 {
-        MarinaAIDateRangeV2(
+    var aiDateRange: MarinaAIDateRange {
+        MarinaAIDateRange(
             startISO8601: startISO8601,
             endISO8601: endISO8601,
             rawText: rawText,
@@ -680,12 +678,12 @@ extension MarinaFoundationRouteKind {
 }
 
 @available(iOS 26.0, macOS 26.0, *)
-extension MarinaFoundationIntentEnvelope {
+extension MarinaFoundationDetailedIntentEnvelope {
     var routeKind: MarinaFoundationRouteKind {
         MarinaFoundationRouteKind(routeRaw: routeRaw)
     }
 
-    var aiIntent: MarinaAIIntentV2 {
+    var aiIntent: MarinaAIIntent {
         switch routeKind {
         case .readQuery:
             return .readQuery(readQueryIntent)
@@ -697,7 +695,7 @@ extension MarinaFoundationIntentEnvelope {
             return .scenario(scenarioIntent)
         case .help:
             return .unsupported(
-                MarinaAIUnsupportedIntentV2(
+                MarinaAIUnsupportedIntent(
                     reasoning: reasoning,
                     reasonRaw: "help",
                     message: unsupportedMessage?.nilIfBlank ?? "Marina can search, summarize, calculate, and run read-only what-if scenarios over this workspace."
@@ -708,8 +706,8 @@ extension MarinaFoundationIntentEnvelope {
         }
     }
 
-    private var readQueryIntent: MarinaAIReadQueryIntentV2 {
-        MarinaAIReadQueryIntentV2(
+    private var readQueryIntent: MarinaAIReadQueryIntent {
+        MarinaAIReadQueryIntent(
             reasoning: reasoning,
             subjectRaw: subjectRaw,
             operationRaw: operationRaw,
@@ -729,10 +727,10 @@ extension MarinaFoundationIntentEnvelope {
         )
     }
 
-    private var lookupIntent: MarinaAILookupIntentV2 {
+    private var lookupIntent: MarinaAILookupIntent {
         let objectTypeRaws = [primaryEntityTypeRaw, secondaryEntityTypeRaw, subjectRaw]
             .compactMap { $0?.nilIfBlank }
-        return MarinaAILookupIntentV2(
+        return MarinaAILookupIntent(
             reasoning: reasoning,
             objectTypeRaws: objectTypeRaws,
             searchText: primaryEntityName?.nilIfBlank ?? secondaryEntityName?.nilIfBlank,
@@ -743,8 +741,8 @@ extension MarinaFoundationIntentEnvelope {
         )
     }
 
-    private var clarificationIntent: MarinaAIClarificationIntentV2 {
-        MarinaAIClarificationIntentV2(
+    private var clarificationIntent: MarinaAIClarificationIntent {
+        MarinaAIClarificationIntent(
             reasoning: reasoning,
             kindRaw: clarificationKindRaw,
             message: clarificationMessage,
@@ -755,16 +753,16 @@ extension MarinaFoundationIntentEnvelope {
         )
     }
 
-    private var unsupportedIntent: MarinaAIUnsupportedIntentV2 {
-        MarinaAIUnsupportedIntentV2(
+    private var unsupportedIntent: MarinaAIUnsupportedIntent {
+        MarinaAIUnsupportedIntent(
             reasoning: reasoning,
             reasonRaw: unsupportedReasonRaw,
-            message: unsupportedMessage?.nilIfBlank ?? "That request is outside Marina v2's safe read-only scope."
+            message: unsupportedMessage?.nilIfBlank ?? "That request is outside Marina's safe read-only scope."
         )
     }
 
-    private var scenarioIntent: MarinaAIScenarioIntentV2 {
-        MarinaAIScenarioIntentV2(
+    private var scenarioIntent: MarinaAIScenarioIntent {
+        MarinaAIScenarioIntent(
             reasoning: reasoning,
             scenarioRaw: scenarioRaw,
             targetTypeRaw: primaryEntityTypeRaw ?? secondaryEntityTypeRaw,
@@ -777,26 +775,26 @@ extension MarinaFoundationIntentEnvelope {
         )
     }
 
-    private var includeMentions: [MarinaAIEntityMentionV2] {
+    private var includeMentions: [MarinaAIEntityMention] {
         [
             entityMention(name: primaryEntityName, typeRaw: primaryEntityTypeRaw, roleRaw: "primaryTarget"),
             entityMention(name: secondaryEntityName, typeRaw: secondaryEntityTypeRaw, roleRaw: "filter")
         ].compactMap { $0 }
     }
 
-    private var excludeMentions: [MarinaAIEntityMentionV2] {
+    private var excludeMentions: [MarinaAIEntityMention] {
         [entityMention(name: excludeEntityName, typeRaw: excludeEntityTypeRaw, roleRaw: "excludeFilter")]
             .compactMap { $0 }
     }
 
-    private var primaryDateRange: MarinaAIDateRangeV2? {
+    private var primaryDateRange: MarinaAIDateRange? {
         guard startISO8601?.nilIfBlank != nil
                 || endISO8601?.nilIfBlank != nil
                 || dateRawText?.nilIfBlank != nil
                 || periodUnitRaw?.nilIfBlank != nil else {
             return nil
         }
-        return MarinaAIDateRangeV2(
+        return MarinaAIDateRange(
             startISO8601: startISO8601,
             endISO8601: endISO8601,
             rawText: dateRawText,
@@ -804,11 +802,11 @@ extension MarinaFoundationIntentEnvelope {
         )
     }
 
-    private var comparisonDateRange: MarinaAIDateRangeV2? {
+    private var comparisonDateRange: MarinaAIDateRange? {
         guard comparisonStartISO8601?.nilIfBlank != nil || comparisonEndISO8601?.nilIfBlank != nil else {
             return nil
         }
-        return MarinaAIDateRangeV2(
+        return MarinaAIDateRange(
             startISO8601: comparisonStartISO8601,
             endISO8601: comparisonEndISO8601,
             rawText: nil,
@@ -825,9 +823,9 @@ extension MarinaFoundationIntentEnvelope {
         name: String?,
         typeRaw: String?,
         roleRaw: String
-    ) -> MarinaAIEntityMentionV2? {
+    ) -> MarinaAIEntityMention? {
         guard let name = name?.nilIfBlank else { return nil }
-        return MarinaAIEntityMentionV2(
+        return MarinaAIEntityMention(
             roleRaw: roleRaw,
             rawText: name,
             typeRaw: typeRaw,
@@ -837,12 +835,12 @@ extension MarinaFoundationIntentEnvelope {
 }
 
 @available(iOS 26.0, macOS 26.0, *)
-extension MarinaFoundationIntentEnvelopeV2 {
+extension MarinaFoundationRouteEnvelope {
     var routeKind: MarinaFoundationRouteKind {
         MarinaFoundationRouteKind(routeRaw: routeRaw)
     }
 
-    var aiIntent: MarinaAIIntentV2 {
+    var aiIntent: MarinaAIIntent {
         switch routeKind {
         case .readQuery:
             return .readQuery(readQueryIntent)
@@ -854,7 +852,7 @@ extension MarinaFoundationIntentEnvelopeV2 {
             return .scenario(scenarioIntent)
         case .help:
             return .unsupported(
-                MarinaAIUnsupportedIntentV2(
+                MarinaAIUnsupportedIntent(
                     reasoning: "",
                     reasonRaw: "help",
                     message: unsupportedMessage?.nilIfBlank ?? "Marina can search, summarize, calculate, and run read-only what-if scenarios over this workspace."
@@ -865,8 +863,8 @@ extension MarinaFoundationIntentEnvelopeV2 {
         }
     }
 
-    private var readQueryIntent: MarinaAIReadQueryIntentV2 {
-        MarinaAIReadQueryIntentV2(
+    private var readQueryIntent: MarinaAIReadQueryIntent {
+        MarinaAIReadQueryIntent(
             reasoning: "",
             subjectRaw: subjectRaw,
             operationRaw: operationRaw,
@@ -886,10 +884,10 @@ extension MarinaFoundationIntentEnvelopeV2 {
         )
     }
 
-    private var lookupIntent: MarinaAILookupIntentV2 {
+    private var lookupIntent: MarinaAILookupIntent {
         let objectTypeRaws = [targetTypeRaw, secondaryTargetTypeRaw, subjectRaw]
             .compactMap { $0?.nilIfBlank }
-        return MarinaAILookupIntentV2(
+        return MarinaAILookupIntent(
             reasoning: "",
             objectTypeRaws: objectTypeRaws,
             searchText: targetText?.nilIfBlank ?? secondaryTargetText?.nilIfBlank,
@@ -900,13 +898,13 @@ extension MarinaFoundationIntentEnvelopeV2 {
         )
     }
 
-    private var clarificationIntent: MarinaAIClarificationIntentV2 {
+    private var clarificationIntent: MarinaAIClarificationIntent {
         let field = clarificationFieldRaw?.nilIfBlank
         let kind = clarificationKindRaw?.nilIfBlank
         let normalizedKind = normalizedToken(kind)
         let isAmbiguous = normalizedKind?.contains("ambiguous") == true
         let isMissing = normalizedKind?.contains("missing") == true || isAmbiguous == false
-        return MarinaAIClarificationIntentV2(
+        return MarinaAIClarificationIntent(
             reasoning: "",
             kindRaw: kind,
             message: clarificationMessage,
@@ -917,16 +915,16 @@ extension MarinaFoundationIntentEnvelopeV2 {
         )
     }
 
-    private var unsupportedIntent: MarinaAIUnsupportedIntentV2 {
-        MarinaAIUnsupportedIntentV2(
+    private var unsupportedIntent: MarinaAIUnsupportedIntent {
+        MarinaAIUnsupportedIntent(
             reasoning: "",
             reasonRaw: unsupportedReasonRaw,
-            message: unsupportedMessage?.nilIfBlank ?? "That request is outside Marina v2's safe read-only scope."
+            message: unsupportedMessage?.nilIfBlank ?? "That request is outside Marina's safe read-only scope."
         )
     }
 
-    private var scenarioIntent: MarinaAIScenarioIntentV2 {
-        MarinaAIScenarioIntentV2(
+    private var scenarioIntent: MarinaAIScenarioIntent {
+        MarinaAIScenarioIntent(
             reasoning: "",
             scenarioRaw: scenarioRaw,
             targetTypeRaw: targetTypeRaw ?? secondaryTargetTypeRaw,
@@ -939,26 +937,26 @@ extension MarinaFoundationIntentEnvelopeV2 {
         )
     }
 
-    private var includeMentions: [MarinaAIEntityMentionV2] {
+    private var includeMentions: [MarinaAIEntityMention] {
         [
             entityMention(name: targetText, typeRaw: targetTypeRaw, roleRaw: "primaryTarget"),
             entityMention(name: secondaryTargetText, typeRaw: secondaryTargetTypeRaw, roleRaw: "filter")
         ].compactMap { $0 }
     }
 
-    private var excludeMentions: [MarinaAIEntityMentionV2] {
+    private var excludeMentions: [MarinaAIEntityMention] {
         [entityMention(name: excludeTargetText, typeRaw: excludeTargetTypeRaw, roleRaw: "excludeFilter")]
             .compactMap { $0 }
     }
 
-    private var primaryDateRange: MarinaAIDateRangeV2? {
+    private var primaryDateRange: MarinaAIDateRange? {
         guard startISO8601?.nilIfBlank != nil
                 || endISO8601?.nilIfBlank != nil
                 || dateRawText?.nilIfBlank != nil
                 || periodUnitRaw?.nilIfBlank != nil else {
             return nil
         }
-        return MarinaAIDateRangeV2(
+        return MarinaAIDateRange(
             startISO8601: startISO8601,
             endISO8601: endISO8601,
             rawText: dateRawText,
@@ -966,11 +964,11 @@ extension MarinaFoundationIntentEnvelopeV2 {
         )
     }
 
-    private var comparisonDateRange: MarinaAIDateRangeV2? {
+    private var comparisonDateRange: MarinaAIDateRange? {
         guard comparisonStartISO8601?.nilIfBlank != nil || comparisonEndISO8601?.nilIfBlank != nil else {
             return nil
         }
-        return MarinaAIDateRangeV2(
+        return MarinaAIDateRange(
             startISO8601: comparisonStartISO8601,
             endISO8601: comparisonEndISO8601,
             rawText: nil,
@@ -997,9 +995,9 @@ extension MarinaFoundationIntentEnvelopeV2 {
         name: String?,
         typeRaw: String?,
         roleRaw: String
-    ) -> MarinaAIEntityMentionV2? {
+    ) -> MarinaAIEntityMention? {
         guard let name = name?.nilIfBlank else { return nil }
-        return MarinaAIEntityMentionV2(
+        return MarinaAIEntityMention(
             roleRaw: roleRaw,
             rawText: name,
             typeRaw: typeRaw,
@@ -1008,7 +1006,7 @@ extension MarinaFoundationIntentEnvelopeV2 {
     }
 }
 
-extension MarinaAIIntentV2 {
+extension MarinaAIIntent {
     var structuredIntent: MarinaStructuredIntent {
         switch self {
         case .readQuery(let intent):
@@ -1025,7 +1023,7 @@ extension MarinaAIIntentV2 {
     }
 }
 
-extension MarinaAIReadQueryIntentV2 {
+extension MarinaAIReadQueryIntent {
     var structuredIntent: MarinaStructuredIntent {
         guard let action = semanticAction(from: operationRaw),
               let dataset = semanticDataset(from: subjectRaw) else {
@@ -1054,7 +1052,7 @@ extension MarinaAIReadQueryIntentV2 {
     }
 }
 
-extension MarinaAILookupIntentV2 {
+extension MarinaAILookupIntent {
     var structuredIntent: MarinaStructuredIntent {
         guard let searchText = searchText?.nilIfBlank else {
             return .clarification(
@@ -1086,7 +1084,7 @@ extension MarinaAILookupIntentV2 {
     }
 }
 
-extension MarinaAIScenarioIntentV2 {
+extension MarinaAIScenarioIntent {
     var structuredIntent: MarinaStructuredIntent {
         let filter = targetName?.nilIfBlank.map { target in
             MarinaSemanticCommandFilter(
@@ -1108,7 +1106,7 @@ extension MarinaAIScenarioIntentV2 {
     }
 }
 
-extension MarinaAIClarificationIntentV2 {
+extension MarinaAIClarificationIntent {
     var structuredClarification: MarinaStructuredClarification {
         MarinaStructuredClarification(
             subtitle: message?.nilIfBlank,
@@ -1448,7 +1446,7 @@ private func periodUnit(from rawValue: String?) -> HomeQueryPeriodUnit? {
     }
 }
 
-private func semanticFilters(from mentions: [MarinaAIEntityMentionV2]) -> [MarinaSemanticCommandFilter] {
+private func semanticFilters(from mentions: [MarinaAIEntityMention]) -> [MarinaSemanticCommandFilter] {
     mentions.compactMap { mention in
         guard let rawText = mention.rawText?.nilIfBlank else { return nil }
         let allowed = ([mention.typeRaw].compactMap { $0 } + mention.allowedTypeRaws)
@@ -1457,7 +1455,7 @@ private func semanticFilters(from mentions: [MarinaAIEntityMentionV2]) -> [Marin
     }
 }
 
-private func makeDateRange(from intent: MarinaAIDateRangeV2?) -> HomeQueryDateRange? {
+private func makeDateRange(from intent: MarinaAIDateRange?) -> HomeQueryDateRange? {
     makeDateRange(start: intent?.startISO8601, end: intent?.endISO8601)
 }
 
@@ -1556,7 +1554,7 @@ struct MarinaFoundationModelsSessionProvider {
 
     func tools(
         for route: MarinaFoundationRouteKind,
-        context: MarinaLanguageRouterContext
+        context: MarinaInterpretationContext
     ) -> [any Tool] {
         switch route {
         case .readQuery, .lookup, .clarification, .scenario:
@@ -1583,7 +1581,7 @@ struct MarinaFoundationEntityLookupTool: Tool {
 
     private let lines: [String]
 
-    init(context: MarinaLanguageRouterContext) {
+    init(context: MarinaInterpretationContext) {
         self.lines = [
             Self.line(type: "card", values: context.cardNames),
             Self.line(type: "category", values: context.categoryNames),
@@ -1660,7 +1658,7 @@ struct MarinaFoundationRecentConversationSummaryTool: Tool {
 
     private let summary: String
 
-    init(context: MarinaLanguageRouterContext) {
+    init(context: MarinaInterpretationContext) {
         let prior = context.priorQueryContext
         guard prior.hasContext else {
             self.summary = "No prior query context."

@@ -46,9 +46,9 @@ enum MarinaDateOnlyRangeCodec {
         rawText: String?,
         periodUnit: HomeQueryPeriodUnit?,
         calendar: Calendar = .current
-    ) -> MarinaAIDateRangeV2? {
+    ) -> MarinaAIDateRange? {
         guard let range else { return nil }
-        return MarinaAIDateRangeV2(
+        return MarinaAIDateRange(
             startISO8601: dateOnlyString(from: range.startDate, calendar: calendar),
             endISO8601: dateOnlyString(from: range.endDate, calendar: calendar),
             rawText: rawText,

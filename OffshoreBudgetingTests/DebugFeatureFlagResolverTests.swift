@@ -8,10 +8,10 @@ struct DebugFeatureFlagResolverTests {
         defer { defaults.removePersistentDomain(forName: "DebugFeatureFlagResolverTests.enabledDefaults") }
 
         for rawValue in ["true", "YES", "on", "1", "enabled"] {
-            defaults.set(rawValue, forKey: "debug_marina_shared_pipeline_enabled")
+            defaults.set(rawValue, forKey: "debug_test_feature_enabled")
 
             #expect(DebugFeatureFlagResolver.isEnabled(
-                key: "debug_marina_shared_pipeline_enabled",
+                key: "debug_test_feature_enabled",
                 fallback: false,
                 defaults: defaults,
                 arguments: []
@@ -31,10 +31,10 @@ struct DebugFeatureFlagResolverTests {
         ))
 
         #expect(DebugFeatureFlagResolver.isEnabled(
-            key: "debug_marina_shared_pipeline_enabled",
+            key: "debug_test_feature_enabled",
             fallback: false,
             defaults: defaults,
-            arguments: ["App", "-debug_marina_shared_pipeline_enabled=yes"]
+            arguments: ["App", "-debug_test_feature_enabled=yes"]
         ))
     }
 
@@ -42,11 +42,11 @@ struct DebugFeatureFlagResolverTests {
         let defaults = try makeDefaults(suiteName: "DebugFeatureFlagResolverTests.bareLaunchArguments")
         defer { defaults.removePersistentDomain(forName: "DebugFeatureFlagResolverTests.bareLaunchArguments") }
 
-        let sharedPipeline = DebugFeatureFlagResolver.resolve(
-            key: "debug_marina_shared_pipeline_enabled",
+        let testFeature = DebugFeatureFlagResolver.resolve(
+            key: "debug_test_feature_enabled",
             fallback: false,
             defaults: defaults,
-            arguments: ["App", "debug_marina_shared_pipeline_enabled"]
+            arguments: ["App", "debug_test_feature_enabled"]
         )
         let aiOptIn = DebugFeatureFlagResolver.resolve(
             key: "marina_ai_opt_in_enabled",
@@ -55,9 +55,9 @@ struct DebugFeatureFlagResolverTests {
             arguments: ["App", "-marina_ai_opt_in_enabled"]
         )
 
-        #expect(sharedPipeline.isEnabled)
-        #expect(sharedPipeline.source == .arguments)
-        #expect(sharedPipeline.argumentValueWasPresent)
+        #expect(testFeature.isEnabled)
+        #expect(testFeature.source == .arguments)
+        #expect(testFeature.argumentValueWasPresent)
         #expect(aiOptIn.isEnabled)
         #expect(aiOptIn.source == .arguments)
         #expect(aiOptIn.argumentValueWasPresent)
@@ -67,16 +67,16 @@ struct DebugFeatureFlagResolverTests {
         let defaults = try makeDefaults(suiteName: "DebugFeatureFlagResolverTests.environment")
         defer { defaults.removePersistentDomain(forName: "DebugFeatureFlagResolverTests.environment") }
 
-        let sharedPipeline = DebugFeatureFlagResolver.resolve(
-            key: "debug_marina_shared_pipeline_enabled",
+        let testFeature = DebugFeatureFlagResolver.resolve(
+            key: "debug_test_feature_enabled",
             fallback: false,
             defaults: defaults,
             arguments: [],
-            environment: ["debug_marina_shared_pipeline_enabled": "yes"]
+            environment: ["debug_test_feature_enabled": "yes"]
         )
-        #expect(sharedPipeline.isEnabled)
-        #expect(sharedPipeline.source == .environment)
-        #expect(sharedPipeline.environmentValueWasPresent)
+        #expect(testFeature.isEnabled)
+        #expect(testFeature.source == .environment)
+        #expect(testFeature.environmentValueWasPresent)
 
         #expect(DebugFeatureFlagResolver.isEnabled(
             key: "marina_ai_opt_in_enabled",
@@ -91,10 +91,10 @@ struct DebugFeatureFlagResolverTests {
         let defaults = try makeDefaults(suiteName: "DebugFeatureFlagResolverTests.disabledDefaults")
         defer { defaults.removePersistentDomain(forName: "DebugFeatureFlagResolverTests.disabledDefaults") }
 
-        defaults.set("off", forKey: "debug_marina_shared_pipeline_enabled")
+        defaults.set("off", forKey: "debug_test_feature_enabled")
 
         #expect(DebugFeatureFlagResolver.isEnabled(
-            key: "debug_marina_shared_pipeline_enabled",
+            key: "debug_test_feature_enabled",
             fallback: true,
             defaults: defaults,
             arguments: []

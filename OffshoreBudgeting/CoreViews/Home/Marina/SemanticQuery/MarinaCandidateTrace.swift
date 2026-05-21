@@ -4,7 +4,7 @@ struct MarinaCandidateTrace: Codable, Equatable {
     let requestFamily: MarinaRequestFamily?
     let requestShape: MarinaRequestShape?
     let routeIntentSummary: String?
-    let interpreterSource: MarinaInterpreterSource?
+    let interpreterSource: MarinaInterpretationSource?
     let operation: MarinaCandidateOperation?
     let measure: MarinaCandidateMeasure?
     let entityMentionSummaries: [String]

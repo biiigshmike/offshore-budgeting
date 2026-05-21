@@ -7,20 +7,6 @@
 
 import Foundation
 
-enum MarinaInterpretedRequest: Equatable {
-    case query(HomeQueryPlan, source: HomeAssistantPlanResolutionSource)
-    case command(HomeAssistantCommandPlan, source: HomeAssistantPlanResolutionSource)
-    case clarification(MarinaClarificationRequest, source: HomeAssistantPlanResolutionSource?)
-    case unresolved
-}
-
-extension MarinaInterpretedRequest {
-    var executableQueryPlan: HomeQueryPlan? {
-        guard case let .query(plan, _) = self else { return nil }
-        return plan
-    }
-}
-
 enum MarinaStructuredIntentKind: String, Equatable {
     case semanticCommand
     case query
@@ -170,15 +156,6 @@ enum MarinaStructuredIntent: Equatable {
     case unresolved
 }
 
-struct MarinaClarificationRequest: Equatable {
-    let subtitle: String
-    let reasons: [HomeAssistantClarificationReason]
-    let shouldRunBestEffort: Bool
-    let queryPlan: HomeQueryPlan?
-    let commandPlan: HomeAssistantCommandPlan?
-    let isActionable: Bool
-}
-
 struct MarinaPriorQueryContext: Equatable {
     let lastQueryPlan: HomeQueryPlan?
     let lastMetric: HomeQueryMetric?
@@ -208,7 +185,7 @@ struct MarinaPriorQueryContext: Equatable {
     )
 }
 
-struct MarinaLanguageRouterContext {
+struct MarinaInterpretationContext {
     let workspaceName: String
     let defaultPeriodUnit: HomeQueryPeriodUnit
     let ambientDateRange: HomeQueryDateRange?

@@ -20,7 +20,7 @@ enum HomeAssistantPlanResolutionSource: String {
     case parser
     case contextual
     case entityAware
-    case sharedFoundationModels
+    case foundationModels
 }
 
 // MARK: - Presented Panel
@@ -86,10 +86,10 @@ struct HomeAssistantPanelView: View {
     @State private var recoverySuggestions: [HomeAssistantRecoverySuggestion] = []
     @State private var lastClarificationReasons: [HomeAssistantClarificationReason] = []
     @State private var activeClarificationContext: HomeAssistantClarificationContext? = nil
-    @State private var sharedPipelineClarification: MarinaTypedClarification? = nil
-    @State private var sharedPipelineClarificationChoiceContext: MarinaTypedClarification? = nil
-    @State private var sharedPipelineClarificationChoicesByID: [UUID: MarinaClarificationChoice] = [:]
-    @State private var sharedPipelineClarificationChoicesByTitle: [String: MarinaClarificationChoice] = [:]
+    @State private var foundationPipelineClarification: MarinaTypedClarification? = nil
+    @State private var foundationPipelineClarificationChoiceContext: MarinaTypedClarification? = nil
+    @State private var foundationPipelineClarificationChoicesByID: [UUID: MarinaClarificationChoice] = [:]
+    @State private var foundationPipelineClarificationChoicesByTitle: [String: MarinaClarificationChoice] = [:]
     @State private var selectedEmptySuggestionGroup: HomeAssistantPresetPromptGroup?
     @State private var pendingExpenseCardPlan: HomeAssistantCommandPlan? = nil
     @State private var pendingExpenseCardOptions: [Card] = []
@@ -138,17 +138,11 @@ struct HomeAssistantPanelView: View {
     private var defaultBudgetingPeriodRaw: String = BudgetingPeriod.monthly.rawValue
     @AppStorage("general_confirmBeforeDeleting")
     private var confirmBeforeDeleting: Bool = true
-    @AppStorage(MarinaRuntimeSettings.nlqV1Key)
-    private var marinaNLQv1Enabled: Bool = MarinaRuntimeSettings.defaultNLQv1Enabled
-    @AppStorage(MarinaRuntimeSettings.sharedPipelineKey)
-    private var marinaSharedPipelineEnabled: Bool = MarinaRuntimeSettings.defaultSharedPipelineEnabled
     @AppStorage(MarinaRuntimeSettings.aiOptInKey)
     private var marinaAIOptInEnabled: Bool = MarinaRuntimeSettings.defaultAIOptInEnabled
 
     private var marinaRuntimeSettings: MarinaRuntimeSettings {
         MarinaRuntimeSettings.resolve(
-            nlqV1Fallback: marinaNLQv1Enabled,
-            sharedPipelineFallback: marinaSharedPipelineEnabled,
             aiOptInFallback: marinaAIOptInEnabled
         )
     }
@@ -526,7 +520,6 @@ struct HomeAssistantPanelView: View {
     }
 
     private func toggleFoundationModelInterpreter() {
-        marinaSharedPipelineEnabled = true
         marinaAIOptInEnabled.toggle()
         prewarmFoundationModelsIfNeeded()
     }
@@ -542,7 +535,7 @@ struct HomeAssistantPanelView: View {
                     promptPrefix: "User prompt:"
                 )
                 provider.prewarm(
-                    instructions: "Prompt version: \(MarinaFoundationPromptVersion.interpretationV3.rawValue)\nExtract coarse Marina budgeting language for deterministic Offshore execution.",
+                    instructions: "Prompt version: \(MarinaFoundationPromptVersion.interpretation.rawValue)\nExtract coarse Marina budgeting language for deterministic Offshore execution.",
                     promptPrefix: "User prompt:"
                 )
             }
@@ -1417,10 +1410,10 @@ struct HomeAssistantPanelView: View {
             )
         }
 
-        if let legacySourcesRange = bodyWithoutTechnicalFooter.range(of: "Sources:", options: .backwards) {
-            let narrative = String(bodyWithoutTechnicalFooter[..<legacySourcesRange.lowerBound])
+        if let sourcesRange = bodyWithoutTechnicalFooter.range(of: "Sources:", options: .backwards) {
+            let narrative = String(bodyWithoutTechnicalFooter[..<sourcesRange.lowerBound])
                 .trimmingCharacters(in: .whitespacesAndNewlines)
-            let provenance = String(bodyWithoutTechnicalFooter[legacySourcesRange.upperBound...])
+            let provenance = String(bodyWithoutTechnicalFooter[sourcesRange.upperBound...])
                 .trimmingCharacters(in: .whitespacesAndNewlines)
 
             return AssistantSubtitlePresentation(
@@ -1443,17 +1436,16 @@ struct HomeAssistantPanelView: View {
         executedPlan: HomeQueryPlan? = nil,
         source: HomeAssistantPlanResolutionSource = .contextual
     ) {
-        // Legacy reachable: suggestion chips and older resolved plans can carry a
-        // prebuilt HomeQuery, so this still executes HomeQueryEngine directly until
-        // each chip path is proven equivalent through the shared pipeline.
+        // Query chips and prebuilt HomeQuery actions still execute through the
+        // deterministic HomeQueryEngine path; live natural-language reads stay in Marina.
         clarificationSuggestions = []
         recoverySuggestions = []
         lastClarificationReasons = []
         activeClarificationContext = nil
-        sharedPipelineClarification = nil
-        sharedPipelineClarificationChoiceContext = nil
-        sharedPipelineClarificationChoicesByID = [:]
-        sharedPipelineClarificationChoicesByTitle = [:]
+        foundationPipelineClarification = nil
+        foundationPipelineClarificationChoiceContext = nil
+        foundationPipelineClarificationChoicesByID = [:]
+        foundationPipelineClarificationChoicesByTitle = [:]
         
         let baseAnswer = engine.execute(
             query: query,
@@ -1485,7 +1477,7 @@ struct HomeAssistantPanelView: View {
         )
         presentMarinaAnswer(
             deterministicAnswer: explainedAnswer,
-            basicFallbackAnswer: explainedAnswer,
+            deterministicRecoveryAnswer: explainedAnswer,
             rawPrompt: userPrompt ?? "",
             source: source,
             homeQueryPlan: executedPlanForMemory,
@@ -1504,7 +1496,7 @@ struct HomeAssistantPanelView: View {
         }
     }
 
-    private func handleSharedPipelineAnswer(
+    private func handleFoundationPipelineAnswer(
         _ answer: HomeAnswer,
         aggregationResult: MarinaAggregationResult?,
         rawPrompt: String,
@@ -1515,10 +1507,10 @@ struct HomeAssistantPanelView: View {
         recoverySuggestions = []
         lastClarificationReasons = []
         activeClarificationContext = nil
-        sharedPipelineClarification = nil
-        sharedPipelineClarificationChoiceContext = nil
-        sharedPipelineClarificationChoicesByID = [:]
-        sharedPipelineClarificationChoicesByTitle = [:]
+        foundationPipelineClarification = nil
+        foundationPipelineClarificationChoiceContext = nil
+        foundationPipelineClarificationChoicesByID = [:]
+        foundationPipelineClarificationChoicesByTitle = [:]
 
         let query = homeQueryPlan?.query
         let normalizedAnswer = query.map {
@@ -1535,7 +1527,7 @@ struct HomeAssistantPanelView: View {
         let deterministicFollowUps = followUpSuggestions(for: titledAnswer, query: query)
         let surfaced = await presentMarinaAnswer(
             deterministicAnswer: titledAnswer,
-            basicFallbackAnswer: titledAnswer,
+            deterministicRecoveryAnswer: titledAnswer,
             rawPrompt: rawPrompt,
             source: source,
             homeQueryPlan: homeQueryPlan,
@@ -1561,12 +1553,12 @@ struct HomeAssistantPanelView: View {
             outcome: .resolved,
             source: source,
             plan: homeQueryPlan,
-            notes: "shared_pipeline"
+            notes: "foundation_pipeline"
         )
     }
 
     @MainActor
-    private func presentMarinaV2SystemAnswer(
+    private func presentMarinaSystemAnswer(
         _ answer: HomeAnswer,
         rawPrompt: String,
         surfaceKind: MarinaPresentationSurfaceKind,
@@ -1576,16 +1568,16 @@ struct HomeAssistantPanelView: View {
         recoverySuggestions = []
         lastClarificationReasons = []
         activeClarificationContext = nil
-        sharedPipelineClarification = nil
-        sharedPipelineClarificationChoiceContext = nil
-        sharedPipelineClarificationChoicesByID = [:]
-        sharedPipelineClarificationChoicesByTitle = [:]
+        foundationPipelineClarification = nil
+        foundationPipelineClarificationChoiceContext = nil
+        foundationPipelineClarificationChoicesByID = [:]
+        foundationPipelineClarificationChoicesByTitle = [:]
 
         _ = await presentMarinaAnswer(
             deterministicAnswer: answer,
-            basicFallbackAnswer: answer,
+            deterministicRecoveryAnswer: answer,
             rawPrompt: rawPrompt,
-            source: .sharedFoundationModels,
+            source: .foundationModels,
             surfaceKind: surfaceKind,
             validationOutcomeSummary: validationOutcomeSummary,
             groundingSummary: validationOutcomeSummary
@@ -1594,7 +1586,7 @@ struct HomeAssistantPanelView: View {
         recordTelemetry(
             for: rawPrompt,
             outcome: .unresolved,
-            source: .sharedFoundationModels,
+            source: .foundationModels,
             plan: nil,
             notes: validationOutcomeSummary
         )
@@ -1607,14 +1599,14 @@ struct HomeAssistantPanelView: View {
 
         return MarinaModelAvailability().currentStatus() == .available
             ? .foundationModelsStreaming
-            : .plainDeterministicFallback
+            : .plainDeterministic
     }
 
     @MainActor
     @discardableResult
     private func presentMarinaAnswer(
         deterministicAnswer: HomeAnswer,
-        basicFallbackAnswer: HomeAnswer,
+        deterministicRecoveryAnswer: HomeAnswer,
         rawPrompt: String,
         source: HomeAssistantPlanResolutionSource,
         homeQueryPlan: HomeQueryPlan? = nil,
@@ -1626,15 +1618,15 @@ struct HomeAssistantPanelView: View {
         followUpSuggestions: [HomeAssistantSuggestion] = []
     ) async -> MarinaResponseSurfaceApplication {
         let presentationMode = marinaPresentationModeDecision()
-        let fallbackApplication: MarinaResponseSurfaceApplication
+        let deterministicApplication: MarinaResponseSurfaceApplication
         switch presentationMode {
         case .foundationModelsStreaming, .basicDeterministic:
-            fallbackApplication = MarinaResponseSurfaceApplication(
-                answer: basicFallbackAnswer,
+            deterministicApplication = MarinaResponseSurfaceApplication(
+                answer: deterministicRecoveryAnswer,
                 followUpSuggestions: followUpSuggestions
             )
-        case .plainDeterministicFallback:
-            fallbackApplication = MarinaResponseSurfaceApplication(
+        case .plainDeterministic:
+            deterministicApplication = MarinaResponseSurfaceApplication(
                 answer: deterministicAnswer,
                 followUpSuggestions: followUpSuggestions
             )
@@ -1645,7 +1637,7 @@ struct HomeAssistantPanelView: View {
             appendAnswer(streamingPreparedAnswer(deterministicAnswer, surfaceKind: surfaceKind))
             let surfaced = await surfaceGeneratedPresentation(
                 generationBaseAnswer: deterministicAnswer,
-                fallbackApplication: fallbackApplication,
+                deterministicApplication: deterministicApplication,
                 rawPrompt: rawPrompt,
                 source: source,
                 homeQueryPlan: homeQueryPlan,
@@ -1662,28 +1654,28 @@ struct HomeAssistantPanelView: View {
 
         case .basicDeterministic:
             MarinaTraceRecorder.shared.recordResponseSurface(
-                source: .deterministicSurfaceFallback,
-                fallbackReason: .aiOptOut
+                source: .deterministicSurface,
+                recoveryReason: .aiOptOut
             )
-            appendAnswer(fallbackApplication.answer)
-            storeGeneratedFollowUps(fallbackApplication.followUpSuggestions, for: fallbackApplication.answer.id)
-            return fallbackApplication
+            appendAnswer(deterministicApplication.answer)
+            storeGeneratedFollowUps(deterministicApplication.followUpSuggestions, for: deterministicApplication.answer.id)
+            return deterministicApplication
 
-        case .plainDeterministicFallback:
+        case .plainDeterministic:
             MarinaTraceRecorder.shared.recordResponseSurface(
-                source: .deterministicSurfaceFallback,
-                fallbackReason: .modelUnavailable
+                source: .deterministicSurface,
+                recoveryReason: .modelUnavailable
             )
-            appendAnswer(fallbackApplication.answer)
-            storeGeneratedFollowUps(fallbackApplication.followUpSuggestions, for: fallbackApplication.answer.id)
-            return fallbackApplication
+            appendAnswer(deterministicApplication.answer)
+            storeGeneratedFollowUps(deterministicApplication.followUpSuggestions, for: deterministicApplication.answer.id)
+            return deterministicApplication
         }
     }
 
     @MainActor
     private func presentMarinaAnswer(
         deterministicAnswer: HomeAnswer,
-        basicFallbackAnswer: HomeAnswer,
+        deterministicRecoveryAnswer: HomeAnswer,
         rawPrompt: String,
         source: HomeAssistantPlanResolutionSource,
         homeQueryPlan: HomeQueryPlan? = nil,
@@ -1698,7 +1690,7 @@ struct HomeAssistantPanelView: View {
         Task { @MainActor in
             let surfaced = await presentMarinaAnswer(
                 deterministicAnswer: deterministicAnswer,
-                basicFallbackAnswer: basicFallbackAnswer,
+                deterministicRecoveryAnswer: deterministicRecoveryAnswer,
                 rawPrompt: rawPrompt,
                 source: source,
                 homeQueryPlan: homeQueryPlan,
@@ -1772,7 +1764,7 @@ struct HomeAssistantPanelView: View {
 
     private func surfaceGeneratedPresentation(
         generationBaseAnswer: HomeAnswer,
-        fallbackApplication: MarinaResponseSurfaceApplication,
+        deterministicApplication: MarinaResponseSurfaceApplication,
         rawPrompt: String,
         source: HomeAssistantPlanResolutionSource,
         homeQueryPlan: HomeQueryPlan?,
@@ -1783,15 +1775,15 @@ struct HomeAssistantPanelView: View {
         allowedTone: String? = nil,
         streamingAnswerID: UUID? = nil
     ) async -> MarinaResponseSurfaceApplication {
-        let fallback = fallbackApplication
-        let plainDeterministicFallback = MarinaResponseSurfaceApplication(
+        let fallback = deterministicApplication
+        let plainDeterministic = MarinaResponseSurfaceApplication(
             answer: generationBaseAnswer,
             followUpSuggestions: fallback.followUpSuggestions
         )
         guard marinaRuntimeSettings.aiOptIn.isEnabled else {
             MarinaTraceRecorder.shared.recordResponseSurface(
-                source: .deterministicSurfaceFallback,
-                fallbackReason: .aiOptOut
+                source: .deterministicSurface,
+                recoveryReason: .aiOptOut
             )
             return fallback
         }
@@ -1799,8 +1791,8 @@ struct HomeAssistantPanelView: View {
         let availability = MarinaModelAvailability().currentStatus()
         guard availability == .available else {
             MarinaTraceRecorder.shared.recordResponseSurface(
-                source: .deterministicSurfaceFallback,
-                fallbackReason: .modelUnavailable
+                source: .deterministicSurface,
+                recoveryReason: .modelUnavailable
             )
             return fallback
         }
@@ -1820,7 +1812,7 @@ struct HomeAssistantPanelView: View {
                 workspaceName: workspace.name,
                 routeSourceRaw: source.rawValue,
                 generationBaseAnswer: generationBaseAnswer,
-                fallbackApplication: fallback,
+                deterministicApplication: fallback,
                 presentationMode: .foundationModelsStreaming,
                 surfaceKind: surfaceKind,
                 voiceProfile: .marina,
@@ -1857,43 +1849,43 @@ struct HomeAssistantPanelView: View {
             let applied = try MarinaResponseSurfaceApplicator().apply(
                 generated: generated,
                 to: request.context.deterministicAnswer,
-                deterministicFollowUps: request.fallbackApplication.followUpSuggestions
+                deterministicFollowUps: request.deterministicApplication.followUpSuggestions
             )
             MarinaTraceRecorder.shared.recordResponseSurface(
                 source: .foundationModelsSurface,
-                fallbackReason: nil
+                recoveryReason: nil
             )
             return applied
         } catch MarinaResponseGenerationError.unavailable {
             MarinaTraceRecorder.shared.recordResponseSurface(
-                source: .deterministicSurfaceFallback,
-                fallbackReason: .modelUnavailable
+                source: .deterministicSurface,
+                recoveryReason: .modelUnavailable
             )
-            return plainDeterministicFallback
+            return plainDeterministic
         } catch MarinaResponseGenerationError.malformedResponse {
             MarinaTraceRecorder.shared.recordResponseSurface(
-                source: .deterministicSurfaceFallback,
-                fallbackReason: .malformedResponse
+                source: .deterministicSurface,
+                recoveryReason: .malformedResponse
             )
-            return plainDeterministicFallback
+            return plainDeterministic
         } catch MarinaResponseGenerationError.invariantViolation {
             MarinaTraceRecorder.shared.recordResponseSurface(
-                source: .deterministicSurfaceFallback,
-                fallbackReason: .invariantViolation
+                source: .deterministicSurface,
+                recoveryReason: .invariantViolation
             )
-            return plainDeterministicFallback
+            return plainDeterministic
         } catch MarinaResponseGenerationError.generationFailed(let category) {
             MarinaTraceRecorder.shared.recordResponseSurface(
-                source: .deterministicSurfaceFallback,
-                fallbackReason: responseSurfaceFallbackReason(for: category)
+                source: .deterministicSurface,
+                recoveryReason: responseSurfaceRecoveryReason(for: category)
             )
-            return plainDeterministicFallback
+            return plainDeterministic
         } catch {
             MarinaTraceRecorder.shared.recordResponseSurface(
-                source: .deterministicSurfaceFallback,
-                fallbackReason: .modelServiceFailed
+                source: .deterministicSurface,
+                recoveryReason: .modelServiceFailed
             )
-            return plainDeterministicFallback
+            return plainDeterministic
         }
     }
 
@@ -1918,9 +1910,9 @@ struct HomeAssistantPanelView: View {
         )
     }
 
-    private func responseSurfaceFallbackReason(
+    private func responseSurfaceRecoveryReason(
         for category: MarinaFoundationModelsErrorCategory
-    ) -> MarinaResponseGenerationFallbackReason {
+    ) -> MarinaResponseGenerationRecoveryReason {
         switch category {
         case .unavailable:
             return .modelUnavailable
@@ -1981,11 +1973,11 @@ struct HomeAssistantPanelView: View {
         if hasPendingMutationTurn {
             clearMutationPendingState()
             Task { @MainActor in
-                await presentMarinaV2SystemAnswer(
-                    MarinaV2TurnCoordinator.deferredCRUDAnswer(prompt: prompt),
+                await presentMarinaSystemAnswer(
+                    MarinaTurnCoordinator.deferredCRUDAnswer(prompt: prompt),
                     rawPrompt: prompt,
                     surfaceKind: .recovery,
-                    validationOutcomeSummary: "marina_v2_pending_crud_deferred"
+                    validationOutcomeSummary: "marina_foundation_pending_crud_deferred"
                 )
             }
             return
@@ -1993,21 +1985,21 @@ struct HomeAssistantPanelView: View {
 
         let runtimeSettings = marinaRuntimeSettings
         let turnClassifier = MarinaPromptTurnClassifier(
-            commandGuard: HomeAssistantSharedPipelineCommandGuard(commandParser: commandParser)
+            commandGuard: HomeAssistantFoundationPipelineCommandGuard(commandParser: commandParser)
         )
         let turnClassification = turnClassifier.classify(
             prompt,
             defaultPeriodUnit: defaultQueryPeriodUnit,
-            hasActiveClarification: sharedPipelineClarification != nil
+            hasActiveClarification: foundationPipelineClarification != nil
         )
 
-        if let clarification = sharedPipelineClarification {
+        if let clarification = foundationPipelineClarification {
             if turnClassification == .freshQuestion || turnClassification == .command {
-                sharedPipelineClarification = nil
+                foundationPipelineClarification = nil
             } else {
                 Task {
-                    await handleSharedPipelineTypedClarificationResolution(
-                        sharedPipelineTypedChoiceResolution(from: prompt, clarification: clarification),
+                    await handleFoundationPipelineTypedClarificationResolution(
+                        foundationPipelineTypedChoiceResolution(from: prompt, clarification: clarification),
                         reply: prompt,
                         clarification: clarification
                     )
@@ -2016,10 +2008,10 @@ struct HomeAssistantPanelView: View {
             }
         }
 
-        if let clarification = sharedPipelineClarification {
+        if let clarification = foundationPipelineClarification {
             Task {
-                await handleSharedPipelineTypedClarificationResolution(
-                    sharedPipelineTypedChoiceResolution(from: prompt, clarification: clarification),
+                await handleFoundationPipelineTypedClarificationResolution(
+                    foundationPipelineTypedChoiceResolution(from: prompt, clarification: clarification),
                     reply: prompt,
                     clarification: clarification
                 )
@@ -2031,16 +2023,16 @@ struct HomeAssistantPanelView: View {
             return
         }
 
-        if HomeAssistantSharedPipelineCommandGuard(commandParser: commandParser).command(
+        if HomeAssistantFoundationPipelineCommandGuard(commandParser: commandParser).command(
             for: prompt,
             defaultPeriodUnit: defaultQueryPeriodUnit
         ) != nil {
             Task { @MainActor in
-                await presentMarinaV2SystemAnswer(
-                    MarinaV2TurnCoordinator.deferredCRUDAnswer(prompt: prompt),
+                await presentMarinaSystemAnswer(
+                    MarinaTurnCoordinator.deferredCRUDAnswer(prompt: prompt),
                     rawPrompt: prompt,
                     surfaceKind: .recovery,
-                    validationOutcomeSummary: "marina_v2_crud_deferred"
+                    validationOutcomeSummary: "marina_foundation_crud_deferred"
                 )
             }
             return
@@ -2078,7 +2070,7 @@ struct HomeAssistantPanelView: View {
             )
             presentMarinaAnswer(
                 deterministicAnswer: answer,
-                basicFallbackAnswer: answer,
+                deterministicRecoveryAnswer: answer,
                 rawPrompt: prompt,
                 source: .contextual,
                 surfaceKind: .clarification,
@@ -2101,7 +2093,7 @@ struct HomeAssistantPanelView: View {
             pendingWhatIfCategoryMappingContext = nil
             presentMarinaAnswer(
                 deterministicAnswer: built.rawAnswer,
-                basicFallbackAnswer: built.rawAnswer,
+                deterministicRecoveryAnswer: built.rawAnswer,
                 rawPrompt: prompt,
                 source: .contextual,
                 homeQueryPlan: HomeQueryPlan(
@@ -2269,7 +2261,7 @@ struct HomeAssistantPanelView: View {
             let raw = MarinaCapabilityGuide.makeAnswer(for: prompt)
             presentMarinaAnswer(
                 deterministicAnswer: raw,
-                basicFallbackAnswer: raw,
+                deterministicRecoveryAnswer: raw,
                 rawPrompt: prompt,
                 source: .contextual,
                 surfaceKind: .help,
@@ -5179,7 +5171,7 @@ struct HomeAssistantPanelView: View {
         )
         presentMarinaAnswer(
             deterministicAnswer: answer,
-            basicFallbackAnswer: answer,
+            deterministicRecoveryAnswer: answer,
             rawPrompt: userPrompt ?? "",
             source: .contextual,
             surfaceKind: .recovery,
@@ -5345,7 +5337,7 @@ struct HomeAssistantPanelView: View {
         )
         presentMarinaAnswer(
             deterministicAnswer: clarificationAnswer,
-            basicFallbackAnswer: clarificationAnswer,
+            deterministicRecoveryAnswer: clarificationAnswer,
             rawPrompt: userPrompt ?? "",
             source: .contextual,
             surfaceKind: .clarification,
@@ -5695,20 +5687,20 @@ struct HomeAssistantPanelView: View {
     }
 
     private func handleSuggestionTap(_ suggestion: HomeAssistantSuggestion) {
-        if let choice = sharedPipelineClarificationChoicesByID[suggestion.id]
-            ?? sharedPipelineClarificationChoice(matching: suggestion.title),
-           let clarification = sharedPipelineClarification ?? sharedPipelineClarificationChoiceContext {
+        if let choice = foundationPipelineClarificationChoicesByID[suggestion.id]
+            ?? foundationPipelineClarificationChoice(matching: suggestion.title),
+           let clarification = foundationPipelineClarification ?? foundationPipelineClarificationChoiceContext {
             Task {
                 MarinaTraceRecorder.shared.recordDebugMarker("clarification_chip_tapped:title=\(suggestion.title)")
-                await handleSharedPipelineClarificationChoice(choice, clarification: clarification)
+                await handleFoundationPipelineClarificationChoice(choice, clarification: clarification)
             }
             return
         }
 
         if clarificationSuggestions.contains(where: { $0.title == suggestion.title }) {
-            emitSharedPipelineClarificationDiagnostic(
+            emitFoundationPipelineClarificationDiagnostic(
                 title: suggestion.title,
-                reason: "missing_pending_shared_pipeline_clarification"
+                reason: "missing_pending_foundation_pipeline_clarification"
             )
             return
         }
@@ -5725,15 +5717,14 @@ struct HomeAssistantPanelView: View {
         MarinaTraceRecorder.shared.begin(
             prompt: suggestion.title,
             routingMode: runtimeSettings.routingMode,
-            marinaNLQv1Enabled: runtimeSettings.nlqV1.isEnabled,
             runtimeSettingsSummary: "\(runtimeSettings.traceSummary),presetPrompt=\(suggestion.query.intent.rawValue)"
         )
         MarinaDebugLogger.log("[MarinaPresetPrompt] title='\(suggestion.title)' query='\(suggestion.query.intent.rawValue)'")
-        let result = await marinaV2PanelRuntime(turnClassification: .freshQuestion).run(
+        let result = await marinaPanelRuntime(turnClassification: .freshQuestion).run(
             query: suggestion.query,
             sourceTitle: suggestion.title
         )
-        await handleMarinaV2TurnResult(result, rawPrompt: suggestion.title)
+        await handleMarinaTurnResult(result, rawPrompt: suggestion.title)
         finishMarinaTrace()
     }
 
@@ -5756,21 +5747,20 @@ struct HomeAssistantPanelView: View {
         MarinaTraceRecorder.shared.begin(
             prompt: prompt,
             routingMode: runtimeSettings.routingMode,
-            marinaNLQv1Enabled: runtimeSettings.nlqV1.isEnabled,
             runtimeSettingsSummary: runtimeSettings.traceSummary
         )
         MarinaDebugLogger.log("[MarinaRuntime] \(runtimeSettings.traceSummary)")
 
-        let result = await marinaV2PanelRuntime(turnClassification: turnClassification).run(prompt: prompt)
-        await handleMarinaV2TurnResult(result, rawPrompt: prompt)
+        let result = await marinaPanelRuntime(turnClassification: turnClassification).run(prompt: prompt)
+        await handleMarinaTurnResult(result, rawPrompt: prompt)
         finishMarinaTrace()
     }
 
     @MainActor
-    private func marinaV2PanelRuntime(
+    private func marinaPanelRuntime(
         turnClassification: MarinaPromptTurnClassification
-    ) -> MarinaV2PanelRuntime {
-        MarinaV2PanelRuntime(
+    ) -> MarinaPanelRuntime {
+        MarinaPanelRuntime(
             modelContext: modelContext,
             workspaceID: workspace.id,
             defaultPeriodUnit: defaultQueryPeriodUnit,
@@ -5781,56 +5771,56 @@ struct HomeAssistantPanelView: View {
     }
 
     @MainActor
-    private func handleMarinaV2TurnResult(
-        _ result: MarinaV2TurnResult,
+    private func handleMarinaTurnResult(
+        _ result: MarinaTurnResult,
         rawPrompt prompt: String
     ) async {
         switch result {
         case .handled(let answer, let aggregationResult, let homeQueryPlan, let amountBasis, let executionRoute):
-            MarinaTraceRecorder.shared.recordSelectedRoute(.sharedFoundationModels, reason: "marina_v2")
+            MarinaTraceRecorder.shared.recordSelectedRoute(.foundationModels, reason: "marina_foundation")
             MarinaTraceRecorder.shared.recordAggregation(
-                path: "marina_v2",
+                path: "marina_foundation",
                 summary: [
                     amountBasis.map { "amountBasis=\($0.rawValue)" },
                     executionRoute.map { "route=\($0.traceName)" }
                 ].compactMap { $0 }.joined(separator: ",")
             )
-            await handleSharedPipelineAnswer(
+            await handleFoundationPipelineAnswer(
                 answer,
                 aggregationResult: aggregationResult,
                 rawPrompt: prompt,
                 homeQueryPlan: homeQueryPlan,
-                source: .sharedFoundationModels
+                source: .foundationModels
             )
         case .clarification(let answer, let clarification):
-            MarinaTraceRecorder.shared.recordSelectedRoute(.clarification, reason: "marina_v2_clarification")
-            await handleSharedPipelineClarification(
+            MarinaTraceRecorder.shared.recordSelectedRoute(.clarification, reason: "marina_foundation_clarification")
+            await handleFoundationPipelineClarification(
                 answer,
                 clarification: clarification,
                 rawPrompt: prompt,
-                source: .sharedFoundationModels
+                source: .foundationModels
             )
         case .blocked(let answer, let validationOutcome):
-            MarinaTraceRecorder.shared.recordSelectedRoute(.sharedFoundationModels, reason: "marina_v2_blocked")
-            await presentMarinaV2SystemAnswer(
+            MarinaTraceRecorder.shared.recordSelectedRoute(.foundationModels, reason: "marina_foundation_blocked")
+            await presentMarinaSystemAnswer(
                 answer,
                 rawPrompt: prompt,
                 surfaceKind: .recovery,
-                validationOutcomeSummary: validationOutcome.map { "\($0)" } ?? "marina_v2_blocked"
+                validationOutcomeSummary: validationOutcome.map { "\($0)" } ?? "marina_foundation_blocked"
             )
         case .unavailable(let answer):
-            MarinaTraceRecorder.shared.recordSelectedRoute(.sharedFoundationModels, reason: "marina_v2_ai_unavailable")
-            await presentMarinaV2SystemAnswer(
+            MarinaTraceRecorder.shared.recordSelectedRoute(.foundationModels, reason: "marina_foundation_ai_unavailable")
+            await presentMarinaSystemAnswer(
                 answer,
                 rawPrompt: prompt,
                 surfaceKind: .recovery,
-                validationOutcomeSummary: "marina_v2_ai_unavailable"
+                validationOutcomeSummary: "marina_foundation_ai_unavailable"
             )
         }
     }
 
     @MainActor
-    private func handleSharedPipelineClarification(
+    private func handleFoundationPipelineClarification(
         _ answer: HomeAnswer,
         clarification: MarinaTypedClarification,
         rawPrompt: String,
@@ -5838,16 +5828,16 @@ struct HomeAssistantPanelView: View {
     ) async {
         let actionable = clarification.isActionable(for: rawPrompt)
         let actionableChoices = clarification.actionableChoices(for: rawPrompt)
-        sharedPipelineClarification = actionable ? clarification : nil
-        sharedPipelineClarificationChoiceContext = actionable ? clarification : nil
-        sharedPipelineClarificationChoicesByID = actionable
+        foundationPipelineClarification = actionable ? clarification : nil
+        foundationPipelineClarificationChoiceContext = actionable ? clarification : nil
+        foundationPipelineClarificationChoicesByID = actionable
             ? Dictionary(uniqueKeysWithValues: actionableChoices.map { ($0.id, $0) })
             : [:]
-        sharedPipelineClarificationChoicesByTitle = actionable ? sharedPipelineChoiceLookup(for: actionableChoices) : [:]
+        foundationPipelineClarificationChoicesByTitle = actionable ? foundationPipelineChoiceLookup(for: actionableChoices) : [:]
         clarificationSuggestions = actionable ? actionableChoices.map { choice in
             HomeAssistantSuggestion(
                 id: choice.id,
-                title: sharedPipelineChoiceTitle(choice),
+                title: foundationPipelineChoiceTitle(choice),
                 query: HomeQuery(intent: .spendThisMonth)
             )
         } : []
@@ -5860,7 +5850,7 @@ struct HomeAssistantPanelView: View {
             outcome: .clarification,
             source: source,
             plan: nil,
-            notes: "shared_pipeline_clarification"
+            notes: "foundation_pipeline_clarification"
         )
         let baseAnswer = actionable || actionableChoices.isEmpty == false
             ? answer
@@ -5874,28 +5864,28 @@ struct HomeAssistantPanelView: View {
             )
         _ = await presentMarinaAnswer(
             deterministicAnswer: baseAnswer,
-            basicFallbackAnswer: baseAnswer,
+            deterministicRecoveryAnswer: baseAnswer,
             rawPrompt: rawPrompt,
             source: source,
             homeQueryPlan: nil,
             surfaceKind: .clarification,
             validationOutcomeSummary: "clarification:\(clarification.kind.rawValue)",
-            clarificationChoices: actionableChoices.map(sharedPipelineChoiceTitle),
+            clarificationChoices: actionableChoices.map(foundationPipelineChoiceTitle),
             groundingSummary: "clarification:\(clarification.kind.rawValue)"
         )
     }
 
     @MainActor
-    private func handleSharedPipelineTypedClarificationResolution(
+    private func handleFoundationPipelineTypedClarificationResolution(
         _ resolution: MarinaClarificationChoiceResolution,
         reply: String,
         clarification: MarinaTypedClarification
     ) async {
         switch resolution {
         case .resolved(let choice):
-            await handleSharedPipelineClarificationChoice(choice, clarification: clarification)
+            await handleFoundationPipelineClarificationChoice(choice, clarification: clarification)
         case .ambiguous(let choices):
-            presentSharedPipelineTypedClarificationRetry(
+            presentFoundationPipelineTypedClarificationRetry(
                 reply: reply,
                 clarification: clarification,
                 title: "I found more than one matching choice",
@@ -5903,7 +5893,7 @@ struct HomeAssistantPanelView: View {
                 choices: choices
             )
         case .unresolved:
-            presentSharedPipelineTypedClarificationRetry(
+            presentFoundationPipelineTypedClarificationRetry(
                 reply: reply,
                 clarification: clarification,
                 title: "I need one of those choices",
@@ -5914,7 +5904,7 @@ struct HomeAssistantPanelView: View {
     }
 
     @MainActor
-    private func presentSharedPipelineTypedClarificationRetry(
+    private func presentFoundationPipelineTypedClarificationRetry(
         reply: String,
         clarification: MarinaTypedClarification,
         title: String,
@@ -5922,14 +5912,14 @@ struct HomeAssistantPanelView: View {
         choices: [MarinaClarificationChoice]
     ) {
         let actionableChoices = choices.isEmpty ? clarification.actionableChoices : choices
-        sharedPipelineClarification = clarification
-        sharedPipelineClarificationChoiceContext = clarification
-        sharedPipelineClarificationChoicesByID = Dictionary(uniqueKeysWithValues: actionableChoices.map { ($0.id, $0) })
-        sharedPipelineClarificationChoicesByTitle = sharedPipelineChoiceLookup(for: actionableChoices)
+        foundationPipelineClarification = clarification
+        foundationPipelineClarificationChoiceContext = clarification
+        foundationPipelineClarificationChoicesByID = Dictionary(uniqueKeysWithValues: actionableChoices.map { ($0.id, $0) })
+        foundationPipelineClarificationChoicesByTitle = foundationPipelineChoiceLookup(for: actionableChoices)
         clarificationSuggestions = actionableChoices.map { choice in
             HomeAssistantSuggestion(
                 id: choice.id,
-                title: sharedPipelineChoiceTitle(choice),
+                title: foundationPipelineChoiceTitle(choice),
                 query: HomeQuery(intent: .spendThisMonth)
             )
         }
@@ -5945,25 +5935,25 @@ struct HomeAssistantPanelView: View {
             subtitle: subtitle,
             rows: actionableChoices.prefix(4).map { choice in
                 HomeAnswerRow(
-                    title: sharedPipelineChoiceTitle(choice),
+                    title: foundationPipelineChoiceTitle(choice),
                     value: choice.subtitle ?? choice.rawValue ?? choice.entityTypeHint?.rawValue ?? ""
                 )
             }
         )
         presentMarinaAnswer(
             deterministicAnswer: answer,
-            basicFallbackAnswer: answer,
+            deterministicRecoveryAnswer: answer,
             rawPrompt: reply,
-            source: .sharedFoundationModels,
+            source: .foundationModels,
             surfaceKind: .clarification,
             validationOutcomeSummary: "clarification_retry:\(clarification.kind.rawValue)",
-            clarificationChoices: actionableChoices.map(sharedPipelineChoiceTitle),
+            clarificationChoices: actionableChoices.map(foundationPipelineChoiceTitle),
             groundingSummary: "typed clarification retry"
         )
     }
 
     @MainActor
-    private func handleSharedPipelineClarificationChoice(
+    private func handleFoundationPipelineClarificationChoice(
         _ choice: MarinaClarificationChoice,
         clarification: MarinaTypedClarification
     ) async {
@@ -5972,43 +5962,42 @@ struct HomeAssistantPanelView: View {
         MarinaTraceRecorder.shared.begin(
             prompt: rawPrompt,
             routingMode: runtimeSettings.routingMode,
-            marinaNLQv1Enabled: runtimeSettings.nlqV1.isEnabled,
             runtimeSettingsSummary: runtimeSettings.traceSummary
         )
-        MarinaTraceRecorder.shared.recordSharedPipelineTurnClassification(.clarificationAnswer)
+        MarinaTraceRecorder.shared.recordFoundationPipelineTurnClassification(.clarificationAnswer)
         MarinaTraceRecorder.shared.recordAggregation(
-            path: "marina_v2_clarification_resume_start",
-            summary: "choice=\(sharedPipelineChoiceTitle(choice))"
+            path: "marina_foundation_clarification_resume_start",
+            summary: "choice=\(foundationPipelineChoiceTitle(choice))"
         )
-        let result = await marinaV2PanelRuntime(turnClassification: .clarificationAnswer).resume(
+        let result = await marinaPanelRuntime(turnClassification: .clarificationAnswer).resume(
             clarification: clarification,
             choice: choice
         )
-        await handleMarinaV2TurnResult(result, rawPrompt: rawPrompt)
+        await handleMarinaTurnResult(result, rawPrompt: rawPrompt)
         if case .clarification = result {
             finishMarinaTrace()
             return
         }
-        sharedPipelineClarification = nil
-        sharedPipelineClarificationChoiceContext = nil
-        sharedPipelineClarificationChoicesByID = [:]
-        sharedPipelineClarificationChoicesByTitle = [:]
+        foundationPipelineClarification = nil
+        foundationPipelineClarificationChoiceContext = nil
+        foundationPipelineClarificationChoicesByID = [:]
+        foundationPipelineClarificationChoicesByTitle = [:]
         finishMarinaTrace()
     }
 
-    private func sharedPipelineChoiceTitle(_ choice: MarinaClarificationChoice) -> String {
+    private func foundationPipelineChoiceTitle(_ choice: MarinaClarificationChoice) -> String {
         MarinaClarificationChoiceResolver.displayTitle(for: choice)
     }
 
-    private func sharedPipelineClarificationChoice(matching rawTitle: String) -> MarinaClarificationChoice? {
-        sharedPipelineClarificationChoicesByTitle[sharedPipelineChoiceLookupKey(rawTitle)]
-            ?? sharedPipelineClarificationChoicesByTitle[rawTitle]
+    private func foundationPipelineClarificationChoice(matching rawTitle: String) -> MarinaClarificationChoice? {
+        foundationPipelineClarificationChoicesByTitle[foundationPipelineChoiceLookupKey(rawTitle)]
+            ?? foundationPipelineClarificationChoicesByTitle[rawTitle]
     }
 
-    private func sharedPipelineChoiceLookup(for choices: [MarinaClarificationChoice]) -> [String: MarinaClarificationChoice] {
+    private func foundationPipelineChoiceLookup(for choices: [MarinaClarificationChoice]) -> [String: MarinaClarificationChoice] {
         var buckets: [String: [MarinaClarificationChoice]] = [:]
         for choice in choices {
-            for key in sharedPipelineChoiceLookupKeys(for: choice) {
+            for key in foundationPipelineChoiceLookupKeys(for: choice) {
                 buckets[key, default: []].append(choice)
             }
         }
@@ -6019,9 +6008,9 @@ struct HomeAssistantPanelView: View {
         return lookup
     }
 
-    private func sharedPipelineChoiceLookupKeys(for choice: MarinaClarificationChoice) -> Set<String> {
+    private func foundationPipelineChoiceLookupKeys(for choice: MarinaClarificationChoice) -> Set<String> {
         var keys: Set<String> = [
-            sharedPipelineChoiceTitle(choice),
+            foundationPipelineChoiceTitle(choice),
             choice.title
         ]
         if let rawValue = choice.rawValue {
@@ -6031,16 +6020,16 @@ struct HomeAssistantPanelView: View {
             keys.insert(type.rawValue)
             keys.insert("\(choice.title) \(type.rawValue)")
             keys.insert("\(choice.title) (\(type.rawValue))")
-            for alias in sharedPipelineChoiceTypeAliases(for: type) {
+            for alias in foundationPipelineChoiceTypeAliases(for: type) {
                 keys.insert(alias)
                 keys.insert("\(choice.title) \(alias)")
                 keys.insert("\(choice.title) (\(alias))")
             }
         }
-        return Set(keys.map(sharedPipelineChoiceLookupKey).filter { $0.isEmpty == false })
+        return Set(keys.map(foundationPipelineChoiceLookupKey).filter { $0.isEmpty == false })
     }
 
-    private func sharedPipelineChoiceTypeAliases(for type: MarinaCandidateEntityTypeHint) -> [String] {
+    private func foundationPipelineChoiceTypeAliases(for type: MarinaCandidateEntityTypeHint) -> [String] {
         switch type {
         case .category:
             return ["category"]
@@ -6065,16 +6054,16 @@ struct HomeAssistantPanelView: View {
         }
     }
 
-    private func sharedPipelineChoiceLookupKey(_ value: String) -> String {
+    private func foundationPipelineChoiceLookupKey(_ value: String) -> String {
         MarinaClarificationChoiceResolver.normalized(value)
     }
 
-    private func sharedPipelineTypedChoiceResolution(
+    private func foundationPipelineTypedChoiceResolution(
         from prompt: String,
         clarification: MarinaTypedClarification
     ) -> MarinaClarificationChoiceResolution {
-        if let choice = sharedPipelineClarificationChoice(matching: prompt)
-            ?? sharedPipelineChoiceLookup(for: clarification.actionableChoices)[sharedPipelineChoiceLookupKey(prompt)] {
+        if let choice = foundationPipelineClarificationChoice(matching: prompt)
+            ?? foundationPipelineChoiceLookup(for: clarification.actionableChoices)[foundationPipelineChoiceLookupKey(prompt)] {
             return .resolved(choice)
         }
         let resolution = MarinaClarificationChoiceResolver().resolve(reply: prompt, clarification: clarification)
@@ -6112,18 +6101,17 @@ struct HomeAssistantPanelView: View {
     }
 
     @MainActor
-    private func emitSharedPipelineClarificationDiagnostic(title: String, reason: String) {
+    private func emitFoundationPipelineClarificationDiagnostic(title: String, reason: String) {
         let runtimeSettings = marinaRuntimeSettings
         MarinaTraceRecorder.shared.begin(
             prompt: title,
             routingMode: runtimeSettings.routingMode,
-            marinaNLQv1Enabled: runtimeSettings.nlqV1.isEnabled,
             runtimeSettingsSummary: runtimeSettings.traceSummary
         )
-        MarinaTraceRecorder.shared.recordSharedPipelineTurnClassification(.clarificationAnswer)
+        MarinaTraceRecorder.shared.recordFoundationPipelineTurnClassification(.clarificationAnswer)
         MarinaTraceRecorder.shared.recordSelectedRoute(.clarification, reason: reason)
         MarinaTraceRecorder.shared.recordAggregation(
-            path: "marina_shared_pipeline_clarification_diagnostic",
+            path: "marina_foundation_pipeline_clarification_diagnostic",
             summary: "title=\(title),reason=\(reason)"
         )
         MarinaTraceRecorder.shared.recordResponse(
@@ -6157,7 +6145,7 @@ struct HomeAssistantPanelView: View {
 
     private func makeMarinaRouterContext(
         turnClassification: MarinaPromptTurnClassification
-    ) -> MarinaLanguageRouterContext {
+    ) -> MarinaInterpretationContext {
         let mostRecentAnswerContext = sessionContext.recentAnswerContexts.last
         let priorQueryContext = MarinaPriorQueryContext(
             lastQueryPlan: sessionContext.lastQueryPlan,
@@ -6168,7 +6156,7 @@ struct HomeAssistantPanelView: View {
             lastResultLimit: sessionContext.lastResultLimit,
             lastPeriodUnit: sessionContext.lastPeriodUnit
         )
-        return MarinaLanguageRouterContext(
+        return MarinaInterpretationContext(
             workspaceName: workspace.name,
             defaultPeriodUnit: defaultQueryPeriodUnit,
             ambientDateRange: assistantDateRange,
@@ -6355,7 +6343,7 @@ struct HomeAssistantPanelView: View {
     ) {
         let contextRows = answerContextRows(
             from: aggregationResult,
-            fallbackRows: rawAnswer.rows
+            sourceRows: rawAnswer.rows
         )
         let topRow = contextRows.first
         let inferredTargetType = targetType(for: query.intent.metric) ?? topRow?.targetType
@@ -6392,7 +6380,7 @@ struct HomeAssistantPanelView: View {
 
     private func answerContextRows(
         from aggregationResult: MarinaAggregationResult?,
-        fallbackRows: [HomeAnswerRow]
+        sourceRows: [HomeAnswerRow]
     ) -> [AssistantAnswerContextRow] {
         let rows: [AssistantAnswerContextRow]
         switch aggregationResult {
@@ -6432,7 +6420,7 @@ struct HomeAssistantPanelView: View {
         if rows.isEmpty == false {
             return rows
         }
-        return fallbackRows.map {
+        return sourceRows.map {
             AssistantAnswerContextRow(title: $0.title, value: $0.value, targetType: nil)
         }
     }
@@ -7553,7 +7541,7 @@ struct HomeAssistantPanelView: View {
         )
         presentMarinaAnswer(
             deterministicAnswer: bundled,
-            basicFallbackAnswer: bundled,
+            deterministicRecoveryAnswer: bundled,
             rawPrompt: userPrompt,
             source: source,
             homeQueryPlan: overviewPlan,
@@ -7702,7 +7690,7 @@ struct HomeAssistantPanelView: View {
         )
         presentMarinaAnswer(
             deterministicAnswer: bundled,
-            basicFallbackAnswer: bundled,
+            deterministicRecoveryAnswer: bundled,
             rawPrompt: userPrompt,
             source: source,
             homeQueryPlan: spendPlan,
@@ -7758,7 +7746,7 @@ struct HomeAssistantPanelView: View {
         )
         presentMarinaAnswer(
             deterministicAnswer: rawAnswer,
-            basicFallbackAnswer: rawAnswer,
+            deterministicRecoveryAnswer: rawAnswer,
             rawPrompt: userPrompt,
             source: source,
             homeQueryPlan: dailyPlan,
@@ -7972,7 +7960,7 @@ struct HomeAssistantPanelView: View {
         )
         presentMarinaAnswer(
             deterministicAnswer: rawAnswer,
-            basicFallbackAnswer: rawAnswer,
+            deterministicRecoveryAnswer: rawAnswer,
             rawPrompt: userPrompt,
             source: source,
             homeQueryPlan: routedPlan,

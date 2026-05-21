@@ -9,10 +9,10 @@ import Foundation
 
 enum MarinaResponseSurfaceSource: String, Codable, Equatable {
     case foundationModelsSurface
-    case deterministicSurfaceFallback
+    case deterministicSurface
 }
 
-enum MarinaResponseGenerationFallbackReason: String, Codable, Equatable {
+enum MarinaResponseGenerationRecoveryReason: String, Codable, Equatable {
     case aiOptOut
     case modelUnavailable
     case modelServiceFailed
@@ -71,7 +71,7 @@ struct MarinaAIVoiceProfile: Equatable {
 enum MarinaPresentationMode: String, Codable, Equatable {
     case foundationModelsStreaming
     case basicDeterministic
-    case plainDeterministicFallback
+    case plainDeterministic
 }
 
 enum MarinaPresentationSurfaceKind: String, Codable, Equatable {
@@ -290,7 +290,7 @@ struct MarinaResponseGenerationContext: Equatable {
 enum MarinaFoundationSurfacePromptBuilder {
     static func instructions() -> String {
         """
-        Prompt version: \(MarinaFoundationPromptVersion.presentationV1.rawValue)
+        Prompt version: \(MarinaFoundationPromptVersion.presentation.rawValue)
         OS/model band: \(MarinaFoundationModelBand.current.rawValue)
         Locale: \(Locale.current.identifier)
 
@@ -410,7 +410,7 @@ struct MarinaResponseSurfaceApplication: Equatable {
 
 struct MarinaResponseSurfaceRequest: Equatable {
     let context: MarinaResponseGenerationContext
-    let fallbackApplication: MarinaResponseSurfaceApplication
+    let deterministicApplication: MarinaResponseSurfaceApplication
 }
 
 enum MarinaResponseSurfaceRequestFactory {
@@ -419,7 +419,7 @@ enum MarinaResponseSurfaceRequestFactory {
         workspaceName: String,
         routeSourceRaw: String,
         generationBaseAnswer: HomeAnswer,
-        fallbackApplication: MarinaResponseSurfaceApplication,
+        deterministicApplication: MarinaResponseSurfaceApplication,
         presentationMode: MarinaPresentationMode = .foundationModelsStreaming,
         surfaceKind: MarinaPresentationSurfaceKind = .answer,
         voiceProfile: MarinaAIVoiceProfile = .marina,
@@ -452,7 +452,7 @@ enum MarinaResponseSurfaceRequestFactory {
                 followUpCandidates: followUpCandidates,
                 recentResponses: recentResponses
             ),
-            fallbackApplication: fallbackApplication
+            deterministicApplication: deterministicApplication
         )
     }
 }

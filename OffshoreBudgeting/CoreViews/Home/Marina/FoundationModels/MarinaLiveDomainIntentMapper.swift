@@ -1,6 +1,6 @@
 import Foundation
 
-struct MarinaFoundationIntentEnvelopeV3Payload: Codable, Equatable, Sendable {
+struct MarinaFoundationIntentEnvelopePayload: Codable, Equatable, Sendable {
     let routeRaw: String
     let intentRaw: String?
     let targetText: String?
@@ -15,7 +15,7 @@ struct MarinaFoundationIntentEnvelopeV3Payload: Codable, Equatable, Sendable {
 }
 
 struct MarinaLiveDomainIntentMapping: Equatable, Sendable {
-    let intent: MarinaAIIntentV2
+    let intent: MarinaAIIntent
     let liveEnvelopeSummary: String
     let canonicalRouteSummary: String
     let routeOverrideSummary: String?
@@ -59,7 +59,7 @@ private enum MarinaLiveDateDefaultMode: Equatable, Sendable {
 }
 
 private struct MarinaLiveDateResolution: Equatable, Sendable {
-    let intent: MarinaAIDateRangeV2?
+    let intent: MarinaAIDateRange?
     let source: MarinaDateSource
     let policySummary: String?
     let effectiveRangeSummary: String?
@@ -93,9 +93,9 @@ struct MarinaLiveDomainIntentMapper {
     }
 
     func map(
-        payload: MarinaFoundationIntentEnvelopeV3Payload,
+        payload: MarinaFoundationIntentEnvelopePayload,
         prompt: String,
-        context: MarinaLanguageRouterContext
+        context: MarinaInterpretationContext
     ) -> MarinaLiveDomainIntentMapping {
         let normalizedPrompt = normalized(prompt)
         let envelopeIntent = token(payload.intentRaw)
@@ -103,14 +103,14 @@ struct MarinaLiveDomainIntentMapper {
         let envelopeSummary = [
             "route=\(route.rawValue)",
             envelopeIntent.map { "intent=\($0)" },
-            payload.targetText?.nilIfBlankForV2.map { "target=\($0)" },
-            payload.secondaryTargetText?.nilIfBlankForV2.map { "secondary=\($0)" },
-            payload.relationshipText?.nilIfBlankForV2.map { "relationship=\($0)" },
-            payload.dateText?.nilIfBlankForV2.map { "date=\($0)" },
-            payload.comparisonDateText?.nilIfBlankForV2.map { "comparison=\($0)" },
-            payload.amountText?.nilIfBlankForV2.map { "amount=\($0)" },
-            payload.valueDirectionRaw?.nilIfBlankForV2.map { "direction=\($0)" },
-            payload.confidenceRaw?.nilIfBlankForV2.map { "confidence=\($0)" }
+            payload.targetText?.marinaNilIfBlank.map { "target=\($0)" },
+            payload.secondaryTargetText?.marinaNilIfBlank.map { "secondary=\($0)" },
+            payload.relationshipText?.marinaNilIfBlank.map { "relationship=\($0)" },
+            payload.dateText?.marinaNilIfBlank.map { "date=\($0)" },
+            payload.comparisonDateText?.marinaNilIfBlank.map { "comparison=\($0)" },
+            payload.amountText?.marinaNilIfBlank.map { "amount=\($0)" },
+            payload.valueDirectionRaw?.marinaNilIfBlank.map { "direction=\($0)" },
+            payload.confidenceRaw?.marinaNilIfBlank.map { "confidence=\($0)" }
         ]
         .compactMap { $0 }
         .joined(separator: ",")
@@ -138,7 +138,7 @@ struct MarinaLiveDomainIntentMapper {
         case .help:
             return mapped(
                 intent: .unsupported(
-                    MarinaAIUnsupportedIntentV2(
+                    MarinaAIUnsupportedIntent(
                         reasoning: "",
                         reasonRaw: "help",
                         message: "Marina can search, summarize, calculate, and run read-only what-if scenarios over this workspace."
@@ -153,20 +153,20 @@ struct MarinaLiveDomainIntentMapper {
         case .unsupported, .clarification:
             return mapped(
                 intent: .unsupported(
-                    MarinaAIUnsupportedIntentV2(
+                    MarinaAIUnsupportedIntent(
                         reasoning: "",
-                        reasonRaw: payload.unsupportedReasonRaw?.nilIfBlankForV2 ?? "unsupported",
+                        reasonRaw: payload.unsupportedReasonRaw?.marinaNilIfBlank ?? "unsupported",
                         message: "I could not safely map that to a supported Marina read route, so I did not query your financial data."
                     )
                 ),
                 payload: payload,
                 envelopeSummary: envelopeSummary,
-                canonicalRoute: "unsupported:\(payload.unsupportedReasonRaw?.nilIfBlankForV2 ?? "unmapped")",
+                canonicalRoute: "unsupported:\(payload.unsupportedReasonRaw?.marinaNilIfBlank ?? "unmapped")",
                 datePolicy: nil,
                 blockedWrongQuery: false
             )
         case .lookup:
-            if let target = payload.targetText?.nilIfBlankForV2,
+            if let target = payload.targetText?.marinaNilIfBlank,
                isInvalidEntityTarget(target) == false {
                 return mappedLookup(
                     payload: payload,
@@ -195,10 +195,10 @@ struct MarinaLiveDomainIntentMapper {
     }
 
     private func supportedMapping(
-        payload: MarinaFoundationIntentEnvelopeV3Payload,
+        payload: MarinaFoundationIntentEnvelopePayload,
         prompt: String,
         normalizedPrompt: String,
-        context: MarinaLanguageRouterContext,
+        context: MarinaInterpretationContext,
         envelopeSummary: String
     ) -> MarinaLiveDomainIntentMapping? {
         guard let routeKey = routeKey(
@@ -288,12 +288,12 @@ struct MarinaLiveDomainIntentMapper {
             let target = scenarioTarget(payload: payload, prompt: prompt, context: context)
             return mapped(
                 intent: .scenario(
-                    MarinaAIScenarioIntentV2(
+                    MarinaAIScenarioIntent(
                         reasoning: "",
                         scenarioRaw: "budgetForecast",
                         targetTypeRaw: target?.type,
                         targetName: target?.name,
-                        valueModeRaw: payload.valueDirectionRaw?.nilIfBlankForV2 ?? inferredValueDirection(from: normalizedPrompt),
+                        valueModeRaw: payload.valueDirectionRaw?.marinaNilIfBlank ?? inferredValueDirection(from: normalizedPrompt),
                         amount: amount(from: payload.amountText) ?? amount(from: prompt),
                         percent: nil,
                         dateRange: dateIntent(from: payload.dateText, prompt: prompt, context: context, defaultMode: .ambient).intent,
@@ -530,10 +530,10 @@ struct MarinaLiveDomainIntentMapper {
     }
 
     private func routeKey(
-        payload: MarinaFoundationIntentEnvelopeV3Payload,
+        payload: MarinaFoundationIntentEnvelopePayload,
         prompt: String,
         normalizedPrompt: String,
-        context: MarinaLanguageRouterContext
+        context: MarinaInterpretationContext
     ) -> MarinaLiveRouteKey? {
         let signal = routeSignal(payload: payload)
         let normalizedSignal = normalized(signal)
@@ -659,7 +659,7 @@ struct MarinaLiveDomainIntentMapper {
         return nil
     }
 
-    private func routeSignal(payload: MarinaFoundationIntentEnvelopeV3Payload) -> String {
+    private func routeSignal(payload: MarinaFoundationIntentEnvelopePayload) -> String {
         [
             payload.intentRaw,
             payload.relationshipText,
@@ -667,7 +667,7 @@ struct MarinaLiveDomainIntentMapper {
             payload.secondaryTargetText,
             payload.unsupportedReasonRaw
         ]
-        .compactMap { $0?.nilIfBlankForV2 }
+        .compactMap { $0?.marinaNilIfBlank }
         .joined(separator: " ")
     }
 
@@ -683,7 +683,7 @@ struct MarinaLiveDomainIntentMapper {
     }
 
     private func mappedRead(
-        payload: MarinaFoundationIntentEnvelopeV3Payload,
+        payload: MarinaFoundationIntentEnvelopePayload,
         prompt: String,
         envelopeSummary: String,
         routeKey: MarinaLiveRouteKey?,
@@ -705,7 +705,7 @@ struct MarinaLiveDomainIntentMapper {
     ) -> MarinaLiveDomainIntentMapping {
         mapped(
             intent: .readQuery(
-                MarinaAIReadQueryIntentV2(
+                MarinaAIReadQueryIntent(
                     reasoning: "",
                     subjectRaw: subject,
                     operationRaw: operation,
@@ -737,7 +737,7 @@ struct MarinaLiveDomainIntentMapper {
     }
 
     private func mappedLookup(
-        payload: MarinaFoundationIntentEnvelopeV3Payload,
+        payload: MarinaFoundationIntentEnvelopePayload,
         envelopeSummary: String,
         routeKey: MarinaLiveRouteKey?,
         canonicalRoute: String,
@@ -747,7 +747,7 @@ struct MarinaLiveDomainIntentMapper {
     ) -> MarinaLiveDomainIntentMapping {
         mapped(
             intent: .lookup(
-                MarinaAILookupIntentV2(
+                MarinaAILookupIntent(
                     reasoning: "",
                     objectTypeRaws: objectTypes,
                     searchText: searchText,
@@ -769,8 +769,8 @@ struct MarinaLiveDomainIntentMapper {
     }
 
     private func mapped(
-        intent: MarinaAIIntentV2,
-        payload: MarinaFoundationIntentEnvelopeV3Payload,
+        intent: MarinaAIIntent,
+        payload: MarinaFoundationIntentEnvelopePayload,
         envelopeSummary: String,
         routeKey: MarinaLiveRouteKey? = nil,
         canonicalRoute: String,
@@ -793,8 +793,8 @@ struct MarinaLiveDomainIntentMapper {
     }
 
     private func mapped(
-        intent: MarinaAIIntentV2,
-        payload: MarinaFoundationIntentEnvelopeV3Payload,
+        intent: MarinaAIIntent,
+        payload: MarinaFoundationIntentEnvelopePayload,
         envelopeSummary: String,
         routeKey: MarinaLiveRouteKey? = nil,
         canonicalRoute: String,
@@ -830,13 +830,13 @@ struct MarinaLiveDomainIntentMapper {
 
     private func blocked(
         prompt: String,
-        payload: MarinaFoundationIntentEnvelopeV3Payload,
+        payload: MarinaFoundationIntentEnvelopePayload,
         envelopeSummary: String,
         reason: String
     ) -> MarinaLiveDomainIntentMapping {
         mapped(
             intent: .unsupported(
-                MarinaAIUnsupportedIntentV2(
+                MarinaAIUnsupportedIntent(
                     reasoning: "",
                     reasonRaw: reason,
                     message: "I could not safely map that to a supported Marina read route, so I did not query your financial data."
@@ -851,9 +851,9 @@ struct MarinaLiveDomainIntentMapper {
         )
     }
 
-    private func entityMention(name: String?, type: String?) -> MarinaAIEntityMentionV2? {
-        guard let name = name?.nilIfBlankForV2 else { return nil }
-        return MarinaAIEntityMentionV2(
+    private func entityMention(name: String?, type: String?) -> MarinaAIEntityMention? {
+        guard let name = name?.marinaNilIfBlank else { return nil }
+        return MarinaAIEntityMention(
             roleRaw: "filter",
             rawText: name,
             typeRaw: type,
@@ -862,9 +862,9 @@ struct MarinaLiveDomainIntentMapper {
     }
 
     private func spendingTarget(
-        payload: MarinaFoundationIntentEnvelopeV3Payload,
+        payload: MarinaFoundationIntentEnvelopePayload,
         prompt: String,
-        context: MarinaLanguageRouterContext
+        context: MarinaInterpretationContext
     ) -> (name: String, type: String)? {
         let normalizedPrompt = normalized(prompt)
         if normalizedPrompt.contains("uncategorized") {
@@ -889,7 +889,7 @@ struct MarinaLiveDomainIntentMapper {
             return (card, "card")
         }
 
-        guard let fallback = (payload.targetText ?? payload.secondaryTargetText)?.nilIfBlankForV2,
+        guard let fallback = (payload.targetText ?? payload.secondaryTargetText)?.marinaNilIfBlank,
               isInvalidEntityTarget(fallback) == false else {
             return nil
         }
@@ -899,9 +899,9 @@ struct MarinaLiveDomainIntentMapper {
     }
 
     private func scenarioTarget(
-        payload: MarinaFoundationIntentEnvelopeV3Payload,
+        payload: MarinaFoundationIntentEnvelopePayload,
         prompt: String,
-        context: MarinaLanguageRouterContext
+        context: MarinaInterpretationContext
     ) -> (name: String, type: String)? {
         if let category = namedTarget(context.categoryNames, in: prompt, fallback: payload.targetText) {
             return (category, "category")
@@ -909,7 +909,7 @@ struct MarinaLiveDomainIntentMapper {
         if let card = namedTarget(context.cardNames, in: prompt, fallback: payload.targetText) {
             return (card, "card")
         }
-        guard let target = payload.targetText?.nilIfBlankForV2,
+        guard let target = payload.targetText?.marinaNilIfBlank,
               isInvalidEntityTarget(target) == false else {
             return nil
         }
@@ -917,13 +917,13 @@ struct MarinaLiveDomainIntentMapper {
     }
 
     private func allocationTarget(
-        payload: MarinaFoundationIntentEnvelopeV3Payload,
+        payload: MarinaFoundationIntentEnvelopePayload,
         prompt: String
     ) -> String? {
-        if let target = payload.targetText?.nilIfBlankForV2,
+        if let target = payload.targetText?.marinaNilIfBlank,
            isInvalidEntityTarget(target) == false {
             let cleaned = cleanReconciliationTarget(target)
-            return isInvalidEntityTarget(cleaned) ? nil : cleaned.nilIfBlankForV2
+            return isInvalidEntityTarget(cleaned) ? nil : cleaned.marinaNilIfBlank
         }
         let normalizedPrompt = normalized(prompt)
         if normalizedPrompt.contains("roommate") {
@@ -944,7 +944,7 @@ struct MarinaLiveDomainIntentMapper {
         if let cardLike = names.first(where: { normalizedPrompt.contains(normalized($0) + " card") }) {
             return cardLike
         }
-        guard let fallback = fallback?.nilIfBlankForV2,
+        guard let fallback = fallback?.marinaNilIfBlank,
               isGenericTarget(fallback) == false else {
             return nil
         }
@@ -961,7 +961,7 @@ struct MarinaLiveDomainIntentMapper {
     private func dateIntent(
         from rawDate: String?,
         prompt: String,
-        context: MarinaLanguageRouterContext,
+        context: MarinaInterpretationContext,
         defaultMode: MarinaLiveDateDefaultMode,
         allowComparisonOnlyPromptDate: Bool = true
     ) -> MarinaLiveDateResolution {
@@ -970,7 +970,7 @@ struct MarinaLiveDomainIntentMapper {
            isComparisonOnlyDatePhrase(promptRaw, prompt: prompt) {
             promptRaw = nil
         }
-        let modelRaw = rawDate?.nilIfBlankForV2
+        let modelRaw = rawDate?.marinaNilIfBlank
         let groundedModel = groundedModelDateText(modelRaw, prompt: prompt)
         let textResolution: (raw: String, source: MarinaDateSource)?
         if let promptRaw {
@@ -1058,7 +1058,7 @@ struct MarinaLiveDomainIntentMapper {
         ]
         .compactMap { $0 }
         .joined(separator: ",")
-        .nilIfBlankForV2
+        .marinaNilIfBlank
         .map {
             MarinaLiveDateResolution(
                 intent: MarinaDateOnlyRangeCodec.aiDateRange(
@@ -1086,14 +1086,14 @@ struct MarinaLiveDomainIntentMapper {
         ]
         .compactMap { $0 }
         .joined(separator: ",")
-        .nilIfBlankForV2
+        .marinaNilIfBlank
         let effective = [
             primary.effectiveRangeSummary.map { "primary=\($0)" },
             comparison.effectiveRangeSummary.map { "comparison=\($0)" }
         ]
         .compactMap { $0 }
         .joined(separator: ",")
-        .nilIfBlankForV2
+        .marinaNilIfBlank
         return MarinaLiveDateResolution(
             intent: primary.intent,
             source: source,
@@ -1149,7 +1149,7 @@ struct MarinaLiveDomainIntentMapper {
                 return String(suffix)
                     .replacingOccurrences(of: #"(?i)\b(this|last|current|previous)\s+(month|week|year)\b"#, with: "", options: .regularExpression)
                     .trimmingCharacters(in: CharacterSet(charactersIn: " ?."))
-                    .nilIfBlankForV2
+                    .marinaNilIfBlank
             }
         }
         return nil
@@ -1171,7 +1171,7 @@ struct MarinaLiveDomainIntentMapper {
     }
 
     private func groundedModelDateText(_ rawValue: String?, prompt: String) -> String? {
-        guard let rawValue = rawValue?.nilIfBlankForV2 else { return nil }
+        guard let rawValue = rawValue?.marinaNilIfBlank else { return nil }
         let normalizedRaw = normalized(rawValue)
         guard normalizedRaw.isEmpty == false else { return nil }
         guard normalized(prompt).contains(normalizedRaw) else { return nil }
@@ -1191,11 +1191,11 @@ struct MarinaLiveDomainIntentMapper {
     }
 
     private func droppedTargetSummary(
-        payload: MarinaFoundationIntentEnvelopeV3Payload,
+        payload: MarinaFoundationIntentEnvelopePayload,
         promptDatePolicy: String?
     ) -> String? {
         var dropped: [String] = []
-        for target in [payload.targetText, payload.secondaryTargetText].compactMap({ $0?.nilIfBlankForV2 }) {
+        for target in [payload.targetText, payload.secondaryTargetText].compactMap({ $0?.marinaNilIfBlank }) {
             if isInvalidEntityTarget(target) {
                 dropped.append("target=\(target)")
             }
@@ -1264,11 +1264,11 @@ struct MarinaLiveDomainIntentMapper {
             .lowercased()
             .replacingOccurrences(of: "[^a-z0-9]+", with: "_", options: .regularExpression)
             .trimmingCharacters(in: CharacterSet(charactersIn: "_"))
-            .nilIfBlankForV2
+            .marinaNilIfBlank
     }
 
     private func amount(from rawValue: String?) -> Double? {
-        guard let rawValue = rawValue?.nilIfBlankForV2 else { return nil }
+        guard let rawValue = rawValue?.marinaNilIfBlank else { return nil }
         let cleaned = rawValue
             .replacingOccurrences(of: ",", with: "")
             .replacingOccurrences(of: "$", with: "")
@@ -1280,7 +1280,7 @@ struct MarinaLiveDomainIntentMapper {
 }
 
 private extension String {
-    var nilIfBlankForV2: String? {
+    var marinaNilIfBlank: String? {
         let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
     }

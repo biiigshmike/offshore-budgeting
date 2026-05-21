@@ -1,7 +1,6 @@
 import Foundation
 
-enum MarinaSharedPipelineFallbackReason: String, Codable, Equatable {
-    case gateDisabled
+enum MarinaFoundationPipelineRecoveryReason: String, Codable, Equatable {
     case aiOptOut
     case modelUnavailable
     case modelServiceFailed
@@ -19,8 +18,6 @@ enum MarinaSharedPipelineFallbackReason: String, Codable, Equatable {
     case modelToolCallFailed
     case modelCancelled
     case modelUnknownFailure
-    case modelUnsupportedHeuristicExactMatch
-    case modelClarificationHeuristicExactMatch
     case droppedExplicitConstraint
     case validationDidNotProduceExecutablePlan
     case clarificationBridgeUnavailable
@@ -30,15 +27,11 @@ enum MarinaSharedPipelineFallbackReason: String, Codable, Equatable {
     case responseBridgeUnavailable
 }
 
-enum MarinaSharedPipelineRuntimePath: String, Codable, Equatable {
-    case legacy
-    case sharedHeuristic
-    case sharedFoundationModels
-    case sharedAttemptedThenLegacyFallback
+enum MarinaFoundationPipelineRuntimePath: String, Codable, Equatable {
+    case foundationModels
 }
 
-enum MarinaInterpreterSelectionReason: String, Codable, Equatable {
-    case gateDisabled
+enum MarinaInterpretationSelectionReason: String, Codable, Equatable {
     case modelEligible
     case aiOptOut
     case modelUnavailable
@@ -50,26 +43,21 @@ enum MarinaInterpreterSelectionReason: String, Codable, Equatable {
     case modelUnsupportedLocale
     case modelToolCallFailed
     case modelConcurrentRequest
-    case modelUnsupportedHeuristicExactMatch
-    case modelClarificationHeuristicExactMatch
-    case universalPreflight
     case clarificationResume
 }
 
-struct MarinaSharedPipelineTrace: Codable, Equatable {
-    let sharedPipelineEnabled: Bool
+struct MarinaFoundationPipelineTrace: Codable, Equatable {
+    let foundationPipelineEnabled: Bool
     let aiOptInEnabled: Bool
     let aiAvailable: Bool?
     let aiOptIn: Bool
     let aiRouteEligible: Bool
-    let selectedInterpreter: MarinaInterpreterSource?
-    let interpreterSelectionReason: MarinaInterpreterSelectionReason?
+    let selectedInterpreter: MarinaInterpretationSource?
+    let interpreterSelectionReason: MarinaInterpretationSelectionReason?
     let modelAttempted: Bool
-    let heuristicAttempted: Bool
-    let heuristicUsedAsFallback: Bool
     let modelAvailabilitySummary: String?
-    let selectedPath: MarinaSharedPipelineRuntimePath
-    let interpreterSource: MarinaInterpreterSource?
+    let selectedPath: MarinaFoundationPipelineRuntimePath
+    let interpreterSource: MarinaInterpretationSource?
     let candidateSummary: String?
     let resolverSummary: String?
     let semanticInterpretationSummary: String?
@@ -79,7 +67,7 @@ struct MarinaSharedPipelineTrace: Codable, Equatable {
     let executorResultSummary: String?
     let responseBridgeSummary: String?
     let responseShapeSummary: String?
-    let fallbackReason: MarinaSharedPipelineFallbackReason?
+    let recoveryReason: MarinaFoundationPipelineRecoveryReason?
     let disagreementSummary: String?
     let selectionRank: Int?
     let rejectedReason: String?
@@ -88,19 +76,17 @@ struct MarinaSharedPipelineTrace: Codable, Equatable {
     let priorContextIncluded: Bool
 
     init(
-        sharedPipelineEnabled: Bool,
+        foundationPipelineEnabled: Bool,
         aiOptInEnabled: Bool,
         aiAvailable: Bool? = nil,
         aiOptIn: Bool? = nil,
         aiRouteEligible: Bool = false,
-        selectedInterpreter: MarinaInterpreterSource? = nil,
-        interpreterSelectionReason: MarinaInterpreterSelectionReason? = nil,
+        selectedInterpreter: MarinaInterpretationSource? = nil,
+        interpreterSelectionReason: MarinaInterpretationSelectionReason? = nil,
         modelAttempted: Bool = false,
-        heuristicAttempted: Bool = false,
-        heuristicUsedAsFallback: Bool = false,
         modelAvailabilitySummary: String? = nil,
-        selectedPath: MarinaSharedPipelineRuntimePath,
-        interpreterSource: MarinaInterpreterSource? = nil,
+        selectedPath: MarinaFoundationPipelineRuntimePath,
+        interpreterSource: MarinaInterpretationSource? = nil,
         candidateSummary: String? = nil,
         resolverSummary: String? = nil,
         semanticInterpretationSummary: String? = nil,
@@ -110,7 +96,7 @@ struct MarinaSharedPipelineTrace: Codable, Equatable {
         executorResultSummary: String? = nil,
         responseBridgeSummary: String? = nil,
         responseShapeSummary: String? = nil,
-        fallbackReason: MarinaSharedPipelineFallbackReason? = nil,
+        recoveryReason: MarinaFoundationPipelineRecoveryReason? = nil,
         disagreementSummary: String? = nil,
         selectionRank: Int? = nil,
         rejectedReason: String? = nil,
@@ -118,7 +104,7 @@ struct MarinaSharedPipelineTrace: Codable, Equatable {
         turnClassification: MarinaPromptTurnClassification = .freshQuestion,
         priorContextIncluded: Bool = false
     ) {
-        self.sharedPipelineEnabled = sharedPipelineEnabled
+        self.foundationPipelineEnabled = foundationPipelineEnabled
         self.aiOptInEnabled = aiOptInEnabled
         self.aiAvailable = aiAvailable
         self.aiOptIn = aiOptIn ?? aiOptInEnabled
@@ -126,8 +112,6 @@ struct MarinaSharedPipelineTrace: Codable, Equatable {
         self.selectedInterpreter = selectedInterpreter
         self.interpreterSelectionReason = interpreterSelectionReason
         self.modelAttempted = modelAttempted
-        self.heuristicAttempted = heuristicAttempted
-        self.heuristicUsedAsFallback = heuristicUsedAsFallback
         self.modelAvailabilitySummary = modelAvailabilitySummary
         self.selectedPath = selectedPath
         self.interpreterSource = interpreterSource
@@ -140,7 +124,7 @@ struct MarinaSharedPipelineTrace: Codable, Equatable {
         self.executorResultSummary = executorResultSummary
         self.responseBridgeSummary = responseBridgeSummary
         self.responseShapeSummary = responseShapeSummary
-        self.fallbackReason = fallbackReason
+        self.recoveryReason = recoveryReason
         self.disagreementSummary = disagreementSummary
         self.selectionRank = selectionRank
         self.rejectedReason = rejectedReason
@@ -151,15 +135,13 @@ struct MarinaSharedPipelineTrace: Codable, Equatable {
 
     var compactSummary: String {
         [
-            "gate=\(sharedPipelineEnabled)",
+            "gate=\(foundationPipelineEnabled)",
             "aiOptIn=\(aiOptInEnabled)",
             aiAvailable.map { "aiAvailable=\($0)" },
             "aiRouteEligible=\(aiRouteEligible)",
             selectedInterpreter.map { "selectedInterpreter=\($0.rawValue)" },
             interpreterSelectionReason.map { "interpreterSelectionReason=\($0.rawValue)" },
             "modelAttempted=\(modelAttempted)",
-            "heuristicAttempted=\(heuristicAttempted)",
-            "heuristicUsedAsFallback=\(heuristicUsedAsFallback)",
             modelAvailabilitySummary.map { "model=\($0)" },
             "path=\(selectedPath.rawValue)",
             interpreterSource.map { "source=\($0.rawValue)" },
@@ -172,7 +154,7 @@ struct MarinaSharedPipelineTrace: Codable, Equatable {
             executorResultSummary.map { "executor=\($0)" },
             responseBridgeSummary.map { "bridge=\($0)" },
             responseShapeSummary.map { "responseShape=\($0)" },
-            fallbackReason.map { "fallback=\($0.rawValue)" },
+            recoveryReason.map { "recovery=\($0.rawValue)" },
             disagreementSummary.map { "disagreement=\($0)" },
             selectionRank.map { "selectionRank=\($0)" },
             rejectedReason.map { "rejected=\($0)" },

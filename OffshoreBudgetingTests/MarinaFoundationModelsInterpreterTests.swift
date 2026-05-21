@@ -600,7 +600,7 @@ struct MarinaFoundationModelsInterpreterTests {
         #expect(interpretation.compatibilityCandidate.semanticCommand == command)
     }
 
-    @Test func foundationModelsSemanticCommandProducesSameRouteIntentAsHeuristicPhrase() {
+    @Test func foundationModelsSemanticCommandProducesSameRouteIntentAsDeterministicPhrase() {
         let cases: [(prompt: String, command: MarinaSemanticCommand, targetTypes: [MarinaCandidateEntityTypeHint])] = [
             (
                 "Show split expenses with Roommate",
@@ -879,8 +879,8 @@ struct MarinaFoundationModelsInterpreterTests {
         return calendar.date(byAdding: DateComponents(day: 1, second: -1), to: calendar.startOfDay(for: date))!
     }
 
-    private func makeRouterContext() -> MarinaLanguageRouterContext {
-        MarinaLanguageRouterContext(
+    private func makeRouterContext() -> MarinaInterpretationContext {
+        MarinaInterpretationContext(
             workspaceName: "Test Workspace",
             defaultPeriodUnit: .month,
             sessionContext: HomeAssistantSessionContext(),
@@ -909,7 +909,7 @@ private struct StubStructuredIntentInterpreter: MarinaStructuredIntentInterpreti
 
     func interpret(
         prompt: String,
-        context: MarinaLanguageRouterContext
+        context: MarinaInterpretationContext
     ) async throws -> MarinaStructuredIntent {
         structuredIntent
     }
@@ -918,7 +918,7 @@ private struct StubStructuredIntentInterpreter: MarinaStructuredIntentInterpreti
 private struct ThrowingStructuredIntentInterpreter: MarinaStructuredIntentInterpreting {
     func interpret(
         prompt: String,
-        context: MarinaLanguageRouterContext
+        context: MarinaInterpretationContext
     ) async throws -> MarinaStructuredIntent {
         throw StubStructuredIntentError()
     }

@@ -18,6 +18,8 @@ enum MarinaLookupObjectType: String, Codable, Sendable, Equatable, CaseIterable 
     case assistantAliasRule
     case workspace
     case unknown
+
+    static let safeDefaultSearchTypes: [MarinaLookupObjectType] = allCases.filter { $0 != .unknown }
 }
 
 struct MarinaDatabaseLookupRequest: Codable, Sendable, Equatable {

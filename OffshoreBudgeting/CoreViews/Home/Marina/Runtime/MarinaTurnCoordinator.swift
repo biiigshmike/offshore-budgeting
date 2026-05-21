@@ -1,23 +1,23 @@
 import Foundation
 
 protocol MarinaCanonicalAIInterpreting {
-    func interpretCanonicalV2(
+    func interpretCanonical(
         prompt: String,
-        context: MarinaLanguageRouterContext
+        context: MarinaInterpretationContext
     ) async throws -> MarinaCanonicalReadInterpretation
 }
 
-struct MarinaV2FoundationAIInterpreter: MarinaCanonicalAIInterpreting {
+struct MarinaFoundationAIInterpreter: MarinaCanonicalAIInterpreting {
     private let aiInterpreter: MarinaAIInterpreter
-    private let legacyInterpreter = MarinaFoundationModelsInterpreter()
+    private let foundationContractInterpreter = MarinaFoundationModelsInterpreter()
 
     init(aiInterpreter: MarinaAIInterpreter = MarinaFoundationModelsService()) {
         self.aiInterpreter = aiInterpreter
     }
 
-    func interpretCanonicalV2(
+    func interpretCanonical(
         prompt: String,
-        context: MarinaLanguageRouterContext
+        context: MarinaInterpretationContext
     ) async throws -> MarinaCanonicalReadInterpretation {
         let intent = try await aiInterpreter.interpretAI(prompt: prompt, context: context)
         let interpretation = canonicalInterpretation(from: intent, prompt: prompt, defaultPeriodUnit: context.defaultPeriodUnit)
@@ -30,14 +30,14 @@ struct MarinaV2FoundationAIInterpreter: MarinaCanonicalAIInterpreting {
     }
 
     private func canonicalInterpretation(
-        from intent: MarinaAIIntentV2,
+        from intent: MarinaAIIntent,
         prompt: String,
         defaultPeriodUnit: HomeQueryPeriodUnit
     ) -> MarinaCanonicalReadInterpretation {
         switch intent {
         case .scenario(let scenario):
             let scenarioFilters: [MarinaSemanticCommandFilter]
-            if let targetName = scenario.targetName?.nilIfBlankForV2 {
+            if let targetName = scenario.targetName?.marinaNilIfBlank {
                 scenarioFilters = [
                     MarinaSemanticCommandFilter(
                         rawText: targetName,
@@ -59,13 +59,13 @@ struct MarinaV2FoundationAIInterpreter: MarinaCanonicalAIInterpreting {
                     limit: nil
                 )
             )
-            return legacyInterpreter.canonicalInterpretation(
+            return foundationContractInterpreter.canonicalInterpretation(
                 from: structuredIntent,
                 prompt: prompt,
                 defaultPeriodUnit: defaultPeriodUnit
             )
         case .readQuery, .lookup, .clarification, .unsupported:
-            return legacyInterpreter.canonicalInterpretation(
+            return foundationContractInterpreter.canonicalInterpretation(
                 from: intent.structuredIntent,
                 prompt: prompt,
                 defaultPeriodUnit: defaultPeriodUnit
@@ -92,7 +92,7 @@ struct MarinaV2FoundationAIInterpreter: MarinaCanonicalAIInterpreting {
         }
     }
 
-    private func dateRange(from intent: MarinaAIDateRangeV2?) -> HomeQueryDateRange? {
+    private func dateRange(from intent: MarinaAIDateRange?) -> HomeQueryDateRange? {
         MarinaDateOnlyRangeCodec.dateRange(
             start: intent?.startISO8601,
             end: intent?.endISO8601
@@ -136,9 +136,9 @@ struct MarinaFakeCanonicalAIInterpreter: MarinaCanonicalAIInterpreting {
         self.interpretationsByPrompt = interpretationsByPrompt
     }
 
-    func interpretCanonicalV2(
+    func interpretCanonical(
         prompt: String,
-        context _: MarinaLanguageRouterContext
+        context _: MarinaInterpretationContext
     ) async throws -> MarinaCanonicalReadInterpretation {
         guard let interpretation = interpretationsByPrompt[prompt] else {
             throw Failure.missingInterpretation
@@ -147,9 +147,9 @@ struct MarinaFakeCanonicalAIInterpreter: MarinaCanonicalAIInterpreting {
     }
 }
 
-struct MarinaV2TurnContext {
+struct MarinaTurnContext {
     let provider: MarinaDataProvider
-    let routerContext: MarinaLanguageRouterContext
+    let routerContext: MarinaInterpretationContext
     let defaultPeriodUnit: HomeQueryPeriodUnit
     let aiEnabled: Bool
     let now: Date
@@ -157,7 +157,7 @@ struct MarinaV2TurnContext {
 
     init(
         provider: MarinaDataProvider,
-        routerContext: MarinaLanguageRouterContext,
+        routerContext: MarinaInterpretationContext,
         defaultPeriodUnit: HomeQueryPeriodUnit,
         aiEnabled: Bool,
         now: Date,
@@ -172,7 +172,7 @@ struct MarinaV2TurnContext {
     }
 }
 
-enum MarinaV2TurnResult {
+enum MarinaTurnResult {
     case handled(
         answer: HomeAnswer,
         aggregationResult: MarinaAggregationResult?,
@@ -192,7 +192,7 @@ enum MarinaV2TurnResult {
 }
 
 @MainActor
-struct MarinaV2TurnCoordinator {
+struct MarinaTurnCoordinator {
     private let availability: MarinaModelAvailabilityProviding
     private let interpreter: MarinaCanonicalAIInterpreting
     private let resolver: MarinaQueryResolver
@@ -211,7 +211,7 @@ struct MarinaV2TurnCoordinator {
         responseBuilder: MarinaResponseBuilder? = nil
     ) {
         self.availability = availability ?? MarinaModelAvailability()
-        self.interpreter = interpreter ?? MarinaV2FoundationAIInterpreter()
+        self.interpreter = interpreter ?? MarinaFoundationAIInterpreter()
         self.resolver = resolver ?? MarinaQueryResolver()
         self.validator = validator ?? MarinaQueryValidator()
         self.queryExecutor = queryExecutor ?? MarinaQueryExecutor(
@@ -227,10 +227,10 @@ struct MarinaV2TurnCoordinator {
 
     func run(
         prompt: String,
-        context: MarinaV2TurnContext
-    ) async -> MarinaV2TurnResult {
+        context: MarinaTurnContext
+    ) async -> MarinaTurnResult {
         guard context.aiEnabled else {
-            MarinaV2TraceBridge.recordUnavailable(context: context, reason: "ai_opt_out")
+            MarinaFoundationTraceBridge.recordUnavailable(context: context, reason: "ai_opt_out")
             return .unavailable(Self.unavailableAnswer(
                 prompt: prompt,
                 reason: "Apple Intelligence is turned off for Marina."
@@ -240,7 +240,7 @@ struct MarinaV2TurnCoordinator {
         let availabilityStatus = availability.currentStatus()
         MarinaTraceRecorder.shared.recordModelAvailability(availabilityStatus)
         guard availabilityStatus == .available else {
-            MarinaV2TraceBridge.recordUnavailable(
+            MarinaFoundationTraceBridge.recordUnavailable(
                 context: context,
                 reason: Self.availabilityReason(availabilityStatus)
             )
@@ -251,7 +251,7 @@ struct MarinaV2TurnCoordinator {
         }
 
         do {
-            let rawInterpretation = try await interpreter.interpretCanonicalV2(
+            let rawInterpretation = try await interpreter.interpretCanonical(
                 prompt: prompt,
                 context: context.routerContext
             )
@@ -271,10 +271,10 @@ struct MarinaV2TurnCoordinator {
                 explicitConstraints: explicitConstraints
             )
         } catch {
-            MarinaDebugLogger.log("Marina v2 AI interpretation failed prompt='\(prompt)' error=\(error)")
+            MarinaDebugLogger.log("Marina AI interpretation failed prompt='\(prompt)' error=\(error)")
             let diagnostic = Self.foundationDiagnostic(from: error)
             MarinaTraceRecorder.shared.recordFoundationModelsFailure(diagnostic)
-            MarinaV2TraceBridge.recordFoundationFailure(context: context, diagnostic: diagnostic)
+            MarinaFoundationTraceBridge.recordFoundationFailure(context: context, diagnostic: diagnostic)
             return .blocked(
                 answer: Self.foundationFailureAnswer(
                     prompt: prompt,
@@ -288,8 +288,8 @@ struct MarinaV2TurnCoordinator {
     func run(
         query: HomeQuery,
         sourceTitle: String,
-        context: MarinaV2TurnContext
-    ) async -> MarinaV2TurnResult {
+        context: MarinaTurnContext
+    ) async -> MarinaTurnResult {
         let presetAdapter = HomeAssistantPresetPromptQueryAdapter()
         let executablePlan = presetAdapter.executablePlan(for: query, sourceTitle: sourceTitle)
         let candidate = presetAdapter.candidate(for: query, sourceTitle: sourceTitle)
@@ -313,7 +313,7 @@ struct MarinaV2TurnCoordinator {
 
         if case .unsupported(let unsupported) = aggregationResult {
             let blockedOutcome = MarinaPlanValidationOutcome.unsupported(unsupported)
-            MarinaV2TraceBridge.record(
+            MarinaFoundationTraceBridge.record(
                 context: context,
                 interpretation: interpretation,
                 resolved: resolved,
@@ -346,7 +346,7 @@ struct MarinaV2TurnCoordinator {
             amountBasis: MarinaAmountBasisAdapter().basis(plan: executablePlan.aggregationPlan, semanticQuery: nil),
             executionRoute: executionRoute(for: executablePlan.aggregationPlan)
         )
-        MarinaV2TraceBridge.record(
+        MarinaFoundationTraceBridge.record(
             context: context,
             interpretation: interpretation,
             resolved: resolved,
@@ -366,8 +366,8 @@ struct MarinaV2TurnCoordinator {
     func resume(
         clarification: MarinaTypedClarification,
         choice: MarinaClarificationChoice,
-        context: MarinaV2TurnContext
-    ) async -> MarinaV2TurnResult {
+        context: MarinaTurnContext
+    ) async -> MarinaTurnResult {
         guard let candidate = clarification.candidate else {
             return .blocked(
                 answer: Self.blockedAnswer(
@@ -418,7 +418,7 @@ struct MarinaV2TurnCoordinator {
             queryID: UUID(),
             kind: .message,
             userPrompt: prompt,
-            title: "Marina v2 is read-only for now",
+            title: "Marina is read-only for now",
             subtitle: "I can search, summarize, calculate, and run what-if scenarios first. Create, edit, and delete commands are paused until the confirmation flow is rebuilt.",
             rows: [
                 HomeAnswerRow(title: "Status", value: "CRUD deferred"),
@@ -450,10 +450,10 @@ struct MarinaV2TurnCoordinator {
 
     private func evaluate(
         _ interpretation: MarinaCanonicalReadInterpretation,
-        context: MarinaV2TurnContext,
+        context: MarinaTurnContext,
         explicitConstraints: MarinaExplicitPromptConstraints,
         allowSingleChoiceAutoResolve: Bool = true
-    ) -> MarinaV2TurnResult {
+    ) -> MarinaTurnResult {
         let candidate = interpretation.compatibilityCandidate
         let resolved = resolver.resolve(
             candidate: candidate,
@@ -490,7 +490,7 @@ struct MarinaV2TurnCoordinator {
             outcome: outcome
         ) {
             let blockedOutcome = MarinaPlanValidationOutcome.unsupported(unsupported)
-            MarinaV2TraceBridge.record(
+            MarinaFoundationTraceBridge.record(
                 context: context,
                 interpretation: interpretation,
                 resolved: resolved,
@@ -531,7 +531,7 @@ struct MarinaV2TurnCoordinator {
                 }
             }
 
-            MarinaV2TraceBridge.record(
+            MarinaFoundationTraceBridge.record(
                 context: context,
                 interpretation: interpretation,
                 resolved: resolved,
@@ -553,7 +553,7 @@ struct MarinaV2TurnCoordinator {
                 clarification: clarification
             )
         case .unsupported:
-            MarinaV2TraceBridge.record(
+            MarinaFoundationTraceBridge.record(
                 context: context,
                 interpretation: interpretation,
                 resolved: resolved,
@@ -565,7 +565,7 @@ struct MarinaV2TurnCoordinator {
                 answer: responseBuilder.responseCompatibleAnswer(from: outcome) ?? Self.blockedAnswer(
                     prompt: candidate.rawPrompt,
                     title: "Marina cannot run that yet",
-                    message: "That request is outside Marina v2's safe read model."
+                    message: "That request is outside Marina's safe read model."
                 ),
                 validationOutcome: outcome
             )
@@ -588,7 +588,7 @@ struct MarinaV2TurnCoordinator {
                     resolved: resolved,
                     semanticResolved: semanticResolved
                 )
-                MarinaV2TraceBridge.record(
+                MarinaFoundationTraceBridge.record(
                     context: context,
                     interpretation: interpretation,
                     resolved: resolved,
@@ -605,7 +605,7 @@ struct MarinaV2TurnCoordinator {
                 )
             case .unsupported(let unsupported):
                 let blockedOutcome = MarinaPlanValidationOutcome.unsupported(unsupported)
-                MarinaV2TraceBridge.record(
+                MarinaFoundationTraceBridge.record(
                     context: context,
                     interpretation: interpretation,
                     resolved: resolved,
@@ -649,7 +649,7 @@ struct MarinaV2TurnCoordinator {
     private func interpretationByApplying(
         choice: MarinaClarificationChoice,
         to clarification: MarinaTypedClarification,
-        context: MarinaV2TurnContext
+        context: MarinaTurnContext
     ) -> MarinaCanonicalReadInterpretation? {
         guard let candidate = clarification.candidate else { return nil }
 
@@ -756,7 +756,7 @@ struct MarinaV2TurnCoordinator {
         if reason.contains("apple_intelligence_not_enabled") || reason.contains("turned off") {
             return (
                 "Apple Intelligence is turned off",
-                "Marina v2 needs Apple Intelligence to understand natural-language budgeting questions. Turn it on to use Marina, or use the app screens directly."
+                "Marina needs Apple Intelligence to understand natural-language budgeting questions. Turn it on to use Marina, or use the app screens directly."
             )
         }
         if reason.contains("model_not_ready") {
@@ -768,24 +768,24 @@ struct MarinaV2TurnCoordinator {
         if reason.contains("unsupported_locale") {
             return (
                 "Apple Intelligence locale unsupported",
-                "Marina v2 needs a supported Apple Intelligence language and locale before it can interpret budgeting questions."
+                "Marina needs a supported Apple Intelligence language and locale before it can interpret budgeting questions."
             )
         }
         if reason.contains("device_not_eligible") {
             return (
                 "Apple Intelligence is not available on this device",
-                "This device is not eligible for the local Foundation Models runtime Marina v2 requires."
+                "This device is not eligible for the local Foundation Models runtime Marina requires."
             )
         }
         if reason.contains("runtime_unavailable") || reason.contains("framework_unavailable") {
             return (
                 "Apple Intelligence requires a newer runtime",
-                "This app build still supports older OS versions, but natural-language Marina v2 requires Foundation Models at runtime."
+                "This app build still supports older OS versions, but natural-language Marina requires Foundation Models at runtime."
             )
         }
         return (
             "Apple Intelligence Required",
-            "Marina v2 uses Apple Intelligence to understand natural-language budgeting questions. Apple Intelligence is not available right now: \(reason)."
+            "Marina uses Apple Intelligence to understand natural-language budgeting questions. Apple Intelligence is not available right now: \(reason)."
         )
     }
 
@@ -901,7 +901,7 @@ struct MarinaV2TurnCoordinator {
 }
 
 private extension String {
-    var nilIfBlankForV2: String? {
+    var marinaNilIfBlank: String? {
         let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
     }
@@ -910,7 +910,7 @@ private extension String {
 private extension MarinaQueryPlanCandidate {
     func replacingClarifiedMention(with choice: MarinaClarificationChoice) -> MarinaQueryPlanCandidate {
         var mentions = entityMentions
-        let replacementText = choice.rawValue?.nilIfBlankForV2 ?? choice.title
+        let replacementText = choice.rawValue?.marinaNilIfBlank ?? choice.title
         let replacementType = choice.entityTypeHint
 
         if let mentionID = choice.mentionID,
@@ -959,7 +959,7 @@ private extension MarinaQueryPlanCandidate {
         fallbackRequest: MarinaDatabaseLookupRequest?
     ) -> MarinaQueryPlanCandidate? {
         guard var request = databaseLookupRequest ?? fallbackRequest else { return nil }
-        request.searchText = choice.rawValue?.nilIfBlankForV2 ?? choice.title
+        request.searchText = choice.rawValue?.marinaNilIfBlank ?? choice.title
         if let objectType = choice.entityTypeHint?.databaseLookupObjectType {
             request.objectTypes = [objectType]
         }
@@ -1009,14 +1009,14 @@ private extension MarinaSemanticQuery {
             return copy(
                 dateRange: MarinaDateRangeRequest(
                     role: .primary,
-                    rawText: choice.rawValue?.nilIfBlankForV2 ?? choice.title
+                    rawText: choice.rawValue?.marinaNilIfBlank ?? choice.title
                 )
             )
         case .comparison:
             return copy(
                 comparisonDateRange: MarinaDateRangeRequest(
                     role: .comparison,
-                    rawText: choice.rawValue?.nilIfBlankForV2 ?? choice.title
+                    rawText: choice.rawValue?.marinaNilIfBlank ?? choice.title
                 )
             )
         case .amount, .simulation, nil:
@@ -1056,7 +1056,7 @@ private extension Array where Element == MarinaFilter {
             id: choice.mentionID ?? first?.id ?? UUID(),
             role: choice.entityRole?.resolvedTargetRole ?? .primaryTarget,
             relationship: choice.entityTypeHint?.relationshipField ?? .unknown,
-            value: choice.rawValue?.nilIfBlankForV2 ?? choice.title,
+            value: choice.rawValue?.marinaNilIfBlank ?? choice.title,
             matchMode: choice.sourceID == nil ? .semanticOrAlias : .exact,
             entityTypeHint: choice.entityTypeHint,
             allowedEntityTypeHints: choice.entityTypeHint.map { [$0] },

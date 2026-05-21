@@ -6,7 +6,7 @@ struct MarinaLiveIntentNormalizer {
     func normalized(
         _ interpretation: MarinaCanonicalReadInterpretation,
         prompt: String,
-        context: MarinaLanguageRouterContext,
+        context: MarinaInterpretationContext,
         defaultPeriodUnit _: HomeQueryPeriodUnit
     ) -> MarinaCanonicalReadInterpretation {
         var repairs: [String] = []
@@ -123,7 +123,7 @@ struct MarinaLiveIntentNormalizer {
     private func normalized(
         _ command: MarinaSemanticCommand,
         prompt: String,
-        context: MarinaLanguageRouterContext,
+        context: MarinaInterpretationContext,
         repairs: inout [String]
     ) -> MarinaSemanticCommand {
         var includeFilters = command.includeFilters.filter { filter in
@@ -200,7 +200,7 @@ struct MarinaLiveIntentNormalizer {
     private func normalized(
         _ query: MarinaSemanticQuery,
         prompt: String,
-        context: MarinaLanguageRouterContext,
+        context: MarinaInterpretationContext,
         repairs: inout [String]
     ) -> MarinaSemanticQuery {
         let filters = query.filters.filter { filter in
@@ -301,7 +301,7 @@ struct MarinaLiveIntentNormalizer {
     private func isGenericSubjectTarget(
         rawText: String?,
         typeHint: MarinaCandidateEntityTypeHint?,
-        context: MarinaLanguageRouterContext
+        context: MarinaInterpretationContext
     ) -> Bool {
         guard let rawText else { return false }
         let normalized = normalizedText(rawText)
@@ -356,7 +356,7 @@ struct MarinaLiveIntentNormalizer {
 
     private func isKnownEntityName(
         _ normalized: String,
-        context: MarinaLanguageRouterContext
+        context: MarinaInterpretationContext
     ) -> Bool {
         let names = context.cardNames
             + context.categoryNames

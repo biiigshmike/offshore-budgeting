@@ -16,7 +16,7 @@ struct MarinaFoundationOnlyTraceGuardTests {
                 timeScopes: [timeScope("this month", monthRange(2026, 5), .month)]
             )
         )
-        let coordinator = MarinaV2TurnCoordinator(
+        let coordinator = MarinaTurnCoordinator(
             availability: FoundationOnlyAvailability(status: .available),
             interpreter: MarinaFakeCanonicalAIInterpreter(interpretationsByPrompt: [prompt: interpretation])
         )
@@ -53,7 +53,7 @@ struct MarinaFoundationOnlyTraceGuardTests {
             result: .clarification(clarification),
             compatibilityCandidate: candidate
         )
-        let coordinator = MarinaV2TurnCoordinator(
+        let coordinator = MarinaTurnCoordinator(
             availability: FoundationOnlyAvailability(status: .available),
             interpreter: MarinaFakeCanonicalAIInterpreter(interpretationsByPrompt: [prompt: interpretation])
         )
@@ -87,7 +87,7 @@ struct MarinaFoundationOnlyTraceGuardTests {
             patchSlot: .target,
             choices: [selectedChoice]
         )
-        let coordinator = MarinaV2TurnCoordinator(
+        let coordinator = MarinaTurnCoordinator(
             availability: FoundationOnlyAvailability(status: .available),
             interpreter: MarinaFakeCanonicalAIInterpreter(interpretationsByPrompt: [:])
         )
@@ -101,11 +101,11 @@ struct MarinaFoundationOnlyTraceGuardTests {
         }
 
         guard case .handled = result else {
-            Issue.record("Expected clarification resume to execute through V2.")
+            Issue.record("Expected clarification resume to execute through Foundation.")
             return
         }
         assertFoundationOnly(trace)
-        #expect(trace?.sharedPipelineTurnClassification == .clarificationAnswer)
+        #expect(trace?.foundationPipelineTurnClassification == .clarificationAnswer)
     }
 
     @Test func followUpTrace_staysFoundationOnlyAndIncludesPriorContext() async throws {
@@ -124,7 +124,7 @@ struct MarinaFoundationOnlyTraceGuardTests {
                 responseShape: .comparison
             )
         )
-        let coordinator = MarinaV2TurnCoordinator(
+        let coordinator = MarinaTurnCoordinator(
             availability: FoundationOnlyAvailability(status: .available),
             interpreter: MarinaFakeCanonicalAIInterpreter(interpretationsByPrompt: [prompt: interpretation])
         )
@@ -153,15 +153,15 @@ struct MarinaFoundationOnlyTraceGuardTests {
             return
         }
         assertFoundationOnly(trace)
-        #expect(trace?.sharedPipelineTurnClassification == .followUp)
-        #expect(trace?.sharedPipelinePriorContextIncluded == true)
+        #expect(trace?.foundationPipelineTurnClassification == .followUp)
+        #expect(trace?.foundationPipelinePriorContextIncluded == true)
     }
 
     @Test func presetChipTrace_staysFoundationOnly() async throws {
         let fixture = try makeFixture()
         try fixture.seedSpendData()
         let prompt = "What did I spend this month?"
-        let coordinator = MarinaV2TurnCoordinator(
+        let coordinator = MarinaTurnCoordinator(
             availability: FoundationOnlyAvailability(status: .available),
             interpreter: MarinaFakeCanonicalAIInterpreter(interpretationsByPrompt: [:])
         )
@@ -179,11 +179,11 @@ struct MarinaFoundationOnlyTraceGuardTests {
         }
 
         guard case .handled = result else {
-            Issue.record("Expected preset chip to execute through V2.")
+            Issue.record("Expected preset chip to execute through Foundation.")
             return
         }
         assertFoundationOnly(trace)
-        #expect(trace?.sharedPipelineInterpreterSource == .foundationModels)
+        #expect(trace?.foundationPipelineInterpreterSource == .foundationModels)
     }
 
     @Test func typedUnsupportedTrace_staysFoundationOnly() async throws {
@@ -200,7 +200,7 @@ struct MarinaFoundationOnlyTraceGuardTests {
             ),
             compatibilityCandidate: candidate
         )
-        let coordinator = MarinaV2TurnCoordinator(
+        let coordinator = MarinaTurnCoordinator(
             availability: FoundationOnlyAvailability(status: .available),
             interpreter: MarinaFakeCanonicalAIInterpreter(interpretationsByPrompt: [prompt: interpretation])
         )
@@ -216,10 +216,10 @@ struct MarinaFoundationOnlyTraceGuardTests {
         assertFoundationOnly(trace)
     }
 
-    @Test func aiDisabledTrace_staysFoundationOnlyWithoutHeuristicAnswer() async throws {
+    @Test func aiDisabledTrace_staysFoundationOnlyWithoutDeterministicAnswer() async throws {
         let fixture = try makeFixture()
         let prompt = "How much did I spend on Groceries this month?"
-        let coordinator = MarinaV2TurnCoordinator(
+        let coordinator = MarinaTurnCoordinator(
             availability: FoundationOnlyAvailability(status: .available),
             interpreter: MarinaFakeCanonicalAIInterpreter(interpretationsByPrompt: [:])
         )
@@ -239,10 +239,10 @@ struct MarinaFoundationOnlyTraceGuardTests {
         assertFoundationOnly(trace)
     }
 
-    @Test func foundationUnavailableTrace_staysFoundationOnlyWithoutHeuristicAnswer() async throws {
+    @Test func foundationUnavailableTrace_staysFoundationOnlyWithoutDeterministicAnswer() async throws {
         let fixture = try makeFixture()
         let prompt = "How much did I spend on Groceries this month?"
-        let coordinator = MarinaV2TurnCoordinator(
+        let coordinator = MarinaTurnCoordinator(
             availability: FoundationOnlyAvailability(status: .unavailable(reason: "model_not_ready")),
             interpreter: MarinaFakeCanonicalAIInterpreter(interpretationsByPrompt: [:])
         )
@@ -259,7 +259,7 @@ struct MarinaFoundationOnlyTraceGuardTests {
         assertFoundationOnly(trace)
     }
 
-    @Test func typedGenerationFailureTrace_staysFoundationOnlyWithoutHeuristicAnswer() async throws {
+    @Test func typedGenerationFailureTrace_staysFoundationOnlyWithoutDeterministicAnswer() async throws {
         let fixture = try makeFixture()
         let prompt = "How much did I spend on Groceries this month?"
         let diagnostic = MarinaFoundationModelsFailureDiagnostic(
@@ -267,7 +267,7 @@ struct MarinaFoundationOnlyTraceGuardTests {
             step: .typedEnvelope,
             debugSummary: "schema mismatch"
         )
-        let coordinator = MarinaV2TurnCoordinator(
+        let coordinator = MarinaTurnCoordinator(
             availability: FoundationOnlyAvailability(status: .available),
             interpreter: ThrowingFoundationOnlyInterpreter(
                 error: MarinaFoundationModelsServiceError.diagnosedGenerationFailure(diagnostic)
@@ -286,28 +286,14 @@ struct MarinaFoundationOnlyTraceGuardTests {
         assertFoundationOnly(trace)
     }
 
-    @Test func legacyRuntimeFlagsDoNotSelectModelRouterOrNLQ() throws {
-        let defaults = try #require(UserDefaults(suiteName: "MarinaFoundationOnlyTraceGuardTests.flags"))
-        defer { defaults.removePersistentDomain(forName: "MarinaFoundationOnlyTraceGuardTests.flags") }
-        defaults.set(false, forKey: MarinaRuntimeSettings.sharedPipelineKey)
-        defaults.set(true, forKey: MarinaRuntimeSettings.nlqV1Key)
-
-        let settings = MarinaRuntimeSettings.resolve(defaults: defaults, arguments: [], environment: [:])
-
-        #expect(settings.routingMode == .sharedPipeline)
-        #expect(settings.routingMode != .modelRouter)
-        #expect(settings.routingMode != .nlqAuthoritative)
-    }
-
     private func tracedTurn(
         prompt: String,
-        turn: () async -> MarinaV2TurnResult
-    ) async -> (MarinaV2TurnResult, MarinaExecutionTrace?) {
+        turn: () async -> MarinaTurnResult
+    ) async -> (MarinaTurnResult, MarinaExecutionTrace?) {
         MarinaTraceRecorder.shared.reset()
         MarinaTraceRecorder.shared.begin(
             prompt: prompt,
-            routingMode: .sharedPipeline,
-            marinaNLQv1Enabled: false,
+            routingMode: .foundationPipeline,
             runtimeSettingsSummary: "foundationOnlyTest=true"
         )
         let result = await turn()
@@ -315,12 +301,12 @@ struct MarinaFoundationOnlyTraceGuardTests {
         return (result, MarinaTraceRecorder.shared.finish())
     }
 
-    private func recordSelectedRoute(for result: MarinaV2TurnResult) {
+    private func recordSelectedRoute(for result: MarinaTurnResult) {
         switch result {
         case .clarification:
             MarinaTraceRecorder.shared.recordSelectedRoute(.clarification, reason: "foundation_only_test")
         case .handled, .blocked, .unavailable:
-            MarinaTraceRecorder.shared.recordSelectedRoute(.sharedFoundationModels, reason: "foundation_only_test")
+            MarinaTraceRecorder.shared.recordSelectedRoute(.foundationModels, reason: "foundation_only_test")
         }
     }
 
@@ -334,23 +320,12 @@ struct MarinaFoundationOnlyTraceGuardTests {
         }
 
         let allowedSelectedRoutes: [MarinaExecutionSelectedRoute] = allowsClarificationRoute
-            ? [.sharedFoundationModels, .clarification]
-            : [.sharedFoundationModels]
+            ? [.foundationModels, .clarification]
+            : [.foundationModels]
         #expect(allowedSelectedRoutes.contains(trace.selectedRoute))
-        #expect(trace.selectedRoute != .fallback)
-        #expect(trace.selectedRoute != .nlq)
-        #expect(trace.selectedRoute != .sharedHeuristic)
-        #expect(trace.selectedRoute != .sharedFallback)
-        #expect(trace.routingMode == .sharedPipeline)
-        #expect(trace.routingMode != .modelRouter)
-        #expect(trace.routingMode != .nlqAuthoritative)
-        #expect(trace.sharedPipelinePath == .sharedFoundationModels)
-        #expect(trace.sharedPipelinePath != .legacy)
-        #expect(trace.sharedPipelinePath != .sharedHeuristic)
-        #expect(trace.sharedPipelinePath != .sharedAttemptedThenLegacyFallback)
-        #expect(trace.sharedPipelineInterpreterSource != .heuristic)
-        #expect(trace.sharedPipelineHeuristicAttempted != true)
-        #expect(trace.sharedPipelineHeuristicUsedAsFallback != true)
+        #expect(trace.routingMode == .foundationPipeline)
+        #expect(trace.foundationPipelinePath == .foundationModels)
+        #expect(trace.foundationPipelineInterpreterSource == .foundationModels || trace.foundationPipelineInterpreterSource == nil)
     }
 
     private func canonicalInterpretation(
@@ -431,10 +406,10 @@ struct MarinaFoundationOnlyTraceGuardTests {
         aiEnabled: Bool = true,
         turnClassification: MarinaPromptTurnClassification = .freshQuestion,
         priorQueryContext: MarinaPriorQueryContext = .empty
-    ) -> MarinaV2TurnContext {
-        MarinaV2TurnContext(
+    ) -> MarinaTurnContext {
+        MarinaTurnContext(
             provider: provider,
-            routerContext: MarinaLanguageRouterContext(
+            routerContext: MarinaInterpretationContext(
                 workspaceName: "Foundation Only Workspace",
                 defaultPeriodUnit: .month,
                 sessionContext: HomeAssistantSessionContext(),
@@ -477,9 +452,9 @@ private struct FoundationOnlyAvailability: MarinaModelAvailabilityProviding {
 private struct ThrowingFoundationOnlyInterpreter: MarinaCanonicalAIInterpreting {
     let error: Error
 
-    func interpretCanonicalV2(
+    func interpretCanonical(
         prompt _: String,
-        context _: MarinaLanguageRouterContext
+        context _: MarinaInterpretationContext
     ) async throws -> MarinaCanonicalReadInterpretation {
         throw error
     }

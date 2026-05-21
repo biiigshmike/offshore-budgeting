@@ -11,7 +11,7 @@ struct MarinaFoundationModelsInterpreter {
 
     func interpret(
         prompt: String,
-        context: MarinaLanguageRouterContext
+        context: MarinaInterpretationContext
     ) async throws -> MarinaQueryPlanCandidate {
         let structuredIntent = try await structuredInterpreter.interpret(prompt: prompt, context: context)
         return candidate(
@@ -23,14 +23,14 @@ struct MarinaFoundationModelsInterpreter {
 
     func interpretSemantic(
         prompt: String,
-        context: MarinaLanguageRouterContext
+        context: MarinaInterpretationContext
     ) async throws -> MarinaInterpretationResult {
         try await interpretCanonical(prompt: prompt, context: context).result
     }
 
     func interpretCanonical(
         prompt: String,
-        context: MarinaLanguageRouterContext
+        context: MarinaInterpretationContext
     ) async throws -> MarinaCanonicalReadInterpretation {
         let structuredIntent = try await structuredInterpreter.interpret(prompt: prompt, context: context)
         return canonicalInterpretation(

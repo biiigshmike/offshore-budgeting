@@ -8,11 +8,11 @@ enum MarinaPromptTurnClassification: String, Codable, Equatable, Sendable {
 }
 
 struct MarinaPromptTurnClassifier {
-    private let commandGuard: HomeAssistantSharedPipelineCommandGuard
+    private let commandGuard: HomeAssistantFoundationPipelineCommandGuard
     private let parser: HomeAssistantTextParser
 
     init(
-        commandGuard: HomeAssistantSharedPipelineCommandGuard = HomeAssistantSharedPipelineCommandGuard(),
+        commandGuard: HomeAssistantFoundationPipelineCommandGuard = HomeAssistantFoundationPipelineCommandGuard(),
         parser: HomeAssistantTextParser = HomeAssistantTextParser()
     ) {
         self.commandGuard = commandGuard

@@ -40,7 +40,7 @@ struct MarinaQueryValidatorTests {
         let primary = HomeQueryDateRange(startDate: date(2026, 5, 1), endDate: date(2026, 5, 31))
         let comparison = HomeQueryDateRange(startDate: date(2026, 4, 1), endDate: date(2026, 4, 30))
         let candidate = MarinaQueryPlanCandidate(
-            source: .heuristic,
+            source: .deterministic,
             rawPrompt: "compare groceries this month to last month",
             operation: .compare,
             measure: .spend,
@@ -75,7 +75,7 @@ struct MarinaQueryValidatorTests {
 
     @Test func validator_validNoTargetRankingPromotesToNonExecutableShellPlan() {
         let candidate = MarinaQueryPlanCandidate(
-            source: .heuristic,
+            source: .deterministic,
             rawPrompt: "where is my money going?",
             operation: .rank,
             measure: .spend,
@@ -101,7 +101,7 @@ struct MarinaQueryValidatorTests {
     @Test func validator_unresolvedTargetReturnsTypedClarification() {
         let mention = MarinaUnresolvedEntityMention(role: .primaryTarget, rawText: "Travel", typeHint: .category)
         let candidate = MarinaQueryPlanCandidate(
-            source: .heuristic,
+            source: .deterministic,
             rawPrompt: "spend on Travel",
             operation: .sum,
             measure: .spend,
@@ -156,7 +156,7 @@ struct MarinaQueryValidatorTests {
 
     @Test func validator_missingComparisonRangeReturnsTypedDateClarification() {
         let candidate = MarinaQueryPlanCandidate(
-            source: .heuristic,
+            source: .deterministic,
             rawPrompt: "compare this month",
             operation: .compare,
             measure: .spend,
@@ -246,7 +246,7 @@ struct MarinaQueryValidatorTests {
 
         for (hint, operation, measure, expectedKind) in cases {
             let candidate = MarinaQueryPlanCandidate(
-                source: .heuristic,
+                source: .deterministic,
                 rawPrompt: hint.rawValue,
                 operation: operation,
                 measure: measure,
@@ -269,7 +269,7 @@ struct MarinaQueryValidatorTests {
         let primary = HomeQueryDateRange(startDate: date(2026, 5, 1), endDate: date(2026, 6, 1))
         let comparison = HomeQueryDateRange(startDate: date(2026, 4, 1), endDate: date(2026, 5, 1))
         let candidate = MarinaQueryPlanCandidate(
-            source: .heuristic,
+            source: .deterministic,
             rawPrompt: "What expenses are making this month higher than last month?",
             operation: .compare,
             measure: .spend,
@@ -303,7 +303,7 @@ struct MarinaQueryValidatorTests {
     @Test func validator_supportedPhase6ShapesStillPromoteToExecutablePlans() {
         let shareMention = MarinaUnresolvedEntityMention(role: .primaryTarget, rawText: "Food & Drink", typeHint: .category)
         let shareCandidate = MarinaQueryPlanCandidate(
-            source: .heuristic,
+            source: .deterministic,
             rawPrompt: "How much of my spending was Food & Drink?",
             operation: .sum,
             measure: .categoryShare,
@@ -329,7 +329,7 @@ struct MarinaQueryValidatorTests {
         #expect(sharePlan.responseShape == .groupedBreakdown)
 
         let frequencyCandidate = MarinaQueryPlanCandidate(
-            source: .heuristic,
+            source: .deterministic,
             rawPrompt: "spending too often",
             operation: .rank,
             measure: .transactionFrequency,
@@ -560,7 +560,7 @@ struct MarinaQueryValidatorTests {
 
         for prompt in prompts {
             let candidate = MarinaQueryPlanCandidate(
-                source: .heuristic,
+                source: .deterministic,
                 rawPrompt: prompt,
                 operation: .rank,
                 measure: .reconciliationBalance,
@@ -580,7 +580,7 @@ struct MarinaQueryValidatorTests {
 
     @Test func validator_responseShapeHintIsAdvisoryAndCanBeOverridden() {
         let candidate = MarinaQueryPlanCandidate(
-            source: .heuristic,
+            source: .deterministic,
             rawPrompt: "what did I spend?",
             operation: .sum,
             measure: .spend,

@@ -1,7 +1,7 @@
 import Foundation
 
-enum MarinaInterpreterSource: String, Codable, Equatable, Sendable {
-    case heuristic
+enum MarinaInterpretationSource: String, Codable, Equatable, Sendable {
+    case deterministic
     case foundationModels
 }
 
@@ -439,7 +439,7 @@ struct MarinaPromptNormalizer {
 
 struct MarinaQueryPlanCandidate: Codable, Equatable, Sendable {
     let requestFamily: MarinaRequestFamily
-    let source: MarinaInterpreterSource
+    let source: MarinaInterpretationSource
     let rawPrompt: String
     let operation: MarinaCandidateOperation?
     let measure: MarinaCandidateMeasure?
@@ -460,7 +460,7 @@ struct MarinaQueryPlanCandidate: Codable, Equatable, Sendable {
 
     init(
         requestFamily: MarinaRequestFamily = .analytics,
-        source: MarinaInterpreterSource,
+        source: MarinaInterpretationSource,
         rawPrompt: String,
         operation: MarinaCandidateOperation? = nil,
         measure: MarinaCandidateMeasure? = nil,

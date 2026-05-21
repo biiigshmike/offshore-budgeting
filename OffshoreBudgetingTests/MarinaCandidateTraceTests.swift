@@ -43,7 +43,7 @@ struct MarinaCandidateTraceTests {
 
     @Test func trace_multiMentionSimulationPreservesEntityRoles() {
         let candidate = MarinaQueryPlanCandidate(
-            source: .heuristic,
+            source: .deterministic,
             rawPrompt: "if I increase Shopping, what will I have left for Transportation?",
             operation: .simulate,
             measure: .remainingBudget,
@@ -68,7 +68,7 @@ struct MarinaCandidateTraceTests {
 
     @Test func trace_recordsValidatorAndExecutablePlanPlaceholdersWithoutRuntimeIntegration() {
         let candidate = MarinaQueryPlanCandidate(
-            source: .heuristic,
+            source: .deterministic,
             rawPrompt: "where is my money going?",
             operation: .rank,
             measure: .spend,

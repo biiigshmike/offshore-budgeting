@@ -17,22 +17,22 @@ enum MarinaFoundationModelsServiceError: Error {
 protocol MarinaStructuredIntentInterpreting {
     func interpret(
         prompt: String,
-        context: MarinaLanguageRouterContext
+        context: MarinaInterpretationContext
     ) async throws -> MarinaStructuredIntent
 }
 
 struct MarinaFoundationModelsService: MarinaStructuredIntentInterpreting, MarinaAIInterpreter {
     func interpret(
         prompt: String,
-        context: MarinaLanguageRouterContext
+        context: MarinaInterpretationContext
     ) async throws -> MarinaStructuredIntent {
         try await interpretAI(prompt: prompt, context: context).structuredIntent
     }
 
     func interpretAI(
         prompt: String,
-        context: MarinaLanguageRouterContext
-    ) async throws -> MarinaAIIntentV2 {
+        context: MarinaInterpretationContext
+    ) async throws -> MarinaAIIntent {
         #if canImport(FoundationModels)
         if #available(iOS 26.0, macOS 26.0, *) {
             return try await interpretWithFoundationModels(prompt: prompt, context: context)
@@ -51,8 +51,8 @@ import FoundationModels
 @available(iOS 26.0, macOS 26.0, *)
 private func interpretWithFoundationModels(
     prompt: String,
-    context: MarinaLanguageRouterContext
-) async throws -> MarinaAIIntentV2 {
+    context: MarinaInterpretationContext
+) async throws -> MarinaAIIntent {
     do {
         let provider = MarinaFoundationModelsSessionProvider()
         let routeSession = try provider.makeSession(
@@ -60,7 +60,7 @@ private func interpretWithFoundationModels(
         )
         let response = try await routeSession.respond(
             to: marinaEnvelopePrompt(prompt: prompt, context: context),
-            generating: MarinaFoundationIntentEnvelopeV3.self,
+            generating: MarinaFoundationIntentEnvelope.self,
             includeSchemaInPrompt: true,
             options: marinaInterpretationOptions(maximumResponseTokens: 900)
         )
@@ -97,7 +97,7 @@ private func interpretWithFoundationModels(
 }
 
 @available(iOS 26.0, macOS 26.0, *)
-private func marinaInstructions(context: MarinaLanguageRouterContext) -> String {
+private func marinaInstructions(context: MarinaInterpretationContext) -> String {
     let aliasLines = context.aliasSummaries
         .prefix(20)
         .map { "\($0.entityTypeRaw): \($0.aliasKey) -> \($0.targetValue)" }
@@ -105,7 +105,7 @@ private func marinaInstructions(context: MarinaLanguageRouterContext) -> String 
     let priorQuerySummary = marinaPriorQuerySummary(context.priorQueryContext)
 
     return """
-    Prompt version: \(MarinaFoundationPromptVersion.interpretationV3.rawValue)
+    Prompt version: \(MarinaFoundationPromptVersion.interpretation.rawValue)
     You are Marina, a private budgeting assistant inside Offshore.
     Return exactly one tiny typed language envelope for deterministic Offshore execution.
     Do not include prose, explanation, chain-of-thought, raw reasoning, final answer text, rows, totals, or calculations.
@@ -129,7 +129,7 @@ private func marinaInstructions(context: MarinaLanguageRouterContext) -> String 
     - clarification: only when the user explicitly asks Marina to clarify a previous choice.
 
     Envelope rules:
-    - Fill one MarinaFoundationIntentEnvelopeV3 only.
+    - Fill one MarinaFoundationIntentEnvelope only.
     - routeRaw must be readQuery, lookup, clarification, scenario, help, or unsupported.
     - Use only scalar strings/numbers in the provided fields. Leave unused optional fields as actual null values.
     - Never put placeholder words like "null", "nil", "none", "n/a", "unknown", or empty JSON fragments into string fields.
@@ -155,7 +155,7 @@ private func marinaInstructions(context: MarinaLanguageRouterContext) -> String 
 }
 
 @available(iOS 26.0, macOS 26.0, *)
-private func marinaEnvelopePrompt(prompt: String, context: MarinaLanguageRouterContext) -> String {
+private func marinaEnvelopePrompt(prompt: String, context: MarinaInterpretationContext) -> String {
     """
     User prompt: \(prompt)
     Default period unit: \(context.defaultPeriodUnit.rawValue)
@@ -210,8 +210,8 @@ private func joinedList(_ values: [String]) -> String {
 #else
 private func interpretWithFoundationModels(
     prompt _: String,
-    context _: MarinaLanguageRouterContext
-) async throws -> MarinaAIIntentV2 {
+    context _: MarinaInterpretationContext
+) async throws -> MarinaAIIntent {
     throw MarinaFoundationModelsServiceError.unavailable
 }
 #endif

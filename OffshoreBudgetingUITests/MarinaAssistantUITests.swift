@@ -61,7 +61,7 @@ final class MarinaAssistantUITests: XCTestCase {
     MARINA_RUN_EXHAUSTIVE_MATRIX=1 xcodebuild -scheme OffshoreBudgeting -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.6' -only-testing:OffshoreBudgetingUITests/MarinaAssistantUITests/testMarinaAppSurfacePromptMatrix_coversAllSwiftDataModelsInOneSession test
     """
 
-    func testMarinaAppSurfaceAppleClarification_resumesWithoutLegacyFallback() throws {
+    func testMarinaAppSurfaceAppleClarification_resumesThroughFoundation() throws {
         let app = XCUIApplication()
         let driver = MarinaUITestDriver(app: app, testCase: self)
         let reporter = MarinaAppSurfaceReporter()
@@ -85,13 +85,13 @@ final class MarinaAssistantUITests: XCTestCase {
             "clarificationAnswer",
             "Expected a clarificationAnswer trace after tapping a chip. latestTrace=\(String(describing: driver.latestTrace())) chips=\(driver.clarificationChipTitles())"
         )
-        XCTAssertNotEqual(resumedTrace?.selectedRoute, "shared_fallback")
-        XCTAssertNotEqual(resumedTrace?.sharedPipelinePath, "legacy")
+        XCTAssertTrue(["foundation_models", "clarification"].contains(resumedTrace?.selectedRoute ?? ""))
+        XCTAssertEqual(resumedTrace?.foundationPipelinePath, "foundationModels")
 
         reporter.attach(to: self)
     }
 
-    func testMarinaAppSurfaceTypedClarificationReply_resumesWithoutLegacyFallback() throws {
+    func testMarinaAppSurfaceTypedClarificationReply_resumesThroughFoundation() throws {
         let app = XCUIApplication()
         let driver = MarinaUITestDriver(app: app, testCase: self)
         let reporter = MarinaAppSurfaceReporter()
@@ -108,13 +108,13 @@ final class MarinaAssistantUITests: XCTestCase {
 
         let resumedTrace = driver.typeClarificationReplyAndWaitForResume("category", timeout: 15)
         XCTAssertEqual(resumedTrace?.turnClassification, "clarificationAnswer")
-        XCTAssertNotEqual(resumedTrace?.selectedRoute, "shared_fallback")
-        XCTAssertNotEqual(resumedTrace?.sharedPipelinePath, "legacy")
+        XCTAssertTrue(["foundation_models", "clarification"].contains(resumedTrace?.selectedRoute ?? ""))
+        XCTAssertEqual(resumedTrace?.foundationPipelinePath, "foundationModels")
 
         reporter.attach(to: self)
     }
 
-    func testMarinaAppSurfaceExactChipTitleTypedReply_resumesWithoutLegacyFallback() throws {
+    func testMarinaAppSurfaceExactChipTitleTypedReply_resumesThroughFoundation() throws {
         let app = XCUIApplication()
         let driver = MarinaUITestDriver(app: app, testCase: self)
         let reporter = MarinaAppSurfaceReporter()
@@ -134,8 +134,8 @@ final class MarinaAssistantUITests: XCTestCase {
 
         let resumedTrace = driver.typeClarificationReplyAndWaitForResume(chipTitle, timeout: 15)
         XCTAssertEqual(resumedTrace?.turnClassification, "clarificationAnswer")
-        XCTAssertNotEqual(resumedTrace?.selectedRoute, "shared_fallback")
-        XCTAssertNotEqual(resumedTrace?.sharedPipelinePath, "legacy")
+        XCTAssertTrue(["foundation_models", "clarification"].contains(resumedTrace?.selectedRoute ?? ""))
+        XCTAssertEqual(resumedTrace?.foundationPipelinePath, "foundationModels")
 
         reporter.attach(to: self)
     }
@@ -209,12 +209,12 @@ final class MarinaAssistantUITests: XCTestCase {
             let report = driver.runPrompt(prompt.text, expectation: prompt.expectation, timeout: 8)
             reporter.record(report)
             XCTAssertTrue(report.result.passed, report.result.reason)
-            XCTAssertNotEqual(report.selectedRoute, "shared_fallback")
-            XCTAssertNotEqual(report.trace?.sharedPipelinePath, "legacy")
+            XCTAssertTrue(["foundation_models", "clarification"].contains(report.selectedRoute ?? ""))
+            XCTAssertEqual(report.trace?.foundationPipelinePath, "foundationModels")
         }
     }
 
-    func testMarinaAppSurfaceStep5MutationPrompt_doesNotExecuteSharedReadApproximation() throws {
+    func testMarinaAppSurfaceStep5MutationPrompt_doesNotExecuteFoundationReadApproximation() throws {
         let app = XCUIApplication()
         let driver = MarinaUITestDriver(app: app, testCase: self)
         let reporter = MarinaAppSurfaceReporter()
@@ -260,7 +260,7 @@ final class MarinaAssistantUITests: XCTestCase {
         XCTAssertTrue(toggle.waitForExistence(timeout: 5), "Expected the Marina Foundation Model toggle to be visible.")
         XCTAssertTrue(
             ["On", "On, unavailable"].contains(toggle.value as? String),
-            "Expected the Foundation Model toggle to default on for Marina V2."
+            "Expected the Foundation Model toggle to default on for Marina."
         )
 
         toggle.tap()
