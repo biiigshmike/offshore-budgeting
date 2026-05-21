@@ -266,6 +266,13 @@ struct MarinaFoundationDetailedIntentEnvelope: Codable, Equatable, Sendable {
     let incomeStatusRaw: String?
     let insightIntentRaw: String?
     let softTimeHintRaw: String?
+    var formulaRaw: String? = nil
+    var formulaFamilyRaw: String? = nil
+    var formulaRecipeRaw: String? = nil
+    var thresholdRaw: String? = nil
+    var baselineRaw: String? = nil
+    var assumptionRaw: String? = nil
+    var excludeIncome: Bool? = nil
     let scenarioRaw: String?
     let scenarioAmount: Double?
     let scenarioPercent: Double?
@@ -321,6 +328,13 @@ struct MarinaFoundationRouteEnvelope: Codable, Equatable, Sendable {
     let incomeStatusRaw: String?
     let insightIntentRaw: String?
     let softTimeHintRaw: String?
+    var formulaRaw: String? = nil
+    var formulaFamilyRaw: String? = nil
+    var formulaRecipeRaw: String? = nil
+    var thresholdRaw: String? = nil
+    var baselineRaw: String? = nil
+    var assumptionRaw: String? = nil
+    var excludeIncome: Bool? = nil
     let scenarioRaw: String?
     let scenarioAmountRaw: String?
     let scenarioPercentRaw: String?
@@ -357,6 +371,13 @@ struct MarinaFoundationIntentEnvelope: Codable, Equatable, Sendable {
     let comparisonDateText: String?
     let amountText: String?
     let valueDirectionRaw: String?
+    var formulaRaw: String? = nil
+    var formulaFamilyRaw: String? = nil
+    var formulaRecipeRaw: String? = nil
+    var thresholdRaw: String? = nil
+    var baselineRaw: String? = nil
+    var assumptionRaw: String? = nil
+    var excludeIncome: Bool? = nil
     let confidenceRaw: String?
     let unsupportedReasonRaw: String?
 
@@ -371,6 +392,13 @@ struct MarinaFoundationIntentEnvelope: Codable, Equatable, Sendable {
             comparisonDateText: comparisonDateText,
             amountText: amountText,
             valueDirectionRaw: valueDirectionRaw,
+            formulaRaw: formulaRaw,
+            formulaFamilyRaw: formulaFamilyRaw,
+            formulaRecipeRaw: formulaRecipeRaw,
+            thresholdRaw: thresholdRaw,
+            baselineRaw: baselineRaw,
+            assumptionRaw: assumptionRaw,
+            excludeIncome: excludeIncome,
             confidenceRaw: confidenceRaw,
             unsupportedReasonRaw: unsupportedReasonRaw
         )
@@ -415,6 +443,13 @@ struct MarinaAIReadQueryIntent: Codable, Equatable, Sendable {
     let incomeStatusRaw: String?
     let insightIntentRaw: String?
     let softTimeHintRaw: String?
+    var formulaRaw: String? = nil
+    var formulaFamilyRaw: String? = nil
+    var formulaRecipeRaw: String? = nil
+    var thresholdRaw: String? = nil
+    var baselineRaw: String? = nil
+    var assumptionRaw: String? = nil
+    var excludeIncome: Bool? = nil
     let confidenceRaw: String?
 }
 
@@ -479,6 +514,13 @@ struct MarinaFoundationReadQueryIntent: Codable, Equatable, Sendable {
     let incomeStatusRaw: String?
     let insightIntentRaw: String?
     let softTimeHintRaw: String?
+    var formulaRaw: String? = nil
+    var formulaFamilyRaw: String? = nil
+    var formulaRecipeRaw: String? = nil
+    var thresholdRaw: String? = nil
+    var baselineRaw: String? = nil
+    var assumptionRaw: String? = nil
+    var excludeIncome: Bool? = nil
     let confidenceRaw: String?
 }
 
@@ -563,6 +605,13 @@ extension MarinaFoundationReadQueryIntent {
             incomeStatusRaw: incomeStatusRaw,
             insightIntentRaw: insightIntentRaw,
             softTimeHintRaw: softTimeHintRaw,
+            formulaRaw: formulaRaw,
+            formulaFamilyRaw: formulaFamilyRaw,
+            formulaRecipeRaw: formulaRecipeRaw,
+            thresholdRaw: thresholdRaw,
+            baselineRaw: baselineRaw,
+            assumptionRaw: assumptionRaw,
+            excludeIncome: excludeIncome,
             confidenceRaw: confidenceRaw
         )
     }
@@ -723,6 +772,13 @@ extension MarinaFoundationDetailedIntentEnvelope {
             incomeStatusRaw: incomeStatusRaw,
             insightIntentRaw: insightIntentRaw,
             softTimeHintRaw: softTimeHintRaw,
+            formulaRaw: formulaRaw,
+            formulaFamilyRaw: formulaFamilyRaw,
+            formulaRecipeRaw: formulaRecipeRaw,
+            thresholdRaw: thresholdRaw,
+            baselineRaw: baselineRaw,
+            assumptionRaw: assumptionRaw,
+            excludeIncome: excludeIncome,
             confidenceRaw: confidenceRaw
         )
     }
@@ -880,6 +936,13 @@ extension MarinaFoundationRouteEnvelope {
             incomeStatusRaw: incomeStatusRaw,
             insightIntentRaw: insightIntentRaw,
             softTimeHintRaw: softTimeHintRaw,
+            formulaRaw: formulaRaw,
+            formulaFamilyRaw: formulaFamilyRaw,
+            formulaRecipeRaw: formulaRecipeRaw,
+            thresholdRaw: thresholdRaw,
+            baselineRaw: baselineRaw,
+            assumptionRaw: assumptionRaw,
+            excludeIncome: excludeIncome,
             confidenceRaw: confidenceRaw
         )
     }
@@ -1025,8 +1088,16 @@ extension MarinaAIIntent {
 
 extension MarinaAIReadQueryIntent {
     var structuredIntent: MarinaStructuredIntent {
-        guard let action = semanticAction(from: operationRaw),
-              let dataset = semanticDataset(from: subjectRaw) else {
+        let formulaKind = compositeFormulaKind(from: formulaRecipeRaw ?? formulaRaw)
+        let formulaFamily = formulaFamily(from: formulaFamilyRaw)
+            ?? formulaKind.map(defaultFormulaFamily(for:))
+        let formulaMeasure = formulaMeasure(from: measureRaw)
+        guard let action = semanticAction(from: operationRaw)
+                ?? formulaKind.map(defaultAction(for:))
+                ?? formulaFamily.map(defaultAction(for:)),
+              let dataset = semanticDataset(from: subjectRaw)
+                ?? formulaKind.map(defaultDataset(for:))
+                ?? defaultDataset(for: formulaFamily, measureRaw: measureRaw) else {
             return .unresolved
         }
 
@@ -1034,7 +1105,9 @@ extension MarinaAIReadQueryIntent {
             family: .analytics,
             action: action,
             datasets: [dataset],
-            measure: semanticMeasure(from: measureRaw),
+            measure: semanticMeasure(from: measureRaw)
+                ?? formulaKind.map(defaultMeasure(for:))
+                ?? formulaFamily.map(defaultCandidateMeasure(for:)),
             includeFilters: semanticFilters(from: includeMentions),
             excludeFilters: semanticFilters(from: excludeMentions),
             grouping: semanticGrouping(from: groupingRaw),
@@ -1046,7 +1119,17 @@ extension MarinaAIReadQueryIntent {
             incomeStatusScope: incomeStatus(from: incomeStatusRaw),
             requestedDetail: requestedDetail(from: requestedDetailRaw),
             insightIntent: insightIntent(from: insightIntentRaw),
-            softTimeHint: softTimeHint(from: softTimeHintRaw)
+            softTimeHint: softTimeHint(from: softTimeHintRaw),
+            formulaKind: formulaKind,
+            formulaFamily: formulaFamily,
+            formulaMeasure: formulaMeasure,
+            formulaBacklogRecipe: formulaBacklogRecipe(from: formulaRecipeRaw),
+            formulaFacets: MarinaFormulaFacets(
+                thresholdRaw: thresholdRaw,
+                baselineRaw: baselineRaw,
+                assumptionRaw: assumptionRaw,
+                excludeIncome: excludeIncome == true
+            )
         )
         return .semanticCommand(command)
     }
@@ -1425,6 +1508,218 @@ private func softTimeHint(from rawValue: String?) -> MarinaInsightSoftTimeHint? 
     }
 }
 
+private func compositeFormulaKind(from rawValue: String?) -> MarinaCompositeFormulaKind? {
+    if let exact = exactRawValue(rawValue, as: MarinaCompositeFormulaKind.self) {
+        return exact
+    }
+    guard let normalized = normalizedToken(rawValue) else { return nil }
+    switch normalized {
+    case "category_limit_burn_rate", "categorylimitburnrate", "burn_rate", "budget_burn_rate", "limit_burn_rate":
+        return .categoryLimitBurnRate
+    case "card_savings_drag", "cardsavingsdrag", "savings_drag", "card_drag":
+        return .cardSavingsDrag
+    case "early_planned_expense_stress", "earlyplannedexpensestress", "planned_expense_stress", "posted_early_stress":
+        return .earlyPlannedExpenseStress
+    case "recurring_charge_anomaly", "recurringchargeanomaly", "subscription_anomaly", "recurring_anomaly":
+        return .recurringChargeAnomaly
+    case "expense_only_savings_runway", "expenseonlysavingsrunway", "savings_runway", "unsafe_runway":
+        return .expenseOnlySavingsRunway
+    default:
+        return nil
+    }
+}
+
+private func formulaFamily(from rawValue: String?) -> MarinaFormulaFamily? {
+    if let exact = exactRawValue(rawValue, as: MarinaFormulaFamily.self) {
+        return exact
+    }
+    guard let normalized = normalizedToken(rawValue) else { return nil }
+    switch normalized {
+    case "list", "list_rows", "rows":
+        return .list
+    case "detail", "lookup", "lookup_details":
+        return .detail
+    case "count", "how_many":
+        return .count
+    case "sum", "total":
+        return .sum
+    case "average", "avg", "mean":
+        return .average
+    case "rank", "top", "bottom", "largest", "smallest":
+        return .rank
+    case "compare", "comparison":
+        return .compare
+    case "threshold", "over_under", "limit":
+        return .threshold
+    case "runway":
+        return .runway
+    case "anomaly", "unusual", "outlier":
+        return .anomaly
+    case "what_if", "whatif", "simulate", "simulation":
+        return .whatIf
+    case "trend", "breakdown":
+        return .trend
+    case "forecast", "projection":
+        return .forecast
+    default:
+        return nil
+    }
+}
+
+private func formulaMeasure(from rawValue: String?) -> MarinaFormulaMeasure? {
+    guard let normalized = normalizedToken(rawValue) else { return nil }
+    switch normalized {
+    case "spend", "budget_impact", "budgetimpact", "variable_budget_impact", "variablebudgetimpact":
+        return .variableBudgetImpact
+    case "transaction_amount", "transactionamount", "ledger", "ledger_amount", "variable_ledger_amount":
+        return .variableLedgerAmount
+    case "preset_amount", "presetamount", "planned", "planned_amount", "planned_effective_amount":
+        return .plannedEffectiveAmount
+    case "income", "income_amount", "incomeamount":
+        return .incomeAmount
+    case "savings", "savings_balance", "savingsbalance":
+        return .savingsBalance
+    case "savings_movement", "savingsmovement":
+        return .savingsMovement
+    case "reconciliation_balance", "reconciliationbalance", "shared_balance":
+        return .reconciliationBalance
+    case "allocation", "allocation_amount", "allocated_amount":
+        return .allocationAmount
+    case "count", "frequency":
+        return .count
+    default:
+        return nil
+    }
+}
+
+private func formulaBacklogRecipe(from rawValue: String?) -> MarinaFormulaBacklogRecipe? {
+    if compositeFormulaKind(from: rawValue) != nil {
+        return nil
+    }
+    if let exact = exactRawValue(rawValue, as: MarinaFormulaBacklogRecipe.self) {
+        return exact
+    }
+    guard let normalized = normalizedToken(rawValue) else { return nil }
+    switch normalized {
+    case "net_cash_flow", "netcashflow":
+        return .netCashFlow
+    case "planned_vs_actual_variance", "plannedactualvariance", "variance":
+        return .plannedVsActualVariance
+    case "threshold_rows", "thresholdrows":
+        return .thresholdRows
+    case "zero_activity_buckets", "zeroactivitybuckets", "zero_spend":
+        return .zeroActivityBuckets
+    case "recurring_frequency", "recurringfrequency":
+        return .recurringFrequency
+    case "period_change_drivers", "periodchangedrivers", "change_drivers":
+        return .periodChangeDrivers
+    case "forecast_periodic_spend", "forecastperiodicspend":
+        return .forecastPeriodicSpend
+    case "median_amount", "medianamount", "median":
+        return .medianAmount
+    default:
+        return nil
+    }
+}
+
+private func defaultFormulaFamily(for formulaKind: MarinaCompositeFormulaKind) -> MarinaFormulaFamily {
+    switch formulaKind {
+    case .categoryLimitBurnRate:
+        return .threshold
+    case .cardSavingsDrag, .earlyPlannedExpenseStress:
+        return .rank
+    case .recurringChargeAnomaly:
+        return .anomaly
+    case .expenseOnlySavingsRunway:
+        return .runway
+    }
+}
+
+private func defaultAction(for formulaKind: MarinaCompositeFormulaKind) -> MarinaSemanticCommandAction {
+    switch formulaKind {
+    case .categoryLimitBurnRate, .expenseOnlySavingsRunway:
+        return .simulate
+    case .cardSavingsDrag, .earlyPlannedExpenseStress, .recurringChargeAnomaly:
+        return .rank
+    }
+}
+
+private func defaultAction(for family: MarinaFormulaFamily) -> MarinaSemanticCommandAction {
+    switch family {
+    case .list:
+        return .listRows
+    case .detail:
+        return .lookupDetails
+    case .count, .sum, .threshold:
+        return .total
+    case .average:
+        return .average
+    case .rank, .anomaly:
+        return .rank
+    case .compare:
+        return .compare
+    case .runway, .whatIf, .trend, .forecast:
+        return .simulate
+    }
+}
+
+private func defaultDataset(for formulaKind: MarinaCompositeFormulaKind) -> MarinaSemanticCommandDataset {
+    switch formulaKind {
+    case .categoryLimitBurnRate, .recurringChargeAnomaly, .expenseOnlySavingsRunway:
+        return .variableExpenses
+    case .cardSavingsDrag:
+        return .cards
+    case .earlyPlannedExpenseStress:
+        return .plannedExpenses
+    }
+}
+
+private func defaultDataset(
+    for family: MarinaFormulaFamily?,
+    measureRaw: String?
+) -> MarinaSemanticCommandDataset? {
+    if let measure = semanticMeasure(from: measureRaw) {
+        switch measure {
+        case .spend, .categoryShare, .transactionAmount, .transactionFrequency:
+            return .variableExpenses
+        case .income:
+            return .income
+        case .savings, .savingsMovement:
+            return .savingsLedger
+        case .remainingBudget:
+            return .budgets
+        case .reconciliationBalance:
+            return .reconciliation
+        case .presetAmount:
+            return .plannedExpenses
+        }
+    }
+    switch family {
+    case .count, .sum, .average, .rank, .compare, .threshold, .runway, .anomaly, .trend, .forecast, .whatIf:
+        return .variableExpenses
+    case .list, .detail, nil:
+        return nil
+    }
+}
+
+private func defaultMeasure(for formulaKind: MarinaCompositeFormulaKind) -> MarinaCandidateMeasure {
+    switch formulaKind {
+    case .categoryLimitBurnRate, .cardSavingsDrag, .expenseOnlySavingsRunway:
+        return .spend
+    case .earlyPlannedExpenseStress:
+        return .presetAmount
+    case .recurringChargeAnomaly:
+        return .transactionAmount
+    }
+}
+
+private func defaultCandidateMeasure(for family: MarinaFormulaFamily) -> MarinaCandidateMeasure {
+    switch family {
+    case .list, .detail, .count, .sum, .average, .rank, .compare, .threshold, .runway, .anomaly, .trend, .forecast, .whatIf:
+        return .spend
+    }
+}
+
 private func periodUnit(from rawValue: String?) -> HomeQueryPeriodUnit? {
     if let exact = exactRawValue(rawValue, as: HomeQueryPeriodUnit.self) {
         return exact
@@ -1644,10 +1939,13 @@ struct MarinaFoundationCapabilityGuideTool: Tool {
         if shape.contains("compare") {
             return "Supported: deterministic comparisons for spend, category, card, merchant, and income shapes after validation."
         }
+        if shape.contains("formula") || shape.contains("unsafe") || shape.contains("subscription") || shape.contains("recurring") || shape.contains("burn") {
+            return "Supported formula families: list, detail, count, sum, average, rank, compare, threshold, runway, anomaly, whatIf, trend, forecast. Executable recipes: categoryLimitBurnRate, cardSavingsDrag, earlyPlannedExpenseStress, recurringChargeAnomaly, expenseOnlySavingsRunway. Swift executes all math and evidence."
+        }
         if shape.contains("list") || shape.contains("recent") || shape.contains("last") {
             return "Supported: recent or ranked row lists after deterministic validation."
         }
-        return "Supported: totals, averages, counts, ranked breakdowns, comparisons, lookup details, and typed clarifications."
+        return "Supported: totals, averages, counts, ranked breakdowns, comparisons, lookup details, deterministic formula recipes, and typed clarifications."
     }
 }
 

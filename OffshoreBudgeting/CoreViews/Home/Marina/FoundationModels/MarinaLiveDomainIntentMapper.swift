@@ -10,6 +10,13 @@ struct MarinaFoundationIntentEnvelopePayload: Codable, Equatable, Sendable {
     let comparisonDateText: String?
     let amountText: String?
     let valueDirectionRaw: String?
+    var formulaRaw: String? = nil
+    var formulaFamilyRaw: String? = nil
+    var formulaRecipeRaw: String? = nil
+    var thresholdRaw: String? = nil
+    var baselineRaw: String? = nil
+    var assumptionRaw: String? = nil
+    var excludeIncome: Bool? = nil
     let confidenceRaw: String?
     let unsupportedReasonRaw: String?
 }
@@ -113,6 +120,9 @@ struct MarinaLiveDomainIntentMapper {
             payload.comparisonDateText?.marinaNilIfBlank.map { "comparison=\($0)" },
             payload.amountText?.marinaNilIfBlank.map { "amount=\($0)" },
             payload.valueDirectionRaw?.marinaNilIfBlank.map { "direction=\($0)" },
+            payload.formulaRaw?.marinaNilIfBlank.map { "formula=\($0)" },
+            payload.formulaFamilyRaw?.marinaNilIfBlank.map { "formulaFamily=\($0)" },
+            payload.formulaRecipeRaw?.marinaNilIfBlank.map { "formulaRecipe=\($0)" },
             payload.confidenceRaw?.marinaNilIfBlank.map { "confidence=\($0)" }
         ]
         .compactMap { $0 }
@@ -825,6 +835,13 @@ struct MarinaLiveDomainIntentMapper {
                     incomeStatusRaw: incomeStatus,
                     insightIntentRaw: nil,
                     softTimeHintRaw: nil,
+                    formulaRaw: payload.formulaRaw,
+                    formulaFamilyRaw: payload.formulaFamilyRaw,
+                    formulaRecipeRaw: payload.formulaRecipeRaw,
+                    thresholdRaw: payload.thresholdRaw,
+                    baselineRaw: payload.baselineRaw,
+                    assumptionRaw: payload.assumptionRaw,
+                    excludeIncome: payload.excludeIncome,
                     confidenceRaw: "high"
                 )
             ),

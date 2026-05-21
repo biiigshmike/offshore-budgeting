@@ -235,6 +235,1538 @@ struct MarinaExplicitConstraintDetector {
     }
 }
 
+enum MarinaCompositeQueryPlannerResult {
+    case handled(MarinaWorkspaceAggregationCard)
+    case clarification(MarinaTypedClarification)
+}
+
+private extension MarinaPlanValidationOutcome {
+    var needsClarificationForFormula: Bool {
+        if case .clarification = self { return true }
+        return false
+    }
+}
+
+@MainActor
+struct MarinaFormulaCatalog {
+    func kind(
+        candidate: MarinaQueryPlanCandidate,
+        resolved: MarinaResolvedQueryCandidate,
+        semanticResolved: MarinaResolvedSemanticQuery?,
+        context: MarinaTurnContext
+    ) -> MarinaCompositeFormulaKind? {
+        if let formula = candidate.formulaKind ?? candidate.semanticCommand?.formulaKind {
+            return formula
+        }
+
+        let prompt = normalized(candidate.rawPrompt)
+        if containsAny(["pace", "burn rate", "blow past", "over my", "over the"], in: prompt),
+           containsAny(["limit", "budget max", "max limit"], in: prompt) {
+            return .categoryLimitBurnRate
+        }
+        if containsAny(["ruining my savings", "hurting my savings", "savings drag", "quietly ruining"], in: prompt),
+           prompt.contains("card") {
+            return .cardSavingsDrag
+        }
+        if prompt.contains("planned expense"),
+           containsAny(["hurt the most", "posted early", "post early", "if it posted"], in: prompt) {
+            return .earlyPlannedExpenseStress
+        }
+        if containsAny(["subscription", "subscriptions", "recurring", "recurring ish", "recurring-ish"], in: prompt),
+           containsAny(["higher than usual", "suspicious", "unusual", "higher"], in: prompt) {
+            return .recurringChargeAnomaly
+        }
+        if containsAny(["unsafe", "runway", "how many days"], in: prompt),
+           containsAny(["ignore income", "only look at actual card activity", "actual card activity"], in: prompt) {
+            return .expenseOnlySavingsRunway
+        }
+
+        if let semanticFormula = semanticResolved?.candidate?.formulaKind {
+            return semanticFormula
+        }
+        if let resolvedFormula = resolved.candidate.formulaKind {
+            return resolvedFormula
+        }
+        if context.routerContext.priorQueryContext.hasContext, prompt.contains("same formula") {
+            return nil
+        }
+        return nil
+    }
+
+    func candidate(
+        from rawValue: String?
+    ) -> MarinaCompositeFormulaKind? {
+        guard let rawValue else { return nil }
+        let normalizedRawValue = normalized(rawValue)
+            .replacingOccurrences(of: " ", with: "")
+        return MarinaCompositeFormulaKind.allCases.first { formula in
+            normalizedRawValue == normalized(formula.rawValue).replacingOccurrences(of: " ", with: "")
+        }
+    }
+
+    private func containsAny(_ needles: [String], in haystack: String) -> Bool {
+        needles.contains { haystack.contains($0) }
+    }
+
+    private func normalized(_ value: String) -> String {
+        value
+            .lowercased()
+            .replacingOccurrences(of: "[^a-z0-9\\s-]", with: " ", options: .regularExpression)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+@MainActor
+struct MarinaFormulaPlanner {
+    private let catalog = MarinaFormulaCatalog()
+    private let calendar = Calendar(identifier: .gregorian)
+
+    func plan(
+        candidate: MarinaQueryPlanCandidate,
+        resolved: MarinaResolvedQueryCandidate,
+        semanticResolved: MarinaResolvedSemanticQuery?,
+        outcome: MarinaPlanValidationOutcome,
+        context: MarinaTurnContext
+    ) -> MarinaFormulaIR? {
+        if let recipe = catalog.kind(candidate: candidate, resolved: resolved, semanticResolved: semanticResolved, context: context) {
+            return recipeIR(recipe, candidate: candidate, resolved: resolved, semanticResolved: semanticResolved, context: context)
+        }
+
+        let prompt = normalized(candidate.rawPrompt)
+        guard !outcome.needsClarificationForFormula,
+              let family = formulaFamily(candidate: candidate, prompt: prompt, outcome: outcome),
+              [.sum, .average, .count, .rank, .compare].contains(family),
+              let measure = candidate.formulaMeasure
+                ?? candidate.semanticCommand?.formulaMeasure
+                ?? measure(from: candidate, prompt: prompt) else {
+            return nil
+        }
+
+        let subject = subject(for: measure, prompt: prompt, candidate: candidate)
+        let ranges = dateRanges(
+            candidate: candidate,
+            resolved: resolved,
+            semanticResolved: semanticResolved,
+            prompt: prompt,
+            now: context.now
+        )
+        let filters = resolved.resolvedTargets.isEmpty
+            ? inferredTargets(prompt: prompt, provider: context.provider)
+            : aggregationTargets(from: resolved.resolvedTargets)
+        let grouping = candidate.grouping
+            ?? semanticResolved?.query.grouping.map { MarinaGroupingCandidate(dimension: $0.dimension, rawText: $0.rawText) }
+            ?? inferredGrouping(family: family, prompt: prompt)
+
+        return MarinaFormulaIR(
+            family: family,
+            recipe: nil,
+            backlogRecipe: candidate.formulaBacklogRecipe ?? candidate.semanticCommand?.formulaBacklogRecipe,
+            subject: subject,
+            measure: family == .count ? .count : measure,
+            filters: filters,
+            dateRange: ranges.primary,
+            comparisonDateRange: ranges.comparison,
+            grouping: grouping,
+            ranking: candidate.ranking ?? MarinaRankingCandidate(direction: .largest, limit: candidate.limit ?? 5),
+            limit: candidate.limit,
+            assumptions: genericAssumptions(family: family, measure: measure, prompt: prompt),
+            facets: mergedFacets(candidate)
+        )
+    }
+
+    private func recipeIR(
+        _ recipe: MarinaCompositeFormulaKind,
+        candidate: MarinaQueryPlanCandidate,
+        resolved: MarinaResolvedQueryCandidate,
+        semanticResolved: MarinaResolvedSemanticQuery?,
+        context: MarinaTurnContext
+    ) -> MarinaFormulaIR {
+        let prompt = normalized(candidate.rawPrompt)
+        let ranges = dateRanges(
+            candidate: candidate,
+            resolved: resolved,
+            semanticResolved: semanticResolved,
+            prompt: prompt,
+            now: context.now
+        )
+        return MarinaFormulaIR(
+            family: family(for: recipe),
+            recipe: recipe,
+            subject: subject(for: recipe),
+            measure: measure(for: recipe),
+            filters: resolved.resolvedTargets.isEmpty ? inferredTargets(prompt: prompt, provider: context.provider) : aggregationTargets(from: resolved.resolvedTargets),
+            dateRange: ranges.primary,
+            comparisonDateRange: ranges.comparison,
+            grouping: grouping(for: recipe),
+            ranking: MarinaRankingCandidate(direction: .largest, limit: candidate.limit ?? 5),
+            limit: candidate.limit,
+            assumptions: ["Named deterministic formula recipe selected by Marina's formula catalog."],
+            facets: mergedFacets(candidate)
+        )
+    }
+
+    private func formulaFamily(
+        candidate: MarinaQueryPlanCandidate,
+        prompt: String,
+        outcome _: MarinaPlanValidationOutcome
+    ) -> MarinaFormulaFamily? {
+        if let family = candidate.formulaFamily ?? candidate.semanticCommand?.formulaFamily {
+            return family
+        }
+        if let family = promptFormulaFamily(from: prompt) {
+            return family
+        }
+        return nil
+    }
+
+    private func promptFormulaFamily(from prompt: String) -> MarinaFormulaFamily? {
+        if prompt.hasPrefix("sum ") || prompt.hasPrefix("total ") || prompt.contains(" total ") {
+            return .sum
+        }
+        if prompt.contains("average") || prompt.contains(" avg ") {
+            return .average
+        }
+        if prompt.hasPrefix("rank ") || prompt.hasPrefix("top ") || prompt.contains("rank ") || prompt.contains(" by spending") {
+            return .rank
+        }
+        if prompt.hasPrefix("compare ") || prompt.contains(" vs ") || prompt.contains(" versus ") {
+            return .compare
+        }
+        if prompt.hasPrefix("count ") || prompt.hasPrefix("how many ") {
+            return .count
+        }
+        if prompt.hasPrefix("number of ") || prompt.contains(" count of ") {
+            return .count
+        }
+        return nil
+    }
+
+    private func measure(
+        from candidate: MarinaQueryPlanCandidate,
+        prompt: String
+    ) -> MarinaFormulaMeasure? {
+        if prompt.contains("planned") || prompt.contains("preset") {
+            return .plannedEffectiveAmount
+        }
+        if prompt.contains("income") {
+            return .incomeAmount
+        }
+        if prompt.contains("savings activity") || prompt.contains("savings movement") {
+            return .savingsMovement
+        }
+        if prompt.contains("savings") {
+            return .savingsBalance
+        }
+        if prompt.contains("reconciliation") || prompt.contains("shared balance") {
+            return .reconciliationBalance
+        }
+        if prompt.contains("allocation") {
+            return .allocationAmount
+        }
+        switch candidate.measure {
+        case .income:
+            return .incomeAmount
+        case .presetAmount:
+            return .plannedEffectiveAmount
+        case .savings:
+            return .savingsBalance
+        case .savingsMovement:
+            return .savingsMovement
+        case .reconciliationBalance:
+            return .reconciliationBalance
+        case .spend, .categoryShare, .transactionAmount, .transactionFrequency, .remainingBudget, nil:
+            return .variableBudgetImpact
+        }
+    }
+
+    private func subject(
+        for measure: MarinaFormulaMeasure,
+        prompt: String,
+        candidate: MarinaQueryPlanCandidate
+    ) -> MarinaSubject {
+        if let dataset = candidate.semanticCommand?.datasets.first {
+            switch dataset {
+            case .plannedExpenses, .presets:
+                return .plannedExpenses
+            case .income, .incomeSeries:
+                return .income
+            case .savingsLedger:
+                return measure == .savingsBalance ? .savingsAccounts : .savingsLedgerEntries
+            case .reconciliation, .expenseAllocations:
+                return .reconciliationAccounts
+            default:
+                break
+            }
+        }
+        switch measure {
+        case .plannedEffectiveAmount:
+            return .plannedExpenses
+        case .incomeAmount:
+            return .income
+        case .savingsBalance:
+            return .savingsAccounts
+        case .savingsMovement:
+            return .savingsLedgerEntries
+        case .reconciliationBalance:
+            return .reconciliationAccounts
+        case .allocationAmount:
+            return .reconciliationItems
+        case .variableBudgetImpact, .variableLedgerAmount, .count:
+            return .variableExpenses
+        }
+    }
+
+    private func family(for recipe: MarinaCompositeFormulaKind) -> MarinaFormulaFamily {
+        switch recipe {
+        case .categoryLimitBurnRate:
+            return .threshold
+        case .cardSavingsDrag, .earlyPlannedExpenseStress:
+            return .rank
+        case .recurringChargeAnomaly:
+            return .anomaly
+        case .expenseOnlySavingsRunway:
+            return .runway
+        }
+    }
+
+    private func subject(for recipe: MarinaCompositeFormulaKind) -> MarinaSubject {
+        switch recipe {
+        case .earlyPlannedExpenseStress:
+            return .plannedExpenses
+        case .categoryLimitBurnRate, .cardSavingsDrag, .recurringChargeAnomaly, .expenseOnlySavingsRunway:
+            return .variableExpenses
+        }
+    }
+
+    private func measure(for recipe: MarinaCompositeFormulaKind) -> MarinaFormulaMeasure {
+        switch recipe {
+        case .earlyPlannedExpenseStress:
+            return .plannedEffectiveAmount
+        case .categoryLimitBurnRate, .cardSavingsDrag, .recurringChargeAnomaly, .expenseOnlySavingsRunway:
+            return .variableBudgetImpact
+        }
+    }
+
+    private func grouping(for recipe: MarinaCompositeFormulaKind) -> MarinaGroupingCandidate? {
+        switch recipe {
+        case .cardSavingsDrag:
+            return MarinaGroupingCandidate(dimension: .card)
+        case .recurringChargeAnomaly:
+            return MarinaGroupingCandidate(dimension: .merchant)
+        case .categoryLimitBurnRate, .earlyPlannedExpenseStress, .expenseOnlySavingsRunway:
+            return nil
+        }
+    }
+
+    private func dateRanges(
+        candidate: MarinaQueryPlanCandidate,
+        resolved: MarinaResolvedQueryCandidate,
+        semanticResolved: MarinaResolvedSemanticQuery?,
+        prompt: String,
+        now: Date
+    ) -> (primary: HomeQueryDateRange?, comparison: HomeQueryDateRange?) {
+        let primary = resolved.primaryDateRange
+            ?? semanticResolved?.primaryDateRange
+            ?? candidate.timeScopes.first(where: { $0.role == .primary || $0.role == .lookbackWindow })?.resolvedRangeHint
+            ?? inferredDateRange(prompt: prompt, now: now)
+        let comparison = resolved.comparisonDateRange
+            ?? semanticResolved?.comparisonDateRange
+            ?? candidate.timeScopes.first(where: { $0.role == .comparison })?.resolvedRangeHint
+            ?? inferredComparisonRange(prompt: prompt, primary: primary, now: now)
+        return (primary, comparison)
+    }
+
+    private func inferredDateRange(prompt: String, now: Date) -> HomeQueryDateRange? {
+        if prompt.contains("last 3 months") {
+            let startOfCurrent = monthRange(containing: now).startDate
+            let start = calendar.date(byAdding: .month, value: -3, to: startOfCurrent) ?? startOfCurrent
+            let end = calendar.date(byAdding: .second, value: -1, to: startOfCurrent) ?? now
+            return HomeQueryDateRange(startDate: start, endDate: end)
+        }
+        if prompt.contains("this month") {
+            return monthRange(containing: now)
+        }
+        if prompt.contains("last month") {
+            return previousMonthRange(now: now)
+        }
+        if prompt.contains("month") || prompt.contains("spending") || prompt.contains("transactions") {
+            return monthRange(containing: now)
+        }
+        return nil
+    }
+
+    private func inferredComparisonRange(
+        prompt: String,
+        primary: HomeQueryDateRange?,
+        now: Date
+    ) -> HomeQueryDateRange? {
+        guard prompt.contains("last month") || prompt.contains(" vs ") || prompt.contains(" versus ") || prompt.contains("compare") else {
+            return nil
+        }
+        let range = primary ?? monthRange(containing: now)
+        let months = max(1, calendar.dateComponents([.month], from: range.startDate, to: range.endDate).month ?? 1)
+        let start = calendar.date(byAdding: .month, value: -months, to: range.startDate) ?? range.startDate
+        let end = calendar.date(byAdding: .second, value: -1, to: range.startDate) ?? range.startDate
+        return HomeQueryDateRange(startDate: start, endDate: end)
+    }
+
+    private func inferredTargets(
+        prompt: String,
+        provider: MarinaDataProvider
+    ) -> [MarinaResolvedAggregationTarget] {
+        var targets: [MarinaResolvedAggregationTarget] = []
+        if prompt.contains("uncategorized") {
+            targets.append(MarinaResolvedAggregationTarget(role: .filter, entityType: .category, displayName: "Uncategorized"))
+        }
+        for category in provider.fetchAllCategories() where containsWholePhrase(normalized(category.name), in: prompt) {
+            targets.append(MarinaResolvedAggregationTarget(role: .primaryTarget, entityType: .category, displayName: category.name, sourceID: category.id))
+        }
+        for card in provider.fetchAllCards() where containsWholePhrase(normalized(card.name), in: prompt) {
+            targets.append(MarinaResolvedAggregationTarget(role: .filter, entityType: .card, displayName: card.name, sourceID: card.id))
+        }
+        return targets
+    }
+
+    private func aggregationTargets(
+        from targets: [MarinaResolvedEntityMention]
+    ) -> [MarinaResolvedAggregationTarget] {
+        targets.map { target in
+            MarinaResolvedAggregationTarget(
+                id: target.id,
+                role: target.role,
+                entityType: target.entityType,
+                displayName: target.displayName,
+                sourceID: target.sourceID
+            )
+        }
+    }
+
+    private func inferredGrouping(
+        family: MarinaFormulaFamily,
+        prompt: String
+    ) -> MarinaGroupingCandidate? {
+        guard family == .rank else { return nil }
+        if prompt.contains("card") {
+            return MarinaGroupingCandidate(dimension: .card, rawText: "cards")
+        }
+        if prompt.contains("categor") {
+            return MarinaGroupingCandidate(dimension: .category, rawText: "categories")
+        }
+        if prompt.contains("merchant") {
+            return MarinaGroupingCandidate(dimension: .merchant, rawText: "merchants")
+        }
+        return nil
+    }
+
+    private func genericAssumptions(
+        family: MarinaFormulaFamily,
+        measure: MarinaFormulaMeasure,
+        prompt: String
+    ) -> [String] {
+        var values = ["Formula family \(family.rawValue); measure \(measure.rawValue)."]
+        if measure == .variableBudgetImpact {
+            values.append("Variable expense spend uses budget-impact math, not raw ledger amount.")
+        }
+        if prompt.contains("weekly") || prompt.contains("per week") {
+            values.append("Average uses week buckets across the selected date range.")
+        }
+        return values
+    }
+
+    private func mergedFacets(_ candidate: MarinaQueryPlanCandidate) -> MarinaFormulaFacets {
+        let command = candidate.semanticCommand
+        if candidate.formulaFacets != MarinaFormulaFacets() {
+            return candidate.formulaFacets
+        }
+        return command?.formulaFacets ?? MarinaFormulaFacets()
+    }
+
+    private func monthRange(containing date: Date) -> HomeQueryDateRange {
+        let start = calendar.date(from: calendar.dateComponents([.year, .month], from: date)) ?? date
+        let end = calendar.date(byAdding: DateComponents(month: 1, second: -1), to: start) ?? date
+        return HomeQueryDateRange(startDate: start, endDate: end)
+    }
+
+    private func previousMonthRange(now: Date) -> HomeQueryDateRange {
+        let current = monthRange(containing: now)
+        let start = calendar.date(byAdding: .month, value: -1, to: current.startDate) ?? current.startDate
+        let end = calendar.date(byAdding: .second, value: -1, to: current.startDate) ?? current.startDate
+        return HomeQueryDateRange(startDate: start, endDate: end)
+    }
+
+    private func containsWholePhrase(_ phrase: String, in prompt: String) -> Bool {
+        let pattern = "(^|\\s)\(NSRegularExpression.escapedPattern(for: phrase))(\\s|$)"
+        return prompt.range(of: pattern, options: .regularExpression) != nil
+    }
+
+    private func normalized(_ value: String) -> String {
+        value
+            .lowercased()
+            .replacingOccurrences(of: "[^a-z0-9\\s&-]", with: " ", options: .regularExpression)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+struct MarinaFormulaDomainRow: Equatable {
+    let id: UUID
+    let title: String
+    let value: String
+    let amount: Double?
+    let date: Date?
+    let objectType: MarinaLookupObjectType?
+    let sourceID: UUID?
+    let groupingValues: [MarinaGroupingDimensionCandidate: String]
+}
+
+@MainActor
+struct MarinaFormulaDomainAdapterRegistry {
+    func rows(
+        for formulaIR: MarinaFormulaIR,
+        context: MarinaTurnContext
+    ) -> [MarinaFormulaDomainRow] {
+        let rows: [MarinaFormulaDomainRow]
+        switch formulaIR.measure {
+        case .variableBudgetImpact, .variableLedgerAmount, .count:
+            rows = variableRows(formulaIR: formulaIR, provider: context.provider)
+        case .plannedEffectiveAmount:
+            rows = plannedRows(formulaIR: formulaIR, provider: context.provider)
+        case .incomeAmount:
+            rows = incomeRows(formulaIR: formulaIR, provider: context.provider)
+        case .savingsBalance:
+            rows = savingsAccountRows(provider: context.provider)
+        case .savingsMovement:
+            rows = savingsMovementRows(provider: context.provider)
+        case .allocationAmount:
+            rows = allocationRows(provider: context.provider)
+        case .reconciliationBalance:
+            rows = reconciliationRows(provider: context.provider)
+        }
+        return rows
+            .filter { row in date(row, isIn: formulaIR.dateRange) }
+            .filter { row in filtersMatch(formulaIR.filters, row: row) }
+    }
+
+    private func variableRows(
+        formulaIR: MarinaFormulaIR,
+        provider: MarinaDataProvider
+    ) -> [MarinaFormulaDomainRow] {
+        provider.fetchAllVariableExpenses().map { expense in
+            let amount: Double
+            switch formulaIR.measure {
+            case .variableLedgerAmount:
+                amount = expense.ledgerSignedAmount()
+            case .count:
+                amount = 1
+            default:
+                amount = SavingsMathService.variableBudgetImpactAmount(for: expense)
+            }
+            return MarinaFormulaDomainRow(
+                id: expense.id,
+                title: expense.descriptionText,
+                value: "\(shortDate(expense.transactionDate)) • \(currency(amount))",
+                amount: amount,
+                date: expense.transactionDate,
+                objectType: .variableExpense,
+                sourceID: expense.id,
+                groupingValues: [
+                    .category: expense.category?.name ?? "Uncategorized",
+                    .card: expense.card?.name ?? "No Card",
+                    .merchant: canonicalMerchant(expense.descriptionText),
+                    .transaction: expense.descriptionText
+                ]
+            )
+        }
+    }
+
+    private func plannedRows(
+        formulaIR: MarinaFormulaIR,
+        provider: MarinaDataProvider
+    ) -> [MarinaFormulaDomainRow] {
+        let presetTitlesByID = Dictionary(uniqueKeysWithValues: provider.fetchAllPresets().map { ($0.id, $0.title) })
+        return provider.fetchAllPlannedExpenses().map { expense in
+            let amount = formulaIR.measure == .count ? 1 : SavingsMathService.plannedProjectedBudgetImpactAmount(for: expense)
+            let preset = expense.sourcePresetID.flatMap { presetTitlesByID[$0] } ?? expense.title
+            return MarinaFormulaDomainRow(
+                id: expense.id,
+                title: expense.title,
+                value: "\(shortDate(expense.expenseDate)) • \(currency(amount))",
+                amount: amount,
+                date: expense.expenseDate,
+                objectType: .plannedExpense,
+                sourceID: expense.id,
+                groupingValues: [
+                    .category: expense.category?.name ?? "Uncategorized",
+                    .card: expense.card?.name ?? "No Card",
+                    .preset: preset,
+                    .transaction: expense.title
+                ]
+            )
+        }
+    }
+
+    private func incomeRows(
+        formulaIR: MarinaFormulaIR,
+        provider: MarinaDataProvider
+    ) -> [MarinaFormulaDomainRow] {
+        provider.fetchAllIncomes().map { income in
+            let amount = formulaIR.measure == .count ? 1 : income.amount
+            return MarinaFormulaDomainRow(
+                id: income.id,
+                title: income.source,
+                value: "\(income.isPlanned ? "Planned" : "Actual") • \(shortDate(income.date)) • \(currency(amount))",
+                amount: amount,
+                date: income.date,
+                objectType: .income,
+                sourceID: income.id,
+                groupingValues: [.incomeSource: income.source]
+            )
+        }
+    }
+
+    private func savingsAccountRows(provider: MarinaDataProvider) -> [MarinaFormulaDomainRow] {
+        provider.fetchAllSavingsAccounts().map { account in
+            MarinaFormulaDomainRow(
+                id: account.id,
+                title: account.name,
+                value: currency(account.total),
+                amount: account.total,
+                date: nil,
+                objectType: .savingsAccount,
+                sourceID: account.id,
+                groupingValues: [:]
+            )
+        }
+    }
+
+    private func savingsMovementRows(provider: MarinaDataProvider) -> [MarinaFormulaDomainRow] {
+        provider.fetchAllSavingsLedgerEntries().map { entry in
+            MarinaFormulaDomainRow(
+                id: entry.id,
+                title: entry.note.isEmpty ? entry.kindRaw : entry.note,
+                value: "\(shortDate(entry.date)) • \(currency(entry.amount))",
+                amount: entry.amount,
+                date: entry.date,
+                objectType: .savingsLedgerEntry,
+                sourceID: entry.id,
+                groupingValues: [.savingsLedgerEntry: entry.account?.name ?? "Savings"]
+            )
+        }
+    }
+
+    private func allocationRows(provider: MarinaDataProvider) -> [MarinaFormulaDomainRow] {
+        provider.fetchAllExpenseAllocations().map { allocation in
+            let title = allocation.expense?.descriptionText ?? allocation.plannedExpense?.title ?? "Allocation"
+            return MarinaFormulaDomainRow(
+                id: allocation.id,
+                title: title,
+                value: currency(allocation.allocatedAmount),
+                amount: allocation.allocatedAmount,
+                date: allocation.expense?.transactionDate ?? allocation.plannedExpense?.expenseDate,
+                objectType: .expenseAllocation,
+                sourceID: allocation.id,
+                groupingValues: [.allocationAccount: allocation.account?.name ?? "Unassigned"]
+            )
+        }
+    }
+
+    private func reconciliationRows(provider: MarinaDataProvider) -> [MarinaFormulaDomainRow] {
+        provider.fetchAllAllocationAccounts().map { account in
+            let allocations = provider.fetchAllExpenseAllocations()
+                .filter { $0.account?.id == account.id }
+                .reduce(0.0) { $0 + $1.allocatedAmount }
+            let settlements = provider.fetchAllAllocationSettlements()
+                .filter { $0.account?.id == account.id }
+                .reduce(0.0) { $0 + $1.amount }
+            let balance = allocations + settlements
+            return MarinaFormulaDomainRow(
+                id: account.id,
+                title: account.name,
+                value: currency(balance),
+                amount: balance,
+                date: nil,
+                objectType: .reconciliationAccount,
+                sourceID: account.id,
+                groupingValues: [.allocationAccount: account.name]
+            )
+        }
+    }
+
+    private func filtersMatch(
+        _ filters: [MarinaResolvedAggregationTarget],
+        row: MarinaFormulaDomainRow
+    ) -> Bool {
+        filters.allSatisfy { filter in
+            let expected = normalized(filter.displayName)
+            switch filter.entityType {
+            case .category:
+                return normalized(row.groupingValues[.category] ?? "") == expected
+            case .card:
+                return normalized(row.groupingValues[.card] ?? "") == expected
+            case .merchant:
+                return normalized(row.groupingValues[.merchant] ?? "").contains(expected)
+            case .expense, .transaction:
+                return normalized(row.title).contains(expected)
+            case .preset:
+                return normalized(row.groupingValues[.preset] ?? "").contains(expected)
+            case .incomeSource:
+                return normalized(row.groupingValues[.incomeSource] ?? "").contains(expected)
+            case .allocationAccount:
+                return normalized(row.groupingValues[.allocationAccount] ?? "").contains(expected)
+            case .savingsAccount, .budget, .workspace:
+                return normalized(row.title).contains(expected)
+            }
+        }
+    }
+
+    private func date(_ row: MarinaFormulaDomainRow, isIn range: HomeQueryDateRange?) -> Bool {
+        guard let range else { return true }
+        guard let date = row.date else { return true }
+        return date >= range.startDate && date <= range.endDate
+    }
+
+    private func canonicalMerchant(_ value: String) -> String {
+        let normalizedValue = normalized(value)
+            .replacingOccurrences(of: "\\b\\d+\\b", with: "", options: .regularExpression)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return normalizedValue.isEmpty ? "Unknown" : displayName(normalizedValue)
+    }
+
+    private func displayName(_ value: String) -> String {
+        value
+            .split(separator: " ")
+            .map { $0.prefix(1).uppercased() + String($0.dropFirst()) }
+            .joined(separator: " ")
+    }
+
+    private func shortDate(_ date: Date) -> String {
+        AppDateFormat.shortDate(date)
+    }
+
+    private func currency(_ value: Double) -> String {
+        CurrencyFormatter.string(from: value)
+    }
+
+    private func normalized(_ value: String) -> String {
+        value
+            .lowercased()
+            .replacingOccurrences(of: "[^a-z0-9\\s&-]", with: " ", options: .regularExpression)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+@MainActor
+struct MarinaFormulaExecutor {
+    private let adapterRegistry = MarinaFormulaDomainAdapterRegistry()
+    private let recipeExecutor = MarinaCompositeFormulaExecutor()
+    private let calendar = Calendar(identifier: .gregorian)
+
+    func execute(
+        formulaIR: MarinaFormulaIR,
+        candidate: MarinaQueryPlanCandidate,
+        resolved: MarinaResolvedQueryCandidate,
+        semanticResolved: MarinaResolvedSemanticQuery?,
+        context: MarinaTurnContext
+    ) -> MarinaWorkspaceAggregationCard {
+        if let recipe = formulaIR.recipe {
+            return recipeExecutor.execute(
+                formula: recipe,
+                candidate: candidate,
+                resolved: resolved,
+                semanticResolved: semanticResolved,
+                context: context
+            )
+        }
+
+        let rows = adapterRegistry.rows(for: formulaIR, context: context)
+        switch formulaIR.family {
+        case .sum:
+            return sumCard(formulaIR: formulaIR, rows: rows)
+        case .average:
+            return averageCard(formulaIR: formulaIR, rows: rows)
+        case .count:
+            return countCard(formulaIR: formulaIR, rows: rows)
+        case .rank:
+            return rankCard(formulaIR: formulaIR, rows: rows)
+        case .compare:
+            return compareCard(formulaIR: formulaIR, context: context)
+        case .list, .detail, .threshold, .runway, .anomaly, .whatIf, .trend, .forecast:
+            return dataLimitCard(formulaIR: formulaIR, message: "This formula family is modeled but does not have an executable recipe yet.")
+        }
+    }
+
+    private func sumCard(
+        formulaIR: MarinaFormulaIR,
+        rows: [MarinaFormulaDomainRow]
+    ) -> MarinaWorkspaceAggregationCard {
+        let total = rows.reduce(0.0) { $0 + ($1.amount ?? 0) }
+        return MarinaWorkspaceAggregationCard(
+            title: title("Total", formulaIR: formulaIR),
+            subtitle: rangeLabel(formulaIR.dateRange),
+            primaryValue: currency(total),
+            rows: baseRows(formulaIR) + evidenceRows(rows.sorted(by: newestFirst).prefix(limit(for: formulaIR))),
+            traceSummary: trace(formulaIR, resultCount: rows.count, total: total)
+        )
+    }
+
+    private func averageCard(
+        formulaIR: MarinaFormulaIR,
+        rows: [MarinaFormulaDomainRow]
+    ) -> MarinaWorkspaceAggregationCard {
+        let total = rows.reduce(0.0) { $0 + ($1.amount ?? 0) }
+        let divisor = averageDivisor(formulaIR: formulaIR, rows: rows)
+        let average = divisor > 0 ? total / divisor : 0
+        return MarinaWorkspaceAggregationCard(
+            title: title(averageTitlePrefix(formulaIR), formulaIR: formulaIR),
+            subtitle: rangeLabel(formulaIR.dateRange),
+            primaryValue: currency(average),
+            rows: baseRows(formulaIR) + [
+                .init(label: "Total", value: currency(total), amount: total),
+                .init(label: "Average basis", value: averageBasisLabel(formulaIR, divisor: divisor))
+            ] + evidenceRows(rows.sorted(by: newestFirst).prefix(limit(for: formulaIR))),
+            traceSummary: trace(formulaIR, resultCount: rows.count, total: average)
+        )
+    }
+
+    private func countCard(
+        formulaIR: MarinaFormulaIR,
+        rows: [MarinaFormulaDomainRow]
+    ) -> MarinaWorkspaceAggregationCard {
+        MarinaWorkspaceAggregationCard(
+            title: title("Count", formulaIR: formulaIR),
+            subtitle: rangeLabel(formulaIR.dateRange),
+            primaryValue: "\(rows.count)",
+            rows: baseRows(formulaIR) + evidenceRows(rows.sorted(by: newestFirst).prefix(limit(for: formulaIR))),
+            traceSummary: trace(formulaIR, resultCount: rows.count, total: Double(rows.count))
+        )
+    }
+
+    private func rankCard(
+        formulaIR: MarinaFormulaIR,
+        rows: [MarinaFormulaDomainRow]
+    ) -> MarinaWorkspaceAggregationCard {
+        let rankedRows: [MarinaWorkspaceAggregationCard.Row]
+        if let grouping = formulaIR.grouping?.dimension {
+            rankedRows = Dictionary(grouping: rows) { row in
+                row.groupingValues[grouping] ?? "Unknown"
+            }
+            .map { label, grouped in
+                let total = grouped.reduce(0.0) { $0 + ($1.amount ?? 0) }
+                return MarinaWorkspaceAggregationCard.Row(label: label, value: currency(total), amount: total, sortValue: total)
+            }
+            .sorted { lhs, rhs in (lhs.sortValue ?? 0) > (rhs.sortValue ?? 0) }
+            .prefix(limit(for: formulaIR))
+            .map { $0 }
+        } else {
+            rankedRows = evidenceRows(
+                rows
+                    .sorted { ($0.amount ?? 0) > ($1.amount ?? 0) }
+                    .prefix(limit(for: formulaIR))
+            )
+        }
+
+        return MarinaWorkspaceAggregationCard(
+            title: title("Ranked", formulaIR: formulaIR),
+            subtitle: rangeLabel(formulaIR.dateRange),
+            primaryValue: rankedRows.first?.value,
+            rows: baseRows(formulaIR) + rankedRows,
+            traceSummary: trace(formulaIR, resultCount: rows.count, total: rankedRows.first?.amount)
+        )
+    }
+
+    private func compareCard(
+        formulaIR: MarinaFormulaIR,
+        context: MarinaTurnContext
+    ) -> MarinaWorkspaceAggregationCard {
+        guard let currentRange = formulaIR.dateRange,
+              let previousRange = formulaIR.comparisonDateRange else {
+            return dataLimitCard(formulaIR: formulaIR, message: "Comparison formulas need both a primary and comparison date range.")
+        }
+        let currentIR = copy(formulaIR, dateRange: currentRange)
+        let previousIR = copy(formulaIR, dateRange: previousRange)
+        let currentRows = adapterRegistry.rows(for: currentIR, context: context)
+        let previousRows = adapterRegistry.rows(for: previousIR, context: context)
+        let current = currentRows.reduce(0.0) { $0 + ($1.amount ?? 0) }
+        let previous = previousRows.reduce(0.0) { $0 + ($1.amount ?? 0) }
+        let change = current - previous
+        return MarinaWorkspaceAggregationCard(
+            title: title("Comparison", formulaIR: formulaIR),
+            subtitle: "\(rangeLabel(currentRange)) vs \(rangeLabel(previousRange))",
+            primaryValue: currency(current),
+            rows: baseRows(formulaIR) + [
+                .init(label: "Current period", value: currency(current), amount: current, sortValue: current),
+                .init(label: "Previous period", value: currency(previous), amount: previous, sortValue: previous),
+                .init(label: "Change", value: signedCurrency(change), amount: change, sortValue: change)
+            ] + evidenceRows(currentRows.sorted(by: newestFirst).prefix(limit(for: formulaIR))),
+            traceSummary: trace(formulaIR, resultCount: currentRows.count + previousRows.count, total: change)
+        )
+    }
+
+    private func dataLimitCard(
+        formulaIR: MarinaFormulaIR,
+        message: String
+    ) -> MarinaWorkspaceAggregationCard {
+        MarinaWorkspaceAggregationCard(
+            title: title("Formula", formulaIR: formulaIR),
+            subtitle: message,
+            primaryValue: "Not enough data",
+            rows: baseRows(formulaIR) + [.init(label: "Data limitation", value: message)],
+            traceSummary: trace(formulaIR, resultCount: 0, total: nil)
+        )
+    }
+
+    private func baseRows(_ formulaIR: MarinaFormulaIR) -> [MarinaWorkspaceAggregationCard.Row] {
+        [
+            .init(label: "Formula family", value: formulaIR.family.rawValue),
+            formulaIR.recipe.map { .init(label: "Formula", value: $0.rawValue) },
+            formulaIR.backlogRecipe.map { .init(label: "Formula backlog", value: $0.rawValue) },
+            .init(label: "Measure", value: formulaIR.measure.rawValue),
+            .init(label: "Assumptions", value: formulaIR.assumptions.joined(separator: " ")),
+            .init(label: "Date range", value: rangeLabel(formulaIR.dateRange))
+        ].compactMap { $0 }
+    }
+
+    private func evidenceRows<S: Sequence>(
+        _ rows: S
+    ) -> [MarinaWorkspaceAggregationCard.Row] where S.Element == MarinaFormulaDomainRow {
+        rows.map { row in
+            MarinaWorkspaceAggregationCard.Row(
+                id: row.id,
+                label: row.title,
+                value: row.value,
+                amount: row.amount,
+                date: row.date,
+                objectType: row.objectType,
+                sourceID: row.sourceID,
+                sortValue: row.amount
+            )
+        }
+    }
+
+    private func title(_ prefix: String, formulaIR: MarinaFormulaIR) -> String {
+        let target = formulaIR.filters.first?.displayName
+        let noun: String
+        switch formulaIR.measure {
+        case .variableBudgetImpact, .variableLedgerAmount:
+            noun = "Spending"
+        case .plannedEffectiveAmount:
+            noun = "Planned Expenses"
+        case .incomeAmount:
+            noun = "Income"
+        case .savingsBalance:
+            noun = "Savings"
+        case .savingsMovement:
+            noun = "Savings Activity"
+        case .reconciliationBalance:
+            noun = "Shared Balances"
+        case .allocationAmount:
+            noun = "Allocations"
+        case .count:
+            noun = "Transactions"
+        }
+        return [target, prefix, noun].compactMap { $0 }.joined(separator: " ")
+    }
+
+    private func averageTitlePrefix(_ formulaIR: MarinaFormulaIR) -> String {
+        if formulaIR.assumptions.contains(where: { $0.localizedCaseInsensitiveContains("week") }) {
+            return "Average Weekly"
+        }
+        if formulaIR.assumptions.contains(where: { $0.localizedCaseInsensitiveContains("day") }) {
+            return "Average Daily"
+        }
+        return "Average"
+    }
+
+    private func averageDivisor(
+        formulaIR: MarinaFormulaIR,
+        rows: [MarinaFormulaDomainRow]
+    ) -> Double {
+        guard let range = formulaIR.dateRange else {
+            return Double(max(rows.count, 1))
+        }
+        let days = max(1, (calendar.dateComponents([.day], from: calendar.startOfDay(for: range.startDate), to: calendar.startOfDay(for: range.endDate)).day ?? 0) + 1)
+        let assumptions = formulaIR.assumptions.joined(separator: " ").lowercased()
+        if assumptions.contains("week") {
+            return max(1, Double(days) / 7.0)
+        }
+        if assumptions.contains("day") {
+            return Double(days)
+        }
+        return Double(max(rows.count, 1))
+    }
+
+    private func averageBasisLabel(
+        _ formulaIR: MarinaFormulaIR,
+        divisor: Double
+    ) -> String {
+        let assumptions = formulaIR.assumptions.joined(separator: " ").lowercased()
+        if assumptions.contains("week") {
+            return "\(String(format: "%.1f", divisor)) weeks"
+        }
+        if assumptions.contains("day") {
+            return "\(Int(divisor)) days"
+        }
+        return "\(Int(divisor)) rows"
+    }
+
+    private func copy(
+        _ formulaIR: MarinaFormulaIR,
+        dateRange: HomeQueryDateRange
+    ) -> MarinaFormulaIR {
+        MarinaFormulaIR(
+            id: formulaIR.id,
+            family: formulaIR.family,
+            recipe: formulaIR.recipe,
+            backlogRecipe: formulaIR.backlogRecipe,
+            subject: formulaIR.subject,
+            measure: formulaIR.measure,
+            filters: formulaIR.filters,
+            dateRange: dateRange,
+            comparisonDateRange: formulaIR.comparisonDateRange,
+            grouping: formulaIR.grouping,
+            ranking: formulaIR.ranking,
+            limit: formulaIR.limit,
+            assumptions: formulaIR.assumptions,
+            facets: formulaIR.facets
+        )
+    }
+
+    private func newestFirst(_ lhs: MarinaFormulaDomainRow, _ rhs: MarinaFormulaDomainRow) -> Bool {
+        (lhs.date ?? .distantPast) > (rhs.date ?? .distantPast)
+    }
+
+    private func rangeLabel(_ range: HomeQueryDateRange?) -> String {
+        guard let range else { return "All selected workspace data" }
+        return "\(shortDate(range.startDate)) - \(shortDate(range.endDate))"
+    }
+
+    private func shortDate(_ date: Date) -> String {
+        AppDateFormat.shortDate(date)
+    }
+
+    private func currency(_ value: Double) -> String {
+        CurrencyFormatter.string(from: value)
+    }
+
+    private func signedCurrency(_ value: Double) -> String {
+        if value > 0 { return "+\(currency(value))" }
+        if value < 0 { return "-\(currency(abs(value)))" }
+        return currency(0)
+    }
+
+    private func trace(
+        _ formulaIR: MarinaFormulaIR,
+        resultCount: Int,
+        total: Double?
+    ) -> String {
+        [
+            "formulaIR=family:\(formulaIR.family.rawValue)",
+            "measure=\(formulaIR.measure.rawValue)",
+            formulaIR.recipe.map { "recipe=\($0.rawValue)" },
+            formulaIR.backlogRecipe.map { "backlogRecipe=\($0.rawValue)" },
+            "resultCount=\(resultCount)",
+            total.map { "total=\($0)" }
+        ].compactMap { $0 }.joined(separator: ",")
+    }
+
+    private func limit(for formulaIR: MarinaFormulaIR) -> Int {
+        min(10, max(1, formulaIR.limit ?? formulaIR.ranking?.limit ?? 5))
+    }
+}
+
+@MainActor
+struct MarinaCompositeQueryPlanner {
+    private let planner = MarinaFormulaPlanner()
+    private let executor = MarinaFormulaExecutor()
+
+    func plan(
+        candidate: MarinaQueryPlanCandidate,
+        resolved: MarinaResolvedQueryCandidate,
+        semanticResolved: MarinaResolvedSemanticQuery?,
+        outcome: MarinaPlanValidationOutcome,
+        context: MarinaTurnContext
+    ) -> MarinaCompositeQueryPlannerResult? {
+        guard let formulaIR = planner.plan(
+            candidate: candidate,
+            resolved: resolved,
+            semanticResolved: semanticResolved,
+            outcome: outcome,
+            context: context
+        ) else {
+            return nil
+        }
+
+        if formulaIR.recipe == .expenseOnlySavingsRunway,
+           context.provider.fetchAllSavingsAccounts().isEmpty,
+           context.provider.fetchAllSavingsLedgerEntries().isEmpty {
+            return .clarification(missingSavingsClarification(candidate: candidate))
+        }
+
+        return .handled(
+            executor.execute(
+                formulaIR: formulaIR,
+                candidate: candidate,
+                resolved: resolved,
+                semanticResolved: semanticResolved,
+                context: context
+            )
+        )
+    }
+
+    private func missingSavingsClarification(candidate: MarinaQueryPlanCandidate) -> MarinaTypedClarification {
+        let prompt = candidate.rawPrompt
+        let budgetRoomCandidate = MarinaQueryPlanCandidate(
+            source: .foundationModels,
+            rawPrompt: prompt,
+            operation: .lookupDetails,
+            measure: .remainingBudget,
+            responseShapeHint: .summaryCard,
+            confidence: .high
+        )
+        let activityCandidate = MarinaQueryPlanCandidate(
+            source: .foundationModels,
+            rawPrompt: prompt,
+            operation: .rank,
+            measure: .spend,
+            grouping: MarinaGroupingCandidate(dimension: .card),
+            ranking: MarinaRankingCandidate(direction: .largest, limit: 5),
+            limit: 5,
+            responseShapeHint: .rankedList,
+            confidence: .high
+        )
+        return MarinaTypedClarification(
+            kind: .ambiguousTarget,
+            message: "I do not see an actual savings account yet. Should Marina use budget room instead?",
+            candidate: candidate,
+            choices: [
+                MarinaClarificationChoice(
+                    title: "Use budget room",
+                    subtitle: "Estimate safety from current budget room",
+                    resumeIntent: MarinaClarificationResumeIntent(candidate: budgetRoomCandidate)
+                ),
+                MarinaClarificationChoice(
+                    title: "Show card activity",
+                    subtitle: "Rank actual card spend instead",
+                    resumeIntent: MarinaClarificationResumeIntent(candidate: activityCandidate)
+                )
+            ]
+        )
+    }
+}
+
+@MainActor
+struct MarinaCompositeFormulaExecutor {
+    private let calendar: Calendar
+
+    init(calendar: Calendar = Calendar(identifier: .gregorian)) {
+        self.calendar = calendar
+    }
+
+    func execute(
+        formula: MarinaCompositeFormulaKind,
+        candidate: MarinaQueryPlanCandidate,
+        resolved: MarinaResolvedQueryCandidate,
+        semanticResolved: MarinaResolvedSemanticQuery?,
+        context: MarinaTurnContext
+    ) -> MarinaWorkspaceAggregationCard {
+        switch formula {
+        case .categoryLimitBurnRate:
+            return categoryLimitBurnRate(candidate: candidate, resolved: resolved, semanticResolved: semanticResolved, context: context)
+        case .cardSavingsDrag:
+            return cardSavingsDrag(context: context)
+        case .earlyPlannedExpenseStress:
+            return earlyPlannedExpenseStress(context: context)
+        case .recurringChargeAnomaly:
+            return recurringChargeAnomaly(context: context)
+        case .expenseOnlySavingsRunway:
+            return expenseOnlySavingsRunway(context: context)
+        }
+    }
+
+    private func categoryLimitBurnRate(
+        candidate: MarinaQueryPlanCandidate,
+        resolved: MarinaResolvedQueryCandidate,
+        semanticResolved: MarinaResolvedSemanticQuery?,
+        context: MarinaTurnContext
+    ) -> MarinaWorkspaceAggregationCard {
+        let range = resolved.primaryDateRange ?? semanticResolved?.primaryDateRange ?? monthRange(containing: context.now)
+        guard let category = categoryTarget(candidate: candidate, resolved: resolved, semanticResolved: semanticResolved, provider: context.provider) else {
+            return dataLimitCard(
+                title: "Category Limit Burn Rate",
+                formula: .categoryLimitBurnRate,
+                message: "I could not identify a category to check against a budget max limit.",
+                range: range
+            )
+        }
+
+        let budget = activeBudget(provider: context.provider, now: context.now, range: range)
+        let maxLimit = budget?.categoryLimits?.first { limit in
+            normalized(limit.category?.name ?? "") == normalized(category.name)
+        }?.maxAmount
+
+        guard let maxLimit else {
+            return dataLimitCard(
+                title: "\(category.name) Limit Burn Rate",
+                formula: .categoryLimitBurnRate,
+                message: "No max budget limit is set for \(category.name) in the active budget.",
+                range: range
+            )
+        }
+
+        let toDateEnd = min(context.now, range.endDate)
+        let expenses = context.provider.fetchAllVariableExpenses()
+            .filter { $0.transactionDate >= range.startDate && $0.transactionDate <= toDateEnd }
+            .filter { normalized($0.category?.name ?? "") == normalized(category.name) }
+        let spendToDate = expenses.reduce(0.0) { $0 + SavingsMathService.variableBudgetImpactAmount(for: $1) }
+        let elapsedDays = max(1, (calendar.dateComponents([.day], from: calendar.startOfDay(for: range.startDate), to: calendar.startOfDay(for: toDateEnd)).day ?? 0) + 1)
+        let periodDays = max(1, (calendar.dateComponents([.day], from: calendar.startOfDay(for: range.startDate), to: calendar.startOfDay(for: range.endDate)).day ?? 0) + 1)
+        let dailyPace = spendToDate / Double(elapsedDays)
+        let projected = dailyPace * Double(periodDays)
+        let overage = projected - maxLimit
+        let overageDate: Date? = {
+            guard dailyPace > 0 else { return nil }
+            if spendToDate >= maxLimit { return calendar.startOfDay(for: context.now) }
+            let daysUntilLimit = Int(ceil(maxLimit / dailyPace)) - 1
+            return calendar.date(byAdding: .day, value: max(0, daysUntilLimit), to: calendar.startOfDay(for: range.startDate))
+        }()
+
+        return MarinaWorkspaceAggregationCard(
+            title: "\(category.name) Limit Burn Rate",
+            subtitle: budget.map { "\($0.name) • \(rangeLabel(range))" } ?? rangeLabel(range),
+            primaryValue: overage > 0 ? "\(currency(overage)) projected over" : "\(currency(abs(overage))) projected under",
+            rows: baseRows(formula: .categoryLimitBurnRate, assumptions: "Actual variable category spend to date; active budget max limit; straight-line daily pace.", range: range) + [
+                .init(label: "Category", value: category.name, objectType: .category, sourceID: category.id),
+                .init(label: "Budget max", value: currency(maxLimit), amount: maxLimit),
+                .init(label: "Spent to date", value: currency(spendToDate), amount: spendToDate),
+                .init(label: "Daily pace", value: "\(currency(dailyPace)) per day", amount: dailyPace),
+                .init(label: "Projected period spend", value: currency(projected), amount: projected),
+                .init(label: "Projected over/under", value: signedCurrency(projected - maxLimit), amount: projected - maxLimit),
+                .init(label: "Expected limit date", value: overageDate.map(shortDate) ?? "No overage at current pace", date: overageDate)
+            ] + evidenceRows(for: expenses, prefix: "Evidence"),
+            traceSummary: "formula=\(MarinaCompositeFormulaKind.categoryLimitBurnRate.rawValue),category=\(category.name),spend=\(spendToDate),limit=\(maxLimit),projected=\(projected)"
+        )
+    }
+
+    private func cardSavingsDrag(context: MarinaTurnContext) -> MarinaWorkspaceAggregationCard {
+        let range = monthRange(containing: context.now)
+        var totals: [String: (id: UUID?, actual: Double, planned: Double)] = [:]
+
+        for expense in context.provider.fetchAllVariableExpenses() where contains(expense.transactionDate, in: range) {
+            let name = expense.card?.name ?? "No Card"
+            let id = expense.card?.id
+            totals[name, default: (id, 0, 0)].actual += SavingsMathService.variableBudgetImpactAmount(for: expense)
+            totals[name]?.id = id
+        }
+        for expense in context.provider.fetchAllPlannedExpenses() where contains(expense.expenseDate, in: range) {
+            let name = expense.card?.name ?? "No Card"
+            let id = expense.card?.id
+            totals[name, default: (id, 0, 0)].planned += SavingsMathService.plannedBudgetImpactAmount(for: expense)
+            totals[name]?.id = id
+        }
+
+        let ranked = totals
+            .map { (name: $0.key, id: $0.value.id, actual: $0.value.actual, planned: $0.value.planned, total: $0.value.actual + $0.value.planned) }
+            .filter { $0.total != 0 }
+            .sorted { $0.total > $1.total }
+        let top = ranked.first
+        let rows = baseRows(formula: .cardSavingsDrag, assumptions: "Card with the highest budget-impact spend this month; actual card activity plus planned card expenses.", range: range)
+            + ranked.prefix(5).map {
+                MarinaWorkspaceAggregationCard.Row(
+                    label: $0.name,
+                    value: "\(currency($0.total)) total • actual \(currency($0.actual)) • planned \(currency($0.planned))",
+                    amount: $0.total,
+                    objectType: .card,
+                    sourceID: $0.id,
+                    sortValue: $0.total
+                )
+            }
+
+        return MarinaWorkspaceAggregationCard(
+            title: "Card Savings Drag",
+            subtitle: rangeLabel(range),
+            primaryValue: top.map { "\($0.name): \(currency($0.total))" } ?? "No card spend",
+            rows: rows,
+            traceSummary: "formula=\(MarinaCompositeFormulaKind.cardSavingsDrag.rawValue),cards=\(ranked.count),top=\(top?.name ?? "none")"
+        )
+    }
+
+    private func earlyPlannedExpenseStress(context: MarinaTurnContext) -> MarinaWorkspaceAggregationCard {
+        let range = nextMonthRange(after: context.now)
+        let savings = actualSavings(provider: context.provider)
+        let presetTitlesByID = Dictionary(uniqueKeysWithValues: context.provider.fetchAllPresets().map { ($0.id, $0.title) })
+        let planned = context.provider.fetchAllPlannedExpenses()
+            .filter { contains($0.expenseDate, in: range) }
+            .sorted { lhs, rhs in
+                let lhsAmount = SavingsMathService.plannedProjectedBudgetImpactAmount(for: lhs)
+                let rhsAmount = SavingsMathService.plannedProjectedBudgetImpactAmount(for: rhs)
+                if lhsAmount == rhsAmount { return lhs.expenseDate < rhs.expenseDate }
+                return lhsAmount > rhsAmount
+            }
+
+        let rows = baseRows(formula: .earlyPlannedExpenseStress, assumptions: "Ranks next-month planned expenses by pressure if posted today; includes planned income and planned expenses before each due date.", range: range) + planned.prefix(10).map { expense in
+            let amount = SavingsMathService.plannedProjectedBudgetImpactAmount(for: expense)
+            let plannedIncomeBeforeDue = context.provider.fetchAllIncomes()
+                .filter { $0.isPlanned && $0.date >= context.now && $0.date <= expense.expenseDate }
+                .reduce(0.0) { $0 + $1.amount }
+            let plannedBeforeDue = context.provider.fetchAllPlannedExpenses()
+                .filter { $0.expenseDate >= context.now && $0.expenseDate < expense.expenseDate }
+                .reduce(0.0) { $0 + SavingsMathService.plannedProjectedBudgetImpactAmount(for: $1) }
+            let cushionByDue = savings + plannedIncomeBeforeDue - plannedBeforeDue
+            let stress = max(0, amount - savings)
+            let preset = expense.sourcePresetID.flatMap { presetTitlesByID[$0] }
+            let presetText = preset.map { " • preset \($0)" } ?? ""
+            return MarinaWorkspaceAggregationCard.Row(
+                label: expense.title,
+                value: "\(currency(amount)) due \(shortDate(expense.expenseDate)) • stress \(currency(stress)) • cushion by due \(currency(cushionByDue))\(presetText)",
+                amount: stress,
+                date: expense.expenseDate,
+                objectType: .plannedExpense,
+                sourceID: expense.id,
+                sortValue: stress == 0 ? amount : stress
+            )
+        }
+
+        return MarinaWorkspaceAggregationCard(
+            title: "Early Planned Expense Stress",
+            subtitle: rangeLabel(range),
+            primaryValue: rows.dropFirst(3).first?.label ?? "No planned expenses",
+            rows: rows,
+            traceSummary: "formula=\(MarinaCompositeFormulaKind.earlyPlannedExpenseStress.rawValue),rows=\(planned.count),savings=\(savings)"
+        )
+    }
+
+    private func recurringChargeAnomaly(context: MarinaTurnContext) -> MarinaWorkspaceAggregationCard {
+        let current = monthRange(containing: context.now)
+        let baseline = completedMonthLookbackRange(endingBefore: context.now, months: 3)
+        let currentRows = context.provider.fetchAllVariableExpenses().filter { contains($0.transactionDate, in: current) }
+        let baselineRows = context.provider.fetchAllVariableExpenses().filter { contains($0.transactionDate, in: baseline) }
+        let baselineGroups = Dictionary(grouping: baselineRows, by: { canonicalMerchant($0.descriptionText) })
+        let currentGroups = Dictionary(grouping: currentRows, by: { canonicalMerchant($0.descriptionText) })
+
+        let merchantRows = currentGroups.compactMap { merchant, expenses -> MarinaWorkspaceAggregationCard.Row? in
+            let currentTotal = expenses.reduce(0.0) { $0 + SavingsMathService.variableBudgetImpactAmount(for: $1) }
+            let currentAverage = currentTotal / Double(max(expenses.count, 1))
+            let baselineValues = baselineGroups[merchant] ?? []
+            let baselineAverage = baselineValues.isEmpty
+                ? 0
+                : baselineValues.reduce(0.0) { $0 + SavingsMathService.variableBudgetImpactAmount(for: $1) } / Double(baselineValues.count)
+            let delta = currentAverage - baselineAverage
+            guard expenses.count > 1 || (baselineValues.isEmpty == false && delta > 0) else { return nil }
+            return MarinaWorkspaceAggregationCard.Row(
+                label: merchant,
+                value: "\(expenses.count) this month • avg \(currency(currentAverage)) • usual \(baselineValues.isEmpty ? "no baseline" : currency(baselineAverage)) • \(signedCurrency(delta))",
+                amount: delta,
+                objectType: .variableExpense,
+                sourceID: expenses.sorted { $0.transactionDate > $1.transactionDate }.first?.id,
+                sortValue: delta
+            )
+        }
+
+        let plannedRows = context.provider.fetchAllPlannedExpenses()
+            .filter { $0.actualAmount > $0.plannedAmount && contains($0.expenseDate, in: current) }
+            .map { expense in
+                let delta = expense.actualAmount - expense.plannedAmount
+                return MarinaWorkspaceAggregationCard.Row(
+                    label: expense.title,
+                    value: "Actual \(currency(expense.actualAmount)) vs planned \(currency(expense.plannedAmount)) • \(signedCurrency(delta))",
+                    amount: delta,
+                    date: expense.expenseDate,
+                    objectType: .plannedExpense,
+                    sourceID: expense.id,
+                    sortValue: delta
+                )
+            }
+
+        let anomalyRows = (merchantRows + plannedRows)
+            .sorted { ($0.sortValue ?? 0) > ($1.sortValue ?? 0) }
+        return MarinaWorkspaceAggregationCard(
+            title: "Recurring Charge Anomalies",
+            subtitle: "\(rangeLabel(current)) vs \(rangeLabel(baseline))",
+            primaryValue: "\(anomalyRows.count)",
+            rows: baseRows(formula: .recurringChargeAnomaly, assumptions: "Recurring-ish means repeated merchant text this month or a current merchant above its prior completed-month baseline; also includes planned rows where actual exceeds planned.", range: current) + anomalyRows.prefix(10),
+            traceSummary: "formula=\(MarinaCompositeFormulaKind.recurringChargeAnomaly.rawValue),rows=\(anomalyRows.count)"
+        )
+    }
+
+    private func expenseOnlySavingsRunway(context: MarinaTurnContext) -> MarinaWorkspaceAggregationCard {
+        let range = monthRange(containing: context.now)
+        let savings = actualSavings(provider: context.provider)
+        let toDateEnd = min(context.now, range.endDate)
+        let expenses = context.provider.fetchAllVariableExpenses()
+            .filter { $0.transactionDate >= range.startDate && $0.transactionDate <= toDateEnd }
+        let spend = expenses.reduce(0.0) { $0 + SavingsMathService.variableBudgetImpactAmount(for: $1) }
+        let elapsedDays = max(1, (calendar.dateComponents([.day], from: calendar.startOfDay(for: range.startDate), to: calendar.startOfDay(for: toDateEnd)).day ?? 0) + 1)
+        let dailySpend = spend / Double(elapsedDays)
+        let days = dailySpend > 0 ? Int(floor(savings / dailySpend)) : nil
+        let projectedDate = days.flatMap { calendar.date(byAdding: .day, value: max(0, $0), to: calendar.startOfDay(for: context.now)) }
+
+        return MarinaWorkspaceAggregationCard(
+            title: "Expense-Only Savings Runway",
+            subtitle: rangeLabel(range),
+            primaryValue: days.map { "\($0) days" } ?? "No current spend rate",
+            rows: baseRows(formula: .expenseOnlySavingsRunway, assumptions: "Ignores income by request; uses actual savings and current-period actual variable card activity only.", range: range) + [
+                .init(label: "Actual savings", value: currency(savings), amount: savings),
+                .init(label: "Actual card activity", value: currency(spend), amount: spend),
+                .init(label: "Daily spend rate", value: "\(currency(dailySpend)) per day", amount: dailySpend),
+                .init(label: "Estimated zero date", value: projectedDate.map(shortDate) ?? "No current spend rate", date: projectedDate)
+            ] + evidenceRows(for: expenses.sorted { $0.transactionDate > $1.transactionDate }.prefix(5), prefix: "Recent"),
+            traceSummary: "formula=\(MarinaCompositeFormulaKind.expenseOnlySavingsRunway.rawValue),savings=\(savings),spend=\(spend),days=\(days ?? -1)"
+        )
+    }
+
+    private func baseRows(
+        formula: MarinaCompositeFormulaKind,
+        assumptions: String,
+        range: HomeQueryDateRange
+    ) -> [MarinaWorkspaceAggregationCard.Row] {
+        [
+            .init(label: "Formula", value: formula.rawValue),
+            .init(label: "Assumptions", value: assumptions),
+            .init(label: "Date range", value: rangeLabel(range))
+        ]
+    }
+
+    private func dataLimitCard(
+        title: String,
+        formula: MarinaCompositeFormulaKind,
+        message: String,
+        range: HomeQueryDateRange
+    ) -> MarinaWorkspaceAggregationCard {
+        MarinaWorkspaceAggregationCard(
+            title: title,
+            subtitle: message,
+            primaryValue: "Not enough data",
+            rows: baseRows(formula: formula, assumptions: "No financial value was inferred without the required workspace data.", range: range) + [
+                .init(label: "Data limitation", value: message)
+            ],
+            traceSummary: "formula=\(formula.rawValue),dataLimit=true"
+        )
+    }
+
+    private func categoryTarget(
+        candidate: MarinaQueryPlanCandidate,
+        resolved: MarinaResolvedQueryCandidate,
+        semanticResolved: MarinaResolvedSemanticQuery?,
+        provider: MarinaDataProvider
+    ) -> Category? {
+        if let resolvedCategory = resolved.resolvedTargets.first(where: { $0.entityType == .category }),
+           let category = provider.fetchAllCategories().first(where: { $0.id == resolvedCategory.sourceID || normalized($0.name) == normalized(resolvedCategory.displayName) }) {
+            return category
+        }
+        if let semanticCategory = semanticResolved?.resolvedFilters.first(where: { $0.entityType == .category }),
+           let category = provider.fetchAllCategories().first(where: { $0.id == semanticCategory.sourceID || normalized($0.name) == normalized(semanticCategory.displayName) }) {
+            return category
+        }
+        let prompt = normalized(candidate.rawPrompt)
+        return provider.fetchAllCategories().first { category in
+            containsWholePhrase(normalized(category.name), in: prompt)
+                || (prompt.contains("grocer") && normalized(category.name).contains("grocer"))
+        }
+    }
+
+    private func activeBudget(provider: MarinaDataProvider, now: Date, range: HomeQueryDateRange) -> Budget? {
+        provider.fetchAllBudgets().first { $0.startDate <= now && $0.endDate >= now }
+            ?? provider.fetchAllBudgets().first { $0.startDate <= range.endDate && $0.endDate >= range.startDate }
+    }
+
+    private func actualSavings(provider: MarinaDataProvider) -> Double {
+        if let account = provider.fetchAllSavingsAccounts().first {
+            return account.total
+        }
+        return provider.fetchAllSavingsLedgerEntries().reduce(0.0) { $0 + $1.amount }
+    }
+
+    private func evidenceRows<S: Sequence>(
+        for expenses: S,
+        prefix: String
+    ) -> [MarinaWorkspaceAggregationCard.Row] where S.Element == VariableExpense {
+        expenses.prefix(5).map { expense in
+            MarinaWorkspaceAggregationCard.Row(
+                label: "\(prefix): \(expense.descriptionText)",
+                value: "\(shortDate(expense.transactionDate)) • \(currency(SavingsMathService.variableBudgetImpactAmount(for: expense)))",
+                amount: SavingsMathService.variableBudgetImpactAmount(for: expense),
+                date: expense.transactionDate,
+                objectType: .variableExpense,
+                sourceID: expense.id,
+                sortValue: SavingsMathService.variableBudgetImpactAmount(for: expense)
+            )
+        }
+    }
+
+    private func monthRange(containing date: Date) -> HomeQueryDateRange {
+        let start = calendar.date(from: calendar.dateComponents([.year, .month], from: date)) ?? date
+        let end = calendar.date(byAdding: DateComponents(month: 1, second: -1), to: start) ?? date
+        return HomeQueryDateRange(startDate: start, endDate: end)
+    }
+
+    private func nextMonthRange(after date: Date) -> HomeQueryDateRange {
+        let currentStart = calendar.date(from: calendar.dateComponents([.year, .month], from: date)) ?? date
+        let start = calendar.date(byAdding: .month, value: 1, to: currentStart) ?? currentStart
+        let end = calendar.date(byAdding: DateComponents(month: 1, second: -1), to: start) ?? start
+        return HomeQueryDateRange(startDate: start, endDate: end)
+    }
+
+    private func completedMonthLookbackRange(endingBefore date: Date, months: Int) -> HomeQueryDateRange {
+        let currentStart = calendar.date(from: calendar.dateComponents([.year, .month], from: date)) ?? date
+        let start = calendar.date(byAdding: .month, value: -max(months, 1), to: currentStart) ?? currentStart
+        let end = calendar.date(byAdding: .second, value: -1, to: currentStart) ?? currentStart
+        return HomeQueryDateRange(startDate: start, endDate: end)
+    }
+
+    private func contains(_ date: Date, in range: HomeQueryDateRange) -> Bool {
+        date >= range.startDate && date <= range.endDate
+    }
+
+    private func canonicalMerchant(_ value: String) -> String {
+        let normalizedValue = normalized(value)
+            .replacingOccurrences(of: "\\b\\d+\\b", with: "", options: .regularExpression)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return normalizedValue.isEmpty ? "Unknown" : displayName(normalizedValue)
+    }
+
+    private func rangeLabel(_ range: HomeQueryDateRange) -> String {
+        "\(shortDate(range.startDate)) - \(shortDate(range.endDate))"
+    }
+
+    private func shortDate(_ date: Date) -> String {
+        AppDateFormat.shortDate(date)
+    }
+
+    private func currency(_ value: Double) -> String {
+        CurrencyFormatter.string(from: value)
+    }
+
+    private func signedCurrency(_ value: Double) -> String {
+        if value > 0 { return "+\(currency(value))" }
+        if value < 0 { return "-\(currency(abs(value)))" }
+        return currency(0)
+    }
+
+    private func displayName(_ value: String) -> String {
+        value
+            .split(separator: " ")
+            .map { $0.prefix(1).uppercased() + String($0.dropFirst()) }
+            .joined(separator: " ")
+    }
+
+    private func containsWholePhrase(_ phrase: String, in prompt: String) -> Bool {
+        let pattern = "(^|\\s)\(NSRegularExpression.escapedPattern(for: phrase))(\\s|$)"
+        return prompt.range(of: pattern, options: .regularExpression) != nil
+    }
+
+    private func normalized(_ value: String) -> String {
+        value
+            .lowercased()
+            .replacingOccurrences(of: "[^a-z0-9\\s&-]", with: " ", options: .regularExpression)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
 enum MarinaQueryExecutionResult {
     case handled(MarinaQueryExecution)
     case unsupported(MarinaTypedUnsupportedResponse)

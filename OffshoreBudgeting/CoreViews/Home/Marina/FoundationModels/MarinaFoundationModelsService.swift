@@ -136,6 +136,10 @@ private func marinaInstructions(context: MarinaInterpretationContext) -> String 
     - Never put placeholder words like "null", "nil", "none", "n/a", "unknown", or empty JSON fragments into string fields.
     - No field named reasoning exists; do not invent one.
     - intentRaw is a short hint, not the final route. Examples: workspace, activeBudget, budgetInventory, upcomingBudgets, plannedExpenseRows, presetTemplates, linkedCards, linkedPresets, categoryLimit, spendTotal, recentTransactions, topCategories, categoryBreakdown, spendComparison, incomeActual, incomePlanned, incomeCompare, savingsStatus, savingsActivity, reconciliationBalance, allocationRows, settlementRows, whatIf, lookup, unsupported.
+    - formulaFamilyRaw is optional. Use only: list, detail, count, sum, average, rank, compare, threshold, runway, anomaly, whatIf, trend, forecast.
+    - formulaRecipeRaw is optional. Use only one executable recipe: categoryLimitBurnRate, cardSavingsDrag, earlyPlannedExpenseStress, recurringChargeAnomaly, expenseOnlySavingsRunway. Backlog recipe names may be emitted only when clearly requested: netCashFlow, plannedVsActualVariance, thresholdRows, zeroActivityBuckets, recurringFrequency, periodChangeDrivers, forecastPeriodicSpend, medianAmount.
+    - formulaRaw remains a legacy recipe alias; prefer formulaFamilyRaw plus formulaRecipeRaw. Swift executes all math and rejects invented recipes.
+    - Use formula facets sparingly: thresholdRaw for numeric/limit cutoffs, baselineRaw for comparison baseline, assumptionRaw for user-stated assumptions, excludeIncome when the user says to ignore income.
     - targetText is only the concrete user-named object or filter, such as Apple Card, Groceries, Salary, May Budget, Dining, Roommate, or Apple.
     - Do not put generic concepts such as "spending", "total spending", "income", "actual income", "active budget", "savings", "budget", "transactions", or "uncategorized spending" into targetText.
     - For relationships, copy the relationship words into relationshipText, such as linked cards, linked presets, budget limit, allocation rows, settlement rows, status, or balance.

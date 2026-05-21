@@ -291,6 +291,254 @@ struct MarinaFoundationSemanticRealAppTests {
         #expect(answer.rows.contains { $0.title == "Manual deposit" })
     }
 
+    @Test func semanticRealApp_formulaIR_sumsCategorySpend() async throws {
+        let fixture = try makeFixture()
+        try fixture.seedSpendData()
+
+        let prompt = "Sum Groceries spend this month."
+        let coordinator = coordinator(for: [prompt: canonicalInterpretation(unsupportedCandidate(prompt: prompt))])
+
+        let (result, _) = await tracedTurn(prompt: prompt) {
+            await coordinator.run(prompt: prompt, context: turnContext(fixture))
+        }
+
+        guard case .handled(let answer, _, _, _, _) = result else {
+            Issue.record("Expected Formula IR sum to execute.")
+            return
+        }
+
+        assertFormulaFamilyRows(answer, family: .sum, measure: .variableBudgetImpact)
+        #expect(answer.title == "Groceries Total Spending")
+        #expect(answer.primaryValue?.contains("50") == true)
+    }
+
+    @Test func semanticRealApp_formulaIR_averagesWeeklyCategorySpend() async throws {
+        let fixture = try makeFixture()
+        fixture.context.insert(VariableExpense(descriptionText: "Feb Groceries", amount: 70, transactionDate: date(2026, 2, 10), workspace: fixture.workspace, card: fixture.appleCard, category: fixture.groceries))
+        fixture.context.insert(VariableExpense(descriptionText: "Mar Groceries", amount: 80, transactionDate: date(2026, 3, 10), workspace: fixture.workspace, card: fixture.appleCard, category: fixture.groceries))
+        fixture.context.insert(VariableExpense(descriptionText: "Apr Groceries", amount: 90, transactionDate: date(2026, 4, 10), workspace: fixture.workspace, card: fixture.appleCard, category: fixture.groceries))
+        try fixture.context.save()
+
+        let prompt = "Average weekly Groceries spend over the last 3 months."
+        let coordinator = coordinator(for: [prompt: canonicalInterpretation(unsupportedCandidate(prompt: prompt))])
+
+        let (result, _) = await tracedTurn(prompt: prompt) {
+            await coordinator.run(prompt: prompt, context: turnContext(fixture))
+        }
+
+        guard case .handled(let answer, _, _, _, _) = result else {
+            Issue.record("Expected Formula IR average to execute.")
+            return
+        }
+
+        assertFormulaFamilyRows(answer, family: .average, measure: .variableBudgetImpact)
+        #expect(answer.title == "Groceries Average Weekly Spending")
+        #expect(answer.rows.contains { $0.title == "Average basis" && $0.value.contains("weeks") })
+    }
+
+    @Test func semanticRealApp_formulaIR_ranksCardsBySpend() async throws {
+        let fixture = try makeFixture()
+        fixture.context.insert(VariableExpense(descriptionText: "Apple Spend", amount: 40, transactionDate: date(2026, 5, 5), workspace: fixture.workspace, card: fixture.appleCard, category: fixture.groceries))
+        fixture.context.insert(VariableExpense(descriptionText: "Backup Spend", amount: 95, transactionDate: date(2026, 5, 6), workspace: fixture.workspace, card: fixture.backupCard, category: fixture.travel))
+        try fixture.context.save()
+
+        let prompt = "Rank cards by spending this month."
+        let coordinator = coordinator(for: [prompt: canonicalInterpretation(unsupportedCandidate(prompt: prompt))])
+
+        let (result, _) = await tracedTurn(prompt: prompt) {
+            await coordinator.run(prompt: prompt, context: turnContext(fixture))
+        }
+
+        guard case .handled(let answer, _, _, _, _) = result else {
+            Issue.record("Expected Formula IR rank to execute.")
+            return
+        }
+
+        assertFormulaFamilyRows(answer, family: .rank, measure: .variableBudgetImpact)
+        #expect(answer.rows.contains { $0.title == "Backup Card" && $0.value.contains("95") })
+    }
+
+    @Test func semanticRealApp_formulaIR_comparesCategorySpend() async throws {
+        let fixture = try makeFixture()
+        let utilities = Offshore.Category(name: "Utilities", hexColor: "#888888", workspace: fixture.workspace)
+        fixture.context.insert(utilities)
+        fixture.context.insert(VariableExpense(descriptionText: "April Power", amount: 50, transactionDate: date(2026, 4, 8), workspace: fixture.workspace, card: fixture.appleCard, category: utilities))
+        fixture.context.insert(VariableExpense(descriptionText: "May Power", amount: 80, transactionDate: date(2026, 5, 8), workspace: fixture.workspace, card: fixture.appleCard, category: utilities))
+        try fixture.context.save()
+
+        let prompt = "Compare Utilities this month to last month."
+        let coordinator = coordinator(for: [prompt: canonicalInterpretation(unsupportedCandidate(prompt: prompt))])
+
+        let (result, _) = await tracedTurn(prompt: prompt) {
+            await coordinator.run(prompt: prompt, context: turnContext(fixture, categoryNames: ["Groceries", "Travel", "Utilities"]))
+        }
+
+        guard case .handled(let answer, _, _, _, _) = result else {
+            Issue.record("Expected Formula IR compare to execute.")
+            return
+        }
+
+        assertFormulaFamilyRows(answer, family: .compare, measure: .variableBudgetImpact)
+        #expect(answer.title == "Utilities Comparison Spending")
+        #expect(answer.rows.contains { $0.title == "Change" && $0.value.contains("30") })
+    }
+
+    @Test func semanticRealApp_formulaIR_countsUncategorizedTransactions() async throws {
+        let fixture = try makeFixture()
+        fixture.context.insert(VariableExpense(descriptionText: "Unknown One", amount: 10, transactionDate: date(2026, 5, 4), workspace: fixture.workspace, card: fixture.appleCard, category: nil))
+        fixture.context.insert(VariableExpense(descriptionText: "Unknown Two", amount: 20, transactionDate: date(2026, 5, 5), workspace: fixture.workspace, card: fixture.backupCard, category: nil))
+        fixture.context.insert(VariableExpense(descriptionText: "Known", amount: 30, transactionDate: date(2026, 5, 6), workspace: fixture.workspace, card: fixture.appleCard, category: fixture.groceries))
+        try fixture.context.save()
+
+        let prompt = "Count uncategorized transactions."
+        let coordinator = coordinator(for: [prompt: canonicalInterpretation(unsupportedCandidate(prompt: prompt))])
+
+        let (result, _) = await tracedTurn(prompt: prompt) {
+            await coordinator.run(prompt: prompt, context: turnContext(fixture))
+        }
+
+        guard case .handled(let answer, _, _, _, _) = result else {
+            Issue.record("Expected Formula IR count to execute.")
+            return
+        }
+
+        assertFormulaFamilyRows(answer, family: .count, measure: .count)
+        #expect(answer.primaryValue == "2")
+    }
+
+    @Test func semanticRealApp_groceryPaceUsesCategoryLimitBurnRateFormula() async throws {
+        let fixture = try makeFixture()
+        let budget = Budget(name: "May Budget", startDate: date(2026, 5, 1), endDate: date(2026, 5, 31), workspace: fixture.workspace)
+        fixture.context.insert(budget)
+        fixture.context.insert(BudgetCategoryLimit(minAmount: nil, maxAmount: 300, budget: budget, category: fixture.groceries))
+        fixture.context.insert(VariableExpense(descriptionText: "Groceries Week 1", amount: 120, transactionDate: date(2026, 5, 4), workspace: fixture.workspace, card: fixture.appleCard, category: fixture.groceries))
+        fixture.context.insert(VariableExpense(descriptionText: "Groceries Week 2", amount: 120, transactionDate: date(2026, 5, 12), workspace: fixture.workspace, card: fixture.appleCard, category: fixture.groceries))
+        try fixture.context.save()
+
+        let prompt = "If I keep spending on groceries at this pace, when do I blow past my grocery limit?"
+        let coordinator = coordinator(for: [prompt: canonicalInterpretation(unsupportedCandidate(prompt: prompt))])
+
+        let (result, _) = await tracedTurn(prompt: prompt) {
+            await coordinator.run(prompt: prompt, context: turnContext(fixture, budgetNames: ["May Budget"]))
+        }
+
+        guard case .handled(let answer, _, _, _, let route) = result else {
+            Issue.record("Expected category limit burn-rate formula to execute.")
+            return
+        }
+
+        #expect(answer.title == "Groceries Limit Burn Rate")
+        assertFormulaRows(answer, formula: .categoryLimitBurnRate)
+        #expect(answer.rows.contains { $0.title == "Expected limit date" })
+        #expect(answer.rows.contains { $0.title == "Budget max" && $0.value.contains("300") })
+        #expect(route?.traceName == "scenario")
+    }
+
+    @Test func semanticRealApp_savingsDragUsesLargestCardFormula() async throws {
+        let fixture = try makeFixture()
+        fixture.context.insert(VariableExpense(descriptionText: "Apple Small", amount: 50, transactionDate: date(2026, 5, 5), workspace: fixture.workspace, card: fixture.appleCard, category: fixture.groceries))
+        fixture.context.insert(VariableExpense(descriptionText: "Backup Large", amount: 425, transactionDate: date(2026, 5, 7), workspace: fixture.workspace, card: fixture.backupCard, category: fixture.travel))
+        fixture.context.insert(PlannedExpense(title: "Backup Plan", plannedAmount: 100, expenseDate: date(2026, 5, 20), workspace: fixture.workspace, card: fixture.backupCard, category: fixture.travel))
+        try fixture.context.save()
+
+        let prompt = "Which card is quietly ruining my savings this month?"
+        let coordinator = coordinator(for: [prompt: canonicalInterpretation(unsupportedCandidate(prompt: prompt))])
+
+        let (result, _) = await tracedTurn(prompt: prompt) {
+            await coordinator.run(prompt: prompt, context: turnContext(fixture))
+        }
+
+        guard case .handled(let answer, _, _, _, _) = result else {
+            Issue.record("Expected card savings drag formula to execute.")
+            return
+        }
+
+        #expect(answer.title == "Card Savings Drag")
+        assertFormulaRows(answer, formula: .cardSavingsDrag)
+        #expect(answer.primaryValue?.contains("Backup Card") == true)
+        #expect(answer.rows.contains { $0.title == "Backup Card" && $0.value.contains("actual") && $0.value.contains("planned") })
+    }
+
+    @Test func semanticRealApp_postedEarlyPlannedExpenseUsesStressFormula() async throws {
+        let fixture = try makeFixture()
+        let rent = Preset(title: "Rent", plannedAmount: 1_500, workspace: fixture.workspace, defaultCard: fixture.appleCard, defaultCategory: fixture.groceries)
+        fixture.context.insert(rent)
+        fixture.context.insert(SavingsAccount(name: "True Savings", total: 250, workspace: fixture.workspace))
+        fixture.context.insert(Income(source: "Paycheck", amount: 600, date: date(2026, 6, 1), isPlanned: true, workspace: fixture.workspace))
+        fixture.context.insert(PlannedExpense(title: "Rent Bill", plannedAmount: 1_500, expenseDate: date(2026, 6, 3), workspace: fixture.workspace, card: fixture.appleCard, category: fixture.groceries, sourcePresetID: rent.id))
+        fixture.context.insert(PlannedExpense(title: "Internet", plannedAmount: 120, expenseDate: date(2026, 6, 10), workspace: fixture.workspace, card: fixture.backupCard, category: fixture.travel))
+        try fixture.context.save()
+
+        let prompt = "What planned expense next month would hurt the most if it posted early?"
+        let coordinator = coordinator(for: [prompt: canonicalInterpretation(unsupportedCandidate(prompt: prompt))])
+
+        let (result, _) = await tracedTurn(prompt: prompt) {
+            await coordinator.run(prompt: prompt, context: turnContext(fixture, presetTitles: ["Rent"]))
+        }
+
+        guard case .handled(let answer, _, _, _, _) = result else {
+            Issue.record("Expected early planned expense stress formula to execute.")
+            return
+        }
+
+        #expect(answer.title == "Early Planned Expense Stress")
+        assertFormulaRows(answer, formula: .earlyPlannedExpenseStress)
+        #expect(answer.rows.contains { $0.title == "Rent Bill" && $0.value.contains("preset Rent") && $0.value.contains("stress") })
+    }
+
+    @Test func semanticRealApp_recurringSubscriptionsDoNotBecomeGenericComparison() async throws {
+        let fixture = try makeFixture()
+        fixture.context.insert(VariableExpense(descriptionText: "StreamBox", amount: 10, transactionDate: date(2026, 3, 5), workspace: fixture.workspace, card: fixture.appleCard, category: fixture.travel))
+        fixture.context.insert(VariableExpense(descriptionText: "StreamBox", amount: 10, transactionDate: date(2026, 4, 5), workspace: fixture.workspace, card: fixture.appleCard, category: fixture.travel))
+        fixture.context.insert(VariableExpense(descriptionText: "StreamBox", amount: 25, transactionDate: date(2026, 5, 5), workspace: fixture.workspace, card: fixture.appleCard, category: fixture.travel))
+        fixture.context.insert(VariableExpense(descriptionText: "StreamBox", amount: 25, transactionDate: date(2026, 5, 14), workspace: fixture.workspace, card: fixture.appleCard, category: fixture.travel))
+        fixture.context.insert(PlannedExpense(title: "Music Plan", plannedAmount: 10, actualAmount: 15, expenseDate: date(2026, 5, 8), workspace: fixture.workspace, card: fixture.backupCard, category: fixture.groceries))
+        try fixture.context.save()
+
+        let prompt = "Show me subscriptions or recurring-ish charges that look suspiciously higher than usual."
+        let coordinator = coordinator(for: [prompt: canonicalInterpretation(unsupportedCandidate(prompt: prompt))])
+
+        let (result, _) = await tracedTurn(prompt: prompt) {
+            await coordinator.run(prompt: prompt, context: turnContext(fixture))
+        }
+
+        guard case .handled(let answer, _, _, _, _) = result else {
+            Issue.record("Expected recurring charge anomaly formula to execute.")
+            return
+        }
+
+        #expect(answer.title == "Recurring Charge Anomalies")
+        #expect(answer.title != "Spending Comparison This Month")
+        assertFormulaRows(answer, formula: .recurringChargeAnomaly)
+        #expect(answer.rows.contains { $0.title == "Streambox" || $0.title == "Music Plan" })
+    }
+
+    @Test func semanticRealApp_unsafeExpenseOnlyPromptUsesSavingsRunwayFormula() async throws {
+        let fixture = try makeFixture()
+        fixture.context.insert(SavingsAccount(name: "True Savings", total: 300, workspace: fixture.workspace))
+        fixture.context.insert(VariableExpense(descriptionText: "Groceries", amount: 90, transactionDate: date(2026, 5, 5), workspace: fixture.workspace, card: fixture.appleCard, category: fixture.groceries))
+        fixture.context.insert(VariableExpense(descriptionText: "Travel", amount: 60, transactionDate: date(2026, 5, 10), workspace: fixture.workspace, card: fixture.backupCard, category: fixture.travel))
+        fixture.context.insert(Income(source: "Ignored Income", amount: 10_000, date: date(2026, 5, 12), isPlanned: false, workspace: fixture.workspace))
+        try fixture.context.save()
+
+        let prompt = "If I ignore income and only look at actual card activity, how many days until this budget feels unsafe?"
+        let coordinator = coordinator(for: [prompt: canonicalInterpretation(unsupportedCandidate(prompt: prompt))])
+
+        let (result, _) = await tracedTurn(prompt: prompt) {
+            await coordinator.run(prompt: prompt, context: turnContext(fixture))
+        }
+
+        guard case .handled(let answer, _, _, _, _) = result else {
+            Issue.record("Expected expense-only savings runway formula to execute.")
+            return
+        }
+
+        #expect(answer.title == "Expense-Only Savings Runway")
+        assertFormulaRows(answer, formula: .expenseOnlySavingsRunway)
+        #expect(answer.rows.contains { $0.title == "Actual card activity" })
+        #expect(answer.rows.contains { $0.title == "Ignored Income" } == false)
+    }
+
     private func coordinator(for interpretations: [String: MarinaCanonicalReadInterpretation]) -> MarinaTurnCoordinator {
         MarinaTurnCoordinator(
             availability: AvailableMarinaModel(),
@@ -332,6 +580,26 @@ struct MarinaFoundationSemanticRealAppTests {
         #expect(allowedRoutes.contains(trace.selectedRoute))
         #expect(trace.foundationPipelinePath == .foundationModels)
         #expect(trace.foundationPipelineInterpreterSource == .foundationModels)
+    }
+
+    private func assertFormulaRows(
+        _ answer: HomeAnswer,
+        formula: MarinaCompositeFormulaKind
+    ) {
+        #expect(answer.rows.contains { $0.title == "Formula" && $0.value == formula.rawValue })
+        #expect(answer.rows.contains { $0.title == "Assumptions" && $0.value.isEmpty == false })
+        #expect(answer.rows.contains { $0.title == "Date range" && $0.value.isEmpty == false })
+    }
+
+    private func assertFormulaFamilyRows(
+        _ answer: HomeAnswer,
+        family: MarinaFormulaFamily,
+        measure: MarinaFormulaMeasure
+    ) {
+        #expect(answer.rows.contains { $0.title == "Formula family" && $0.value == family.rawValue })
+        #expect(answer.rows.contains { $0.title == "Measure" && $0.value == measure.rawValue })
+        #expect(answer.rows.contains { $0.title == "Assumptions" && $0.value.isEmpty == false })
+        #expect(answer.rows.contains { $0.title == "Date range" && $0.value.isEmpty == false })
     }
 
     private func canonicalInterpretation(

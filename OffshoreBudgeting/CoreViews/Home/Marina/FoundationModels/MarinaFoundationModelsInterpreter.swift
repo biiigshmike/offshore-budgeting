@@ -143,7 +143,12 @@ struct MarinaFoundationModelsInterpreter {
             databaseLookupRequest: databaseLookupRequest,
             semanticCommand: command,
             insightIntent: command.insightIntent,
-            softTimeHint: command.softTimeHint
+            softTimeHint: command.softTimeHint,
+            formulaKind: command.formulaKind,
+            formulaFamily: command.formulaFamily,
+            formulaMeasure: command.formulaMeasure,
+            formulaBacklogRecipe: command.formulaBacklogRecipe,
+            formulaFacets: command.formulaFacets
         )
     }
 

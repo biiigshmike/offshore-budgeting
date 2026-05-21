@@ -134,6 +134,82 @@ struct MarinaFoundationModelsContractsTests {
         #expect(command.periodUnit == .month)
     }
 
+    @Test func typedReadQuery_formulaRawCanDriveCatalogCommandWithoutPrimitiveRoute() {
+        let intent = MarinaAIIntent.readQuery(
+            MarinaAIReadQueryIntent(
+                reasoning: "Use the deterministic formula catalog.",
+                subjectRaw: nil,
+                operationRaw: nil,
+                measureRaw: nil,
+                includeMentions: [],
+                excludeMentions: [],
+                primaryDateRange: nil,
+                comparisonDateRange: nil,
+                groupingRaw: nil,
+                rankingRaw: nil,
+                requestedDetailRaw: nil,
+                limit: nil,
+                incomeStatusRaw: nil,
+                insightIntentRaw: nil,
+                softTimeHintRaw: nil,
+                formulaRaw: "expenseOnlySavingsRunway",
+                confidenceRaw: "medium"
+            )
+        )
+
+        guard case .semanticCommand(let command) = intent.structuredIntent else {
+            Issue.record("Expected formula-selected read query to produce a semantic command.")
+            return
+        }
+
+        #expect(command.formulaKind == .expenseOnlySavingsRunway)
+        #expect(command.action == .simulate)
+        #expect(command.datasets == [.variableExpenses])
+        #expect(command.measure == .spend)
+    }
+
+    @Test func typedReadQuery_formulaFamilyAndFacetsBridgeToSemanticCommand() {
+        let intent = MarinaAIIntent.readQuery(
+            MarinaAIReadQueryIntent(
+                reasoning: "Use the generic formula family.",
+                subjectRaw: nil,
+                operationRaw: nil,
+                measureRaw: "spend",
+                includeMentions: [],
+                excludeMentions: [],
+                primaryDateRange: nil,
+                comparisonDateRange: nil,
+                groupingRaw: nil,
+                rankingRaw: nil,
+                requestedDetailRaw: nil,
+                limit: nil,
+                incomeStatusRaw: nil,
+                insightIntentRaw: nil,
+                softTimeHintRaw: nil,
+                formulaFamilyRaw: "average",
+                formulaRecipeRaw: "medianAmount",
+                thresholdRaw: "250",
+                baselineRaw: "last month",
+                assumptionRaw: "ignore refunds",
+                excludeIncome: true,
+                confidenceRaw: "medium"
+            )
+        )
+
+        guard case .semanticCommand(let command) = intent.structuredIntent else {
+            Issue.record("Expected formula-family read query to produce a semantic command.")
+            return
+        }
+
+        #expect(command.formulaFamily == .average)
+        #expect(command.formulaMeasure == .variableBudgetImpact)
+        #expect(command.formulaBacklogRecipe == .medianAmount)
+        #expect(command.formulaFacets.thresholdRaw == "250")
+        #expect(command.formulaFacets.baselineRaw == "last month")
+        #expect(command.formulaFacets.assumptionRaw == "ignore refunds")
+        #expect(command.formulaFacets.excludeIncome == true)
+    }
+
     @Test func typedReadQuery_treatsLiteralNullAndNonePlaceholdersAsMissing() {
         let intent = MarinaAIIntent.readQuery(
             MarinaAIReadQueryIntent(

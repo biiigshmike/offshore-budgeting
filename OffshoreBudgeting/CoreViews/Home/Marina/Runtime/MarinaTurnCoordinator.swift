@@ -202,6 +202,7 @@ struct MarinaTurnCoordinator {
     private let recoveryPolicy = MarinaQueryRecoveryPolicy()
     private let semanticAdapter = MarinaSemanticQueryAdapter()
     private let conversationalPlanner = MarinaConversationalQueryPlanner()
+    private let compositePlanner = MarinaCompositeQueryPlanner()
 
     init(
         availability: MarinaModelAvailabilityProviding? = nil,
@@ -489,6 +490,61 @@ struct MarinaTurnCoordinator {
         case .unsupported(let unsupported):
             semanticResolved = nil
             outcome = .unsupported(unsupported)
+        }
+
+        if let composite = compositePlanner.plan(
+            candidate: candidate,
+            resolved: resolved,
+            semanticResolved: semanticResolved,
+            outcome: outcome,
+            context: context
+        ) {
+            switch composite {
+            case .handled(let card):
+                let execution = MarinaQueryExecution(
+                    executablePlan: nil,
+                    aggregationResult: .workspaceCard(card),
+                    databaseLookupResponse: nil,
+                    workspaceAggregationCard: card,
+                    amountBasis: .budgetImpact,
+                    executionRoute: .scenario
+                )
+                let answer = answerWithEvidence(
+                    responseBuilder.responseCompatibleAnswer(from: execution.aggregationResult),
+                    execution: execution,
+                    resolved: resolved,
+                    semanticResolved: semanticResolved
+                )
+                MarinaFoundationTraceBridge.record(
+                    context: context,
+                    interpretation: interpretation,
+                    resolved: resolved,
+                    semanticResolved: semanticResolved,
+                    validationOutcome: outcome,
+                    execution: execution
+                )
+                return .handled(
+                    answer: answer,
+                    aggregationResult: execution.aggregationResult,
+                    homeQueryPlan: nil,
+                    amountBasis: execution.amountBasis,
+                    executionRoute: execution.executionRoute
+                )
+            case .clarification(let clarification):
+                let clarificationOutcome = MarinaPlanValidationOutcome.clarification(clarification)
+                MarinaFoundationTraceBridge.record(
+                    context: context,
+                    interpretation: interpretation,
+                    resolved: resolved,
+                    semanticResolved: semanticResolved,
+                    validationOutcome: clarificationOutcome,
+                    execution: nil
+                )
+                return .clarification(
+                    answer: responseBuilder.aggregationBridge.responseCompatibleAnswer(from: clarification),
+                    clarification: clarification
+                )
+            }
         }
 
         if let unsupported = explicitConstraints.unsupportedIfDropped(

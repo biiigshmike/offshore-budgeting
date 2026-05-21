@@ -198,6 +198,121 @@ enum MarinaInsightSoftTimeHint: String, Codable, Equatable, CaseIterable, Sendab
     case aroundTrip
 }
 
+enum MarinaCompositeFormulaKind: String, Codable, Equatable, CaseIterable, Sendable {
+    case categoryLimitBurnRate
+    case cardSavingsDrag
+    case earlyPlannedExpenseStress
+    case recurringChargeAnomaly
+    case expenseOnlySavingsRunway
+}
+
+enum MarinaFormulaFamily: String, Codable, Equatable, CaseIterable, Sendable {
+    case list
+    case detail
+    case count
+    case sum
+    case average
+    case rank
+    case compare
+    case threshold
+    case runway
+    case anomaly
+    case whatIf
+    case trend
+    case forecast
+}
+
+enum MarinaFormulaMeasure: String, Codable, Equatable, CaseIterable, Sendable {
+    case variableBudgetImpact
+    case variableLedgerAmount
+    case plannedEffectiveAmount
+    case incomeAmount
+    case savingsBalance
+    case savingsMovement
+    case reconciliationBalance
+    case allocationAmount
+    case count
+}
+
+enum MarinaFormulaBacklogRecipe: String, Codable, Equatable, CaseIterable, Sendable {
+    case netCashFlow
+    case plannedVsActualVariance
+    case thresholdRows
+    case zeroActivityBuckets
+    case recurringFrequency
+    case periodChangeDrivers
+    case forecastPeriodicSpend
+    case medianAmount
+}
+
+struct MarinaFormulaFacets: Codable, Equatable, Sendable {
+    let thresholdRaw: String?
+    let baselineRaw: String?
+    let assumptionRaw: String?
+    let excludeIncome: Bool
+
+    init(
+        thresholdRaw: String? = nil,
+        baselineRaw: String? = nil,
+        assumptionRaw: String? = nil,
+        excludeIncome: Bool = false
+    ) {
+        self.thresholdRaw = thresholdRaw
+        self.baselineRaw = baselineRaw
+        self.assumptionRaw = assumptionRaw
+        self.excludeIncome = excludeIncome
+    }
+}
+
+struct MarinaFormulaIR: Codable, Equatable, Identifiable, Sendable {
+    let id: UUID
+    let family: MarinaFormulaFamily
+    let recipe: MarinaCompositeFormulaKind?
+    let backlogRecipe: MarinaFormulaBacklogRecipe?
+    let subject: MarinaSubject
+    let measure: MarinaFormulaMeasure
+    let filters: [MarinaResolvedAggregationTarget]
+    let dateRange: HomeQueryDateRange?
+    let comparisonDateRange: HomeQueryDateRange?
+    let grouping: MarinaGroupingCandidate?
+    let ranking: MarinaRankingCandidate?
+    let limit: Int?
+    let assumptions: [String]
+    let facets: MarinaFormulaFacets
+
+    init(
+        id: UUID = UUID(),
+        family: MarinaFormulaFamily,
+        recipe: MarinaCompositeFormulaKind? = nil,
+        backlogRecipe: MarinaFormulaBacklogRecipe? = nil,
+        subject: MarinaSubject,
+        measure: MarinaFormulaMeasure,
+        filters: [MarinaResolvedAggregationTarget] = [],
+        dateRange: HomeQueryDateRange? = nil,
+        comparisonDateRange: HomeQueryDateRange? = nil,
+        grouping: MarinaGroupingCandidate? = nil,
+        ranking: MarinaRankingCandidate? = nil,
+        limit: Int? = nil,
+        assumptions: [String] = [],
+        facets: MarinaFormulaFacets = MarinaFormulaFacets()
+    ) {
+        self.id = id
+        self.family = family
+        self.recipe = recipe
+        self.backlogRecipe = backlogRecipe
+        self.subject = subject
+        self.measure = measure
+        self.filters = filters
+        self.dateRange = dateRange
+        self.comparisonDateRange = comparisonDateRange
+        self.grouping = grouping
+        self.ranking = ranking
+        self.limit = limit
+        self.assumptions = assumptions
+        self.facets = facets
+    }
+}
+
 enum MarinaRequestFamily: String, Codable, Sendable, Equatable {
     case analytics
     case databaseLookup
@@ -342,6 +457,11 @@ struct MarinaSemanticCommand: Codable, Equatable, Sendable {
     let requestedDetail: MarinaSemanticRequestedDetail?
     let insightIntent: MarinaInsightIntent?
     let softTimeHint: MarinaInsightSoftTimeHint?
+    let formulaKind: MarinaCompositeFormulaKind?
+    let formulaFamily: MarinaFormulaFamily?
+    let formulaMeasure: MarinaFormulaMeasure?
+    let formulaBacklogRecipe: MarinaFormulaBacklogRecipe?
+    let formulaFacets: MarinaFormulaFacets
 
     init(
         family: MarinaRequestFamily,
@@ -359,7 +479,12 @@ struct MarinaSemanticCommand: Codable, Equatable, Sendable {
         incomeStatusScope: MarinaIncomeStatusScope? = nil,
         requestedDetail: MarinaSemanticRequestedDetail? = nil,
         insightIntent: MarinaInsightIntent? = nil,
-        softTimeHint: MarinaInsightSoftTimeHint? = nil
+        softTimeHint: MarinaInsightSoftTimeHint? = nil,
+        formulaKind: MarinaCompositeFormulaKind? = nil,
+        formulaFamily: MarinaFormulaFamily? = nil,
+        formulaMeasure: MarinaFormulaMeasure? = nil,
+        formulaBacklogRecipe: MarinaFormulaBacklogRecipe? = nil,
+        formulaFacets: MarinaFormulaFacets = MarinaFormulaFacets()
     ) {
         self.family = family
         self.action = action
@@ -377,6 +502,11 @@ struct MarinaSemanticCommand: Codable, Equatable, Sendable {
         self.requestedDetail = requestedDetail
         self.insightIntent = insightIntent
         self.softTimeHint = softTimeHint
+        self.formulaKind = formulaKind
+        self.formulaFamily = formulaFamily
+        self.formulaMeasure = formulaMeasure
+        self.formulaBacklogRecipe = formulaBacklogRecipe
+        self.formulaFacets = formulaFacets
     }
 }
 
@@ -461,6 +591,11 @@ struct MarinaQueryPlanCandidate: Codable, Equatable, Sendable {
     let requestShape: MarinaRequestShape?
     let insightIntent: MarinaInsightIntent?
     let softTimeHint: MarinaInsightSoftTimeHint?
+    let formulaKind: MarinaCompositeFormulaKind?
+    let formulaFamily: MarinaFormulaFamily?
+    let formulaMeasure: MarinaFormulaMeasure?
+    let formulaBacklogRecipe: MarinaFormulaBacklogRecipe?
+    let formulaFacets: MarinaFormulaFacets
     let routeIntent: MarinaRouteIntent?
 
     init(
@@ -482,6 +617,11 @@ struct MarinaQueryPlanCandidate: Codable, Equatable, Sendable {
         requestShape: MarinaRequestShape? = nil,
         insightIntent: MarinaInsightIntent? = nil,
         softTimeHint: MarinaInsightSoftTimeHint? = nil,
+        formulaKind: MarinaCompositeFormulaKind? = nil,
+        formulaFamily: MarinaFormulaFamily? = nil,
+        formulaMeasure: MarinaFormulaMeasure? = nil,
+        formulaBacklogRecipe: MarinaFormulaBacklogRecipe? = nil,
+        formulaFacets: MarinaFormulaFacets = MarinaFormulaFacets(),
         routeIntent: MarinaRouteIntent? = nil
     ) {
         self.requestFamily = requestFamily
@@ -502,6 +642,13 @@ struct MarinaQueryPlanCandidate: Codable, Equatable, Sendable {
         self.requestShape = requestShape
         self.insightIntent = insightIntent
         self.softTimeHint = softTimeHint
+        self.formulaKind = formulaKind ?? semanticCommand?.formulaKind
+        self.formulaFamily = formulaFamily ?? semanticCommand?.formulaFamily
+        self.formulaMeasure = formulaMeasure ?? semanticCommand?.formulaMeasure
+        self.formulaBacklogRecipe = formulaBacklogRecipe ?? semanticCommand?.formulaBacklogRecipe
+        self.formulaFacets = formulaFacets == MarinaFormulaFacets()
+            ? semanticCommand?.formulaFacets ?? formulaFacets
+            : formulaFacets
         self.routeIntent = routeIntent ?? MarinaRouteIntent.inferred(
             requestFamily: requestFamily,
             rawPrompt: rawPrompt,
