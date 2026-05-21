@@ -711,14 +711,14 @@ struct MarinaQueryResolverTests {
         let resolved = MarinaQueryResolver().resolve(
             query: query,
             provider: fixture.provider,
-            now: date(2026, 5, 15),
+            now: localDate(2026, 5, 15),
             defaultPeriodUnit: .month
         )
 
-        #expect(resolved.primaryDateRange?.startDate == date(2026, 5, 1))
-        #expect(resolved.primaryDateRange?.endDate == date(2026, 5, 31, 23, 59, 59))
-        #expect(resolved.comparisonDateRange?.startDate == date(2026, 4, 1))
-        #expect(resolved.comparisonDateRange?.endDate == date(2026, 4, 30, 23, 59, 59))
+        #expect(resolved.primaryDateRange?.startDate == localDate(2026, 5, 1))
+        #expect(resolved.primaryDateRange?.endDate == localDate(2026, 5, 31, 23, 59, 59))
+        #expect(resolved.comparisonDateRange?.startDate == localDate(2026, 4, 1))
+        #expect(resolved.comparisonDateRange?.endDate == localDate(2026, 4, 30, 23, 59, 59))
     }
 
     private struct Fixture {
@@ -777,6 +777,27 @@ struct MarinaQueryResolverTests {
     ) -> Date {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .gmt
+        var components = DateComponents()
+        components.year = year
+        components.month = month
+        components.day = day
+        components.hour = hour
+        components.minute = minute
+        components.second = second
+        components.timeZone = calendar.timeZone
+        return calendar.date(from: components) ?? .distantPast
+    }
+
+    private func localDate(
+        _ year: Int,
+        _ month: Int,
+        _ day: Int,
+        _ hour: Int = 0,
+        _ minute: Int = 0,
+        _ second: Int = 0
+    ) -> Date {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
         var components = DateComponents()
         components.year = year
         components.month = month

@@ -7,6 +7,10 @@
 
 import Foundation
 
+protocol MarinaModelAvailabilityProviding {
+    func currentStatus() -> MarinaModelAvailability.Status
+}
+
 struct MarinaModelAvailability {
     enum Status: Equatable {
         case available
@@ -25,6 +29,8 @@ struct MarinaModelAvailability {
         #endif
     }
 }
+
+extension MarinaModelAvailability: MarinaModelAvailabilityProviding {}
 
 #if canImport(FoundationModels)
 import FoundationModels

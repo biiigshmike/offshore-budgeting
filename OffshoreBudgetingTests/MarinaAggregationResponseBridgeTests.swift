@@ -129,7 +129,8 @@ struct MarinaAggregationResponseBridgeTests {
             kind: .missingTarget,
             message: "Which target did you mean?",
             choices: [
-                MarinaClarificationChoice(title: "Groceries", entityTypeHint: .category, rawValue: "Groceries")
+                MarinaClarificationChoice(title: "Groceries", entityTypeHint: .category, rawValue: "Groceries"),
+                MarinaClarificationChoice(title: "Grocery Card", entityTypeHint: .card, rawValue: "Grocery Card")
             ]
         )
 
@@ -139,7 +140,7 @@ struct MarinaAggregationResponseBridgeTests {
         #expect(bridged.kind == .message)
         #expect(bridged.title == "I need one choice first")
         #expect(bridged.subtitle == "Which target did you mean?")
-        #expect(bridged.rows.map(\.title) == ["Groceries (category)"])
+        #expect(bridged.rows.map(\.title) == ["Groceries (category)", "Grocery Card (card)"])
         #expect(outcomeAnswer?.title == bridged.title)
         #expect(outcomeAnswer?.subtitle == bridged.subtitle)
     }

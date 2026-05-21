@@ -469,6 +469,11 @@ struct MarinaUITestDriver {
             || trace.sharedPipelineHeuristicUsedAsFallback == true {
             return MarinaSurfaceResult(passed: false, category: .legacyRouteInterception, reason: "Prompt selected a legacy or heuristic route.")
         }
+        if answer.text.localizedCaseInsensitiveContains("MarinaResponseRules")
+            || answer.text.localizedCaseInsensitiveContains("MarinaResponses")
+            || answer.text.localizedCaseInsensitiveContains("bestie") {
+            return MarinaSurfaceResult(passed: false, category: .legacyRouteInterception, reason: "Prompt surfaced legacy canned persona copy.")
+        }
         if trace.turnClassification == "freshQuestion", trace.priorContextIncluded == true {
             return MarinaSurfaceResult(passed: false, category: .stalePriorContext, reason: "Fresh question included prior context.")
         }

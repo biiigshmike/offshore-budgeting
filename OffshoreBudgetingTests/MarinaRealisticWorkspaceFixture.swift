@@ -19,52 +19,6 @@ struct MarinaRealisticWorkspaceFixture {
     let sharedAccount: AllocationAccount
     let provider: MarinaDataProvider
 
-    var contextForSharedPipeline: MarinaSharedPipelineContext {
-        sharedPipelineContext()
-    }
-
-    func sharedPipelineContext(
-        turnClassification: MarinaPromptTurnClassification = .freshQuestion,
-        priorQueryContext: MarinaPriorQueryContext? = nil,
-        aiOptInEnabled: Bool = false
-    ) -> MarinaSharedPipelineContext {
-        let priorQueryContext = priorQueryContext ?? .empty
-        return MarinaSharedPipelineContext(
-            provider: provider,
-            routerContext: MarinaLanguageRouterContext(
-                workspaceName: workspace.name,
-                defaultPeriodUnit: .month,
-                sessionContext: HomeAssistantSessionContext(),
-                priorQueryContext: priorQueryContext,
-                cardNames: ["Apple", "Backup Card", "Amex Platinum", "Visa - Blue", "Cash"],
-                categoryNames: ["Groceries", "Dining", "Travel", "Utilities", "Cannabis"],
-                incomeSourceNames: ["Salary", "Consulting", "Acme Dental"],
-                presetTitles: ["Rent"],
-                budgetNames: ["May Budget"],
-                aliasSummaries: [
-                    MarinaAliasSummary(
-                        entityTypeRaw: HomeAssistantAliasEntityType.category.rawValue,
-                        aliasKey: "food",
-                        targetValue: "Groceries"
-                    )
-                ],
-                now: Self.date(2026, 5, 15)
-            ),
-            defaultPeriodUnit: .month,
-            sharedPipelineEnabled: true,
-            aiOptInEnabled: aiOptInEnabled,
-            turnClassification: turnClassification,
-            now: Self.date(2026, 5, 15)
-        )
-    }
-
-    func run(_ prompt: String) async -> MarinaSharedPipelineRuntimeResult {
-        await MarinaSharedPipelineCoordinator().run(
-            prompt: prompt,
-            context: contextForSharedPipeline
-        )
-    }
-
     static func make() throws -> MarinaRealisticWorkspaceFixture {
         let schema = Schema([
             Workspace.self,

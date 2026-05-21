@@ -20,7 +20,6 @@ enum HomeAssistantPlanResolutionSource: String {
     case parser
     case contextual
     case entityAware
-    case sharedHeuristic
     case sharedFoundationModels
 }
 
@@ -81,7 +80,6 @@ struct HomeAssistantPanelView: View {
     @State private var quickButtonsVisible = false
     @State private var followUpsCollapsed = false
     @State private var hasLoadedConversation = false
-    private let selectedPersonaID: HomeAssistantPersonaID = .marina
     @State private var isShowingClearConversationAlert = false
     @State private var sessionContext = HomeAssistantSessionContext()
     @State private var clarificationSuggestions: [HomeAssistantSuggestion] = []
@@ -93,8 +91,6 @@ struct HomeAssistantPanelView: View {
     @State private var sharedPipelineClarificationChoicesByID: [UUID: MarinaClarificationChoice] = [:]
     @State private var sharedPipelineClarificationChoicesByTitle: [String: MarinaClarificationChoice] = [:]
     @State private var selectedEmptySuggestionGroup: HomeAssistantPresetPromptGroup?
-    @State private var personaSessionSeed: UInt64 = UInt64.random(in: UInt64.min...UInt64.max)
-    @State private var personaCooldownSessionID: String = UUID().uuidString
     @State private var pendingExpenseCardPlan: HomeAssistantCommandPlan? = nil
     @State private var pendingExpenseCardOptions: [Card] = []
     @State private var pendingPresetCardPlan: HomeAssistantCommandPlan? = nil
@@ -176,21 +172,13 @@ struct HomeAssistantPanelView: View {
     private let categoryAvailabilityAnswerBuilder = HomeAssistantCategoryAvailabilityAnswerBuilder()
     private let cardSummaryAnswerBuilder = HomeAssistantCardSummaryAnswerBuilder()
     private let responseGenerationService: any MarinaResponseGenerating = MarinaResponseGenerationService()
+    private let followUpSuggestionBuilder = HomeAssistantFollowUpSuggestionBuilder()
     private let mutationService = HomeAssistantMutationService()
-    private let followUpAnchorResolver = HomeAssistantFollowUpAnchorResolver()
     private var intentBuilder: HomeAssistantIntentBuilder {
         HomeAssistantIntentBuilder(
             categoryNames: categories.map(\.name),
             cardNames: cards.map(\.name),
             incomeSourceNames: Array(Set(incomes.map(\.source)))
-        )
-    }
-    
-    private var personaFormatter: HomeAssistantPersonaFormatter {
-        HomeAssistantPersonaFormatter(
-            sessionSeed: personaSessionSeed,
-            responseRules: .marinaUserVisible,
-            cooldownSessionID: personaCooldownSessionID
         )
     }
     
@@ -271,9 +259,9 @@ struct HomeAssistantPanelView: View {
                     VStack(alignment: .leading, spacing: 14) {
                         if answers.isEmpty {
                             ContentUnavailableView(
-                                selectedPersonaProfile.displayName,
+                                "Marina",
                                 systemImage: "figure.wave",
-                                description: Text(personaTransitionDescription)
+                                description: Text(marinaEmptyStateDescription)
                             )
                         } else {
                             answersSection
@@ -1092,10 +1080,9 @@ struct HomeAssistantPanelView: View {
         let groundedQuery = sessionContext.recentAnswerContexts.last?.executedPlan?.query
             ?? sessionContext.recentAnswerContexts.last?.query
         let followUps = generatedFollowUpSuggestionsByAnswerID[answer.id]
-            ?? personaFormatter.followUpSuggestions(
+            ?? followUpSuggestionBuilder.suggestions(
                 after: answer,
-                executedQuery: groundedQuery,
-                personaID: selectedPersonaID
+                executedQuery: groundedQuery
             )
         let sections = HomeAssistantSuggestionSectionBuilder.build(
             clarificationSuggestions: clarificationSuggestions,
@@ -1116,17 +1103,9 @@ struct HomeAssistantPanelView: View {
         )
     }
     
-    private var selectedPersonaProfile: HomeAssistantPersonaProfile {
-        HomeAssistantPersonaCatalog.profile(for: selectedPersonaID)
-    }
-    
-    private var emptyStatePersonaIntroduction: String {
-        personaTransitionDescription
-    }
-    
-    private var personaTransitionDescription: String {
+    private var marinaEmptyStateDescription: String {
         String(
-            localized: "assistant.persona.transitionDescription",
+            localized: "assistant.marina.emptyDescription",
             defaultValue: "I’ll help you stay encouraged and grounded with quick, practical reads on your spending and trends.",
             comment: "Introductory Marina description shown in the empty assistant state."
         )
@@ -1494,17 +1473,6 @@ struct HomeAssistantPanelView: View {
             userPrompt: userPrompt
         )
         let explainedAnswer = applyResolutionExplanation(explanation, to: titledAnswer)
-        let personaUserPrompt = (confidenceBand == .high || rawAnswer.kind != .comparison) ? userPrompt : nil
-        
-        let answer = personaFormatter.styledAnswer(
-            from: explainedAnswer,
-            userPrompt: personaUserPrompt,
-            personaID: selectedPersonaID,
-            seedContext: personaSeedContext(for: query),
-            footerContext: personaFooterContext(for: [query]),
-            echoContext: personaEchoContext(for: query),
-            visibleProvenance: visibleProvenance(for: query)
-        )
         
         let executedPlanForMemory = executedPlan ?? HomeQueryPlan(
             metric: query.intent.metric,
@@ -1517,13 +1485,13 @@ struct HomeAssistantPanelView: View {
         )
         presentMarinaAnswer(
             deterministicAnswer: explainedAnswer,
-            basicFallbackAnswer: answer,
+            basicFallbackAnswer: explainedAnswer,
             rawPrompt: userPrompt ?? "",
             source: source,
             homeQueryPlan: executedPlanForMemory,
             surfaceKind: explainedAnswer.primaryValue == nil && explainedAnswer.rows.isEmpty ? .noData : .answer,
             groundingSummary: executedPlanForMemory.traceSummary,
-            followUpSuggestions: followUpSuggestions(for: answer, query: query)
+            followUpSuggestions: followUpSuggestions(for: explainedAnswer, query: query)
         ) { presentedAnswer in
             updateSessionContext(after: executedPlanForMemory)
             rememberAnswerContext(
@@ -1564,17 +1532,10 @@ struct HomeAssistantPanelView: View {
                 now: marinaRuntimeSettings.now
             )
         } ?? normalizedAnswer
-        let styled = shouldBypassPersonaStyling(for: titledAnswer)
-            ? titledAnswer
-            : personaFormatter.styledAnswer(
-                from: titledAnswer,
-                userPrompt: rawPrompt,
-                personaID: selectedPersonaID
-            )
-        let deterministicFollowUps = followUpSuggestions(for: styled, query: query)
+        let deterministicFollowUps = followUpSuggestions(for: titledAnswer, query: query)
         let surfaced = await presentMarinaAnswer(
             deterministicAnswer: titledAnswer,
-            basicFallbackAnswer: styled,
+            basicFallbackAnswer: titledAnswer,
             rawPrompt: rawPrompt,
             source: source,
             homeQueryPlan: homeQueryPlan,
@@ -1802,24 +1763,10 @@ struct HomeAssistantPanelView: View {
         }
     }
 
-    private func shouldBypassPersonaStyling(for answer: HomeAnswer) -> Bool {
-        guard answer.kind == .message,
-              answer.rows.isEmpty == false else {
-            return false
-        }
-
-        if answer.title.hasPrefix("You are in ") {
-            return true
-        }
-
-        return false
-    }
-
     private func followUpSuggestions(for answer: HomeAnswer, query: HomeQuery?) -> [HomeAssistantSuggestion] {
-        personaFormatter.followUpSuggestions(
+        followUpSuggestionBuilder.suggestions(
             after: answer,
-            executedQuery: query,
-            personaID: selectedPersonaID
+            executedQuery: query
         )
     }
 
@@ -2054,10 +2001,6 @@ struct HomeAssistantPanelView: View {
             hasActiveClarification: sharedPipelineClarification != nil
         )
 
-        if handleClarificationRejection(prompt) {
-            return
-        }
-
         if let clarification = sharedPipelineClarification {
             if turnClassification == .freshQuestion || turnClassification == .command {
                 sharedPipelineClarification = nil
@@ -2081,11 +2024,6 @@ struct HomeAssistantPanelView: View {
                     clarification: clarification
                 )
             }
-            return
-        }
-        
-        if let explainPrompt = planExplainPrompt(from: prompt) {
-            appendAnswer(planExplanationAnswer(for: explainPrompt))
             return
         }
         
@@ -2158,21 +2096,12 @@ struct HomeAssistantPanelView: View {
                 variableExpenses: variableExpenses,
                 incomes: incomes
             )
-            let styled = personaFormatter.styledAnswer(
-                from: built.rawAnswer,
-                userPrompt: prompt,
-                personaID: selectedPersonaID,
-                seedContext: personaSeedContext(for: built.primaryQuery),
-                footerContext: personaFooterContext(for: built.footerQueries),
-                echoContext: personaEchoContext(for: built.primaryQuery),
-                visibleProvenance: visibleProvenance(for: built.footerQueries)
-            )
 
             pendingWhatIfContext = built.context
             pendingWhatIfCategoryMappingContext = nil
             presentMarinaAnswer(
                 deterministicAnswer: built.rawAnswer,
-                basicFallbackAnswer: styled,
+                basicFallbackAnswer: built.rawAnswer,
                 rawPrompt: prompt,
                 source: .contextual,
                 homeQueryPlan: HomeQueryPlan(
@@ -2186,7 +2115,7 @@ struct HomeAssistantPanelView: View {
                 ),
                 surfaceKind: .simulation,
                 groundingSummary: "deterministic what-if simulation",
-                followUpSuggestions: followUpSuggestions(for: styled, query: built.primaryQuery)
+                followUpSuggestions: followUpSuggestions(for: built.rawAnswer, query: built.primaryQuery)
             )
             return true
         }
@@ -2332,20 +2261,15 @@ struct HomeAssistantPanelView: View {
         
         let isDirectGreeting = greetingTokens.contains(firstToken) && tokens.count <= 3
         if isDirectGreeting || greetingPhrases.contains(where: { normalized.contains($0) }) {
-            appendAnswer(personaFormatter.greetingAnswer(for: selectedPersonaID))
+            appendAnswer(marinaGreetingAnswer(userPrompt: prompt))
             return true
         }
 
         if MarinaCapabilityGuide.matchesPrompt(prompt) {
             let raw = MarinaCapabilityGuide.makeAnswer(for: prompt)
-            let styled = personaFormatter.styledAnswer(
-                from: raw,
-                userPrompt: prompt,
-                personaID: selectedPersonaID
-            )
             presentMarinaAnswer(
                 deterministicAnswer: raw,
-                basicFallbackAnswer: styled,
+                basicFallbackAnswer: raw,
                 rawPrompt: prompt,
                 source: .contextual,
                 surfaceKind: .help,
@@ -2354,6 +2278,17 @@ struct HomeAssistantPanelView: View {
             return true
         }
         return false
+    }
+
+    private func marinaGreetingAnswer(userPrompt: String?) -> HomeAnswer {
+        HomeAnswer(
+            queryID: UUID(),
+            kind: .message,
+            userPrompt: userPrompt,
+            title: "Marina",
+            subtitle: "Ask me for quick answers from your budget data.",
+            rows: []
+        )
     }
     
     private func handleUnsupportedPrompt(_ prompt: String) -> Bool {
@@ -4856,165 +4791,6 @@ struct HomeAssistantPanelView: View {
         AppDateFormat.shortDate(date)
     }
     
-    private func resolvedPlan(
-        for prompt: String
-    ) -> (plan: HomeQueryPlan, source: HomeAssistantPlanResolutionSource)? {
-        if let plan = parser.parsePlan(prompt, defaultPeriodUnit: defaultQueryPeriodUnit) {
-            let fallbackPlan = enrichPlanWithEntities(plan, rawPrompt: prompt)
-            let signals = parsedSignals(for: prompt, fallbackPlan: fallbackPlan)
-            let resolvedPlan = intentBuilder.buildPlan(from: signals, fallbackPlan: fallbackPlan)
-            MarinaDebugLogger.log(
-                "[MarinaResolution] parserRaw plan=\(plan) fallback=\(fallbackPlan) resolved=\(resolvedPlan)"
-            )
-            return (resolvedPlan, .parser)
-        }
-        
-        if let contextualPlan = contextualPlan(for: prompt) {
-            return (contextualPlan, .contextual)
-        }
-        
-        if let entityPlan = entityAwarePlan(for: prompt) {
-            return (entityPlan, .entityAware)
-        }
-        
-        return nil
-    }
-    
-    private func planExplainPrompt(from prompt: String) -> String? {
-        let normalized = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
-        let explainPrefixes = ["/explain", "explain:"]
-        
-        for prefix in explainPrefixes {
-            if normalized.lowercased().hasPrefix(prefix) {
-                let remaining = normalized.dropFirst(prefix.count).trimmingCharacters(in: .whitespacesAndNewlines)
-                return remaining.isEmpty ? nil : remaining
-            }
-        }
-        
-        return nil
-    }
-    
-    private func planExplanationAnswer(for prompt: String) -> HomeAnswer {
-        let normalized = normalizedPrompt(prompt)
-        let comparisonDetected = detectComparison(prompt)
-        let explicitComparisonRequested = appearsToRequestExplicitComparisonDates(in: normalized)
-        let signalTarget = extractedSignalTarget(for: prompt)
-        let signalTargetSource = extractedSignalTargetSource(for: prompt)
-        let signalScope: String = {
-            guard let signalTarget else { return "global" }
-            switch signalTargetSource {
-            case .matchedEntity?:
-                if entityMatcher.bestCategoryMatch(in: prompt, categories: categories)?.caseInsensitiveCompare(signalTarget) == .orderedSame
-                    || aliasTarget(in: prompt, entityType: .category)?.caseInsensitiveCompare(signalTarget) == .orderedSame {
-                    return "category"
-                }
-                if entityMatcher.bestCardMatch(in: prompt, cards: cards)?.caseInsensitiveCompare(signalTarget) == .orderedSame
-                    || aliasTarget(in: prompt, entityType: .card)?.caseInsensitiveCompare(signalTarget) == .orderedSame {
-                    return "card"
-                }
-                if entityMatcher.bestIncomeSourceMatch(in: prompt, incomes: incomes)?.caseInsensitiveCompare(signalTarget) == .orderedSame
-                    || aliasTarget(in: prompt, entityType: .incomeSource)?.caseInsensitiveCompare(signalTarget) == .orderedSame {
-                    return "incomeSource"
-                }
-                return "matchedEntity"
-            case .merchantPhrase?:
-                return "merchant"
-            case .weakMerchantPhrase?:
-                return "merchantCandidate"
-            case .inferredComparisonText?:
-                return "unresolved"
-            case nil:
-                return "global"
-            }
-        }()
-        let aliasCard = aliasTarget(in: prompt, entityType: .card)
-        let aliasCategory = aliasTarget(in: prompt, entityType: .category)
-        let aliasIncome = aliasTarget(in: prompt, entityType: .incomeSource)
-        let aliasPreset = aliasTarget(in: prompt, entityType: .preset)
-        let matchedCard = entityMatcher.bestCardMatch(in: prompt, cards: cards)
-        let matchedCategory = entityMatcher.bestCategoryMatch(in: prompt, categories: categories)
-        let matchedIncome = entityMatcher.bestIncomeSourceMatch(in: prompt, incomes: incomes)
-        let matchedPreset = entityMatcher.bestPresetMatch(in: prompt, presets: presets)
-        
-        guard let resolved = resolvedPlan(for: prompt) else {
-            return HomeAnswer(
-                queryID: UUID(),
-                kind: .message,
-                userPrompt: prompt,
-                title: "Plan Explain",
-                subtitle: "No plan resolved from this prompt.",
-                rows: [
-                    HomeAnswerRow(title: "Normalized", value: normalized),
-                    HomeAnswerRow(title: "Matched Card", value: matchedCard ?? "None"),
-                    HomeAnswerRow(title: "Alias Card", value: aliasCard ?? "None"),
-                    HomeAnswerRow(title: "Matched Category", value: matchedCategory ?? "None"),
-                    HomeAnswerRow(title: "Alias Category", value: aliasCategory ?? "None"),
-                    HomeAnswerRow(title: "Matched Income", value: matchedIncome ?? "None"),
-                    HomeAnswerRow(title: "Alias Income", value: aliasIncome ?? "None"),
-                    HomeAnswerRow(title: "Matched Preset", value: matchedPreset ?? "None"),
-                    HomeAnswerRow(title: "Alias Preset", value: aliasPreset ?? "None")
-                ]
-            )
-        }
-        
-        let plan = resolved.plan
-        let clarification = clarificationPlan(for: plan, rawPrompt: prompt)
-        
-        return HomeAnswer(
-            queryID: UUID(),
-            kind: .message,
-            userPrompt: prompt,
-            title: "Plan Explain",
-            subtitle: "Resolved via \(resolved.source.rawValue).",
-            rows: [
-                HomeAnswerRow(title: "Normalized", value: normalized),
-                HomeAnswerRow(title: "Intent", value: plan.metric.intent.rawValue),
-                HomeAnswerRow(title: "Metric", value: plan.metric.rawValue),
-                HomeAnswerRow(title: "Confidence", value: plan.confidenceBand.rawValue),
-                HomeAnswerRow(title: "Target", value: plan.targetName ?? "None"),
-                HomeAnswerRow(title: "Date Range", value: debugDateRangeLabel(plan.dateRange)),
-                HomeAnswerRow(title: "Comparison Date Range", value: debugDateRangeLabel(plan.comparisonDateRange)),
-                HomeAnswerRow(title: "Comparison Detected", value: comparisonDetected ? "Yes" : "No"),
-                HomeAnswerRow(title: "Explicit Comparison Dates", value: explicitComparisonRequested ? "Yes" : "No"),
-                HomeAnswerRow(title: "Signal Target", value: signalTarget ?? "None"),
-                HomeAnswerRow(title: "Signal Target Source", value: signalTargetSource.map(debugSignalTargetSource) ?? "None"),
-                HomeAnswerRow(title: "Resolved Comparison Scope", value: signalScope),
-                HomeAnswerRow(title: "Limit", value: plan.resultLimit.map(String.init) ?? "Default"),
-                HomeAnswerRow(title: "Period Unit", value: plan.periodUnit?.rawValue ?? defaultQueryPeriodUnit.rawValue),
-                HomeAnswerRow(title: "Matched Card", value: matchedCard ?? "None"),
-                HomeAnswerRow(title: "Alias Card", value: aliasCard ?? "None"),
-                HomeAnswerRow(title: "Matched Category", value: matchedCategory ?? "None"),
-                HomeAnswerRow(title: "Alias Category", value: aliasCategory ?? "None"),
-                HomeAnswerRow(title: "Matched Income", value: matchedIncome ?? "None"),
-                HomeAnswerRow(title: "Alias Income", value: aliasIncome ?? "None"),
-                HomeAnswerRow(title: "Matched Preset", value: matchedPreset ?? "None"),
-                HomeAnswerRow(title: "Alias Preset", value: aliasPreset ?? "None"),
-                HomeAnswerRow(
-                    title: "Clarification",
-                    value: clarification.map { $0.shouldRunBestEffort ? "Best-effort + chips" : "Blocked until clarified" } ?? "None"
-                )
-            ]
-        )
-    }
-    
-    private func debugDateRangeLabel(_ range: HomeQueryDateRange?) -> String {
-        guard let range else { return "None" }
-        return "\(AppDateFormat.shortDate(range.startDate)) - \(AppDateFormat.shortDate(range.endDate))"
-    }
-
-    private func debugSignalTargetSource(_ source: HomeAssistantSignalTargetSource) -> String {
-        switch source {
-        case .matchedEntity:
-            return "matchedEntity"
-        case .merchantPhrase:
-            return "merchantPhrase"
-        case .weakMerchantPhrase:
-            return "weakMerchantPhrase"
-        case .inferredComparisonText:
-            return "inferredComparisonText"
-        }
-    }
-    
     private func aliasTarget(
         in prompt: String,
         entityType: HomeAssistantAliasEntityType
@@ -5172,217 +4948,6 @@ struct HomeAssistantPanelView: View {
         conversationStore.saveAnswers([], workspaceID: workspace.id)
     }
     
-    private func handleResolvedPlan(
-        _ plan: HomeQueryPlan,
-        rawPrompt: String,
-        allowsBroadBundle: Bool,
-        source: HomeAssistantPlanResolutionSource,
-        overrideClarificationPlan: HomeAssistantClarificationPlan? = nil,
-        overrideResolution: HomeAssistantEntityResolution? = nil
-    ) {
-        let normalized = normalizedPrompt(rawPrompt)
-        let resolution = overrideResolution ?? resolveEntityResolution(for: plan, rawPrompt: rawPrompt)
-        let reconciliation = planReconciler.reconcile(plan: plan, resolution: resolution)
-        let resolvedPlan = reconciliation.plan
-        let routedRequest = requestRoutingResolver.resolve(prompt: rawPrompt, basePlan: resolvedPlan)
-        let routedPlan = routedRequest.plan
-        let eligibility = HomeAssistantExecutionEligibilityEvaluator.evaluate(
-            plan: routedPlan,
-            normalizedPrompt: normalized,
-            activeBudgetDateRange: activeBudgetDateRange(),
-            now: Date()
-        )
-        let executionPlan = eligibility.planWithDateFallback
-        let executionPolicy = executionPlan.metric.executionPolicy
-        MarinaDebugLogger.log(
-            "[MarinaResolution] inputPlan=\(plan) resolutionConfidence=\(resolution.confidence.rawValue) reconciledPlan=\(resolvedPlan) routedPlan=\(routedPlan) executionPlan=\(executionPlan) unresolvedRequirements=\(eligibility.unresolvedRequirements)"
-        )
-        let enrichedResolution = resolutionWithRecoverySuggestions(
-            resolution,
-            basePlan: executionPlan,
-            rawPrompt: rawPrompt,
-            explanation: reconciliation.explanation
-        )
-        let requiredClarification = requiredFieldClarificationPlan(for: executionPlan, rawPrompt: rawPrompt)
-        let ambiguityClarification = ambiguityClarificationPlan(for: executionPlan, resolution: enrichedResolution)
-        let clarificationPlan = actionableClarificationPlan(
-            mergeClarificationPlans(
-                overrideClarificationPlan ?? requiredClarification,
-                ambiguityClarification
-            ),
-            basePlan: executionPlan,
-            rawPrompt: rawPrompt
-        )
-
-        if let requiredClarification, requiredClarification.shouldRunBestEffort == false {
-            let blockingClarification = actionableClarificationPlan(
-                clarificationPlan ?? requiredClarification,
-                basePlan: routedPlan,
-                rawPrompt: rawPrompt
-            )
-            let finalOutcome = MarinaTurnOutcomeEvaluator.outcome(
-                hasExecutableQuery: true,
-                requiredFieldsMissing: true,
-                clarificationIsActionable: blockingClarification != nil,
-                shouldRecover: blockingClarification == nil
-            )
-            logFinalTurnOutcome(
-                finalOutcome,
-                rawPrompt: rawPrompt,
-                notes: "required_fields_missing clarificationActionable=\(blockingClarification != nil)"
-            )
-            recordTelemetry(
-                for: rawPrompt,
-                outcome: .clarification,
-                source: source,
-                plan: executionPlan,
-                notes: blockingClarification == nil ? "required_clarification_recovery" : "required_clarification"
-            )
-            if let blockingClarification {
-                presentClarificationTurn(
-                    blockingClarification,
-                    userPrompt: rawPrompt,
-                    context: clarificationContext(
-                        for: executionPlan,
-                        rawPrompt: rawPrompt,
-                        resolution: enrichedResolution
-                    )
-                )
-            } else {
-                presentRecoveryTurn(
-                    enrichedResolution.recoverySuggestions,
-                    userPrompt: rawPrompt,
-                    subtitle: "I still need one more detail, so here are the safest fallback paths."
-                )
-            }
-            return
-        }
-
-        if enrichedResolution.isTieAmbiguity {
-            let finalOutcome = MarinaTurnOutcomeEvaluator.outcome(
-                hasExecutableQuery: false,
-                requiredFieldsMissing: false,
-                clarificationIsActionable: clarificationPlan != nil,
-                shouldRecover: clarificationPlan == nil
-            )
-            logFinalTurnOutcome(
-                finalOutcome,
-                rawPrompt: rawPrompt,
-                notes: "tie_ambiguity clarificationActionable=\(clarificationPlan != nil)"
-            )
-            recordTelemetry(
-                for: rawPrompt,
-                outcome: .clarification,
-                source: source,
-                plan: executionPlan,
-                notes: clarificationPlan == nil ? "tie_band_ambiguity_recovery" : "tie_band_ambiguity"
-            )
-            if let clarificationPlan {
-                presentClarificationTurn(
-                    clarificationPlan,
-                    userPrompt: rawPrompt,
-                    context: clarificationContext(
-                        for: executionPlan,
-                        rawPrompt: rawPrompt,
-                        resolution: enrichedResolution
-                    )
-                )
-            } else {
-                presentRecoveryTurn(
-                    enrichedResolution.recoverySuggestions,
-                    userPrompt: rawPrompt,
-                    subtitle: "I found a few close matches, but none were clear enough to run safely."
-                )
-            }
-            return
-        }
-
-        if enrichedResolution.confidence == .low && eligibility.unresolvedRequirements.isEmpty == false {
-            logFinalTurnOutcome(
-                .recovery,
-                rawPrompt: rawPrompt,
-                notes: "low_confidence unresolvedRequirements=\(eligibility.unresolvedRequirements) recoverySuggestions=\(enrichedResolution.recoverySuggestions.count)"
-            )
-            recordTelemetry(
-                for: rawPrompt,
-                outcome: .clarification,
-                source: source,
-                plan: executionPlan,
-                notes: "recovery_only"
-            )
-            presentRecoveryTurn(
-                enrichedResolution.recoverySuggestions,
-                userPrompt: rawPrompt,
-                subtitle: "I couldn’t lock onto a safe match, so here are the best fallback paths."
-            )
-            return
-        }
-
-        if enrichedResolution.confidence == .low
-            && executionPolicy.supportsBroadExecution
-            && executionPlan.targetName == nil
-        {
-            MarinaDebugLogger.log("[MarinaFinalization] low-confidence ignored for broad targetless metric=\(executionPlan.metric.rawValue)")
-        }
-
-        if allowsBroadBundle && shouldRunBroadOverviewBundle(for: rawPrompt, plan: executionPlan) {
-            runBroadOverviewBundle(userPrompt: rawPrompt, basePlan: executionPlan, source: source)
-            logFinalTurnOutcome(
-                .answer,
-                rawPrompt: rawPrompt,
-                notes: "executed_broad_bundle clarificationAttached=\(clarificationPlan != nil)"
-            )
-            recordTelemetry(
-                for: rawPrompt,
-                outcome: .resolved,
-                source: source,
-                plan: executionPlan,
-                notes: clarificationPlan == nil ? "broad_bundle" : "broad_bundle_with_clarification_chips"
-            )
-        } else {
-            let executionRoutedRequest = HomeAssistantRequestRoutingResolution(
-                shape: routedRequest.shape,
-                plan: executionPlan
-            )
-            runRoutedRequest(
-                executionRoutedRequest,
-                userPrompt: rawPrompt,
-                explanation: reconciliation.explanation,
-                executedPlan: executionPlan,
-                source: source
-            )
-            logFinalTurnOutcome(
-                .answer,
-                rawPrompt: rawPrompt,
-                notes: "executed_query clarificationAttached=\(clarificationPlan != nil)"
-            )
-            recordTelemetry(
-                for: rawPrompt,
-                outcome: .resolved,
-                source: source,
-                plan: executionPlan,
-                notes: routedRequest.shape == .single
-                    ? (clarificationPlan == nil ? nil : "resolved_with_clarification_chips")
-                    : bundledRoutingTelemetryNote(
-                        for: routedRequest.shape,
-                        hasClarificationPlan: clarificationPlan != nil
-                    )
-            )
-        }
-
-        if let clarificationPlan {
-            presentClarificationTurn(
-                clarificationPlan,
-                userPrompt: nil,
-                context: clarificationContext(
-                    for: executionPlan,
-                    rawPrompt: rawPrompt,
-                    resolution: enrichedResolution
-                )
-            )
-        }
-    }
-
     private func resolveEntityResolution(
         for plan: HomeQueryPlan,
         rawPrompt: String,
@@ -5827,44 +5392,6 @@ struct HomeAssistantPanelView: View {
         )
     }
 
-    private func handleClarificationRejection(_ prompt: String) -> Bool {
-        guard let context = activeClarificationContext else { return false }
-        let normalized = normalizedPrompt(prompt)
-        guard ["no", "n", "nope", "nah"].contains(normalized) else { return false }
-
-        let rejectedName = context.currentBestMatch?.name ?? context.activeCandidates.first?.name
-        let rejectedNames = context.rejectedCandidateNames + (rejectedName.map { [$0] } ?? [])
-        let resolution = resolveEntityResolution(
-            for: context.basePlan,
-            rawPrompt: context.originalPrompt,
-            rejectedCandidateNames: rejectedNames
-        )
-
-        if resolution.rankedCandidates.isEmpty {
-            let enrichedResolution = resolutionWithRecoverySuggestions(
-                resolution,
-                basePlan: context.basePlan,
-                rawPrompt: context.originalPrompt,
-                explanation: "Using recovery options after rejection"
-            )
-            presentRecoveryTurn(
-                enrichedResolution.recoverySuggestions,
-                userPrompt: prompt,
-                subtitle: "Okay, I dropped that option. Here are the next best paths."
-            )
-            return true
-        }
-
-        handleResolvedPlan(
-            context.basePlan,
-            rawPrompt: context.originalPrompt,
-            allowsBroadBundle: false,
-            source: .contextual,
-            overrideResolution: resolution
-        )
-        return true
-    }
-    
     private func clarificationReasons(
         for plan: HomeQueryPlan,
         normalizedPrompt: String
@@ -6427,7 +5954,7 @@ struct HomeAssistantPanelView: View {
             deterministicAnswer: answer,
             basicFallbackAnswer: answer,
             rawPrompt: reply,
-            source: .sharedHeuristic,
+            source: .sharedFoundationModels,
             surfaceKind: .clarification,
             validationOutcomeSummary: "clarification_retry:\(clarification.kind.rawValue)",
             clarificationChoices: actionableChoices.map(sharedPipelineChoiceTitle),
@@ -6964,156 +6491,6 @@ struct HomeAssistantPanelView: View {
         return Double(normalized[valueRange])
     }
 
-    private func handleAnchoredFollowUpPrompt(_ rawPrompt: String) -> Bool {
-        let decision = followUpAnchorResolver.resolve(
-            prompt: rawPrompt,
-            recentContexts: sessionContext.recentAnswerContexts
-        )
-
-        switch decision {
-        case .none:
-            return false
-        case let .matched(context):
-            guard let plan = anchoredFollowUpPlan(for: rawPrompt, context: context) else {
-                return false
-            }
-            handleResolvedPlan(
-                plan,
-                rawPrompt: rawPrompt,
-                allowsBroadBundle: false,
-                source: .contextual
-            )
-            return true
-        case let .ambiguous(contexts):
-            presentAnchoredFollowUpClarification(contexts, userPrompt: rawPrompt)
-            return true
-        }
-    }
-
-    private func anchoredFollowUpPlan(
-        for rawPrompt: String,
-        context: HomeAssistantAnswerContext
-    ) -> HomeQueryPlan? {
-        let normalized = normalizedPrompt(rawPrompt)
-        let parsedDateRange = parser.parseDateRange(rawPrompt, defaultPeriodUnit: defaultQueryPeriodUnit)
-        let parsedComparisonRanges = extractedComparisonDateRanges(for: rawPrompt)
-        let parsedLimit = parser.parseLimit(rawPrompt)
-
-        var metric = context.query.intent.metric
-        var targetName = resolvedAnchoredTargetName(for: rawPrompt, context: context) ?? context.targetName
-        var confidenceBand: HomeQueryConfidenceBand = .high
-
-        if context.query.intent.metric == .categoryReallocationGuidance,
-           ["save", "savings", "cut", "reduce", "decrease"].contains(where: normalized.contains) {
-            metric = .categoryPotentialSavings
-        } else if context.query.intent.metric == .categoryPotentialSavings,
-                  ["reallocate", "rebalance", "other categories", "increase"].contains(where: normalized.contains) {
-            metric = .categoryReallocationGuidance
-        }
-
-        if targetName == nil {
-            targetName = context.targetName
-            confidenceBand = .medium
-        }
-
-        return HomeQueryPlan(
-            metric: metric,
-            dateRange: parsedComparisonRanges?.primary ?? parsedDateRange ?? context.query.dateRange,
-            comparisonDateRange: parsedComparisonRanges?.comparison ?? context.query.comparisonDateRange,
-            resultLimit: parsedLimit ?? context.query.resultLimit,
-            confidenceBand: confidenceBand,
-            targetName: targetName,
-            periodUnit: context.query.periodUnit
-        )
-    }
-
-    private func resolvedAnchoredTargetName(
-        for rawPrompt: String,
-        context: HomeAssistantAnswerContext
-    ) -> String? {
-        switch context.targetType {
-        case .category:
-            return aliasTarget(in: rawPrompt, entityType: .category)
-                ?? entityMatcher.bestCategoryMatch(in: rawPrompt, categories: categories)
-                ?? bestPartialCategoryMatch(in: rawPrompt, anchoredTarget: context.targetName)
-        case .card:
-            return aliasTarget(in: rawPrompt, entityType: .card)
-                ?? entityMatcher.bestCardMatch(in: rawPrompt, cards: cards)
-        case .incomeSource:
-            return aliasTarget(in: rawPrompt, entityType: .incomeSource)
-                ?? entityMatcher.bestIncomeSourceMatch(in: rawPrompt, incomes: incomes)
-        case .merchant:
-            return extractedMerchantTarget(from: rawPrompt) ?? context.targetName
-        case nil:
-            return context.targetName
-        }
-    }
-
-    private func bestPartialCategoryMatch(
-        in rawPrompt: String,
-        anchoredTarget: String?
-    ) -> String? {
-        guard let anchoredTarget else { return nil }
-        let promptTokens = significantTokens(in: rawPrompt)
-        let anchoredTokens = significantTokens(in: anchoredTarget)
-        guard promptTokens.intersection(anchoredTokens).isEmpty == false else { return nil }
-        return anchoredTarget
-    }
-
-    private func significantTokens(in text: String) -> Set<String> {
-        let stopWords: Set<String> = [
-            "the", "and", "for", "that", "this", "with", "from", "what", "about",
-            "same", "will", "does", "mean", "your", "have", "been", "into", "than",
-            "please", "month", "year", "save", "savings", "reduce", "increase"
-        ]
-
-        return Set(
-            normalizedPrompt(text)
-                .split(separator: " ")
-                .map(String.init)
-                .filter { $0.count > 2 && stopWords.contains($0) == false }
-        )
-    }
-
-    private func presentAnchoredFollowUpClarification(
-        _ contexts: [HomeAssistantAnswerContext],
-        userPrompt: String
-    ) {
-        clarificationSuggestions = contexts.map { context in
-            HomeAssistantSuggestion(
-                title: context.targetName ?? context.answerTitle,
-                query: context.query
-            )
-        }
-        recoverySuggestions = []
-        lastClarificationReasons = []
-        activeClarificationContext = nil
-
-        let answer = HomeAnswer(
-            queryID: UUID(),
-            kind: .message,
-            userPrompt: userPrompt,
-            title: String(localized: "assistant.quickClarification", defaultValue: "Quick clarification", comment: "Assistant clarification card title."),
-            subtitle: "I found more than one recent answer this could refer to. Pick the one you want to continue from.",
-            rows: contexts.prefix(2).map { context in
-                HomeAnswerRow(
-                    title: context.targetName ?? context.answerTitle,
-                    value: context.answerTitle
-                )
-            }
-        )
-        presentMarinaAnswer(
-            deterministicAnswer: answer,
-            basicFallbackAnswer: answer,
-            rawPrompt: userPrompt,
-            source: .contextual,
-            surfaceKind: .clarification,
-            validationOutcomeSummary: "anchored_follow_up_ambiguous",
-            clarificationChoices: contexts.map { $0.targetName ?? $0.answerTitle },
-            groundingSummary: "recent answer context disambiguation"
-        )
-    }
-    
     private func contextualPlan(for rawPrompt: String) -> HomeQueryPlan? {
         guard let lastMetric = sessionContext.lastMetric else { return nil }
         
@@ -8165,30 +7542,6 @@ struct HomeAssistantPanelView: View {
             rows: rows
         )
         
-        let styled = personaFormatter.styledAnswer(
-            from: bundled,
-            userPrompt: userPrompt,
-            personaID: selectedPersonaID,
-            seedContext: personaSeedContext(for: overviewQuery),
-            footerContext: personaFooterContext(
-                for: [
-                    overviewQuery,
-                    savingsQuery,
-                    categoriesQuery,
-                    cardsQuery
-                ]
-            ),
-            echoContext: nil,
-            visibleProvenance: visibleProvenance(
-                for: [
-                    overviewQuery,
-                    savingsQuery,
-                    categoriesQuery,
-                    cardsQuery
-                ]
-            )
-        )
-        
         let overviewPlan = HomeQueryPlan(
             metric: overviewQuery.intent.metric,
             dateRange: overviewQuery.dateRange,
@@ -8200,13 +7553,13 @@ struct HomeAssistantPanelView: View {
         )
         presentMarinaAnswer(
             deterministicAnswer: bundled,
-            basicFallbackAnswer: styled,
+            basicFallbackAnswer: bundled,
             rawPrompt: userPrompt,
             source: source,
             homeQueryPlan: overviewPlan,
             surfaceKind: rows.isEmpty ? .noData : .answer,
             groundingSummary: "bundled budget check-in",
-            followUpSuggestions: followUpSuggestions(for: styled, query: overviewQuery)
+            followUpSuggestions: followUpSuggestions(for: bundled, query: overviewQuery)
         ) { presentedAnswer in
             updateSessionContext(after: overviewPlan)
             rememberAnswerContext(
@@ -8338,16 +7691,6 @@ struct HomeAssistantPanelView: View {
             rows: merchantsAnswer.rows
         )
 
-        let styled = personaFormatter.styledAnswer(
-            from: bundled,
-            userPrompt: userPrompt,
-            personaID: selectedPersonaID,
-            seedContext: personaSeedContext(for: spendQuery),
-            footerContext: personaFooterContext(for: [spendQuery, merchantsQuery]),
-            echoContext: personaEchoContext(for: spendQuery),
-            visibleProvenance: visibleProvenance(for: [spendQuery, merchantsQuery])
-        )
-
         let spendPlan = HomeQueryPlan(
             metric: spendQuery.intent.metric,
             dateRange: spendQuery.dateRange,
@@ -8359,13 +7702,13 @@ struct HomeAssistantPanelView: View {
         )
         presentMarinaAnswer(
             deterministicAnswer: bundled,
-            basicFallbackAnswer: styled,
+            basicFallbackAnswer: bundled,
             rawPrompt: userPrompt,
             source: source,
             homeQueryPlan: spendPlan,
             surfaceKind: merchantsAnswer.rows.isEmpty ? .noData : .answer,
             groundingSummary: "bundled spend and merchant rows",
-            followUpSuggestions: followUpSuggestions(for: styled, query: spendQuery)
+            followUpSuggestions: followUpSuggestions(for: bundled, query: spendQuery)
         ) { presentedAnswer in
             updateSessionContext(after: spendPlan)
             rememberAnswerContext(
@@ -8404,16 +7747,6 @@ struct HomeAssistantPanelView: View {
             plannedExpenses: plannedExpenses,
             variableExpenses: variableExpenses
         )
-        let answer = personaFormatter.styledAnswer(
-            from: rawAnswer,
-            userPrompt: userPrompt,
-            personaID: selectedPersonaID,
-            seedContext: personaSeedContext(for: query),
-            footerContext: personaFooterContext(for: [query]),
-            echoContext: personaEchoContext(for: query),
-            visibleProvenance: visibleProvenance(for: query)
-        )
-
         let dailyPlan = HomeQueryPlan(
             metric: query.intent.metric,
             dateRange: query.dateRange,
@@ -8425,13 +7758,13 @@ struct HomeAssistantPanelView: View {
         )
         presentMarinaAnswer(
             deterministicAnswer: rawAnswer,
-            basicFallbackAnswer: answer,
+            basicFallbackAnswer: rawAnswer,
             rawPrompt: userPrompt,
             source: source,
             homeQueryPlan: dailyPlan,
             surfaceKind: rawAnswer.rows.isEmpty ? .noData : .answer,
             groundingSummary: "deterministic daily spend rows",
-            followUpSuggestions: followUpSuggestions(for: answer, query: query)
+            followUpSuggestions: followUpSuggestions(for: rawAnswer, query: query)
         ) { presentedAnswer in
             updateSessionContext(after: dailyPlan)
             rememberAnswerContext(
@@ -8457,7 +7790,7 @@ struct HomeAssistantPanelView: View {
             dateRange: range,
             incomes: incomes
         )
-        appendStyledRoutedAnswer(
+        appendRoutedAnswer(
             rawAnswer,
             userPrompt: userPrompt,
             primaryQuery: query,
@@ -8504,7 +7837,7 @@ struct HomeAssistantPanelView: View {
             primaryValue: savings.primaryValue,
             rows: rows
         )
-        appendStyledRoutedAnswer(
+        appendRoutedAnswer(
             rawAnswer,
             userPrompt: userPrompt,
             primaryQuery: savingsQuery,
@@ -8529,7 +7862,7 @@ struct HomeAssistantPanelView: View {
             plannedExpenses: plannedExpenses,
             variableExpenses: variableExpenses
         )
-        appendStyledRoutedAnswer(
+        appendRoutedAnswer(
             rawAnswer,
             userPrompt: userPrompt,
             primaryQuery: query,
@@ -8589,7 +7922,7 @@ struct HomeAssistantPanelView: View {
             primaryValue: categoryChanges.primaryValue,
             rows: rows
         )
-        appendStyledRoutedAnswer(
+        appendRoutedAnswer(
             rawAnswer,
             userPrompt: userPrompt,
             primaryQuery: categoryChangesQuery,
@@ -8612,7 +7945,7 @@ struct HomeAssistantPanelView: View {
             cards: cards,
             targetName: basePlan.targetName
         )
-        appendStyledRoutedAnswer(
+        appendRoutedAnswer(
             rawAnswer,
             userPrompt: userPrompt,
             primaryQuery: query,
@@ -8621,23 +7954,13 @@ struct HomeAssistantPanelView: View {
         )
     }
 
-    private func appendStyledRoutedAnswer(
+    private func appendRoutedAnswer(
         _ rawAnswer: HomeAnswer,
         userPrompt: String,
         primaryQuery: HomeQuery,
         footerQueries: [HomeQuery],
         source: HomeAssistantPlanResolutionSource = .contextual
     ) {
-        let styled = personaFormatter.styledAnswer(
-            from: rawAnswer,
-            userPrompt: userPrompt,
-            personaID: selectedPersonaID,
-            seedContext: personaSeedContext(for: primaryQuery),
-            footerContext: personaFooterContext(for: footerQueries),
-            echoContext: personaEchoContext(for: primaryQuery),
-            visibleProvenance: visibleProvenance(for: footerQueries)
-        )
-
         let routedPlan = HomeQueryPlan(
             metric: primaryQuery.intent.metric,
             dateRange: primaryQuery.dateRange,
@@ -8649,13 +7972,13 @@ struct HomeAssistantPanelView: View {
         )
         presentMarinaAnswer(
             deterministicAnswer: rawAnswer,
-            basicFallbackAnswer: styled,
+            basicFallbackAnswer: rawAnswer,
             rawPrompt: userPrompt,
             source: source,
             homeQueryPlan: routedPlan,
             surfaceKind: rawAnswer.primaryValue == nil && rawAnswer.rows.isEmpty ? .noData : .answer,
             groundingSummary: "deterministic routed summary",
-            followUpSuggestions: followUpSuggestions(for: styled, query: primaryQuery)
+            followUpSuggestions: followUpSuggestions(for: rawAnswer, query: primaryQuery)
         ) { presentedAnswer in
             updateSessionContext(after: routedPlan)
             rememberAnswerContext(
@@ -8699,57 +8022,6 @@ struct HomeAssistantPanelView: View {
     
     private var trimmedPromptText: String {
         promptText.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-    
-    private func personaSeedContext(for query: HomeQuery) -> HomeAssistantPersonaSeedContext {
-        let referenceDate = query.dateRange?.endDate ?? Date()
-        return HomeAssistantPersonaSeedContext.from(
-            actorID: workspace.id.uuidString,
-            intentKey: query.intent.rawValue,
-            referenceDate: referenceDate
-        )
-    }
-    
-    private func personaFooterContext(for queries: [HomeQuery]) -> HomeAssistantPersonaFooterContext {
-        let dateRange = queries.compactMap(\.dateRange).first
-        let queryLabels = queries.map { "\($0.intent.rawValue)#\(shortQueryID($0.id))" }
-        return HomeAssistantPersonaFooterContext(
-            dataWindow: personaDateWindowLabel(dateRange),
-            sources: personaSourceLabels(),
-            queries: queryLabels
-        )
-    }
-    
-    private func personaDateWindowLabel(_ dateRange: HomeQueryDateRange?) -> String {
-        guard let dateRange else { return "Not specified" }
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar.current
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone.current
-        formatter.dateFormat = "yyyy-MM-dd"
-        let start = formatter.string(from: dateRange.startDate)
-        let end = formatter.string(from: dateRange.endDate)
-        return "\(start)–\(end)"
-    }
-    
-    private func personaSourceLabels() -> [String] {
-        var labels: [String] = []
-        if categories.isEmpty == false { labels.append("Categories") }
-        if presets.isEmpty == false { labels.append("Presets") }
-        if plannedExpenses.isEmpty == false { labels.append("Planned expenses") }
-        if variableExpenses.isEmpty == false { labels.append("Variable expenses") }
-        if incomes.isEmpty == false { labels.append("Income") }
-        
-        if labels.isEmpty {
-            return ["On-device budgeting data"]
-        }
-        
-        return labels
-    }
-    
-    private func shortQueryID(_ id: UUID) -> String {
-        let raw = id.uuidString.replacingOccurrences(of: "-", with: "")
-        return String(raw.prefix(8)).uppercased()
     }
 
     private func whatIfBaselineSpendByCategoryID(
@@ -8929,38 +8201,7 @@ struct HomeAssistantPanelView: View {
         return calendar.isDate(range.startDate, inSameDayAs: yearStart)
             && calendar.isDate(range.endDate, inSameDayAs: yearEnd)
     }
-    
-    private func personaEchoContext(for query: HomeQuery) -> HomeAssistantPersonaEchoContext? {
-        guard let targetName = query.targetName?.trimmingCharacters(in: .whitespacesAndNewlines), targetName.isEmpty == false else {
-            return nil
-        }
-        
-        switch query.intent {
-        case .cardSpendTotal, .cardVariableSpendingHabits, .compareCardThisMonthToPreviousMonth, .nextPlannedExpense, .spendTrendsSummary, .cardSnapshotSummary, .topCardChangesThisMonth:
-            return HomeAssistantPersonaEchoContext(
-                cardName: targetName,
-                categoryName: nil,
-                incomeSourceName: nil
-            )
-        case .categorySpendTotal, .categorySpendShare, .categorySpendShareTrend, .categoryPotentialSavings, .categoryReallocationGuidance, .presetCategorySpend, .compareCategoryThisMonthToPreviousMonth, .topCategoryChangesThisMonth:
-            return HomeAssistantPersonaEchoContext(
-                cardName: nil,
-                categoryName: targetName,
-                incomeSourceName: nil
-            )
-        case .incomeAverageActual, .incomeSourceShare, .incomeSourceShareTrend, .compareIncomeSourceThisMonthToPreviousMonth:
-            return HomeAssistantPersonaEchoContext(
-                cardName: nil,
-                categoryName: nil,
-                incomeSourceName: targetName
-            )
-        case .merchantSpendTotal, .merchantSpendSummary, .compareMerchantThisMonthToPreviousMonth:
-            return nil
-        default:
-            return nil
-        }
-    }
-    
+
     private var panelHeaderBackgroundStyle: AnyShapeStyle {
 #if os(iOS)
         if #available(iOS 26.0, *) {

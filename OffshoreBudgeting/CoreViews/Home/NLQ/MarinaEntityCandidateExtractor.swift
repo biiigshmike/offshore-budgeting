@@ -1,16 +1,16 @@
 import Foundation
 
-struct MarinaNLQCandidateExtractor {
+struct MarinaEntityCandidateExtractor {
     func extractCandidates(
         from text: String,
         provider: MarinaDataProvider
-    ) -> MarinaNLQTargetExtractionResult {
+    ) -> MarinaEntityTargetExtractionResult {
         let normalizedTarget = normalize(text)
         guard normalizedTarget.isEmpty == false else {
-            return MarinaNLQTargetExtractionResult(rawTargetText: nil, matchesByType: [:])
+            return MarinaEntityTargetExtractionResult(rawTargetText: nil, matchesByType: [:])
         }
 
-        var collected: [MarinaNLQCandidateMatch] = []
+        var collected: [MarinaEntityCandidateMatch] = []
 
         for category in provider.fetchAllCategories() {
             if let match = matchCandidate(
@@ -81,11 +81,11 @@ struct MarinaNLQCandidateExtractor {
 
         let deduplicated = deduplicate(collected)
         let grouped = Dictionary(grouping: deduplicated, by: \.entityType)
-        return MarinaNLQTargetExtractionResult(rawTargetText: text, matchesByType: grouped)
+        return MarinaEntityTargetExtractionResult(rawTargetText: text, matchesByType: grouped)
     }
 
-    private func deduplicate(_ matches: [MarinaNLQCandidateMatch]) -> [MarinaNLQCandidateMatch] {
-        var bestByKey: [String: MarinaNLQCandidateMatch] = [:]
+    private func deduplicate(_ matches: [MarinaEntityCandidateMatch]) -> [MarinaEntityCandidateMatch] {
+        var bestByKey: [String: MarinaEntityCandidateMatch] = [:]
 
         for match in matches {
             let key = "\(match.entityType.rawValue)|\(match.normalizedValue)"
@@ -112,15 +112,15 @@ struct MarinaNLQCandidateExtractor {
     private func matchCandidate(
         target: String,
         displayValue: String,
-        targetType: MarinaNLQTargetType,
+        targetType: MarinaEntityCandidateTargetType,
         sourceID: UUID,
         clarificationSubtitle: String? = nil
-    ) -> MarinaNLQCandidateMatch? {
+    ) -> MarinaEntityCandidateMatch? {
         let normalizedCandidate = normalize(displayValue)
         guard normalizedCandidate.isEmpty == false else { return nil }
 
         if normalizedCandidate == target {
-            return MarinaNLQCandidateMatch(
+            return MarinaEntityCandidateMatch(
                 entityType: targetType,
                 displayValue: displayValue,
                 normalizedValue: normalizedCandidate,
@@ -131,7 +131,7 @@ struct MarinaNLQCandidateExtractor {
         }
 
         if normalizedCandidate.hasPrefix(target) {
-            return MarinaNLQCandidateMatch(
+            return MarinaEntityCandidateMatch(
                 entityType: targetType,
                 displayValue: displayValue,
                 normalizedValue: normalizedCandidate,
@@ -142,7 +142,7 @@ struct MarinaNLQCandidateExtractor {
         }
 
         if targetType == .merchant, target.hasPrefix(normalizedCandidate + " ") {
-            return MarinaNLQCandidateMatch(
+            return MarinaEntityCandidateMatch(
                 entityType: targetType,
                 displayValue: displayValue,
                 normalizedValue: normalizedCandidate,

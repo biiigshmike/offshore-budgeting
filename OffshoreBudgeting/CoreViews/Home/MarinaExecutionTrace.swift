@@ -808,24 +808,3 @@ extension HomeQueryMetric {
         }
     }
 }
-
-extension MarinaNormalizedMetric {
-    var traceOperation: String {
-        switch self {
-        case .spendTotal, .categorySpendTotal, .merchantSpendTotal:
-            return "sum"
-        case .spendAveragePerPeriod, .incomeAverageActual:
-            return "average"
-        case .mostFrequentTransactions:
-            return "count"
-        case .monthComparison, .categoryMonthComparison:
-            return "difference"
-        case .categorySpendShare:
-            return "share_of_total"
-        case .topCategories, .topMerchants, .largestTransactions:
-            return "ranked_list"
-        case .presetDueSoon:
-            return "overview"
-        }
-    }
-}

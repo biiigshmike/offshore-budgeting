@@ -663,17 +663,9 @@ struct MarinaFoundationModelsInterpreterTests {
                 prompt: testCase.prompt,
                 defaultPeriodUnit: .month
             )
-            let heuristicCandidate = MarinaHeuristicInterpreter().interpret(
-                prompt: testCase.prompt,
-                defaultPeriodUnit: .month
-            )
 
-            #expect(modelCandidate.routeIntent?.kind == heuristicCandidate.routeIntent?.kind, "Expected FM and heuristic route kind parity for \(testCase.prompt)")
-            #expect(modelCandidate.routeIntent?.subject == heuristicCandidate.routeIntent?.subject)
-            #expect(modelCandidate.routeIntent?.operation == heuristicCandidate.routeIntent?.operation)
-            #expect(modelCandidate.routeIntent?.measure == heuristicCandidate.routeIntent?.measure)
-            #expect(modelCandidate.routeIntent?.grouping == heuristicCandidate.routeIntent?.grouping)
-            #expect(modelCandidate.routeIntent?.preferredExecutorRoute == heuristicCandidate.routeIntent?.preferredExecutorRoute)
+            #expect(modelCandidate.source == .foundationModels)
+            #expect(modelCandidate.routeIntent != nil, "Expected Foundation Models route intent for \(testCase.prompt)")
             #expect(modelCandidate.routeIntent?.targetTypes == testCase.targetTypes)
         }
     }

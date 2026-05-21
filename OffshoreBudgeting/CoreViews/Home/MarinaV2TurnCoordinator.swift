@@ -906,3 +906,244 @@ private extension String {
         return trimmed.isEmpty ? nil : trimmed
     }
 }
+
+private extension MarinaQueryPlanCandidate {
+    func replacingClarifiedMention(with choice: MarinaClarificationChoice) -> MarinaQueryPlanCandidate {
+        var mentions = entityMentions
+        let replacementText = choice.rawValue?.nilIfBlankForV2 ?? choice.title
+        let replacementType = choice.entityTypeHint
+
+        if let mentionID = choice.mentionID,
+           let index = mentions.firstIndex(where: { $0.id == mentionID }) {
+            let mention = mentions[index]
+            mentions[index] = MarinaUnresolvedEntityMention(
+                id: mention.id,
+                role: choice.entityRole ?? mention.role,
+                rawText: replacementText,
+                typeHint: replacementType ?? mention.typeHint,
+                allowedTypeHints: replacementType.map { [$0] } ?? mention.allowedTypeHints,
+                confidence: .high
+            )
+        } else if let index = mentions.firstIndex(where: { mention in
+            guard let role = choice.entityRole else {
+                return mention.role == .primaryTarget || mention.role == .filter
+            }
+            return mention.role == role
+        }) {
+            let mention = mentions[index]
+            mentions[index] = MarinaUnresolvedEntityMention(
+                id: mention.id,
+                role: choice.entityRole ?? mention.role,
+                rawText: replacementText,
+                typeHint: replacementType ?? mention.typeHint,
+                allowedTypeHints: replacementType.map { [$0] } ?? mention.allowedTypeHints,
+                confidence: .high
+            )
+        } else {
+            mentions.append(
+                MarinaUnresolvedEntityMention(
+                    role: choice.entityRole ?? .primaryTarget,
+                    rawText: replacementText,
+                    typeHint: replacementType,
+                    allowedTypeHints: replacementType.map { [$0] },
+                    confidence: .high
+                )
+            )
+        }
+
+        return copy(entityMentions: mentions)
+    }
+
+    func replacingDatabaseLookupRequest(
+        with choice: MarinaClarificationChoice,
+        fallbackRequest: MarinaDatabaseLookupRequest?
+    ) -> MarinaQueryPlanCandidate? {
+        guard var request = databaseLookupRequest ?? fallbackRequest else { return nil }
+        request.searchText = choice.rawValue?.nilIfBlankForV2 ?? choice.title
+        if let objectType = choice.entityTypeHint?.databaseLookupObjectType {
+            request.objectTypes = [objectType]
+        }
+        return copy(databaseLookupRequest: request.clamped)
+    }
+
+    func copy(
+        entityMentions: [MarinaUnresolvedEntityMention]? = nil,
+        databaseLookupRequest: MarinaDatabaseLookupRequest? = nil
+    ) -> MarinaQueryPlanCandidate {
+        MarinaQueryPlanCandidate(
+            requestFamily: requestFamily,
+            source: source,
+            rawPrompt: rawPrompt,
+            operation: operation,
+            measure: measure,
+            entityMentions: entityMentions ?? self.entityMentions,
+            timeScopes: timeScopes,
+            grouping: grouping,
+            ranking: ranking,
+            limit: limit,
+            responseShapeHint: responseShapeHint,
+            confidence: confidence,
+            unsupportedHint: unsupportedHint,
+            databaseLookupRequest: databaseLookupRequest ?? self.databaseLookupRequest,
+            semanticCommand: semanticCommand,
+            requestShape: requestShape,
+            insightIntent: insightIntent,
+            softTimeHint: softTimeHint,
+            routeIntent: routeIntent
+        )
+    }
+}
+
+private extension MarinaSemanticQuery {
+    func patching(
+        choice: MarinaClarificationChoice,
+        fallbackSlot: MarinaClarificationPatchSlot?,
+        now _: Date,
+        defaultPeriodUnit _: HomeQueryPeriodUnit
+    ) -> MarinaSemanticQuery? {
+        let slot = choice.patchSlot ?? fallbackSlot
+        switch slot {
+        case .target:
+            return copy(filters: filters.patchingTarget(with: choice))
+        case .date:
+            return copy(
+                dateRange: MarinaDateRangeRequest(
+                    role: .primary,
+                    rawText: choice.rawValue?.nilIfBlankForV2 ?? choice.title
+                )
+            )
+        case .comparison:
+            return copy(
+                comparisonDateRange: MarinaDateRangeRequest(
+                    role: .comparison,
+                    rawText: choice.rawValue?.nilIfBlankForV2 ?? choice.title
+                )
+            )
+        case .amount, .simulation, nil:
+            return nil
+        }
+    }
+
+    func copy(
+        filters: [MarinaFilter]? = nil,
+        dateRange: MarinaDateRangeRequest? = nil,
+        comparisonDateRange: MarinaDateRangeRequest? = nil
+    ) -> MarinaSemanticQuery {
+        MarinaSemanticQuery(
+            id: id,
+            subject: subject,
+            operation: operation,
+            filters: filters ?? self.filters,
+            amountField: amountField,
+            dateRange: dateRange ?? self.dateRange,
+            comparisonDateRange: comparisonDateRange ?? self.comparisonDateRange,
+            grouping: grouping,
+            ranking: ranking,
+            limit: limit,
+            averageBasis: averageBasis,
+            incomeStatusScope: incomeStatusScope,
+            responseShape: responseShape,
+            requestedDetail: requestedDetail,
+            routeIntent: routeIntent
+        )
+    }
+}
+
+private extension Array where Element == MarinaFilter {
+    func patchingTarget(with choice: MarinaClarificationChoice) -> [MarinaFilter] {
+        var patched = self
+        let replacement = MarinaFilter(
+            id: choice.mentionID ?? first?.id ?? UUID(),
+            role: choice.entityRole?.resolvedTargetRole ?? .primaryTarget,
+            relationship: choice.entityTypeHint?.relationshipField ?? .unknown,
+            value: choice.rawValue?.nilIfBlankForV2 ?? choice.title,
+            matchMode: choice.sourceID == nil ? .semanticOrAlias : .exact,
+            entityTypeHint: choice.entityTypeHint,
+            allowedEntityTypeHints: choice.entityTypeHint.map { [$0] },
+            sourceID: choice.sourceID
+        )
+
+        if let mentionID = choice.mentionID,
+           let index = patched.firstIndex(where: { $0.id == mentionID }) {
+            patched[index] = replacement
+        } else if let index = patched.firstIndex(where: { filter in
+            filter.role == replacement.role || filter.matchMode == .unresolved
+        }) {
+            patched[index] = replacement
+        } else {
+            patched.append(replacement)
+        }
+        return patched
+    }
+}
+
+private extension MarinaEntityMentionRole {
+    var resolvedTargetRole: MarinaResolvedTargetRole {
+        switch self {
+        case .filter:
+            return .filter
+        case .excludeFilter:
+            return .excludeFilter
+        case .primaryTarget:
+            return .primaryTarget
+        case .comparisonTarget:
+            return .comparisonTarget
+        case .groupingDimension:
+            return .groupingDimension
+        case .simulationInput:
+            return .simulationInput
+        case .simulationOutput:
+            return .simulationOutput
+        }
+    }
+}
+
+private extension MarinaCandidateEntityTypeHint {
+    var relationshipField: MarinaRelationshipField {
+        switch self {
+        case .category:
+            return .category
+        case .merchant:
+            return .merchant
+        case .expense, .transaction:
+            return .transaction
+        case .card:
+            return .card
+        case .budget:
+            return .budget
+        case .preset:
+            return .preset
+        case .incomeSource:
+            return .incomeSource
+        case .allocationAccount:
+            return .allocationAccount
+        case .savingsAccount:
+            return .savingsAccount
+        case .workspace:
+            return .workspace
+        }
+    }
+
+    var databaseLookupObjectType: MarinaLookupObjectType {
+        switch self {
+        case .category:
+            return .category
+        case .merchant, .expense, .transaction:
+            return .variableExpense
+        case .card:
+            return .card
+        case .budget:
+            return .budget
+        case .preset:
+            return .preset
+        case .incomeSource:
+            return .income
+        case .allocationAccount:
+            return .reconciliationAccount
+        case .savingsAccount:
+            return .savingsAccount
+        case .workspace:
+            return .workspace
+        }
+    }
+}

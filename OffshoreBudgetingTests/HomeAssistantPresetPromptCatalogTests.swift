@@ -148,7 +148,7 @@ struct HomeAssistantPresetPromptCatalogTests {
     }
 
     @Test func followUps_areContextAwareAndDoNotRepeatCurrentQuery() {
-        let formatter = HomeAssistantPersonaFormatter()
+        let builder = HomeAssistantFollowUpSuggestionBuilder()
         let answer = HomeAnswer(
             queryID: UUID(),
             kind: .metric,
@@ -157,10 +157,9 @@ struct HomeAssistantPresetPromptCatalogTests {
         )
         let query = HomeQuery(intent: .incomeAverageActual, periodUnit: .year)
 
-        let suggestions = formatter.followUpSuggestions(
+        let suggestions = builder.suggestions(
             after: answer,
-            executedQuery: query,
-            personaID: .marina
+            executedQuery: query
         )
 
         #expect(suggestions.isEmpty == false)

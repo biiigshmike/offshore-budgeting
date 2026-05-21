@@ -506,7 +506,7 @@ private extension String {
 @MainActor
 struct MarinaUniversalQueryDetector {
     private let catalog: MarinaEntityCatalog
-    private let extractor = MarinaNLQCandidateExtractor()
+    private let extractor = MarinaEntityCandidateExtractor()
 
     init(catalog: MarinaEntityCatalog? = nil) {
         self.catalog = catalog ?? .current

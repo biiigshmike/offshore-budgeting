@@ -217,8 +217,8 @@ struct HomeAssistantResolutionPipelineTests {
         #expect(reconciled.didOverrideMetric == false)
     }
 
-    @Test func personaFollowUpsUseExecutedQueryWhenProvided() throws {
-        let formatter = HomeAssistantPersonaFormatter(variantIndexPicker: { _, _ in 0 })
+    @Test func followUpsUseExecutedQueryWhenProvided() throws {
+        let builder = HomeAssistantFollowUpSuggestionBuilder()
         let answer = HomeAnswer(
             queryID: UUID(),
             kind: .metric,
@@ -233,10 +233,9 @@ struct HomeAssistantResolutionPipelineTests {
             targetName: "Food & Drink"
         )
 
-        let followUps = formatter.followUpSuggestions(
+        let followUps = builder.suggestions(
             after: answer,
-            executedQuery: executedQuery,
-            personaID: .marina
+            executedQuery: executedQuery
         )
 
         #expect(followUps.first?.query.intent == .compareCategoryThisMonthToPreviousMonth)

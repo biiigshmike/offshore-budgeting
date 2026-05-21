@@ -81,7 +81,7 @@ struct MarinaResolvedSemanticQuery: Equatable {
 
 @MainActor
 struct MarinaQueryResolver {
-    private let extractor = MarinaNLQCandidateExtractor()
+    private let extractor = MarinaEntityCandidateExtractor()
 
     func resolve(
         candidate: MarinaQueryPlanCandidate,
@@ -344,12 +344,12 @@ struct MarinaQueryResolver {
 
     private enum RepresentativeMatchSet {
         case none
-        case one(MarinaNLQCandidateMatch)
-        case many([MarinaNLQCandidateMatch])
+        case one(MarinaEntityCandidateMatch)
+        case many([MarinaEntityCandidateMatch])
     }
 
     private func representativeMatches(
-        from matches: [MarinaNLQCandidateMatch],
+        from matches: [MarinaEntityCandidateMatch],
         mention: MarinaUnresolvedEntityMention,
         preferExactCategoryOverExpenseDescription: Bool
     ) -> RepresentativeMatchSet {
@@ -395,7 +395,7 @@ struct MarinaQueryResolver {
         let shouldPreserveCrossFamilyExactMatches = hasSingleTypeHint == false
             && exactEntityTypes.count > 1
             && shouldPreferExactCategory == false
-        let preferredMatches: [MarinaNLQCandidateMatch]
+        let preferredMatches: [MarinaEntityCandidateMatch]
         if shouldPreferExplicitMerchant {
             let exactMerchantMatches = exactMatches.filter { $0.entityType == .merchant }
             preferredMatches = exactMerchantMatches.isEmpty
@@ -410,7 +410,7 @@ struct MarinaQueryResolver {
             preferredMatches,
             preferExpenseOverMerchant: preferExactCategoryOverExpenseDescription == false
         )
-        var bestByKey: [String: MarinaNLQCandidateMatch] = [:]
+        var bestByKey: [String: MarinaEntityCandidateMatch] = [:]
         for match in equivalenceCollapsed {
             let key = canonicalIdentityKey(for: match)
             if let existing = bestByKey[key] {
@@ -467,15 +467,15 @@ struct MarinaQueryResolver {
     }
 
     private func collapseEquivalentMatches(
-        _ matches: [MarinaNLQCandidateMatch],
+        _ matches: [MarinaEntityCandidateMatch],
         preferExpenseOverMerchant: Bool
-    ) -> [MarinaNLQCandidateMatch] {
+    ) -> [MarinaEntityCandidateMatch] {
         guard matches.count > 1 else { return matches }
 
         let groupedByNormalizedDisplay = Dictionary(grouping: matches, by: {
             normalizeDisplay($0.displayValue)
         })
-        var collapsed: [MarinaNLQCandidateMatch] = []
+        var collapsed: [MarinaEntityCandidateMatch] = []
 
         for bucket in groupedByNormalizedDisplay.values {
             let hasMerchant = bucket.contains { $0.entityType == .merchant }
@@ -494,7 +494,7 @@ struct MarinaQueryResolver {
         return collapsed
     }
 
-    private func canonicalIdentityKey(for match: MarinaNLQCandidateMatch) -> String {
+    private func canonicalIdentityKey(for match: MarinaEntityCandidateMatch) -> String {
         switch match.entityType {
         case .merchant:
             // Merchant source IDs are variable-expense row IDs, not stable merchant IDs.
@@ -514,9 +514,9 @@ struct MarinaQueryResolver {
     }
 
     private func scopedMatches(
-        _ matches: [MarinaNLQCandidateMatch],
+        _ matches: [MarinaEntityCandidateMatch],
         mention: MarinaUnresolvedEntityMention
-    ) -> [MarinaNLQCandidateMatch] {
+    ) -> [MarinaEntityCandidateMatch] {
         let allowedTypes = mention.allowedTypeHints?.isEmpty == false
             ? mention.allowedTypeHints
             : mention.typeHint.map { [$0] }
@@ -529,7 +529,7 @@ struct MarinaQueryResolver {
         return matches.filter { nlqTypes.contains($0.entityType) }
     }
 
-    private func nlqType(from hint: MarinaCandidateEntityTypeHint) -> MarinaNLQTargetType? {
+    private func nlqType(from hint: MarinaCandidateEntityTypeHint) -> MarinaEntityCandidateTargetType? {
         switch hint {
         case .category:
             return .category
@@ -554,7 +554,7 @@ struct MarinaQueryResolver {
         }
     }
 
-    private func relationship(from targetType: MarinaNLQTargetType) -> MarinaRelationshipField {
+    private func relationship(from targetType: MarinaEntityCandidateTargetType) -> MarinaRelationshipField {
         switch targetType {
         case .category:
             return .category
@@ -577,7 +577,7 @@ struct MarinaQueryResolver {
         }
     }
 
-    private func candidateType(from targetType: MarinaNLQTargetType) -> MarinaCandidateEntityTypeHint {
+    private func candidateType(from targetType: MarinaEntityCandidateTargetType) -> MarinaCandidateEntityTypeHint {
         switch targetType {
         case .category:
             return .category
