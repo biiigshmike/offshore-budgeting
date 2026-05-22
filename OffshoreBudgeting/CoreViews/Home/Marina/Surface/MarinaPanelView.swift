@@ -64,6 +64,8 @@ struct MarinaPanelView: View {
     let onDismiss: () -> Void
     let shouldUseLargeMinimumSize: Bool
     let ambientDateRange: HomeQueryDateRange?
+    let cardSummaryExcludeFuturePlannedExpensesOverride: Bool?
+    let cardSummaryExcludeFutureVariableExpensesOverride: Bool?
     
     @Query private var budgets: [Budget]
     @Query private var categories: [Category]
@@ -74,11 +76,14 @@ struct MarinaPanelView: View {
     @Query private var assistantAliasRules: [AssistantAliasRule]
     @Query private var plannedExpenses: [PlannedExpense]
     @Query private var variableExpenses: [VariableExpense]
+    @Query private var savingsAccounts: [SavingsAccount]
     @Query private var savingsEntries: [SavingsLedgerEntry]
     
     @State private var answers: [HomeAnswer] = []
     @State private var promptText = ""
     @State private var pendingUserPromptForNextAnswer: String? = nil
+    @State private var pendingThinkingPrompt: String? = nil
+    @State private var pendingThinkingStartedAt: Date? = nil
     @State private var latestTraceAccessibilityValue: String = ""
     @State private var quickButtonsVisible = false
     @State private var followUpsCollapsed = false
@@ -137,6 +142,10 @@ struct MarinaPanelView: View {
     @FocusState private var isPromptFieldFocused: Bool
     @AppStorage("general_defaultBudgetingPeriod")
     private var defaultBudgetingPeriodRaw: String = BudgetingPeriod.monthly.rawValue
+    @AppStorage("general_excludeFuturePlannedExpensesFromCalculations")
+    private var excludeFuturePlannedExpensesFromCalculationsDefault: Bool = false
+    @AppStorage("general_excludeFutureVariableExpensesFromCalculations")
+    private var excludeFutureVariableExpensesFromCalculationsDefault: Bool = false
     @AppStorage("general_confirmBeforeDeleting")
     private var confirmBeforeDeleting: Bool = true
     @AppStorage(MarinaRuntimeSettings.aiOptInKey)
@@ -170,17 +179,45 @@ struct MarinaPanelView: View {
     private var defaultBudgetingPeriod: BudgetingPeriod {
         BudgetingPeriod(rawValue: defaultBudgetingPeriodRaw) ?? .monthly
     }
+
+    private var cardSummaryExcludeFuturePlannedExpenses: Bool {
+        cardSummaryExcludeFuturePlannedExpensesOverride ?? excludeFuturePlannedExpensesFromCalculationsDefault
+    }
+
+    private var cardSummaryExcludeFutureVariableExpenses: Bool {
+        cardSummaryExcludeFutureVariableExpensesOverride ?? excludeFutureVariableExpensesFromCalculationsDefault
+    }
+
+    private func cardSummaryDateRange() -> HomeQueryDateRange {
+        if let ambientDateRange {
+            return ambientDateRange
+        }
+
+        let calendar = Calendar.current
+        let range = defaultBudgetingPeriod.defaultRange(
+            containing: marinaRuntimeSettings.now,
+            calendar: calendar
+        )
+        return HomeQueryDateRange(
+            startDate: calendar.startOfDay(for: range.start),
+            endDate: range.end
+        )
+    }
     
     init(
         workspace: Workspace,
         onDismiss: @escaping () -> Void,
         shouldUseLargeMinimumSize: Bool,
-        ambientDateRange: HomeQueryDateRange? = nil
+        ambientDateRange: HomeQueryDateRange? = nil,
+        cardSummaryExcludeFuturePlannedExpensesOverride: Bool? = nil,
+        cardSummaryExcludeFutureVariableExpensesOverride: Bool? = nil
     ) {
         self.workspace = workspace
         self.onDismiss = onDismiss
         self.shouldUseLargeMinimumSize = shouldUseLargeMinimumSize
         self.ambientDateRange = ambientDateRange
+        self.cardSummaryExcludeFuturePlannedExpensesOverride = cardSummaryExcludeFuturePlannedExpensesOverride
+        self.cardSummaryExcludeFutureVariableExpensesOverride = cardSummaryExcludeFutureVariableExpensesOverride
         
         let workspaceID = workspace.id
 
@@ -207,6 +244,11 @@ struct MarinaPanelView: View {
         _savingsEntries = Query(
             filter: #Predicate<SavingsLedgerEntry> { $0.workspace?.id == workspaceID },
             sort: [SortDescriptor(\SavingsLedgerEntry.date, order: .forward)]
+        )
+
+        _savingsAccounts = Query(
+            filter: #Predicate<SavingsAccount> { $0.workspace?.id == workspaceID },
+            sort: [SortDescriptor(\SavingsAccount.name, order: .forward)]
         )
         
         _cards = Query(
@@ -240,7 +282,7 @@ struct MarinaPanelView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 14) {
-                        if answers.isEmpty {
+                        if answers.isEmpty && pendingThinkingPrompt == nil {
                             marinaEmptyState
                         } else {
                             answersSection
@@ -1127,8 +1169,45 @@ struct MarinaPanelView: View {
                     }
                 }
             }
+
+            if let pendingThinkingPrompt {
+                pendingThinkingTurn(
+                    prompt: pendingThinkingPrompt,
+                    generatedAt: pendingThinkingStartedAt ?? Date()
+                )
+            }
         }
         .accessibilityIdentifier("marina.answerList")
+    }
+
+    private func pendingThinkingTurn(prompt: String, generatedAt: Date) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            userMessageBubble(text: prompt, generatedAt: generatedAt)
+                .accessibilityIdentifier("marina.pendingUserMessage")
+
+            assistantThinkingBubble(generatedAt: generatedAt)
+        }
+    }
+
+    private func assistantThinkingBubble(generatedAt: Date) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Thinking...")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(assistantBubbleBackground, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(assistantBubbleStroke, lineWidth: 1)
+                }
+                .accessibilityIdentifier("marina.thinking")
+                .accessibilityLabel("Marina is thinking")
+
+            Text(timestampText(for: generatedAt))
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
     }
     
     private func assistantFollowUpRail(
@@ -1261,6 +1340,15 @@ struct MarinaPanelView: View {
                         .font(.title2.weight(.bold))
                         .accessibilityIdentifier("marina.answer.\(index).primaryValue")
                 }
+
+                if let summary = cardSummaryAttachment(for: answer) {
+                    MarinaCardSummaryAttachmentView(
+                        workspace: workspace,
+                        summary: summary,
+                        card: cards.first(where: { $0.id == summary.cardID })
+                    )
+                    .padding(.top, 2)
+                }
                 
                 if let narrative = subtitlePresentation.narrative {
                     Text(narrative)
@@ -1269,7 +1357,7 @@ struct MarinaPanelView: View {
                         .accessibilityIdentifier("marina.answer.\(index).narrative")
                 }
                 
-                if answer.rows.isEmpty == false {
+                if shouldRenderRowsVisually(for: answer) {
                     ForEach(Array(answer.rows.enumerated()), id: \.element.id) { rowIndex, row in
                         HStack {
                             Text(row.title)
@@ -1325,6 +1413,18 @@ struct MarinaPanelView: View {
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }
+    }
+
+    private func cardSummaryAttachment(for answer: HomeAnswer) -> CardSummaryPresentationModel? {
+        guard case let .cardSummary(summary)? = answer.attachment else { return nil }
+        return summary
+    }
+
+    private func shouldRenderRowsVisually(for answer: HomeAnswer) -> Bool {
+        if cardSummaryAttachment(for: answer) != nil {
+            return false
+        }
+        return answer.rows.isEmpty == false
     }
 
     private func answerStateAccessibilityLabel(for answer: HomeAnswer) -> String {
@@ -1523,15 +1623,22 @@ struct MarinaPanelView: View {
                 now: marinaRuntimeSettings.now
             )
         } ?? normalizedAnswer
-        let deterministicFollowUps = followUpSuggestions(for: titledAnswer, query: query)
+        let presentationAnswer = MarinaCardSummaryAttachmentBuilder().attachingCardSummaryIfNeeded(
+            to: titledAnswer,
+            cards: cards,
+            dateRange: cardSummaryDateRange(),
+            excludeFuturePlannedExpenses: cardSummaryExcludeFuturePlannedExpenses,
+            excludeFutureVariableExpenses: cardSummaryExcludeFutureVariableExpenses
+        )
+        let deterministicFollowUps = followUpSuggestions(for: presentationAnswer, query: query)
         let surfaced = await presentMarinaAnswer(
-            deterministicAnswer: titledAnswer,
-            deterministicRecoveryAnswer: titledAnswer,
+            deterministicAnswer: presentationAnswer,
+            deterministicRecoveryAnswer: presentationAnswer,
             rawPrompt: rawPrompt,
             source: source,
             homeQueryPlan: homeQueryPlan,
-            surfaceKind: titledAnswer.primaryValue == nil && titledAnswer.rows.isEmpty ? .noData : .answer,
-            groundingSummary: aggregationResult?.sourceAnswer?.traceSummary ?? titledAnswer.traceSummary,
+            surfaceKind: presentationAnswer.primaryValue == nil && presentationAnswer.rows.isEmpty ? .noData : .answer,
+            groundingSummary: aggregationResult?.sourceAnswer?.traceSummary ?? presentationAnswer.traceSummary,
             followUpSuggestions: deterministicFollowUps
         )
 
@@ -1540,7 +1647,7 @@ struct MarinaPanelView: View {
             rememberAnswerContext(
                 for: query,
                 executedPlan: homeQueryPlan,
-                rawAnswer: titledAnswer,
+                rawAnswer: presentationAnswer,
                 aggregationResult: aggregationResult,
                 presentedAnswer: surfaced.answer,
                 userPrompt: rawPrompt
@@ -1966,6 +2073,7 @@ struct MarinaPanelView: View {
         let prompt = trimmedPromptText
         guard prompt.isEmpty == false else { return }
         pendingUserPromptForNextAnswer = prompt
+        beginPendingThinking(for: prompt)
         
         defer { promptText = "" }
         
@@ -4632,6 +4740,8 @@ struct MarinaPanelView: View {
     }
     
     private func appendAnswer(_ answer: HomeAnswer) {
+        clearPendingThinking()
+
         let resolvedUserPrompt: String?
         if let existingPrompt = answer.userPrompt, existingPrompt.isEmpty == false {
             resolvedUserPrompt = existingPrompt
@@ -4663,6 +4773,16 @@ struct MarinaPanelView: View {
         conversationStore.saveAnswers(answers, workspaceID: workspace.id)
     }
 
+    private func beginPendingThinking(for prompt: String) {
+        pendingThinkingPrompt = prompt
+        pendingThinkingStartedAt = Date()
+    }
+
+    private func clearPendingThinking() {
+        pendingThinkingPrompt = nil
+        pendingThinkingStartedAt = nil
+    }
+
     private func updateAnswerSubtitle(answerID: UUID, subtitle: String) {
         guard let index = answers.firstIndex(where: { $0.id == answerID }) else { return }
         let answer = answers[index]
@@ -4683,6 +4803,8 @@ struct MarinaPanelView: View {
     }
 
     private func replaceAnswerPreservingPrompt(_ replacement: HomeAnswer) {
+        clearPendingThinking()
+
         guard let index = answers.firstIndex(where: { $0.id == replacement.id }) else {
             appendAnswer(replacement)
             return
@@ -5245,6 +5367,7 @@ struct MarinaPanelView: View {
             presetTitles: presets.map(\.title).sorted(),
             budgetNames: budgets.map(\.name).sorted(),
             allocationAccountNames: allocationAccounts.map(\.name).sorted(),
+            savingsAccountNames: savingsAccounts.map(\.name).sorted(),
             aliasSummaries: assistantAliasRules.map {
                 MarinaAliasSummary(
                     entityTypeRaw: $0.entityType.rawValue,

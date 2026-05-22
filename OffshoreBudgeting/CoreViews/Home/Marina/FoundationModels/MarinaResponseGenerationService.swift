@@ -177,6 +177,12 @@ struct MarinaPresentationGroundingBuilder {
             highlights.append("Deterministic subtitle: \(trimmedOneLine(subtitle, limit: 140))")
         }
 
+        if case let .cardSummary(summary)? = answer.attachment {
+            highlights.append(
+                "Card summary: \(trimmedOneLine(summary.title, limit: 60)); period \(summary.dateRangeSubtitle); total \(CurrencyFormatter.string(from: summary.total)); planned \(CurrencyFormatter.string(from: summary.plannedTotal)); variable \(CurrencyFormatter.string(from: summary.variableTotal))"
+            )
+        }
+
         let visibleRows = answer.rows.prefix(5).map {
             "\(trimmedOneLine($0.title, limit: 40)): \(trimmedOneLine($0.value, limit: 90))"
         }
@@ -299,6 +305,7 @@ enum MarinaFoundationSurfacePromptBuilder {
         Rules:
         - This pass is presentation only. The app has already routed, validated, fetched, and calculated the answer.
         - Do not compute, change, or invent totals, balances, percentages, dates, rows, entities, transactions, or sources.
+        - Do not change attachments or native UI cards; only write the narrative subtitle around the supplied facts.
         - Use only the deterministic facts in the prompt.
         - Preserve the user's workspace boundary.
         - Keep the response to one or two natural sentences unless asking a clarification.

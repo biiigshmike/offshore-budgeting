@@ -435,6 +435,7 @@ struct MarinaFoundationModelsInterpreterTests {
             #expect(candidate.operation == .lookupDetails)
             #expect(candidate.databaseLookupRequest?.searchText == searchText)
             #expect(candidate.databaseLookupRequest?.objectTypes == [expectedType])
+            #expect(candidate.databaseLookupRequest?.lookupMode == .entityDetail)
             #expect(candidate.entityMentions.first?.rawText == searchText)
             #expect(candidate.semanticCommand == command)
         }
@@ -597,6 +598,7 @@ struct MarinaFoundationModelsInterpreterTests {
         #expect(query.filters.first?.value == "Apple Card")
         #expect(interpretation.compatibilityCandidate.databaseLookupRequest?.searchText == "Apple Card")
         #expect(interpretation.compatibilityCandidate.databaseLookupRequest?.objectTypes == [.card])
+        #expect(interpretation.compatibilityCandidate.databaseLookupRequest?.lookupMode == .entityDetail)
         #expect(interpretation.compatibilityCandidate.semanticCommand == command)
     }
 

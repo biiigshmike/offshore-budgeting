@@ -35,6 +35,13 @@ struct MarinaTypedFixtureInterpreter: MarinaCanonicalAIInterpreting {
         context: MarinaInterpretationContext
     ) -> MarinaCanonicalReadInterpretation? {
         switch canonicalPrompt(prompt) {
+        case "show me my apple card", "show apple card":
+            return databaseLookup(
+                prompt: prompt,
+                searchText: "Apple Card",
+                objectTypes: [.card],
+                lookupMode: .entityDetail
+            )
         case "what workspace am i in":
             return databaseLookup(
                 prompt: prompt,
@@ -206,6 +213,7 @@ struct MarinaTypedFixtureInterpreter: MarinaCanonicalAIInterpreting {
         prompt: String,
         searchText: String,
         objectTypes: [MarinaLookupObjectType],
+        lookupMode: MarinaLookupMode = .broadSearch,
         requestShape: MarinaRequestShape? = nil
     ) -> MarinaCanonicalReadInterpretation {
         let request = MarinaDatabaseLookupRequest(
@@ -214,7 +222,8 @@ struct MarinaTypedFixtureInterpreter: MarinaCanonicalAIInterpreting {
             objectTypes: objectTypes,
             dateRange: nil,
             limit: 10,
-            requestedDetail: .general
+            requestedDetail: .general,
+            lookupMode: lookupMode
         )
         let candidate = MarinaQueryPlanCandidate(
             requestFamily: .databaseLookup,

@@ -100,6 +100,17 @@ struct MarinaLiveDomainIntentMapperTests {
         #expect(command(linkedPresets)?.includeFilters.first?.rawText == "May Budget")
         #expect(command(linkedPresets)?.includeFilters.first?.allowedTypes == [.budget])
         #expect(command(linkedPresets)?.requestedDetail == .linkedPresets)
+
+        let budgetsUsingCard = mapper.map(
+            payload: payload(route: "lookup", intent: "membership", target: "Apple Card", relationship: "budgets use"),
+            prompt: "Which budgets use Apple Card?",
+            context: context
+        )
+        #expect(budgetsUsingCard.canonicalRouteSummary == "budget.membership")
+        #expect(budgetsUsingCard.routeKeySummary == "budgetMembership")
+        #expect(command(budgetsUsingCard)?.includeFilters.first?.rawText == "Apple Card")
+        #expect(command(budgetsUsingCard)?.includeFilters.first?.allowedTypes == [.card])
+        #expect(command(budgetsUsingCard)?.requestedDetail == .membership)
     }
 
     @Test func mapper_usesHomeAppliedDateRangeForNoDateSpendAndIncomePrompts() {
@@ -332,6 +343,62 @@ struct MarinaLiveDomainIntentMapperTests {
         #expect(scenarioIntent.valueModeRaw == "less")
     }
 
+    @Test func mapper_entityLookupConstrainKnownNamesBeforeDatabaseSearch() {
+        let mapper = MarinaLiveDomainIntentMapper(nowProvider: { fixedNow })
+        let context = routerContext(
+            cardNames: ["Apple Card", "Debit Card", "Amex"],
+            categoryNames: ["Apple"]
+        )
+
+        let apple = mapper.map(
+            payload: minimalPayload(route: "lookup"),
+            prompt: "Show me my Apple Card",
+            context: context
+        )
+        let debit = mapper.map(
+            payload: payload(route: "lookup", intent: nil, target: "Debit Card card"),
+            prompt: "Show Debit Card card",
+            context: context
+        )
+        let amex = mapper.map(
+            payload: minimalPayload(route: "lookup"),
+            prompt: "Show Amex",
+            context: context
+        )
+        let expenseRows = mapper.map(
+            payload: minimalPayload(route: "readQuery"),
+            prompt: "Show expenses on Apple Card",
+            context: context
+        )
+
+        #expect(apple.canonicalRouteSummary == "entity.lookup.card")
+        #expect(command(apple)?.datasets == [.cards])
+        #expect(command(apple)?.includeFilters.first?.rawText == "Apple Card")
+        #expect(command(apple)?.includeFilters.first?.allowedTypes == [.card])
+
+        #expect(debit.canonicalRouteSummary == "entity.lookup.card")
+        #expect(command(debit)?.includeFilters.first?.rawText == "Debit Card")
+        #expect(command(debit)?.includeFilters.first?.allowedTypes == [.card])
+
+        #expect(amex.canonicalRouteSummary == "entity.lookup.card")
+        #expect(command(amex)?.includeFilters.first?.rawText == "Amex")
+        #expect(command(amex)?.includeFilters.first?.allowedTypes == [.card])
+
+        let candidate = MarinaFoundationModelsInterpreter().candidate(
+            from: .semanticCommand(command(apple)!),
+            prompt: "Show me my Apple Card",
+            defaultPeriodUnit: .month
+        )
+        #expect(candidate.databaseLookupRequest?.objectTypes == [.card])
+        #expect(candidate.databaseLookupRequest?.lookupMode == .entityDetail)
+
+        #expect(expenseRows.canonicalRouteSummary == "spending.recentRows")
+        #expect(command(expenseRows)?.action == .listRows)
+        #expect(command(expenseRows)?.datasets == [.variableExpenses])
+        #expect(command(expenseRows)?.includeFilters.first?.rawText == "Apple Card")
+        #expect(command(expenseRows)?.includeFilters.first?.allowedTypes == [.card])
+    }
+
     @Test func mapper_preservesAllocationAccountAndCategoryForAllocatedSpend() {
         let mapper = MarinaLiveDomainIntentMapper(nowProvider: { fixedNow })
         let context = routerContext(
@@ -403,8 +470,10 @@ struct MarinaLiveDomainIntentMapperTests {
     private func routerContext(
         ambientDateRange: HomeQueryDateRange? = nil,
         defaultPeriodUnit: HomeQueryPeriodUnit = .month,
+        cardNames: [String] = ["Apple Card", "Backup Card"],
         categoryNames: [String] = ["Groceries", "Dining"],
-        allocationAccountNames: [String] = []
+        allocationAccountNames: [String] = [],
+        savingsAccountNames: [String] = []
     ) -> MarinaInterpretationContext {
         MarinaInterpretationContext(
             workspaceName: "Personal",
@@ -412,12 +481,13 @@ struct MarinaLiveDomainIntentMapperTests {
             ambientDateRange: ambientDateRange,
             sessionContext: MarinaSessionContext(),
             priorQueryContext: .empty,
-            cardNames: ["Apple Card", "Backup Card"],
+            cardNames: cardNames,
             categoryNames: categoryNames,
             incomeSourceNames: ["Salary"],
             presetTitles: ["Rent"],
             budgetNames: ["May Budget"],
             allocationAccountNames: allocationAccountNames,
+            savingsAccountNames: savingsAccountNames,
             aliasSummaries: [],
             now: fixedNow
         )

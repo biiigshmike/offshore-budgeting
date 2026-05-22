@@ -324,7 +324,9 @@ struct HomeView: View {
                 ambientDateRange: HomeQueryDateRange(
                     startDate: appliedStartDate,
                     endDate: appliedEndDate
-                )
+                ),
+                cardSummaryExcludeFuturePlannedExpensesOverride: excludeFuturePlannedExpensesFromCalculationsInView,
+                cardSummaryExcludeFutureVariableExpensesOverride: excludeFutureVariableExpensesFromCalculationsInView
             )
         }
         .postBoardingTip(

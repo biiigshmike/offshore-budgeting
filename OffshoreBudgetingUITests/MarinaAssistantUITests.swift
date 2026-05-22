@@ -214,6 +214,33 @@ final class MarinaAssistantUITests: XCTestCase {
         }
     }
 
+    func testMarinaAppSurfaceCardLookup_rendersNativeCardSummary() throws {
+        let app = XCUIApplication()
+        let driver = MarinaUITestDriver(app: app, testCase: self)
+        let reporter = MarinaAppSurfaceReporter()
+        defer { reporter.attach(to: self) }
+
+        driver.launchHarness()
+
+        let report = driver.runPrompt(
+            "Show me my Apple Card",
+            expectation: MarinaPromptExpectation(
+                model: "Card",
+                outcome: .handled,
+                responseShape: .summaryCard,
+                requiredVisibleText: ["Apple Card", "Total", "Planned", "Variable"]
+            ),
+            timeout: 8
+        )
+        reporter.record(report)
+
+        XCTAssertTrue(report.result.passed, report.result.reason)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["marina.cardSummary"].waitForExistence(timeout: 4),
+            "Expected Marina to render the native card summary attachment. answer=\(report.visibleAnswer.text)"
+        )
+    }
+
     func testMarinaAppSurfaceStep5MutationPrompt_doesNotExecuteFoundationReadApproximation() throws {
         let app = XCUIApplication()
         let driver = MarinaUITestDriver(app: app, testCase: self)

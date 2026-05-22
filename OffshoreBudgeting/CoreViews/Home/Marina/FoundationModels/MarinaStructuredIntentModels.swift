@@ -197,6 +197,7 @@ struct MarinaInterpretationContext {
     let presetTitles: [String]
     let budgetNames: [String]
     let allocationAccountNames: [String]
+    let savingsAccountNames: [String]
     let aliasSummaries: [MarinaAliasSummary]
     let now: Date
 
@@ -212,6 +213,7 @@ struct MarinaInterpretationContext {
         presetTitles: [String],
         budgetNames: [String],
         allocationAccountNames: [String] = [],
+        savingsAccountNames: [String] = [],
         aliasSummaries: [MarinaAliasSummary],
         now: Date
     ) {
@@ -226,6 +228,7 @@ struct MarinaInterpretationContext {
         self.presetTitles = presetTitles
         self.budgetNames = budgetNames
         self.allocationAccountNames = allocationAccountNames
+        self.savingsAccountNames = savingsAccountNames
         self.aliasSummaries = aliasSummaries
         self.now = now
     }

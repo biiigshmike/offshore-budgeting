@@ -51,13 +51,163 @@ struct MarinaDatabaseLookupExecutorTests {
     @Test func objectTypeClue_filtersResults() throws {
         let fixture = try makeLookupFixture()
         let response = MarinaDatabaseLookupExecutor().execute(
-            request(searchText: "Apple Card", objectTypes: [.card]),
+            request(searchText: "Apple Card", objectTypes: [.card], lookupMode: .entityDetail),
             provider: fixture.provider
         )
 
         #expect(response.results.count == 1)
         #expect(response.results.first?.objectType == .card)
         #expect(response.results.first?.title == "Apple Card")
+    }
+
+    @Test func entityDetailMode_doesNotRouteCardNameToLinkedPlannedExpense() throws {
+        let fixture = try makeLookupFixture()
+        let response = MarinaDatabaseLookupExecutor().execute(
+            request(
+                searchText: "Apple Card",
+                objectTypes: [.card, .plannedExpense],
+                lookupMode: .entityDetail
+            ),
+            provider: fixture.provider
+        )
+
+        #expect(response.results.map(\.objectType) == [.card])
+        #expect(response.results.first?.title == "Apple Card")
+        #expect(response.traceSummary.contains("lookupMode=entityDetail"))
+        #expect(response.traceSummary.contains("selectedResultTypes=card"))
+    }
+
+    @Test func entityDetailMode_handlesDebitCardCollisionWithPlannedExpense() throws {
+        let fixture = try makeLookupFixture()
+        let debit = Card(name: "Debit Card", workspace: fixture.workspace)
+        let billCategory = Category(name: "Bills & Utilities", hexColor: "#345678", workspace: fixture.workspace)
+        let bill = PlannedExpense(
+            title: "T-Mobile",
+            plannedAmount: 96.20,
+            expenseDate: date(2026, 5, 19),
+            workspace: fixture.workspace,
+            card: debit,
+            category: billCategory
+        )
+        fixture.context.insert(debit)
+        fixture.context.insert(billCategory)
+        fixture.context.insert(bill)
+        try fixture.context.save()
+
+        let response = MarinaDatabaseLookupExecutor().execute(
+            request(
+                searchText: "Debit Card",
+                objectTypes: [.card, .plannedExpense],
+                lookupMode: .entityDetail
+            ),
+            provider: fixture.provider
+        )
+
+        #expect(response.results.map(\.objectType) == [.card])
+        #expect(response.results.first?.title == "Debit Card")
+    }
+
+    @Test func entityDetailMode_doesNotRouteCategoryNameToCategorizedExpense() throws {
+        let fixture = try makeLookupFixture()
+        let groceries = Category(name: "Groceries", hexColor: "#00AA00", workspace: fixture.workspace)
+        let card = Card(name: "Grocery Card", workspace: fixture.workspace)
+        let expense = VariableExpense(
+            descriptionText: "Market",
+            amount: 42,
+            transactionDate: date(2026, 5, 12),
+            workspace: fixture.workspace,
+            card: card,
+            category: groceries
+        )
+        fixture.context.insert(groceries)
+        fixture.context.insert(card)
+        fixture.context.insert(expense)
+        try fixture.context.save()
+
+        let response = MarinaDatabaseLookupExecutor().execute(
+            request(
+                searchText: "Groceries",
+                objectTypes: [.category, .variableExpense],
+                lookupMode: .entityDetail
+            ),
+            provider: fixture.provider
+        )
+
+        #expect(response.results.map(\.objectType) == [.category])
+        #expect(response.results.first?.title == "Groceries")
+    }
+
+    @Test func entityDetailMode_keepsPresetAndAccountsConstrainedToTheirEntityType() throws {
+        let fixture = try makeLookupFixture()
+
+        let preset = MarinaDatabaseLookupExecutor().execute(
+            request(searchText: "Rent", objectTypes: [.preset], lookupMode: .entityDetail),
+            provider: fixture.provider
+        )
+        let savings = MarinaDatabaseLookupExecutor().execute(
+            request(searchText: "True Savings", objectTypes: [.savingsAccount], lookupMode: .entityDetail),
+            provider: fixture.provider
+        )
+        let reconciliation = MarinaDatabaseLookupExecutor().execute(
+            request(searchText: "Roommate Reconciliation", objectTypes: [.reconciliationAccount], lookupMode: .entityDetail),
+            provider: fixture.provider
+        )
+
+        #expect(preset.results.first?.objectType == .preset)
+        #expect(savings.results.first?.objectType == .savingsAccount)
+        #expect(reconciliation.results.first?.objectType == .reconciliationAccount)
+    }
+
+    @Test func relatedRowsMode_stillAllowsRelationshipFieldMatches() throws {
+        let fixture = try makeLookupFixture()
+        let response = MarinaDatabaseLookupExecutor().execute(
+            request(
+                searchText: "Apple Card",
+                objectTypes: [.variableExpense, .plannedExpense],
+                lookupMode: .relatedRows,
+                limit: 10
+            ),
+            provider: fixture.provider
+        )
+
+        #expect(response.results.map(\.objectType).contains(.plannedExpense))
+        #expect(response.results.map(\.objectType).contains(.variableExpense))
+        #expect(response.results.allSatisfy { $0.cardName == "Apple Card" })
+    }
+
+    @Test func broadSearchClarifiesExactEntityAndRelatedRowCollision() throws {
+        let fixture = try makeLookupFixture()
+        let response = MarinaDatabaseLookupExecutor().execute(
+            request(
+                searchText: "Apple Card",
+                objectTypes: MarinaLookupObjectType.safeDefaultSearchTypes,
+                lookupMode: .broadSearch
+            ),
+            provider: fixture.provider
+        )
+
+        #expect(response.needsClarification)
+        #expect(response.ambiguityChoices.map(\.objectType).contains(.card))
+        #expect(response.ambiguityChoices.map(\.objectType).contains(.plannedExpense))
+    }
+
+    @Test func lookupRequestCodable_defaultsMissingModeToBroadSearch() throws {
+        let json = """
+        {
+          "rawPrompt": "Find Apple Card",
+          "searchText": "Apple Card",
+          "objectTypes": ["card"],
+          "limit": 1,
+          "requestedDetail": "general"
+        }
+        """.data(using: .utf8)!
+
+        let decoded = try JSONDecoder().decode(MarinaDatabaseLookupRequest.self, from: json)
+        #expect(decoded.lookupMode == .broadSearch)
+
+        let encoded = try JSONEncoder().encode(decoded)
+        let encodedText = String(data: encoded, encoding: .utf8) ?? ""
+        #expect(encodedText.contains("\"lookupMode\""))
     }
 
     @Test func noMatch_isEmptySuccessfulLookupResponse() throws {
@@ -202,6 +352,7 @@ struct MarinaDatabaseLookupExecutorTests {
     private func request(
         searchText: String,
         objectTypes: [MarinaLookupObjectType],
+        lookupMode: MarinaLookupMode = .broadSearch,
         limit: Int = 5
     ) -> MarinaDatabaseLookupRequest {
         MarinaDatabaseLookupRequest(
@@ -210,7 +361,8 @@ struct MarinaDatabaseLookupExecutorTests {
             objectTypes: objectTypes,
             dateRange: nil,
             limit: limit,
-            requestedDetail: .general
+            requestedDetail: .general,
+            lookupMode: lookupMode
         )
     }
 

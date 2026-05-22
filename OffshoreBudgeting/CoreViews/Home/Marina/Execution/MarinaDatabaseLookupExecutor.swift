@@ -19,7 +19,7 @@ struct MarinaDatabaseLookupExecutor {
                 guard search.isEmpty == false else {
                     return (result, 1)
                 }
-                let score = matchScore(search: search, result: result)
+                let score = matchScore(search: search, result: result, mode: request.lookupMode)
                 return score > 0 ? (result, score) : nil
             }
             .sorted { lhs, rhs in
@@ -40,6 +40,18 @@ struct MarinaDatabaseLookupExecutor {
         let exactTypeMatches = scoredResults
             .filter { $0.1 == 100 }
             .map(\.0)
+        if request.lookupMode == .broadSearch,
+           shouldClarifyBroadExactMatches(request.objectTypes),
+           let collisionChoices = broadSearchIdentityRelationshipCollision(
+            search: search,
+            matches: exactTypeMatches
+           ) {
+            return MarinaDatabaseLookupResponse(
+                request: request,
+                results: [],
+                ambiguityChoices: Array(collisionChoices.prefix(request.limit))
+            )
+        }
         let exactObjectTypes = Set(exactTypeMatches.map(\.objectType))
         if request.requestedDetail == .general,
            exactObjectTypes.count > 1,
@@ -474,15 +486,78 @@ struct MarinaDatabaseLookupExecutor {
         return Set(objectTypes) == Set(MarinaLookupObjectType.safeDefaultSearchTypes)
     }
 
-    private func matchScore(search: String, result: MarinaDatabaseLookupResult) -> Int {
-        let candidates = [
+    private func matchScore(
+        search: String,
+        result: MarinaDatabaseLookupResult,
+        mode: MarinaLookupMode
+    ) -> Int {
+        switch mode {
+        case .entityDetail:
+            return score(
+                search: search,
+                candidates: identityCandidates(for: result),
+                allowsTokenOverlap: false
+            )
+        case .relatedRows, .relationship, .broadSearch:
+            return score(search: search, candidates: broadCandidates(for: result))
+        }
+    }
+
+    private func broadSearchIdentityRelationshipCollision(
+        search: String,
+        matches: [MarinaDatabaseLookupResult]
+    ) -> [MarinaDatabaseLookupResult]? {
+        guard search.isEmpty == false else { return nil }
+        let identityMatches = matches.filter {
+            score(search: search, candidates: identityCandidates(for: $0), allowsTokenOverlap: false) == 100
+        }
+        guard identityMatches.isEmpty == false else { return nil }
+
+        let relatedMatches = matches.filter { result in
+            score(search: search, candidates: relationshipCandidates(for: result)) == 100
+                && identityMatches.contains(where: { $0.id == result.id && $0.objectType == result.objectType }) == false
+        }
+        guard relatedMatches.isEmpty == false else { return nil }
+
+        let identityChoices = representativeStoredObjectMatches(identityMatches)
+        return (identityChoices.isEmpty ? identityMatches : identityChoices)
+            + relatedMatches.sorted { lhs, rhs in
+                if lhs.objectType != rhs.objectType {
+                    return ambiguityRank(lhs.objectType) < ambiguityRank(rhs.objectType)
+                }
+                return (lhs.date ?? .distantFuture) < (rhs.date ?? .distantFuture)
+            }
+    }
+
+    private func identityCandidates(for result: MarinaDatabaseLookupResult) -> [String] {
+        [result.title]
+    }
+
+    private func relationshipCandidates(for result: MarinaDatabaseLookupResult) -> [String] {
+        [
+            result.cardName,
+            result.categoryName,
+            result.accountName
+        ].compactMap { $0 }
+    }
+
+    private func broadCandidates(for result: MarinaDatabaseLookupResult) -> [String] {
+        [
             result.title,
             result.subtitle,
             result.cardName,
             result.categoryName,
             result.accountName,
             result.workspaceName
-        ].compactMap { $0 }.map(normalized)
+        ].compactMap { $0 }
+    }
+
+    private func score(
+        search: String,
+        candidates rawCandidates: [String],
+        allowsTokenOverlap: Bool = true
+    ) -> Int {
+        let candidates = rawCandidates.map(normalized)
 
         if candidates.contains(search) {
             return 100
@@ -490,6 +565,7 @@ struct MarinaDatabaseLookupExecutor {
         if candidates.contains(where: { $0.contains(search) || search.contains($0) }) {
             return 70
         }
+        guard allowsTokenOverlap else { return 0 }
 
         let searchTokens = Set(search.split(separator: " ").map(String.init))
         guard searchTokens.isEmpty == false else { return 0 }

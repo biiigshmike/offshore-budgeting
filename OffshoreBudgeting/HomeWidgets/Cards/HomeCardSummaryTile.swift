@@ -16,57 +16,21 @@ struct HomeCardSummaryTile: View {
     let excludeFuturePlannedExpensesFromCalculationsInView: Bool
     let excludeFutureVariableExpensesFromCalculationsInView: Bool
 
-    private var metrics: HomeCardMetrics {
-        HomeCardMetricsCalculator.metrics(
+    private var presentationModel: CardSummaryPresentationModel {
+        CardSummaryPresentationModel.make(
             for: card,
-            start: startDate,
-            end: endDate,
+            startDate: startDate,
+            endDate: endDate,
             excludeFuturePlannedExpenses: excludeFuturePlannedExpensesFromCalculationsInView,
             excludeFutureVariableExpenses: excludeFutureVariableExpensesFromCalculationsInView
         )
-    }
-
-    private var themeOption: CardThemeOption {
-        CardThemeOption(rawValue: card.theme) ?? .charcoal
-    }
-
-    private var effectOption: CardEffectOption {
-        CardEffectOption(rawValue: card.effect) ?? .plastic
     }
 
     var body: some View {
         NavigationLink {
             CardDetailView(workspace: workspace, card: card)
         } label: {
-            HomeTileContainer(
-                title: card.name,
-                subtitle: dateRangeSubtitle,
-                accent: .primary,
-                showsChevron: true
-            ) {
-                HStack(alignment: .center, spacing: 14) {
-
-                    CardVisualView(
-                        title: card.name,
-                        theme: themeOption,
-                        effect: effectOption,
-                        minHeight: nil,
-                        showsShadow: false,
-                        titleFont: .headline.weight(.semibold),
-                        titlePadding: 12,
-                        titleOpacity: 0.85
-                    )
-                    .frame(width: 120)
-
-                    VStack(alignment: .leading, spacing: 8) {
-                        metricRow(title: String(localized: "common.total", defaultValue: "Total", comment: "Common label for totals."), value: metrics.total, isEmphasized: false)
-                        metricRow(title: String(localized: "common.planned", defaultValue: "Planned", comment: "Common label for planned values."), value: metrics.plannedTotal, isEmphasized: false)
-                        metricRow(title: String(localized: "common.variable", defaultValue: "Variable", comment: "Common label for variable values."), value: metrics.variableTotal, isEmphasized: false)
-                    }
-
-                    Spacer(minLength: 0)
-                }
-            }
+            CardSummaryPresentationView(model: presentationModel, showsChevron: true)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(
@@ -81,27 +45,5 @@ struct HomeCardSummaryTile: View {
             )
         )
         .accessibilityHint(String(localized: "homeWidget.cardSummary.accessibilityHint", defaultValue: "Opens card details", comment: "Accessibility hint for opening card details from Home card widget."))
-    }
-
-    private func metricRow(title: String, value: Double, isEmphasized: Bool) -> some View {
-        HStack(spacing: 10) {
-            Text(title)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-
-            Spacer()
-
-            Text(value, format: CurrencyFormatter.currencyStyle())
-                .font(isEmphasized ? .headline.weight(.semibold) : .subheadline.weight(.semibold))
-                .foregroundStyle(.primary)
-        }
-    }
-
-    private var dateRangeSubtitle: String {
-        "\(formattedDate(startDate)) - \(formattedDate(endDate))"
-    }
-
-    private func formattedDate(_ date: Date) -> String {
-        AppDateFormat.abbreviatedDate(date)
     }
 }

@@ -316,15 +316,67 @@ struct MarinaFoundationModelsInterpreter {
 
     private func lookupRequest(from command: MarinaSemanticCommand, prompt: String) -> MarinaDatabaseLookupRequest? {
         guard let filter = command.includeFilters.first else { return nil }
-        let objectTypes = command.datasets.compactMap(lookupObjectType)
+        let filterObjectTypes = filter.allowedTypes.compactMap(lookupObjectType)
+        let datasetObjectTypes = command.datasets.compactMap(lookupObjectType)
+        let objectTypes = preferredLookupObjectTypes(
+            filterObjectTypes: filterObjectTypes,
+            datasetObjectTypes: datasetObjectTypes
+        )
         return MarinaDatabaseLookupRequest(
             rawPrompt: prompt,
             searchText: filter.rawText,
             objectTypes: objectTypes.isEmpty ? [.unknown] : objectTypes,
             dateRange: command.dateRange,
             limit: min(max(command.limit ?? 5, 1), 10),
-            requestedDetail: lookupRequestedDetail(from: command.requestedDetail)
+            requestedDetail: lookupRequestedDetail(from: command.requestedDetail),
+            lookupMode: lookupMode(
+                requestedDetail: command.requestedDetail,
+                objectTypes: objectTypes
+            )
         )
+    }
+
+    private func preferredLookupObjectTypes(
+        filterObjectTypes: [MarinaLookupObjectType],
+        datasetObjectTypes: [MarinaLookupObjectType]
+    ) -> [MarinaLookupObjectType] {
+        if filterObjectTypes.count == 1 {
+            return filterObjectTypes
+        }
+        return uniqueLookupObjectTypes(datasetObjectTypes + filterObjectTypes)
+    }
+
+    private func uniqueLookupObjectTypes(_ objectTypes: [MarinaLookupObjectType]) -> [MarinaLookupObjectType] {
+        var unique: [MarinaLookupObjectType] = []
+        for objectType in objectTypes where unique.contains(objectType) == false {
+            unique.append(objectType)
+        }
+        return unique
+    }
+
+    private func lookupMode(
+        requestedDetail: MarinaSemanticRequestedDetail?,
+        objectTypes: [MarinaLookupObjectType]
+    ) -> MarinaLookupMode {
+        switch requestedDetail {
+        case .linkedObjects, .linkedCards, .linkedPresets, .categoryLimits, .membership:
+            return .relationship
+        default:
+            break
+        }
+
+        let concreteTypes = objectTypes.filter { $0 != .unknown }
+        guard concreteTypes.isEmpty == false,
+              Set(concreteTypes) != Set(MarinaLookupObjectType.safeDefaultSearchTypes) else {
+            return .broadSearch
+        }
+        if concreteTypes.count == 1 {
+            return .entityDetail
+        }
+        if Set(concreteTypes).isSubset(of: [.variableExpense, .plannedExpense]) {
+            return .entityDetail
+        }
+        return .broadSearch
     }
 
     private func lookupObjectType(from dataset: MarinaSemanticCommandDataset) -> MarinaLookupObjectType? {
@@ -357,6 +409,29 @@ struct MarinaFoundationModelsInterpreter {
             return .importMerchantRule
         case .assistantAliasRules:
             return .assistantAliasRule
+        }
+    }
+
+    private func lookupObjectType(from entityHint: MarinaCandidateEntityTypeHint) -> MarinaLookupObjectType? {
+        switch entityHint {
+        case .category:
+            return .category
+        case .merchant, .expense, .transaction:
+            return .variableExpense
+        case .card:
+            return .card
+        case .budget:
+            return .budget
+        case .preset:
+            return .preset
+        case .incomeSource:
+            return .income
+        case .allocationAccount:
+            return .reconciliationAccount
+        case .savingsAccount:
+            return .savingsAccount
+        case .workspace:
+            return .workspace
         }
     }
 

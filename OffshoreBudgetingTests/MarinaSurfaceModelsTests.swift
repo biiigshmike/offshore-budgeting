@@ -117,6 +117,109 @@ struct MarinaModelsTests {
         #expect(normalized.subtitle?.contains("Apr") == true || normalized.subtitle?.contains("2026") == true)
     }
 
+    @Test func cardSummaryPresentationModel_usesHomeCardMetrics() throws {
+        let card = Card(
+            name: "Apple Card",
+            theme: CardThemeOption.ruby.rawValue,
+            effect: CardEffectOption.plastic.rawValue
+        )
+        let planned = PlannedExpense(
+            title: "Phone",
+            plannedAmount: 579.45,
+            expenseDate: date(2026, 5, 5),
+            card: card
+        )
+        let futurePlanned = PlannedExpense(
+            title: "Future",
+            plannedAmount: 500,
+            expenseDate: date(2026, 7, 1),
+            card: card
+        )
+        let variable = VariableExpense(
+            descriptionText: "Groceries",
+            amount: 909.06,
+            transactionDate: date(2026, 5, 10),
+            card: card
+        )
+        let otherPeriodVariable = VariableExpense(
+            descriptionText: "April",
+            amount: 44,
+            transactionDate: date(2026, 4, 30),
+            card: card
+        )
+        card.plannedExpenses = [planned, futurePlanned]
+        card.variableExpenses = [variable, otherPeriodVariable]
+
+        let summary = CardSummaryPresentationModel.make(
+            for: card,
+            startDate: date(2026, 5, 1),
+            endDate: date(2026, 5, 31),
+            excludeFuturePlannedExpenses: false,
+            excludeFutureVariableExpenses: false
+        )
+
+        #expect(summary.title == "Apple Card")
+        #expect(summary.themeRaw == CardThemeOption.ruby.rawValue)
+        #expect(summary.effectRaw == CardEffectOption.plastic.rawValue)
+        #expect(abs(summary.plannedTotal - 579.45) < 0.001)
+        #expect(abs(summary.variableTotal - 909.06) < 0.001)
+        #expect(abs(summary.total - 1_488.51) < 0.001)
+    }
+
+    @Test func cardSummaryAttachmentBuilder_attachesSummaryForSingleCardLookup() throws {
+        let card = Card(
+            name: "Apple Card",
+            theme: CardThemeOption.ruby.rawValue,
+            effect: CardEffectOption.plastic.rawValue
+        )
+        let planned = PlannedExpense(
+            title: "Phone",
+            plannedAmount: 579.45,
+            expenseDate: date(2026, 5, 5),
+            card: card
+        )
+        let variable = VariableExpense(
+            descriptionText: "Groceries",
+            amount: 909.06,
+            transactionDate: date(2026, 5, 10),
+            card: card
+        )
+        card.plannedExpenses = [planned]
+        card.variableExpenses = [variable]
+
+        let lookupAnswer = HomeAnswer(
+            queryID: UUID(),
+            kind: .message,
+            userPrompt: "show Apple Card",
+            title: "I found Apple Card.",
+            subtitle: "Card",
+            rows: [
+                HomeAnswerRow(title: "Type", value: "Card"),
+                HomeAnswerRow(title: "Theme", value: CardThemeOption.ruby.rawValue),
+                HomeAnswerRow(title: "Matched", value: "Apple Card")
+            ]
+        )
+
+        let decorated = MarinaCardSummaryAttachmentBuilder().attachingCardSummaryIfNeeded(
+            to: lookupAnswer,
+            cards: [card],
+            dateRange: HomeQueryDateRange(startDate: date(2026, 5, 1), endDate: date(2026, 5, 31)),
+            excludeFuturePlannedExpenses: false,
+            excludeFutureVariableExpenses: false
+        )
+
+        guard case let .cardSummary(summary)? = decorated.attachment else {
+            Issue.record("Expected card summary attachment.")
+            return
+        }
+
+        #expect(summary.title == "Apple Card")
+        #expect(abs(summary.total - 1_488.51) < 0.001)
+        #expect(decorated.subtitle?.contains("Total spending is currently") == true)
+        #expect(decorated.rows.prefix(4).map(\.title) == ["Period", "Total", "Planned", "Variable"])
+        #expect(decorated.rows.contains { $0.title == "Type" && $0.value == "Card" })
+    }
+
     @Test func suggestionSectionBuilder_prioritizesClarificationRecoveryThenFollowUps() throws {
         let clarification = [
             MarinaSuggestion(title: "Clarify", query: HomeQuery(intent: .spendThisMonth))
@@ -622,6 +725,10 @@ struct MarinaModelsTests {
         comps.second = second
         comps.timeZone = TimeZone(secondsFromGMT: 0)
         return calendar.date(from: comps) ?? .distantPast
+    }
+
+    private func date(_ year: Int, _ month: Int, _ day: Int) -> Date {
+        date(year, month, day, 0, 0, 0)
     }
 
     private func dayRange(_ year: Int, _ month: Int, _ day: Int) -> HomeQueryDateRange {

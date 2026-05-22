@@ -189,6 +189,47 @@ struct MarinaResponseGenerationServiceTests {
         #expect(applied.followUpSuggestions.map(\.query) == [followUpQuery])
     }
 
+    @Test func surfaceApplicator_preservesCardSummaryAttachment() throws {
+        let summary = CardSummaryPresentationModel(
+            cardID: UUID(),
+            title: "Apple Card",
+            themeRaw: CardThemeOption.ruby.rawValue,
+            effectRaw: CardEffectOption.plastic.rawValue,
+            startDate: Date(timeIntervalSince1970: 1_776_729_600),
+            endDate: Date(timeIntervalSince1970: 1_779_321_599),
+            plannedTotal: 579.45,
+            variableTotal: 909.06,
+            total: 1_488.51
+        )
+        let raw = HomeAnswer(
+            queryID: UUID(),
+            kind: .message,
+            title: "I found Apple Card.",
+            subtitle: "Here's your Apple Card.",
+            rows: [
+                HomeAnswerRow(title: "Total", value: "$1,488.51"),
+                HomeAnswerRow(title: "Planned", value: "$579.45"),
+                HomeAnswerRow(title: "Variable", value: "$909.06")
+            ],
+            attachment: .cardSummary(summary)
+        )
+        let generated = MarinaGeneratedSurfaceResponse(
+            titleOverride: "Different Title",
+            narrativeSubtitle: "Here's your Apple Card. Total spending is currently $1,488.51."
+        )
+
+        let applied = try MarinaResponseSurfaceApplicator().apply(
+            generated: generated,
+            to: raw,
+            deterministicFollowUps: []
+        )
+
+        #expect(applied.answer.title == raw.title)
+        #expect(applied.answer.rows == raw.rows)
+        #expect(applied.answer.attachment == raw.attachment)
+        #expect(applied.answer.subtitle == generated.narrativeSubtitle)
+    }
+
     @Test func surfaceApplicator_rewritesAndRanksOnlyDeterministicFollowUps() throws {
         let answer = HomeAnswer(queryID: UUID(), kind: .metric, title: "Spend", primaryValue: "$1")
         let first = MarinaSuggestion(

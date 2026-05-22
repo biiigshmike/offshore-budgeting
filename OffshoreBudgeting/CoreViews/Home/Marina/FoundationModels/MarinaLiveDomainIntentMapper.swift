@@ -42,6 +42,7 @@ private enum MarinaLiveRouteKey: String, Equatable, Sendable {
     case budgetInventory
     case budgetLinkedCards
     case budgetLinkedPresets
+    case budgetMembership
     case budgetCategoryLimit
     case plannedExpenseRows
     case presetTemplateRows
@@ -179,6 +180,21 @@ struct MarinaLiveDomainIntentMapper {
                 blockedWrongQuery: false
             )
         case .lookup:
+            if let entityTarget = entityDetailLookupTarget(
+                payload: payload,
+                prompt: prompt,
+                context: context
+            ) {
+                return mappedLookup(
+                    payload: payload,
+                    envelopeSummary: envelopeSummary,
+                    routeKey: nil,
+                    canonicalRoute: "entity.lookup.\(entityTarget.objectType.rawValue)",
+                    searchText: entityTarget.name,
+                    objectTypes: [entityTarget.objectType.rawValue],
+                    requestedDetail: "general"
+                )
+            }
             if let target = payload.targetText?.marinaNilIfBlank,
                isInvalidEntityTarget(target) == false {
                 return mappedLookup(
@@ -291,6 +307,23 @@ struct MarinaLiveDomainIntentMapper {
                 target: namedTarget(context.budgetNames, in: prompt, fallback: payload.targetText ?? payload.secondaryTargetText),
                 targetType: "budget",
                 requestedDetail: "linkedPresets",
+                responseDate: .none
+            )
+
+        case .budgetMembership:
+            let member = budgetMemberTarget(payload: payload, prompt: prompt, context: context)
+            return mappedRead(
+                payload: payload,
+                prompt: prompt,
+                envelopeSummary: envelopeSummary,
+                routeKey: routeKey,
+                canonicalRoute: "budget.membership",
+                subject: "budgets",
+                operation: "lookupDetails",
+                measure: "remainingBudget",
+                target: member?.name,
+                targetType: member?.type,
+                requestedDetail: "membership",
                 responseDate: .none
             )
 
@@ -514,6 +547,7 @@ struct MarinaLiveDomainIntentMapper {
             )
 
         case .recentTransactions:
+            let spendTarget = spendingTarget(payload: payload, prompt: prompt, context: context)
             return mappedRead(
                 payload: payload,
                 prompt: prompt,
@@ -523,6 +557,8 @@ struct MarinaLiveDomainIntentMapper {
                 subject: "variableExpenses",
                 operation: "listRows",
                 measure: "transactionAmount",
+                target: spendTarget?.name,
+                targetType: spendTarget?.type,
                 grouping: "transaction",
                 ranking: "newest",
                 limit: explicitLimit(in: normalizedPrompt) ?? 10,
@@ -624,6 +660,15 @@ struct MarinaLiveDomainIntentMapper {
             return .activeBudget
         }
 
+        if isBudgetMembershipByItemPrompt(
+            payload: payload,
+            prompt: prompt,
+            normalizedPrompt: normalizedPrompt,
+            context: context
+        ) {
+            return .budgetMembership
+        }
+
         if isBudgetInventoryPrompt(normalizedPrompt: normalizedPrompt, normalizedSignal: normalizedSignal) {
             return .budgetInventory
         }
@@ -719,6 +764,7 @@ struct MarinaLiveDomainIntentMapper {
             || normalizedPrompt.contains("spent")
             || normalizedPrompt.contains("spending")
         if containsAny(["recent transactions", "recent purchases", "latest transactions", "last purchase", "newest transactions"], in: normalizedPrompt)
+            || isExpenseRowsPrompt(normalizedPrompt: normalizedPrompt, context: context)
             || (promptAsksForSpend == false && containsAny(["recenttransactions", "transactionrows"], in: normalizedSignal)) {
             return .recentTransactions
         }
@@ -763,6 +809,107 @@ struct MarinaLiveDomainIntentMapper {
         .joined(separator: " ")
     }
 
+    private struct EntityDetailLookupTarget {
+        let name: String
+        let objectType: MarinaLookupObjectType
+    }
+
+    private func entityDetailLookupTarget(
+        payload: MarinaFoundationIntentEnvelopePayload,
+        prompt: String,
+        context: MarinaInterpretationContext
+    ) -> EntityDetailLookupTarget? {
+        let fallback = payload.targetText ?? payload.secondaryTargetText
+        var matches: [EntityDetailLookupTarget] = []
+        appendEntityMatch(
+            namedTarget(context.cardNames, in: prompt, fallback: fallback),
+            type: .card,
+            to: &matches
+        )
+        appendEntityMatch(
+            namedTarget(context.categoryNames, in: prompt, fallback: fallback),
+            type: .category,
+            to: &matches
+        )
+        appendEntityMatch(
+            namedTarget(context.presetTitles, in: prompt, fallback: fallback),
+            type: .preset,
+            to: &matches
+        )
+        appendEntityMatch(
+            namedTarget(context.budgetNames, in: prompt, fallback: fallback),
+            type: .budget,
+            to: &matches
+        )
+        appendEntityMatch(
+            namedTarget(context.incomeSourceNames, in: prompt, fallback: fallback),
+            type: .income,
+            to: &matches
+        )
+        appendEntityMatch(
+            namedTarget(context.savingsAccountNames, in: prompt, fallback: fallback),
+            type: .savingsAccount,
+            to: &matches
+        )
+        appendEntityMatch(
+            namedTarget(context.allocationAccountNames, in: prompt, fallback: fallback),
+            type: .reconciliationAccount,
+            to: &matches
+        )
+
+        if matches.count == 1 {
+            return matches[0]
+        }
+
+        let preferredTypes = preferredEntityDetailTypes(in: prompt)
+        for preferredType in preferredTypes {
+            let preferredMatches = matches.filter { $0.objectType == preferredType }
+            if preferredMatches.count == 1 {
+                return preferredMatches[0]
+            }
+        }
+
+        return nil
+    }
+
+    private func appendEntityMatch(
+        _ name: String?,
+        type: MarinaLookupObjectType,
+        to matches: inout [EntityDetailLookupTarget]
+    ) {
+        guard let name else { return }
+        if matches.contains(where: { $0.objectType == type && normalized($0.name) == normalized(name) }) == false {
+            matches.append(EntityDetailLookupTarget(name: name, objectType: type))
+        }
+    }
+
+    private func preferredEntityDetailTypes(in prompt: String) -> [MarinaLookupObjectType] {
+        let normalizedPrompt = normalized(prompt)
+        var types: [MarinaLookupObjectType] = []
+        if containsWord("card", in: normalizedPrompt) || containsWord("cards", in: normalizedPrompt) {
+            types.append(.card)
+        }
+        if containsWord("category", in: normalizedPrompt) || containsWord("categories", in: normalizedPrompt) {
+            types.append(.category)
+        }
+        if containsWord("preset", in: normalizedPrompt) || containsWord("presets", in: normalizedPrompt) {
+            types.append(.preset)
+        }
+        if containsWord("budget", in: normalizedPrompt) || containsWord("budgets", in: normalizedPrompt) {
+            types.append(.budget)
+        }
+        if normalizedPrompt.contains("income source") || containsWord("income", in: normalizedPrompt) {
+            types.append(.income)
+        }
+        if normalizedPrompt.contains("savings account") || containsWord("savings", in: normalizedPrompt) {
+            types.append(.savingsAccount)
+        }
+        if containsAny(["reconciliation account", "allocation account", "shared balance"], in: normalizedPrompt) {
+            types.append(.reconciliationAccount)
+        }
+        return types
+    }
+
     private func isBudgetLinkedRelationship(
         normalizedPrompt: String,
         normalizedSignal: String,
@@ -789,6 +936,20 @@ struct MarinaLiveDomainIntentMapper {
         return containsAny(["list budgets", "show budgets", "show my budgets", "what budgets", "which budgets"], in: normalizedPrompt)
     }
 
+    private func isBudgetMembershipByItemPrompt(
+        payload: MarinaFoundationIntentEnvelopePayload,
+        prompt: String,
+        normalizedPrompt: String,
+        context: MarinaInterpretationContext
+    ) -> Bool {
+        guard normalizedPrompt.contains("budget"),
+              containsAny(["use", "uses", "using", "include", "included", "linked", "attached"], in: normalizedPrompt),
+              budgetMemberTarget(payload: payload, prompt: prompt, context: context) != nil else {
+            return false
+        }
+        return containsAny(["which budget", "which budgets", "what budget", "what budgets", "budgets use", "budgets include"], in: normalizedPrompt)
+    }
+
     private func isPlannedExpenseRowsPrompt(
         normalizedPrompt: String,
         normalizedSignal: String
@@ -811,6 +972,28 @@ struct MarinaLiveDomainIntentMapper {
             return false
         }
         return containsAny(["list", "show", "templates", "active presets"], in: normalizedPrompt)
+    }
+
+    private func isExpenseRowsPrompt(
+        normalizedPrompt: String,
+        context: MarinaInterpretationContext
+    ) -> Bool {
+        let asksForRows = containsWord("show", in: normalizedPrompt)
+            || containsWord("list", in: normalizedPrompt)
+            || containsWord("find", in: normalizedPrompt)
+        guard asksForRows else { return false }
+
+        let asksForExpenseRows = containsWord("expense", in: normalizedPrompt)
+            || containsWord("expenses", in: normalizedPrompt)
+            || containsWord("transaction", in: normalizedPrompt)
+            || containsWord("transactions", in: normalizedPrompt)
+            || containsWord("purchase", in: normalizedPrompt)
+            || containsWord("purchases", in: normalizedPrompt)
+        guard asksForExpenseRows else { return false }
+
+        return namedTarget(context.cardNames, in: normalizedPrompt, fallback: nil) != nil
+            || namedTarget(context.categoryNames, in: normalizedPrompt, fallback: nil) != nil
+            || normalizedPrompt.contains(" at ")
     }
 
     private func mappedRead(
@@ -1059,6 +1242,21 @@ struct MarinaLiveDomainIntentMapper {
         }
         if let card = namedTarget(context.cardNames, in: prompt, fallback: payload.targetText) {
             return (card, "card")
+        }
+        return nil
+    }
+
+    private func budgetMemberTarget(
+        payload: MarinaFoundationIntentEnvelopePayload,
+        prompt: String,
+        context: MarinaInterpretationContext
+    ) -> (name: String, type: String)? {
+        let fallback = payload.targetText ?? payload.secondaryTargetText
+        if let card = namedTarget(context.cardNames, in: prompt, fallback: fallback) {
+            return (card, "card")
+        }
+        if let preset = namedTarget(context.presetTitles, in: prompt, fallback: fallback) {
+            return (preset, "preset")
         }
         return nil
     }

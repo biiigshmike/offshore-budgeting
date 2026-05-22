@@ -369,6 +369,7 @@ struct MarinaLiveIntentNormalizer {
             + context.presetTitles
             + context.budgetNames
             + context.allocationAccountNames
+            + context.savingsAccountNames
         return names.contains { normalizedText($0) == normalized }
     }
 

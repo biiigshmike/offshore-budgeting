@@ -75,7 +75,19 @@ struct MarinaComposableWorkspaceQueryExecutor {
             return .handled(allocationRows(resolved: resolved, plan: plan, provider: provider, now: now))
         case .settlementRows?:
             return .handled(settlementRows(resolved: resolved, plan: plan, provider: provider, now: now))
-        case .budgetLinkedCards?, .budgetLinkedPresets?, .budgetCategoryLimits?, .budgetMembership?, .activeBudget?:
+        case .budgetMembership?:
+            if let detail = (candidate.routeIntent?.requestedDetail ?? plan.routeIntent?.requestedDetail ?? candidate.semanticCommand?.requestedDetail),
+               detail == .membership,
+               asksForBudgetMembershipList(candidate.rawPrompt),
+               let member = budgetMemberTarget(in: resolved) {
+                return .handled(budgetsUsingMember(member, provider: provider))
+            }
+            if let budget = resolvedBudgetTarget(in: resolved, candidate: candidate, provider: provider, now: now),
+               let detail = (candidate.routeIntent?.requestedDetail ?? plan.routeIntent?.requestedDetail ?? candidate.semanticCommand?.requestedDetail),
+               isBudgetRelationshipDetail(detail) {
+                return .handled(budgetRelationshipResponse(budget: budget, detail: detail, resolved: resolved, plan: plan, provider: provider))
+            }
+        case .budgetLinkedCards?, .budgetLinkedPresets?, .budgetCategoryLimits?, .activeBudget?:
             if let budget = resolvedBudgetTarget(in: resolved, candidate: candidate, provider: provider, now: now),
                let detail = (candidate.routeIntent?.requestedDetail ?? plan.routeIntent?.requestedDetail ?? candidate.semanticCommand?.requestedDetail),
                isBudgetRelationshipDetail(detail) {
@@ -486,6 +498,45 @@ struct MarinaComposableWorkspaceQueryExecutor {
                 .init(label: noun.capitalized, value: member.displayName, objectType: lookupObjectType(from: member.entityType), sourceID: member.sourceID)
             ],
             traceSummary: "composableWorkspace=budgetMembershipCheck,memberType=\(member.entityType.rawValue),included=\(included)"
+        )
+    }
+
+    private func budgetsUsingMember(
+        _ member: MarinaResolvedEntityMention,
+        provider: MarinaDataProvider
+    ) -> MarinaWorkspaceAggregationCard {
+        let matchingBudgets = provider.fetchAllBudgets()
+            .filter { budget in
+                switch member.entityType {
+                case .card:
+                    return (budget.cardLinks ?? []).contains { link in
+                        link.card?.id == member.sourceID || normalized(link.card?.name ?? "") == normalized(member.displayName)
+                    }
+                case .preset:
+                    return (budget.presetLinks ?? []).contains { link in
+                        link.preset?.id == member.sourceID || normalized(link.preset?.title ?? "") == normalized(member.displayName)
+                    }
+                default:
+                    return false
+                }
+            }
+            .sorted { $0.startDate < $1.startDate }
+
+        let rows = matchingBudgets.map { budget in
+            MarinaWorkspaceAggregationCard.Row(
+                label: budget.name,
+                value: rangeLabel(HomeQueryDateRange(startDate: budget.startDate, endDate: budget.endDate)),
+                objectType: .budget,
+                sourceID: budget.id
+            )
+        }
+
+        return MarinaWorkspaceAggregationCard(
+            title: "Budgets using \(member.displayName)",
+            subtitle: rows.isEmpty ? "No budgets are linked to this \(member.entityType == .card ? "card" : "preset")." : "\(rows.count) budget\(rows.count == 1 ? "" : "s")",
+            primaryValue: rows.isEmpty ? "None" : "\(rows.count)",
+            rows: rows,
+            traceSummary: "composableWorkspace=budgetMembershipList,memberType=\(member.entityType.rawValue),budgetCount=\(rows.count)"
         )
     }
 
@@ -1028,6 +1079,24 @@ struct MarinaComposableWorkspaceQueryExecutor {
 
     private func hasAllocationAccountTarget(_ plan: MarinaAggregationPlan) -> Bool {
         plan.targets.contains { $0.entityType == .allocationAccount }
+    }
+
+    private func asksForBudgetMembershipList(_ prompt: String) -> Bool {
+        let prompt = normalized(prompt)
+        guard prompt.contains("budget") else { return false }
+        return prompt.contains("which budget")
+            || prompt.contains("which budgets")
+            || prompt.contains("what budget")
+            || prompt.contains("what budgets")
+            || prompt.contains("budgets use")
+            || prompt.contains("budgets include")
+            || prompt.contains("budgets linked")
+    }
+
+    private func budgetMemberTarget(in resolved: MarinaResolvedQueryCandidate) -> MarinaResolvedEntityMention? {
+        resolved.resolvedTargets.first { target in
+            target.entityType == .card || target.entityType == .preset
+        }
     }
 
     private func resolvedBudgetTarget(

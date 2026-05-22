@@ -2781,7 +2781,8 @@ struct MarinaQueryExecutor {
             objectTypes: objectTypes,
             dateRange: plan.dateRange,
             limit: plan.limit ?? 1,
-            requestedDetail: .general
+            requestedDetail: .general,
+            lookupMode: .relatedRows
         ).clamped
     }
 

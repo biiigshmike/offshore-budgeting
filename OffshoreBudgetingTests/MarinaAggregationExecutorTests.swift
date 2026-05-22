@@ -465,14 +465,17 @@ struct MarinaAggregationExecutorTests {
     @Test func composableExecutor_budgetRelationshipsReturnFocusedResponses() throws {
         let fixture = try makeFixture()
         let budget = Budget(name: "May", startDate: date(2026, 5, 1), endDate: date(2026, 5, 31), workspace: fixture.workspace)
+        let juneBudget = Budget(name: "June", startDate: date(2026, 6, 1), endDate: date(2026, 6, 30), workspace: fixture.workspace)
         let harborCard = Card(name: "Harbor Checking", workspace: fixture.workspace)
         let preset = Preset(title: "Rent", plannedAmount: 900, workspace: fixture.workspace, defaultCard: fixture.appleCard, defaultCategory: fixture.groceries)
         fixture.context.insert(budget)
+        fixture.context.insert(juneBudget)
         fixture.context.insert(harborCard)
         fixture.context.insert(preset)
         fixture.context.insert(BudgetCardLink(budget: budget, card: fixture.appleCard))
         fixture.context.insert(BudgetCardLink(budget: budget, card: fixture.backupCard))
         fixture.context.insert(BudgetCardLink(budget: budget, card: harborCard))
+        fixture.context.insert(BudgetCardLink(budget: juneBudget, card: fixture.appleCard))
         fixture.context.insert(BudgetPresetLink(budget: budget, preset: preset))
         fixture.context.insert(BudgetCategoryLimit(maxAmount: 500, budget: budget, category: fixture.groceries))
         try fixture.context.save()
@@ -536,6 +539,26 @@ struct MarinaAggregationExecutorTests {
         #expect(membership.primaryValue == "Included")
         #expect(membership.title.contains("Apple Card"))
         #expect(membership.traceSummary.contains("budgetMembershipCheck"))
+
+        let budgetList = handledCard(executor.execute(
+            candidate: candidate(prompt: "Which budgets use Apple Card?", operation: .lookupDetails, measure: .spend, mentions: [cardMention], requestedDetail: .membership, responseShapeHint: .relationshipList),
+            resolved: resolvedCandidate(targets: [
+                resolvedTarget(mention: cardMention, role: .filter, entityType: .card, displayName: "Apple Card", sourceID: fixture.appleCard.id)
+            ]),
+            plan: MarinaAggregationPlan(
+                operation: .lookupDetails,
+                measure: .spend,
+                targets: [
+                    target(.card, "Apple Card", role: .filter, sourceID: fixture.appleCard.id)
+                ],
+                responseShape: .relationshipList
+            ),
+            provider: fixture.provider,
+            now: date(2026, 5, 15)
+        ))
+        #expect(budgetList.title == "Budgets using Apple Card")
+        #expect(budgetList.rows.map(\.label) == ["May", "June"])
+        #expect(budgetList.traceSummary.contains("budgetMembershipList"))
     }
 
     @Test func composableExecutor_step5RoutesDoNotNeedPromptFallback() throws {

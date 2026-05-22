@@ -1152,7 +1152,7 @@ extension MarinaAILookupIntent {
         let command = MarinaSemanticCommand(
             family: .databaseLookup,
             action: .lookupDetails,
-            datasets: datasets.isEmpty ? [.variableExpenses] : datasets,
+            datasets: datasets,
             includeFilters: [
                 MarinaSemanticCommandFilter(
                     rawText: searchText,
@@ -1263,7 +1263,7 @@ private func semanticDataset(from rawValue: String?) -> MarinaSemanticCommandDat
     switch normalized {
     case "workspace", "workspaces", "current_workspace", "currentworkspace":
         return .workspaces
-    case "variable_expenses", "variableexpenses", "expenses", "expense", "transactions", "transaction", "merchant":
+    case "variable_expenses", "variableexpenses", "variable_expense", "variableexpense", "expenses", "expense", "transactions", "transaction", "merchant":
         return .variableExpenses
     case "planned_expenses", "plannedexpenses", "planned_expense", "plannedexpense", "presets_due":
         return .plannedExpenses
@@ -1279,15 +1279,15 @@ private func semanticDataset(from rawValue: String?) -> MarinaSemanticCommandDat
         return .presets
     case "budgets", "budget":
         return .budgets
-    case "savings", "savings_ledger", "savingsledger", "savings_ledger_entries", "savingsledgerentries":
+    case "savings", "savings_account", "savingsaccount", "savings_ledger", "savingsledger", "savings_ledger_entries", "savingsledgerentries", "savings_ledger_entry", "savingsledgerentry":
         return .savingsLedger
-    case "reconciliation", "reconciliation_accounts", "reconciliationaccounts", "allocation_account", "allocationaccount":
+    case "reconciliation", "reconciliation_account", "reconciliationaccount", "reconciliation_accounts", "reconciliationaccounts", "reconciliation_item", "reconciliationitem", "allocation_account", "allocationaccount":
         return .reconciliation
-    case "expense_allocations", "expenseallocations", "allocations":
+    case "expense_allocation", "expenseallocation", "expense_allocations", "expenseallocations", "allocations":
         return .expenseAllocations
-    case "import_merchant_rules", "importmerchantrules":
+    case "import_merchant_rule", "importmerchantrule", "import_merchant_rules", "importmerchantrules":
         return .importMerchantRules
-    case "assistant_alias_rules", "assistantaliasrules", "aliases":
+    case "assistant_alias_rule", "assistantaliasrule", "assistant_alias_rules", "assistantaliasrules", "aliases":
         return .assistantAliasRules
     default:
         return MarinaSemanticCommandDataset(rawValue: normalized)
@@ -1882,7 +1882,9 @@ struct MarinaFoundationEntityLookupTool: Tool {
             Self.line(type: "category", values: context.categoryNames),
             Self.line(type: "incomeSource", values: context.incomeSourceNames),
             Self.line(type: "preset", values: context.presetTitles),
-            Self.line(type: "budget", values: context.budgetNames)
+            Self.line(type: "budget", values: context.budgetNames),
+            Self.line(type: "savingsAccount", values: context.savingsAccountNames),
+            Self.line(type: "allocationAccount", values: context.allocationAccountNames)
         ]
     }
 

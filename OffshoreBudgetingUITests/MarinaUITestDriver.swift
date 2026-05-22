@@ -208,6 +208,7 @@ struct MarinaUITestDriver {
         let rowTexts = rows.flatMap { row in
             [row.title, row.value].compactMap { $0 }
         }
+        let attachmentText = cardSummaryText()
         let containerText = [
             container.exists ? container.label : nil,
             container.exists ? container.value as? String : nil
@@ -219,7 +220,7 @@ struct MarinaUITestDriver {
             primaryValue.exists ? primaryValue.label : nil,
             narrative.exists ? narrative.label : nil
         ]
-        .compactMap { $0 } + rowTexts + containerText
+        .compactMap { $0 } + rowTexts + attachmentText + containerText
         let text = deduped(parts).joined(separator: "\n")
 
         return MarinaVisibleAnswer(
@@ -232,6 +233,20 @@ struct MarinaUITestDriver {
         )
     }
 
+    private func cardSummaryText() -> [String] {
+        elementText(app.descendants(matching: .any)["marina.cardSummary"].firstMatch)
+    }
+
+    private func elementText(_ element: XCUIElement) -> [String] {
+        guard element.exists else { return [] }
+        return [
+            element.label,
+            element.value as? String
+        ]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { $0.isEmpty == false }
+    }
+
     private func visibleAnswer(preferredIndex: Int, requiredText: [String]) -> MarinaVisibleAnswer {
         if requiredText.isEmpty == false,
            let matchingAnswer = answerContainingAll(requiredText, around: preferredIndex) {
@@ -241,7 +256,7 @@ struct MarinaUITestDriver {
     }
 
     private func answerContainingAll(_ requiredText: [String], around preferredIndex: Int) -> MarinaVisibleAnswer? {
-        let upperBound = max(preferredIndex + 8, 30)
+        let upperBound = max(preferredIndex + 8, 8)
         for index in stride(from: upperBound, through: 0, by: -1) {
             guard answerExists(at: index) else { continue }
             let answer = latestVisibleAnswer(preferredIndex: index)
@@ -253,7 +268,7 @@ struct MarinaUITestDriver {
     }
 
     private func answerIndex(for prompt: String, preferredIndex: Int) -> Int {
-        let upperBound = max(preferredIndex + 5, 30)
+        let upperBound = max(preferredIndex + 5, 5)
         for index in stride(from: upperBound, through: 0, by: -1) {
             let userMessage = app.descendants(matching: .any)["marina.userMessage.\(index)"].firstMatch
             if userMessage.exists,

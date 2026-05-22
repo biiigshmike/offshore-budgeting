@@ -969,14 +969,17 @@ struct MarinaExecutedQueryAnswerNormalizer {
 
 enum MarinaAttachment: Codable, Equatable {
     case inlineCreateForm(MarinaInlineCreateForm)
+    case cardSummary(CardSummaryPresentationModel)
 
     private enum CodingKeys: String, CodingKey {
         case kind
         case form
+        case cardSummary
     }
 
     private enum Kind: String, Codable {
         case inlineCreateForm
+        case cardSummary
     }
 
     init(from decoder: Decoder) throws {
@@ -984,6 +987,8 @@ enum MarinaAttachment: Codable, Equatable {
         switch try container.decode(Kind.self, forKey: .kind) {
         case .inlineCreateForm:
             self = .inlineCreateForm(try container.decode(MarinaInlineCreateForm.self, forKey: .form))
+        case .cardSummary:
+            self = .cardSummary(try container.decode(CardSummaryPresentationModel.self, forKey: .cardSummary))
         }
     }
 
@@ -993,6 +998,9 @@ enum MarinaAttachment: Codable, Equatable {
         case let .inlineCreateForm(form):
             try container.encode(Kind.inlineCreateForm, forKey: .kind)
             try container.encode(form, forKey: .form)
+        case let .cardSummary(summary):
+            try container.encode(Kind.cardSummary, forKey: .kind)
+            try container.encode(summary, forKey: .cardSummary)
         }
     }
 }

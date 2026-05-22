@@ -72,6 +72,43 @@ struct MarinaConversationStoreTests {
         #expect(loaded == expected)
     }
 
+    @Test func saveAnswers_withCardSummaryAttachment_preservesAttachmentPayload() throws {
+        let setup = makeStore()
+        defer { clearDefaults(setup.suiteName) }
+
+        let workspaceID = UUID()
+        let cardID = UUID()
+        let summary = CardSummaryPresentationModel(
+            cardID: cardID,
+            title: "Apple Card",
+            themeRaw: CardThemeOption.ruby.rawValue,
+            effectRaw: CardEffectOption.plastic.rawValue,
+            startDate: Date(timeIntervalSince1970: 1_776_729_600),
+            endDate: Date(timeIntervalSince1970: 1_779_321_599),
+            plannedTotal: 579.45,
+            variableTotal: 909.06,
+            total: 1_488.51
+        )
+        let expected = [
+            HomeAnswer(
+                queryID: UUID(),
+                kind: .message,
+                userPrompt: "show Apple Card",
+                title: "I found Apple Card.",
+                subtitle: "Here's your Apple Card.",
+                rows: [
+                    HomeAnswerRow(title: "Total", value: "$1,488.51")
+                ],
+                attachment: .cardSummary(summary)
+            )
+        ]
+
+        setup.store.saveAnswers(expected, workspaceID: workspaceID)
+        let loaded = setup.store.loadAnswers(workspaceID: workspaceID)
+
+        #expect(loaded == expected)
+    }
+
     @Test func saveAnswers_thenLoadAnswers_preservesInlineCreateFormDrafts() throws {
         let setup = makeStore()
         defer { clearDefaults(setup.suiteName) }

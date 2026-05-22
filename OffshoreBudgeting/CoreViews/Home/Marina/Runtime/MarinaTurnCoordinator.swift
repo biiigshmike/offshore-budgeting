@@ -1224,6 +1224,7 @@ private extension MarinaQueryPlanCandidate {
         request.searchText = choice.rawValue?.marinaNilIfBlank ?? choice.title
         if let objectType = choice.entityTypeHint?.databaseLookupObjectType {
             request.objectTypes = [objectType]
+            request.lookupMode = .entityDetail
         }
         return copy(databaseLookupRequest: request.clamped)
     }
