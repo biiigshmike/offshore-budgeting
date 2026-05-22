@@ -205,6 +205,7 @@ struct MarinaTurnCoordinator {
     private let compositePlanner = MarinaCompositeQueryPlanner()
     private let metricContractResolver = MarinaMetricContractResolver()
     private let metricContractResponseBuilder = MarinaMetricContractResponseBuilder()
+    private let metricFormulaExecutor = MarinaMetricFormulaExecutor()
 
     init(
         availability: MarinaModelAvailabilityProviding? = nil,
@@ -500,6 +501,81 @@ struct MarinaTurnCoordinator {
             semanticResolved: semanticResolved,
             outcome: outcome
         )
+
+        if let metricContractResolution {
+            switch metricFormulaExecutor.execute(
+                contract: metricContractResolution.contract,
+                candidate: candidate,
+                resolved: resolved,
+                semanticResolved: semanticResolved,
+                context: context
+            ) {
+            case .handled(let card, let amountBasis, let route):
+                let execution = MarinaQueryExecution(
+                    executablePlan: nil,
+                    aggregationResult: .workspaceCard(card),
+                    databaseLookupResponse: nil,
+                    workspaceAggregationCard: card,
+                    amountBasis: amountBasis,
+                    executionRoute: route
+                )
+                let answer = answerWithEvidence(
+                    responseBuilder.responseCompatibleAnswer(from: execution.aggregationResult),
+                    execution: execution,
+                    resolved: resolved,
+                    semanticResolved: semanticResolved,
+                    metricContract: metricContractResolution.contract
+                )
+                MarinaFoundationTraceBridge.record(
+                    context: context,
+                    interpretation: interpretation,
+                    resolved: resolved,
+                    semanticResolved: semanticResolved,
+                    validationOutcome: outcome,
+                    execution: execution
+                )
+                return .handled(
+                    answer: answer,
+                    aggregationResult: execution.aggregationResult,
+                    homeQueryPlan: nil,
+                    amountBasis: execution.amountBasis,
+                    executionRoute: execution.executionRoute
+                )
+            case .blocked(let answer, let unsupported):
+                let blockedOutcome = MarinaPlanValidationOutcome.unsupported(unsupported)
+                MarinaFoundationTraceBridge.record(
+                    context: context,
+                    interpretation: interpretation,
+                    resolved: resolved,
+                    semanticResolved: semanticResolved,
+                    validationOutcome: blockedOutcome,
+                    execution: nil
+                )
+                return .blocked(answer: answer, validationOutcome: blockedOutcome)
+            case .notHandled:
+                if metricContractResolution.isDirectFormulaSummon {
+                    let answer = metricContractResponseBuilder.summonedFormulaAnswer(
+                        contract: metricContractResolution.contract,
+                        candidate: candidate
+                    )
+                    let unsupported = metricContractResponseBuilder.summonedFormulaUnsupportedResponse(
+                        contract: metricContractResolution.contract,
+                        candidate: candidate
+                    )
+                    let blockedOutcome = MarinaPlanValidationOutcome.unsupported(unsupported)
+                    MarinaFoundationTraceBridge.record(
+                        context: context,
+                        interpretation: interpretation,
+                        resolved: resolved,
+                        semanticResolved: semanticResolved,
+                        validationOutcome: blockedOutcome,
+                        execution: nil
+                    )
+                    return .blocked(answer: answer, validationOutcome: blockedOutcome)
+                }
+                break
+            }
+        }
 
         if let metricContractResolution,
            metricContractResolution.shouldBlockExecution {
@@ -887,16 +963,44 @@ struct MarinaTurnCoordinator {
             return "Home spend"
         case .cardDisplaySpend:
             return "Card display spend"
+        case .debitSpend:
+            return "Debit spend"
         case .budgetImpact:
             return "Budget impact"
+        case .ownedSpend:
+            return "Owned spend"
         case .ledgerSigned:
             return "Ledger signed"
         case .gross:
             return "Gross amount"
         case .allocated:
             return "Allocated amount"
+        case .plannedAmount:
+            return "Planned amount"
+        case .plannedEffectiveAmount:
+            return "Planned effective amount"
+        case .recordedActualAmount:
+            return "Recorded actual amount"
+        case .actualIncome:
+            return "Actual income"
+        case .plannedIncome:
+            return "Planned income"
+        case .savingsRunningTotal:
+            return "Savings running total"
+        case .savingsMovement:
+            return "Savings movement"
+        case .savingsAdjustment:
+            return "Savings adjustment"
+        case .savingsOffset:
+            return "Savings offset"
         case .reconciliationBalance:
             return "Reconciliation balance"
+        case .reconciliationSettlement:
+            return "Reconciliation settlement"
+        case .count:
+            return "Count"
+        case .dateWindow:
+            return "Date window"
         }
     }
 

@@ -3,11 +3,25 @@ import Foundation
 enum MarinaFinancialAmountBasis: String, Codable, Equatable, CaseIterable, Sendable {
     case homeSpend
     case cardDisplaySpend
+    case debitSpend
     case budgetImpact
+    case ownedSpend
     case ledgerSigned
     case gross
     case allocated
+    case plannedAmount
+    case plannedEffectiveAmount
+    case recordedActualAmount
+    case actualIncome
+    case plannedIncome
+    case savingsRunningTotal
+    case savingsMovement
+    case savingsAdjustment
+    case savingsOffset
     case reconciliationBalance
+    case reconciliationSettlement
+    case count
+    case dateWindow
 }
 
 struct MarinaAmountBasisAdapter {
@@ -62,15 +76,17 @@ struct MarinaAmountBasisAdapter {
         switch basis {
         case .homeSpend, .ledgerSigned:
             return expense.ledgerSignedAmount()
-        case .cardDisplaySpend:
+        case .cardDisplaySpend, .debitSpend:
             return expense.spendingAmount()
         case .budgetImpact:
             return SavingsMathService.variableBudgetImpactAmount(for: expense)
+        case .ownedSpend:
+            return SavingsMathService.ownedAmount(for: expense)
         case .gross:
             return SavingsMathService.variableGrossAmount(for: expense)
         case .allocated:
             return max(0, expense.allocation?.allocatedAmount ?? 0)
-        case .reconciliationBalance:
+        case .plannedAmount, .plannedEffectiveAmount, .recordedActualAmount, .actualIncome, .plannedIncome, .savingsRunningTotal, .savingsMovement, .savingsAdjustment, .savingsOffset, .reconciliationBalance, .reconciliationSettlement, .count, .dateWindow:
             return 0
         }
     }
@@ -80,15 +96,23 @@ struct MarinaAmountBasisAdapter {
         basis: MarinaFinancialAmountBasis
     ) -> Double {
         switch basis {
-        case .homeSpend, .cardDisplaySpend, .ledgerSigned:
+        case .homeSpend, .cardDisplaySpend, .debitSpend, .ledgerSigned:
             return expense.effectiveAmount()
         case .budgetImpact:
             return SavingsMathService.plannedBudgetImpactAmount(for: expense)
+        case .ownedSpend:
+            return SavingsMathService.ownedEffectiveAmount(for: expense)
         case .gross:
             return SavingsMathService.grossEffectiveAmount(for: expense)
         case .allocated:
             return max(0, expense.allocation?.allocatedAmount ?? 0)
-        case .reconciliationBalance:
+        case .plannedAmount:
+            return max(0, expense.plannedAmount)
+        case .plannedEffectiveAmount:
+            return expense.effectiveAmount()
+        case .recordedActualAmount:
+            return max(0, expense.actualAmount)
+        case .actualIncome, .plannedIncome, .savingsRunningTotal, .savingsMovement, .savingsAdjustment, .savingsOffset, .reconciliationBalance, .reconciliationSettlement, .count, .dateWindow:
             return 0
         }
     }
@@ -104,18 +128,22 @@ struct MarinaAmountBasisAdapter {
         switch field {
         case .amount:
             return .homeSpend
-        case .plannedAmount, .actualAmount, .effectivePlannedAmount:
-            return subject == .cards ? .cardDisplaySpend : .homeSpend
+        case .plannedAmount:
+            return .plannedAmount
+        case .actualAmount:
+            return .recordedActualAmount
+        case .effectivePlannedAmount:
+            return .plannedEffectiveAmount
         case .spendingAmount:
-            return .cardDisplaySpend
+            return subject == .cards ? .cardDisplaySpend : .homeSpend
         case .ledgerSignedAmount:
             return .ledgerSigned
         case .budgetImpactAmount:
             return .budgetImpact
         case .incomeAmount:
-            return .homeSpend
+            return .actualIncome
         case .savingsAmount:
-            return .budgetImpact
+            return .savingsMovement
         case .allocatedAmount:
             return .allocated
         case .reconciliationBalance:

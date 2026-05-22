@@ -48,10 +48,22 @@ final class MarinaConversationStore {
         }
     }
 
+    func loadLastCheckIn(workspaceID: UUID) -> Date? {
+        userDefaults.object(forKey: checkInStorageKey(for: workspaceID)) as? Date
+    }
+
+    func saveLastCheckIn(_ date: Date, workspaceID: UUID) {
+        userDefaults.set(date, forKey: checkInStorageKey(for: workspaceID))
+    }
+
     // MARK: - Helpers
 
     private func storageKey(for workspaceID: UUID) -> String {
         "\(storageKeyPrefix).\(workspaceID.uuidString)"
+    }
+
+    private func checkInStorageKey(for workspaceID: UUID) -> String {
+        "\(storageKeyPrefix).checkIn.\(workspaceID.uuidString)"
     }
 
     private func trimmed(_ answers: [HomeAnswer]) -> [HomeAnswer] {

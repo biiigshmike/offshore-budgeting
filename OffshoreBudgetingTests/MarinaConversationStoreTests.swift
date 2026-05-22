@@ -142,6 +142,24 @@ struct MarinaConversationStoreTests {
         #expect(loadedB == answersB)
     }
 
+    @Test func saveLastCheckIn_keepsSeparateTimestampPerWorkspace() throws {
+        let setup = makeStore()
+        defer { clearDefaults(setup.suiteName) }
+
+        let workspaceA = UUID()
+        let workspaceB = UUID()
+        let checkInA = Date(timeIntervalSince1970: 1_000)
+        let checkInB = Date(timeIntervalSince1970: 2_000)
+
+        #expect(setup.store.loadLastCheckIn(workspaceID: workspaceA) == nil)
+
+        setup.store.saveLastCheckIn(checkInA, workspaceID: workspaceA)
+        setup.store.saveLastCheckIn(checkInB, workspaceID: workspaceB)
+
+        #expect(setup.store.loadLastCheckIn(workspaceID: workspaceA) == checkInA)
+        #expect(setup.store.loadLastCheckIn(workspaceID: workspaceB) == checkInB)
+    }
+
     // MARK: - Helpers
 
     private func makeStore() -> (store: MarinaConversationStore, suiteName: String) {

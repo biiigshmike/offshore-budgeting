@@ -137,7 +137,7 @@ struct MarinaFoundationSemanticRealAppTests {
             return
         }
 
-        #expect(answer.title == "Marina knows this metric, but cannot run it yet")
+        #expect(answer.title == "Marina needs one setup step")
         #expect(answer.rows.contains { $0.title == "Metric contract" && $0.value == "upcomingExpensesBeforeNextIncome" })
         #expect(answer.rows.contains { $0.title == "Amount basis" && $0.value == "budget impact" })
         #expect(answer.rows.contains { $0.title == "Source rows" && $0.value.contains("PlannedExpense") && $0.value.contains("Income") })
@@ -145,8 +145,105 @@ struct MarinaFoundationSemanticRealAppTests {
             Issue.record("Expected unsupported contract outcome.")
             return
         }
-        #expect(unsupported.message.contains("known Marina metric contract"))
+        #expect(unsupported.message.contains("upcoming planned or actual income"))
         assertFoundationOnly(trace)
+    }
+
+    @Test func semanticRealApp_allApprovedMetricSeedsSurfaceContractEvidence() async throws {
+        let fixture = try makeFixture()
+        let seedIDs: [MarinaMetricContractID] = [
+            .safeSpendRemaining,
+            .spendingIncreaseDrivers,
+            .categoryOverPace,
+            .upcomingExpensesBeforeNextIncome,
+            .plannedVsActualSpend,
+            .unrecordedPlannedExpenses,
+            .unusualMerchantSpend,
+            .subscriptionSpend,
+            .reconciliationOwedThisMonth,
+            .trueOwnedSpend,
+            .cardOverspendingDriver,
+            .categoryCutImpact,
+            .skipCategoryScenario,
+            .savingsTrackVsLastMonth,
+            .budgetSharedLinks,
+            .categorizationReview,
+            .sinceLastCheckIn
+        ]
+        let contracts = try seedIDs.map { try #require(MarinaMetricContractRegistry.current.contract(for: $0)) }
+        let coordinator = coordinator(for: Dictionary(uniqueKeysWithValues: contracts.map { contract in
+            (contract.seedPrompt, canonicalInterpretation(unsupportedCandidate(prompt: contract.seedPrompt)))
+        }))
+
+        for contract in contracts {
+            let (result, _) = await tracedTurn(prompt: contract.seedPrompt) {
+                await coordinator.run(prompt: contract.seedPrompt, context: turnContext(fixture))
+            }
+
+            switch result {
+            case .handled(let answer, _, _, _, _), .blocked(let answer, _):
+                #expect(answer.rows.contains { $0.title == "Metric contract" && $0.value == contract.id.rawValue })
+            case .clarification, .unavailable:
+                Issue.record("Expected \(contract.id.rawValue) to handle or return a setup-aware block.")
+            }
+        }
+    }
+
+    @Test func semanticRealApp_formulaNamePhraseRoutesToContractExecutor() async throws {
+        let fixture = try makeFixture()
+        fixture.context.insert(Income(source: "Paycheck", amount: 1_200, date: date(2026, 5, 5), isPlanned: false, workspace: fixture.workspace))
+        fixture.context.insert(Income(source: "Side Work", amount: 300, date: date(2026, 5, 9), isPlanned: false, workspace: fixture.workspace))
+        fixture.context.insert(Income(source: "Expected Bonus", amount: 900, date: date(2026, 5, 20), isPlanned: true, workspace: fixture.workspace))
+        try fixture.context.save()
+
+        let prompt = "income by source"
+        let coordinator = coordinator(for: [
+            prompt: canonicalInterpretation(unsupportedCandidate(prompt: prompt))
+        ])
+
+        let (result, trace) = await tracedTurn(prompt: prompt) {
+            await coordinator.run(prompt: prompt, context: turnContext(fixture))
+        }
+
+        guard case .handled(let answer, _, _, let amountBasis, let route) = result else {
+            Issue.record("Expected formula-name phrase to execute through the metric contract.")
+            return
+        }
+
+        #expect(answer.title == "Income by Source")
+        #expect(answer.primaryValue == "$1,500.00")
+        #expect(answer.rows.contains { $0.title == "Metric contract" && $0.value == "incomeBySource" })
+        #expect(answer.rows.contains { $0.title == "Amount basis" && $0.value == "actual income" })
+        #expect(answer.rows.contains { $0.title == "Paycheck" && $0.value == "$1,200.00" })
+        #expect(answer.rows.contains { $0.title == "Expected Bonus" } == false)
+        #expect(amountBasis == .actualIncome)
+        #expect(route?.traceName == "groupedRanked")
+        assertFoundationOnly(trace)
+    }
+
+    @Test func semanticRealApp_allFormulaNamePhrasesSurfaceContractEvidence() async throws {
+        let fixture = try makeFixture()
+        var interpretations: [String: MarinaCanonicalReadInterpretation] = [:]
+        let prompts = MarinaMetricContractRegistry.current.contracts.map { contract in
+            let prompt = spaced(contract.formulaName)
+            interpretations[prompt] = canonicalInterpretation(unsupportedCandidate(prompt: prompt))
+            return (prompt: prompt, contract: contract)
+        }
+        let coordinator = coordinator(for: interpretations)
+
+        for item in prompts {
+            let (result, trace) = await tracedTurn(prompt: item.prompt) {
+                await coordinator.run(prompt: item.prompt, context: turnContext(fixture))
+            }
+
+            switch result {
+            case .handled(let answer, _, _, _, _), .blocked(let answer, _):
+                #expect(answer.rows.contains { $0.title == "Metric contract" && $0.value == item.contract.id.rawValue }, "Prompt '\(item.prompt)' should surface \(item.contract.id.rawValue).")
+            case .clarification, .unavailable:
+                Issue.record("Expected formula prompt '\(item.prompt)' to surface \(item.contract.id.rawValue).")
+            }
+            assertFoundationOnly(trace)
+        }
     }
 
     @Test func semanticRealApp_typedRelationshipPromptUsesDeterministicExecutor() async throws {
@@ -811,6 +908,13 @@ struct MarinaFoundationSemanticRealAppTests {
             startDate: date(2026, 5, 1),
             endDate: date(2026, 5, 31)
         )
+    }
+
+    private func spaced(_ raw: String) -> String {
+        raw
+            .replacingOccurrences(of: "([a-z0-9])([A-Z])", with: "$1 $2", options: .regularExpression)
+            .replacingOccurrences(of: "[-_]", with: " ", options: .regularExpression)
+            .lowercased()
     }
 
     private func date(_ year: Int, _ month: Int, _ day: Int) -> Date {
