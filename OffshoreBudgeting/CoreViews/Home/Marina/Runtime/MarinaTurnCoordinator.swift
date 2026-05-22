@@ -203,6 +203,8 @@ struct MarinaTurnCoordinator {
     private let semanticAdapter = MarinaSemanticQueryAdapter()
     private let conversationalPlanner = MarinaConversationalQueryPlanner()
     private let compositePlanner = MarinaCompositeQueryPlanner()
+    private let metricContractResolver = MarinaMetricContractResolver()
+    private let metricContractResponseBuilder = MarinaMetricContractResponseBuilder()
 
     init(
         availability: MarinaModelAvailabilityProviding? = nil,
@@ -492,6 +494,37 @@ struct MarinaTurnCoordinator {
             outcome = .unsupported(unsupported)
         }
 
+        let metricContractResolution = metricContractResolver.resolve(
+            candidate: candidate,
+            resolved: resolved,
+            semanticResolved: semanticResolved,
+            outcome: outcome
+        )
+
+        if let metricContractResolution,
+           metricContractResolution.shouldBlockExecution {
+            let blocked = metricContractResponseBuilder.unsupportedResponse(
+                contract: metricContractResolution.contract,
+                candidate: candidate
+            )
+            let blockedOutcome = MarinaPlanValidationOutcome.unsupported(blocked)
+            MarinaFoundationTraceBridge.record(
+                context: context,
+                interpretation: interpretation,
+                resolved: resolved,
+                semanticResolved: semanticResolved,
+                validationOutcome: blockedOutcome,
+                execution: nil
+            )
+            return .blocked(
+                answer: metricContractResponseBuilder.unsupportedAnswer(
+                    contract: metricContractResolution.contract,
+                    candidate: candidate
+                ),
+                validationOutcome: blockedOutcome
+            )
+        }
+
         if let composite = compositePlanner.plan(
             candidate: candidate,
             resolved: resolved,
@@ -513,7 +546,8 @@ struct MarinaTurnCoordinator {
                     responseBuilder.responseCompatibleAnswer(from: execution.aggregationResult),
                     execution: execution,
                     resolved: resolved,
-                    semanticResolved: semanticResolved
+                    semanticResolved: semanticResolved,
+                    metricContract: metricContractResolution?.contract
                 )
                 MarinaFoundationTraceBridge.record(
                     context: context,
@@ -690,7 +724,8 @@ struct MarinaTurnCoordinator {
                     baseAnswer,
                     execution: execution,
                     resolved: resolved,
-                    semanticResolved: semanticResolved
+                    semanticResolved: semanticResolved,
+                    metricContract: metricContractResolution?.contract
                 )
                 MarinaFoundationTraceBridge.record(
                     context: context,
@@ -813,9 +848,13 @@ struct MarinaTurnCoordinator {
         _ answer: HomeAnswer,
         execution: MarinaQueryExecution,
         resolved: MarinaResolvedQueryCandidate,
-        semanticResolved: MarinaResolvedSemanticQuery?
+        semanticResolved: MarinaResolvedSemanticQuery?,
+        metricContract: MarinaMetricContract? = nil
     ) -> HomeAnswer {
         var evidenceRows: [HomeAnswerRow] = []
+        if let metricContract {
+            evidenceRows.append(contentsOf: metricContractResponseBuilder.evidenceRows(for: metricContract))
+        }
         evidenceRows.append(HomeAnswerRow(title: "Amount basis", value: displayName(for: execution.amountBasis)))
         evidenceRows.append(HomeAnswerRow(title: "Execution route", value: execution.executionRoute.traceName))
 

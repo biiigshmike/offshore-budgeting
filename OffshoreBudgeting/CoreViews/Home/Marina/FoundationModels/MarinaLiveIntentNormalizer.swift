@@ -193,7 +193,12 @@ struct MarinaLiveIntentNormalizer {
             incomeStatusScope: incomeStatus,
             requestedDetail: requestedDetail,
             insightIntent: command.insightIntent,
-            softTimeHint: command.softTimeHint
+            softTimeHint: command.softTimeHint,
+            formulaKind: command.formulaKind,
+            formulaFamily: command.formulaFamily,
+            formulaMeasure: command.formulaMeasure,
+            formulaBacklogRecipe: command.formulaBacklogRecipe,
+            formulaFacets: command.formulaFacets
         )
     }
 
@@ -390,7 +395,12 @@ struct MarinaLiveIntentNormalizer {
             semanticCommand: semanticCommand ?? candidate.semanticCommand,
             requestShape: candidate.requestShape,
             insightIntent: candidate.insightIntent,
-            softTimeHint: candidate.softTimeHint
+            softTimeHint: candidate.softTimeHint,
+            formulaKind: candidate.formulaKind,
+            formulaFamily: candidate.formulaFamily,
+            formulaMeasure: candidate.formulaMeasure,
+            formulaBacklogRecipe: candidate.formulaBacklogRecipe,
+            formulaFacets: candidate.formulaFacets
         )
     }
 

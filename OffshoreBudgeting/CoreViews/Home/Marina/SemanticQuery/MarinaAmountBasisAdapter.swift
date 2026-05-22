@@ -21,6 +21,12 @@ struct MarinaAmountBasisAdapter {
             return .reconciliationBalance
         }
 
+        if plan.measure == .spend,
+           plan.targets.contains(where: { $0.entityType == .allocationAccount })
+            || semanticQuery?.filters.contains(where: { $0.entityTypeHint == .allocationAccount || $0.relationship == .allocationAccount }) == true {
+            return .allocated
+        }
+
         if let field = semanticQuery?.amountField {
             return basis(for: field, subject: semanticQuery?.subject)
         }

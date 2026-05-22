@@ -774,6 +774,97 @@ struct MarinaQueryValidatorTests {
         #expect(plan.responseShape == .groupedBreakdown)
     }
 
+    @Test func semanticValidator_rejectsAllocatedAmountOnIncomeSubject() {
+        let query = MarinaSemanticQuery(
+            subject: .income,
+            operation: .sum,
+            amountField: .allocatedAmount,
+            responseShape: .scalarCurrency
+        )
+        let resolved = MarinaResolvedSemanticQuery(
+            query: query,
+            candidate: nil,
+            resolvedFilters: [],
+            unresolvedFilters: [],
+            ambiguousFilters: [],
+            primaryDateRange: nil,
+            comparisonDateRange: nil,
+            databaseLookupRequest: nil
+        )
+
+        let outcome = MarinaQueryValidator().validate(resolved)
+
+        guard case .unsupported(let unsupported) = outcome else {
+            Issue.record("Expected allocated amount to be rejected for income")
+            return
+        }
+        #expect(unsupported.kind == .unsupportedCombination)
+        #expect(unsupported.message.contains("allocatedAmount"))
+    }
+
+    @Test func semanticValidator_allocationAccountSpendUsesAllocatedBasisWithoutGrossSubstitution() {
+        let accountID = UUID()
+        let categoryID = UUID()
+        let account = MarinaFilter(
+            role: .filter,
+            relationship: .allocationAccount,
+            value: "Alejandro",
+            entityTypeHint: .allocationAccount
+        )
+        let category = MarinaFilter(
+            role: .filter,
+            relationship: .category,
+            value: "Cannabis",
+            entityTypeHint: .category
+        )
+        let query = MarinaSemanticQuery(
+            subject: .variableExpenses,
+            operation: .sum,
+            filters: [account, category],
+            amountField: .budgetImpactAmount,
+            responseShape: .scalarCurrency
+        )
+        let resolved = MarinaResolvedSemanticQuery(
+            query: query,
+            candidate: nil,
+            resolvedFilters: [
+                MarinaResolvedFilter(
+                    id: account.id,
+                    filter: account,
+                    role: .filter,
+                    relationship: .allocationAccount,
+                    entityType: .allocationAccount,
+                    displayName: "Alejandro",
+                    sourceID: accountID
+                ),
+                MarinaResolvedFilter(
+                    id: category.id,
+                    filter: category,
+                    role: .filter,
+                    relationship: .category,
+                    entityType: .category,
+                    displayName: "Cannabis",
+                    sourceID: categoryID
+                )
+            ],
+            unresolvedFilters: [],
+            ambiguousFilters: [],
+            primaryDateRange: nil,
+            comparisonDateRange: nil,
+            databaseLookupRequest: nil
+        )
+
+        let outcome = MarinaQueryValidator().validate(resolved)
+
+        guard case .executable(let plan) = outcome else {
+            Issue.record("Expected allocated spend semantic query to validate")
+            return
+        }
+        #expect(plan.measure == .spend)
+        #expect(plan.targets.map(\.entityType) == [.allocationAccount, .category])
+        #expect(MarinaAmountBasisAdapter().basis(plan: plan, semanticQuery: query) == .allocated)
+    }
+
     private func resolvedCandidate(
         _ candidate: MarinaQueryPlanCandidate,
         targets: [MarinaResolvedEntityMention] = [],

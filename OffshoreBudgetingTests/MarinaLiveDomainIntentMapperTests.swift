@@ -231,6 +231,16 @@ struct MarinaLiveDomainIntentMapperTests {
         #expect(command(plannedVsActualIncome)?.dateRange?.startDate == date(2026, 5, 1))
         #expect(plannedVsActualIncome.datePolicySummary?.contains("aiDateDropped=May 2024") == true)
 
+        let receivedVsExpectedIncome = mapper.map(
+            payload: payload(route: "readQuery", intent: "categoryComparison", target: nil),
+            prompt: "How much income have I actually received versus expected?",
+            context: context
+        )
+        #expect(receivedVsExpectedIncome.canonicalRouteSummary == "income.plannedVsActual")
+        #expect(receivedVsExpectedIncome.routeKeySummary == "incomePlannedVsActual")
+        #expect(command(receivedVsExpectedIncome)?.datasets == [.income])
+        #expect(command(receivedVsExpectedIncome)?.incomeStatusScope == .all)
+
         let savingsActivity = mapper.map(
             payload: payload(route: "readQuery", intent: "missingTarget", target: "savings activity"),
             prompt: "Show savings activity.",

@@ -240,13 +240,21 @@ struct MarinaQueryValidator {
             )
         }
 
-        if requiresAmountField(query.operation),
-           query.amountField == nil || amountFieldSupported(query.amountField, by: descriptor) == false {
-            return unsupported(
-                .unsupportedCombination,
-                message: "That money operation needs a supported amount field for \(descriptor.displayName).",
-                candidate: candidate
-            )
+        if requiresAmountField(query.operation) {
+            guard let amountField = query.amountField else {
+                return unsupported(
+                    .unsupportedCombination,
+                    message: "That money operation needs a supported amount field for \(descriptor.displayName).",
+                    candidate: candidate
+                )
+            }
+            guard amountFieldSupported(amountField, by: descriptor) else {
+                return unsupported(
+                    .unsupportedCombination,
+                    message: "The \(amountField.rawValue) field is not available for \(descriptor.displayName).",
+                    candidate: candidate
+                )
+            }
         }
 
         if let amountField = query.amountField,
@@ -616,15 +624,17 @@ struct MarinaQueryValidator {
         case .budgetImpactAmount:
             return fields.contains("budgetimpact") || fields.contains("budgetimpactamount") || fields.contains("expenseamount") || fields.contains("amount")
         case .incomeAmount:
-            return fields.contains("incomeamount") || fields.contains("amount")
+            return descriptor.entityName == "Income" || fields.contains("incomeamount")
         case .savingsAmount:
-            return fields.contains("savingsamount") || fields.contains("actualsavings") || fields.contains("amount") || fields.contains("total")
+            return descriptor.entityName == "SavingsAccount"
+                || descriptor.entityName == "SavingsLedgerEntry"
+                || fields.contains("savingsamount")
+                || fields.contains("actualsavings")
         case .allocatedAmount:
-            return fields.contains("allocatedamount") || fields.contains("amount")
+            return descriptor.entityName == "ExpenseAllocation" || fields.contains("allocatedamount")
         case .reconciliationBalance:
             return descriptor.entityName == "AllocationAccount"
                 || fields.contains("reconciliationbalance")
-                || fields.contains("amount")
         }
     }
 

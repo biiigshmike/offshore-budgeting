@@ -691,6 +691,7 @@ struct MarinaLiveDomainIntentMapper {
 
         if containsAny(["planned vs actual income", "actual vs planned income"], in: normalizedPrompt)
             || (normalizedPrompt.contains("income") && normalizedPrompt.contains("planned") && normalizedPrompt.contains("actual"))
+            || (normalizedPrompt.contains("income") && normalizedPrompt.contains("received") && normalizedPrompt.contains("expected"))
             || containsAny(["incomecomparison", "plannedvsactualincome"], in: normalizedSignal) {
             return .incomePlannedVsActual
         }

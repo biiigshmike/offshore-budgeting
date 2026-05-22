@@ -260,6 +260,15 @@ struct MarinaFormulaCatalog {
             return formula
         }
 
+        if let contract = MarinaMetricContractRegistry.current.contract(forSeedPrompt: candidate.rawPrompt) {
+            switch contract.id {
+            case .recurringExpenseIncrease:
+                return .recurringChargeAnomaly
+            default:
+                break
+            }
+        }
+
         let prompt = normalized(candidate.rawPrompt)
         if containsAny(["pace", "burn rate", "blow past", "over my", "over the"], in: prompt),
            containsAny(["limit", "budget max", "max limit"], in: prompt) {

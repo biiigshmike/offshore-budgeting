@@ -35,6 +35,120 @@ struct MarinaFoundationSemanticRealAppTests {
         assertFoundationOnly(trace)
     }
 
+    @Test func semanticRealApp_allocatedCategoryContractUsesAllocatedShareInsteadOfGrossSpend() async throws {
+        let fixture = try makeFixture()
+        let cannabis = Offshore.Category(name: "Cannabis", hexColor: "#225522", workspace: fixture.workspace)
+        let alejandro = AllocationAccount(name: "Alejandro", workspace: fixture.workspace)
+        let sharedCannabis = VariableExpense(
+            descriptionText: "Cannabis shared purchase",
+            amount: 100,
+            transactionDate: date(2026, 5, 9),
+            workspace: fixture.workspace,
+            card: fixture.appleCard,
+            category: cannabis
+        )
+        let grossOnlyCannabis = VariableExpense(
+            descriptionText: "Cannabis personal purchase",
+            amount: 70,
+            transactionDate: date(2026, 5, 10),
+            workspace: fixture.workspace,
+            card: fixture.appleCard,
+            category: cannabis
+        )
+        fixture.context.insert(cannabis)
+        fixture.context.insert(alejandro)
+        fixture.context.insert(sharedCannabis)
+        fixture.context.insert(grossOnlyCannabis)
+        fixture.context.insert(ExpenseAllocation(
+            allocatedAmount: 30,
+            workspace: fixture.workspace,
+            account: alejandro,
+            expense: sharedCannabis
+        ))
+        try fixture.context.save()
+
+        let prompt = "What had Alejandro spent on Cannabis?"
+        let candidate = MarinaQueryPlanCandidate(
+            source: .foundationModels,
+            rawPrompt: prompt,
+            operation: .sum,
+            measure: .spend,
+            entityMentions: [
+                MarinaUnresolvedEntityMention(
+                    role: .filter,
+                    rawText: "Alejandro",
+                    typeHint: .allocationAccount,
+                    allowedTypeHints: [.allocationAccount]
+                ),
+                MarinaUnresolvedEntityMention(
+                    role: .filter,
+                    rawText: "Cannabis",
+                    typeHint: .category,
+                    allowedTypeHints: [.category]
+                )
+            ],
+            timeScopes: [monthScope()],
+            responseShapeHint: .scalarCurrency,
+            confidence: .high
+        )
+        let coordinator = coordinator(for: [
+            prompt: canonicalInterpretation(candidate)
+        ])
+
+        let (result, trace) = await tracedTurn(prompt: prompt) {
+            await coordinator.run(
+                prompt: prompt,
+                context: turnContext(
+                    fixture,
+                    categoryNames: ["Groceries", "Travel", "Cannabis"],
+                    allocationAccountNames: ["Alejandro"]
+                )
+            )
+        }
+
+        guard case .handled(let answer, _, _, let amountBasis, let route) = result else {
+            Issue.record("Expected allocated category spend to execute.")
+            return
+        }
+
+        #expect(answer.primaryValue == "$30.00")
+        #expect(answer.primaryValue != "$170.00")
+        #expect(answer.rows.contains { $0.title == "Metric contract" && $0.value == "allocatedCategorySpend" })
+        #expect(answer.rows.contains { $0.title == "Amount basis" && $0.value == "allocated" })
+        #expect(answer.rows.contains { $0.title == "Matched" && $0.value.contains("Alejandro") && $0.value.contains("Cannabis") })
+        #expect(amountBasis == .allocated)
+        #expect(route?.traceName == "aggregate")
+        assertFoundationOnly(trace)
+    }
+
+    @Test func semanticRealApp_missingSeedReturnsContractAwareResponseInsteadOfFallback() async throws {
+        let fixture = try makeFixture()
+        let prompt = "What upcoming expenses will hit before my next income?"
+        let coordinator = coordinator(for: [
+            prompt: canonicalInterpretation(unsupportedCandidate(prompt: prompt))
+        ])
+
+        let (result, trace) = await tracedTurn(prompt: prompt) {
+            await coordinator.run(prompt: prompt, context: turnContext(fixture))
+        }
+
+        guard case .blocked(let answer, let outcome) = result else {
+            Issue.record("Expected missing contract seed to block with contract-aware answer.")
+            return
+        }
+
+        #expect(answer.title == "Marina knows this metric, but cannot run it yet")
+        #expect(answer.rows.contains { $0.title == "Metric contract" && $0.value == "upcomingExpensesBeforeNextIncome" })
+        #expect(answer.rows.contains { $0.title == "Amount basis" && $0.value == "budget impact" })
+        #expect(answer.rows.contains { $0.title == "Source rows" && $0.value.contains("PlannedExpense") && $0.value.contains("Income") })
+        guard case .unsupported(let unsupported) = outcome else {
+            Issue.record("Expected unsupported contract outcome.")
+            return
+        }
+        #expect(unsupported.message.contains("known Marina metric contract"))
+        assertFoundationOnly(trace)
+    }
+
     @Test func semanticRealApp_typedRelationshipPromptUsesDeterministicExecutor() async throws {
         let fixture = try makeFixture()
         let budget = Budget(
@@ -666,6 +780,7 @@ struct MarinaFoundationSemanticRealAppTests {
         categoryNames: [String] = ["Groceries", "Travel"],
         presetTitles: [String] = [],
         budgetNames: [String] = [],
+        allocationAccountNames: [String] = [],
         turnClassification: MarinaPromptTurnClassification = .freshQuestion
     ) -> MarinaTurnContext {
         MarinaTurnContext(
@@ -680,6 +795,7 @@ struct MarinaFoundationSemanticRealAppTests {
                 incomeSourceNames: [],
                 presetTitles: presetTitles,
                 budgetNames: budgetNames,
+                allocationAccountNames: allocationAccountNames,
                 aliasSummaries: [],
                 now: date(2026, 5, 15)
             ),
