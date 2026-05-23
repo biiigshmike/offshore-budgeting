@@ -61,6 +61,14 @@ final class MarinaAssistantUITests: XCTestCase {
     MARINA_RUN_EXHAUSTIVE_MATRIX=1 xcodebuild -scheme OffshoreBudgeting -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.6' -only-testing:OffshoreBudgetingUITests/MarinaAssistantUITests/testMarinaAppSurfacePromptMatrix_coversAllSwiftDataModelsInOneSession test
     """
 
+    private static let userFacingForbiddenDebugText = [
+        "unsupportedCombination",
+        "contractOnly",
+        "metricFormula=",
+        "Failure step",
+        "Foundation Models tool call"
+    ]
+
     func testMarinaAppSurfaceAppleClarification_resumesThroughFoundation() throws {
         let app = XCUIApplication()
         let driver = MarinaUITestDriver(app: app, testCase: self)
@@ -70,7 +78,12 @@ final class MarinaAssistantUITests: XCTestCase {
 
         let ambiguityReport = driver.runPrompt(
             "What did I spend at Apple?",
-            expectation: MarinaPromptExpectation(model: "VariableExpense", outcome: .clarification, responseShape: .clarification)
+            expectation: MarinaPromptExpectation(
+                model: "VariableExpense",
+                outcome: .clarification,
+                responseShape: .clarification,
+                forbiddenVisibleText: Self.userFacingForbiddenDebugText
+            )
         )
         reporter.record(ambiguityReport)
         XCTAssertTrue(ambiguityReport.result.passed, ambiguityReport.result.reason)
@@ -100,7 +113,12 @@ final class MarinaAssistantUITests: XCTestCase {
 
         let ambiguityReport = driver.runPrompt(
             "Show Groceries.",
-            expectation: MarinaPromptExpectation(model: "Category", outcome: .clarification, responseShape: .clarification)
+            expectation: MarinaPromptExpectation(
+                model: "Category",
+                outcome: .clarification,
+                responseShape: .clarification,
+                forbiddenVisibleText: Self.userFacingForbiddenDebugText
+            )
         )
         reporter.record(ambiguityReport)
         XCTAssertTrue(ambiguityReport.result.passed, ambiguityReport.result.reason)
@@ -123,7 +141,12 @@ final class MarinaAssistantUITests: XCTestCase {
 
         let ambiguityReport = driver.runPrompt(
             "Tell me about Apple",
-            expectation: MarinaPromptExpectation(model: "VariableExpense", outcome: .clarification, responseShape: .clarification)
+            expectation: MarinaPromptExpectation(
+                model: "VariableExpense",
+                outcome: .clarification,
+                responseShape: .clarification,
+                forbiddenVisibleText: Self.userFacingForbiddenDebugText
+            )
         )
         reporter.record(ambiguityReport)
         XCTAssertTrue(ambiguityReport.result.passed, ambiguityReport.result.reason)
@@ -254,7 +277,8 @@ final class MarinaAssistantUITests: XCTestCase {
             expectation: MarinaPromptExpectation(
                 model: "AllocationSettlement",
                 outcome: .typedUnsupported,
-                responseShape: .unsupported
+                responseShape: .unsupported,
+                forbiddenVisibleText: Self.userFacingForbiddenDebugText
             ),
             timeout: 8
         )

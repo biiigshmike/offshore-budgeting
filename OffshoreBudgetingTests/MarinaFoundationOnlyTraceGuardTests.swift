@@ -282,7 +282,7 @@ struct MarinaFoundationOnlyTraceGuardTests {
             Issue.record("Expected typed generation failure response.")
             return
         }
-        #expect(answer.title == "Marina could not read the typed response")
+        #expect(answer.title == "Marina could not read that request")
         assertFoundationOnly(trace)
     }
 

@@ -281,6 +281,62 @@ struct MarinaFormulaContractPresentationModel: Codable, Equatable, Identifiable,
     }
 }
 
+struct MarinaClarificationPresentationModel: Codable, Equatable, Identifiable, Sendable {
+    let id: UUID
+    let title: String
+    let subtitle: String?
+    let systemImage: String
+    let tintHex: String?
+    let rows: [MarinaDisplayRow]
+    let hidesSourceRows: Bool
+
+    init(
+        id: UUID = UUID(),
+        title: String,
+        subtitle: String? = nil,
+        systemImage: String = "questionmark.bubble.fill",
+        tintHex: String? = "#6366F1",
+        rows: [MarinaDisplayRow],
+        hidesSourceRows: Bool = true
+    ) {
+        self.id = id
+        self.title = title
+        self.subtitle = subtitle
+        self.systemImage = systemImage
+        self.tintHex = tintHex
+        self.rows = rows
+        self.hidesSourceRows = hidesSourceRows
+    }
+}
+
+struct MarinaDeadEndPresentationModel: Codable, Equatable, Identifiable, Sendable {
+    let id: UUID
+    let title: String
+    let subtitle: String?
+    let systemImage: String
+    let tintHex: String?
+    let rows: [MarinaDisplayRow]
+    let hidesSourceRows: Bool
+
+    init(
+        id: UUID = UUID(),
+        title: String,
+        subtitle: String? = nil,
+        systemImage: String = "exclamationmark.triangle.fill",
+        tintHex: String? = "#F59E0B",
+        rows: [MarinaDisplayRow],
+        hidesSourceRows: Bool = true
+    ) {
+        self.id = id
+        self.title = title
+        self.subtitle = subtitle
+        self.systemImage = systemImage
+        self.tintHex = tintHex
+        self.rows = rows
+        self.hidesSourceRows = hidesSourceRows
+    }
+}
+
 struct MarinaGenericSummaryPresentationModel: Codable, Equatable, Identifiable, Sendable {
     let id: UUID
     let title: String

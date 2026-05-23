@@ -149,7 +149,7 @@ struct MarinaAggregationResponseBridgeTests {
 
         #expect(bridged.kind == .message)
         #expect(bridged.subtitle == "That operation is not supported for safe Marina queries yet.")
-        #expect(summary.contains("I can answer this a different way"))
+        #expect(summary.contains("I need a narrower query"))
     }
 
     @Test func responseBridge_noDataPreservesTypedMessage() {

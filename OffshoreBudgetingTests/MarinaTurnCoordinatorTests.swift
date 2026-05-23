@@ -50,10 +50,14 @@ struct MarinaTurnCoordinatorTests {
         }
 
         #expect(answer.title == "Apple Intelligence is still preparing")
-        let hasModelNotReadyRow = answer.rows.contains { row in
-            row.title == "Availability" && row.value.contains("model_not_ready")
+        let hasStatusRow = answer.rows.contains { row in
+            row.title == "Status" && row.value.contains("Apple Intelligence")
         }
-        #expect(hasModelNotReadyRow)
+        let leaksRawAvailability = answer.rows.contains { row in
+            row.value.contains("model_not_ready")
+        }
+        #expect(hasStatusRow)
+        #expect(leaksRawAvailability == false)
     }
 
     @Test func run_whenFoundationModelsTypedOutputFails_returnsDiagnosticCard() async throws {
@@ -78,18 +82,18 @@ struct MarinaTurnCoordinatorTests {
             return
         }
 
-        #expect(answer.title == "Marina could not read the typed response")
-        let hasFailureTypeRow = answer.rows.contains { row in
-            row.title == "Failure type" && row.value == "decodingFailure"
+        #expect(answer.title == "Marina could not read that request")
+        let hasStatusRow = answer.rows.contains { row in
+            row.title == "Status" && row.value.contains("paused")
         }
-        let hasFailureStepRow = answer.rows.contains { row in
-            row.title == "Failure step" && row.value == "typedEnvelope"
+        let leaksRawDiagnostic = answer.rows.contains { row in
+            row.value.contains("decodingFailure") || row.value.contains("typedEnvelope")
         }
         let hasVisibleDebugRow = answer.rows.contains { row in
             row.title == "Debug" || row.value.contains("schema mismatch")
         }
-        #expect(hasFailureTypeRow)
-        #expect(hasFailureStepRow)
+        #expect(hasStatusRow)
+        #expect(leaksRawDiagnostic == false)
         #expect(hasVisibleDebugRow == false)
     }
 
@@ -298,7 +302,7 @@ struct MarinaTurnCoordinatorTests {
 
         #expect(answer.title == "Marina is read-only for now")
         let hasStatusRow = answer.rows.contains { row in
-            row.title == "Status" && row.value == "CRUD deferred"
+            row.title == "Status" && row.value == "Saved changes are paused."
         }
         #expect(hasStatusRow)
     }

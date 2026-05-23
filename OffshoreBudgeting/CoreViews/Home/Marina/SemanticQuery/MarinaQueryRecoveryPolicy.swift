@@ -127,7 +127,7 @@ struct MarinaQueryRecoveryPolicy {
     func unsupportedTitle(for unsupported: MarinaTypedUnsupportedResponse) -> String {
         switch unsupported.kind {
         case .unsupportedOperation:
-            return "I can answer this a different way"
+            return "I need a narrower query"
         case .unsupportedTargetType, .unsupportedCombination, .unsupportedSimulation, .unsupportedDateShape:
             return "I need a narrower query"
         }

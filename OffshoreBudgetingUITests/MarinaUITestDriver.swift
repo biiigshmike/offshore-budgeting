@@ -251,6 +251,8 @@ struct MarinaUITestDriver {
             "marina.breakdownList",
             "marina.trendChart",
             "marina.formulaContract",
+            "marina.clarification",
+            "marina.deadEnd",
             "marina.genericSummary"
         ]
         return deduped(identifiers.flatMap { identifier in
@@ -359,6 +361,8 @@ struct MarinaUITestDriver {
             "marina.answer.\(answerIndex).comparisonSummary",
             "marina.answer.\(answerIndex).breakdownList",
             "marina.answer.\(answerIndex).formulaContract",
+            "marina.answer.\(answerIndex).clarification",
+            "marina.answer.\(answerIndex).deadEnd",
             "marina.answer.\(answerIndex).genericSummary"
         ]
         return prefixes.flatMap { prefix in

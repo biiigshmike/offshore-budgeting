@@ -93,7 +93,7 @@ struct MarinaFoundationModelsFailureDiagnostic: Codable, Equatable, Sendable {
         case .unsupportedLanguageOrLocale:
             return "Apple Intelligence locale unsupported"
         case .decodingFailure, .malformedResponse, .unsupportedGuide:
-            return "Marina could not read the typed response"
+            return "Marina could not read that request"
         case .guardrailViolation, .refusal:
             return "Apple Intelligence declined that request"
         case .rateLimited, .concurrentRequests:
@@ -101,7 +101,7 @@ struct MarinaFoundationModelsFailureDiagnostic: Codable, Equatable, Sendable {
         case .exceededContextWindowSize:
             return "That request had too much context"
         case .toolCallFailed:
-            return "A Marina tool call failed"
+            return "Marina could not finish that request"
         case .cancelled:
             return "Marina stopped reading that request"
         case .unknown:
@@ -112,15 +112,15 @@ struct MarinaFoundationModelsFailureDiagnostic: Codable, Equatable, Sendable {
     var userMessage: String {
         switch category {
         case .unavailable:
-            return "Apple Intelligence was available enough to try, but Foundation Models reported unavailable during interpretation."
+            return "Apple Intelligence became unavailable while Marina was reading the request."
         case .assetsUnavailable:
             return "The on-device model assets are not ready yet. Try again after Apple Intelligence finishes preparing."
         case .unsupportedLanguageOrLocale:
             return "Apple Intelligence does not support the current language or locale for this request."
         case .decodingFailure, .malformedResponse:
-            return "Apple Intelligence returned a shape that did not match Marina's typed contract, so Offshore did not query your financial data."
+            return "Apple Intelligence returned something Marina could not safely use, so Offshore did not query your financial data."
         case .unsupportedGuide:
-            return "The typed guidance for this request is not supported by the local Foundation Models runtime."
+            return "Marina could not use the local guidance for this request."
         case .guardrailViolation:
             return "Apple Intelligence blocked the interpretation step before Offshore could safely query your data."
         case .refusal:
@@ -132,7 +132,7 @@ struct MarinaFoundationModelsFailureDiagnostic: Codable, Equatable, Sendable {
         case .exceededContextWindowSize:
             return "The prompt plus Marina context was too large for the on-device model."
         case .toolCallFailed:
-            return "A Foundation Models tool call failed. The live Foundation path should avoid tools until smoke tests pass."
+            return "Marina could not finish one of the local reading steps."
         case .cancelled:
             return "The interpretation task was cancelled before Offshore queried your data."
         case .unknown:
@@ -1933,7 +1933,7 @@ struct MarinaFoundationCapabilityGuideTool: Tool {
     func call(arguments: Arguments) async throws -> String {
         let shape = arguments.requestedShape.lowercased()
         if shape.contains("delete") || shape.contains("edit") || shape.contains("create") {
-            return "CRUD commands are not handled by Foundation Models in this pass."
+            return "Saved changes are paused in this pass."
         }
         if shape.contains("lookup") || shape.contains("detail") {
             return "Supported: lookup details for cards, categories, budgets, presets, income, savings, reconciliation, and ledger-like rows."

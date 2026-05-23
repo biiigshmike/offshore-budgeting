@@ -599,8 +599,7 @@ struct MarinaModelsTests {
             HomeAnswer(
                 queryID: UUID(),
                 kind: .message,
-                title: "Marina knows this metric, but cannot run it yet",
-                primaryValue: "contractOnly",
+                title: "Known Formula",
                 rows: [
                     HomeAnswerRow(title: "Metric contract", value: "forecastSavings", role: .contract),
                     HomeAnswerRow(title: "Required support", value: "Executor wiring is planned.", role: .contract)
@@ -646,6 +645,62 @@ struct MarinaModelsTests {
         #expect(contractSummary.rows.map(\.role).allSatisfy { $0 == .contract })
         #expect(trendSummary.points.first?.value == 40)
         #expect(genericSummary.rows.first?.title == "Status")
+    }
+
+    @Test func visualAttachmentBuilder_polishesClarificationAndDeadEndCardsBeforeGenericFallback() throws {
+        let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
+        let clarification = visualAttachmentAnswer(
+            HomeAnswer(
+                queryID: UUID(),
+                kind: .message,
+                title: "Which Apple do you mean?",
+                subtitle: "I found more than one kind of Offshore data with that name. Pick the object type and I can show the details.",
+                rows: [
+                    HomeAnswerRow(title: "Apple Card", value: "Card", objectType: .card),
+                    HomeAnswerRow(title: "Apple Store", value: "$42.00 on Apple Card", objectType: .variableExpense)
+                ]
+            ),
+            workspace: workspace
+        )
+        let unsupported = visualAttachmentAnswer(
+            HomeAnswer(
+                queryID: UUID(),
+                kind: .message,
+                title: "I can answer this a different way",
+                subtitle: "No deterministic Marina executor supports this plan shape.",
+                rows: [
+                    HomeAnswerRow(title: "Reason", value: "unsupportedCombination")
+                ]
+            ),
+            workspace: workspace
+        )
+        let contractOnly = visualAttachmentAnswer(
+            HomeAnswer(
+                queryID: UUID(),
+                kind: .message,
+                title: "Marina knows this metric, but cannot run it yet",
+                primaryValue: "contractOnly",
+                rows: [
+                    HomeAnswerRow(title: "Metric contract", value: "forecastSavings", role: .contract),
+                    HomeAnswerRow(title: "Required setup", value: "Executor wiring is planned.", role: .contract)
+                ]
+            ),
+            workspace: workspace
+        )
+
+        guard case let .clarification(clarificationCard)? = clarification.attachment,
+              case let .deadEnd(unsupportedCard)? = unsupported.attachment,
+              case let .deadEnd(contractCard)? = contractOnly.attachment else {
+            Issue.record("Expected clarification and dead-end cards.")
+            return
+        }
+
+        #expect(clarificationCard.rows.contains { $0.title == "Next step" && $0.value.contains("Choose") })
+        #expect(clarificationCard.hidesSourceRows)
+        #expect(unsupported.title == "I need a narrower query")
+        #expect(unsupportedCard.rows.contains { $0.value.contains("unsupportedCombination") } == false)
+        #expect(contractCard.rows.contains { $0.value.contains("contractOnly") || $0.value.contains("forecastSavings") } == false)
+        #expect(contractOnly.title == "Marina needs one setup step")
     }
 
     @Test func suggestionSectionBuilder_prioritizesClarificationRecoveryThenFollowUps() throws {
@@ -988,6 +1043,20 @@ struct MarinaModelsTests {
                     id: UUID(uuidString: "77777777-AAAA-BBBB-CCCC-777777777777")!,
                     title: "Known Formula",
                     status: "contractOnly",
+                    rows: [row]
+                )
+            ),
+            .clarification(
+                MarinaClarificationPresentationModel(
+                    id: UUID(uuidString: "99999999-AAAA-BBBB-CCCC-999999999999")!,
+                    title: "Which one?",
+                    rows: [row]
+                )
+            ),
+            .deadEnd(
+                MarinaDeadEndPresentationModel(
+                    id: UUID(uuidString: "AAAAAAAA-AAAA-BBBB-CCCC-AAAAAAAAAAAA")!,
+                    title: "I need a narrower query",
                     rows: [row]
                 )
             ),

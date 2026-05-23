@@ -2750,7 +2750,7 @@ struct MarinaQueryExecutor {
             return .unsupported(
                 MarinaTypedUnsupportedResponse(
                     kind: kind,
-                    message: "No deterministic Marina executor supports this plan shape.",
+                    message: "Marina cannot run that exact question yet.",
                     candidate: candidate
                 )
             )
@@ -2930,7 +2930,7 @@ struct MarinaQueryExecutor {
         .unsupported(
             MarinaTypedUnsupportedResponse(
                 kind: .unsupportedCombination,
-                message: "No deterministic Marina executor supports this plan shape.",
+                message: "Marina cannot run that exact question yet.",
                 candidate: candidate
             )
         )

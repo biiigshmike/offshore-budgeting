@@ -432,7 +432,7 @@ struct MarinaTurnCoordinator {
             title: "Marina is read-only for now",
             subtitle: "I can search, summarize, calculate, and run what-if scenarios first. Create, edit, and delete commands are paused until the confirmation flow is rebuilt.",
             rows: [
-                HomeAnswerRow(title: "Status", value: "CRUD deferred"),
+                HomeAnswerRow(title: "Status", value: "Saved changes are paused."),
                 HomeAnswerRow(title: "Safe next step", value: "Use the app forms for changes that alter saved records.")
             ]
         )
@@ -1014,8 +1014,8 @@ struct MarinaTurnCoordinator {
             subtitle: recovery.message,
             rows: [
                 HomeAnswerRow(title: "Data safety", value: "Offshore did not query or change your financial records."),
-                HomeAnswerRow(title: "Availability", value: reason),
-                HomeAnswerRow(title: "Fallback", value: "Use the app screens directly until Apple Intelligence is available.")
+                HomeAnswerRow(title: "Status", value: "Marina is waiting for Apple Intelligence."),
+                HomeAnswerRow(title: "Safe next step", value: "Use the app screens directly until Marina is available.")
             ]
         )
     }
@@ -1042,13 +1042,13 @@ struct MarinaTurnCoordinator {
         if reason.contains("device_not_eligible") {
             return (
                 "Apple Intelligence is not available on this device",
-                "This device is not eligible for the local Foundation Models runtime Marina requires."
+                "This device is not eligible for the local Apple Intelligence runtime Marina requires."
             )
         }
         if reason.contains("runtime_unavailable") || reason.contains("framework_unavailable") {
             return (
                 "Apple Intelligence requires a newer runtime",
-                "This app build still supports older OS versions, but natural-language Marina requires Foundation Models at runtime."
+                "This app build still supports older OS versions, but natural-language Marina requires a newer Apple Intelligence runtime."
             )
         }
         return (
@@ -1061,14 +1061,11 @@ struct MarinaTurnCoordinator {
         prompt: String,
         diagnostic: MarinaFoundationModelsFailureDiagnostic
     ) -> HomeAnswer {
-        var rows = [
+        let rows = [
             HomeAnswerRow(title: "Data safety", value: "Offshore did not query or change your financial records."),
-            HomeAnswerRow(title: "Failure type", value: diagnostic.category.rawValue),
-            HomeAnswerRow(title: "Failure step", value: diagnostic.step.rawValue)
+            HomeAnswerRow(title: "Status", value: "Marina paused before querying your data."),
+            HomeAnswerRow(title: "Safe next step", value: failureSafeNextStep(for: diagnostic.category))
         ]
-        if let availabilityReason = diagnostic.availabilityReason {
-            rows.append(HomeAnswerRow(title: "Availability", value: availabilityReason))
-        }
 
         return HomeAnswer(
             queryID: UUID(),
@@ -1078,6 +1075,19 @@ struct MarinaTurnCoordinator {
             subtitle: diagnostic.userMessage,
             rows: rows
         )
+    }
+
+    private static func failureSafeNextStep(for category: MarinaFoundationModelsErrorCategory) -> String {
+        switch category {
+        case .rateLimited, .concurrentRequests:
+            return "Try again after the current request settles."
+        case .assetsUnavailable, .unavailable, .unsupportedLanguageOrLocale:
+            return "Use the app screens directly until Apple Intelligence is available."
+        case .exceededContextWindowSize:
+            return "Try a shorter prompt with one card, category, merchant, budget, or date range."
+        default:
+            return "Try again with a more specific budget question."
+        }
     }
 
     private static func foundationDiagnostic(from error: Error) -> MarinaFoundationModelsFailureDiagnostic {
@@ -1143,11 +1153,10 @@ struct MarinaTurnCoordinator {
             kind: .message,
             userPrompt: prompt,
             title: "I need a clearer target",
-            subtitle: "Marina produced a clarification that was not actionable, so Offshore did not query your financial data.",
+            subtitle: "I could not turn that into a safe choice, so Offshore did not query your financial data.",
             rows: [
                 HomeAnswerRow(title: "Data safety", value: "Offshore did not query or change your financial records."),
-                HomeAnswerRow(title: "Recovery", value: "Ask again with a named card, budget, category, merchant, income source, savings account, or reconciliation account."),
-                HomeAnswerRow(title: "Clarification shape", value: "\(clarification.kind.rawValue), choices=\(clarification.choices.count)")
+                HomeAnswerRow(title: "Try", value: "Ask again with a named card, budget, category, merchant, income source, savings account, or reconciliation account.")
             ]
         )
     }

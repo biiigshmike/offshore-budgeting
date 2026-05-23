@@ -27,7 +27,7 @@ struct MarinaDatabaseLookupResponseBuilder {
                 subtitle: "I couldn't find anything matching \"\(request.searchText)\". Try searching by merchant, card, amount, category, budget, or a shorter name.",
                 rows: [
                     HomeAnswerRow(title: "Search", value: request.searchText),
-                    HomeAnswerRow(title: "Type", value: request.objectTypes.map(\.rawValue).joined(separator: ", "))
+                    HomeAnswerRow(title: "Try", value: "Search by merchant, card, amount, category, budget, or a shorter name.")
                 ]
             )
         }

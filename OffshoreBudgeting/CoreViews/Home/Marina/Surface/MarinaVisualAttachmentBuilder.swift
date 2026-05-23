@@ -35,6 +35,23 @@ struct MarinaVisualAttachmentBuilder {
         )
         if cardAnswer.attachment != nil { return cardAnswer }
 
+        if let clarification = clarificationCard(for: answer) {
+            return applying(
+                .clarification(clarification),
+                to: answer,
+                subtitle: fallbackSubtitle(for: clarification)
+            )
+        }
+
+        if let deadEnd = deadEndCard(for: answer) {
+            return applying(
+                .deadEnd(deadEnd),
+                to: answer,
+                title: deadEnd.title,
+                subtitle: fallbackSubtitle(for: deadEnd)
+            )
+        }
+
         if let summary = entitySummary(
             for: answer,
             workspace: workspace,
@@ -117,6 +134,215 @@ struct MarinaVisualAttachmentBuilder {
         }
 
         return answer
+    }
+
+    private enum DeadEndFamily {
+        case noData
+        case readOnly
+        case unavailable
+        case formulaSetup
+        case clarificationFailure
+        case unsupported
+    }
+
+    private func clarificationCard(for answer: HomeAnswer) -> MarinaClarificationPresentationModel? {
+        guard answer.kind == .message else { return nil }
+
+        let rows = visibleRows(from: answer)
+        let choiceRows = rows.filter(isClarificationChoiceRow)
+        let title = normalized(answer.title)
+        let subtitle = normalized(answer.subtitle ?? "")
+        let looksClarifying = title.contains("which ")
+            || title.contains("need one choice")
+            || title.contains("need one of those choices")
+            || title.contains("more than one matching choice")
+            || subtitle.contains("pick ")
+            || subtitle.contains("choose ")
+            || subtitle.contains("more than one")
+        guard looksClarifying, choiceRows.count > 1 else { return nil }
+
+        return MarinaClarificationPresentationModel(
+            title: answer.title,
+            subtitle: "I found more than one possible match and need you to choose the target before I query your data.",
+            rows: [
+                presentationRow(title: "Why I paused", value: "The request could point to more than one Offshore item."),
+                presentationRow(title: "Next step", value: "Choose one of the options below."),
+                presentationRow(title: "Options", value: integer(choiceRows.count))
+            ]
+        )
+    }
+
+    private func deadEndCard(for answer: HomeAnswer) -> MarinaDeadEndPresentationModel? {
+        guard answer.kind == .message else { return nil }
+        guard let family = deadEndFamily(for: answer) else { return nil }
+
+        return MarinaDeadEndPresentationModel(
+            title: deadEndTitle(for: answer, family: family),
+            subtitle: deadEndSubtitle(for: answer, family: family),
+            systemImage: deadEndSystemImage(for: family),
+            tintHex: deadEndTintHex(for: family),
+            rows: deadEndRows(for: answer, family: family)
+        )
+    }
+
+    private func deadEndFamily(for answer: HomeAnswer) -> DeadEndFamily? {
+        let title = normalized(answer.title)
+        let subtitle = normalized(answer.subtitle ?? "")
+        let primary = normalized(answer.primaryValue ?? "")
+        let hasTechnicalRows = answer.rows.contains(where: rowLooksInternal)
+
+        if title.contains("no matching")
+            || title.hasPrefix("no ")
+            || subtitle.contains("couldn t find")
+            || subtitle.contains("no matching")
+            || primary == "data unavailable" {
+            return .noData
+        }
+
+        if title.contains("read only") || subtitle.contains("confirmation flow") {
+            return .readOnly
+        }
+
+        if title.contains("apple intelligence")
+            || title.contains("not ready")
+            || title.contains("busy")
+            || title.contains("declined")
+            || title.contains("too much context")
+            || title.contains("stopped reading")
+            || title.contains("could not read")
+            || subtitle.contains("apple intelligence") {
+            return .unavailable
+        }
+
+        if title.contains("needs one setup")
+            || title.contains("formula contract")
+            || title.contains("knows this metric")
+            || primary.contains("contract")
+            || primary.contains("setup required")
+            || (hasTechnicalRows && title.contains("metric")) {
+            return .formulaSetup
+        }
+
+        if title.contains("try a more specific prompt")
+            || title.contains("clearer target")
+            || subtitle.contains("not actionable") {
+            return .clarificationFailure
+        }
+
+        if title.contains("different way")
+            || title.contains("narrower query")
+            || title.contains("cannot run")
+            || title.contains("can t run")
+            || subtitle.contains("outside marina")
+            || subtitle.contains("deterministic marina executor")
+            || hasTechnicalRows {
+            return .unsupported
+        }
+
+        return nil
+    }
+
+    private func deadEndTitle(for answer: HomeAnswer, family: DeadEndFamily) -> String {
+        switch family {
+        case .noData:
+            return answer.title
+        case .readOnly:
+            return "Marina is read-only for now"
+        case .unavailable:
+            return answer.title
+        case .formulaSetup:
+            return "Marina needs one setup step"
+        case .clarificationFailure:
+            return "I need a clearer target"
+        case .unsupported:
+            return "I need a narrower query"
+        }
+    }
+
+    private func deadEndSubtitle(for answer: HomeAnswer, family: DeadEndFamily) -> String {
+        switch family {
+        case .noData:
+            return "I could not find matching data in this workspace. Try a shorter name, a merchant, card, category, amount, or budget."
+        case .readOnly:
+            return "I can search, summarize, calculate, and run what-if scenarios. Use the app forms for changes that alter saved records."
+        case .unavailable:
+            return "Marina paused before querying your financial data. Try again in a moment, or use the app screens directly."
+        case .formulaSetup:
+            return "Marina knows this question, but it needs setup before it can run safely."
+        case .clarificationFailure:
+            return "I could not turn that into a safe choice. Ask again with a named card, budget, category, merchant, income source, savings account, or reconciliation account."
+        case .unsupported:
+            return "Marina cannot run that exact question yet. Ask for a total, a list, a comparison, or a named budget item."
+        }
+    }
+
+    private func deadEndRows(for answer: HomeAnswer, family: DeadEndFamily) -> [MarinaDisplayRow] {
+        switch family {
+        case .noData:
+            return [
+                presentationRow(title: "Result", value: "No matching data found."),
+                presentationRow(title: "Try", value: "Use a shorter name or search by merchant, card, category, budget, or amount.")
+            ]
+        case .readOnly:
+            return [
+                presentationRow(title: "Available now", value: "Search, summarize, calculate, and run what-if scenarios."),
+                presentationRow(title: "Safe next step", value: "Use the app forms for saved changes.")
+            ]
+        case .unavailable:
+            return [
+                presentationRow(title: "Data safety", value: "Offshore did not query or change your financial records."),
+                presentationRow(title: "Safe next step", value: "Try again in a moment or use the app screens directly.")
+            ]
+        case .formulaSetup:
+            return [
+                presentationRow(title: "Status", value: "This question needs setup before Marina can run it."),
+                presentationRow(title: "Safe next step", value: "Ask for a supported total, list, or comparison.")
+            ]
+        case .clarificationFailure:
+            return [
+                presentationRow(title: "Data safety", value: "Offshore did not query or change your financial records."),
+                presentationRow(title: "Try", value: "Name the card, budget, category, merchant, income source, savings account, or reconciliation account.")
+            ]
+        case .unsupported:
+            return [
+                presentationRow(title: "Status", value: "That request is outside Marina's current read model."),
+                presentationRow(title: "Try", value: "Ask for a total, list, comparison, or named budget item.")
+            ]
+        }
+    }
+
+    private func deadEndSystemImage(for family: DeadEndFamily) -> String {
+        switch family {
+        case .noData:
+            return "magnifyingglass"
+        case .readOnly:
+            return "lock.fill"
+        case .unavailable:
+            return "sparkles"
+        case .formulaSetup:
+            return "wrench.and.screwdriver.fill"
+        case .clarificationFailure:
+            return "questionmark.bubble.fill"
+        case .unsupported:
+            return "exclamationmark.triangle.fill"
+        }
+    }
+
+    private func deadEndTintHex(for family: DeadEndFamily) -> String {
+        switch family {
+        case .noData:
+            return "#64748B"
+        case .readOnly:
+            return "#0EA5E9"
+        case .unavailable:
+            return "#8B5CF6"
+        case .formulaSetup:
+            return "#F59E0B"
+        case .clarificationFailure:
+            return "#6366F1"
+        case .unsupported:
+            return "#F59E0B"
+        }
     }
 
     private func entitySummary(
@@ -529,6 +755,7 @@ struct MarinaVisualAttachmentBuilder {
     private func applying(
         _ attachment: MarinaAttachment,
         to answer: HomeAnswer,
+        title: String? = nil,
         subtitle: String
     ) -> HomeAnswer {
         HomeAnswer(
@@ -536,7 +763,7 @@ struct MarinaVisualAttachmentBuilder {
             queryID: answer.queryID,
             kind: answer.kind,
             userPrompt: answer.userPrompt,
-            title: answer.title,
+            title: title ?? answer.title,
             subtitle: subtitle,
             primaryValue: answer.primaryValue,
             rows: answer.rows,
@@ -582,9 +809,68 @@ struct MarinaVisualAttachmentBuilder {
         return "This formula is known to Marina."
     }
 
+    private func fallbackSubtitle(for clarification: MarinaClarificationPresentationModel) -> String {
+        clarification.subtitle ?? "Choose one of the options below so Marina can answer safely."
+    }
+
+    private func fallbackSubtitle(for deadEnd: MarinaDeadEndPresentationModel) -> String {
+        deadEnd.subtitle ?? "Marina paused before querying your financial data."
+    }
+
     private func visibleRows(from answer: HomeAnswer) -> [HomeAnswerRow] {
         answer.rows.filter { row in
             row.role != .trace && row.role != .contract
+        }
+    }
+
+    private func presentationRow(title: String, value: String) -> MarinaDisplayRow {
+        MarinaDisplayRow(title: title, value: value)
+    }
+
+    private func isClarificationChoiceRow(_ row: HomeAnswerRow) -> Bool {
+        guard rowLooksInternal(row) == false else { return false }
+        let title = normalized(row.title)
+        let blockedTitles = [
+            "data safety",
+            "recovery",
+            "reason",
+            "status",
+            "safe next step",
+            "availability",
+            "fallback",
+            "failure type",
+            "failure step",
+            "clarification shape"
+        ]
+        return blockedTitles.contains(title) == false
+    }
+
+    private func rowLooksInternal(_ row: HomeAnswerRow) -> Bool {
+        if row.role == .trace || row.role == .contract {
+            return true
+        }
+
+        let title = normalized(row.title)
+        let value = normalized(row.value)
+        let fragments = [
+            "metric contract",
+            "contract status",
+            "amount basis",
+            "source rows",
+            "refused substitution",
+            "clarification shape",
+            "failure type",
+            "failure step",
+            "unsupported",
+            "contractonly",
+            "metricformula",
+            "foundation",
+            "executor",
+            "crud deferred",
+            "debug"
+        ]
+        return fragments.contains { fragment in
+            title.contains(fragment) || value.contains(fragment)
         }
     }
 

@@ -68,8 +68,27 @@ struct MarinaPresetPromptCatalogTests {
             #expect(answer.title.isEmpty == false, "Missing title for \(preset.title)")
             #expect(answer.title.localizedCaseInsensitiveContains("Unsupported") == false, "Unsupported answer for \(preset.title)")
             #expect(aggregationResult != nil)
+            let surfaced = MarinaVisualAttachmentBuilder().attachingVisualAttachmentIfNeeded(
+                to: answer,
+                workspace: fixture.workspace,
+                cards: fixture.provider.fetchAllCards(),
+                allocationAccounts: fixture.provider.fetchAllAllocationAccounts(),
+                savingsAccounts: fixture.provider.fetchAllSavingsAccounts(),
+                categories: fixture.provider.fetchAllCategories(),
+                presets: fixture.provider.fetchAllPresets(),
+                variableExpenses: fixture.provider.fetchAllVariableExpenses(),
+                plannedExpenses: fixture.provider.fetchAllPlannedExpenses(),
+                savingsEntries: fixture.provider.fetchAllSavingsLedgerEntries(),
+                dateRange: HomeQueryDateRange(
+                    startDate: foundationPipelineDate(2026, 5, 1),
+                    endDate: foundationPipelineDate(2026, 5, 31)
+                ),
+                excludeFuturePlannedExpenses: false,
+                excludeFutureVariableExpenses: false
+            )
             if let expectedKind = preset.expectedAnswerKind,
                answer.primaryValue != nil || answer.rows.isEmpty == false {
+                #expect(surfaced.attachment != nil, "Missing polished Marina attachment for preset prompt \(preset.title)")
                 #expect(answer.kind == expectedKind, "Unexpected answer kind for \(preset.title)")
             }
         }

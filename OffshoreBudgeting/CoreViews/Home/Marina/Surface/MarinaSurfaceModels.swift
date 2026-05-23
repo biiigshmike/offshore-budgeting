@@ -1038,6 +1038,8 @@ enum MarinaAttachment: Codable, Equatable {
     case breakdownList(MarinaBreakdownListPresentationModel)
     case trendChart(MarinaTrendChartPresentationModel)
     case formulaContract(MarinaFormulaContractPresentationModel)
+    case clarification(MarinaClarificationPresentationModel)
+    case deadEnd(MarinaDeadEndPresentationModel)
     case genericSummary(MarinaGenericSummaryPresentationModel)
 
     private enum CodingKeys: String, CodingKey {
@@ -1051,6 +1053,8 @@ enum MarinaAttachment: Codable, Equatable {
         case breakdownList
         case trendChart
         case formulaContract
+        case clarification
+        case deadEnd
         case genericSummary
     }
 
@@ -1064,6 +1068,8 @@ enum MarinaAttachment: Codable, Equatable {
         case breakdownList
         case trendChart
         case formulaContract
+        case clarification
+        case deadEnd
         case genericSummary
     }
 
@@ -1088,6 +1094,10 @@ enum MarinaAttachment: Codable, Equatable {
             self = .trendChart(try container.decode(MarinaTrendChartPresentationModel.self, forKey: .trendChart))
         case .formulaContract:
             self = .formulaContract(try container.decode(MarinaFormulaContractPresentationModel.self, forKey: .formulaContract))
+        case .clarification:
+            self = .clarification(try container.decode(MarinaClarificationPresentationModel.self, forKey: .clarification))
+        case .deadEnd:
+            self = .deadEnd(try container.decode(MarinaDeadEndPresentationModel.self, forKey: .deadEnd))
         case .genericSummary:
             self = .genericSummary(try container.decode(MarinaGenericSummaryPresentationModel.self, forKey: .genericSummary))
         }
@@ -1123,6 +1133,12 @@ enum MarinaAttachment: Codable, Equatable {
         case let .formulaContract(contract):
             try container.encode(Kind.formulaContract, forKey: .kind)
             try container.encode(contract, forKey: .formulaContract)
+        case let .clarification(clarification):
+            try container.encode(Kind.clarification, forKey: .kind)
+            try container.encode(clarification, forKey: .clarification)
+        case let .deadEnd(deadEnd):
+            try container.encode(Kind.deadEnd, forKey: .kind)
+            try container.encode(deadEnd, forKey: .deadEnd)
         case let .genericSummary(summary):
             try container.encode(Kind.genericSummary, forKey: .kind)
             try container.encode(summary, forKey: .genericSummary)

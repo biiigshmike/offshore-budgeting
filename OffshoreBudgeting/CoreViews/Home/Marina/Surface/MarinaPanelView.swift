@@ -1429,6 +1429,22 @@ struct MarinaPanelView: View {
                         .padding(.top, 2)
                 }
 
+                if let clarification = clarificationAttachment(for: answer) {
+                    MarinaClarificationAttachmentView(
+                        model: clarification,
+                        accessibilityPrefix: "marina.answer.\(index).clarification"
+                    )
+                        .padding(.top, 2)
+                }
+
+                if let deadEnd = deadEndAttachment(for: answer) {
+                    MarinaDeadEndAttachmentView(
+                        model: deadEnd,
+                        accessibilityPrefix: "marina.answer.\(index).deadEnd"
+                    )
+                        .padding(.top, 2)
+                }
+
                 if let generic = genericSummaryAttachment(for: answer) {
                     MarinaGenericSummaryAttachmentView(
                         model: generic,
@@ -1544,6 +1560,16 @@ struct MarinaPanelView: View {
         return contract
     }
 
+    private func clarificationAttachment(for answer: HomeAnswer) -> MarinaClarificationPresentationModel? {
+        guard case let .clarification(clarification)? = answer.attachment else { return nil }
+        return clarification
+    }
+
+    private func deadEndAttachment(for answer: HomeAnswer) -> MarinaDeadEndPresentationModel? {
+        guard case let .deadEnd(deadEnd)? = answer.attachment else { return nil }
+        return deadEnd
+    }
+
     private func genericSummaryAttachment(for answer: HomeAnswer) -> MarinaGenericSummaryPresentationModel? {
         guard case let .genericSummary(summary)? = answer.attachment else { return nil }
         return summary
@@ -1609,6 +1635,10 @@ struct MarinaPanelView: View {
             return chart.points.map { ($0.label, $0.renderedValue) }
         case let .formulaContract(contract):
             return contract.rows.map { ($0.title, $0.value) }
+        case let .clarification(clarification):
+            return clarification.rows.map { ($0.title, $0.value) }
+        case let .deadEnd(deadEnd):
+            return deadEnd.rows.map { ($0.title, $0.value) }
         case let .genericSummary(summary):
             return summary.rows.map { ($0.title, $0.value) }
         case .inlineCreateForm:
@@ -1618,7 +1648,7 @@ struct MarinaPanelView: View {
 
     private func shouldRenderPrimaryValue(for answer: HomeAnswer) -> Bool {
         switch answer.attachment {
-        case .some(.metricSummary), .some(.breakdownList), .some(.formulaContract), .some(.genericSummary):
+        case .some(.metricSummary), .some(.breakdownList), .some(.formulaContract), .some(.clarification), .some(.deadEnd), .some(.genericSummary):
             return false
         case .some(.cardSummary), .some(.entitySummary), .some(.rowList), .some(.comparisonSummary), .some(.trendChart), .some(.inlineCreateForm), nil:
             return true
@@ -1627,7 +1657,7 @@ struct MarinaPanelView: View {
 
     private func shouldRenderRowsVisually(for answer: HomeAnswer) -> Bool {
         switch answer.attachment {
-        case .some(.cardSummary), .some(.entitySummary), .some(.metricSummary), .some(.comparisonSummary), .some(.breakdownList), .some(.trendChart), .some(.formulaContract), .some(.genericSummary):
+        case .some(.cardSummary), .some(.entitySummary), .some(.metricSummary), .some(.comparisonSummary), .some(.breakdownList), .some(.trendChart), .some(.formulaContract), .some(.clarification), .some(.deadEnd), .some(.genericSummary):
             return false
         case let .some(.rowList(rowList)):
             return rowList.hidesSourceRows == false && answer.rows.isEmpty == false
@@ -1637,6 +1667,13 @@ struct MarinaPanelView: View {
     }
 
     private func answerStateAccessibilityLabel(for answer: HomeAnswer) -> String {
+        if case .clarification? = answer.attachment {
+            return "Marina answer clarification \(answer.kind.rawValue)"
+        }
+        if case .deadEnd? = answer.attachment {
+            return "Marina answer needs attention \(answer.kind.rawValue)"
+        }
+
         let normalizedTitle = normalizedPrompt(answer.title)
         let normalizedSubtitle = normalizedPrompt(answer.subtitle ?? "")
         if normalizedTitle.contains("quick clarification") || normalizedSubtitle.contains("pick") {
@@ -1656,7 +1693,7 @@ struct MarinaPanelView: View {
         subtitlePresentation: AssistantSubtitlePresentation
     ) -> String {
         var parts: [String] = [answer.title]
-        if let primaryValue = answer.primaryValue {
+        if shouldRenderPrimaryValue(for: answer), let primaryValue = answer.primaryValue {
             parts.append(primaryValue)
         }
         if let narrative = subtitlePresentation.narrative {
@@ -1665,8 +1702,10 @@ struct MarinaPanelView: View {
         if let attachment = answer.attachment {
             parts.append(attachmentAccessibilityValue(attachment))
         }
-        for row in answer.rows {
-            parts.append("\(row.title): \(row.value)")
+        if sourceRowsAreVisibleToAccessibility(for: answer.attachment) {
+            for row in answer.rows where row.role != .trace && row.role != .contract {
+                parts.append("\(row.title): \(row.value)")
+            }
         }
         if let provenance = subtitlePresentation.provenance {
             parts.append("Based on: \(provenance)")
@@ -1724,12 +1763,49 @@ struct MarinaPanelView: View {
                 primaryValue: contract.status,
                 rows: contract.rows
             )
+        case let .clarification(clarification):
+            return polishedRowsAccessibility(
+                title: clarification.title,
+                rows: clarification.rows
+            )
+        case let .deadEnd(deadEnd):
+            return polishedRowsAccessibility(
+                title: deadEnd.title,
+                rows: deadEnd.rows
+            )
         case let .genericSummary(summary):
             return polishedRowsAccessibility(
                 title: summary.title,
                 primaryValue: summary.primaryValue,
                 rows: summary.rows
             )
+        }
+    }
+
+    private func sourceRowsAreVisibleToAccessibility(for attachment: MarinaAttachment?) -> Bool {
+        switch attachment {
+        case .none:
+            return true
+        case .inlineCreateForm, .cardSummary, .entitySummary:
+            return true
+        case let .rowList(rowList):
+            return rowList.hidesSourceRows == false
+        case let .metricSummary(summary):
+            return summary.hidesSourceRows == false
+        case let .comparisonSummary(summary):
+            return summary.hidesSourceRows == false
+        case let .breakdownList(list):
+            return list.hidesSourceRows == false
+        case let .trendChart(chart):
+            return chart.hidesSourceRows == false
+        case let .formulaContract(contract):
+            return contract.hidesSourceRows == false
+        case let .clarification(clarification):
+            return clarification.hidesSourceRows == false
+        case let .deadEnd(deadEnd):
+            return deadEnd.hidesSourceRows == false
+        case let .genericSummary(summary):
+            return summary.hidesSourceRows == false
         }
     }
 
@@ -1956,9 +2032,10 @@ struct MarinaPanelView: View {
         foundationPipelineClarificationChoicesByID = [:]
         foundationPipelineClarificationChoicesByTitle = [:]
 
+        let presentationAnswer = visualAttachmentAnswer(from: answer)
         _ = await presentMarinaAnswer(
-            deterministicAnswer: answer,
-            deterministicRecoveryAnswer: answer,
+            deterministicAnswer: presentationAnswer,
+            deterministicRecoveryAnswer: presentationAnswer,
             rawPrompt: rawPrompt,
             source: .foundationModels,
             surfaceKind: surfaceKind,
@@ -5338,9 +5415,10 @@ struct MarinaPanelView: View {
                 subtitle: "I could not turn that into a safe clarification choice. Try asking for a total, a list, or a named object, like \"How much did I spend on Groceries?\"",
                 rows: []
             )
+        let presentationAnswer = visualAttachmentAnswer(from: baseAnswer)
         _ = await presentMarinaAnswer(
-            deterministicAnswer: baseAnswer,
-            deterministicRecoveryAnswer: baseAnswer,
+            deterministicAnswer: presentationAnswer,
+            deterministicRecoveryAnswer: presentationAnswer,
             rawPrompt: rawPrompt,
             source: source,
             homeQueryPlan: nil,
@@ -5416,9 +5494,10 @@ struct MarinaPanelView: View {
                 )
             }
         )
+        let presentationAnswer = visualAttachmentAnswer(from: answer)
         presentMarinaAnswer(
-            deterministicAnswer: answer,
-            deterministicRecoveryAnswer: answer,
+            deterministicAnswer: presentationAnswer,
+            deterministicRecoveryAnswer: presentationAnswer,
             rawPrompt: reply,
             source: .foundationModels,
             surfaceKind: .clarification,

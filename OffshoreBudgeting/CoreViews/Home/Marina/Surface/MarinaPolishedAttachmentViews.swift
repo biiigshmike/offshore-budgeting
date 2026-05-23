@@ -185,6 +185,48 @@ struct MarinaFormulaContractAttachmentView: View {
     }
 }
 
+struct MarinaClarificationAttachmentView: View {
+    let model: MarinaClarificationPresentationModel
+    var accessibilityPrefix: String = "marina.clarification"
+
+    var body: some View {
+        MarinaPolishedShell(
+            title: model.title,
+            subtitle: model.subtitle,
+            systemImage: model.systemImage,
+            tint: tint
+        ) {
+            MarinaDisplayRowsView(rows: model.rows, tint: tint, showsProgress: false, accessibilityPrefix: accessibilityPrefix)
+        }
+        .accessibilityIdentifier("marina.clarification")
+    }
+
+    private var tint: Color {
+        model.tintHex.flatMap { Color(hex: $0) } ?? .indigo
+    }
+}
+
+struct MarinaDeadEndAttachmentView: View {
+    let model: MarinaDeadEndPresentationModel
+    var accessibilityPrefix: String = "marina.deadEnd"
+
+    var body: some View {
+        MarinaPolishedShell(
+            title: model.title,
+            subtitle: model.subtitle,
+            systemImage: model.systemImage,
+            tint: tint
+        ) {
+            MarinaDisplayRowsView(rows: model.rows, tint: tint, showsProgress: false, accessibilityPrefix: accessibilityPrefix)
+        }
+        .accessibilityIdentifier("marina.deadEnd")
+    }
+
+    private var tint: Color {
+        model.tintHex.flatMap { Color(hex: $0) } ?? .orange
+    }
+}
+
 struct MarinaGenericSummaryAttachmentView: View {
     let model: MarinaGenericSummaryPresentationModel
     var accessibilityPrefix: String = "marina.genericSummary"

@@ -213,6 +213,10 @@ struct MarinaPresentationGroundingBuilder {
             highlights.append("Trend attachment: \(trimmedOneLine(chart.title, limit: 60)); \(chart.points.count) points\(points.isEmpty ? "" : "; \(points)")")
         case let .formulaContract(contract)?:
             highlights.append(polishedAttachmentHighlight("Formula contract attachment", title: contract.title, primaryValue: contract.status, rows: contract.rows))
+        case let .clarification(clarification)?:
+            highlights.append(polishedAttachmentHighlight("Clarification attachment", title: clarification.title, primaryValue: nil, rows: clarification.rows))
+        case let .deadEnd(deadEnd)?:
+            highlights.append(polishedAttachmentHighlight("Dead-end attachment", title: deadEnd.title, primaryValue: nil, rows: deadEnd.rows))
         case let .genericSummary(summary)?:
             highlights.append(polishedAttachmentHighlight("Generic summary attachment", title: summary.title, primaryValue: summary.primaryValue, rows: summary.rows))
         case .inlineCreateForm?, nil:

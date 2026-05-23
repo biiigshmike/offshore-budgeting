@@ -20,11 +20,11 @@ struct MarinaAggregationResponseBridge {
                 queryID: clarification.id,
                 kind: .message,
                 title: "I need a clearer target",
-                subtitle: "Marina produced a clarification that was not actionable, so Offshore did not query your financial data.",
+                subtitle: "I could not turn that into a safe choice, so Offshore did not query your financial data.",
                 primaryValue: nil,
                 rows: [
                     HomeAnswerRow(title: "Data safety", value: "Offshore did not query or change your financial records."),
-                    HomeAnswerRow(title: "Clarification shape", value: "\(clarification.kind.rawValue), choices=\(clarification.choices.count)")
+                    HomeAnswerRow(title: "Try", value: "Ask again with a named card, budget, category, merchant, income source, savings account, or reconciliation account.")
                 ]
             )
         }
@@ -66,7 +66,8 @@ struct MarinaAggregationResponseBridge {
                 subtitle: unsupported.message,
                 primaryValue: nil,
                 rows: [
-                    HomeAnswerRow(title: "Reason", value: unsupported.kind.rawValue)
+                    HomeAnswerRow(title: "Status", value: "Marina cannot run that exact question yet."),
+                    HomeAnswerRow(title: "Try", value: "Ask for a total, list, comparison, or named budget item.")
                 ]
             )
         }
