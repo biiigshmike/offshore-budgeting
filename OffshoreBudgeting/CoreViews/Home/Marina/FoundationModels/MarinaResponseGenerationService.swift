@@ -177,13 +177,49 @@ struct MarinaPresentationGroundingBuilder {
             highlights.append("Deterministic subtitle: \(trimmedOneLine(subtitle, limit: 140))")
         }
 
-        if case let .cardSummary(summary)? = answer.attachment {
+        switch answer.attachment {
+        case let .cardSummary(summary)?:
             highlights.append(
                 "Card summary: \(trimmedOneLine(summary.title, limit: 60)); period \(summary.dateRangeSubtitle); total \(CurrencyFormatter.string(from: summary.total)); planned \(CurrencyFormatter.string(from: summary.plannedTotal)); variable \(CurrencyFormatter.string(from: summary.variableTotal))"
             )
+        case let .entitySummary(summary)?:
+            let rows = summary.rows.prefix(4).map {
+                "\(trimmedOneLine($0.title, limit: 28)) \(trimmedOneLine($0.value, limit: 46))"
+            }.joined(separator: "; ")
+            let value = summary.primaryValue.map { "; value \(trimmedOneLine($0, limit: 50))" } ?? ""
+            highlights.append(
+                "Entity summary: \(summary.objectType.rawValue); \(trimmedOneLine(summary.title, limit: 60)); \(trimmedOneLine(summary.subtitle, limit: 50))\(value)\(rows.isEmpty ? "" : "; rows \(rows)")"
+            )
+        case let .rowList(rowList)?:
+            let rows = rowList.rows.prefix(5).map {
+                "\(trimmedOneLine($0.title, limit: 34)): \(trimmedOneLine($0.value, limit: 50))"
+            }.joined(separator: " | ")
+            highlights.append(
+                "Row list attachment: \(rowList.family.rawValue); \(rowList.rows.count) rows\(rows.isEmpty ? "" : "; \(rows)")"
+            )
+        case let .metricSummary(summary)?:
+            highlights.append(polishedAttachmentHighlight("Metric summary", title: summary.title, primaryValue: summary.primaryValue, rows: summary.rows))
+        case let .comparisonSummary(summary)?:
+            let delta = summary.deltaValue.map { "; delta \(trimmedOneLine($0, limit: 40))" } ?? ""
+            highlights.append(
+                "Comparison attachment: \(trimmedOneLine(summary.title, limit: 60)); \(trimmedOneLine(summary.primaryLabel, limit: 30)) \(trimmedOneLine(summary.primaryValue, limit: 40)); \(trimmedOneLine(summary.comparisonLabel, limit: 30)) \(trimmedOneLine(summary.comparisonValue, limit: 40))\(delta)"
+            )
+        case let .breakdownList(list)?:
+            highlights.append(polishedAttachmentHighlight("Breakdown attachment", title: list.title, primaryValue: list.primaryValue, rows: list.rows))
+        case let .trendChart(chart)?:
+            let points = chart.points.prefix(5).map {
+                "\(trimmedOneLine($0.label, limit: 32)): \(trimmedOneLine($0.renderedValue, limit: 40))"
+            }.joined(separator: " | ")
+            highlights.append("Trend attachment: \(trimmedOneLine(chart.title, limit: 60)); \(chart.points.count) points\(points.isEmpty ? "" : "; \(points)")")
+        case let .formulaContract(contract)?:
+            highlights.append(polishedAttachmentHighlight("Formula contract attachment", title: contract.title, primaryValue: contract.status, rows: contract.rows))
+        case let .genericSummary(summary)?:
+            highlights.append(polishedAttachmentHighlight("Generic summary attachment", title: summary.title, primaryValue: summary.primaryValue, rows: summary.rows))
+        case .inlineCreateForm?, nil:
+            break
         }
 
-        let visibleRows = answer.rows.prefix(5).map {
+        let visibleRows = answer.rows.filter { $0.role != .trace && $0.role != .contract }.prefix(5).map {
             "\(trimmedOneLine($0.title, limit: 40)): \(trimmedOneLine($0.value, limit: 90))"
         }
         if visibleRows.isEmpty == false {
@@ -191,6 +227,19 @@ struct MarinaPresentationGroundingBuilder {
         }
 
         return Array(highlights.prefix(8))
+    }
+
+    private func polishedAttachmentHighlight(
+        _ prefix: String,
+        title: String,
+        primaryValue: String?,
+        rows: [MarinaDisplayRow]
+    ) -> String {
+        let primary = primaryValue.map { "; primary \(trimmedOneLine($0, limit: 60))" } ?? ""
+        let rowText = rows.prefix(5).map {
+            "\(trimmedOneLine($0.title, limit: 34)): \(trimmedOneLine($0.value, limit: 50))"
+        }.joined(separator: " | ")
+        return "\(prefix): \(trimmedOneLine(title, limit: 60))\(primary)\(rowText.isEmpty ? "" : "; \(rowText)")"
     }
 
     private func insightRows(_ rows: [HomeAnswerRow]) -> [String] {

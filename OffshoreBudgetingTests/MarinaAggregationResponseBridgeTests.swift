@@ -86,6 +86,58 @@ struct MarinaAggregationResponseBridgeTests {
         #expect(grouped.rows[1].value.contains("40%"))
     }
 
+    @Test func workspaceAggregationBridge_preservesRowsAndItemFallbackMetadata() {
+        let rowID = UUID()
+        let itemID = UUID()
+        let rowDate = Date(timeIntervalSince1970: 1_777_593_600)
+        let itemDate = Date(timeIntervalSince1970: 1_777_680_000)
+        let bridge = MarinaWorkspaceAggregationResponseBridge()
+
+        let rowCard = MarinaWorkspaceAggregationCard(
+            title: "Expense rows",
+            rows: [
+                .init(
+                    label: "Coffee",
+                    value: "$6.50",
+                    amount: 6.5,
+                    date: rowDate,
+                    objectType: .variableExpense,
+                    sourceID: rowID
+                )
+            ],
+            traceSummary: "rows"
+        )
+        let itemCard = MarinaWorkspaceAggregationCard(
+            title: "Savings rows",
+            items: [
+                .init(
+                    label: "Manual save",
+                    value: "$25.00",
+                    subtitle: "May 2, 2026",
+                    amount: 25,
+                    date: itemDate,
+                    objectType: .savingsLedgerEntry,
+                    sourceID: itemID,
+                    role: .evidence
+                )
+            ],
+            traceSummary: "items"
+        )
+
+        let rowAnswer = bridge.responseCompatibleAnswer(from: rowCard)
+        let itemAnswer = bridge.responseCompatibleAnswer(from: itemCard)
+
+        #expect(rowAnswer.rows.first?.sourceID == rowID)
+        #expect(rowAnswer.rows.first?.objectType == .variableExpense)
+        #expect(rowAnswer.rows.first?.amount == 6.5)
+        #expect(rowAnswer.rows.first?.date == rowDate)
+        #expect(itemAnswer.rows.first?.sourceID == itemID)
+        #expect(itemAnswer.rows.first?.objectType == .savingsLedgerEntry)
+        #expect(itemAnswer.rows.first?.amount == 25)
+        #expect(itemAnswer.rows.first?.date == itemDate)
+        #expect(itemAnswer.rows.first?.role == .evidence)
+    }
+
     @Test func responseBridge_unsupportedProducesNonCrashingMessage() {
         let unsupported = MarinaTypedUnsupportedResponse(
             kind: .unsupportedOperation,

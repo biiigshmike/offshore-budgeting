@@ -277,40 +277,6 @@ final class MarinaAssistantUITests: XCTestCase {
         XCTAssertTrue(balanceReport.result.passed, balanceReport.result.reason)
     }
 
-    func testMarinaFoundationModelToggle_isAvailableWithoutRuntimeLaunchArguments() throws {
-        let app = XCUIApplication()
-        let driver = MarinaUITestDriver(app: app, testCase: self)
-
-        driver.launchHarness()
-
-        let toggle = driver.foundationModelToggle()
-        XCTAssertTrue(toggle.waitForExistence(timeout: 5), "Expected the Marina Foundation Model toggle to be visible.")
-        XCTAssertTrue(
-            ["On", "On, unavailable"].contains(toggle.value as? String),
-            "Expected the Foundation Model toggle to default on for Marina."
-        )
-
-        toggle.tap()
-        XCTAssertEqual(toggle.value as? String, "Off")
-    }
-
-    func testMarinaFoundationModelToggle_canLaunchExplicitlyOptedOut() throws {
-        let app = XCUIApplication()
-        let driver = MarinaUITestDriver(app: app, testCase: self)
-
-        driver.launchHarness(aiOptIn: false)
-
-        let toggle = driver.foundationModelToggle()
-        XCTAssertTrue(toggle.waitForExistence(timeout: 5), "Expected the Marina Foundation Model toggle to be visible.")
-        XCTAssertEqual(toggle.value as? String, "Off")
-
-        toggle.tap()
-        XCTAssertTrue(
-            ["On", "On, unavailable"].contains(toggle.value as? String),
-            "Expected the Foundation Model toggle to report an enabled preference after tapping."
-        )
-    }
-
     private static let sequentialSmokePrompts: [ModelPrompt] = [
         ModelPrompt(model: "Workspace", text: "What workspace am I in?", shape: .summaryCard),
         ModelPrompt(model: "Budget", text: "What is my active budget?", shape: .summaryCard),

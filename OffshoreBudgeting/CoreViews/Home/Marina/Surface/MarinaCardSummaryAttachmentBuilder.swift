@@ -45,12 +45,23 @@ struct MarinaCardSummaryAttachmentBuilder {
     }
 
     private func isSingleCardLookupAnswer(_ answer: HomeAnswer) -> Bool {
-        answer.rows.contains { row in
+        if answer.kind == .message, answer.rows.contains(where: { $0.objectType == .card }) {
+            return true
+        }
+
+        return answer.rows.contains { row in
             normalized(row.title) == "type" && normalized(row.value) == "card"
         }
     }
 
     private func matchingCard(for answer: HomeAnswer, cards: [Card]) -> Card? {
+        let sourceIDs = Set(answer.rows.compactMap(\.sourceID))
+        if sourceIDs.count == 1,
+           let sourceID = sourceIDs.first,
+           let card = cards.first(where: { $0.id == sourceID }) {
+            return card
+        }
+
         let matchedNames = answer.rows
             .filter { normalized($0.title) == "matched" }
             .flatMap { $0.value.components(separatedBy: ",") }

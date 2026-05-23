@@ -576,10 +576,10 @@ struct MarinaMetricContractResponseBuilder {
             subtitle: contract.formulaName,
             primaryValue: summonPrimaryValue(for: contract),
             rows: contractRows(contract) + [
-                HomeAnswerRow(title: "Required inputs", value: slotSummary(contract.requiredInputs)),
-                HomeAnswerRow(title: "Optional inputs", value: slotSummary(contract.optionalInputs)),
-                HomeAnswerRow(title: "Required support", value: contract.missingExecutorPolicy),
-                HomeAnswerRow(title: "Refused substitution", value: contract.neverSilentlySubstituteRules.first ?? "No unsafe substitute is allowed.")
+                HomeAnswerRow(title: "Required inputs", value: slotSummary(contract.requiredInputs), role: .contract),
+                HomeAnswerRow(title: "Optional inputs", value: slotSummary(contract.optionalInputs), role: .contract),
+                HomeAnswerRow(title: "Required support", value: contract.missingExecutorPolicy, role: .contract),
+                HomeAnswerRow(title: "Refused substitution", value: contract.neverSilentlySubstituteRules.first ?? "No unsafe substitute is allowed.", role: .contract)
             ]
         )
     }
@@ -607,9 +607,9 @@ struct MarinaMetricContractResponseBuilder {
             subtitle: contract.formulaName,
             primaryValue: contract.supportStatus.rawValue,
             rows: contractRows(contract) + [
-                HomeAnswerRow(title: "Required support", value: contract.missingExecutorPolicy),
-                HomeAnswerRow(title: "Refused substitution", value: contract.neverSilentlySubstituteRules.first ?? "No unsafe substitute is allowed."),
-                HomeAnswerRow(title: "Regression fixture", value: contract.regressionFixtureIdea)
+                HomeAnswerRow(title: "Required support", value: contract.missingExecutorPolicy, role: .contract),
+                HomeAnswerRow(title: "Refused substitution", value: contract.neverSilentlySubstituteRules.first ?? "No unsafe substitute is allowed.", role: .contract),
+                HomeAnswerRow(title: "Regression fixture", value: contract.regressionFixtureIdea, role: .contract)
             ]
         )
     }
@@ -626,18 +626,29 @@ struct MarinaMetricContractResponseBuilder {
     }
 
     func evidenceRows(for contract: MarinaMetricContract) -> [HomeAnswerRow] {
-        contractRows(contract)
+        contractRows(contract).map { row in
+            HomeAnswerRow(
+                id: row.id,
+                title: row.title,
+                value: row.value,
+                sourceID: row.sourceID,
+                objectType: row.objectType,
+                amount: row.amount,
+                date: row.date,
+                role: .trace
+            )
+        }
     }
 
     private func contractRows(_ contract: MarinaMetricContract) -> [HomeAnswerRow] {
         [
-            HomeAnswerRow(title: "Metric contract", value: contract.id.rawValue),
-            HomeAnswerRow(title: "Formula", value: contract.formulaName),
-            HomeAnswerRow(title: "Contract status", value: contract.supportStatus.rawValue),
-            HomeAnswerRow(title: "Amount basis", value: contract.amountBasisDescription),
-            HomeAnswerRow(title: "Source rows", value: contract.sourceModels.joined(separator: ", ")),
-            HomeAnswerRow(title: "Date policy", value: contract.dateRangeBehavior),
-            HomeAnswerRow(title: "Workspace scope", value: contract.workspaceScope)
+            HomeAnswerRow(title: "Metric contract", value: contract.id.rawValue, role: .contract),
+            HomeAnswerRow(title: "Formula", value: contract.formulaName, role: .contract),
+            HomeAnswerRow(title: "Contract status", value: contract.supportStatus.rawValue, role: .contract),
+            HomeAnswerRow(title: "Amount basis", value: contract.amountBasisDescription, role: .contract),
+            HomeAnswerRow(title: "Source rows", value: contract.sourceModels.joined(separator: ", "), role: .contract),
+            HomeAnswerRow(title: "Date policy", value: contract.dateRangeBehavior, role: .contract),
+            HomeAnswerRow(title: "Workspace scope", value: contract.workspaceScope, role: .contract)
         ]
     }
 

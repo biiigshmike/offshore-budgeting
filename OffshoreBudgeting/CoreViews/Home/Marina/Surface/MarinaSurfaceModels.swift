@@ -868,15 +868,76 @@ extension BudgetingPeriod {
 
 // MARK: - Answer Models
 
+enum HomeAnswerRowRole: String, Codable, Equatable, Sendable {
+    case result
+    case evidence
+    case trace
+    case contract
+}
+
 struct HomeAnswerRow: Identifiable, Codable, Equatable {
     let id: UUID
     let title: String
     let value: String
+    let sourceID: UUID?
+    let objectType: MarinaLookupObjectType?
+    let amount: Double?
+    let date: Date?
+    let role: HomeAnswerRowRole
 
-    init(id: UUID = UUID(), title: String, value: String) {
+    init(
+        id: UUID = UUID(),
+        title: String,
+        value: String,
+        sourceID: UUID? = nil,
+        objectType: MarinaLookupObjectType? = nil,
+        amount: Double? = nil,
+        date: Date? = nil,
+        role: HomeAnswerRowRole = .result
+    ) {
         self.id = id
         self.title = title
         self.value = value
+        self.sourceID = sourceID
+        self.objectType = objectType
+        self.amount = amount
+        self.date = date
+        self.role = role
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case title
+        case value
+        case sourceID
+        case objectType
+        case amount
+        case date
+        case role
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        title = try container.decode(String.self, forKey: .title)
+        value = try container.decode(String.self, forKey: .value)
+        sourceID = try container.decodeIfPresent(UUID.self, forKey: .sourceID)
+        objectType = try container.decodeIfPresent(MarinaLookupObjectType.self, forKey: .objectType)
+        amount = try container.decodeIfPresent(Double.self, forKey: .amount)
+        date = try container.decodeIfPresent(Date.self, forKey: .date)
+        role = try container.decodeIfPresent(HomeAnswerRowRole.self, forKey: .role) ?? .result
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(title, forKey: .title)
+        try container.encode(value, forKey: .value)
+        try container.encodeIfPresent(sourceID, forKey: .sourceID)
+        try container.encodeIfPresent(objectType, forKey: .objectType)
+        try container.encodeIfPresent(amount, forKey: .amount)
+        try container.encodeIfPresent(date, forKey: .date)
+        try container.encode(role, forKey: .role)
     }
 }
 
@@ -970,16 +1031,40 @@ struct MarinaExecutedQueryAnswerNormalizer {
 enum MarinaAttachment: Codable, Equatable {
     case inlineCreateForm(MarinaInlineCreateForm)
     case cardSummary(CardSummaryPresentationModel)
+    case entitySummary(MarinaEntitySummaryPresentationModel)
+    case rowList(MarinaRowListPresentationModel)
+    case metricSummary(MarinaMetricSummaryPresentationModel)
+    case comparisonSummary(MarinaComparisonSummaryPresentationModel)
+    case breakdownList(MarinaBreakdownListPresentationModel)
+    case trendChart(MarinaTrendChartPresentationModel)
+    case formulaContract(MarinaFormulaContractPresentationModel)
+    case genericSummary(MarinaGenericSummaryPresentationModel)
 
     private enum CodingKeys: String, CodingKey {
         case kind
         case form
         case cardSummary
+        case entitySummary
+        case rowList
+        case metricSummary
+        case comparisonSummary
+        case breakdownList
+        case trendChart
+        case formulaContract
+        case genericSummary
     }
 
     private enum Kind: String, Codable {
         case inlineCreateForm
         case cardSummary
+        case entitySummary
+        case rowList
+        case metricSummary
+        case comparisonSummary
+        case breakdownList
+        case trendChart
+        case formulaContract
+        case genericSummary
     }
 
     init(from decoder: Decoder) throws {
@@ -989,6 +1074,22 @@ enum MarinaAttachment: Codable, Equatable {
             self = .inlineCreateForm(try container.decode(MarinaInlineCreateForm.self, forKey: .form))
         case .cardSummary:
             self = .cardSummary(try container.decode(CardSummaryPresentationModel.self, forKey: .cardSummary))
+        case .entitySummary:
+            self = .entitySummary(try container.decode(MarinaEntitySummaryPresentationModel.self, forKey: .entitySummary))
+        case .rowList:
+            self = .rowList(try container.decode(MarinaRowListPresentationModel.self, forKey: .rowList))
+        case .metricSummary:
+            self = .metricSummary(try container.decode(MarinaMetricSummaryPresentationModel.self, forKey: .metricSummary))
+        case .comparisonSummary:
+            self = .comparisonSummary(try container.decode(MarinaComparisonSummaryPresentationModel.self, forKey: .comparisonSummary))
+        case .breakdownList:
+            self = .breakdownList(try container.decode(MarinaBreakdownListPresentationModel.self, forKey: .breakdownList))
+        case .trendChart:
+            self = .trendChart(try container.decode(MarinaTrendChartPresentationModel.self, forKey: .trendChart))
+        case .formulaContract:
+            self = .formulaContract(try container.decode(MarinaFormulaContractPresentationModel.self, forKey: .formulaContract))
+        case .genericSummary:
+            self = .genericSummary(try container.decode(MarinaGenericSummaryPresentationModel.self, forKey: .genericSummary))
         }
     }
 
@@ -1001,6 +1102,30 @@ enum MarinaAttachment: Codable, Equatable {
         case let .cardSummary(summary):
             try container.encode(Kind.cardSummary, forKey: .kind)
             try container.encode(summary, forKey: .cardSummary)
+        case let .entitySummary(summary):
+            try container.encode(Kind.entitySummary, forKey: .kind)
+            try container.encode(summary, forKey: .entitySummary)
+        case let .rowList(list):
+            try container.encode(Kind.rowList, forKey: .kind)
+            try container.encode(list, forKey: .rowList)
+        case let .metricSummary(summary):
+            try container.encode(Kind.metricSummary, forKey: .kind)
+            try container.encode(summary, forKey: .metricSummary)
+        case let .comparisonSummary(summary):
+            try container.encode(Kind.comparisonSummary, forKey: .kind)
+            try container.encode(summary, forKey: .comparisonSummary)
+        case let .breakdownList(list):
+            try container.encode(Kind.breakdownList, forKey: .kind)
+            try container.encode(list, forKey: .breakdownList)
+        case let .trendChart(chart):
+            try container.encode(Kind.trendChart, forKey: .kind)
+            try container.encode(chart, forKey: .trendChart)
+        case let .formulaContract(contract):
+            try container.encode(Kind.formulaContract, forKey: .kind)
+            try container.encode(contract, forKey: .formulaContract)
+        case let .genericSummary(summary):
+            try container.encode(Kind.genericSummary, forKey: .kind)
+            try container.encode(summary, forKey: .genericSummary)
         }
     }
 }

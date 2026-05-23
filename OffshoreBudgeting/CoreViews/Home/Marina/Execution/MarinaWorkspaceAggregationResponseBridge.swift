@@ -10,7 +10,8 @@ struct MarinaWorkspaceAggregationResponseBridge {
                 date: item.date,
                 objectType: item.objectType,
                 sourceID: item.sourceID,
-                sortValue: item.sortValue
+                sortValue: item.sortValue,
+                role: item.role
             )
         }
 
@@ -20,7 +21,17 @@ struct MarinaWorkspaceAggregationResponseBridge {
             title: card.title,
             subtitle: card.subtitle,
             primaryValue: card.primaryValue,
-            rows: rows.map { HomeAnswerRow(title: $0.label, value: $0.value) }
+            rows: rows.map {
+                HomeAnswerRow(
+                    title: $0.label,
+                    value: $0.value,
+                    sourceID: $0.sourceID,
+                    objectType: $0.objectType,
+                    amount: $0.amount,
+                    date: $0.date,
+                    role: $0.role
+                )
+            }
         )
     }
 }

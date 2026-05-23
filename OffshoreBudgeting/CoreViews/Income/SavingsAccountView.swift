@@ -892,7 +892,7 @@ private struct SavingsDateFilterRow: View {
     }
 }
 
-private struct SavingsLedgerRow: View {
+struct SavingsLedgerRow: View {
     let entry: SavingsLedgerEntry
 
     private var subtitle: String {

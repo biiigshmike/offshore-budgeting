@@ -495,7 +495,13 @@ struct HomeQueryEngine {
         ).metrics
 
         let rows = Array(metrics.prefix(query.resultLimit)).map { metric in
-            HomeAnswerRow(title: metric.categoryName, value: currency(metric.totalSpent))
+            HomeAnswerRow(
+                title: metric.categoryName,
+                value: currency(metric.totalSpent),
+                sourceID: categories.first(where: { $0.id == metric.categoryID })?.id,
+                objectType: .category,
+                amount: metric.totalSpent
+            )
         }
 
         if rows.isEmpty {
@@ -741,23 +747,43 @@ struct HomeQueryEngine {
     ) -> HomeAnswer {
         let range = query.dateRange ?? monthRange(containing: now)
 
-        var entries: [(title: String, amount: Double)] = []
+        var entries: [HomeAnswerRow] = []
         entries.reserveCapacity(plannedExpenses.count + variableExpenses.count)
 
         for expense in plannedExpenses {
             guard expense.expenseDate >= range.startDate, expense.expenseDate <= range.endDate else { continue }
-            entries.append((title: expense.title, amount: expense.effectiveAmount()))
+            let amount = expense.effectiveAmount()
+            entries.append(
+                HomeAnswerRow(
+                    title: expense.title,
+                    value: currency(amount),
+                    sourceID: expense.id,
+                    objectType: .plannedExpense,
+                    amount: amount,
+                    date: expense.expenseDate
+                )
+            )
         }
 
         for expense in variableExpenses {
             guard expense.transactionDate >= range.startDate, expense.transactionDate <= range.endDate else { continue }
-            entries.append((title: expense.descriptionText, amount: expense.ledgerSignedAmount()))
+            let amount = expense.ledgerSignedAmount()
+            entries.append(
+                HomeAnswerRow(
+                    title: expense.descriptionText,
+                    value: currency(amount),
+                    sourceID: expense.id,
+                    objectType: .variableExpense,
+                    amount: amount,
+                    date: expense.transactionDate
+                )
+            )
         }
 
         let rows = entries
-            .sorted { $0.amount > $1.amount }
+            .sorted { ($0.amount ?? 0) > ($1.amount ?? 0) }
             .prefix(query.resultLimit)
-            .map { HomeAnswerRow(title: $0.title, value: currency($0.amount)) }
+            .map { $0 }
 
         if rows.isEmpty {
             return HomeAnswer(
@@ -827,7 +853,8 @@ struct HomeQueryEngine {
             .map { label in
                 HomeAnswerRow(
                     title: label,
-                    value: "\(countByLabel[label, default: 0])x | \(currency(totalByLabel[label, default: 0]))"
+                    value: "\(countByLabel[label, default: 0])x | \(currency(totalByLabel[label, default: 0]))",
+                    amount: totalByLabel[label, default: 0]
                 )
             }
 
@@ -2209,7 +2236,16 @@ struct HomeQueryEngine {
             title: query.targetName.map { "Next Planned Expense (\($0))" } ?? "Next Planned Expense",
             subtitle: rangeLabel(for: range),
             primaryValue: currency(HomeNextPlannedExpenseFinder.effectiveAmount(for: expense)),
-            rows: [HomeAnswerRow(title: "Expense", value: expense.title)] + rows
+            rows: [
+                HomeAnswerRow(
+                    title: "Expense",
+                    value: expense.title,
+                    sourceID: expense.id,
+                    objectType: .plannedExpense,
+                    amount: HomeNextPlannedExpenseFinder.effectiveAmount(for: expense),
+                    date: expense.expenseDate
+                )
+            ] + rows
         )
     }
 
@@ -2251,7 +2287,10 @@ struct HomeQueryEngine {
         var rows = topMetrics.map { metric in
             HomeAnswerRow(
                 title: metric.categoryName,
-                value: "\(currency(metric.totalSpent)) (\(percent(metric.percentOfTotal)))"
+                value: "\(currency(metric.totalSpent)) (\(percent(metric.percentOfTotal)))",
+                sourceID: categories.first(where: { $0.id == metric.categoryID })?.id,
+                objectType: .category,
+                amount: metric.totalSpent
             )
         }
 

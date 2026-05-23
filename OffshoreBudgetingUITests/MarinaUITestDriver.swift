@@ -186,10 +186,6 @@ struct MarinaUITestDriver {
         titles(forIdentifierPrefix: "marina.clarificationChip.")
     }
 
-    func foundationModelToggle() -> XCUIElement {
-        app.buttons["marina.foundationModelToggle"].firstMatch
-    }
-
     private func promptField() -> XCUIElement {
         let identified = app.textFields["marina.promptField"].firstMatch
         if identified.exists { return identified }
@@ -205,10 +201,15 @@ struct MarinaUITestDriver {
         let primaryValue = app.descendants(matching: .any)["marina.answer.\(preferredIndex).primaryValue"].firstMatch
         let narrative = app.descendants(matching: .any)["marina.answer.\(preferredIndex).narrative"].firstMatch
         let rows = boundedAnswerRows(answerIndex: preferredIndex)
+        let attachmentRows = boundedAttachmentRows(answerIndex: preferredIndex)
+        let visibleStaticTexts = visibleStaticTextLabels(in: container)
         let rowTexts = rows.flatMap { row in
             [row.title, row.value].compactMap { $0 }
         }
-        let attachmentText = cardSummaryText()
+        let attachmentRowTexts = attachmentRows.flatMap { row in
+            [row.title, row.value].compactMap { $0 }
+        }
+        let attachmentText = attachmentText(in: container, answerIndex: preferredIndex)
         let containerText = [
             container.exists ? container.label : nil,
             container.exists ? container.value as? String : nil
@@ -220,21 +221,41 @@ struct MarinaUITestDriver {
             primaryValue.exists ? primaryValue.label : nil,
             narrative.exists ? narrative.label : nil
         ]
-        .compactMap { $0 } + rowTexts + attachmentText + containerText
+        .compactMap { $0 } + rowTexts + attachmentRowTexts + attachmentText + visibleStaticTexts + containerText
         let text = deduped(parts).joined(separator: "\n")
+        let inferredRowTitles = inferredRowTitles(
+            from: visibleStaticTexts,
+            title: title.exists ? title.label : nil,
+            primaryValue: primaryValue.exists ? primaryValue.label : nil,
+            narrative: narrative.exists ? narrative.label : nil
+        )
 
         return MarinaVisibleAnswer(
             title: title.exists ? title.label : nil,
             value: primaryValue.exists ? primaryValue.label : "",
             label: text,
             text: text,
-            rowTitles: rows.map { $0.title },
-            rowValues: rows.compactMap { $0.value }
+            rowTitles: rows.map { $0.title } + attachmentRows.map { $0.title } + inferredRowTitles,
+            rowValues: rows.compactMap { $0.value } + attachmentRows.compactMap { $0.value }
         )
     }
 
-    private func cardSummaryText() -> [String] {
-        elementText(app.descendants(matching: .any)["marina.cardSummary"].firstMatch)
+    private func attachmentText(in container: XCUIElement, answerIndex: Int) -> [String] {
+        let identifiers = [
+            "marina.answer.\(answerIndex).attachmentText",
+            "marina.cardSummary",
+            "marina.entitySummary",
+            "marina.rowList",
+            "marina.metricSummary",
+            "marina.comparisonSummary",
+            "marina.breakdownList",
+            "marina.trendChart",
+            "marina.formulaContract",
+            "marina.genericSummary"
+        ]
+        return deduped(identifiers.flatMap { identifier in
+            elementText(scopedElement(identifier, in: container, fallbackToGlobal: false))
+        })
     }
 
     private func elementText(_ element: XCUIElement) -> [String] {
@@ -245,6 +266,21 @@ struct MarinaUITestDriver {
         ]
             .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { $0.isEmpty == false }
+    }
+
+    private func scopedElement(
+        _ identifier: String,
+        in container: XCUIElement,
+        fallbackToGlobal: Bool = true
+    ) -> XCUIElement {
+        if container.exists {
+            let scoped = container.descendants(matching: .any)[identifier].firstMatch
+            if scoped.exists { return scoped }
+        }
+        guard fallbackToGlobal else {
+            return app.descendants(matching: .any)["__missing__\(identifier)"].firstMatch
+        }
+        return app.descendants(matching: .any)[identifier].firstMatch
     }
 
     private func visibleAnswer(preferredIndex: Int, requiredText: [String]) -> MarinaVisibleAnswer {
@@ -316,6 +352,92 @@ struct MarinaUITestDriver {
         return rows
     }
 
+    private func boundedAttachmentRows(answerIndex: Int, limit: Int = 16) -> [(title: String, value: String?)] {
+        let prefixes = [
+            "marina.answer.\(answerIndex).attachment",
+            "marina.answer.\(answerIndex).metricSummary",
+            "marina.answer.\(answerIndex).comparisonSummary",
+            "marina.answer.\(answerIndex).breakdownList",
+            "marina.answer.\(answerIndex).formulaContract",
+            "marina.answer.\(answerIndex).genericSummary"
+        ]
+        return prefixes.flatMap { prefix in
+            boundedAttachmentRows(prefix: prefix, limit: limit)
+        }
+    }
+
+    private func boundedAttachmentRows(
+        prefix: String,
+        limit: Int
+    ) -> [(title: String, value: String?)] {
+        var rows: [(title: String, value: String?)] = []
+        for rowIndex in 0..<limit {
+            let title = app.descendants(matching: .any)["\(prefix).row.\(rowIndex).title"].firstMatch
+            let value = app.descendants(matching: .any)["\(prefix).row.\(rowIndex).value"].firstMatch
+            let titleExists = title.exists
+            let valueExists = value.exists
+            if titleExists {
+                rows.append((title.label, valueExists ? value.label : nil))
+            } else if valueExists {
+                rows.append((value.label, nil))
+            }
+            if titleExists == false, valueExists == false, rows.isEmpty == false {
+                break
+            }
+        }
+        return rows
+    }
+
+    private func visibleStaticTextLabels(in container: XCUIElement) -> [String] {
+        guard container.exists else { return [] }
+        let frame = container.frame
+        guard frame.isEmpty == false else { return [] }
+
+        return deduped(
+            app.staticTexts.allElementsBoundByIndex.compactMap { element in
+                guard element.exists else { return nil }
+                let elementFrame = element.frame
+                guard elementFrame.isEmpty == false else { return nil }
+                let midpoint = CGPoint(x: elementFrame.midX, y: elementFrame.midY)
+                guard frame.contains(midpoint) else { return nil }
+                let label = element.label.trimmingCharacters(in: .whitespacesAndNewlines)
+                return label.isEmpty ? nil : label
+            }
+        )
+    }
+
+    private func inferredRowTitles(
+        from labels: [String],
+        title: String?,
+        primaryValue: String?,
+        narrative: String?
+    ) -> [String] {
+        let excluded = Set([title, primaryValue, narrative].compactMap {
+            $0?.trimmingCharacters(in: .whitespacesAndNewlines)
+        })
+
+        return deduped(labels).filter { label in
+            let trimmed = label.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard trimmed.isEmpty == false, excluded.contains(trimmed) == false else { return false }
+            guard trimmed.count <= 80 else { return false }
+            guard looksLikeValueText(trimmed) == false else { return false }
+            return true
+        }
+    }
+
+    private func looksLikeValueText(_ value: String) -> Bool {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.contains("$") || trimmed.contains("%") { return true }
+        if Double(trimmed.replacingOccurrences(of: ",", with: "")) != nil { return true }
+        if trimmed.range(of: #"^[A-Z][a-z]{2,8}\s+\d{1,2},?\s+\d{4}$"#, options: .regularExpression) != nil {
+            return true
+        }
+        if trimmed.range(of: #"^[A-Z][a-z]{2,8}\s+\d{4}$"#, options: .regularExpression) != nil {
+            return true
+        }
+        return false
+    }
+
     private func deduped(_ values: [String]) -> [String] {
         var seen: Set<String> = []
         var result: [String] = []
@@ -364,7 +486,7 @@ struct MarinaUITestDriver {
             if traces.count > previousTraceCount {
                 let newTraces = traces.dropFirst(previousTraceCount)
                 if let matching = newTraces.last(where: {
-                    $0.originalPrompt == prompt || $0.originalPrompt.localizedCaseInsensitiveContains(prompt)
+                    promptMatches(tracePrompt: $0.originalPrompt, submittedPrompt: prompt)
                 }) {
                     return matching
                 }
@@ -376,7 +498,7 @@ struct MarinaUITestDriver {
         let traceElement = app.staticTexts["marina.trace.latest"].firstMatch
         if traceElement.exists {
             let fallback = MarinaTraceSnapshot(accessibilityValue: traceElement.value as? String ?? "")
-            if fallback.originalPrompt == prompt || fallback.originalPrompt.localizedCaseInsensitiveContains(prompt) {
+            if promptMatches(tracePrompt: fallback.originalPrompt, submittedPrompt: prompt) {
                 return fallback
             }
         }
@@ -457,7 +579,7 @@ struct MarinaUITestDriver {
             }
             return MarinaSurfaceResult(passed: false, category: .traceUnavailable, reason: "No Marina trace was exported or surfaced.")
         }
-        if trace.originalPrompt != prompt {
+        if promptMatches(tracePrompt: trace.originalPrompt, submittedPrompt: prompt) == false {
             if allowCommandOrUnsupportedTrace,
                expectation?.outcome == .typedUnsupported,
                (looksUnsupported || trace.originalPrompt.isEmpty) {
@@ -561,6 +683,16 @@ struct MarinaUITestDriver {
             return MarinaSurfaceResult(passed: false, category: .responseBridgeMismatch, reason: "Visible unsupported-style text did not match message response type.")
         }
         return MarinaSurfaceResult(passed: true, category: .pass, reason: "Surface response and trace were captured.")
+    }
+
+    private func promptMatches(tracePrompt: String, submittedPrompt: String) -> Bool {
+        let trace = tracePrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        let submitted = submittedPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trace.isEmpty == false, submitted.isEmpty == false else {
+            return trace == submitted
+        }
+        return trace.localizedCaseInsensitiveCompare(submitted) == .orderedSame
+            || trace.localizedCaseInsensitiveContains(submitted)
     }
 
     private func diagnostics(from trace: MarinaTraceSnapshot?) -> MarinaSurfaceDiagnostics? {

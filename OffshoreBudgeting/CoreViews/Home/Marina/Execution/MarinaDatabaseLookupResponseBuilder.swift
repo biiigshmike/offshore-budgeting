@@ -13,7 +13,7 @@ struct MarinaDatabaseLookupResponseBuilder {
                 title: "Which \(request.searchText) do you mean?",
                 subtitle: "I found more than one kind of Offshore data with that name. Pick the object type and I can show the details.",
                 rows: response.ambiguityChoices.map { result in
-                    HomeAnswerRow(title: result.title, value: compactValue(for: result))
+                    row(from: result)
                 }
             )
         }
@@ -43,7 +43,7 @@ struct MarinaDatabaseLookupResponseBuilder {
             title: listTitle(for: request),
             subtitle: nil,
             rows: response.results.map { result in
-                HomeAnswerRow(title: result.title, value: compactValue(for: result))
+                row(from: result)
             }
         )
     }
@@ -60,7 +60,27 @@ struct MarinaDatabaseLookupResponseBuilder {
             title: title(for: result, request: request),
             subtitle: result.subtitle,
             primaryValue: primaryValue(for: result, requestedDetail: request.requestedDetail),
-            rows: result.detailRows.map { HomeAnswerRow(title: $0.label, value: $0.value) }
+            rows: result.detailRows.map {
+                HomeAnswerRow(
+                    title: $0.label,
+                    value: $0.value,
+                    sourceID: result.id,
+                    objectType: result.objectType,
+                    amount: result.amount,
+                    date: result.date
+                )
+            }
+        )
+    }
+
+    private func row(from result: MarinaDatabaseLookupResult) -> HomeAnswerRow {
+        HomeAnswerRow(
+            title: result.title,
+            value: compactValue(for: result),
+            sourceID: result.id,
+            objectType: result.objectType,
+            amount: result.amount,
+            date: result.date
         )
     }
 

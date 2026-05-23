@@ -203,6 +203,24 @@ struct MarinaPanelView: View {
             endDate: range.end
         )
     }
+
+    private func visualAttachmentAnswer(from answer: HomeAnswer) -> HomeAnswer {
+        MarinaVisualAttachmentBuilder().attachingVisualAttachmentIfNeeded(
+            to: answer,
+            workspace: workspace,
+            cards: cards,
+            allocationAccounts: allocationAccounts,
+            savingsAccounts: savingsAccounts,
+            categories: categories,
+            presets: presets,
+            variableExpenses: variableExpenses,
+            plannedExpenses: plannedExpenses,
+            savingsEntries: savingsEntries,
+            dateRange: cardSummaryDateRange(),
+            excludeFuturePlannedExpenses: cardSummaryExcludeFuturePlannedExpenses,
+            excludeFutureVariableExpenses: cardSummaryExcludeFutureVariableExpenses
+        )
+    }
     
     init(
         workspace: Workspace,
@@ -1335,7 +1353,7 @@ struct MarinaPanelView: View {
                     .font(.subheadline.weight(.semibold))
                     .accessibilityIdentifier("marina.answer.\(index).title")
                 
-                if let primaryValue = answer.primaryValue {
+                if shouldRenderPrimaryValue(for: answer), let primaryValue = answer.primaryValue {
                     Text(primaryValue)
                         .font(.title2.weight(.bold))
                         .accessibilityIdentifier("marina.answer.\(index).primaryValue")
@@ -1349,6 +1367,77 @@ struct MarinaPanelView: View {
                     )
                     .padding(.top, 2)
                 }
+
+                if let summary = entitySummaryAttachment(for: answer) {
+                    MarinaEntitySummaryAttachmentView(
+                        workspace: workspace,
+                        summary: summary,
+                        allocationAccount: summary.sourceID.flatMap { id in
+                            allocationAccounts.first(where: { $0.id == id })
+                        },
+                        savingsAccount: summary.sourceID.flatMap { id in
+                            savingsAccounts.first(where: { $0.id == id })
+                        }
+                    )
+                    .padding(.top, 2)
+                }
+
+                if let rowList = rowListAttachment(for: answer) {
+                    MarinaRowListAttachmentView(
+                        model: rowList,
+                        variableExpenses: variableExpenses,
+                        plannedExpenses: plannedExpenses,
+                        savingsEntries: savingsEntries
+                    )
+                    .padding(.top, 2)
+                }
+
+                if let metric = metricSummaryAttachment(for: answer) {
+                    MarinaMetricSummaryAttachmentView(
+                        model: metric,
+                        accessibilityPrefix: "marina.answer.\(index).metricSummary"
+                    )
+                        .padding(.top, 2)
+                }
+
+                if let comparison = comparisonSummaryAttachment(for: answer) {
+                    MarinaComparisonSummaryAttachmentView(
+                        model: comparison,
+                        accessibilityPrefix: "marina.answer.\(index).comparisonSummary"
+                    )
+                        .padding(.top, 2)
+                }
+
+                if let breakdown = breakdownListAttachment(for: answer) {
+                    MarinaBreakdownListAttachmentView(
+                        model: breakdown,
+                        accessibilityPrefix: "marina.answer.\(index).breakdownList"
+                    )
+                        .padding(.top, 2)
+                }
+
+                if let trend = trendChartAttachment(for: answer) {
+                    MarinaTrendChartAttachmentView(model: trend)
+                        .padding(.top, 2)
+                }
+
+                if let contract = formulaContractAttachment(for: answer) {
+                    MarinaFormulaContractAttachmentView(
+                        model: contract,
+                        accessibilityPrefix: "marina.answer.\(index).formulaContract"
+                    )
+                        .padding(.top, 2)
+                }
+
+                if let generic = genericSummaryAttachment(for: answer) {
+                    MarinaGenericSummaryAttachmentView(
+                        model: generic,
+                        accessibilityPrefix: "marina.answer.\(index).genericSummary"
+                    )
+                        .padding(.top, 2)
+                }
+
+                uiTestAttachmentProbe(for: answer, index: index)
                 
                 if let narrative = subtitlePresentation.narrative {
                     Text(narrative)
@@ -1420,11 +1509,131 @@ struct MarinaPanelView: View {
         return summary
     }
 
-    private func shouldRenderRowsVisually(for answer: HomeAnswer) -> Bool {
-        if cardSummaryAttachment(for: answer) != nil {
-            return false
+    private func entitySummaryAttachment(for answer: HomeAnswer) -> MarinaEntitySummaryPresentationModel? {
+        guard case let .entitySummary(summary)? = answer.attachment else { return nil }
+        return summary
+    }
+
+    private func rowListAttachment(for answer: HomeAnswer) -> MarinaRowListPresentationModel? {
+        guard case let .rowList(rowList)? = answer.attachment else { return nil }
+        return rowList
+    }
+
+    private func metricSummaryAttachment(for answer: HomeAnswer) -> MarinaMetricSummaryPresentationModel? {
+        guard case let .metricSummary(summary)? = answer.attachment else { return nil }
+        return summary
+    }
+
+    private func comparisonSummaryAttachment(for answer: HomeAnswer) -> MarinaComparisonSummaryPresentationModel? {
+        guard case let .comparisonSummary(summary)? = answer.attachment else { return nil }
+        return summary
+    }
+
+    private func breakdownListAttachment(for answer: HomeAnswer) -> MarinaBreakdownListPresentationModel? {
+        guard case let .breakdownList(list)? = answer.attachment else { return nil }
+        return list
+    }
+
+    private func trendChartAttachment(for answer: HomeAnswer) -> MarinaTrendChartPresentationModel? {
+        guard case let .trendChart(chart)? = answer.attachment else { return nil }
+        return chart
+    }
+
+    private func formulaContractAttachment(for answer: HomeAnswer) -> MarinaFormulaContractPresentationModel? {
+        guard case let .formulaContract(contract)? = answer.attachment else { return nil }
+        return contract
+    }
+
+    private func genericSummaryAttachment(for answer: HomeAnswer) -> MarinaGenericSummaryPresentationModel? {
+        guard case let .genericSummary(summary)? = answer.attachment else { return nil }
+        return summary
+    }
+
+    @ViewBuilder
+    private func uiTestAttachmentProbe(for answer: HomeAnswer, index: Int) -> some View {
+        #if DEBUG
+        if UITestSupport.shouldRunMarinaHarness {
+            let rows = attachmentProbeRows(for: answer)
+            if rows.isEmpty == false {
+                VStack(spacing: 0) {
+                    Text(rows.map { "\($0.title): \($0.value)" }.joined(separator: "\n"))
+                        .accessibilityIdentifier("marina.answer.\(index).attachmentText")
+
+                    ForEach(Array(rows.enumerated()), id: \.offset) { rowIndex, row in
+                        Text(row.title)
+                            .accessibilityIdentifier("marina.answer.\(index).attachment.row.\(rowIndex).title")
+                        Text(row.value)
+                            .accessibilityIdentifier("marina.answer.\(index).attachment.row.\(rowIndex).value")
+                    }
+                }
+                .frame(width: 1, height: 1)
+                .opacity(0.01)
+            }
         }
-        return answer.rows.isEmpty == false
+        #endif
+    }
+
+    private func attachmentProbeRows(for answer: HomeAnswer) -> [(title: String, value: String)] {
+        guard let attachment = answer.attachment else { return [] }
+        switch attachment {
+        case let .cardSummary(summary):
+            return [
+                ("Card", summary.title),
+                ("Period", summary.dateRangeSubtitle),
+                ("Total", CurrencyFormatter.string(from: summary.total)),
+                ("Planned", CurrencyFormatter.string(from: summary.plannedTotal)),
+                ("Variable", CurrencyFormatter.string(from: summary.variableTotal))
+            ]
+        case let .entitySummary(summary):
+            return [
+                ("Entity", summary.title),
+                ("Type", summary.subtitle)
+            ] + summary.rows.map { ($0.title, $0.value) }
+        case let .rowList(rowList):
+            return rowList.rows.map { ($0.title, $0.value) }
+        case let .metricSummary(summary):
+            return summary.rows.map { ($0.title, $0.value) }
+        case let .comparisonSummary(summary):
+            var rows: [(title: String, value: String)] = [
+                (summary.primaryLabel, summary.primaryValue),
+                (summary.comparisonLabel, summary.comparisonValue)
+            ]
+            if let deltaLabel = summary.deltaLabel, let deltaValue = summary.deltaValue {
+                rows.append((deltaLabel, deltaValue))
+            }
+            rows.append(contentsOf: summary.rows.map { ($0.title, $0.value) })
+            return rows
+        case let .breakdownList(list):
+            return list.rows.map { ($0.title, $0.value) }
+        case let .trendChart(chart):
+            return chart.points.map { ($0.label, $0.renderedValue) }
+        case let .formulaContract(contract):
+            return contract.rows.map { ($0.title, $0.value) }
+        case let .genericSummary(summary):
+            return summary.rows.map { ($0.title, $0.value) }
+        case .inlineCreateForm:
+            return []
+        }
+    }
+
+    private func shouldRenderPrimaryValue(for answer: HomeAnswer) -> Bool {
+        switch answer.attachment {
+        case .some(.metricSummary), .some(.breakdownList), .some(.formulaContract), .some(.genericSummary):
+            return false
+        case .some(.cardSummary), .some(.entitySummary), .some(.rowList), .some(.comparisonSummary), .some(.trendChart), .some(.inlineCreateForm), nil:
+            return true
+        }
+    }
+
+    private func shouldRenderRowsVisually(for answer: HomeAnswer) -> Bool {
+        switch answer.attachment {
+        case .some(.cardSummary), .some(.entitySummary), .some(.metricSummary), .some(.comparisonSummary), .some(.breakdownList), .some(.trendChart), .some(.formulaContract), .some(.genericSummary):
+            return false
+        case let .some(.rowList(rowList)):
+            return rowList.hidesSourceRows == false && answer.rows.isEmpty == false
+        case .some(.inlineCreateForm), nil:
+            return answer.rows.isEmpty == false
+        }
     }
 
     private func answerStateAccessibilityLabel(for answer: HomeAnswer) -> String {
@@ -1453,6 +1662,9 @@ struct MarinaPanelView: View {
         if let narrative = subtitlePresentation.narrative {
             parts.append(narrative)
         }
+        if let attachment = answer.attachment {
+            parts.append(attachmentAccessibilityValue(attachment))
+        }
         for row in answer.rows {
             parts.append("\(row.title): \(row.value)")
         }
@@ -1461,6 +1673,76 @@ struct MarinaPanelView: View {
         }
         parts.append("kind=\(answer.kind.rawValue)")
         return parts.joined(separator: "\n")
+    }
+
+    private func attachmentAccessibilityValue(_ attachment: MarinaAttachment) -> String {
+        switch attachment {
+        case .inlineCreateForm:
+            return "Inline create form"
+        case let .cardSummary(summary):
+            return [
+                "\(summary.title) card summary",
+                summary.dateRangeSubtitle,
+                "Total \(CurrencyFormatter.string(from: summary.total))",
+                "Planned \(CurrencyFormatter.string(from: summary.plannedTotal))",
+                "Variable \(CurrencyFormatter.string(from: summary.variableTotal))"
+            ].joined(separator: ", ")
+        case let .entitySummary(summary):
+            var parts = ["\(summary.title) \(summary.subtitle)"]
+            if let primaryValue = summary.primaryValue {
+                parts.append(primaryValue)
+            }
+            parts.append(contentsOf: summary.rows.map { "\($0.title): \($0.value)" })
+            return parts.joined(separator: ", ")
+        case let .rowList(rowList):
+            return rowList.rows.map { "\($0.title): \($0.value)" }.joined(separator: ", ")
+        case let .metricSummary(summary):
+            return polishedRowsAccessibility(
+                title: summary.title,
+                primaryValue: summary.primaryValue,
+                rows: summary.rows
+            )
+        case let .comparisonSummary(summary):
+            return [
+                summary.title,
+                "\(summary.primaryLabel): \(summary.primaryValue)",
+                "\(summary.comparisonLabel): \(summary.comparisonValue)",
+                summary.deltaLabel.flatMap { label in summary.deltaValue.map { "\(label): \($0)" } },
+                polishedRowsAccessibility(rows: summary.rows)
+            ].compactMap { $0 }.joined(separator: ", ")
+        case let .breakdownList(list):
+            return polishedRowsAccessibility(
+                title: list.title,
+                primaryValue: list.primaryValue,
+                rows: list.rows
+            )
+        case let .trendChart(chart):
+            return chart.points.map { "\($0.label): \($0.renderedValue)" }.joined(separator: ", ")
+        case let .formulaContract(contract):
+            return polishedRowsAccessibility(
+                title: contract.title,
+                primaryValue: contract.status,
+                rows: contract.rows
+            )
+        case let .genericSummary(summary):
+            return polishedRowsAccessibility(
+                title: summary.title,
+                primaryValue: summary.primaryValue,
+                rows: summary.rows
+            )
+        }
+    }
+
+    private func polishedRowsAccessibility(
+        title: String? = nil,
+        primaryValue: String? = nil,
+        rows: [MarinaDisplayRow]
+    ) -> String {
+        var parts: [String] = []
+        if let title { parts.append(title) }
+        if let primaryValue { parts.append(primaryValue) }
+        parts.append(contentsOf: rows.map { "\($0.title): \($0.value)" })
+        return parts.joined(separator: ", ")
     }
 
     private func suggestionAccessibilityIdentifier(
@@ -1564,6 +1846,7 @@ struct MarinaPanelView: View {
             userPrompt: userPrompt
         )
         let explainedAnswer = applyResolutionExplanation(explanation, to: titledAnswer)
+        let presentationAnswer = visualAttachmentAnswer(from: explainedAnswer)
         
         let executedPlanForMemory = executedPlan ?? HomeQueryPlan(
             metric: query.intent.metric,
@@ -1575,14 +1858,14 @@ struct MarinaPanelView: View {
             periodUnit: query.periodUnit
         )
         presentMarinaAnswer(
-            deterministicAnswer: explainedAnswer,
-            deterministicRecoveryAnswer: explainedAnswer,
+            deterministicAnswer: presentationAnswer,
+            deterministicRecoveryAnswer: presentationAnswer,
             rawPrompt: userPrompt ?? "",
             source: source,
             homeQueryPlan: executedPlanForMemory,
-            surfaceKind: explainedAnswer.primaryValue == nil && explainedAnswer.rows.isEmpty ? .noData : .answer,
+            surfaceKind: presentationAnswer.primaryValue == nil && presentationAnswer.rows.isEmpty ? .noData : .answer,
             groundingSummary: executedPlanForMemory.traceSummary,
-            followUpSuggestions: followUpSuggestions(for: explainedAnswer, query: query)
+            followUpSuggestions: followUpSuggestions(for: presentationAnswer, query: query)
         ) { presentedAnswer in
             updateSessionContext(after: executedPlanForMemory)
             rememberAnswerContext(
@@ -1623,13 +1906,7 @@ struct MarinaPanelView: View {
                 now: marinaRuntimeSettings.now
             )
         } ?? normalizedAnswer
-        let presentationAnswer = MarinaCardSummaryAttachmentBuilder().attachingCardSummaryIfNeeded(
-            to: titledAnswer,
-            cards: cards,
-            dateRange: cardSummaryDateRange(),
-            excludeFuturePlannedExpenses: cardSummaryExcludeFuturePlannedExpenses,
-            excludeFutureVariableExpenses: cardSummaryExcludeFutureVariableExpenses
-        )
+        let presentationAnswer = visualAttachmentAnswer(from: titledAnswer)
         let deterministicFollowUps = followUpSuggestions(for: presentationAnswer, query: query)
         let surfaced = await presentMarinaAnswer(
             deterministicAnswer: presentationAnswer,

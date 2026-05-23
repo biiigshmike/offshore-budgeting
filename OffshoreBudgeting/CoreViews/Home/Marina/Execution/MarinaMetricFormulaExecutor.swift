@@ -89,7 +89,7 @@ struct MarinaMetricFormulaExecutor {
                 row("Rest of month", "\(shortDate(summary.rangeStart))-\(shortDate(summary.rangeEnd))"),
                 row("Days left", "\(summary.daysLeftInPeriod)"),
                 row("Per-day reference", currency(summary.safeToSpendToday)),
-                row("Formula", "income received + expected income - owned expenses - remaining planned expenses + savings adjustments")
+                row("Formula", "income received + expected income - owned expenses - remaining planned expenses + savings adjustments", role: .trace)
             ],
             traceSummary: "metricFormula=\(contract.id.rawValue),remaining=\(summary.periodRemainingRoom)"
         )
@@ -892,9 +892,10 @@ struct MarinaMetricFormulaExecutor {
         amount: Double? = nil,
         date: Date? = nil,
         objectType: MarinaLookupObjectType? = nil,
-        sourceID: UUID? = nil
+        sourceID: UUID? = nil,
+        role: HomeAnswerRowRole = .result
     ) -> MarinaWorkspaceAggregationCard.Row {
-        MarinaWorkspaceAggregationCard.Row(label: label, value: value, amount: amount, date: date, objectType: objectType, sourceID: sourceID, sortValue: amount)
+        MarinaWorkspaceAggregationCard.Row(label: label, value: value, amount: amount, date: date, objectType: objectType, sourceID: sourceID, sortValue: amount, role: role)
     }
 
     private func rangeLabel(_ range: HomeQueryDateRange) -> String {
@@ -949,11 +950,11 @@ struct MarinaMetricFormulaExecutor {
             subtitle: contract.formulaName,
             primaryValue: "setup required",
             rows: [
-                HomeAnswerRow(title: "Metric contract", value: contract.id.rawValue),
-                HomeAnswerRow(title: "Amount basis", value: contract.amountBasisDescription),
-                HomeAnswerRow(title: "Source rows", value: contract.sourceModels.joined(separator: ", ")),
-                HomeAnswerRow(title: "Required setup", value: message),
-                HomeAnswerRow(title: "Refused substitution", value: contract.neverSilentlySubstituteRules.first ?? "No unsafe substitute is allowed.")
+                HomeAnswerRow(title: "Metric contract", value: contract.id.rawValue, role: .contract),
+                HomeAnswerRow(title: "Amount basis", value: contract.amountBasisDescription, role: .contract),
+                HomeAnswerRow(title: "Source rows", value: contract.sourceModels.joined(separator: ", "), role: .contract),
+                HomeAnswerRow(title: "Required setup", value: message, role: .contract),
+                HomeAnswerRow(title: "Refused substitution", value: contract.neverSilentlySubstituteRules.first ?? "No unsafe substitute is allowed.", role: .contract)
             ]
         )
         let unsupported = MarinaTypedUnsupportedResponse(

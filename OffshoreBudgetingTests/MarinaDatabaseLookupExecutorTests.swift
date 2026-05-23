@@ -285,6 +285,89 @@ struct MarinaDatabaseLookupExecutorTests {
         #expect(answer.rows.contains { $0.title == "Card" && $0.value == "Apple Card" })
     }
 
+    @Test func responseBuilder_singleResultRowsPreserveSourceMetadata() throws {
+        let resultID = UUID()
+        let resultDate = date(2026, 5, 12)
+        let response = MarinaDatabaseLookupResponse(
+            request: request(searchText: "Coffee", objectTypes: [.variableExpense]),
+            results: [
+                MarinaDatabaseLookupResult(
+                    id: resultID,
+                    objectType: .variableExpense,
+                    title: "Coffee",
+                    subtitle: "Apple Card",
+                    date: resultDate,
+                    amount: 6.5,
+                    cardName: "Apple Card",
+                    categoryName: nil,
+                    accountName: nil,
+                    workspaceName: nil,
+                    detailRows: [
+                        .init(label: "Type", value: "Variable expense"),
+                        .init(label: "Amount", value: "$6.50")
+                    ]
+                )
+            ]
+        )
+
+        let answer = MarinaDatabaseLookupResponseBuilder().responseCompatibleAnswer(from: response)
+
+        #expect(answer.rows.allSatisfy { $0.sourceID == resultID })
+        #expect(answer.rows.allSatisfy { $0.objectType == .variableExpense })
+        #expect(answer.rows.allSatisfy { $0.amount == 6.5 })
+        #expect(answer.rows.allSatisfy { $0.date == resultDate })
+    }
+
+    @Test func responseBuilder_listAndAmbiguityRowsPreserveSourceMetadata() throws {
+        let categoryID = UUID()
+        let expenseID = UUID()
+        let categoryResult = MarinaDatabaseLookupResult(
+            id: categoryID,
+            objectType: .category,
+            title: "Groceries",
+            subtitle: "Category",
+            date: nil,
+            amount: nil,
+            cardName: nil,
+            categoryName: nil,
+            accountName: nil,
+            workspaceName: nil,
+            detailRows: []
+        )
+        let expenseResult = MarinaDatabaseLookupResult(
+            id: expenseID,
+            objectType: .variableExpense,
+            title: "Groceries",
+            subtitle: "Apple Card",
+            date: date(2026, 5, 12),
+            amount: 42,
+            cardName: "Apple Card",
+            categoryName: "Groceries",
+            accountName: nil,
+            workspaceName: nil,
+            detailRows: []
+        )
+
+        let listAnswer = MarinaDatabaseLookupResponseBuilder().responseCompatibleAnswer(
+            from: MarinaDatabaseLookupResponse(
+                request: request(searchText: "Groceries", objectTypes: [.category, .variableExpense]),
+                results: [categoryResult, expenseResult]
+            )
+        )
+        let clarificationAnswer = MarinaDatabaseLookupResponseBuilder().responseCompatibleAnswer(
+            from: MarinaDatabaseLookupResponse(
+                request: request(searchText: "Groceries", objectTypes: [.category, .variableExpense]),
+                results: [],
+                ambiguityChoices: [categoryResult, expenseResult]
+            )
+        )
+
+        #expect(listAnswer.rows.map(\.sourceID) == [categoryID, expenseID])
+        #expect(listAnswer.rows.map(\.objectType) == [.category, .variableExpense])
+        #expect(clarificationAnswer.rows.map(\.sourceID) == [categoryID, expenseID])
+        #expect(clarificationAnswer.rows.map(\.objectType) == [.category, .variableExpense])
+    }
+
     @Test func ambiguousLookup_acrossObjectTypesAsksForClarification() throws {
         let fixture = try makeLookupFixture()
         let response = MarinaDatabaseLookupExecutor().execute(

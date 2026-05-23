@@ -220,6 +220,434 @@ struct MarinaModelsTests {
         #expect(decorated.rows.contains { $0.title == "Type" && $0.value == "Card" })
     }
 
+    @Test func visualAttachmentBuilder_keepsCardSummaryForCardEntityMetadata() throws {
+        let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
+        let card = Card(
+            name: "Apple Card",
+            theme: CardThemeOption.ruby.rawValue,
+            effect: CardEffectOption.plastic.rawValue,
+            workspace: workspace
+        )
+        let variable = VariableExpense(
+            descriptionText: "Groceries",
+            amount: 50,
+            transactionDate: date(2026, 5, 10),
+            workspace: workspace,
+            card: card
+        )
+        card.variableExpenses = [variable]
+
+        let answer = HomeAnswer(
+            queryID: UUID(),
+            kind: .message,
+            title: "I found Apple Card.",
+            rows: [
+                HomeAnswerRow(title: "Type", value: "Card", sourceID: card.id, objectType: .card)
+            ]
+        )
+
+        let decorated = visualAttachmentAnswer(
+            answer,
+            workspace: workspace,
+            cards: [card],
+            variableExpenses: [variable]
+        )
+
+        guard case let .cardSummary(summary)? = decorated.attachment else {
+            Issue.record("Expected card summary attachment.")
+            return
+        }
+
+        #expect(summary.cardID == card.id)
+        #expect(abs(summary.variableTotal - 50) < 0.001)
+    }
+
+    @Test func visualAttachmentBuilder_attachesEntitySummariesForSupportedLookups() throws {
+        let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
+        let category = Category(name: "Groceries", hexColor: "#10B981", workspace: workspace)
+        let card = Card(name: "Debit Card", workspace: workspace)
+        let preset = Preset(
+            title: "Rent",
+            plannedAmount: 1_500,
+            workspace: workspace,
+            defaultCard: card,
+            defaultCategory: category
+        )
+        let variable = VariableExpense(
+            descriptionText: "Market",
+            amount: 42,
+            transactionDate: date(2026, 5, 2),
+            workspace: workspace,
+            card: card,
+            category: category
+        )
+        let planned = PlannedExpense(
+            title: "Rent",
+            plannedAmount: 1_500,
+            expenseDate: date(2026, 5, 1),
+            workspace: workspace,
+            card: card,
+            category: category
+        )
+
+        let categoryAnswer = HomeAnswer(
+            queryID: UUID(),
+            kind: .message,
+            title: "I found Groceries.",
+            rows: [
+                HomeAnswerRow(title: "Type", value: "Category", sourceID: category.id, objectType: .category)
+            ]
+        )
+        let presetAnswer = HomeAnswer(
+            queryID: UUID(),
+            kind: .message,
+            title: "I found Rent.",
+            rows: [
+                HomeAnswerRow(title: "Type", value: "Preset", sourceID: preset.id, objectType: .preset)
+            ]
+        )
+        let workspaceAnswer = HomeAnswer(
+            queryID: UUID(),
+            kind: .message,
+            title: "I found Personal.",
+            rows: [
+                HomeAnswerRow(title: "Type", value: "Workspace", sourceID: workspace.id, objectType: .workspace)
+            ]
+        )
+
+        let categoryDecorated = visualAttachmentAnswer(
+            categoryAnswer,
+            workspace: workspace,
+            cards: [card],
+            categories: [category],
+            presets: [preset],
+            variableExpenses: [variable],
+            plannedExpenses: [planned]
+        )
+        let presetDecorated = visualAttachmentAnswer(
+            presetAnswer,
+            workspace: workspace,
+            cards: [card],
+            categories: [category],
+            presets: [preset]
+        )
+        let workspaceDecorated = visualAttachmentAnswer(
+            workspaceAnswer,
+            workspace: workspace,
+            cards: [card],
+            categories: [category],
+            presets: [preset]
+        )
+
+        guard case let .entitySummary(categorySummary)? = categoryDecorated.attachment,
+              case let .entitySummary(presetSummary)? = presetDecorated.attachment,
+              case let .entitySummary(workspaceSummary)? = workspaceDecorated.attachment else {
+            Issue.record("Expected entity summary attachments.")
+            return
+        }
+
+        #expect(categorySummary.objectType == .category)
+        #expect(categorySummary.title == "Groceries")
+        #expect(categorySummary.rows.contains { $0.title == "Variable rows" && $0.value == "1" })
+        #expect(presetSummary.objectType == .preset)
+        #expect(presetSummary.primaryValue == CurrencyFormatter.string(from: 1_500))
+        #expect(workspaceSummary.objectType == .workspace)
+        #expect(workspaceSummary.rows.contains { $0.title == "Cards" && $0.value == "1" })
+    }
+
+    @Test func visualAttachmentBuilder_attachesAccountAndLedgerSummaries() throws {
+        let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
+        let reconciliation = AllocationAccount(
+            name: "Roommate",
+            hexColor: "#6366F1",
+            workspace: workspace
+        )
+        let settlement = AllocationSettlement(
+            date: date(2026, 5, 3),
+            note: "Paid back",
+            amount: -25,
+            workspace: workspace,
+            account: reconciliation
+        )
+        reconciliation.settlements = [settlement]
+        let savings = SavingsAccount(
+            name: "Emergency Fund",
+            total: 1_200,
+            workspace: workspace
+        )
+        let entry = SavingsLedgerEntry(
+            date: date(2026, 5, 4),
+            amount: 25,
+            note: "Manual save",
+            kindRaw: SavingsLedgerEntryKind.manualAdjustment.rawValue,
+            workspace: workspace,
+            account: savings
+        )
+        savings.entries = [entry]
+
+        let reconciliationAnswer = HomeAnswer(
+            queryID: UUID(),
+            kind: .message,
+            title: "I found Roommate.",
+            rows: [
+                HomeAnswerRow(title: "Type", value: "Reconciliation account", sourceID: reconciliation.id, objectType: .reconciliationAccount)
+            ]
+        )
+        let savingsAnswer = HomeAnswer(
+            queryID: UUID(),
+            kind: .message,
+            title: "I found Emergency Fund.",
+            rows: [
+                HomeAnswerRow(title: "Type", value: "Savings account", sourceID: savings.id, objectType: .savingsAccount)
+            ]
+        )
+        let reconciliationRowsAnswer = HomeAnswer(
+            queryID: UUID(),
+            kind: .list,
+            title: "Roommate reconciliation rows",
+            rows: [
+                HomeAnswerRow(title: "Paid back", value: "-$25.00", sourceID: settlement.id, objectType: .reconciliationItem, amount: -25, date: settlement.date)
+            ]
+        )
+        let savingsRowsAnswer = HomeAnswer(
+            queryID: UUID(),
+            kind: .list,
+            title: "Savings activity",
+            rows: [
+                HomeAnswerRow(title: "Manual save", value: "$25.00", sourceID: entry.id, objectType: .savingsLedgerEntry, amount: 25, date: entry.date)
+            ]
+        )
+
+        let reconciliationDecorated = visualAttachmentAnswer(
+            reconciliationAnswer,
+            workspace: workspace,
+            allocationAccounts: [reconciliation]
+        )
+        let savingsDecorated = visualAttachmentAnswer(
+            savingsAnswer,
+            workspace: workspace,
+            savingsAccounts: [savings],
+            savingsEntries: [entry]
+        )
+        let reconciliationRowsDecorated = visualAttachmentAnswer(
+            reconciliationRowsAnswer,
+            workspace: workspace,
+            allocationAccounts: [reconciliation]
+        )
+        let savingsRowsDecorated = visualAttachmentAnswer(
+            savingsRowsAnswer,
+            workspace: workspace,
+            savingsAccounts: [savings],
+            savingsEntries: [entry]
+        )
+
+        guard case let .entitySummary(reconciliationSummary)? = reconciliationDecorated.attachment,
+              case let .entitySummary(savingsSummary)? = savingsDecorated.attachment,
+              case let .rowList(reconciliationRows)? = reconciliationRowsDecorated.attachment,
+              case let .rowList(savingsRows)? = savingsRowsDecorated.attachment else {
+            Issue.record("Expected account summaries and ledger row lists.")
+            return
+        }
+
+        #expect(reconciliationSummary.primaryValue == CurrencyFormatter.string(from: -25))
+        #expect(savingsSummary.primaryValue == CurrencyFormatter.string(from: 1_200))
+        #expect(reconciliationRows.family == .reconciliation)
+        #expect(savingsRows.family == .savings)
+    }
+
+    @Test func visualAttachmentBuilder_attachesExpenseRowListAndLeavesMixedRowsUntouched() throws {
+        let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
+        let card = Card(name: "Apple Card", workspace: workspace)
+        let category = Category(name: "Groceries", hexColor: "#10B981", workspace: workspace)
+        let variable = VariableExpense(
+            descriptionText: "Market",
+            amount: 42,
+            transactionDate: date(2026, 5, 2),
+            workspace: workspace,
+            card: card,
+            category: category
+        )
+        let planned = PlannedExpense(
+            title: "Internet",
+            plannedAmount: 80,
+            expenseDate: date(2026, 5, 19),
+            workspace: workspace,
+            card: card,
+            category: category
+        )
+        let expenseRows = HomeAnswer(
+            queryID: UUID(),
+            kind: .list,
+            title: "Apple Card expenses",
+            rows: [
+                HomeAnswerRow(title: "Market", value: "$42.00", sourceID: variable.id, objectType: .variableExpense, amount: 42, date: variable.transactionDate),
+                HomeAnswerRow(title: "Internet", value: "$80.00", sourceID: planned.id, objectType: .plannedExpense, amount: 80, date: planned.expenseDate)
+            ]
+        )
+        let mixedRows = HomeAnswer(
+            queryID: UUID(),
+            kind: .list,
+            title: "Mixed results",
+            rows: [
+                HomeAnswerRow(title: "Market", value: "$42.00", sourceID: variable.id, objectType: .variableExpense, amount: 42, date: variable.transactionDate),
+                HomeAnswerRow(title: "Groceries", value: "Category", sourceID: category.id, objectType: .category)
+            ]
+        )
+
+        let decorated = visualAttachmentAnswer(
+            expenseRows,
+            workspace: workspace,
+            variableExpenses: [variable],
+            plannedExpenses: [planned]
+        )
+        let mixedDecorated = visualAttachmentAnswer(
+            mixedRows,
+            workspace: workspace,
+            categories: [category],
+            variableExpenses: [variable]
+        )
+
+        guard case let .rowList(rowList)? = decorated.attachment else {
+            Issue.record("Expected expense row list attachment.")
+            return
+        }
+
+        #expect(rowList.family == .expenses)
+        #expect(rowList.rows.map(\.objectType) == [.variableExpense, .plannedExpense])
+        #expect(rowList.hidesSourceRows)
+        guard case let .breakdownList(mixedBreakdown)? = mixedDecorated.attachment else {
+            Issue.record("Expected mixed rows to get polished breakdown fallback.")
+            return
+        }
+        #expect(mixedBreakdown.rows.map(\.title) == ["Market", "Groceries"])
+    }
+
+    @Test func visualAttachmentBuilder_polishesRecentPurchasesFromHomeQueryRows() throws {
+        let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
+        let card = Card(name: "Apple Card", workspace: workspace)
+        let category = Category(name: "Groceries", hexColor: "#10B981", workspace: workspace)
+        let variable = VariableExpense(
+            descriptionText: "Market",
+            amount: 42,
+            transactionDate: date(2026, 5, 2),
+            workspace: workspace,
+            card: card,
+            category: category
+        )
+        let planned = PlannedExpense(
+            title: "Internet",
+            plannedAmount: 80,
+            expenseDate: date(2026, 5, 19),
+            workspace: workspace,
+            card: card,
+            category: category
+        )
+
+        let answer = HomeQueryEngine(calendar: calendar).execute(
+            query: HomeQuery(intent: .largestRecentTransactions, dateRange: monthRange(2026, 5)),
+            categories: [category],
+            plannedExpenses: [planned],
+            variableExpenses: [variable],
+            now: date(2026, 5, 20)
+        )
+
+        let decorated = visualAttachmentAnswer(
+            answer,
+            workspace: workspace,
+            variableExpenses: [variable],
+            plannedExpenses: [planned]
+        )
+
+        guard case let .rowList(rowList)? = decorated.attachment else {
+            Issue.record("Expected HomeQuery recent purchase rows to render native expense rows.")
+            return
+        }
+
+        #expect(rowList.family == .expenses)
+        #expect(rowList.rows.map(\.objectType) == [.plannedExpense, .variableExpense])
+        #expect(rowList.hidesSourceRows)
+    }
+
+    @Test func visualAttachmentBuilder_polishesMetricComparisonContractAndGenericRows() throws {
+        let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
+        let metric = visualAttachmentAnswer(
+            HomeAnswer(
+                queryID: UUID(),
+                kind: .metric,
+                title: "Safe Spend Today",
+                primaryValue: "$45.00",
+                rows: [
+                    HomeAnswerRow(title: "Period remaining room", value: "$450.00", amount: 450)
+                ]
+            ),
+            workspace: workspace
+        )
+        let comparison = visualAttachmentAnswer(
+            HomeAnswer(
+                queryID: UUID(),
+                kind: .comparison,
+                title: "Spending Comparison",
+                rows: [
+                    HomeAnswerRow(title: "Current period", value: "$80.00", amount: 80),
+                    HomeAnswerRow(title: "Previous period", value: "$120.00", amount: 120),
+                    HomeAnswerRow(title: "Change", value: "-$40.00", amount: -40)
+                ]
+            ),
+            workspace: workspace
+        )
+        let contract = visualAttachmentAnswer(
+            HomeAnswer(
+                queryID: UUID(),
+                kind: .message,
+                title: "Marina knows this metric, but cannot run it yet",
+                primaryValue: "contractOnly",
+                rows: [
+                    HomeAnswerRow(title: "Metric contract", value: "forecastSavings", role: .contract),
+                    HomeAnswerRow(title: "Required support", value: "Executor wiring is planned.", role: .contract)
+                ]
+            ),
+            workspace: workspace
+        )
+        let trend = visualAttachmentAnswer(
+            HomeAnswer(
+                queryID: UUID(),
+                kind: .list,
+                title: "Spend trend",
+                rows: [
+                    HomeAnswerRow(title: "May 1", value: "1x | $40.00"),
+                    HomeAnswerRow(title: "May 2", value: "2x | $65.00")
+                ]
+            ),
+            workspace: workspace
+        )
+        let generic = visualAttachmentAnswer(
+            HomeAnswer(
+                queryID: UUID(),
+                kind: .message,
+                title: "I found details",
+                rows: [
+                    HomeAnswerRow(title: "Status", value: "Ready")
+                ]
+            ),
+            workspace: workspace
+        )
+
+        guard case let .metricSummary(metricSummary)? = metric.attachment,
+              case let .comparisonSummary(comparisonSummary)? = comparison.attachment,
+              case let .formulaContract(contractSummary)? = contract.attachment,
+              case let .trendChart(trendSummary)? = trend.attachment,
+              case let .genericSummary(genericSummary)? = generic.attachment else {
+            Issue.record("Expected polished attachment fallbacks.")
+            return
+        }
+
+        #expect(metricSummary.primaryValue == "$45.00")
+        #expect(comparisonSummary.deltaValue == "-$40.00")
+        #expect(contractSummary.rows.map(\.role).allSatisfy { $0 == .contract })
+        #expect(trendSummary.points.first?.value == 40)
+        #expect(genericSummary.rows.first?.title == "Status")
+    }
+
     @Test func suggestionSectionBuilder_prioritizesClarificationRecoveryThenFollowUps() throws {
         let clarification = [
             MarinaSuggestion(title: "Clarify", query: HomeQuery(intent: .spendThisMonth))
@@ -390,12 +818,22 @@ struct MarinaModelsTests {
                 HomeAnswerRow(
                     id: UUID(uuidString: "12345678-1234-1234-1234-123456789012")!,
                     title: "Food",
-                    value: "$500.00"
+                    value: "$500.00",
+                    sourceID: UUID(uuidString: "AAAAAAAA-1234-1234-1234-123456789012")!,
+                    objectType: .category,
+                    amount: 500,
+                    date: Date(timeIntervalSince1970: 6_000),
+                    role: .result
                 ),
                 HomeAnswerRow(
                     id: UUID(uuidString: "87654321-4321-4321-4321-210987654321")!,
                     title: "Travel",
-                    value: "$300.00"
+                    value: "$300.00",
+                    sourceID: UUID(uuidString: "BBBBBBBB-4321-4321-4321-210987654321")!,
+                    objectType: .variableExpense,
+                    amount: 300,
+                    date: Date(timeIntervalSince1970: 7_000),
+                    role: .evidence
                 )
             ],
             generatedAt: generatedAt
@@ -405,6 +843,176 @@ struct MarinaModelsTests {
         let decoded = try JSONDecoder().decode(HomeAnswer.self, from: encoded)
 
         #expect(decoded == original)
+    }
+
+    @Test func answer_decodesOldRowsWithoutSourceMetadata() throws {
+        let json = """
+        {
+          "id": "99999999-8888-7777-6666-555555555555",
+          "queryID": "11111111-2222-3333-4444-555555555555",
+          "kind": "message",
+          "title": "Old answer",
+          "rows": [
+            {
+              "id": "12345678-1234-1234-1234-123456789012",
+              "title": "Total",
+              "value": "$42.00"
+            }
+          ],
+          "generatedAt": 12345
+        }
+        """.data(using: .utf8)!
+
+        let decoded = try JSONDecoder().decode(HomeAnswer.self, from: json)
+
+        #expect(decoded.rows.first?.sourceID == nil)
+        #expect(decoded.rows.first?.objectType == nil)
+        #expect(decoded.rows.first?.amount == nil)
+        #expect(decoded.rows.first?.date == nil)
+        #expect(decoded.rows.first?.role == .result)
+    }
+
+    @Test func answer_codableRoundTrip_preservesEntitySummaryAttachment() throws {
+        let summary = MarinaEntitySummaryPresentationModel(
+            id: UUID(uuidString: "11111111-1111-1111-1111-111111111111")!,
+            sourceID: UUID(uuidString: "22222222-2222-2222-2222-222222222222")!,
+            objectType: .savingsAccount,
+            title: "Emergency Fund",
+            subtitle: "Savings account",
+            primaryValue: "$1,200.00",
+            systemImage: "banknote.fill",
+            tintHex: "#22C55E",
+            rows: [
+                .init(id: UUID(uuidString: "33333333-3333-3333-3333-333333333333")!, title: "Ledger entries", value: "3")
+            ]
+        )
+        let original = HomeAnswer(
+            queryID: UUID(uuidString: "44444444-4444-4444-4444-444444444444")!,
+            kind: .message,
+            title: "I found Emergency Fund.",
+            rows: [],
+            attachment: .entitySummary(summary),
+            generatedAt: Date(timeIntervalSince1970: 12_347)
+        )
+
+        let encoded = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(HomeAnswer.self, from: encoded)
+
+        #expect(decoded == original)
+    }
+
+    @Test func answer_codableRoundTrip_preservesRowListAttachment() throws {
+        let rowList = MarinaRowListPresentationModel(
+            id: UUID(uuidString: "55555555-5555-5555-5555-555555555555")!,
+            title: "Savings activity",
+            subtitle: "2 rows",
+            family: .savings,
+            rows: [
+                .init(
+                    id: UUID(uuidString: "66666666-6666-6666-6666-666666666666")!,
+                    sourceID: UUID(uuidString: "77777777-7777-7777-7777-777777777777")!,
+                    objectType: .savingsLedgerEntry,
+                    title: "Manual Adjustment",
+                    subtitle: "May 1, 2026",
+                    value: "$25.00",
+                    amount: 25,
+                    date: Date(timeIntervalSince1970: 12_000),
+                    systemImage: "banknote.fill",
+                    tintHex: "#22C55E"
+                )
+            ]
+        )
+        let original = HomeAnswer(
+            queryID: UUID(uuidString: "88888888-8888-8888-8888-888888888888")!,
+            kind: .list,
+            title: "Savings activity",
+            rows: [],
+            attachment: .rowList(rowList),
+            generatedAt: Date(timeIntervalSince1970: 12_348)
+        )
+
+        let encoded = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(HomeAnswer.self, from: encoded)
+
+        #expect(decoded == original)
+    }
+
+    @Test func answer_codableRoundTrip_preservesPolishedAttachments() throws {
+        let row = MarinaDisplayRow(
+            id: UUID(uuidString: "11111111-AAAA-BBBB-CCCC-111111111111")!,
+            title: "Current period",
+            value: "$80.00",
+            amount: 80,
+            role: .result
+        )
+        let attachments: [MarinaAttachment] = [
+            .metricSummary(
+                MarinaMetricSummaryPresentationModel(
+                    id: UUID(uuidString: "22222222-AAAA-BBBB-CCCC-222222222222")!,
+                    title: "Safe Spend",
+                    primaryValue: "$45.00",
+                    rows: [row]
+                )
+            ),
+            .comparisonSummary(
+                MarinaComparisonSummaryPresentationModel(
+                    id: UUID(uuidString: "33333333-AAAA-BBBB-CCCC-333333333333")!,
+                    title: "Comparison",
+                    primaryLabel: "Current",
+                    primaryValue: "$80.00",
+                    comparisonLabel: "Previous",
+                    comparisonValue: "$120.00",
+                    deltaLabel: "Change",
+                    deltaValue: "-$40.00",
+                    rows: [row]
+                )
+            ),
+            .breakdownList(
+                MarinaBreakdownListPresentationModel(
+                    id: UUID(uuidString: "44444444-AAAA-BBBB-CCCC-444444444444")!,
+                    title: "Breakdown",
+                    rows: [row]
+                )
+            ),
+            .trendChart(
+                MarinaTrendChartPresentationModel(
+                    id: UUID(uuidString: "55555555-AAAA-BBBB-CCCC-555555555555")!,
+                    title: "Trend",
+                    points: [
+                        .init(id: UUID(uuidString: "66666666-AAAA-BBBB-CCCC-666666666666")!, label: "May", value: 80, renderedValue: "$80.00")
+                    ]
+                )
+            ),
+            .formulaContract(
+                MarinaFormulaContractPresentationModel(
+                    id: UUID(uuidString: "77777777-AAAA-BBBB-CCCC-777777777777")!,
+                    title: "Known Formula",
+                    status: "contractOnly",
+                    rows: [row]
+                )
+            ),
+            .genericSummary(
+                MarinaGenericSummaryPresentationModel(
+                    id: UUID(uuidString: "88888888-AAAA-BBBB-CCCC-888888888888")!,
+                    title: "Details",
+                    rows: [row]
+                )
+            )
+        ]
+
+        for attachment in attachments {
+            let original = HomeAnswer(
+                queryID: UUID(),
+                kind: .message,
+                title: "Polished",
+                attachment: attachment
+            )
+
+            let encoded = try JSONEncoder().encode(original)
+            let decoded = try JSONDecoder().decode(HomeAnswer.self, from: encoded)
+
+            #expect(decoded == original)
+        }
     }
 
     @Test func answer_codableRoundTrip_preservesInlineCreateFormAttachment() throws {
@@ -751,6 +1359,35 @@ struct MarinaModelsTests {
         HomeQueryDateRange(
             startDate: date(year, month, day, 0, 0, 0),
             endDate: date(year, month, day + 6, 23, 59, 59)
+        )
+    }
+
+    private func visualAttachmentAnswer(
+        _ answer: HomeAnswer,
+        workspace: Workspace,
+        cards: [Card] = [],
+        allocationAccounts: [AllocationAccount] = [],
+        savingsAccounts: [SavingsAccount] = [],
+        categories: [Offshore.Category] = [],
+        presets: [Preset] = [],
+        variableExpenses: [VariableExpense] = [],
+        plannedExpenses: [PlannedExpense] = [],
+        savingsEntries: [SavingsLedgerEntry] = []
+    ) -> HomeAnswer {
+        MarinaVisualAttachmentBuilder().attachingVisualAttachmentIfNeeded(
+            to: answer,
+            workspace: workspace,
+            cards: cards,
+            allocationAccounts: allocationAccounts,
+            savingsAccounts: savingsAccounts,
+            categories: categories,
+            presets: presets,
+            variableExpenses: variableExpenses,
+            plannedExpenses: plannedExpenses,
+            savingsEntries: savingsEntries,
+            dateRange: monthRange(2026, 5),
+            excludeFuturePlannedExpenses: false,
+            excludeFutureVariableExpenses: false
         )
     }
 

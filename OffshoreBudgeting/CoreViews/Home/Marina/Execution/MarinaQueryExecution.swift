@@ -1130,12 +1130,12 @@ struct MarinaFormulaExecutor {
 
     private func baseRows(_ formulaIR: MarinaFormulaIR) -> [MarinaWorkspaceAggregationCard.Row] {
         [
-            .init(label: "Formula family", value: formulaIR.family.rawValue),
-            formulaIR.recipe.map { .init(label: "Formula", value: $0.rawValue) },
-            formulaIR.backlogRecipe.map { .init(label: "Formula backlog", value: $0.rawValue) },
-            .init(label: "Measure", value: formulaIR.measure.rawValue),
-            .init(label: "Assumptions", value: formulaIR.assumptions.joined(separator: " ")),
-            .init(label: "Date range", value: rangeLabel(formulaIR.dateRange))
+            .init(label: "Formula family", value: formulaIR.family.rawValue, role: .trace),
+            formulaIR.recipe.map { .init(label: "Formula", value: $0.rawValue, role: .trace) },
+            formulaIR.backlogRecipe.map { .init(label: "Formula backlog", value: $0.rawValue, role: .trace) },
+            .init(label: "Measure", value: formulaIR.measure.rawValue, role: .trace),
+            .init(label: "Assumptions", value: formulaIR.assumptions.joined(separator: " "), role: .trace),
+            .init(label: "Date range", value: rangeLabel(formulaIR.dateRange), role: .trace)
         ].compactMap { $0 }
     }
 
@@ -1633,9 +1633,9 @@ struct MarinaCompositeFormulaExecutor {
         range: HomeQueryDateRange
     ) -> [MarinaWorkspaceAggregationCard.Row] {
         [
-            .init(label: "Formula", value: formula.rawValue),
-            .init(label: "Assumptions", value: assumptions),
-            .init(label: "Date range", value: rangeLabel(range))
+            .init(label: "Formula", value: formula.rawValue, role: .trace),
+            .init(label: "Assumptions", value: assumptions, role: .trace),
+            .init(label: "Date range", value: rangeLabel(range), role: .trace)
         ]
     }
 
@@ -1701,7 +1701,8 @@ struct MarinaCompositeFormulaExecutor {
                 date: expense.transactionDate,
                 objectType: .variableExpense,
                 sourceID: expense.id,
-                sortValue: SavingsMathService.variableBudgetImpactAmount(for: expense)
+                sortValue: SavingsMathService.variableBudgetImpactAmount(for: expense),
+                role: .evidence
             )
         }
     }

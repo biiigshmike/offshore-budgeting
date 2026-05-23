@@ -931,14 +931,14 @@ struct MarinaTurnCoordinator {
         if let metricContract {
             evidenceRows.append(contentsOf: metricContractResponseBuilder.evidenceRows(for: metricContract))
         }
-        evidenceRows.append(HomeAnswerRow(title: "Amount basis", value: displayName(for: execution.amountBasis)))
-        evidenceRows.append(HomeAnswerRow(title: "Execution route", value: execution.executionRoute.traceName))
+        evidenceRows.append(HomeAnswerRow(title: "Amount basis", value: displayName(for: execution.amountBasis), role: .trace))
+        evidenceRows.append(HomeAnswerRow(title: "Execution route", value: execution.executionRoute.traceName, role: .trace))
 
         let targets = resolved.resolvedTargets.map(\.displayName)
             + (semanticResolved?.resolvedFilters.map(\.displayName) ?? [])
         let uniqueTargets = Array(Set(targets)).sorted()
         if uniqueTargets.isEmpty == false {
-            evidenceRows.append(HomeAnswerRow(title: "Matched", value: uniqueTargets.prefix(4).joined(separator: ", ")))
+            evidenceRows.append(HomeAnswerRow(title: "Matched", value: uniqueTargets.prefix(4).joined(separator: ", "), role: .trace))
         }
 
         guard evidenceRows.isEmpty == false else { return answer }

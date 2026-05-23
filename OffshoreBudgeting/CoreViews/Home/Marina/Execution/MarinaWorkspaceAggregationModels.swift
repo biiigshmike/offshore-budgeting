@@ -36,6 +36,7 @@ struct MarinaWorkspaceAggregationCard: Codable, Equatable, Identifiable {
         let objectType: MarinaLookupObjectType?
         let sourceID: UUID?
         let sortValue: Double?
+        let role: HomeAnswerRowRole
 
         init(
             id: UUID = UUID(),
@@ -45,7 +46,8 @@ struct MarinaWorkspaceAggregationCard: Codable, Equatable, Identifiable {
             date: Date? = nil,
             objectType: MarinaLookupObjectType? = nil,
             sourceID: UUID? = nil,
-            sortValue: Double? = nil
+            sortValue: Double? = nil,
+            role: HomeAnswerRowRole = .result
         ) {
             self.id = id
             self.label = label
@@ -55,6 +57,7 @@ struct MarinaWorkspaceAggregationCard: Codable, Equatable, Identifiable {
             self.objectType = objectType
             self.sourceID = sourceID
             self.sortValue = sortValue
+            self.role = role
         }
     }
 
@@ -68,6 +71,7 @@ struct MarinaWorkspaceAggregationCard: Codable, Equatable, Identifiable {
         let objectType: MarinaLookupObjectType?
         let sourceID: UUID?
         let sortValue: Double?
+        let role: HomeAnswerRowRole
 
         init(
             id: UUID = UUID(),
@@ -78,7 +82,8 @@ struct MarinaWorkspaceAggregationCard: Codable, Equatable, Identifiable {
             date: Date? = nil,
             objectType: MarinaLookupObjectType? = nil,
             sourceID: UUID? = nil,
-            sortValue: Double? = nil
+            sortValue: Double? = nil,
+            role: HomeAnswerRowRole = .result
         ) {
             self.id = id
             self.label = label
@@ -89,6 +94,7 @@ struct MarinaWorkspaceAggregationCard: Codable, Equatable, Identifiable {
             self.objectType = objectType
             self.sourceID = sourceID
             self.sortValue = sortValue
+            self.role = role
         }
     }
 }

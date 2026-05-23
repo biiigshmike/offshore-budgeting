@@ -109,6 +109,105 @@ struct MarinaConversationStoreTests {
         #expect(loaded == expected)
     }
 
+    @Test func saveAnswers_withEntitySummaryAttachment_preservesAttachmentPayload() throws {
+        let setup = makeStore()
+        defer { clearDefaults(setup.suiteName) }
+
+        let workspaceID = UUID()
+        let summary = MarinaEntitySummaryPresentationModel(
+            sourceID: UUID(),
+            objectType: .reconciliationAccount,
+            title: "Roommate",
+            subtitle: "Reconciliation account",
+            primaryValue: "$125.00",
+            systemImage: "person.2.fill",
+            tintHex: "#6366F1",
+            rows: [
+                .init(title: "Ledger rows", value: "4")
+            ]
+        )
+        let expected = [
+            HomeAnswer(
+                queryID: UUID(),
+                kind: .message,
+                title: "I found Roommate.",
+                attachment: .entitySummary(summary)
+            )
+        ]
+
+        setup.store.saveAnswers(expected, workspaceID: workspaceID)
+        let loaded = setup.store.loadAnswers(workspaceID: workspaceID)
+
+        #expect(loaded == expected)
+    }
+
+    @Test func saveAnswers_withRowListAttachment_preservesAttachmentPayload() throws {
+        let setup = makeStore()
+        defer { clearDefaults(setup.suiteName) }
+
+        let workspaceID = UUID()
+        let rowList = MarinaRowListPresentationModel(
+            title: "Apple Card expenses",
+            subtitle: "2 rows",
+            family: .expenses,
+            rows: [
+                .init(
+                    sourceID: UUID(),
+                    objectType: .variableExpense,
+                    title: "Coffee",
+                    subtitle: "May 1, 2026",
+                    value: "$6.50",
+                    amount: 6.5,
+                    date: Date(timeIntervalSince1970: 1_777_593_600),
+                    systemImage: "creditcard.fill",
+                    tintHex: "#14B8A6"
+                )
+            ]
+        )
+        let expected = [
+            HomeAnswer(
+                queryID: UUID(),
+                kind: .list,
+                title: "Apple Card expenses",
+                attachment: .rowList(rowList)
+            )
+        ]
+
+        setup.store.saveAnswers(expected, workspaceID: workspaceID)
+        let loaded = setup.store.loadAnswers(workspaceID: workspaceID)
+
+        #expect(loaded == expected)
+    }
+
+    @Test func saveAnswers_withPolishedFormulaAttachment_preservesAttachmentPayload() throws {
+        let setup = makeStore()
+        defer { clearDefaults(setup.suiteName) }
+
+        let workspaceID = UUID()
+        let summary = MarinaMetricSummaryPresentationModel(
+            title: "Safe Spend Remaining",
+            subtitle: "May 2026",
+            primaryValue: "$450.00",
+            rows: [
+                MarinaDisplayRow(title: "Days left", value: "9", role: .result),
+                MarinaDisplayRow(title: "Formula", value: "deterministic safe-spend", role: .trace)
+            ]
+        )
+        let expected = [
+            HomeAnswer(
+                queryID: UUID(),
+                kind: .list,
+                title: "Safe Spend Remaining",
+                attachment: .metricSummary(summary)
+            )
+        ]
+
+        setup.store.saveAnswers(expected, workspaceID: workspaceID)
+        let loaded = setup.store.loadAnswers(workspaceID: workspaceID)
+
+        #expect(loaded == expected)
+    }
+
     @Test func saveAnswers_thenLoadAnswers_preservesInlineCreateFormDrafts() throws {
         let setup = makeStore()
         defer { clearDefaults(setup.suiteName) }
