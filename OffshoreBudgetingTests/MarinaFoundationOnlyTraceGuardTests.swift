@@ -405,7 +405,7 @@ struct MarinaFoundationOnlyTraceGuardTests {
         provider: MarinaDataProvider,
         aiEnabled: Bool = true,
         turnClassification: MarinaPromptTurnClassification = .freshQuestion,
-        priorQueryContext: MarinaPriorQueryContext = .empty
+        priorQueryContext: MarinaPriorQueryContext? = nil
     ) -> MarinaTurnContext {
         MarinaTurnContext(
             provider: provider,
@@ -413,7 +413,7 @@ struct MarinaFoundationOnlyTraceGuardTests {
                 workspaceName: "Foundation Only Workspace",
                 defaultPeriodUnit: .month,
                 sessionContext: MarinaSessionContext(),
-                priorQueryContext: priorQueryContext,
+                priorQueryContext: priorQueryContext ?? .empty,
                 cardNames: ["Apple Card", "Backup Card"],
                 categoryNames: ["Groceries", "Travel"],
                 incomeSourceNames: [],

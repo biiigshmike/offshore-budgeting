@@ -26,15 +26,6 @@ struct MarinaVisualAttachmentBuilder {
     ) -> HomeAnswer {
         guard answer.attachment == nil else { return answer }
 
-        let cardAnswer = MarinaCardSummaryAttachmentBuilder().attachingCardSummaryIfNeeded(
-            to: answer,
-            cards: cards,
-            dateRange: dateRange,
-            excludeFuturePlannedExpenses: excludeFuturePlannedExpenses,
-            excludeFutureVariableExpenses: excludeFutureVariableExpenses
-        )
-        if cardAnswer.attachment != nil { return cardAnswer }
-
         if let clarification = clarificationCard(for: answer) {
             return applying(
                 .clarification(clarification),
@@ -49,6 +40,23 @@ struct MarinaVisualAttachmentBuilder {
                 to: answer,
                 title: deadEnd.title,
                 subtitle: fallbackSubtitle(for: deadEnd)
+            )
+        }
+
+        let cardAnswer = MarinaCardSummaryAttachmentBuilder().attachingCardSummaryIfNeeded(
+            to: answer,
+            cards: cards,
+            dateRange: dateRange,
+            excludeFuturePlannedExpenses: excludeFuturePlannedExpenses,
+            excludeFutureVariableExpenses: excludeFutureVariableExpenses
+        )
+        if cardAnswer.attachment != nil { return cardAnswer }
+
+        if let contract = formulaContract(for: answer) {
+            return applying(
+                .formulaContract(contract),
+                to: answer,
+                subtitle: answer.subtitle ?? fallbackSubtitle(for: contract)
             )
         }
 
@@ -82,14 +90,6 @@ struct MarinaVisualAttachmentBuilder {
                 .rowList(rowList),
                 to: answer,
                 subtitle: fallbackSubtitle(for: rowList)
-            )
-        }
-
-        if let contract = formulaContract(for: answer) {
-            return applying(
-                .formulaContract(contract),
-                to: answer,
-                subtitle: answer.subtitle ?? fallbackSubtitle(for: contract)
             )
         }
 
@@ -161,14 +161,21 @@ struct MarinaVisualAttachmentBuilder {
             || subtitle.contains("more than one")
         guard looksClarifying, choiceRows.count > 1 else { return nil }
 
+        var presentationRows: [MarinaDisplayRow] = [
+            presentationRow(title: "Why I paused", value: "The request could point to more than one executable interpretation."),
+            presentationRow(title: "Next step", value: "Choose the action and target below.")
+        ]
+        presentationRows.append(contentsOf: choiceRows.prefix(3).map { row in
+            presentationRow(title: row.title, value: row.value)
+        })
+        if choiceRows.count > 3 {
+            presentationRows.append(presentationRow(title: "More choices", value: integer(choiceRows.count - 3)))
+        }
+
         return MarinaClarificationPresentationModel(
             title: answer.title,
-            subtitle: "I found more than one possible match and need you to choose the target before I query your data.",
-            rows: [
-                presentationRow(title: "Why I paused", value: "The request could point to more than one Offshore item."),
-                presentationRow(title: "Next step", value: "Choose one of the options below."),
-                presentationRow(title: "Options", value: integer(choiceRows.count))
-            ]
+            subtitle: answer.subtitle ?? "I found more than one possible match and need you to choose the target before I query your data.",
+            rows: presentationRows
         )
     }
 

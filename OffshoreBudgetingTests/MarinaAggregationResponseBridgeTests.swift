@@ -192,7 +192,9 @@ struct MarinaAggregationResponseBridgeTests {
         #expect(bridged.kind == .message)
         #expect(bridged.title == "I need one choice first")
         #expect(bridged.subtitle == "Which target did you mean?")
-        #expect(bridged.rows.map(\.title) == ["Groceries (category)", "Grocery Card (card)"])
+        #expect(bridged.rows.map(\.title) == ["Groceries", "Grocery Card"])
+        #expect(bridged.rows.map(\.value) == ["Category", "Card"])
+        #expect(bridged.rows.map(\.objectType) == [.category, .card])
         #expect(outcomeAnswer?.title == bridged.title)
         #expect(outcomeAnswer?.subtitle == bridged.subtitle)
     }

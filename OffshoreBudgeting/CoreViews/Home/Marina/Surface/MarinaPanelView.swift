@@ -5391,7 +5391,8 @@ struct MarinaPanelView: View {
             MarinaSuggestion(
                 id: choice.id,
                 title: foundationPipelineChoiceTitle(choice),
-                query: HomeQuery(intent: .spendThisMonth)
+                query: HomeQuery(intent: .periodOverview),
+                reasoning: "clarification_choice:\(choice.id.uuidString)"
             )
         } : []
         recoverySuggestions = []
@@ -5474,7 +5475,8 @@ struct MarinaPanelView: View {
             MarinaSuggestion(
                 id: choice.id,
                 title: foundationPipelineChoiceTitle(choice),
-                query: HomeQuery(intent: .spendThisMonth)
+                query: HomeQuery(intent: .periodOverview),
+                reasoning: "clarification_choice:\(choice.id.uuidString)"
             )
         }
         recoverySuggestions = []

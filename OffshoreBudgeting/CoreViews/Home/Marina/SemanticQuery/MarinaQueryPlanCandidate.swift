@@ -333,6 +333,8 @@ enum MarinaRequestShape: String, Codable, Sendable, Equatable {
 enum MarinaRouteIntentKind: String, Codable, Sendable, Equatable {
     case generic
     case databaseLookup
+    case periodOverview
+    case budgetSummary
     case budgetInventory
     case activeBudget
     case budgetMembership
@@ -992,6 +994,10 @@ extension MarinaRouteIntent {
         switch kind {
         case .databaseLookup:
             return .databaseLookup
+        case .periodOverview:
+            return .homeAdapter
+        case .budgetSummary:
+            return .composableWorkspace
         case .budgetInventory, .budgetMembership, .budgetLinkedCards, .budgetLinkedPresets, .budgetCategoryLimits, .budgetCategoryLimit, .overBudgetCategories, .allocationRows, .settlementRows:
             return .composableWorkspace
         case .plannedExpenseRows, .presetTemplateRows, .plannedExpenseByCategory, .plannedExpenseByCard, .plannedExpenseByPreset:
@@ -1047,6 +1053,22 @@ struct MarinaRoutePatternRegistry {
     }
 
     nonisolated static let routeCatalog: [RoutePattern] = [
+        RoutePattern(
+            kind: .periodOverview,
+            preferredExecutorRoute: .homeAdapter,
+            operations: [.lookupDetails],
+            measures: [.remainingBudget],
+            groupings: [nil],
+            requestedDetails: [nil, .general, .status]
+        ),
+        RoutePattern(
+            kind: .budgetSummary,
+            preferredExecutorRoute: .composableWorkspace,
+            operations: [.sum],
+            measures: [.spend],
+            groupings: [nil],
+            requestedDetails: [nil, .general]
+        ),
         RoutePattern(
             kind: .budgetCategoryLimits,
             preferredExecutorRoute: .composableWorkspace,
@@ -1252,6 +1274,14 @@ struct MarinaRoutePatternRegistry {
         }) {
             return detailMatch.kind
         }
+        if isPeriodOverviewPrompt(normalized),
+           matchesCatalog(.periodOverview, operation: operation, measure: measure, grouping: grouping, requestedDetail: requestedDetail) {
+            return .periodOverview
+        }
+        if isBudgetSummaryPrompt(normalized),
+           matchesCatalog(.budgetSummary, operation: operation, measure: measure, grouping: grouping, requestedDetail: requestedDetail) {
+            return .budgetSummary
+        }
         if requestShape == .objectInventoryList,
            matchesCatalog(.budgetInventory, operation: operation, measure: measure, grouping: grouping, requestedDetail: requestedDetail) {
             return .budgetInventory
@@ -1305,6 +1335,9 @@ struct MarinaRoutePatternRegistry {
         targetTypes: [MarinaCandidateEntityTypeHint]
     ) -> MarinaRouteIntentKind {
         if subject == .budgets {
+            if operation == .sum, measure == .spend, targetTypes.contains(.budget) {
+                return .budgetSummary
+            }
             switch requestedDetail {
             case .categoryLimits:
                 return .budgetCategoryLimits
@@ -1435,6 +1468,22 @@ struct MarinaRoutePatternRegistry {
                 || prompt.hasPrefix("list ")
                 || prompt.hasPrefix("show ")
                 || prompt.hasPrefix("what are"))
+    }
+
+    private nonisolated static func isPeriodOverviewPrompt(_ prompt: String) -> Bool {
+        prompt.contains("how am i doing")
+            || prompt.contains("budget overview")
+            || prompt.contains("period overview")
+            || prompt.contains("budget summary")
+    }
+
+    private nonisolated static func isBudgetSummaryPrompt(_ prompt: String) -> Bool {
+        (prompt.contains("budget") || prompt.contains("budgets"))
+            && (prompt.contains("summary")
+                || prompt.contains("overview")
+                || prompt.contains("looking")
+                || prompt.contains("how is")
+                || prompt.contains("how am i"))
     }
 
     private nonisolated static func isOverBudgetCategoriesPrompt(_ prompt: String) -> Bool {

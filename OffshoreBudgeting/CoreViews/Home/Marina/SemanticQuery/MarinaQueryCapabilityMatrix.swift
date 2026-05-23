@@ -162,6 +162,24 @@ struct MarinaQueryCapabilityMatrix {
     }
 
     private static let routeCapabilityCatalog: [MarinaRouteIntentKind: RouteCapabilityRecord] = [
+        .periodOverview: RouteCapabilityRecord(
+            kind: .periodOverview,
+            operations: [.lookupDetails],
+            measures: [.remainingBudget],
+            groupings: [nil],
+            targetTypes: [.budget],
+            requestedDetails: [nil, .general, .status],
+            preferredExecutorRoute: .homeAdapter
+        ),
+        .budgetSummary: RouteCapabilityRecord(
+            kind: .budgetSummary,
+            operations: [.sum],
+            measures: [.spend],
+            groupings: [nil],
+            targetTypes: [.budget],
+            requestedDetails: [nil, .general],
+            preferredExecutorRoute: .composableWorkspace
+        ),
         .budgetInventory: RouteCapabilityRecord(
             kind: .budgetInventory,
             operations: [.listRows, .lookupDetails],
@@ -383,9 +401,9 @@ struct MarinaQueryCapabilityMatrix {
             sourceEntities: ["Budget", "VariableExpense", "PlannedExpense", "Income", "SavingsLedgerEntry"],
             dateRangeBehavior: "HomeQuery date range or active/current period",
             filterBehavior: "workspace-wide unless query target is provided",
-            marinaSupportStatus: .typedUnsupportedGap,
-            marinaRoute: nil,
-            unsupportedReason: "Shared pipeline does not yet map overview requests to HomeQueryMetric.overview."
+            marinaSupportStatus: .supportedRoute,
+            marinaRoute: "MarinaSemanticInterpretationContract.periodOverview -> HomeQueryMetric.overview",
+            unsupportedReason: nil
         ),
         surface(
             id: "home.spend.total",

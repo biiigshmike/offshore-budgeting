@@ -38,7 +38,9 @@ struct MarinaAggregationResponseBridge {
             rows: clarification.choices.map { choice in
                 HomeAnswerRow(
                     title: typedChoiceTitle(choice),
-                    value: choice.subtitle ?? choice.rawValue ?? choice.entityTypeHint?.rawValue ?? ""
+                    value: typedChoiceValue(choice),
+                    sourceID: choice.sourceID,
+                    objectType: lookupObjectType(from: choice.entityTypeHint)
                 )
             }
         )
@@ -81,7 +83,59 @@ struct MarinaAggregationResponseBridge {
     }
 
     private func typedChoiceTitle(_ choice: MarinaClarificationChoice) -> String {
-        guard let type = choice.entityTypeHint else { return choice.title }
-        return "\(choice.title) (\(type.rawValue))"
+        MarinaClarificationChoiceResolver.displayTitle(for: choice)
+    }
+
+    private func typedChoiceValue(_ choice: MarinaClarificationChoice) -> String {
+        if let subtitle = choice.subtitle?.trimmingCharacters(in: .whitespacesAndNewlines),
+           subtitle.isEmpty == false {
+            return subtitle
+        }
+        if let type = choice.entityTypeHint {
+            return displayName(for: type)
+        }
+        return choice.rawValue ?? ""
+    }
+
+    private func displayName(for type: MarinaCandidateEntityTypeHint) -> String {
+        switch type {
+        case .allocationAccount:
+            return "Reconciliation account"
+        case .incomeSource:
+            return "Income source"
+        case .savingsAccount:
+            return "Savings account"
+        case .expense:
+            return "Expense"
+        case .transaction:
+            return "Transaction"
+        default:
+            return type.rawValue.prefix(1).uppercased() + type.rawValue.dropFirst()
+        }
+    }
+
+    private func lookupObjectType(from type: MarinaCandidateEntityTypeHint?) -> MarinaLookupObjectType? {
+        switch type {
+        case .budget:
+            return .budget
+        case .category:
+            return .category
+        case .card:
+            return .card
+        case .preset:
+            return .preset
+        case .expense:
+            return .variableExpense
+        case .transaction:
+            return .variableExpense
+        case .incomeSource:
+            return .income
+        case .savingsAccount:
+            return .savingsAccount
+        case .allocationAccount:
+            return .reconciliationAccount
+        case .merchant, .workspace, nil:
+            return nil
+        }
     }
 }

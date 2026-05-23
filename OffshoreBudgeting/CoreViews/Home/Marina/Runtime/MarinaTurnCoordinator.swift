@@ -203,6 +203,7 @@ struct MarinaTurnCoordinator {
     private let semanticAdapter = MarinaSemanticQueryAdapter()
     private let conversationalPlanner = MarinaConversationalQueryPlanner()
     private let compositePlanner = MarinaCompositeQueryPlanner()
+    private let semanticContractResolver = MarinaSemanticInterpretationContractResolver()
     private let metricContractResolver = MarinaMetricContractResolver()
     private let metricContractResponseBuilder = MarinaMetricContractResponseBuilder()
     private let metricFormulaExecutor = MarinaMetricFormulaExecutor()
@@ -264,8 +265,13 @@ struct MarinaTurnCoordinator {
                 in: prompt,
                 context: context.routerContext
             )
+            let contractInterpretation = semanticContractResolver.resolve(
+                prompt: prompt,
+                context: context,
+                priorInterpretation: rawInterpretation
+            )
             let interpretation = canonicalizedInterpretation(
-                rawInterpretation,
+                contractInterpretation ?? rawInterpretation,
                 explicitConstraints: explicitConstraints,
                 now: context.now,
                 defaultPeriodUnit: context.defaultPeriodUnit
@@ -278,6 +284,26 @@ struct MarinaTurnCoordinator {
         } catch {
             MarinaDebugLogger.log("Marina AI interpretation failed prompt='\(prompt)' error=\(error)")
             let diagnostic = Self.foundationDiagnostic(from: error)
+            let explicitConstraints = MarinaExplicitConstraintDetector().constraints(
+                in: prompt,
+                context: context.routerContext
+            )
+            if let contractInterpretation = semanticContractResolver.resolve(
+                prompt: prompt,
+                context: context,
+                failureDiagnostic: diagnostic
+            ) {
+                return evaluate(
+                    canonicalizedInterpretation(
+                        contractInterpretation,
+                        explicitConstraints: explicitConstraints,
+                        now: context.now,
+                        defaultPeriodUnit: context.defaultPeriodUnit
+                    ),
+                    context: context,
+                    explicitConstraints: explicitConstraints
+                )
+            }
             MarinaTraceRecorder.shared.recordFoundationModelsFailure(diagnostic)
             MarinaFoundationTraceBridge.recordFoundationFailure(context: context, diagnostic: diagnostic)
             return .blocked(

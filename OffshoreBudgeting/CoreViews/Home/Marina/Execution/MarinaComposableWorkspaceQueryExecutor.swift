@@ -67,6 +67,10 @@ struct MarinaComposableWorkspaceQueryExecutor {
         }
 
         switch candidate.routeIntent?.kind ?? plan.routeIntent?.kind {
+        case .budgetSummary?:
+            if let budget = resolvedBudgetTarget(in: resolved, candidate: candidate, provider: provider, now: now) {
+                return .handled(budgetLinkedSummary(budget: budget, plan: plan, provider: provider))
+            }
         case .budgetInventory?:
             return .handled(budgetsOverlappingRange(prompt: candidate.rawPrompt, plan: plan, provider: provider, now: now))
         case .overBudgetCategories?:
@@ -99,7 +103,7 @@ struct MarinaComposableWorkspaceQueryExecutor {
             }
         case .recentTransactionRows?:
             return .handled(recentFilteredTransactions(resolved: resolved, plan: plan, provider: provider, now: now, amountBasis: amountBasis))
-        case .databaseLookup?, .generic?, .broadSpend?, .plannedExpenseRows?, .presetTemplateRows?, .plannedExpenseByCategory?, .plannedExpenseByCard?, .plannedExpenseByPreset?, .savingsStatus?, .savingsActivity?, .savingsMovementRanking?, .incomePlannedVsActual?, .reconciliationBalance?, nil:
+        case .databaseLookup?, .periodOverview?, .generic?, .broadSpend?, .plannedExpenseRows?, .presetTemplateRows?, .plannedExpenseByCategory?, .plannedExpenseByCard?, .plannedExpenseByPreset?, .savingsStatus?, .savingsActivity?, .savingsMovementRanking?, .incomePlannedVsActual?, .reconciliationBalance?, nil:
             break
         }
 
@@ -123,7 +127,7 @@ struct MarinaComposableWorkspaceQueryExecutor {
                 return .handled(settlementRows(resolved: resolved, plan: plan, provider: provider, now: now))
             case .recentTransactionRows:
                 return .handled(recentFilteredTransactions(resolved: resolved, plan: plan, provider: provider, now: now, amountBasis: amountBasis))
-            case .generic, .databaseLookup, .activeBudget, .budgetMembership, .budgetLinkedCards, .budgetLinkedPresets, .budgetCategoryLimits, .budgetCategoryLimit, .plannedExpenseRows, .presetTemplateRows, .plannedExpenseByCategory, .plannedExpenseByCard, .plannedExpenseByPreset, .savingsStatus, .savingsActivity, .savingsMovementRanking, .incomePlannedVsActual, .reconciliationBalance, .broadSpend:
+            case .generic, .databaseLookup, .periodOverview, .budgetSummary, .activeBudget, .budgetMembership, .budgetLinkedCards, .budgetLinkedPresets, .budgetCategoryLimits, .budgetCategoryLimit, .plannedExpenseRows, .presetTemplateRows, .plannedExpenseByCategory, .plannedExpenseByCard, .plannedExpenseByPreset, .savingsStatus, .savingsActivity, .savingsMovementRanking, .incomePlannedVsActual, .reconciliationBalance, .broadSpend:
                 break
             }
         }
@@ -266,7 +270,7 @@ struct MarinaComposableWorkspaceQueryExecutor {
         plan: MarinaAggregationPlan,
         provider: MarinaDataProvider
     ) -> MarinaWorkspaceAggregationCard {
-        let range = plan.dateRange ?? HomeQueryDateRange(startDate: budget.startDate, endDate: budget.endDate)
+        let range = HomeQueryDateRange(startDate: budget.startDate, endDate: budget.endDate)
         let linkedCardIDs = Set((budget.cardLinks ?? []).compactMap { $0.card?.id })
         let linkedPresetIDs = Set((budget.presetLinks ?? []).compactMap { $0.preset?.id })
         let linkedCardNames = (budget.cardLinks ?? []).compactMap { $0.card?.name }.sorted()

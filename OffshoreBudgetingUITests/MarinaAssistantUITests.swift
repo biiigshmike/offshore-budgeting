@@ -150,8 +150,11 @@ final class MarinaAssistantUITests: XCTestCase {
         )
         reporter.record(ambiguityReport)
         XCTAssertTrue(ambiguityReport.result.passed, ambiguityReport.result.reason)
-        guard let chipTitle = ambiguityReport.clarificationChips.first else {
-            XCTFail("Expected Apple ambiguity to surface clarification chips.")
+        let uniqueChipTitle = ambiguityReport.clarificationChips.first { title in
+            ambiguityReport.clarificationChips.filter { $0 == title }.count == 1
+        }
+        guard let chipTitle = uniqueChipTitle else {
+            XCTFail("Expected Apple ambiguity to surface at least one uniquely titled clarification chip. chips=\(ambiguityReport.clarificationChips)")
             return
         }
 
@@ -304,7 +307,14 @@ final class MarinaAssistantUITests: XCTestCase {
     private static let sequentialSmokePrompts: [ModelPrompt] = [
         ModelPrompt(model: "Workspace", text: "What workspace am I in?", shape: .summaryCard),
         ModelPrompt(model: "Budget", text: "What is my active budget?", shape: .summaryCard),
-        ModelPrompt(model: "BudgetCategoryLimit", text: "Show my Groceries budget limit", shape: .summaryCard),
+        ModelPrompt(
+            model: "BudgetCategoryLimit",
+            text: "Show my Groceries budget limit",
+            outcome: .clarification,
+            shape: .clarification,
+            requiredVisibleText: ["Groceries budget limit", "Show budget category limit"],
+            requiresClarificationChips: false
+        ),
         ModelPrompt(model: "Card", text: "What did I spend on Apple Card this month?", shape: .scalarCurrency),
         ModelPrompt(
             model: "BudgetCardLink",
@@ -325,7 +335,14 @@ final class MarinaAssistantUITests: XCTestCase {
         ModelPrompt(model: "Budget", text: "What budgets do I have this month?", requestShape: .objectInventoryList),
         ModelPrompt(model: "Budget", text: "List all my budgets", requestShape: .objectInventoryList, shape: .relationshipList),
         ModelPrompt(model: "BudgetCategoryLimit", text: "How much do I have left in Groceries?", shape: .summaryCard),
-        ModelPrompt(model: "BudgetCategoryLimit", text: "Show my Groceries budget limit", shape: .summaryCard),
+        ModelPrompt(
+            model: "BudgetCategoryLimit",
+            text: "Show my Groceries budget limit",
+            outcome: .clarification,
+            shape: .clarification,
+            requiredVisibleText: ["Groceries budget limit", "Show budget category limit"],
+            requiresClarificationChips: false
+        ),
         ModelPrompt(model: "BudgetCategoryLimit", text: "Which categories are over budget?", shape: .rankedList),
         ModelPrompt(model: "Card", text: "What did I spend on Apple Card this month?", shape: .scalarCurrency),
         ModelPrompt(model: "Card", text: "Show my card balances", shape: .rankedList),
@@ -454,6 +471,7 @@ private struct ModelPrompt {
     let shape: MarinaPromptExpectation.ResponseShape?
     let requiredVisibleText: [String]
     let forbiddenVisibleText: [String]
+    let requiresClarificationChips: Bool
 
     init(
         model: String,
@@ -462,7 +480,8 @@ private struct ModelPrompt {
         requestShape: MarinaPromptExpectation.RequestShape? = nil,
         shape: MarinaPromptExpectation.ResponseShape? = nil,
         requiredVisibleText: [String] = [],
-        forbiddenVisibleText: [String] = []
+        forbiddenVisibleText: [String] = [],
+        requiresClarificationChips: Bool = true
     ) {
         self.model = model
         self.text = text
@@ -471,6 +490,7 @@ private struct ModelPrompt {
         self.shape = shape
         self.requiredVisibleText = requiredVisibleText
         self.forbiddenVisibleText = forbiddenVisibleText
+        self.requiresClarificationChips = requiresClarificationChips
     }
 
     var expectation: MarinaPromptExpectation {
@@ -480,7 +500,8 @@ private struct ModelPrompt {
             requestShape: requestShape,
             responseShape: shape,
             requiredVisibleText: requiredVisibleText,
-            forbiddenVisibleText: forbiddenVisibleText
+            forbiddenVisibleText: forbiddenVisibleText,
+            requiresClarificationChips: requiresClarificationChips
         )
     }
 }

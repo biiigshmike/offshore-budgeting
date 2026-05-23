@@ -129,8 +129,7 @@ struct MarinaClarificationChoiceResolver {
     }
 
     static func displayTitle(for choice: MarinaClarificationChoice) -> String {
-        guard let type = choice.entityTypeHint else { return choice.title }
-        return "\(choice.title) (\(type.rawValue))"
+        choice.title
     }
 
     nonisolated static func normalized(_ value: String) -> String {

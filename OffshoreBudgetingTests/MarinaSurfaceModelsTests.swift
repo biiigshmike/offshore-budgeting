@@ -649,6 +649,7 @@ struct MarinaModelsTests {
 
     @Test func visualAttachmentBuilder_polishesClarificationAndDeadEndCardsBeforeGenericFallback() throws {
         let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
+        let appleCard = Card(name: "Apple Card", workspace: workspace)
         let clarification = visualAttachmentAnswer(
             HomeAnswer(
                 queryID: UUID(),
@@ -656,11 +657,12 @@ struct MarinaModelsTests {
                 title: "Which Apple do you mean?",
                 subtitle: "I found more than one kind of Offshore data with that name. Pick the object type and I can show the details.",
                 rows: [
-                    HomeAnswerRow(title: "Apple Card", value: "Card", objectType: .card),
+                    HomeAnswerRow(title: "Apple Card", value: "Card", sourceID: appleCard.id, objectType: .card),
                     HomeAnswerRow(title: "Apple Store", value: "$42.00 on Apple Card", objectType: .variableExpense)
                 ]
             ),
-            workspace: workspace
+            workspace: workspace,
+            cards: [appleCard]
         )
         let unsupported = visualAttachmentAnswer(
             HomeAnswer(
@@ -688,10 +690,16 @@ struct MarinaModelsTests {
             workspace: workspace
         )
 
-        guard case let .clarification(clarificationCard)? = clarification.attachment,
-              case let .deadEnd(unsupportedCard)? = unsupported.attachment,
-              case let .deadEnd(contractCard)? = contractOnly.attachment else {
-            Issue.record("Expected clarification and dead-end cards.")
+        guard case let .clarification(clarificationCard)? = clarification.attachment else {
+            Issue.record("Expected clarification card, saw \(String(describing: clarification.attachment)).")
+            return
+        }
+        guard case let .deadEnd(unsupportedCard)? = unsupported.attachment else {
+            Issue.record("Expected unsupported dead-end card, saw \(String(describing: unsupported.attachment)).")
+            return
+        }
+        guard case let .deadEnd(contractCard)? = contractOnly.attachment else {
+            Issue.record("Expected contract-only dead-end card, saw \(String(describing: contractOnly.attachment)).")
             return
         }
 
@@ -1188,8 +1196,54 @@ struct MarinaModelsTests {
             reply: "Apple Card (card)",
             clarification: clarification
         )
+        let cleanTitleResult = MarinaClarificationChoiceResolver().resolve(
+            reply: "Apple Card",
+            clarification: clarification
+        )
 
         #expect(result == .resolved(card))
+        #expect(cleanTitleResult == .resolved(card))
+    }
+
+    @Test func clarificationChoiceResolver_returnsAmbiguousForDuplicateCleanDisplayTitle() throws {
+        let category = MarinaClarificationChoice(
+            title: "Apple",
+            entityTypeHint: .category,
+            patchSlot: .target,
+            rawValue: "Apple",
+            sourceID: UUID()
+        )
+        let merchant = MarinaClarificationChoice(
+            title: "Apple",
+            entityTypeHint: .merchant,
+            patchSlot: .target,
+            rawValue: "Apple",
+            sourceID: UUID()
+        )
+        let card = MarinaClarificationChoice(
+            title: "Apple Card",
+            entityTypeHint: .card,
+            patchSlot: .target,
+            rawValue: "Apple Card",
+            sourceID: UUID()
+        )
+        let clarification = MarinaTypedClarification(
+            kind: .ambiguousTarget,
+            message: "Which Apple?",
+            choices: [category, merchant, card]
+        )
+
+        let duplicateTitleResult = MarinaClarificationChoiceResolver().resolve(
+            reply: "Apple",
+            clarification: clarification
+        )
+        let uniqueTitleResult = MarinaClarificationChoiceResolver().resolve(
+            reply: "Apple Card",
+            clarification: clarification
+        )
+
+        #expect(duplicateTitleResult == .ambiguous([category, merchant]))
+        #expect(uniqueTitleResult == .resolved(card))
     }
 
     @Test func clarificationChoiceResolver_resolvesUniqueTypeAlias() throws {

@@ -646,7 +646,9 @@ struct MarinaUITestDriver {
                 reason: "Expected typed clarification, but the prompt resolved to a handled response. responseType=\(trace.responseType ?? "nil"); candidate=\(trace.foundationPipelineCandidateSummary ?? "nil"); resolver=\(trace.foundationPipelineResolverSummary ?? "nil"); semanticResolver=\(trace.foundationPipelineSemanticResolverSummary ?? "nil"); executor=\(trace.foundationPipelineExecutorSummary ?? "nil")"
             )
         }
-        if expectation?.outcome == .clarification, chips.clarification.isEmpty {
+        if expectation?.outcome == .clarification,
+           expectation?.requiresClarificationChips ?? true,
+           chips.clarification.isEmpty {
             return MarinaSurfaceResult(passed: false, category: .missingClarificationChips, reason: "Expected actionable clarification chips.")
         }
         if let expectedShape = expectation?.requestShape {
@@ -738,6 +740,7 @@ struct MarinaPromptExpectation {
     let responseShape: ResponseShape?
     let requiredVisibleText: [String]
     let forbiddenVisibleText: [String]
+    let requiresClarificationChips: Bool
 
     init(
         model: String,
@@ -745,7 +748,8 @@ struct MarinaPromptExpectation {
         requestShape: RequestShape? = nil,
         responseShape: ResponseShape?,
         requiredVisibleText: [String] = [],
-        forbiddenVisibleText: [String] = []
+        forbiddenVisibleText: [String] = [],
+        requiresClarificationChips: Bool = true
     ) {
         self.model = model
         self.outcome = outcome
@@ -753,6 +757,7 @@ struct MarinaPromptExpectation {
         self.responseShape = responseShape
         self.requiredVisibleText = requiredVisibleText
         self.forbiddenVisibleText = forbiddenVisibleText
+        self.requiresClarificationChips = requiresClarificationChips
     }
 
     enum Outcome: String {

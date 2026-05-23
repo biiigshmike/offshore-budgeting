@@ -97,6 +97,9 @@ struct MarinaAggregationPlanHomeQueryAdapter {
         for plan: MarinaAggregationPlan,
         target: MarinaResolvedAggregationTarget?
     ) -> HomeQueryMetric? {
+        if plan.routeIntent?.kind == .periodOverview {
+            return .overview
+        }
         switch (plan.operation, plan.measure) {
         case (.sum, .spend) where plan.grouping?.dimension == .category && plan.responseShape == .groupedBreakdown:
             return .topCategories

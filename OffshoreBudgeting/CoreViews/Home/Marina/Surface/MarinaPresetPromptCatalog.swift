@@ -330,7 +330,7 @@ struct MarinaPresetPromptQueryAdapter {
     private func spec(for query: HomeQuery) -> Spec {
         switch query.intent {
         case .periodOverview:
-            return Spec(.lookupDetails, .remainingBudget, .summaryCard, subject: .budgets)
+            return Spec(.lookupDetails, .remainingBudget, .summaryCard, subject: .budgets, requestedDetail: .status, routeKind: .periodOverview)
         case .spendThisMonth:
             return Spec(.sum, .spend, .scalarCurrency, subject: .variableExpenses)
         case .categorySpendTotal:
