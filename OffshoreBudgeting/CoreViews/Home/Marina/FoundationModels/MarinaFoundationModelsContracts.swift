@@ -158,6 +158,7 @@ protocol MarinaAIInterpreter {
 }
 
 enum MarinaAIIntentKind: String, Codable, Equatable, Sendable {
+    case semanticQuery
     case readQuery
     case lookup
     case clarification
@@ -166,6 +167,7 @@ enum MarinaAIIntentKind: String, Codable, Equatable, Sendable {
 }
 
 enum MarinaAIIntent: Codable, Equatable, Sendable {
+    case semanticQuery(MarinaSemanticQuery)
     case readQuery(MarinaAIReadQueryIntent)
     case lookup(MarinaAILookupIntent)
     case clarification(MarinaAIClarificationIntent)
@@ -174,6 +176,8 @@ enum MarinaAIIntent: Codable, Equatable, Sendable {
 
     var kind: MarinaAIIntentKind {
         switch self {
+        case .semanticQuery:
+            return .semanticQuery
         case .readQuery:
             return .readQuery
         case .lookup:
@@ -401,6 +405,202 @@ struct MarinaFoundationIntentEnvelope: Codable, Equatable, Sendable {
             excludeIncome: excludeIncome,
             confidenceRaw: confidenceRaw,
             unsupportedReasonRaw: unsupportedReasonRaw
+        )
+    }
+}
+
+#if canImport(FoundationModels)
+@available(iOS 26.0, macOS 26.0, *)
+@Generable
+#endif
+struct MarinaFoundationSemanticFilterIntent: Codable, Equatable, Sendable {
+    #if canImport(FoundationModels)
+    @Guide(description: "Exact text span from the user's prompt that names the filter, without command words such as show, list, find, expenses, transactions, or please.")
+    #endif
+    let rawText: String?
+    #if canImport(FoundationModels)
+    @Guide(description: "category, card, merchant, transaction, expense, budget, preset, incomeSource, allocationAccount, savingsAccount, workspace, or null.")
+    #endif
+    let typeRaw: String?
+    #if canImport(FoundationModels)
+    @Guide(description: "primaryTarget, filter, excludeFilter, comparisonTarget, groupingDimension, simulationInput, or null.")
+    #endif
+    let roleRaw: String?
+    #if canImport(FoundationModels)
+    @Guide(description: "Allowed entity types when the user text may be free-form row text, for example merchant, expense, transaction.")
+    #endif
+    let allowedTypeRaws: [String]
+    #if canImport(FoundationModels)
+    @Guide(description: "true when this is free text to match against expense or transaction row titles instead of a stored named object.")
+    #endif
+    let isFreeText: Bool?
+}
+
+#if canImport(FoundationModels)
+@available(iOS 26.0, macOS 26.0, *)
+@Generable
+#endif
+struct MarinaFoundationSemanticRequest: Codable, Equatable, Sendable {
+    #if canImport(FoundationModels)
+    @Guide(description: "readQuery, lookup, clarification, unsupported, scenario, or help.")
+    #endif
+    let routeRaw: String
+    #if canImport(FoundationModels)
+    @Guide(description: "variableExpenses, plannedExpenses, income, budgets, cards, categories, presets, savingsAccounts, savingsLedgerEntries, reconciliationAccounts, reconciliationItems, workspaces, merchant, incomeSource, or uncategorizedExpenses.")
+    #endif
+    let subjectRaw: String?
+    #if canImport(FoundationModels)
+    @Guide(description: "sum, average, count, minimum, maximum, median, list, compare, rank, breakdown, percentageShare, lookupDetails, forecast, or simulate.")
+    #endif
+    let operationRaw: String?
+    #if canImport(FoundationModels)
+    @Guide(description: "amount, plannedAmount, actualAmount, effectivePlannedAmount, spendingAmount, ledgerSignedAmount, budgetImpactAmount, incomeAmount, savingsAmount, allocatedAmount, reconciliationBalance, or null.")
+    #endif
+    let amountFieldRaw: String?
+    let filters: [MarinaFoundationSemanticFilterIntent]
+    let dateText: String?
+    let comparisonDateText: String?
+    let periodUnitRaw: String?
+    let groupingRaw: String?
+    let rankingRaw: String?
+    let requestedDetailRaw: String?
+    let responseShapeRaw: String?
+    let limit: Int?
+    let incomeStatusRaw: String?
+    let metricContractRaw: String?
+    let unsupportedReasonRaw: String?
+    let unsupportedMessage: String?
+    let clarificationMessage: String?
+    let clarificationMissingFieldRaw: String?
+    let confidenceRaw: String?
+
+    func intent(
+        prompt: String,
+        context: MarinaInterpretationContext
+    ) -> MarinaAIIntent {
+        let route = MarinaFoundationRouteKind(routeRaw: routeRaw)
+        switch route {
+        case .unsupported, .help:
+            return .unsupported(
+                MarinaAIUnsupportedIntent(
+                    reasoning: "",
+                    reasonRaw: unsupportedReasonRaw?.nilIfBlank ?? (route == .help ? "help" : "unsupported"),
+                    message: unsupportedMessage?.nilIfBlank ?? "Marina could not safely map that to a supported read-only budgeting query."
+                )
+            )
+        case .clarification:
+            return .clarification(
+                MarinaAIClarificationIntent(
+                    reasoning: "",
+                    kindRaw: "missingTarget",
+                    message: clarificationMessage?.nilIfBlank ?? "Marina needs one more detail before reading your data.",
+                    missingFieldRaws: [clarificationMissingFieldRaw].compactMap { $0?.nilIfBlank },
+                    ambiguousFieldRaws: [],
+                    patchSlotRaw: "target",
+                    shouldRunBestEffort: false
+                )
+            )
+        case .readQuery, .lookup, .scenario:
+            guard let query = semanticQuery(prompt: prompt, context: context, route: route) else {
+                return .unsupported(
+                    MarinaAIUnsupportedIntent(
+                        reasoning: "",
+                        reasonRaw: "malformedSemanticRequest",
+                        message: "Apple Intelligence returned a typed request Marina could not safely validate."
+                    )
+                )
+            }
+            return .semanticQuery(query)
+        }
+    }
+
+    private func semanticQuery(
+        prompt: String,
+        context: MarinaInterpretationContext,
+        route: MarinaFoundationRouteKind
+    ) -> MarinaSemanticQuery? {
+        let subject = subject(from: subjectRaw, route: route)
+        let operation = operation(from: operationRaw, route: route)
+        guard route == .scenario || operation != .simulate else { return nil }
+        let metricID = metricContractID(from: metricContractRaw)
+        let routeIntent = MarinaRouteIntent.from(
+            semanticQuery: MarinaSemanticQuery(
+                subject: subject,
+                operation: operation,
+                metricContractID: metricID,
+                filters: [],
+                amountField: amountField(from: amountFieldRaw),
+                dateRange: nil,
+                comparisonDateRange: nil,
+                grouping: groupingRaw.flatMap { semanticGrouping(from: $0) }.map { MarinaGrouping(dimension: $0, rawText: groupingRaw) },
+                ranking: rankingRaw.flatMap { rankingDirection(from: $0) }.map { MarinaRanking(direction: $0, limit: limit, rawText: rankingRaw) },
+                limit: clampedLimit(limit),
+                averageBasis: nil,
+                incomeStatusScope: incomeStatus(from: incomeStatusRaw),
+                responseShape: responseShape(from: responseShapeRaw),
+                requestedDetail: requestedDetail(from: requestedDetailRaw),
+                routeIntent: nil
+            ),
+            operation: candidateOperation(from: operation),
+            measure: candidateMeasure(subject: subject, operation: operation, amountField: amountField(from: amountFieldRaw)),
+            targetTypes: semanticFilters().compactMap(\.entityTypeHint),
+            grouping: groupingRaw.flatMap { semanticGrouping(from: $0) },
+            responseShape: responseShape(from: responseShapeRaw).flatMap(responseShapeHint)
+        )
+        return MarinaSemanticQuery(
+            subject: subject,
+            operation: operation,
+            metricContractID: metricID,
+            filters: semanticFilters(),
+            amountField: amountField(from: amountFieldRaw),
+            dateRange: semanticDateRange(rawText: dateText, role: .primary, context: context),
+            comparisonDateRange: semanticDateRange(rawText: comparisonDateText, role: .comparison, context: context),
+            grouping: groupingRaw.flatMap { semanticGrouping(from: $0) }.map { MarinaGrouping(dimension: $0, rawText: groupingRaw) },
+            ranking: rankingRaw.flatMap { rankingDirection(from: $0) }.map { MarinaRanking(direction: $0, limit: limit, rawText: rankingRaw) },
+            limit: clampedLimit(limit),
+            averageBasis: nil,
+            incomeStatusScope: incomeStatus(from: incomeStatusRaw),
+            responseShape: responseShape(from: responseShapeRaw),
+            requestedDetail: requestedDetail(from: requestedDetailRaw),
+            routeIntent: routeIntent
+        )
+    }
+
+    private func semanticFilters() -> [MarinaFilter] {
+        filters.compactMap { filter in
+            guard let rawText = filter.rawText?.nilIfBlank else { return nil }
+            let typeHint = filter.typeRaw.flatMap(entityTypeHint(from:))
+            let allowed = filter.allowedTypeRaws.compactMap(entityTypeHint(from:))
+            let relationship = typeHint.map(relationship(from:)) ?? .unknown
+            return MarinaFilter(
+                role: resolvedRole(from: filter.roleRaw) ?? .filter,
+                relationship: relationship,
+                value: rawText,
+                matchMode: filter.isFreeText == true ? .freeText : .semanticOrAlias,
+                entityTypeHint: typeHint,
+                allowedEntityTypeHints: allowed.isEmpty ? nil : allowed,
+                sourceID: nil
+            )
+        }
+    }
+
+    private func semanticDateRange(
+        rawText: String?,
+        role: MarinaTimeScopeRole,
+        context: MarinaInterpretationContext
+    ) -> MarinaDateRangeRequest? {
+        guard let rawText = rawText?.nilIfBlank else { return nil }
+        let resolved = MarinaDateResolver(nowProvider: { context.now }).resolve(
+            input: rawText,
+            modelStartISO8601: nil,
+            modelEndISO8601: nil,
+            defaultPeriodUnit: periodUnit(from: periodUnitRaw) ?? context.defaultPeriodUnit
+        )?.queryDateRange
+        return MarinaDateRangeRequest(
+            role: role,
+            rawText: rawText,
+            resolvedRange: resolved,
+            periodUnit: periodUnit(from: periodUnitRaw)
         )
     }
 }
@@ -1072,6 +1272,8 @@ extension MarinaFoundationRouteEnvelope {
 extension MarinaAIIntent {
     var structuredIntent: MarinaStructuredIntent {
         switch self {
+        case .semanticQuery(let query):
+            return .semanticQuery(query)
         case .readQuery(let intent):
             return intent.structuredIntent
         case .lookup(let intent):
@@ -1446,6 +1648,344 @@ private func requestedDetail(from rawValue: String?) -> MarinaSemanticRequestedD
         return .membership
     default:
         return nil
+    }
+}
+
+private func subject(
+    from rawValue: String?,
+    route: MarinaFoundationRouteKind
+) -> MarinaSubject {
+    if let exact = exactRawValue(rawValue, as: MarinaSubject.self) {
+        return exact
+    }
+    guard let normalized = normalizedToken(rawValue) else {
+        return route == .lookup ? .workspaces : .variableExpenses
+    }
+    switch normalized {
+    case "variable_expenses", "variableexpenses", "variable_expense", "variableexpense", "expenses", "expense", "transactions", "transaction":
+        return .variableExpenses
+    case "planned_expenses", "plannedexpenses", "planned_expense", "plannedexpense":
+        return .plannedExpenses
+    case "income", "incomes":
+        return .income
+    case "budgets", "budget":
+        return .budgets
+    case "cards", "card":
+        return .cards
+    case "categories", "category":
+        return .categories
+    case "presets", "preset":
+        return .presets
+    case "savings_accounts", "savingsaccounts", "savings_account", "savingsaccount":
+        return .savingsAccounts
+    case "savings_ledger_entries", "savingsledgerentries", "savings_ledger", "savingsledger":
+        return .savingsLedgerEntries
+    case "reconciliation_accounts", "reconciliationaccounts", "allocation_accounts", "allocationaccounts", "reconciliation":
+        return .reconciliationAccounts
+    case "reconciliation_items", "reconciliationitems", "allocations", "settlements":
+        return .reconciliationItems
+    case "workspaces", "workspace":
+        return .workspaces
+    case "merchant", "merchants":
+        return .merchant
+    case "income_source", "incomesource", "income_sources", "incomesources":
+        return .incomeSource
+    case "uncategorized", "uncategorized_expenses", "uncategorizedexpenses":
+        return .uncategorizedExpenses
+    default:
+        return route == .lookup ? .workspaces : .variableExpenses
+    }
+}
+
+private func operation(
+    from rawValue: String?,
+    route: MarinaFoundationRouteKind
+) -> MarinaOperation {
+    if let exact = exactRawValue(rawValue, as: MarinaOperation.self) {
+        return exact
+    }
+    guard let normalized = normalizedToken(rawValue) else {
+        switch route {
+        case .lookup:
+            return .lookupDetails
+        case .scenario:
+            return .simulate
+        default:
+            return .sum
+        }
+    }
+    switch normalized {
+    case "sum", "total", "spend_total", "amount_total":
+        return .sum
+    case "avg", "average", "normally":
+        return .average
+    case "count":
+        return .count
+    case "min", "minimum":
+        return .minimum
+    case "max", "maximum":
+        return .maximum
+    case "median":
+        return .median
+    case "list", "list_rows", "listrows", "rows", "show", "find", "recent", "latest":
+        return .list
+    case "compare", "comparison", "change":
+        return .compare
+    case "rank", "top", "largest", "biggest", "highest":
+        return .rank
+    case "breakdown", "group", "grouped":
+        return .breakdown
+    case "percentage_share", "percentageshare", "share":
+        return .percentageShare
+    case "lookup", "lookup_details", "lookupdetails", "details":
+        return .lookupDetails
+    case "forecast", "project":
+        return .forecast
+    case "simulate", "scenario", "what_if", "whatif":
+        return .simulate
+    default:
+        return route == .lookup ? .lookupDetails : .sum
+    }
+}
+
+private func amountField(from rawValue: String?) -> MarinaAmountField? {
+    if let exact = exactRawValue(rawValue, as: MarinaAmountField.self) {
+        return exact
+    }
+    guard let normalized = normalizedToken(rawValue) else { return nil }
+    switch normalized {
+    case "amount":
+        return .amount
+    case "planned_amount", "plannedamount":
+        return .plannedAmount
+    case "actual_amount", "actualamount":
+        return .actualAmount
+    case "effective_planned_amount", "effectiveplannedamount":
+        return .effectivePlannedAmount
+    case "spending_amount", "spendingamount", "spend":
+        return .spendingAmount
+    case "ledger_signed_amount", "ledgersignedamount", "ledger":
+        return .ledgerSignedAmount
+    case "budget_impact_amount", "budgetimpactamount", "budget_impact", "budgetimpact":
+        return .budgetImpactAmount
+    case "income_amount", "incomeamount", "income":
+        return .incomeAmount
+    case "savings_amount", "savingsamount", "savings":
+        return .savingsAmount
+    case "allocated_amount", "allocatedamount", "allocated":
+        return .allocatedAmount
+    case "reconciliation_balance", "reconciliationbalance":
+        return .reconciliationBalance
+    default:
+        return nil
+    }
+}
+
+private func responseShape(from rawValue: String?) -> MarinaResponseShape? {
+    if let exact = exactRawValue(rawValue, as: MarinaResponseShape.self) {
+        return exact
+    }
+    guard let normalized = normalizedToken(rawValue) else { return nil }
+    switch normalized {
+    case "scalar_currency", "scalarcurrency", "currency":
+        return .scalarCurrency
+    case "summary_card", "summarycard", "summary":
+        return .summaryCard
+    case "relationship_list", "relationshiplist":
+        return .relationshipList
+    case "membership_status", "membershipstatus":
+        return .membershipStatus
+    case "comparison":
+        return .comparison
+    case "ranked_list", "rankedlist", "list":
+        return .rankedList
+    case "grouped_breakdown", "groupedbreakdown", "breakdown":
+        return .groupedBreakdown
+    case "chart_rows", "chartrows":
+        return .chartRows
+    case "clarification":
+        return .clarification
+    case "unsupported":
+        return .unsupported
+    default:
+        return nil
+    }
+}
+
+private func responseShapeHint(_ shape: MarinaResponseShape) -> MarinaResponseShapeHint? {
+    switch shape {
+    case .scalarCurrency:
+        return .scalarCurrency
+    case .summaryCard:
+        return .summaryCard
+    case .relationshipList:
+        return .relationshipList
+    case .membershipStatus:
+        return .membershipStatus
+    case .comparison:
+        return .comparison
+    case .rankedList:
+        return .rankedList
+    case .groupedBreakdown:
+        return .groupedBreakdown
+    case .chartRows:
+        return .chartRows
+    case .clarification:
+        return .clarification
+    case .unsupported:
+        return .unsupported
+    }
+}
+
+private func rankingDirection(from rawValue: String?) -> MarinaRankingDirectionCandidate? {
+    if let exact = exactRawValue(rawValue, as: MarinaRankingDirectionCandidate.self) {
+        return exact
+    }
+    guard let normalized = normalizedToken(rawValue) else { return nil }
+    switch normalized {
+    case "newest", "latest", "recent":
+        return .newest
+    case "largest", "biggest", "top", "highest":
+        return .largest
+    case "smallest", "lowest", "bottom":
+        return .smallest
+    default:
+        return nil
+    }
+}
+
+private func clampedLimit(_ limit: Int?) -> Int? {
+    limit.map { max(1, min($0, 25)) }
+}
+
+private func metricContractID(from rawValue: String?) -> MarinaMetricContractID? {
+    if let exact = exactRawValue(rawValue, as: MarinaMetricContractID.self) {
+        return exact
+    }
+    guard let normalized = normalizedToken(rawValue) else { return nil }
+    let compact = normalized.replacingOccurrences(of: "_", with: "")
+    return MarinaMetricContractID.allCases.first { id in
+        id.rawValue.lowercased() == normalized
+            || id.rawValue.lowercased() == compact
+            || id.rawValue
+                .replacingOccurrences(of: "([a-z0-9])([A-Z])", with: "$1_$2", options: .regularExpression)
+                .lowercased() == normalized
+    }
+}
+
+private func relationship(from hint: MarinaCandidateEntityTypeHint) -> MarinaRelationshipField {
+    switch hint {
+    case .category:
+        return .category
+    case .merchant:
+        return .merchant
+    case .expense, .transaction:
+        return .transaction
+    case .card:
+        return .card
+    case .budget:
+        return .budget
+    case .preset:
+        return .preset
+    case .incomeSource:
+        return .incomeSource
+    case .allocationAccount:
+        return .allocationAccount
+    case .savingsAccount:
+        return .savingsAccount
+    case .workspace:
+        return .workspace
+    }
+}
+
+private func resolvedRole(from rawValue: String?) -> MarinaResolvedTargetRole? {
+    if let exact = exactRawValue(rawValue, as: MarinaResolvedTargetRole.self) {
+        return exact
+    }
+    guard let normalized = normalizedToken(rawValue) else { return nil }
+    switch normalized {
+    case "filter":
+        return .filter
+    case "exclude_filter", "excludefilter", "exclude":
+        return .excludeFilter
+    case "primary_target", "primarytarget", "target":
+        return .primaryTarget
+    case "comparison_target", "comparisontarget":
+        return .comparisonTarget
+    case "grouping_dimension", "groupingdimension", "grouping":
+        return .groupingDimension
+    case "simulation_input", "simulationinput":
+        return .simulationInput
+    case "simulation_output", "simulationoutput":
+        return .simulationOutput
+    default:
+        return nil
+    }
+}
+
+private func candidateOperation(from operation: MarinaOperation) -> MarinaCandidateOperation {
+    switch operation {
+    case .sum, .percentageShare, .breakdown:
+        return .sum
+    case .average, .median:
+        return .average
+    case .count:
+        return .count
+    case .minimum:
+        return .minimum
+    case .maximum:
+        return .maximum
+    case .list:
+        return .listRows
+    case .compare:
+        return .compare
+    case .rank:
+        return .rank
+    case .lookupDetails:
+        return .lookupDetails
+    case .forecast:
+        return .forecast
+    case .simulate:
+        return .simulate
+    }
+}
+
+private func candidateMeasure(
+    subject: MarinaSubject,
+    operation: MarinaOperation,
+    amountField: MarinaAmountField?
+) -> MarinaCandidateMeasure {
+    if operation == .percentageShare {
+        return .categoryShare
+    }
+    switch amountField {
+    case .incomeAmount:
+        return .income
+    case .savingsAmount:
+        return .savings
+    case .allocatedAmount, .reconciliationBalance:
+        return .reconciliationBalance
+    case .plannedAmount, .actualAmount, .effectivePlannedAmount:
+        return .presetAmount
+    case .amount, .spendingAmount, .ledgerSignedAmount, .budgetImpactAmount:
+        return operation == .list ? .transactionAmount : .spend
+    case nil:
+        switch subject {
+        case .income, .incomeSource:
+            return .income
+        case .savingsAccounts:
+            return .savings
+        case .savingsLedgerEntries:
+            return .savingsMovement
+        case .reconciliationAccounts, .reconciliationItems:
+            return .reconciliationBalance
+        case .plannedExpenses, .presets:
+            return .presetAmount
+        case .budgets:
+            return .remainingBudget
+        case .variableExpenses, .cards, .categories, .merchant, .uncategorizedExpenses, .workspaces:
+            return operation == .list ? .transactionAmount : .spend
+        }
     }
 }
 

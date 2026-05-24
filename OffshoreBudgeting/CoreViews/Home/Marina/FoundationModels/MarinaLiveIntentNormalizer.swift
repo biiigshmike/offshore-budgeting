@@ -237,6 +237,7 @@ struct MarinaLiveIntentNormalizer {
             id: query.id,
             subject: query.subject,
             operation: query.operation,
+            metricContractID: query.metricContractID,
             filters: filters,
             amountField: query.amountField,
             dateRange: query.dateRange,

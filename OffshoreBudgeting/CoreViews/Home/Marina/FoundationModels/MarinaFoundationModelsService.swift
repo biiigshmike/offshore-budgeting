@@ -46,23 +46,24 @@ struct MarinaFoundationModelsService: MarinaStructuredIntentInterpreting, Marina
 }
 
 enum MarinaFoundationInterpretationPromptBuilder {
-    static let maximumResponseTokens = 256
+    static let maximumResponseTokens = 384
 
     static func instructions(context: MarinaInterpretationContext) -> String {
         """
         Prompt version: \(MarinaFoundationPromptVersion.interpretation.rawValue)
-        You are Marina inside Offshore. Extract one tiny typed envelope for deterministic Swift execution.
+        You are Marina inside Offshore. Extract one typed semantic request for deterministic Swift execution.
         Swift validates workspace scope, resolves entities, reads data, computes math, and writes the final answer.
 
         Rules:
-        - Return only MarinaFoundationIntentEnvelope fields.
+        - Return only MarinaFoundationSemanticRequest fields.
         - routeRaw must be readQuery, lookup, clarification, scenario, help, or unsupported.
         - Use null for unused optional fields; never write placeholder strings like null, nil, none, n/a, or unknown.
         - Never calculate totals, balances, rows, percentages, or final answer text.
         - Preserve date phrases exactly in dateText or comparisonDateText; if no date appears, leave dateText null.
-        - targetText is only a concrete named object or filter. Do not put generic concepts like spending, income, actual income, active budget, savings, budget, transactions, or uncategorized spending in targetText.
-        - For relationships, copy words like linked cards, linked presets, budget limit, allocation rows, settlement rows, status, or balance into relationshipText.
-        - For explicit what-if prompts, copy the amount phrase into amountText and use valueDirectionRaw more, less, set, increase, or decrease when obvious.
+        - Put only concrete named objects or row-search spans in filters[].rawText.
+        - Do not include command/filler words such as show, list, find, me, all, my, expenses, transactions, purchases, please in filter spans.
+        - For unknown merchant/transaction row text such as "Mr. Pickle", use subjectRaw variableExpenses, operationRaw list, amountFieldRaw amount, filter typeRaw merchant, allowedTypeRaws merchant/expense/transaction, and isFreeText true.
+        - For known formulas, set metricContractRaw to the matching MarinaMetricContractID when obvious; Swift will validate support and execution.
         - For CRUD commands, set routeRaw unsupported and unsupportedReasonRaw crud.
 
         Route hints:
@@ -83,7 +84,7 @@ enum MarinaFoundationInterpretationPromptBuilder {
     static func prompt(userPrompt: String) -> String {
         """
         User prompt: \(userPrompt)
-        Produce the typed envelope only.
+        Produce the typed semantic request only.
         """
     }
 
@@ -126,29 +127,25 @@ private func interpretWithFoundationModels(
         )
         let response = try await routeSession.respond(
             to: MarinaFoundationInterpretationPromptBuilder.prompt(userPrompt: prompt),
-            generating: MarinaFoundationIntentEnvelope.self,
+            generating: MarinaFoundationSemanticRequest.self,
             includeSchemaInPrompt: true,
             options: marinaInterpretationOptions(maximumResponseTokens: MarinaFoundationInterpretationPromptBuilder.maximumResponseTokens)
         )
-        let mapping = MarinaLiveDomainIntentMapper(nowProvider: { context.now }).map(
-            payload: response.content.payload,
-            prompt: prompt,
-            context: context
-        )
+        let intent = response.content.intent(prompt: prompt, context: context)
         MarinaTraceRecorder.shared.recordLiveRouteOwnership(
-            liveEnvelopeSummary: mapping.liveEnvelopeSummary,
-            canonicalRouteSummary: mapping.canonicalRouteSummary,
-            routeOverrideSummary: mapping.routeOverrideSummary,
-            routeGuardSummary: mapping.routeGuardSummary,
-            routeKeySummary: mapping.routeKeySummary,
-            droppedTargetSummary: mapping.droppedTargetSummary,
-            datePolicySummary: mapping.datePolicySummary,
-            dateSourceSummary: mapping.dateSourceSummary,
-            effectiveDateRangeSummary: mapping.effectiveDateRangeSummary,
-            routeRescueSummary: mapping.routeRescueSummary,
-            blockedWrongQuery: mapping.blockedWrongQuery
+            liveEnvelopeSummary: "semanticRequest=typed",
+            canonicalRouteSummary: intent.kind.rawValue,
+            routeOverrideSummary: nil,
+            routeGuardSummary: "semanticQueryValidatedBySwift",
+            routeKeySummary: nil,
+            droppedTargetSummary: nil,
+            datePolicySummary: nil,
+            dateSourceSummary: nil,
+            effectiveDateRangeSummary: nil,
+            routeRescueSummary: nil,
+            blockedWrongQuery: intent.kind == .unsupported
         )
-        return mapping.intent
+        return intent
     } catch let error as MarinaFoundationModelsServiceError {
         throw error
     } catch {

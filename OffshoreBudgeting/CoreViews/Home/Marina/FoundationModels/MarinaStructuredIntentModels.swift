@@ -8,6 +8,7 @@
 import Foundation
 
 enum MarinaStructuredIntentKind: String, Equatable {
+    case semanticQuery
     case semanticCommand
     case query
     case command
@@ -149,6 +150,7 @@ struct MarinaStructuredCommandIntent: Equatable {
 }
 
 enum MarinaStructuredIntent: Equatable {
+    case semanticQuery(MarinaSemanticQuery)
     case semanticCommand(MarinaSemanticCommand)
     case query(MarinaStructuredQueryIntent)
     case command(MarinaStructuredCommandIntent)

@@ -195,7 +195,8 @@ struct MarinaLiveDomainIntentMapper {
                     requestedDetail: "general"
                 )
             }
-            if let target = payload.targetText?.marinaNilIfBlank,
+            if let target = payload.targetText?.marinaNilIfBlank.map(cleanSpendTarget),
+               target.isEmpty == false,
                isInvalidEntityTarget(target) == false {
                 return mappedLookup(
                     payload: payload,
@@ -989,11 +990,7 @@ struct MarinaLiveDomainIntentMapper {
             || containsWord("transactions", in: normalizedPrompt)
             || containsWord("purchase", in: normalizedPrompt)
             || containsWord("purchases", in: normalizedPrompt)
-        guard asksForExpenseRows else { return false }
-
-        return namedTarget(context.cardNames, in: normalizedPrompt, fallback: nil) != nil
-            || namedTarget(context.categoryNames, in: normalizedPrompt, fallback: nil) != nil
-            || normalizedPrompt.contains(" at ")
+        return asksForExpenseRows
     }
 
     private func mappedRead(
@@ -1587,7 +1584,9 @@ struct MarinaLiveDomainIntentMapper {
         value
             .replacingOccurrences(of: #"(?i)['’]s\b"#, with: "", options: .regularExpression)
             .replacingOccurrences(of: #"(?i)\b(this|last|current|previous)\s+(month|week|year)\b"#, with: "", options: .regularExpression)
-            .replacingOccurrences(of: #"(?i)\bspending|spend|spent|budget|limit|rows?\b"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"(?i)\b(me|all|of|my|the|please)\b"#, with: " ", options: .regularExpression)
+            .replacingOccurrences(of: #"(?i)\b(spending|spend|spent|budget|limit|expense|expenses|transaction|transactions|purchase|purchases|rows?)\b"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
             .trimmingCharacters(in: CharacterSet(charactersIn: " ?.'"))
     }
 

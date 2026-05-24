@@ -35,6 +35,12 @@ struct MarinaFoundationAIInterpreter: MarinaCanonicalAIInterpreting {
         defaultPeriodUnit: HomeQueryPeriodUnit
     ) -> MarinaCanonicalReadInterpretation {
         switch intent {
+        case .semanticQuery:
+            return foundationContractInterpreter.canonicalInterpretation(
+                from: intent.structuredIntent,
+                prompt: prompt,
+                defaultPeriodUnit: defaultPeriodUnit
+            )
         case .scenario(let scenario):
             let scenarioFilters: [MarinaSemanticCommandFilter]
             if let targetName = scenario.targetName?.marinaNilIfBlank {
@@ -1331,6 +1337,7 @@ private extension MarinaSemanticQuery {
             id: id,
             subject: subject,
             operation: operation,
+            metricContractID: metricContractID,
             filters: filters ?? self.filters,
             amountField: amountField,
             dateRange: dateRange ?? self.dateRange,

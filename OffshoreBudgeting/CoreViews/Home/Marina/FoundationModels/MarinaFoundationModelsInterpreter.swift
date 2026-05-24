@@ -45,6 +45,13 @@ struct MarinaFoundationModelsInterpreter {
         prompt: String,
         defaultPeriodUnit: HomeQueryPeriodUnit
     ) -> MarinaQueryPlanCandidate {
+        if case .semanticQuery(let query) = structuredIntent {
+            return MarinaSemanticQueryAdapter().compatibilityCandidate(
+                from: query,
+                prompt: prompt
+            )
+        }
+
         if case .semanticCommand(let command) = structuredIntent {
             return candidate(
                 from: command,
@@ -53,6 +60,12 @@ struct MarinaFoundationModelsInterpreter {
         }
 
         switch structuredIntent {
+        case .semanticQuery:
+            return unsupportedCandidate(
+                prompt: prompt,
+                confidence: .low,
+                unsupportedHint: .lowConfidence
+            )
         case .semanticCommand:
             return unsupportedCandidate(
                 prompt: prompt,
@@ -105,6 +118,16 @@ struct MarinaFoundationModelsInterpreter {
         prompt: String,
         defaultPeriodUnit: HomeQueryPeriodUnit
     ) -> MarinaCanonicalReadInterpretation {
+        if case .semanticQuery(let query) = structuredIntent {
+            return MarinaCanonicalReadInterpretation(
+                result: .query(query),
+                compatibilityCandidate: MarinaSemanticQueryAdapter().compatibilityCandidate(
+                    from: query,
+                    prompt: prompt
+                )
+            )
+        }
+
         let candidate = candidate(
             from: structuredIntent,
             prompt: prompt,

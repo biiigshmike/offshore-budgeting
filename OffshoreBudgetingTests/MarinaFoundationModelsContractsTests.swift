@@ -71,6 +71,54 @@ struct MarinaFoundationModelsContractsTests {
         }
     }
 
+    @available(iOS 26.0, macOS 26.0, *)
+    @Test func semanticRequest_mapsFreeTextExpenseRowsWithoutPollutedTarget() {
+        let request = MarinaFoundationSemanticRequest(
+            routeRaw: "readQuery",
+            subjectRaw: "variableExpenses",
+            operationRaw: "list",
+            amountFieldRaw: "amount",
+            filters: [
+                MarinaFoundationSemanticFilterIntent(
+                    rawText: "Mr. Pickle",
+                    typeRaw: "merchant",
+                    roleRaw: "filter",
+                    allowedTypeRaws: ["merchant", "expense", "transaction"],
+                    isFreeText: true
+                )
+            ],
+            dateText: nil,
+            comparisonDateText: nil,
+            periodUnitRaw: nil,
+            groupingRaw: "transaction",
+            rankingRaw: "newest",
+            requestedDetailRaw: nil,
+            responseShapeRaw: "rankedList",
+            limit: 10,
+            incomeStatusRaw: nil,
+            metricContractRaw: nil,
+            unsupportedReasonRaw: nil,
+            unsupportedMessage: nil,
+            clarificationMessage: nil,
+            clarificationMissingFieldRaw: nil,
+            confidenceRaw: "high"
+        )
+
+        guard case .semanticQuery(let query) = request.intent(
+            prompt: "Show me all of my Mr. Pickle expenses, please",
+            context: routerContext()
+        ) else {
+            Issue.record("Expected typed semantic query.")
+            return
+        }
+
+        #expect(query.subject == .variableExpenses)
+        #expect(query.operation == .list)
+        #expect(query.filters.first?.value == "Mr. Pickle")
+        #expect(query.filters.first?.matchMode == .freeText)
+        #expect(query.filters.first?.allowedEntityTypeHints == [.merchant, .expense, .transaction])
+    }
+
     @Test func runtimeTraceSummary_includesFoundationPromptVersioning() {
         let settings = MarinaRuntimeSettings.resolve(
             aiOptInFallback: true,
@@ -129,9 +177,9 @@ struct MarinaFoundationModelsContractsTests {
             userPrompt: "What is my actual income this month?"
         )
 
-        #expect(MarinaFoundationInterpretationPromptBuilder.maximumResponseTokens == 256)
+        #expect(MarinaFoundationInterpretationPromptBuilder.maximumResponseTokens == 384)
         #expect(prompt.contains("User prompt: What is my actual income this month?"))
-        #expect(prompt.contains("Produce the typed envelope only."))
+        #expect(prompt.contains("Produce the typed semantic request only."))
         #expect(prompt.contains("Default period unit") == false)
         #expect(prompt.contains("Prior context") == false)
     }

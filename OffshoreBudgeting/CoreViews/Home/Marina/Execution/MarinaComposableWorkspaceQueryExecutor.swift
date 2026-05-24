@@ -156,7 +156,7 @@ struct MarinaComposableWorkspaceQueryExecutor {
         case (.rank, .spend, .card):
             return .handled(cardBudgetImpactRanking(plan: plan, provider: provider, now: now, amountBasis: amountBasis))
         case (.sum, .spend, _):
-            guard resolved.resolvedTargets.isEmpty == false else { return .unsupported }
+            guard hasFilterTargets(resolved: resolved, plan: plan) else { return .unsupported }
             return .handled(filteredSpend(candidate: candidate, resolved: resolved, plan: plan, provider: provider, now: now, amountBasis: amountBasis))
         case (.rank, .spend, nil), (.rank, .spend, .transaction):
             guard candidate.measure == .transactionAmount || candidate.grouping?.dimension == .transaction,
@@ -172,7 +172,7 @@ struct MarinaComposableWorkspaceQueryExecutor {
             }
             return .handled(recentFilteredTransactions(resolved: resolved, plan: plan, provider: provider, now: now, amountBasis: amountBasis))
         case (.average, .spend, nil), (.average, .spend, .week), (.average, .spend, .month):
-            guard plan.targets.isEmpty || resolved.resolvedTargets.isEmpty == false else { return .unsupported }
+            guard plan.targets.isEmpty || hasFilterTargets(resolved: resolved, plan: plan) else { return .unsupported }
             return .handled(targetedPeriodicAverage(resolved: resolved, plan: plan, provider: provider, now: now, amountBasis: amountBasis))
         case (.compare, .spend, .category), (.compare, .spend, .transaction):
             guard plan.ranking != nil else { return .unsupported }
@@ -606,12 +606,13 @@ struct MarinaComposableWorkspaceQueryExecutor {
     ) -> MarinaWorkspaceAggregationCard {
         let range = plan.dateRange ?? monthRange(containing: now)
         let excludedNames = exclusionNames(from: candidate.rawPrompt)
-        let explicitExcludeFilters = resolved.resolvedTargets.filter { $0.role == .excludeFilter }
-        let includeFilters = resolved.resolvedTargets.filter {
+        let targets = filterTargets(resolved: resolved, plan: plan)
+        let explicitExcludeFilters = targets.filter { $0.role == .excludeFilter }
+        let includeFilters = targets.filter {
             $0.role != .excludeFilter && excludedNames.contains(normalized($0.displayName)) == false
         }
         let excludeFilters = explicitExcludeFilters.isEmpty
-            ? resolved.resolvedTargets.filter { excludedNames.contains(normalized($0.displayName)) }
+            ? targets.filter { excludedNames.contains(normalized($0.displayName)) }
             : explicitExcludeFilters
         let rows = spendingRows(provider: provider, range: range, amountBasis: amountBasis)
             .filter { row in includeFilters.allSatisfy { matches(row: row, target: $0) } }
@@ -635,7 +636,7 @@ struct MarinaComposableWorkspaceQueryExecutor {
         amountBasis: MarinaFinancialAmountBasis
     ) -> MarinaWorkspaceAggregationCard {
         let range = plan.dateRange ?? lookbackRange(from: now, months: 12)
-        let filters = resolved.resolvedTargets.filter { $0.role != .excludeFilter }
+        let filters = filterTargets(resolved: resolved, plan: plan).filter { $0.role != .excludeFilter }
         let filteredRows = spendingRows(provider: provider, range: range, amountBasis: amountBasis)
             .filter { row in filters.isEmpty || filters.allSatisfy { matches(row: row, target: $0) } }
         let rows = plan.ranking?.direction == .largest
@@ -1076,6 +1077,60 @@ struct MarinaComposableWorkspaceQueryExecutor {
                 || normalized(row.title).contains(normalized(target.displayName))
         case .allocationAccount, .budget, .incomeSource, .savingsAccount, .workspace:
             return false
+        }
+    }
+
+    private func hasFilterTargets(
+        resolved: MarinaResolvedQueryCandidate,
+        plan: MarinaAggregationPlan
+    ) -> Bool {
+        filterTargets(resolved: resolved, plan: plan).isEmpty == false
+    }
+
+    private func filterTargets(
+        resolved: MarinaResolvedQueryCandidate,
+        plan: MarinaAggregationPlan
+    ) -> [MarinaResolvedEntityMention] {
+        if plan.targets.isEmpty == false {
+            return plan.targets.map(resolvedMention)
+        }
+        return resolved.resolvedTargets
+    }
+
+    private func resolvedMention(from target: MarinaResolvedAggregationTarget) -> MarinaResolvedEntityMention {
+        MarinaResolvedEntityMention(
+            id: target.id,
+            mention: MarinaUnresolvedEntityMention(
+                id: target.id,
+                role: mentionRole(from: target.role),
+                rawText: target.displayName,
+                typeHint: target.entityType,
+                allowedTypeHints: [target.entityType],
+                confidence: .high
+            ),
+            role: target.role,
+            entityType: target.entityType,
+            displayName: target.displayName,
+            sourceID: target.sourceID
+        )
+    }
+
+    private func mentionRole(from role: MarinaResolvedTargetRole) -> MarinaEntityMentionRole {
+        switch role {
+        case .filter:
+            return .filter
+        case .excludeFilter:
+            return .excludeFilter
+        case .primaryTarget:
+            return .primaryTarget
+        case .comparisonTarget:
+            return .comparisonTarget
+        case .groupingDimension:
+            return .groupingDimension
+        case .simulationInput:
+            return .simulationInput
+        case .simulationOutput:
+            return .simulationOutput
         }
     }
 

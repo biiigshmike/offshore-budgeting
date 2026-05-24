@@ -544,7 +544,6 @@ struct MarinaDatabaseLookupExecutor {
     private func broadCandidates(for result: MarinaDatabaseLookupResult) -> [String] {
         [
             result.title,
-            result.subtitle,
             result.cardName,
             result.categoryName,
             result.accountName,

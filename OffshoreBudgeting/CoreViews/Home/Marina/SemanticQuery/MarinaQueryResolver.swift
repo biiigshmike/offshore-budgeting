@@ -212,6 +212,22 @@ struct MarinaQueryResolver {
                 continue
             }
 
+            if filter.matchMode == .freeText,
+               let freeTextType = freeTextEntityType(from: filter) {
+                resolvedFilters.append(
+                    MarinaResolvedFilter(
+                        id: filter.id,
+                        filter: filter,
+                        role: filter.role,
+                        relationship: freeTextRelationship(from: filter, entityType: freeTextType),
+                        entityType: freeTextType,
+                        displayName: trimmedValue,
+                        sourceID: nil
+                    )
+                )
+                continue
+            }
+
             let mention = MarinaUnresolvedEntityMention(
                 id: filter.id,
                 role: mentionRole(from: filter.role),
@@ -685,5 +701,51 @@ struct MarinaQueryResolver {
             || filter.value
                 .trimmingCharacters(in: .whitespacesAndNewlines)
                 .localizedCaseInsensitiveCompare("uncategorized") == .orderedSame
+    }
+
+    private func freeTextEntityType(from filter: MarinaFilter) -> MarinaCandidateEntityTypeHint? {
+        let allowed = filter.allowedEntityTypeHints ?? []
+        if allowed.contains(.merchant) { return .merchant }
+        if allowed.contains(.transaction) { return .transaction }
+        if allowed.contains(.expense) { return .expense }
+        if let hint = filter.entityTypeHint,
+           [.merchant, .transaction, .expense].contains(hint) {
+            return hint
+        }
+        if [.merchant, .transaction].contains(filter.relationship) {
+            return filter.relationship == .merchant ? .merchant : .transaction
+        }
+        return nil
+    }
+
+    private func freeTextRelationship(
+        from filter: MarinaFilter,
+        entityType: MarinaCandidateEntityTypeHint
+    ) -> MarinaRelationshipField {
+        if filter.relationship != .unknown {
+            return filter.relationship
+        }
+        switch entityType {
+        case .merchant:
+            return .merchant
+        case .expense, .transaction:
+            return .transaction
+        case .category:
+            return .category
+        case .card:
+            return .card
+        case .budget:
+            return .budget
+        case .preset:
+            return .preset
+        case .incomeSource:
+            return .incomeSource
+        case .allocationAccount:
+            return .allocationAccount
+        case .savingsAccount:
+            return .savingsAccount
+        case .workspace:
+            return .workspace
+        }
     }
 }

@@ -454,6 +454,11 @@ struct MarinaMetricContractResolver {
             return MarinaMetricContractResolution(contract: contract, match: .formulaPhrase)
         }
 
+        if let id = semanticResolved?.query.metricContractID,
+           let contract = registry.contract(for: id) {
+            return MarinaMetricContractResolution(contract: contract, match: .semanticShape)
+        }
+
         if let id = contractIDFromFormula(candidate: candidate),
            let contract = registry.contract(for: id) {
             return MarinaMetricContractResolution(contract: contract, match: .formulaMetadata)

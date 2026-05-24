@@ -4,6 +4,7 @@ struct MarinaSemanticQuery: Codable, Equatable, Identifiable, Sendable {
     let id: UUID
     let subject: MarinaSubject
     let operation: MarinaOperation
+    let metricContractID: MarinaMetricContractID?
     let filters: [MarinaFilter]
     let amountField: MarinaAmountField?
     let dateRange: MarinaDateRangeRequest?
@@ -21,6 +22,7 @@ struct MarinaSemanticQuery: Codable, Equatable, Identifiable, Sendable {
         id: UUID = UUID(),
         subject: MarinaSubject,
         operation: MarinaOperation,
+        metricContractID: MarinaMetricContractID? = nil,
         filters: [MarinaFilter] = [],
         amountField: MarinaAmountField? = nil,
         dateRange: MarinaDateRangeRequest? = nil,
@@ -37,6 +39,7 @@ struct MarinaSemanticQuery: Codable, Equatable, Identifiable, Sendable {
         self.id = id
         self.subject = subject
         self.operation = operation
+        self.metricContractID = metricContractID
         self.filters = filters
         self.amountField = amountField
         self.dateRange = dateRange
@@ -200,6 +203,7 @@ enum MarinaFilterMatchMode: String, Codable, Equatable, CaseIterable, Sendable {
     case exact
     case prefix
     case semanticOrAlias
+    case freeText
     case unresolved
 }
 
@@ -538,6 +542,30 @@ struct MarinaSemanticQueryAdapter {
         )
     }
 
+    func compatibilityCandidate(
+        from semanticQuery: MarinaSemanticQuery,
+        prompt: String,
+        source: MarinaInterpretationSource = .foundationModels
+    ) -> MarinaQueryPlanCandidate {
+        let operation = candidateOperation(from: semanticQuery.operation)
+        let measure = candidateMeasure(from: semanticQuery)
+        return MarinaQueryPlanCandidate(
+            requestFamily: semanticQuery.operation == .lookupDetails ? .databaseLookup : .analytics,
+            source: source,
+            rawPrompt: prompt,
+            operation: operation,
+            measure: measure,
+            entityMentions: semanticQuery.filters.map(entityMention),
+            timeScopes: timeScopes(from: semanticQuery),
+            grouping: semanticQuery.grouping.map { MarinaGroupingCandidate(dimension: $0.dimension, rawText: $0.rawText) },
+            ranking: semanticQuery.ranking.map { MarinaRankingCandidate(direction: $0.direction, limit: $0.limit, rawText: $0.rawText) },
+            limit: semanticQuery.limit,
+            responseShapeHint: semanticQuery.responseShape.flatMap(responseShapeHint),
+            confidence: .high,
+            routeIntent: semanticQuery.routeIntent
+        )
+    }
+
     private func subject(from dataset: MarinaSemanticCommandDataset?) -> MarinaSubject {
         switch dataset {
         case .workspaces:
@@ -745,6 +773,42 @@ struct MarinaSemanticQueryAdapter {
         }
     }
 
+    private func entityMention(from filter: MarinaFilter) -> MarinaUnresolvedEntityMention {
+        MarinaUnresolvedEntityMention(
+            id: filter.id,
+            role: mentionRole(from: filter.role),
+            rawText: filter.value,
+            typeHint: filter.entityTypeHint,
+            allowedTypeHints: filter.allowedEntityTypeHints,
+            confidence: filter.matchMode == .exact ? .high : .medium
+        )
+    }
+
+    private func timeScopes(from semanticQuery: MarinaSemanticQuery) -> [MarinaUnresolvedTimeScope] {
+        var scopes: [MarinaUnresolvedTimeScope] = []
+        if let dateRange = semanticQuery.dateRange {
+            scopes.append(
+                MarinaUnresolvedTimeScope(
+                    role: dateRange.role,
+                    rawText: dateRange.rawText,
+                    resolvedRangeHint: dateRange.resolvedRange,
+                    periodUnitHint: dateRange.periodUnit
+                )
+            )
+        }
+        if let comparisonDateRange = semanticQuery.comparisonDateRange {
+            scopes.append(
+                MarinaUnresolvedTimeScope(
+                    role: .comparison,
+                    rawText: comparisonDateRange.rawText,
+                    resolvedRangeHint: comparisonDateRange.resolvedRange,
+                    periodUnitHint: comparisonDateRange.periodUnit
+                )
+            )
+        }
+        return scopes
+    }
+
     private func isReservedIncomeStatusWord(_ value: String) -> Bool {
         let normalized = value
             .lowercased()
@@ -900,6 +964,25 @@ struct MarinaSemanticQueryAdapter {
     }
 
     private func resolvedRole(from role: MarinaEntityMentionRole) -> MarinaResolvedTargetRole {
+        switch role {
+        case .filter:
+            return .filter
+        case .excludeFilter:
+            return .excludeFilter
+        case .primaryTarget:
+            return .primaryTarget
+        case .comparisonTarget:
+            return .comparisonTarget
+        case .groupingDimension:
+            return .groupingDimension
+        case .simulationInput:
+            return .simulationInput
+        case .simulationOutput:
+            return .simulationOutput
+        }
+    }
+
+    private func mentionRole(from role: MarinaResolvedTargetRole) -> MarinaEntityMentionRole {
         switch role {
         case .filter:
             return .filter

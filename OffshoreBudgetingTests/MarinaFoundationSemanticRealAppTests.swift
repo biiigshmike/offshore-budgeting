@@ -35,6 +35,45 @@ struct MarinaFoundationSemanticRealAppTests {
         assertFoundationOnly(trace)
     }
 
+    @Test func semanticRealApp_freeTextMerchantExpensePhrasesShareCanonicalRows() async throws {
+        let fixture = try makeFixture()
+        fixture.context.insert(VariableExpense(descriptionText: "DoorDash - Mr. Pickle", amount: 45.69, transactionDate: date(2026, 5, 10), workspace: fixture.workspace, card: fixture.appleCard, category: fixture.groceries))
+        fixture.context.insert(VariableExpense(descriptionText: "DoorDash - Mr. Pickle", amount: 50.74, transactionDate: date(2026, 5, 14), workspace: fixture.workspace, card: fixture.appleCard, category: fixture.groceries))
+        fixture.context.insert(VariableExpense(descriptionText: "Starbucks", amount: 25, transactionDate: date(2026, 5, 13), workspace: fixture.workspace, card: fixture.appleCard, category: fixture.groceries))
+        try fixture.context.save()
+
+        let prompts = [
+            "Show me all of my Mr. Pickle expenses, please",
+            "List Mr. Pickle Expenses",
+            "Show Mr. Pickle"
+        ]
+        let coordinator = coordinator(for: Dictionary(uniqueKeysWithValues: prompts.map { prompt in
+            (prompt, freeTextRowsInterpretation(prompt: prompt, target: "Mr. Pickle"))
+        }))
+
+        var canonicalResultTitles: [[String]] = []
+        for prompt in prompts {
+            let (result, trace) = await tracedTurn(prompt: prompt) {
+                await coordinator.run(prompt: prompt, context: turnContext(fixture))
+            }
+
+            guard case .handled(let answer, _, _, _, let route) = result else {
+                Issue.record("Expected free-text merchant row lookup to handle '\(prompt)'.")
+                continue
+            }
+            let pickleTitles = answer.rows.map(\.title).filter {
+                $0.localizedCaseInsensitiveContains("Mr. Pickle")
+            }
+            #expect(pickleTitles.count == 2)
+            #expect(answer.rows.contains { $0.title.localizedCaseInsensitiveContains("Starbucks") } == false)
+            #expect(route?.traceName == "list")
+            canonicalResultTitles.append(pickleTitles)
+            assertFoundationOnly(trace)
+        }
+
+        #expect(Set(canonicalResultTitles).count == 1)
+    }
+
     @Test func semanticRealApp_allocatedCategoryContractUsesAllocatedShareInsteadOfGrossSpend() async throws {
         let fixture = try makeFixture()
         let cannabis = Offshore.Category(name: "Cannabis", hexColor: "#225522", workspace: fixture.workspace)
@@ -819,6 +858,47 @@ struct MarinaFoundationSemanticRealAppTests {
         MarinaCanonicalReadInterpretation(
             result: MarinaSemanticQueryAdapter().interpretationResult(from: candidate),
             compatibilityCandidate: candidate
+        )
+    }
+
+    private func freeTextRowsInterpretation(
+        prompt: String,
+        target: String
+    ) -> MarinaCanonicalReadInterpretation {
+        let query = MarinaSemanticQuery(
+            subject: .variableExpenses,
+            operation: .list,
+            filters: [
+                MarinaFilter(
+                    role: .filter,
+                    relationship: .merchant,
+                    value: target,
+                    matchMode: .freeText,
+                    entityTypeHint: .merchant,
+                    allowedEntityTypeHints: [.merchant, .expense, .transaction],
+                    sourceID: nil
+                )
+            ],
+            amountField: .amount,
+            grouping: MarinaGrouping(dimension: .transaction, rawText: "transaction"),
+            ranking: MarinaRanking(direction: .newest, limit: 10, rawText: "newest"),
+            limit: 10,
+            responseShape: .rankedList,
+            routeIntent: MarinaRouteIntent(
+                kind: .recentTransactionRows,
+                subject: .variableExpenses,
+                operation: .listRows,
+                measure: .transactionAmount,
+                grouping: .transaction,
+                targetTypes: [.merchant, .expense, .transaction],
+                requestedDetail: nil,
+                responseShape: .rankedList,
+                preferredExecutorRoute: .list
+            )
+        )
+        return MarinaCanonicalReadInterpretation(
+            result: .query(query),
+            compatibilityCandidate: MarinaSemanticQueryAdapter().compatibilityCandidate(from: query, prompt: prompt)
         )
     }
 

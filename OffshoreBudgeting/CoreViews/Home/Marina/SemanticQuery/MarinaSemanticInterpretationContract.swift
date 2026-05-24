@@ -267,6 +267,16 @@ struct MarinaSemanticInterpretationContractResolver {
 
         if let priorInterpretation,
            case .unsupported = priorInterpretation.result,
+           let rowInterpretation = freeTextExpenseRowsInterpretation(
+            prompt: prompt,
+            normalizedPrompt: normalizedPrompt,
+            failureDiagnostic: failureDiagnostic
+           ) {
+            return rowInterpretation
+        }
+
+        if let priorInterpretation,
+           case .unsupported = priorInterpretation.result,
            let lookupInterpretation = bareEntityLookupInterpretation(
             prompt: prompt,
             normalizedPrompt: normalizedPrompt,
@@ -603,6 +613,95 @@ struct MarinaSemanticInterpretationContractResolver {
             candidate: candidate,
             repairSummary: repairSummary(contract: contract, failureDiagnostic: failureDiagnostic)
         )
+    }
+
+    private func freeTextExpenseRowsInterpretation(
+        prompt: String,
+        normalizedPrompt: String,
+        failureDiagnostic: MarinaFoundationModelsFailureDiagnostic?
+    ) -> MarinaCanonicalReadInterpretation? {
+        guard normalizedPrompt.hasPrefix("show ")
+                || normalizedPrompt.hasPrefix("find ")
+                || normalizedPrompt.hasPrefix("list ") else {
+            return nil
+        }
+        guard containsAny(["expense", "expenses", "transaction", "transactions", "purchase", "purchases"], in: normalizedPrompt) else {
+            return nil
+        }
+        guard let searchText = freeTextExpenseSearchText(prompt) else {
+            return nil
+        }
+
+        let query = MarinaSemanticQuery(
+            subject: .variableExpenses,
+            operation: .list,
+            filters: [
+                MarinaFilter(
+                    role: .filter,
+                    relationship: .merchant,
+                    value: searchText,
+                    matchMode: .freeText,
+                    entityTypeHint: .merchant,
+                    allowedEntityTypeHints: [.merchant, .expense, .transaction],
+                    sourceID: nil
+                )
+            ],
+            amountField: .amount,
+            grouping: MarinaGrouping(dimension: .transaction, rawText: "transaction"),
+            ranking: MarinaRanking(direction: .newest, limit: 10, rawText: "newest"),
+            limit: 10,
+            responseShape: .rankedList,
+            routeIntent: MarinaRouteIntent(
+                kind: .recentTransactionRows,
+                subject: .variableExpenses,
+                operation: .listRows,
+                measure: .transactionAmount,
+                grouping: .transaction,
+                targetTypes: [.merchant, .expense, .transaction],
+                requestedDetail: nil,
+                responseShape: .rankedList,
+                preferredExecutorRoute: .list
+            )
+        )
+        let candidate = MarinaSemanticQueryAdapter().compatibilityCandidate(from: query, prompt: prompt)
+        return MarinaCanonicalReadInterpretation(
+            result: .query(query),
+            compatibilityCandidate: candidate,
+            repairSummary: [
+                "semanticContract=freeTextExpenseRows",
+                failureDiagnostic.map { "foundationFailure=\($0.category.rawValue)" }
+            ]
+            .compactMap { $0 }
+            .joined(separator: ",")
+        )
+    }
+
+    private func freeTextExpenseSearchText(_ prompt: String) -> String? {
+        let cleaned = prompt
+            .replacingOccurrences(of: #"(?i)^\s*(show|find|list)\b"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"(?i)\b(me|all|of|my|the|please)\b"#, with: " ", options: .regularExpression)
+            .replacingOccurrences(of: #"(?i)\b(expense|expenses|transaction|transactions|purchase|purchases|rows?|records?)\b"#, with: " ", options: .regularExpression)
+            .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+            .trimmingCharacters(in: CharacterSet(charactersIn: " ?.\"'"))
+        guard cleaned.isEmpty == false,
+              isGenericSearchText(cleaned) == false else {
+            return nil
+        }
+        return cleaned
+    }
+
+    private func isGenericSearchText(_ value: String) -> Bool {
+        let normalized = normalized(value)
+        return [
+            "expense",
+            "expenses",
+            "transaction",
+            "transactions",
+            "purchase",
+            "purchases",
+            "spending",
+            "spend"
+        ].contains(normalized)
     }
 
     private func hasActionableEntityMatch(for searchText: String, provider: MarinaDataProvider) -> Bool {

@@ -223,6 +223,35 @@ struct MarinaDatabaseLookupExecutorTests {
         #expect(answer.subtitle?.contains("clearer budgeting prompt") == false)
     }
 
+    @Test func genericExpenseWords_doNotMatchRowsThroughSubtitleOverlap() throws {
+        let fixture = try makeLookupFixture()
+        let response = MarinaDatabaseLookupExecutor().execute(
+            request(
+                searchText: "expenses",
+                objectTypes: MarinaLookupObjectType.safeDefaultSearchTypes,
+                lookupMode: .broadSearch
+            ),
+            provider: fixture.provider
+        )
+
+        #expect(response.results.isEmpty)
+        #expect(response.ambiguityChoices.isEmpty)
+    }
+
+    @Test func pollutedExpenseSearchText_doesNotReturnUnrelatedRows() throws {
+        let fixture = try makeLookupFixture()
+        let response = MarinaDatabaseLookupExecutor().execute(
+            request(
+                searchText: "Mr. Pickle expenses",
+                objectTypes: [.variableExpense, .plannedExpense],
+                lookupMode: .broadSearch
+            ),
+            provider: fixture.provider
+        )
+
+        #expect(response.results.isEmpty)
+    }
+
     @Test func responseBuilder_workspaceLookupUsesDirectConfidentCopy() throws {
         let fixture = try makeLookupFixture()
         let response = MarinaDatabaseLookupExecutor().execute(
