@@ -589,6 +589,7 @@ struct MarinaResponseSurfaceApplicator {
                     id: original.id,
                     title: title,
                     query: original.query,
+                    promptText: original.promptText,
                     confidenceScore: original.confidenceScore,
                     reasoning: original.reasoning
                 )

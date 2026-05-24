@@ -1,46 +1,100 @@
 import Foundation
 
+struct MarinaPresetPromptContext: Equatable {
+    let budgetNames: [String]
+    let cardNames: [String]
+    let categoryNames: [String]
+    let presetTitles: [String]
+    let incomeSourceNames: [String]
+    let savingsAccountNames: [String]
+    let allocationAccountNames: [String]
+    let supportsPromptBackedSuggestions: Bool
+
+    init(
+        budgetNames: [String] = [],
+        cardNames: [String] = [],
+        categoryNames: [String] = [],
+        presetTitles: [String] = [],
+        incomeSourceNames: [String] = [],
+        savingsAccountNames: [String] = [],
+        allocationAccountNames: [String] = [],
+        supportsPromptBackedSuggestions: Bool = false
+    ) {
+        self.budgetNames = Self.clean(budgetNames)
+        self.cardNames = Self.clean(cardNames)
+        self.categoryNames = Self.clean(categoryNames)
+        self.presetTitles = Self.clean(presetTitles)
+        self.incomeSourceNames = Self.clean(incomeSourceNames)
+        self.savingsAccountNames = Self.clean(savingsAccountNames)
+        self.allocationAccountNames = Self.clean(allocationAccountNames)
+        self.supportsPromptBackedSuggestions = supportsPromptBackedSuggestions
+    }
+
+    static let empty = MarinaPresetPromptContext()
+
+    var primaryBudgetName: String? { budgetNames.first }
+    var primaryCardName: String? { cardNames.first }
+    var primaryCategoryName: String? { categoryNames.first }
+    var primaryPresetTitle: String? { presetTitles.first }
+    var primaryIncomeSourceName: String? { incomeSourceNames.first }
+    var primarySavingsAccountName: String? { savingsAccountNames.first }
+    var primaryAllocationAccountName: String? { allocationAccountNames.first }
+
+    private static func clean(_ values: [String]) -> [String] {
+        var seen: Set<String> = []
+        var cleaned: [String] = []
+        for value in values {
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard trimmed.isEmpty == false else { continue }
+            let key = trimmed.lowercased()
+            guard seen.insert(key).inserted else { continue }
+            cleaned.append(trimmed)
+        }
+        return cleaned
+    }
+}
+
 enum MarinaPresetPromptGroup: String, CaseIterable, Identifiable {
-    case budget
+    case budgets
     case income
-    case card
-    case preset
-    case category
+    case accounts
+    case expenses
     case trends
+    case planning
 
     var id: String { rawValue }
 
     var iconName: String {
         switch self {
-        case .budget:
+        case .budgets:
             return "chart.pie.fill"
         case .income:
             return "calendar"
-        case .card:
+        case .accounts:
             return "creditcard"
-        case .preset:
-            return "list.bullet.rectangle"
-        case .category:
-            return "tag.fill"
+        case .expenses:
+            return "dollarsign"
         case .trends:
-            return "chart.line.uptrend.xyaxis"
+            return "chart.bar.xaxis"
+        case .planning:
+            return "bubble.left.and.text.bubble.right"
         }
     }
 
     var title: String {
         switch self {
-        case .budget:
+        case .budgets:
             return "Budget Prompt Suggestions"
         case .income:
             return "Income Prompt Suggestions"
-        case .card:
-            return "Card Prompt Suggestions"
-        case .preset:
-            return "Preset Prompt Suggestions"
-        case .category:
-            return "Category Prompt Suggestions"
+        case .accounts:
+            return "Account Prompt Suggestions"
+        case .expenses:
+            return "Expense Prompt Suggestions"
         case .trends:
             return "Trend Prompt Suggestions"
+        case .planning:
+            return "Planning Prompt Suggestions"
         }
     }
 }
@@ -50,6 +104,7 @@ struct MarinaPresetPrompt: Identifiable, Equatable {
     let group: MarinaPresetPromptGroup?
     let title: String
     let query: HomeQuery
+    let promptText: String?
     let expectedMetric: HomeQueryMetric
     let expectedAnswerKind: HomeAnswerKind?
     let expectedTitleFamily: String
@@ -58,22 +113,30 @@ struct MarinaPresetPrompt: Identifiable, Equatable {
         group: MarinaPresetPromptGroup?,
         title: String,
         query: HomeQuery,
+        promptText: String? = nil,
         expectedAnswerKind: HomeAnswerKind?,
         expectedTitleFamily: String
     ) {
-        self.id = [group?.rawValue ?? "default", title, query.intent.rawValue].joined(separator: "::")
+        let trimmedPrompt = promptText?.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.id = [group?.rawValue ?? "default", title, trimmedPrompt ?? query.intent.rawValue].joined(separator: "::")
         self.group = group
         self.title = title
         self.query = query
+        self.promptText = trimmedPrompt?.isEmpty == false ? trimmedPrompt : nil
         self.expectedMetric = query.intent.metric
         self.expectedAnswerKind = expectedAnswerKind
         self.expectedTitleFamily = expectedTitleFamily
+    }
+
+    var isPromptBacked: Bool {
+        promptText != nil
     }
 
     var suggestion: MarinaSuggestion {
         MarinaSuggestion(
             title: title,
             query: query,
+            promptText: promptText,
             reasoning: "preset_prompt:\(id)"
         )
     }
@@ -81,34 +144,47 @@ struct MarinaPresetPrompt: Identifiable, Equatable {
 
 enum MarinaPresetPromptCatalog {
     static func prompts(defaultPeriodUnit: HomeQueryPeriodUnit) -> [MarinaPresetPrompt] {
-        emptyStatePrompts(defaultPeriodUnit: defaultPeriodUnit) + defaultPrompts()
+        prompts(defaultPeriodUnit: defaultPeriodUnit, context: .empty)
+    }
+
+    static func prompts(
+        defaultPeriodUnit: HomeQueryPeriodUnit,
+        context: MarinaPresetPromptContext
+    ) -> [MarinaPresetPrompt] {
+        emptyStatePrompts(defaultPeriodUnit: defaultPeriodUnit, context: context) + defaultPrompts()
     }
 
     static func prompts(
         for group: MarinaPresetPromptGroup,
-        defaultPeriodUnit: HomeQueryPeriodUnit
+        defaultPeriodUnit: HomeQueryPeriodUnit,
+        context: MarinaPresetPromptContext = .empty
     ) -> [MarinaPresetPrompt] {
-        emptyStatePrompts(defaultPeriodUnit: defaultPeriodUnit).filter { $0.group == group }
+        emptyStatePrompts(defaultPeriodUnit: defaultPeriodUnit, context: context).filter { $0.group == group }
     }
 
     static func suggestions(
         for group: MarinaPresetPromptGroup,
-        defaultPeriodUnit: HomeQueryPeriodUnit
+        defaultPeriodUnit: HomeQueryPeriodUnit,
+        context: MarinaPresetPromptContext = .empty
     ) -> [MarinaSuggestion] {
-        prompts(for: group, defaultPeriodUnit: defaultPeriodUnit).map(\.suggestion)
+        prompts(for: group, defaultPeriodUnit: defaultPeriodUnit, context: context).map(\.suggestion)
     }
 
     static func defaultSuggestions() -> [MarinaSuggestion] {
         defaultPrompts().map(\.suggestion)
     }
 
-    private static func emptyStatePrompts(defaultPeriodUnit: HomeQueryPeriodUnit) -> [MarinaPresetPrompt] {
-        [
-            prompt(.budget, "How am I doing this month?", .periodOverview, .list, "Budget Overview"),
-            prompt(.budget, "Spend this month", .spendThisMonth, .metric, "Spend"),
-            prompt(.budget, "Compare with last month", .compareThisMonthToPreviousMonth, .comparison, "Spending Comparison"),
-            prompt(.budget, "How am I doing with savings?", .savingsStatus, .metric, "Savings Status"),
+    private static func emptyStatePrompts(
+        defaultPeriodUnit: HomeQueryPeriodUnit,
+        context: MarinaPresetPromptContext
+    ) -> [MarinaPresetPrompt] {
+        var prompts: [MarinaPresetPrompt] = [
+            prompt(.budgets, "How am I doing this month?", .periodOverview, .list, "Budget Overview"),
+            prompt(.budgets, "Spend this month", .spendThisMonth, .metric, "Spend"),
+            prompt(.budgets, "Compare with last month", .compareThisMonthToPreviousMonth, .comparison, "Spending Comparison"),
+            prompt(.budgets, "How am I doing with savings?", .savingsStatus, .metric, "Savings Status"),
 
+            prompt(.income, "Actual income this month", text: "What is my actual income this month?", fallback: .incomeAverageActual, requiresPromptSupport: true, context: context, expectedAnswerKind: .metric, expectedTitleFamily: "Actual Income"),
             prompt(.income, "Average actual income this year", .incomeAverageActual, .metric, "Average Actual Income"),
             prompt(.income, "Income share by source this month", .incomeSourceShare, .list, "Income Share by Source"),
             prompt(
@@ -118,28 +194,27 @@ enum MarinaPresetPromptCatalog {
                 .list,
                 "Income Share Trend"
             ),
+
+            prompt(.accounts, "Card spend total this month", .cardSpendTotal, .metric, "Card Spend"),
+            prompt(.accounts, "Variable spending habits by card", .cardVariableSpendingHabits, .list, "Card Spending Habits"),
+            prompt(.accounts, "Savings status", .savingsStatus, .metric, "Savings Status"),
             prompt(
-                .income,
-                "Savings average (last 4 periods)",
-                HomeQuery(intent: .savingsAverageRecentPeriods, resultLimit: 4, periodUnit: defaultPeriodUnit),
+                .accounts,
+                "Savings average (last 6 periods)",
+                HomeQuery(intent: .savingsAverageRecentPeriods, resultLimit: 6, periodUnit: defaultPeriodUnit),
                 .metric,
                 "Average Savings"
             ),
 
-            prompt(.card, "Card spend total this month", .cardSpendTotal, .metric, "Card Spend"),
-            prompt(.card, "Variable spending habits by card", .cardVariableSpendingHabits, .list, "Card Spending Habits"),
-            prompt(.card, "Largest recent expenses", .largestRecentTransactions, .list, "Largest Recent Expenses"),
-            prompt(.card, "Spend this month", .spendThisMonth, .metric, "Spend"),
-
-            prompt(.preset, "Do I have presets due soon?", .presetDueSoon, .list, "Presets Due Soon"),
-            prompt(.preset, "Most expensive preset", .presetHighestCost, .list, "Highest Preset Costs"),
-            prompt(.preset, "Top preset category", .presetTopCategory, .list, "Categories Assigned to Presets"),
-            prompt(.preset, "Preset spend by category", .presetCategorySpend, .list, "Preset Spend by Category"),
-
-            prompt(.category, "Top categories this month", .topCategoriesThisMonth, .list, "Top Categories"),
-            prompt(.category, "Category spend share this month", .categorySpendShare, .list, "Category Spend Share"),
-            prompt(.category, "Potential savings by category", .categoryPotentialSavings, .list, "Category Potential Savings"),
-            prompt(.category, "Category reallocation guidance", .categoryReallocationGuidance, .list, "Category Reallocation Guidance"),
+            prompt(.expenses, "Spend this month", .spendThisMonth, .metric, "Spend"),
+            prompt(.expenses, "Top categories this month", .topCategoriesThisMonth, .list, "Top Categories"),
+            prompt(.expenses, "Category spend share this month", .categorySpendShare, .list, "Category Spend Share"),
+            prompt(.expenses, "Top merchants this month", .topMerchantsThisMonth, .list, "Top Merchants"),
+            prompt(.expenses, "Largest recent expenses", .largestRecentTransactions, .list, "Largest Recent Expenses"),
+            prompt(.expenses, "Do I have presets due soon?", .presetDueSoon, .list, "Presets Due Soon"),
+            prompt(.expenses, "Most expensive preset", .presetHighestCost, .list, "Highest Preset Costs"),
+            prompt(.expenses, "Top preset category", .presetTopCategory, .list, "Categories Assigned to Presets"),
+            prompt(.expenses, "Preset spend by category", .presetCategorySpend, .list, "Preset Spend by Category"),
 
             prompt(.trends, "Compare with last month", .compareThisMonthToPreviousMonth, .comparison, "Spending Comparison"),
             prompt(
@@ -156,14 +231,22 @@ enum MarinaPresetPromptCatalog {
                 .list,
                 "Category Share Trend"
             ),
-            prompt(
-                .trends,
-                "Savings average (last 6 periods)",
-                HomeQuery(intent: .savingsAverageRecentPeriods, resultLimit: 6, periodUnit: defaultPeriodUnit),
-                .metric,
-                "Average Savings"
-            )
-        ]
+            prompt(.trends, "Top category changes", .topCategoryChangesThisMonth, .list, "Top Category Changes"),
+            prompt(.trends, "Top card changes", .topCardChangesThisMonth, .list, "Top Card Changes"),
+
+            prompt(.planning, "Safe spend today", .safeSpendToday, .metric, "Safe Spend Today"),
+            prompt(.planning, "Forecast savings", .forecastSavings, .metric, "Forecast Savings"),
+            prompt(.planning, "Next planned expense", .nextPlannedExpense, .message, "Next Planned Expense"),
+            prompt(.planning, "Potential savings by category", .categoryPotentialSavings, .list, "Category Potential Savings"),
+            prompt(.planning, "Category reallocation guidance", .categoryReallocationGuidance, .list, "Category Reallocation Guidance")
+        ].compactMap { $0 }
+
+        guard context.supportsPromptBackedSuggestions else {
+            return prompts
+        }
+
+        prompts.append(contentsOf: promptBackedPrompts(context: context))
+        return prompts
     }
 
     private static func defaultPrompts() -> [MarinaPresetPrompt] {
@@ -214,6 +297,81 @@ enum MarinaPresetPromptCatalog {
             expectedAnswerKind: expectedAnswerKind,
             expectedTitleFamily: expectedTitleFamily
         )
+    }
+
+    private static func prompt(
+        _ group: MarinaPresetPromptGroup?,
+        _ title: String,
+        text: String,
+        fallback fallbackIntent: HomeQueryIntent,
+        requiresPromptSupport: Bool,
+        context: MarinaPresetPromptContext,
+        expectedAnswerKind: HomeAnswerKind?,
+        expectedTitleFamily: String
+    ) -> MarinaPresetPrompt? {
+        guard requiresPromptSupport == false || context.supportsPromptBackedSuggestions else {
+            return nil
+        }
+        return MarinaPresetPrompt(
+            group: group,
+            title: title,
+            query: HomeQuery(intent: fallbackIntent),
+            promptText: text,
+            expectedAnswerKind: expectedAnswerKind,
+            expectedTitleFamily: expectedTitleFamily
+        )
+    }
+
+    private static func promptBackedPrompts(
+        context: MarinaPresetPromptContext
+    ) -> [MarinaPresetPrompt] {
+        var prompts: [MarinaPresetPrompt?] = [
+            prompt(.budgets, "What is my active budget?", text: "What is my active budget?", fallback: .periodOverview, requiresPromptSupport: true, context: context, expectedAnswerKind: .message, expectedTitleFamily: "Active Budget"),
+            prompt(.budgets, "Which budgets share links?", text: "Which budgets share the same card or preset?", fallback: .periodOverview, requiresPromptSupport: true, context: context, expectedAnswerKind: .list, expectedTitleFamily: "Budget Shared Links"),
+            prompt(.income, "Compare planned vs actual income", text: "Compare actual vs planned income this month.", fallback: .incomeAverageActual, requiresPromptSupport: true, context: context, expectedAnswerKind: .comparison, expectedTitleFamily: "Income"),
+            prompt(.income, "Expenses before next income", text: "What upcoming expenses will hit before my next income?", fallback: .nextPlannedExpense, requiresPromptSupport: true, context: context, expectedAnswerKind: .list, expectedTitleFamily: "Upcoming Expenses"),
+            prompt(.accounts, "Show savings activity", text: "Show savings activity.", fallback: .savingsAverageRecentPeriods, requiresPromptSupport: true, context: context, expectedAnswerKind: .list, expectedTitleFamily: "Savings Activity"),
+            prompt(.accounts, "Show settlement rows", text: "Show settlement rows.", fallback: .savingsStatus, requiresPromptSupport: true, context: context, expectedAnswerKind: .list, expectedTitleFamily: "Settlement Rows"),
+            prompt(.expenses, "Show recent transactions", text: "Show recent transactions.", fallback: .largestRecentTransactions, requiresPromptSupport: true, context: context, expectedAnswerKind: .list, expectedTitleFamily: "Recent Transactions"),
+            prompt(.trends, "Spending increase drivers", text: "Why is my spending higher this month than last month?", fallback: .compareThisMonthToPreviousMonth, requiresPromptSupport: true, context: context, expectedAnswerKind: .list, expectedTitleFamily: "Spending Increase Drivers"),
+            prompt(.trends, "Unusual merchant spend", text: "What merchants are unusually high this month?", fallback: .topMerchantsThisMonth, requiresPromptSupport: true, context: context, expectedAnswerKind: .list, expectedTitleFamily: "Unusual Merchant Spend"),
+            prompt(.trends, "Recurring expense increases", text: "What recurring expenses increased?", fallback: .mostFrequentTransactions, requiresPromptSupport: true, context: context, expectedAnswerKind: .list, expectedTitleFamily: "Recurring Charge"),
+            prompt(.planning, "Categories over pace", text: "What categories are over pace for this point in the month?", fallback: .categoryPotentialSavings, requiresPromptSupport: true, context: context, expectedAnswerKind: .list, expectedTitleFamily: "Categories Over Pace")
+        ]
+
+        if let budgetName = context.primaryBudgetName {
+            prompts.append(prompt(.budgets, "Cards linked to \(budgetName)", text: "Which cards are linked to \(budgetName)?", fallback: .periodOverview, requiresPromptSupport: true, context: context, expectedAnswerKind: .list, expectedTitleFamily: "Cards linked"))
+            prompts.append(prompt(.budgets, "Presets linked to \(budgetName)", text: "Which presets are linked to \(budgetName)?", fallback: .presetDueSoon, requiresPromptSupport: true, context: context, expectedAnswerKind: .list, expectedTitleFamily: "Presets linked"))
+        }
+
+        if let categoryName = context.primaryCategoryName {
+            prompts.append(prompt(.budgets, "\(categoryName) budget limit", text: "Show my \(categoryName) budget limit.", fallback: .categorySpendTotal, requiresPromptSupport: true, context: context, expectedAnswerKind: .message, expectedTitleFamily: "Budget Limit"))
+            prompts.append(prompt(.planning, "What if I cut \(categoryName)?", text: "What if I spend 200 less on \(categoryName)?", fallback: .forecastSavings, requiresPromptSupport: true, context: context, expectedAnswerKind: .message, expectedTitleFamily: "Budget Forecast"))
+        }
+
+        if let cardName = context.primaryCardName {
+            prompts.append(prompt(.accounts, "Show \(cardName)", text: "Show \(cardName) card details.", fallback: .cardSnapshotSummary, requiresPromptSupport: true, context: context, expectedAnswerKind: .message, expectedTitleFamily: "Card"))
+            prompts.append(prompt(.accounts, "\(cardName) recent transactions", text: "Show expenses on \(cardName).", fallback: .largestRecentTransactions, requiresPromptSupport: true, context: context, expectedAnswerKind: .list, expectedTitleFamily: "Recent Transactions"))
+        }
+
+        if let allocationName = context.primaryAllocationAccountName {
+            prompts.append(prompt(.accounts, "\(allocationName) balance", text: "What is \(allocationName)'s balance?", fallback: .savingsStatus, requiresPromptSupport: true, context: context, expectedAnswerKind: .message, expectedTitleFamily: "Reconciliation Balance"))
+            prompts.append(prompt(.accounts, "\(allocationName) allocation rows", text: "Show \(allocationName) allocation rows.", fallback: .largestRecentTransactions, requiresPromptSupport: true, context: context, expectedAnswerKind: .list, expectedTitleFamily: "Allocation Rows"))
+        }
+
+        if let presetTitle = context.primaryPresetTitle {
+            prompts.append(prompt(.expenses, "Planned from \(presetTitle)", text: "What planned expenses came from \(presetTitle)?", fallback: .presetDueSoon, requiresPromptSupport: true, context: context, expectedAnswerKind: .list, expectedTitleFamily: "Planned Expenses"))
+        }
+
+        if let incomeSourceName = context.primaryIncomeSourceName {
+            prompts.append(prompt(.income, "\(incomeSourceName) income", text: "How much did \(incomeSourceName) pay this month?", fallback: .incomeSourceShare, requiresPromptSupport: true, context: context, expectedAnswerKind: .metric, expectedTitleFamily: "Income"))
+        }
+
+        if let savingsAccountName = context.primarySavingsAccountName {
+            prompts.append(prompt(.accounts, "Show \(savingsAccountName)", text: "Show \(savingsAccountName) savings account status.", fallback: .savingsStatus, requiresPromptSupport: true, context: context, expectedAnswerKind: .message, expectedTitleFamily: "Savings Account"))
+        }
+
+        return prompts.compactMap { $0 }
     }
 }
 

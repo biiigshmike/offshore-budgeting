@@ -180,6 +180,41 @@ struct MarinaPanelView: View {
         BudgetingPeriod(rawValue: defaultBudgetingPeriodRaw) ?? .monthly
     }
 
+    private var supportsPromptBackedSuggestions: Bool {
+        guard marinaRuntimeSettings.aiOptIn.isEnabled else { return false }
+        #if DEBUG
+        if MarinaTypedFixtureInterpreter.isEnabled {
+            return true
+        }
+        #endif
+        return MarinaModelAvailability().currentStatus() == .available
+    }
+
+    private var presetPromptContext: MarinaPresetPromptContext {
+        MarinaPresetPromptContext(
+            budgetNames: budgets.map(\.name),
+            cardNames: cards.map(\.name),
+            categoryNames: categories.map(\.name),
+            presetTitles: presets.map(\.title),
+            incomeSourceNames: recentIncomeSourceNames,
+            savingsAccountNames: savingsAccounts.map(\.name),
+            allocationAccountNames: allocationAccounts.map(\.name),
+            supportsPromptBackedSuggestions: supportsPromptBackedSuggestions
+        )
+    }
+
+    private var recentIncomeSourceNames: [String] {
+        var seen: Set<String> = []
+        var names: [String] = []
+        for income in incomes.sorted(by: { $0.date > $1.date }) {
+            let source = income.source.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard source.isEmpty == false else { continue }
+            guard seen.insert(source.lowercased()).inserted else { continue }
+            names.append(source)
+        }
+        return names
+    }
+
     private var cardSummaryExcludeFuturePlannedExpenses: Bool {
         cardSummaryExcludeFuturePlannedExpensesOverride ?? excludeFuturePlannedExpensesFromCalculationsDefault
     }
@@ -1061,7 +1096,8 @@ struct MarinaPanelView: View {
         let followUps = generatedFollowUpSuggestionsByAnswerID[answer.id]
             ?? followUpSuggestionBuilder.suggestions(
                 after: answer,
-                executedQuery: groundedQuery
+                executedQuery: groundedQuery,
+                supportsPromptBackedSuggestions: supportsPromptBackedSuggestions
             )
         let sections = MarinaSuggestionSectionBuilder.build(
             clarificationSuggestions: clarificationSuggestions,
@@ -1078,7 +1114,8 @@ struct MarinaPanelView: View {
     private func emptyStateSuggestions(for group: MarinaPresetPromptGroup) -> [MarinaSuggestion] {
         MarinaPresetPromptCatalog.suggestions(
             for: group,
-            defaultPeriodUnit: defaultQueryPeriodUnit
+            defaultPeriodUnit: defaultQueryPeriodUnit,
+            context: presetPromptContext
         )
     }
 
@@ -2243,7 +2280,8 @@ struct MarinaPanelView: View {
     private func followUpSuggestions(for answer: HomeAnswer, query: HomeQuery?) -> [MarinaSuggestion] {
         followUpSuggestionBuilder.suggestions(
             after: answer,
-            executedQuery: query
+            executedQuery: query,
+            supportsPromptBackedSuggestions: supportsPromptBackedSuggestions
         )
     }
 
@@ -2312,7 +2350,7 @@ struct MarinaPanelView: View {
                     MarinaResponseSuggestionCandidate(
                         index: index,
                         title: suggestion.title,
-                        querySummary: responseGenerationQuerySummary(suggestion.query)
+                        querySummary: responseGenerationSuggestionSummary(suggestion)
                     )
                 },
                 recentResponses: sessionContext.recentAnswerContexts.suffix(3).map { context in
@@ -2428,6 +2466,13 @@ struct MarinaPanelView: View {
         case .unknown:
             return .unknown
         }
+    }
+
+    private func responseGenerationSuggestionSummary(_ suggestion: MarinaSuggestion) -> String {
+        if let promptText = suggestion.promptText {
+            return "prompt=\(promptText)"
+        }
+        return responseGenerationQuerySummary(suggestion.query)
     }
 
     private func responseGenerationQuerySummary(_ query: HomeQuery) -> String {
@@ -5291,19 +5336,33 @@ struct MarinaPanelView: View {
     @MainActor
     private func runPresetSuggestion(_ suggestion: MarinaSuggestion) async {
         let runtimeSettings = marinaRuntimeSettings
+        let prompt = suggestion.executionPrompt
         latestTraceAccessibilityValue = ""
         MarinaTraceRecorder.shared.begin(
-            prompt: suggestion.title,
+            prompt: prompt,
             routingMode: runtimeSettings.routingMode,
-            runtimeSettingsSummary: "\(runtimeSettings.traceSummary),presetPrompt=\(suggestion.query.intent.rawValue)"
+            runtimeSettingsSummary: "\(runtimeSettings.traceSummary),presetPrompt=\(suggestionTraceSummary(suggestion))"
         )
-        MarinaDebugLogger.log("[MarinaPresetPrompt] title='\(suggestion.title)' query='\(suggestion.query.intent.rawValue)'")
-        let result = await marinaPanelRuntime(turnClassification: .freshQuestion).run(
-            query: suggestion.query,
-            sourceTitle: suggestion.title
-        )
-        await handleMarinaTurnResult(result, rawPrompt: suggestion.title)
+        MarinaDebugLogger.log("[MarinaPresetPrompt] title='\(suggestion.title)' action='\(suggestionTraceSummary(suggestion))'")
+        let runtime = marinaPanelRuntime(turnClassification: .freshQuestion)
+        let result: MarinaTurnResult
+        if suggestion.isPromptBacked {
+            result = await runtime.run(prompt: prompt)
+        } else {
+            result = await runtime.run(
+                query: suggestion.query,
+                sourceTitle: suggestion.title
+            )
+        }
+        await handleMarinaTurnResult(result, rawPrompt: prompt)
         finishMarinaTrace()
+    }
+
+    private func suggestionTraceSummary(_ suggestion: MarinaSuggestion) -> String {
+        if let promptText = suggestion.promptText {
+            return "prompt:\(promptText)"
+        }
+        return "query:\(suggestion.query.intent.rawValue)"
     }
 
     @discardableResult

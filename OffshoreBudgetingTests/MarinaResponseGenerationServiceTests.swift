@@ -284,6 +284,29 @@ struct MarinaResponseGenerationServiceTests {
         #expect(applied.followUpSuggestions.map(\.title) == ["Spend this month"])
     }
 
+    @Test func surfaceApplicator_preservesPromptBackedSuggestionActions() throws {
+        let answer = HomeAnswer(queryID: UUID(), kind: .message, title: "Fallback")
+        let suggestion = MarinaSuggestion(
+            title: "Active budget",
+            promptText: "What is my active budget?"
+        )
+        let generated = MarinaGeneratedSurfaceResponse(
+            narrativeSubtitle: "Here is the read.",
+            suggestionRewrites: [
+                MarinaGeneratedSuggestionRewrite(candidateIndex: 0, title: "Show active budget")
+            ]
+        )
+
+        let applied = try MarinaResponseSurfaceApplicator().apply(
+            generated: generated,
+            to: answer,
+            deterministicFollowUps: [suggestion]
+        )
+
+        #expect(applied.followUpSuggestions.first?.promptText == "What is my active budget?")
+        #expect(applied.followUpSuggestions.first?.isPromptBacked == true)
+    }
+
     @Test func surfaceApplicator_rejectsTitleOnlyOrDebugGeneratedSurface() throws {
         let answer = HomeAnswer(queryID: UUID(), kind: .message, title: "Fallback", subtitle: "Use me.")
 

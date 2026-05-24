@@ -737,6 +737,23 @@ struct MarinaModelsTests {
         #expect(sections[0].suggestions.first?.title == "Clarify")
     }
 
+    @Test func suggestionModel_supportsQueryAndPromptBackedActions() throws {
+        let querySuggestion = MarinaSuggestion(
+            title: "Spend this month",
+            query: HomeQuery(intent: .spendThisMonth)
+        )
+        let promptSuggestion = MarinaSuggestion(
+            title: "Show active budget",
+            promptText: "What is my active budget?"
+        )
+
+        #expect(querySuggestion.isPromptBacked == false)
+        #expect(querySuggestion.executionPrompt == "Spend this month")
+        #expect(promptSuggestion.isPromptBacked)
+        #expect(promptSuggestion.executionPrompt == "What is my active budget?")
+        #expect(promptSuggestion.query.intent == .periodOverview)
+    }
+
     // MARK: - HomeQueryDateRange
 
     @Test func queryDateRange_reordersWhenInputIsDescending() throws {

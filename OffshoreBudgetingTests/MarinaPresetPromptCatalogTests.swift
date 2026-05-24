@@ -10,7 +10,16 @@ struct MarinaPresetPromptCatalogTests {
         let groups = Set(prompts.compactMap(\.group))
 
         #expect(groups == Set(MarinaPresetPromptGroup.allCases))
+        #expect(MarinaPresetPromptGroup.allCases.map(\.title) == [
+            "Budget Prompt Suggestions",
+            "Income Prompt Suggestions",
+            "Account Prompt Suggestions",
+            "Expense Prompt Suggestions",
+            "Trend Prompt Suggestions",
+            "Planning Prompt Suggestions"
+        ])
         #expect(prompts.count >= 30)
+        #expect(prompts.allSatisfy { $0.isPromptBacked == false })
 
         let intents = Set(prompts.map(\.query.intent))
         let requiredIntents: Set<HomeQueryIntent> = [
@@ -35,13 +44,73 @@ struct MarinaPresetPromptCatalogTests {
             .categoryReallocationGuidance,
             .categorySpendShareTrend,
             .safeSpendToday,
+            .forecastSavings,
             .nextPlannedExpense,
-            .topMerchantsThisMonth
+            .topMerchantsThisMonth,
+            .topCategoryChangesThisMonth,
+            .topCardChangesThisMonth
         ]
 
         for intent in requiredIntents {
             #expect(intents.contains(intent), "Missing preset prompt intent \(intent.rawValue)")
         }
+    }
+
+    @Test func catalog_promptBackedSuggestionsRequireRuntimeSupportAndSafeEntityTargets() {
+        let unavailableContext = MarinaPresetPromptContext(
+            budgetNames: ["May Budget"],
+            cardNames: ["Apple Card"],
+            categoryNames: ["Dining"],
+            presetTitles: ["Rent"],
+            incomeSourceNames: ["Salary"],
+            savingsAccountNames: ["Main Savings"],
+            allocationAccountNames: ["Roommate"],
+            supportsPromptBackedSuggestions: false
+        )
+        let unavailable = MarinaPresetPromptCatalog.suggestions(
+            for: .budgets,
+            defaultPeriodUnit: .month,
+            context: unavailableContext
+        )
+        #expect(unavailable.allSatisfy { $0.isPromptBacked == false })
+
+        let availableContext = MarinaPresetPromptContext(
+            budgetNames: ["May Budget"],
+            cardNames: ["Apple Card"],
+            categoryNames: ["Dining"],
+            presetTitles: ["Rent"],
+            incomeSourceNames: ["Salary"],
+            savingsAccountNames: ["Main Savings"],
+            allocationAccountNames: ["Roommate"],
+            supportsPromptBackedSuggestions: true
+        )
+        let budgetSuggestions = MarinaPresetPromptCatalog.suggestions(
+            for: .budgets,
+            defaultPeriodUnit: .month,
+            context: availableContext
+        )
+        let accountSuggestions = MarinaPresetPromptCatalog.suggestions(
+            for: .accounts,
+            defaultPeriodUnit: .month,
+            context: availableContext
+        )
+        let expenseSuggestions = MarinaPresetPromptCatalog.suggestions(
+            for: .expenses,
+            defaultPeriodUnit: .month,
+            context: availableContext
+        )
+
+        #expect(budgetSuggestions.contains { $0.promptText == "Which cards are linked to May Budget?" })
+        #expect(accountSuggestions.contains { $0.promptText == "What is Roommate's balance?" })
+        #expect(expenseSuggestions.contains { $0.promptText == "What planned expenses came from Rent?" })
+
+        let targetlessContext = MarinaPresetPromptContext(supportsPromptBackedSuggestions: true)
+        let targetlessBudgetSuggestions = MarinaPresetPromptCatalog.suggestions(
+            for: .budgets,
+            defaultPeriodUnit: .month,
+            context: targetlessContext
+        )
+        #expect(targetlessBudgetSuggestions.contains { $0.promptText?.contains("linked to") == true } == false)
     }
 
     @Test func catalogedPresetPrompts_executeStoredQueriesThroughTypedRuntime() async throws {
@@ -167,6 +236,56 @@ struct MarinaPresetPromptCatalogTests {
         #expect(suggestions.isEmpty == false)
         #expect(suggestions.contains { $0.query.intent == .incomeAverageActual } == false)
         #expect(suggestions.contains { $0.query.intent == .incomeSourceShare })
+    }
+
+    @Test func followUps_coverContextualDomainTrios() {
+        let builder = MarinaFollowUpSuggestionBuilder()
+
+        let cardSuggestions = builder.suggestions(
+            after: HomeAnswer(queryID: UUID(), kind: .metric, title: "Apple Card Spend", primaryValue: "$80"),
+            executedQuery: HomeQuery(intent: .cardSpendTotal, targetName: "Apple Card"),
+            supportsPromptBackedSuggestions: true
+        )
+        #expect(cardSuggestions.count <= 3)
+        #expect(cardSuggestions.contains { $0.query.intent == .compareCardThisMonthToPreviousMonth })
+
+        let reconciliationSuggestions = builder.suggestions(
+            after: HomeAnswer(queryID: UUID(), kind: .message, title: "Reconciliation Balance", primaryValue: "$60"),
+            executedQuery: nil,
+            supportsPromptBackedSuggestions: true
+        )
+        #expect(reconciliationSuggestions.count <= 3)
+        #expect(reconciliationSuggestions.contains { $0.promptText == "Show reconciliation balances." })
+
+        let planningSuggestions = builder.suggestions(
+            after: HomeAnswer(queryID: UUID(), kind: .metric, title: "Safe Spend Today", primaryValue: "$20"),
+            executedQuery: HomeQuery(intent: .safeSpendToday),
+            supportsPromptBackedSuggestions: true
+        )
+        #expect(planningSuggestions.count <= 3)
+        #expect(planningSuggestions.contains { $0.query.intent == .safeSpendToday } == false)
+        #expect(planningSuggestions.contains { $0.query.intent == .forecastSavings })
+    }
+
+    @Test func followUps_doNotRepeatPromptBackedAction() {
+        let builder = MarinaFollowUpSuggestionBuilder()
+        let answer = HomeAnswer(
+            queryID: UUID(),
+            kind: .message,
+            userPrompt: "What is my active budget?",
+            title: "Active Budget",
+            primaryValue: "May"
+        )
+
+        let suggestions = builder.suggestions(
+            after: answer,
+            executedQuery: HomeQuery(intent: .periodOverview),
+            supportsPromptBackedSuggestions: true
+        )
+
+        #expect(suggestions.count <= 3)
+        #expect(suggestions.contains { $0.promptText == "What is my active budget?" } == false)
+        #expect(suggestions.contains { $0.query.intent == .spendThisMonth })
     }
 
     private func turnContext(_ fixture: MarinaPhase5Fixture) -> MarinaTurnContext {

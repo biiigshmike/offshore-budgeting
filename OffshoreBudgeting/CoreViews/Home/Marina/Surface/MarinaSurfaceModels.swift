@@ -1262,6 +1262,7 @@ struct MarinaSuggestion: Identifiable, Codable, Equatable {
     let id: UUID
     let title: String
     let query: HomeQuery
+    let promptText: String?
     let confidenceScore: Double?
     let reasoning: String?
 
@@ -1269,14 +1270,43 @@ struct MarinaSuggestion: Identifiable, Codable, Equatable {
         id: UUID = UUID(),
         title: String,
         query: HomeQuery,
+        promptText: String? = nil,
         confidenceScore: Double? = nil,
         reasoning: String? = nil
     ) {
         self.id = id
         self.title = title
         self.query = query
+        let trimmedPrompt = promptText?.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.promptText = trimmedPrompt?.isEmpty == false ? trimmedPrompt : nil
         self.confidenceScore = confidenceScore
         self.reasoning = reasoning
+    }
+
+    init(
+        id: UUID = UUID(),
+        title: String,
+        promptText: String,
+        fallbackQuery: HomeQuery = HomeQuery(intent: .periodOverview),
+        confidenceScore: Double? = nil,
+        reasoning: String? = nil
+    ) {
+        self.init(
+            id: id,
+            title: title,
+            query: fallbackQuery,
+            promptText: promptText,
+            confidenceScore: confidenceScore,
+            reasoning: reasoning
+        )
+    }
+
+    var isPromptBacked: Bool {
+        promptText != nil
+    }
+
+    var executionPrompt: String {
+        promptText ?? title
     }
 }
 
