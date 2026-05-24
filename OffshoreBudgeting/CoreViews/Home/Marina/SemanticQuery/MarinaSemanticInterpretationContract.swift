@@ -1,6 +1,8 @@
 import Foundation
 
 enum MarinaSemanticInterpretationContractID: String, Codable, CaseIterable, Sendable, Equatable {
+    case currentWorkspace
+    case activeBudgetStatus
     case periodOverview
     case budgetSummary
     case spendTotal
@@ -66,6 +68,26 @@ struct MarinaSemanticInterpretationContractRegistry: Sendable {
     }
 
     private nonisolated static let defaultContracts: [MarinaSemanticInterpretationContract] = [
+        contract(
+            .currentWorkspace,
+            subject: .workspaces,
+            operation: .lookupDetails,
+            measure: .transactionAmount,
+            responseShape: .summaryCard,
+            datePolicy: .ignored,
+            routeKind: .currentWorkspace,
+            preferredExecutorRoute: .databaseLookup
+        ),
+        contract(
+            .activeBudgetStatus,
+            subject: .budgets,
+            operation: .lookupDetails,
+            measure: .remainingBudget,
+            responseShape: .summaryCard,
+            datePolicy: .ignored,
+            routeKind: .activeBudget,
+            preferredExecutorRoute: .composableWorkspace
+        ),
         contract(
             .periodOverview,
             metricContractID: .periodOverview,
@@ -238,6 +260,14 @@ struct MarinaSemanticInterpretationContractResolver {
             return nil
         }
 
+        if let contextInterpretation = currentContextInterpretation(
+            prompt: prompt,
+            normalizedPrompt: normalizedPrompt,
+            failureDiagnostic: failureDiagnostic
+        ) {
+            return contextInterpretation
+        }
+
         if let budgetInterpretation = budgetSummaryInterpretation(
             prompt: prompt,
             normalizedPrompt: normalizedPrompt,
@@ -284,6 +314,59 @@ struct MarinaSemanticInterpretationContractResolver {
             failureDiagnostic: failureDiagnostic
            ) {
             return lookupInterpretation
+        }
+
+        return nil
+    }
+
+    private func currentContextInterpretation(
+        prompt: String,
+        normalizedPrompt: String,
+        failureDiagnostic: MarinaFoundationModelsFailureDiagnostic?
+    ) -> MarinaCanonicalReadInterpretation? {
+        if asksForCurrentWorkspace(normalizedPrompt),
+           let contract = registry.contract(for: .currentWorkspace) {
+            let request = MarinaDatabaseLookupRequest(
+                rawPrompt: prompt,
+                searchText: "",
+                objectTypes: [.workspace],
+                dateRange: nil,
+                limit: 1,
+                requestedDetail: .general,
+                lookupMode: .entityDetail
+            ).clamped
+            let candidate = MarinaQueryPlanCandidate(
+                requestFamily: .databaseLookup,
+                source: .foundationModels,
+                rawPrompt: prompt,
+                operation: contract.operation,
+                measure: contract.measure,
+                responseShapeHint: contract.responseShape,
+                confidence: .high,
+                databaseLookupRequest: request,
+                routeIntent: routeIntent(for: contract, targetTypes: [.workspace])
+            )
+            return canonicalInterpretation(
+                candidate: candidate,
+                repairSummary: repairSummary(contract: contract, failureDiagnostic: failureDiagnostic)
+            )
+        }
+
+        if asksForActiveBudget(normalizedPrompt),
+           let contract = registry.contract(for: .activeBudgetStatus) {
+            let candidate = MarinaQueryPlanCandidate(
+                source: .foundationModels,
+                rawPrompt: prompt,
+                operation: contract.operation,
+                measure: contract.measure,
+                responseShapeHint: contract.responseShape,
+                confidence: .high,
+                routeIntent: routeIntent(for: contract, targetTypes: [.budget])
+            )
+            return canonicalInterpretation(
+                candidate: candidate,
+                repairSummary: repairSummary(contract: contract, failureDiagnostic: failureDiagnostic)
+            )
         }
 
         return nil
@@ -748,14 +831,23 @@ struct MarinaSemanticInterpretationContractResolver {
         for contract: MarinaSemanticInterpretationContract,
         targetTypes: [MarinaCandidateEntityTypeHint]
     ) -> MarinaRouteIntent {
-        MarinaRouteIntent(
+        let requestedDetail: MarinaSemanticRequestedDetail?
+        switch contract.id {
+        case .periodOverview, .activeBudgetStatus:
+            requestedDetail = .status
+        case .currentWorkspace:
+            requestedDetail = .general
+        default:
+            requestedDetail = nil
+        }
+        return MarinaRouteIntent(
             kind: contract.routeKind,
             subject: contract.subject,
             operation: contract.operation,
             measure: contract.measure,
             grouping: nil,
             targetTypes: targetTypes,
-            requestedDetail: contract.id == .periodOverview ? .status : nil,
+            requestedDetail: requestedDetail,
             responseShape: contract.responseShape,
             preferredExecutorRoute: contract.preferredExecutorRoute
         )
@@ -802,6 +894,20 @@ struct MarinaSemanticInterpretationContractResolver {
             ],
             in: prompt
         )
+    }
+
+    private func asksForCurrentWorkspace(_ prompt: String) -> Bool {
+        prompt.contains("workspace am i in")
+            || prompt.contains("current workspace")
+            || prompt.contains("which workspace")
+            || prompt == "what workspace"
+            || prompt.hasPrefix("what workspace ")
+    }
+
+    private func asksForActiveBudget(_ prompt: String) -> Bool {
+        prompt.contains("active budget")
+            || prompt.contains("current budget")
+            || (prompt.contains("active") && prompt.contains("budget"))
     }
 
     private func budgetMatches(

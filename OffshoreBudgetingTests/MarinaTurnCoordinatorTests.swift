@@ -97,6 +97,167 @@ struct MarinaTurnCoordinatorTests {
         #expect(hasVisibleDebugRow == false)
     }
 
+    @Test func run_currentWorkspacePrompt_executesSelectedWorkspaceWithoutFoundationModels() async throws {
+        let fixture = try makeFixture()
+        let coordinator = MarinaTurnCoordinator(
+            availability: FakeMarinaAvailability(status: .unavailable(reason: .modelNotReady)),
+            interpreter: MarinaFakeCanonicalAIInterpreter(interpretationsByPrompt: [:])
+        )
+
+        let result = await coordinator.run(
+            prompt: "What workspace am I in?",
+            context: turnContext(provider: fixture.provider, aiEnabled: false)
+        )
+
+        guard case .handled(let answer, _, _, _, let route) = result else {
+            Issue.record("Expected current workspace to execute without Foundation Models.")
+            return
+        }
+
+        #expect(answer.title == "You are in Phase 5 Workspace.")
+        #expect(route?.traceName == "lookupDetail")
+    }
+
+    @Test func run_activeBudgetPrompt_executesActiveBudgetStatusWithoutFoundationModels() async throws {
+        let fixture = try makeFixture()
+        let budget = Budget(
+            name: "May Budget",
+            startDate: date(2026, 5, 1),
+            endDate: date(2026, 5, 31),
+            workspace: fixture.workspace
+        )
+        let preset = Preset(
+            title: "Rent",
+            plannedAmount: 900,
+            workspace: fixture.workspace,
+            defaultCard: fixture.appleCard,
+            defaultCategory: fixture.groceries
+        )
+        fixture.context.insert(budget)
+        fixture.context.insert(preset)
+        fixture.context.insert(BudgetCardLink(budget: budget, card: fixture.appleCard))
+        fixture.context.insert(BudgetPresetLink(budget: budget, preset: preset))
+        fixture.context.insert(BudgetCategoryLimit(maxAmount: 500, budget: budget, category: fixture.groceries))
+        try fixture.context.save()
+
+        let coordinator = MarinaTurnCoordinator(
+            availability: FakeMarinaAvailability(status: .unavailable(reason: .modelNotReady)),
+            interpreter: MarinaFakeCanonicalAIInterpreter(interpretationsByPrompt: [:])
+        )
+
+        let result = await coordinator.run(
+            prompt: "What is my active budget?",
+            context: turnContext(provider: fixture.provider, aiEnabled: false)
+        )
+
+        guard case .handled(let answer, _, _, _, let route) = result else {
+            Issue.record("Expected active budget prompt to execute without Foundation Models.")
+            return
+        }
+
+        #expect(answer.title == "Active Budget")
+        #expect(answer.primaryValue == "May Budget")
+        #expect(answer.rows.contains { $0.title == "Linked cards" && $0.value == "Apple Card" })
+        #expect(answer.rows.contains { $0.title == "Linked presets" && $0.value == "Rent" })
+        #expect(answer.rows.contains { $0.title == "Category limits" && $0.value == "1" })
+        #expect(route?.traceName == "groupedRanked")
+    }
+
+    @Test func run_activeBudgetPrompt_reportsNoActiveBudgetWithoutFallback() async throws {
+        let fixture = try makeFixture()
+        let coordinator = MarinaTurnCoordinator(
+            availability: FakeMarinaAvailability(status: .available),
+            interpreter: MarinaFakeCanonicalAIInterpreter(interpretationsByPrompt: [:])
+        )
+
+        let result = await coordinator.run(
+            prompt: "What is my active budget?",
+            context: turnContext(provider: fixture.provider)
+        )
+
+        guard case .handled(let answer, _, _, _, _) = result else {
+            Issue.record("Expected no-active-budget answer.")
+            return
+        }
+
+        #expect(answer.title == "No Active Budget")
+        #expect(answer.primaryValue == "None")
+        #expect(answer.rows.contains { $0.title == "Status" && $0.value.contains("No active budget") })
+    }
+
+    @Test func run_activeBudgetPrompt_listsOverlappingActiveBudgetsWithoutGuessing() async throws {
+        let fixture = try makeFixture()
+        fixture.context.insert(
+            Budget(
+                name: "May Budget",
+                startDate: date(2026, 5, 1),
+                endDate: date(2026, 5, 31),
+                workspace: fixture.workspace
+            )
+        )
+        fixture.context.insert(
+            Budget(
+                name: "Travel Budget",
+                startDate: date(2026, 5, 10),
+                endDate: date(2026, 5, 20),
+                workspace: fixture.workspace
+            )
+        )
+        try fixture.context.save()
+
+        let coordinator = MarinaTurnCoordinator(
+            availability: FakeMarinaAvailability(status: .available),
+            interpreter: MarinaFakeCanonicalAIInterpreter(interpretationsByPrompt: [:])
+        )
+
+        let result = await coordinator.run(
+            prompt: "What is my active budget?",
+            context: turnContext(provider: fixture.provider)
+        )
+
+        guard case .handled(let answer, _, _, _, _) = result else {
+            Issue.record("Expected overlapping active budget answer.")
+            return
+        }
+
+        #expect(answer.title == "Multiple Active Budgets")
+        #expect(answer.primaryValue == "2")
+        #expect(answer.rows.contains { $0.title == "May Budget" })
+        #expect(answer.rows.contains { $0.title == "Travel Budget" })
+        #expect(answer.subtitle == "Choose the budget Marina should use.")
+    }
+
+    @Test func run_activeBudgetPrompt_treatsStartAndEndDatesAsInclusive() async throws {
+        let fixture = try makeFixture()
+        fixture.context.insert(
+            Budget(
+                name: "One Day Budget",
+                startDate: date(2026, 5, 15),
+                endDate: date(2026, 5, 15),
+                workspace: fixture.workspace
+            )
+        )
+        try fixture.context.save()
+
+        let coordinator = MarinaTurnCoordinator(
+            availability: FakeMarinaAvailability(status: .available),
+            interpreter: MarinaFakeCanonicalAIInterpreter(interpretationsByPrompt: [:])
+        )
+
+        let result = await coordinator.run(
+            prompt: "What is my active budget?",
+            context: turnContext(provider: fixture.provider)
+        )
+
+        guard case .handled(let answer, _, _, _, _) = result else {
+            Issue.record("Expected inclusive one-day active budget answer.")
+            return
+        }
+
+        #expect(answer.title == "Active Budget")
+        #expect(answer.primaryValue == "One Day Budget")
+    }
+
     @Test func run_liveNormalizerRepairsGenericIncomeTargetAcrossTypedAI() async throws {
         let fixture = try makeFixture()
         fixture.context.insert(

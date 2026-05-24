@@ -241,6 +241,14 @@ struct MarinaTurnCoordinator {
         prompt: String,
         context: MarinaTurnContext
     ) async -> MarinaTurnResult {
+        if let typedIntent = Self.deterministicContextIntent(from: prompt) {
+            return await run(
+                typedIntent: typedIntent,
+                sourceTitle: prompt,
+                context: context
+            )
+        }
+
         guard context.aiEnabled else {
             MarinaFoundationTraceBridge.recordUnavailable(context: context, reason: "ai_opt_out")
             return .unavailable(Self.unavailableAnswer(
@@ -400,6 +408,19 @@ struct MarinaTurnCoordinator {
         )
     }
 
+    func run(
+        typedIntent: MarinaCanonicalTypedIntent,
+        sourceTitle: String,
+        context: MarinaTurnContext
+    ) async -> MarinaTurnResult {
+        let explicitConstraints = MarinaExplicitPromptConstraints()
+        return evaluate(
+            interpretation(for: typedIntent, sourceTitle: sourceTitle),
+            context: context,
+            explicitConstraints: explicitConstraints
+        )
+    }
+
     func resume(
         clarification: MarinaTypedClarification,
         choice: MarinaClarificationChoice,
@@ -470,6 +491,123 @@ struct MarinaTurnCoordinator {
         )
     }
 
+    private func interpretation(
+        for typedIntent: MarinaCanonicalTypedIntent,
+        sourceTitle: String
+    ) -> MarinaCanonicalReadInterpretation {
+        switch typedIntent {
+        case .semanticQuery(let query):
+            return MarinaCanonicalReadInterpretation(
+                result: .query(query),
+                compatibilityCandidate: semanticAdapter.compatibilityCandidate(
+                    from: query,
+                    prompt: sourceTitle,
+                    source: .deterministic
+                ),
+                repairSummary: "typedIntent:\(typedIntent.traceSummary)"
+            )
+        case .currentWorkspace:
+            let request = MarinaDatabaseLookupRequest(
+                rawPrompt: sourceTitle,
+                searchText: "",
+                objectTypes: [.workspace],
+                dateRange: nil,
+                limit: 1,
+                requestedDetail: .general,
+                lookupMode: .entityDetail
+            ).clamped
+            let routeIntent = MarinaRouteIntent(
+                kind: .currentWorkspace,
+                subject: .workspaces,
+                operation: .lookupDetails,
+                measure: .transactionAmount,
+                grouping: nil,
+                targetTypes: [.workspace],
+                requestedDetail: .general,
+                responseShape: .summaryCard,
+                preferredExecutorRoute: .databaseLookup
+            )
+            let candidate = MarinaQueryPlanCandidate(
+                requestFamily: .databaseLookup,
+                source: .deterministic,
+                rawPrompt: sourceTitle,
+                operation: .lookupDetails,
+                measure: .transactionAmount,
+                responseShapeHint: .summaryCard,
+                confidence: .high,
+                databaseLookupRequest: request,
+                routeIntent: routeIntent
+            )
+            return MarinaCanonicalReadInterpretation(
+                result: semanticAdapter.interpretationResult(from: candidate),
+                compatibilityCandidate: candidate,
+                repairSummary: "typedIntent:\(typedIntent.traceSummary)"
+            )
+        case .activeBudgetStatus:
+            let routeIntent = MarinaRouteIntent(
+                kind: .activeBudget,
+                subject: .budgets,
+                operation: .lookupDetails,
+                measure: .remainingBudget,
+                grouping: nil,
+                targetTypes: [.budget],
+                requestedDetail: .status,
+                responseShape: .summaryCard,
+                preferredExecutorRoute: .composableWorkspace
+            )
+            let query = MarinaSemanticQuery(
+                subject: .budgets,
+                operation: .lookupDetails,
+                amountField: nil,
+                responseShape: .summaryCard,
+                requestedDetail: .status,
+                routeIntent: routeIntent
+            )
+            let candidate = MarinaQueryPlanCandidate(
+                source: .deterministic,
+                rawPrompt: sourceTitle,
+                operation: .lookupDetails,
+                measure: .remainingBudget,
+                responseShapeHint: .summaryCard,
+                confidence: .high,
+                routeIntent: routeIntent
+            )
+            return MarinaCanonicalReadInterpretation(
+                result: .query(query),
+                compatibilityCandidate: candidate,
+                repairSummary: "typedIntent:\(typedIntent.traceSummary)"
+            )
+        case .clarification(let clarification):
+            let candidate = clarification.candidate ?? MarinaQueryPlanCandidate(
+                source: .deterministic,
+                rawPrompt: sourceTitle,
+                operation: .lookupDetails,
+                measure: .transactionAmount,
+                responseShapeHint: .clarification,
+                confidence: .high
+            )
+            return MarinaCanonicalReadInterpretation(
+                result: .clarification(clarification),
+                compatibilityCandidate: candidate,
+                repairSummary: "typedIntent:\(typedIntent.traceSummary)"
+            )
+        case .unsupported(let unsupported):
+            let candidate = unsupported.candidate ?? MarinaQueryPlanCandidate(
+                source: .deterministic,
+                rawPrompt: sourceTitle,
+                operation: .lookupDetails,
+                measure: .transactionAmount,
+                responseShapeHint: .unsupported,
+                confidence: .high
+            )
+            return MarinaCanonicalReadInterpretation(
+                result: .unsupported(unsupported),
+                compatibilityCandidate: candidate,
+                repairSummary: "typedIntent:\(typedIntent.traceSummary)"
+            )
+        }
+    }
+
     private func canonicalizedInterpretation(
         _ interpretation: MarinaCanonicalReadInterpretation,
         explicitConstraints: MarinaExplicitPromptConstraints,
@@ -489,6 +627,31 @@ struct MarinaTurnCoordinator {
             compatibilityCandidate: repairedCandidate,
             repairSummary: interpretation.repairSummary
         )
+    }
+
+    private static func deterministicContextIntent(from prompt: String) -> MarinaCanonicalTypedIntent? {
+        let normalized = prompt
+            .lowercased()
+            .replacingOccurrences(of: "[^a-z0-9\\s&]", with: " ", options: .regularExpression)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard normalized.isEmpty == false else { return nil }
+
+        if normalized.contains("active budget")
+            || normalized.contains("current budget")
+            || (normalized.contains("active") && normalized.contains("budget")) {
+            return .activeBudgetStatus
+        }
+
+        if normalized.contains("workspace am i in")
+            || normalized.contains("current workspace")
+            || normalized.contains("which workspace")
+            || normalized == "what workspace"
+            || normalized.hasPrefix("what workspace ") {
+            return .currentWorkspace
+        }
+
+        return nil
     }
 
     private func evaluate(

@@ -1258,11 +1258,71 @@ struct MarinaInlineCreateForm: Codable, Equatable {
 
 // MARK: - Suggestions
 
+enum MarinaSuggestionAction: Codable, Equatable {
+    case homeQuery(HomeQuery)
+    case typedIntent(MarinaCanonicalTypedIntent)
+    case freeformPrompt(String)
+
+    func executionPrompt(fallbackTitle: String) -> String {
+        switch self {
+        case .homeQuery:
+            return fallbackTitle
+        case .typedIntent:
+            return fallbackTitle
+        case .freeformPrompt(let prompt):
+            let trimmed = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? fallbackTitle : trimmed
+        }
+    }
+
+    func traceSummary(fallbackQuery: HomeQuery) -> String {
+        switch self {
+        case .homeQuery(let query):
+            return "query:\(query.intent.rawValue)"
+        case .typedIntent(let intent):
+            return "typed:\(intent.traceSummary)"
+        case .freeformPrompt(let prompt):
+            return "prompt:\(prompt)"
+        }
+    }
+
+    var actionKey: String {
+        switch self {
+        case .homeQuery(let query):
+            return "query|\(Self.queryKey(query))"
+        case .typedIntent(let intent):
+            return "typed|\(intent.traceSummary)"
+        case .freeformPrompt(let prompt):
+            return "prompt|\(Self.normalized(prompt))"
+        }
+    }
+
+    private static func queryKey(_ query: HomeQuery) -> String {
+        [
+            query.intent.rawValue,
+            query.dateRange?.traceSummary ?? "nil",
+            query.comparisonDateRange?.traceSummary ?? "nil",
+            "\(query.resultLimit)",
+            query.targetName ?? "nil",
+            query.periodUnit?.rawValue ?? "nil"
+        ].joined(separator: "|")
+    }
+
+    private static func normalized(_ value: String) -> String {
+        value
+            .lowercased()
+            .replacingOccurrences(of: "[^a-z0-9\\s&]", with: " ", options: .regularExpression)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
 struct MarinaSuggestion: Identifiable, Codable, Equatable {
     let id: UUID
     let title: String
     let query: HomeQuery
     let promptText: String?
+    let action: MarinaSuggestionAction
     let confidenceScore: Double?
     let reasoning: String?
 
@@ -1271,6 +1331,7 @@ struct MarinaSuggestion: Identifiable, Codable, Equatable {
         title: String,
         query: HomeQuery,
         promptText: String? = nil,
+        action: MarinaSuggestionAction? = nil,
         confidenceScore: Double? = nil,
         reasoning: String? = nil
     ) {
@@ -1279,6 +1340,7 @@ struct MarinaSuggestion: Identifiable, Codable, Equatable {
         self.query = query
         let trimmedPrompt = promptText?.trimmingCharacters(in: .whitespacesAndNewlines)
         self.promptText = trimmedPrompt?.isEmpty == false ? trimmedPrompt : nil
+        self.action = Self.normalizedAction(action) ?? Self.defaultAction(query: query, promptText: self.promptText)
         self.confidenceScore = confidenceScore
         self.reasoning = reasoning
     }
@@ -1288,6 +1350,7 @@ struct MarinaSuggestion: Identifiable, Codable, Equatable {
         title: String,
         promptText: String,
         fallbackQuery: HomeQuery = HomeQuery(intent: .periodOverview),
+        action: MarinaSuggestionAction? = nil,
         confidenceScore: Double? = nil,
         reasoning: String? = nil
     ) {
@@ -1296,6 +1359,27 @@ struct MarinaSuggestion: Identifiable, Codable, Equatable {
             title: title,
             query: fallbackQuery,
             promptText: promptText,
+            action: action,
+            confidenceScore: confidenceScore,
+            reasoning: reasoning
+        )
+    }
+
+    init(
+        id: UUID = UUID(),
+        title: String,
+        typedIntent: MarinaCanonicalTypedIntent,
+        promptText: String? = nil,
+        fallbackQuery: HomeQuery = HomeQuery(intent: .periodOverview),
+        confidenceScore: Double? = nil,
+        reasoning: String? = nil
+    ) {
+        self.init(
+            id: id,
+            title: title,
+            query: fallbackQuery,
+            promptText: promptText,
+            action: .typedIntent(typedIntent),
             confidenceScore: confidenceScore,
             reasoning: reasoning
         )
@@ -1306,7 +1390,60 @@ struct MarinaSuggestion: Identifiable, Codable, Equatable {
     }
 
     var executionPrompt: String {
-        promptText ?? title
+        promptText ?? action.executionPrompt(fallbackTitle: title)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case title
+        case query
+        case promptText
+        case action
+        case confidenceScore
+        case reasoning
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        title = try container.decode(String.self, forKey: .title)
+        query = try container.decode(HomeQuery.self, forKey: .query)
+        let trimmedPrompt = try container.decodeIfPresent(String.self, forKey: .promptText)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        promptText = trimmedPrompt?.isEmpty == false ? trimmedPrompt : nil
+        let decodedAction = try container.decodeIfPresent(MarinaSuggestionAction.self, forKey: .action)
+        action = Self.normalizedAction(decodedAction) ?? Self.defaultAction(query: query, promptText: promptText)
+        confidenceScore = try container.decodeIfPresent(Double.self, forKey: .confidenceScore)
+        reasoning = try container.decodeIfPresent(String.self, forKey: .reasoning)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(title, forKey: .title)
+        try container.encode(query, forKey: .query)
+        try container.encodeIfPresent(promptText, forKey: .promptText)
+        try container.encode(action, forKey: .action)
+        try container.encodeIfPresent(confidenceScore, forKey: .confidenceScore)
+        try container.encodeIfPresent(reasoning, forKey: .reasoning)
+    }
+
+    private static func defaultAction(query: HomeQuery, promptText: String?) -> MarinaSuggestionAction {
+        if let promptText {
+            return .freeformPrompt(promptText)
+        }
+        return .homeQuery(query)
+    }
+
+    private static func normalizedAction(_ action: MarinaSuggestionAction?) -> MarinaSuggestionAction? {
+        guard let action else { return nil }
+        switch action {
+        case .freeformPrompt(let prompt):
+            let trimmed = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? nil : .freeformPrompt(trimmed)
+        case .homeQuery, .typedIntent:
+            return action
+        }
     }
 }
 

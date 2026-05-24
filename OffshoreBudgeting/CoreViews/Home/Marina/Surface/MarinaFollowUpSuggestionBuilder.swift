@@ -70,7 +70,10 @@ struct MarinaFollowUpSuggestionBuilder {
             query(scopedLabel("Top categories", context: context), .topCategoriesThisMonth, context: context, resultLimit: 3)
         ]
         if supportsPromptBackedSuggestions {
-            suggestions.insert(prompt("What is my active budget?", fallback: .periodOverview), at: 0)
+            suggestions.insert(
+                typedPrompt("What is my active budget?", typedIntent: .activeBudgetStatus, fallback: .periodOverview),
+                at: 0
+            )
             if let target = context.targetName {
                 suggestions.append(prompt("Which cards are linked to \(target)?", fallback: .periodOverview))
             }
@@ -275,6 +278,20 @@ struct MarinaFollowUpSuggestionBuilder {
         )
     }
 
+    private func typedPrompt(
+        _ promptText: String,
+        title: String? = nil,
+        typedIntent: MarinaCanonicalTypedIntent,
+        fallback fallbackIntent: HomeQueryIntent
+    ) -> MarinaSuggestion {
+        MarinaSuggestion(
+            title: title ?? promptText,
+            typedIntent: typedIntent,
+            promptText: promptText,
+            fallbackQuery: HomeQuery(intent: fallbackIntent)
+        )
+    }
+
     private func limitedUnique(
         _ suggestions: [MarinaSuggestion],
         excluding executedQuery: HomeQuery?,
@@ -308,6 +325,9 @@ struct MarinaFollowUpSuggestionBuilder {
     }
 
     private func suggestionKey(_ suggestion: MarinaSuggestion) -> String {
+        if case .typedIntent = suggestion.action {
+            return suggestion.action.actionKey
+        }
         if let promptText = suggestion.promptText {
             return "prompt|\(normalized(promptText))"
         }

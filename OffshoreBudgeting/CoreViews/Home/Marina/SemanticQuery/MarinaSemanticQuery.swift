@@ -90,6 +90,37 @@ enum MarinaInterpretationResult: Codable, Equatable, Sendable {
     case unsupported(MarinaTypedUnsupportedResponse)
 }
 
+enum MarinaCanonicalTypedIntent: Codable, Equatable, Sendable {
+    case semanticQuery(MarinaSemanticQuery)
+    case currentWorkspace
+    case activeBudgetStatus
+    case clarification(MarinaTypedClarification)
+    case unsupported(MarinaTypedUnsupportedResponse)
+
+    var traceSummary: String {
+        switch self {
+        case .semanticQuery(let query):
+            return [
+                "semanticQuery",
+                "subject=\(query.subject.rawValue)",
+                "operation=\(query.operation.rawValue)",
+                query.requestedDetail.map { "detail=\($0.rawValue)" },
+                query.routeIntent.map { "route=\($0.kind.rawValue)" }
+            ]
+            .compactMap { $0 }
+            .joined(separator: ",")
+        case .currentWorkspace:
+            return "currentWorkspace"
+        case .activeBudgetStatus:
+            return "activeBudgetStatus"
+        case .clarification(let clarification):
+            return "clarification:\(clarification.kind.rawValue)"
+        case .unsupported(let unsupported):
+            return "unsupported:\(unsupported.kind.rawValue)"
+        }
+    }
+}
+
 struct MarinaCanonicalReadInterpretation: Equatable, Sendable {
     let result: MarinaInterpretationResult
     let compatibilityCandidate: MarinaQueryPlanCandidate

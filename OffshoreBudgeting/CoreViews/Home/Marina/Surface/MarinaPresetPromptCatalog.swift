@@ -105,6 +105,7 @@ struct MarinaPresetPrompt: Identifiable, Equatable {
     let title: String
     let query: HomeQuery
     let promptText: String?
+    let action: MarinaSuggestionAction?
     let expectedMetric: HomeQueryMetric
     let expectedAnswerKind: HomeAnswerKind?
     let expectedTitleFamily: String
@@ -114,6 +115,7 @@ struct MarinaPresetPrompt: Identifiable, Equatable {
         title: String,
         query: HomeQuery,
         promptText: String? = nil,
+        action: MarinaSuggestionAction? = nil,
         expectedAnswerKind: HomeAnswerKind?,
         expectedTitleFamily: String
     ) {
@@ -123,6 +125,7 @@ struct MarinaPresetPrompt: Identifiable, Equatable {
         self.title = title
         self.query = query
         self.promptText = trimmedPrompt?.isEmpty == false ? trimmedPrompt : nil
+        self.action = action
         self.expectedMetric = query.intent.metric
         self.expectedAnswerKind = expectedAnswerKind
         self.expectedTitleFamily = expectedTitleFamily
@@ -137,6 +140,7 @@ struct MarinaPresetPrompt: Identifiable, Equatable {
             title: title,
             query: query,
             promptText: promptText,
+            action: action,
             reasoning: "preset_prompt:\(id)"
         )
     }
@@ -322,11 +326,36 @@ enum MarinaPresetPromptCatalog {
         )
     }
 
+    private static func typedPrompt(
+        _ group: MarinaPresetPromptGroup?,
+        _ title: String,
+        typedIntent: MarinaCanonicalTypedIntent,
+        text: String,
+        fallback fallbackIntent: HomeQueryIntent,
+        requiresPromptSupport: Bool,
+        context: MarinaPresetPromptContext,
+        expectedAnswerKind: HomeAnswerKind?,
+        expectedTitleFamily: String
+    ) -> MarinaPresetPrompt? {
+        guard requiresPromptSupport == false || context.supportsPromptBackedSuggestions else {
+            return nil
+        }
+        return MarinaPresetPrompt(
+            group: group,
+            title: title,
+            query: HomeQuery(intent: fallbackIntent),
+            promptText: text,
+            action: .typedIntent(typedIntent),
+            expectedAnswerKind: expectedAnswerKind,
+            expectedTitleFamily: expectedTitleFamily
+        )
+    }
+
     private static func promptBackedPrompts(
         context: MarinaPresetPromptContext
     ) -> [MarinaPresetPrompt] {
         var prompts: [MarinaPresetPrompt?] = [
-            prompt(.budgets, "What is my active budget?", text: "What is my active budget?", fallback: .periodOverview, requiresPromptSupport: true, context: context, expectedAnswerKind: .message, expectedTitleFamily: "Active Budget"),
+            typedPrompt(.budgets, "What is my active budget?", typedIntent: .activeBudgetStatus, text: "What is my active budget?", fallback: .periodOverview, requiresPromptSupport: true, context: context, expectedAnswerKind: .message, expectedTitleFamily: "Active Budget"),
             prompt(.budgets, "Which budgets share links?", text: "Which budgets share the same card or preset?", fallback: .periodOverview, requiresPromptSupport: true, context: context, expectedAnswerKind: .list, expectedTitleFamily: "Budget Shared Links"),
             prompt(.income, "Compare planned vs actual income", text: "Compare actual vs planned income this month.", fallback: .incomeAverageActual, requiresPromptSupport: true, context: context, expectedAnswerKind: .comparison, expectedTitleFamily: "Income"),
             prompt(.income, "Expenses before next income", text: "What upcoming expenses will hit before my next income?", fallback: .nextPlannedExpense, requiresPromptSupport: true, context: context, expectedAnswerKind: .list, expectedTitleFamily: "Upcoming Expenses"),

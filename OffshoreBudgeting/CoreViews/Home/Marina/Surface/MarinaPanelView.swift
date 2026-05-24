@@ -1105,9 +1105,6 @@ struct MarinaPanelView: View {
             recoverySuggestions: recoverySuggestions,
             followUpSuggestions: followUps
         )
-        MarinaDebugLogger.log(
-            "[MarinaSuggestions] answer='\(answer.title)' sections=\(sections.map { "\($0.title):\($0.suggestions.count)" }.joined(separator: ", "))"
-        )
         return sections
     }
     
@@ -2469,6 +2466,9 @@ struct MarinaPanelView: View {
     }
 
     private func responseGenerationSuggestionSummary(_ suggestion: MarinaSuggestion) -> String {
+        if case .typedIntent(let typedIntent) = suggestion.action {
+            return "typed=\(typedIntent.traceSummary)"
+        }
         if let promptText = suggestion.promptText {
             return "prompt=\(promptText)"
         }
@@ -5223,7 +5223,6 @@ struct MarinaPanelView: View {
             explanation: answer.explanation,
             generatedAt: answer.generatedAt
         )
-        conversationStore.saveAnswers(answers, workspaceID: workspace.id)
     }
 
     private func replaceAnswerPreservingPrompt(_ replacement: HomeAnswer) {
@@ -5346,23 +5345,26 @@ struct MarinaPanelView: View {
         MarinaDebugLogger.log("[MarinaPresetPrompt] title='\(suggestion.title)' action='\(suggestionTraceSummary(suggestion))'")
         let runtime = marinaPanelRuntime(turnClassification: .freshQuestion)
         let result: MarinaTurnResult
-        if suggestion.isPromptBacked {
-            result = await runtime.run(prompt: prompt)
-        } else {
+        switch suggestion.action {
+        case .homeQuery(let query):
             result = await runtime.run(
-                query: suggestion.query,
+                query: query,
                 sourceTitle: suggestion.title
             )
+        case .typedIntent(let typedIntent):
+            result = await runtime.run(
+                typedIntent: typedIntent,
+                sourceTitle: prompt
+            )
+        case .freeformPrompt(let promptText):
+            result = await runtime.run(prompt: promptText)
         }
         await handleMarinaTurnResult(result, rawPrompt: prompt)
         finishMarinaTrace()
     }
 
     private func suggestionTraceSummary(_ suggestion: MarinaSuggestion) -> String {
-        if let promptText = suggestion.promptText {
-            return "prompt:\(promptText)"
-        }
-        return "query:\(suggestion.query.intent.rawValue)"
+        suggestion.action.traceSummary(fallbackQuery: suggestion.query)
     }
 
     @discardableResult

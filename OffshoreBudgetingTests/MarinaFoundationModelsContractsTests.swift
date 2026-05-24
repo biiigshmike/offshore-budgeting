@@ -119,6 +119,27 @@ struct MarinaFoundationModelsContractsTests {
         #expect(query.filters.first?.allowedEntityTypeHints == [.merchant, .expense, .transaction])
     }
 
+    @available(iOS 26.0, macOS 26.0, *)
+    @Test func semanticRequest_unknownRawContractFieldsFailClosed() {
+        let unknownSubject = semanticRequest(
+            subjectRaw: "mysteryLedger",
+            operationRaw: "sum"
+        ).intent(prompt: "Show mystery ledger", context: routerContext())
+        let unknownOperation = semanticRequest(
+            subjectRaw: "variableExpenses",
+            operationRaw: "teleport"
+        ).intent(prompt: "Teleport my expenses", context: routerContext())
+
+        guard case .unsupported(let subjectUnsupported) = unknownSubject,
+              case .unsupported(let operationUnsupported) = unknownOperation else {
+            Issue.record("Expected unknown Foundation semantic fields to fail closed.")
+            return
+        }
+
+        #expect(subjectUnsupported.reasonRaw == "malformedSemanticRequest")
+        #expect(operationUnsupported.reasonRaw == "malformedSemanticRequest")
+    }
+
     @Test func runtimeTraceSummary_includesFoundationPromptVersioning() {
         let settings = MarinaRuntimeSettings.resolve(
             aiOptInFallback: true,
@@ -524,6 +545,35 @@ struct MarinaFoundationModelsContractsTests {
 
     private func generatedNames(prefix: String, count: Int) -> [String] {
         (1...count).map { "\(prefix) \($0)" }
+    }
+
+    @available(iOS 26.0, macOS 26.0, *)
+    private func semanticRequest(
+        subjectRaw: String?,
+        operationRaw: String?
+    ) -> MarinaFoundationSemanticRequest {
+        MarinaFoundationSemanticRequest(
+            routeRaw: "readQuery",
+            subjectRaw: subjectRaw,
+            operationRaw: operationRaw,
+            amountFieldRaw: "amount",
+            filters: [],
+            dateText: nil,
+            comparisonDateText: nil,
+            periodUnitRaw: nil,
+            groupingRaw: nil,
+            rankingRaw: nil,
+            requestedDetailRaw: nil,
+            responseShapeRaw: "summaryCard",
+            limit: nil,
+            incomeStatusRaw: nil,
+            metricContractRaw: nil,
+            unsupportedReasonRaw: nil,
+            unsupportedMessage: nil,
+            clarificationMessage: nil,
+            clarificationMissingFieldRaw: nil,
+            confidenceRaw: "high"
+        )
     }
 
     @available(iOS 26.0, macOS 26.0, *)

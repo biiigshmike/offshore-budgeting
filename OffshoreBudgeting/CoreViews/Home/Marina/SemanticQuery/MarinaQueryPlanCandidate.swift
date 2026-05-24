@@ -333,6 +333,7 @@ enum MarinaRequestShape: String, Codable, Sendable, Equatable {
 enum MarinaRouteIntentKind: String, Codable, Sendable, Equatable {
     case generic
     case databaseLookup
+    case currentWorkspace
     case periodOverview
     case budgetSummary
     case budgetInventory
@@ -992,7 +993,7 @@ extension MarinaRouteIntent {
             return catalogRoute
         }
         switch kind {
-        case .databaseLookup:
+        case .databaseLookup, .currentWorkspace:
             return .databaseLookup
         case .periodOverview:
             return .homeAdapter
@@ -1062,6 +1063,14 @@ struct MarinaRoutePatternRegistry {
             requestedDetails: [nil, .general, .status]
         ),
         RoutePattern(
+            kind: .currentWorkspace,
+            preferredExecutorRoute: .databaseLookup,
+            operations: [.lookupDetails],
+            measures: [.transactionAmount],
+            groupings: [nil],
+            requestedDetails: [nil, .general, .status]
+        ),
+        RoutePattern(
             kind: .budgetSummary,
             preferredExecutorRoute: .composableWorkspace,
             operations: [.sum],
@@ -1107,7 +1116,7 @@ struct MarinaRoutePatternRegistry {
             operations: [.lookupDetails],
             measures: [.remainingBudget],
             groupings: [nil],
-            requestedDetails: [.status]
+            requestedDetails: [nil, .general, .status]
         ),
         RoutePattern(
             kind: .budgetCategoryLimit,
@@ -1258,6 +1267,10 @@ struct MarinaRoutePatternRegistry {
         databaseLookupRequest: MarinaDatabaseLookupRequest?
     ) -> MarinaRouteIntentKind {
         if requestFamily == .databaseLookup || databaseLookupRequest != nil {
+            if databaseLookupRequest?.objectTypes == [.workspace],
+               databaseLookupRequest?.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == true {
+                return .currentWorkspace
+            }
             return .databaseLookup
         }
         let normalized = normalized(rawPrompt)
@@ -1334,6 +1347,9 @@ struct MarinaRoutePatternRegistry {
         requestedDetail: MarinaSemanticRequestedDetail?,
         targetTypes: [MarinaCandidateEntityTypeHint]
     ) -> MarinaRouteIntentKind {
+        if subject == .workspaces, operation == .lookupDetails {
+            return .currentWorkspace
+        }
         if subject == .budgets {
             if operation == .sum, measure == .spend, targetTypes.contains(.budget) {
                 return .budgetSummary

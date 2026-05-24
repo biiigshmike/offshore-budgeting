@@ -749,8 +749,10 @@ struct MarinaModelsTests {
 
         #expect(querySuggestion.isPromptBacked == false)
         #expect(querySuggestion.executionPrompt == "Spend this month")
+        #expect(querySuggestion.action == .homeQuery(HomeQuery(intent: .spendThisMonth)))
         #expect(promptSuggestion.isPromptBacked)
         #expect(promptSuggestion.executionPrompt == "What is my active budget?")
+        #expect(promptSuggestion.action == .freeformPrompt("What is my active budget?"))
         #expect(promptSuggestion.query.intent == .periodOverview)
     }
 

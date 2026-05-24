@@ -171,6 +171,15 @@ struct MarinaQueryCapabilityMatrix {
             requestedDetails: [nil, .general, .status],
             preferredExecutorRoute: .homeAdapter
         ),
+        .currentWorkspace: RouteCapabilityRecord(
+            kind: .currentWorkspace,
+            operations: [.lookupDetails],
+            measures: [.transactionAmount],
+            groupings: [nil],
+            targetTypes: [.workspace],
+            requestedDetails: [nil, .general, .status],
+            preferredExecutorRoute: .databaseLookup
+        ),
         .budgetSummary: RouteCapabilityRecord(
             kind: .budgetSummary,
             operations: [.sum],

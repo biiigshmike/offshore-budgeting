@@ -44,6 +44,14 @@ struct MarinaPanelRuntime {
         )
     }
 
+    func run(typedIntent: MarinaCanonicalTypedIntent, sourceTitle: String) async -> MarinaTurnResult {
+        await coordinator.run(
+            typedIntent: typedIntent,
+            sourceTitle: sourceTitle,
+            context: turnContext
+        )
+    }
+
     func resume(
         clarification: MarinaTypedClarification,
         choice: MarinaClarificationChoice

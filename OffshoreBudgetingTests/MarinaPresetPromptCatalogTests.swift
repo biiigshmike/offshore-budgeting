@@ -101,6 +101,12 @@ struct MarinaPresetPromptCatalogTests {
         )
 
         #expect(budgetSuggestions.contains { $0.promptText == "Which cards are linked to May Budget?" })
+        #expect(
+            budgetSuggestions.contains { suggestion in
+                guard case .typedIntent(.activeBudgetStatus) = suggestion.action else { return false }
+                return suggestion.promptText == "What is my active budget?"
+            }
+        )
         #expect(accountSuggestions.contains { $0.promptText == "What is Roommate's balance?" })
         #expect(expenseSuggestions.contains { $0.promptText == "What planned expenses came from Rent?" })
 

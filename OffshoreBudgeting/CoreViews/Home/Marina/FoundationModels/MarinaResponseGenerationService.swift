@@ -590,6 +590,7 @@ struct MarinaResponseSurfaceApplicator {
                     title: title,
                     query: original.query,
                     promptText: original.promptText,
+                    action: original.action,
                     confidenceScore: original.confidenceScore,
                     reasoning: original.reasoning
                 )

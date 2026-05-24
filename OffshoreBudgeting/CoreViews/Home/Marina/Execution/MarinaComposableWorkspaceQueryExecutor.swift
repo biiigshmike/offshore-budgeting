@@ -91,7 +91,9 @@ struct MarinaComposableWorkspaceQueryExecutor {
                isBudgetRelationshipDetail(detail) {
                 return .handled(budgetRelationshipResponse(budget: budget, detail: detail, resolved: resolved, plan: plan, provider: provider))
             }
-        case .budgetLinkedCards?, .budgetLinkedPresets?, .budgetCategoryLimits?, .activeBudget?:
+        case .activeBudget?:
+            return .handled(activeBudgetStatus(provider: provider, now: now))
+        case .budgetLinkedCards?, .budgetLinkedPresets?, .budgetCategoryLimits?:
             if let budget = resolvedBudgetTarget(in: resolved, candidate: candidate, provider: provider, now: now),
                let detail = (candidate.routeIntent?.requestedDetail ?? plan.routeIntent?.requestedDetail ?? candidate.semanticCommand?.requestedDetail),
                isBudgetRelationshipDetail(detail) {
@@ -103,7 +105,7 @@ struct MarinaComposableWorkspaceQueryExecutor {
             }
         case .recentTransactionRows?:
             return .handled(recentFilteredTransactions(resolved: resolved, plan: plan, provider: provider, now: now, amountBasis: amountBasis))
-        case .databaseLookup?, .periodOverview?, .generic?, .broadSpend?, .plannedExpenseRows?, .presetTemplateRows?, .plannedExpenseByCategory?, .plannedExpenseByCard?, .plannedExpenseByPreset?, .savingsStatus?, .savingsActivity?, .savingsMovementRanking?, .incomePlannedVsActual?, .reconciliationBalance?, nil:
+        case .currentWorkspace?, .databaseLookup?, .periodOverview?, .generic?, .broadSpend?, .plannedExpenseRows?, .presetTemplateRows?, .plannedExpenseByCategory?, .plannedExpenseByCard?, .plannedExpenseByPreset?, .savingsStatus?, .savingsActivity?, .savingsMovementRanking?, .incomePlannedVsActual?, .reconciliationBalance?, nil:
             break
         }
 
@@ -127,7 +129,7 @@ struct MarinaComposableWorkspaceQueryExecutor {
                 return .handled(settlementRows(resolved: resolved, plan: plan, provider: provider, now: now))
             case .recentTransactionRows:
                 return .handled(recentFilteredTransactions(resolved: resolved, plan: plan, provider: provider, now: now, amountBasis: amountBasis))
-            case .generic, .databaseLookup, .periodOverview, .budgetSummary, .activeBudget, .budgetMembership, .budgetLinkedCards, .budgetLinkedPresets, .budgetCategoryLimits, .budgetCategoryLimit, .plannedExpenseRows, .presetTemplateRows, .plannedExpenseByCategory, .plannedExpenseByCard, .plannedExpenseByPreset, .savingsStatus, .savingsActivity, .savingsMovementRanking, .incomePlannedVsActual, .reconciliationBalance, .broadSpend:
+            case .generic, .databaseLookup, .currentWorkspace, .periodOverview, .budgetSummary, .activeBudget, .budgetMembership, .budgetLinkedCards, .budgetLinkedPresets, .budgetCategoryLimits, .budgetCategoryLimit, .plannedExpenseRows, .presetTemplateRows, .plannedExpenseByCategory, .plannedExpenseByCard, .plannedExpenseByPreset, .savingsStatus, .savingsActivity, .savingsMovementRanking, .incomePlannedVsActual, .reconciliationBalance, .broadSpend:
                 break
             }
         }
@@ -183,6 +185,106 @@ struct MarinaComposableWorkspaceQueryExecutor {
     }
 
     // MARK: - Budgets
+
+    private func activeBudgetStatus(
+        provider: MarinaDataProvider,
+        now: Date
+    ) -> MarinaWorkspaceAggregationCard {
+        let matches = activeBudgets(provider: provider, now: now)
+
+        guard matches.isEmpty == false else {
+            return MarinaWorkspaceAggregationCard(
+                title: "No Active Budget",
+                subtitle: "No budget includes today.",
+                primaryValue: "None",
+                rows: [
+                    .init(label: "Status", value: "No active budget includes today.")
+                ],
+                traceSummary: "composableWorkspace=activeBudgetStatus,result=none"
+            )
+        }
+
+        guard matches.count == 1, let budget = matches.first else {
+            let rows = matches.map { budget in
+                MarinaWorkspaceAggregationCard.Row(
+                    label: budget.name,
+                    value: activeBudgetValue(budget),
+                    date: budget.startDate,
+                    objectType: .budget,
+                    sourceID: budget.id,
+                    sortValue: budget.startDate.timeIntervalSince1970
+                )
+            }
+            return MarinaWorkspaceAggregationCard(
+                title: "Multiple Active Budgets",
+                subtitle: "Choose the budget Marina should use.",
+                primaryValue: "\(matches.count)",
+                rows: rows,
+                traceSummary: "composableWorkspace=activeBudgetStatus,result=ambiguous,count=\(matches.count)"
+            )
+        }
+
+        let range = HomeQueryDateRange(startDate: budget.startDate, endDate: budget.endDate)
+        let linkedCards = (budget.cardLinks ?? []).compactMap { $0.card?.name }.sorted()
+        let linkedPresets = (budget.presetLinks ?? []).compactMap { $0.preset?.title }.sorted()
+        let categoryLimitCount = budget.categoryLimits?.count ?? 0
+        return MarinaWorkspaceAggregationCard(
+            title: "Active Budget",
+            subtitle: rangeLabel(range),
+            primaryValue: budget.name,
+            rows: [
+                .init(label: "Budget", value: budget.name, objectType: .budget, sourceID: budget.id),
+                .init(label: "Period", value: rangeLabel(range), date: budget.startDate),
+                .init(label: "Linked cards", value: linkedCards.isEmpty ? "None" : linkedCards.joined(separator: ", ")),
+                .init(label: "Linked presets", value: linkedPresets.isEmpty ? "None" : linkedPresets.joined(separator: ", ")),
+                .init(label: "Category limits", value: "\(categoryLimitCount)")
+            ],
+            traceSummary: "composableWorkspace=activeBudgetStatus,result=single,budgetID=\(budget.id.uuidString),budgetName=\(budget.name)"
+        )
+    }
+
+    private func activeBudgetValue(_ budget: Budget) -> String {
+        let linkedCardCount = budget.cardLinks?.count ?? 0
+        let linkedPresetCount = budget.presetLinks?.count ?? 0
+        return "\(rangeLabel(HomeQueryDateRange(startDate: budget.startDate, endDate: budget.endDate))) • \(linkedCardCount) card\(linkedCardCount == 1 ? "" : "s") • \(linkedPresetCount) preset\(linkedPresetCount == 1 ? "" : "s")"
+    }
+
+    private func activeBudgets(
+        provider: MarinaDataProvider,
+        now: Date
+    ) -> [Budget] {
+        let day = calendar.startOfDay(for: now)
+        var seenBudgetIDs = Set<UUID>()
+        var seenBudgetKeys = Set<String>()
+        return provider.fetchAllBudgets()
+            .filter { budget in
+                budget.workspace?.id == provider.workspaceID
+            }
+            .filter { budget in
+                seenBudgetIDs.insert(budget.id).inserted
+            }
+            .filter { budget in
+                let key = [
+                    normalized(budget.name),
+                    "\(calendar.startOfDay(for: budget.startDate).timeIntervalSince1970)",
+                    "\(calendar.startOfDay(for: budget.endDate).timeIntervalSince1970)"
+                ].joined(separator: "|")
+                return seenBudgetKeys.insert(key).inserted
+            }
+            .filter { budget in
+                calendar.startOfDay(for: budget.startDate) <= day
+                    && calendar.startOfDay(for: budget.endDate) >= day
+            }
+            .sorted { lhs, rhs in
+                if lhs.startDate != rhs.startDate {
+                    return lhs.startDate < rhs.startDate
+                }
+                if lhs.endDate != rhs.endDate {
+                    return lhs.endDate < rhs.endDate
+                }
+                return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+            }
+    }
 
     private func budgetsOverlappingRange(
         prompt: String,

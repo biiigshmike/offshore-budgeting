@@ -519,8 +519,10 @@ struct MarinaFoundationSemanticRequest: Codable, Equatable, Sendable {
         context: MarinaInterpretationContext,
         route: MarinaFoundationRouteKind
     ) -> MarinaSemanticQuery? {
-        let subject = subject(from: subjectRaw, route: route)
-        let operation = operation(from: operationRaw, route: route)
+        guard let subject = subject(from: subjectRaw, route: route),
+              let operation = operation(from: operationRaw, route: route) else {
+            return nil
+        }
         guard route == .scenario || operation != .simulate else { return nil }
         let metricID = metricContractID(from: metricContractRaw)
         let routeIntent = MarinaRouteIntent.from(
@@ -1653,13 +1655,13 @@ private func requestedDetail(from rawValue: String?) -> MarinaSemanticRequestedD
 
 private func subject(
     from rawValue: String?,
-    route: MarinaFoundationRouteKind
-) -> MarinaSubject {
+    route _: MarinaFoundationRouteKind
+) -> MarinaSubject? {
     if let exact = exactRawValue(rawValue, as: MarinaSubject.self) {
         return exact
     }
     guard let normalized = normalizedToken(rawValue) else {
-        return route == .lookup ? .workspaces : .variableExpenses
+        return nil
     }
     switch normalized {
     case "variable_expenses", "variableexpenses", "variable_expense", "variableexpense", "expenses", "expense", "transactions", "transaction":
@@ -1693,26 +1695,19 @@ private func subject(
     case "uncategorized", "uncategorized_expenses", "uncategorizedexpenses":
         return .uncategorizedExpenses
     default:
-        return route == .lookup ? .workspaces : .variableExpenses
+        return nil
     }
 }
 
 private func operation(
     from rawValue: String?,
-    route: MarinaFoundationRouteKind
-) -> MarinaOperation {
+    route _: MarinaFoundationRouteKind
+) -> MarinaOperation? {
     if let exact = exactRawValue(rawValue, as: MarinaOperation.self) {
         return exact
     }
     guard let normalized = normalizedToken(rawValue) else {
-        switch route {
-        case .lookup:
-            return .lookupDetails
-        case .scenario:
-            return .simulate
-        default:
-            return .sum
-        }
+        return nil
     }
     switch normalized {
     case "sum", "total", "spend_total", "amount_total":
@@ -1744,7 +1739,7 @@ private func operation(
     case "simulate", "scenario", "what_if", "whatif":
         return .simulate
     default:
-        return route == .lookup ? .lookupDetails : .sum
+        return nil
     }
 }
 
