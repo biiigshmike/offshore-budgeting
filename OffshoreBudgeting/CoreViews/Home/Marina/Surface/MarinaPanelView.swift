@@ -1091,6 +1091,8 @@ struct MarinaPanelView: View {
             Text("Marina")
                 .font(.title2.weight(.semibold))
 
+            marinaBetaBadge
+
             Text(marinaEmptyStateDescription)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
@@ -1104,6 +1106,29 @@ struct MarinaPanelView: View {
         .padding(.vertical, 32)
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("marina.emptyState")
+    }
+
+    @ViewBuilder
+    private var marinaBetaBadge: some View {
+        let badge = Text(String(localized: "assistant.marina.betaBadge", defaultValue: "BETA", comment: "Short badge indicating Marina is in beta."))
+            .font(.caption2.weight(.bold))
+            .foregroundStyle(Color("AccentColor"))
+            .tracking(0.8)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .accessibilityIdentifier("marina.betaBadge")
+
+        if #available(iOS 26.0, *) {
+            badge
+                .glassEffect(.regular, in: .capsule)
+        } else {
+            badge
+                .background(.ultraThinMaterial, in: Capsule())
+                .overlay {
+                    Capsule()
+                        .stroke(Color("AccentColor").opacity(0.24), lineWidth: 1)
+                }
+        }
     }
 
     private var marinaAppleIntelligenceRequirementBadge: some View {

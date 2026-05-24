@@ -5474,6 +5474,18 @@
         }
       }
     },
+    "assistant.marina.betaBadge" : {
+      "comment" : "Short badge indicating Marina is in beta.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "BETA"
+          }
+        }
+      }
+    },
     "assistant.marina.emptyDescription" : {
       "comment" : "Introductory Marina description shown in the empty assistant state.",
       "extractionState" : "extracted_with_value",
