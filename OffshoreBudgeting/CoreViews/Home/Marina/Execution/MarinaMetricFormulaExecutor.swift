@@ -85,6 +85,7 @@ struct MarinaMetricFormulaExecutor {
             title: "Safe Spend Remaining",
             subtitle: rangeLabel(summary.rangeStart, summary.rangeEnd),
             primaryValue: currency(summary.periodRemainingRoom),
+            answerKind: .metric,
             rows: [
                 row("Rest of month", "\(shortDate(summary.rangeStart))-\(shortDate(summary.rangeEnd))"),
                 row("Days left", "\(summary.daysLeftInPeriod)"),
@@ -114,6 +115,7 @@ struct MarinaMetricFormulaExecutor {
             title: "Planned vs Actual Spend",
             subtitle: rangeLabel(range),
             primaryValue: delta(gap),
+            answerKind: .comparison,
             rows: [
                 row("Planned spend", currency(plannedTotal), amount: plannedTotal),
                 row("Recorded planned actual", currency(recordedPlannedActual), amount: recordedPlannedActual),
@@ -172,6 +174,7 @@ struct MarinaMetricFormulaExecutor {
             title: "True Owned Spend",
             subtitle: rangeLabel(range),
             primaryValue: currency(total),
+            answerKind: .metric,
             rows: [
                 row("Variable owned spend", currency(variableOwned), amount: variableOwned),
                 row("Planned owned spend", currency(plannedOwned), amount: plannedOwned),
@@ -397,6 +400,7 @@ struct MarinaMetricFormulaExecutor {
             title: "Subscription Spend",
             subtitle: rangeLabel(range),
             primaryValue: currency(variableTotal + plannedTotal),
+            answerKind: .metric,
             rows: [
                 row("Variable subscription spend", currency(variableTotal), amount: variableTotal),
                 row("Planned subscription spend", currency(plannedTotal), amount: plannedTotal)
@@ -433,6 +437,7 @@ struct MarinaMetricFormulaExecutor {
             title: "Skip \(target.displayName) Scenario",
             subtitle: "Two-week skip projected into \(rangeLabel(range))",
             primaryValue: currency(projectedWithSkip),
+            answerKind: .metric,
             rows: [
                 row("Projected without skip", currency(projectedWithoutSkip), amount: projectedWithoutSkip),
                 row("Estimated avoided spend", currency(avoidable), amount: avoidable),
@@ -455,6 +460,7 @@ struct MarinaMetricFormulaExecutor {
             title: "Savings Track vs Last Month",
             subtitle: "\(rangeLabel(ranges.current)) vs \(rangeLabel(ranges.previous))",
             primaryValue: diff >= 0 ? "On track" : "Behind",
+            answerKind: .comparison,
             rows: [
                 row("Projected savings", currency(currentProjected), amount: currentProjected),
                 row("Last month actual savings", currency(lastActual), amount: lastActual),
@@ -516,6 +522,7 @@ struct MarinaMetricFormulaExecutor {
             title: "\(account.name) Owed This Month",
             subtitle: rangeLabel(range),
             primaryValue: currency(owed),
+            answerKind: .metric,
             rows: [
                 row("Allocated share", currency(allocatedTotal), amount: allocatedTotal),
                 row("Signed settlements", currency(settlementTotal), amount: settlementTotal),

@@ -19,12 +19,20 @@ struct MarinaQueryExecution {
 struct MarinaExplicitPromptConstraints: Equatable {
     var categories: Set<String> = []
     var cards: Set<String> = []
+    var allocationAccounts: Set<String> = []
+    var merchants: Set<String> = []
     var hasDateConstraint = false
     var limit: Int?
     var sort: MarinaRankingDirectionCandidate?
 
     var isEmpty: Bool {
-        categories.isEmpty && cards.isEmpty && hasDateConstraint == false && limit == nil && sort == nil
+        categories.isEmpty
+            && cards.isEmpty
+            && allocationAccounts.isEmpty
+            && merchants.isEmpty
+            && hasDateConstraint == false
+            && limit == nil
+            && sort == nil
     }
 
     func unsupportedIfDropped(
@@ -45,6 +53,14 @@ struct MarinaExplicitPromptConstraints: Equatable {
         if cards.isEmpty == false,
            preserves(names: cards, type: .card, plan: plan, resolvedQuery: resolvedQuery, candidate: candidate) == false {
             dropped.append("card")
+        }
+        if allocationAccounts.isEmpty == false,
+           preserves(names: allocationAccounts, type: .allocationAccount, plan: plan, resolvedQuery: resolvedQuery, candidate: candidate) == false {
+            dropped.append("account")
+        }
+        if merchants.isEmpty == false,
+           preserves(names: merchants, type: .merchant, plan: plan, resolvedQuery: resolvedQuery, candidate: candidate) == false {
+            dropped.append("merchant")
         }
         if hasDateConstraint,
            plan.dateRange == nil,
@@ -126,11 +142,14 @@ struct MarinaExplicitConstraintDetector {
         let normalizedPrompt = normalized(prompt)
         let explicitCards = explicitNames(context.cardNames, in: normalizedPrompt)
         let explicitCategories = explicitNames(context.categoryNames, in: normalizedPrompt)
+        let explicitAllocationAccounts = explicitNames(context.allocationAccountNames, in: normalizedPrompt)
         return MarinaExplicitPromptConstraints(
             categories: explicitCategories.filter { category in
                 isLikelyCardNameFragment(category, cards: explicitCards, prompt: normalizedPrompt) == false
             },
             cards: explicitCards,
+            allocationAccounts: explicitAllocationAccounts,
+            merchants: explicitMerchantNames(in: normalizedPrompt),
             hasDateConstraint: hasDateConstraint(
                 in: normalizedPrompt,
                 protectedEntityNames: context.cardNames
@@ -203,6 +222,23 @@ struct MarinaExplicitConstraintDetector {
             .split(separator: " ")
             .compactMap { Int($0) }
             .first
+    }
+
+    private func explicitMerchantNames(in prompt: String) -> Set<String> {
+        let pattern = #"(?:\bat\b|\bfrom\b|\bshopping at\b|\bshop at\b)\s+([a-z0-9&][a-z0-9&\s]{0,40})"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
+        let nsRange = NSRange(prompt.startIndex..<prompt.endIndex, in: prompt)
+        return Set(regex.matches(in: prompt, range: nsRange).compactMap { match in
+            guard match.numberOfRanges > 1,
+                  let range = Range(match.range(at: 1), in: prompt) else {
+                return nil
+            }
+            let raw = String(prompt[range])
+                .replacingOccurrences(of: #"\b(this|last|current|period|month|week|year|today|yesterday|for|on|with|spend|spent|expenses?|transactions?)\b.*$"#, with: "", options: .regularExpression)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let normalizedRaw = normalized(raw)
+            return normalizedRaw.isEmpty ? nil : normalizedRaw
+        })
     }
 
     private func explicitSort(in prompt: String) -> MarinaRankingDirectionCandidate? {
@@ -1017,6 +1053,7 @@ struct MarinaFormulaExecutor {
             title: title("Total", formulaIR: formulaIR),
             subtitle: rangeLabel(formulaIR.dateRange),
             primaryValue: currency(total),
+            answerKind: .metric,
             rows: baseRows(formulaIR) + evidenceRows(rows.sorted(by: newestFirst).prefix(limit(for: formulaIR))),
             traceSummary: trace(formulaIR, resultCount: rows.count, total: total)
         )
@@ -1033,6 +1070,7 @@ struct MarinaFormulaExecutor {
             title: title(averageTitlePrefix(formulaIR), formulaIR: formulaIR),
             subtitle: rangeLabel(formulaIR.dateRange),
             primaryValue: currency(average),
+            answerKind: .metric,
             rows: baseRows(formulaIR) + [
                 .init(label: "Total", value: currency(total), amount: total),
                 .init(label: "Average basis", value: averageBasisLabel(formulaIR, divisor: divisor))
@@ -1049,6 +1087,7 @@ struct MarinaFormulaExecutor {
             title: title("Count", formulaIR: formulaIR),
             subtitle: rangeLabel(formulaIR.dateRange),
             primaryValue: "\(rows.count)",
+            answerKind: .metric,
             rows: baseRows(formulaIR) + evidenceRows(rows.sorted(by: newestFirst).prefix(limit(for: formulaIR))),
             traceSummary: trace(formulaIR, resultCount: rows.count, total: Double(rows.count))
         )
@@ -1106,6 +1145,7 @@ struct MarinaFormulaExecutor {
             title: title("Comparison", formulaIR: formulaIR),
             subtitle: "\(rangeLabel(currentRange)) vs \(rangeLabel(previousRange))",
             primaryValue: currency(current),
+            answerKind: .comparison,
             rows: baseRows(formulaIR) + [
                 .init(label: "Current period", value: currency(current), amount: current, sortValue: current),
                 .init(label: "Previous period", value: currency(previous), amount: previous, sortValue: previous),
@@ -1123,6 +1163,7 @@ struct MarinaFormulaExecutor {
             title: title("Formula", formulaIR: formulaIR),
             subtitle: message,
             primaryValue: "Not enough data",
+            answerKind: .message,
             rows: baseRows(formulaIR) + [.init(label: "Data limitation", value: message)],
             traceSummary: trace(formulaIR, resultCount: 0, total: nil)
         )
@@ -1447,6 +1488,7 @@ struct MarinaCompositeFormulaExecutor {
             title: "\(category.name) Limit Burn Rate",
             subtitle: budget.map { "\($0.name) • \(rangeLabel(range))" } ?? rangeLabel(range),
             primaryValue: overage > 0 ? "\(currency(overage)) projected over" : "\(currency(abs(overage))) projected under",
+            answerKind: .metric,
             rows: baseRows(formula: .categoryLimitBurnRate, assumptions: "Actual variable category spend to date; active budget max limit; straight-line daily pace.", range: range) + [
                 .init(label: "Category", value: category.name, objectType: .category, sourceID: category.id),
                 .init(label: "Budget max", value: currency(maxLimit), amount: maxLimit),
@@ -1617,6 +1659,7 @@ struct MarinaCompositeFormulaExecutor {
             title: "Expense-Only Savings Runway",
             subtitle: rangeLabel(range),
             primaryValue: days.map { "\($0) days" } ?? "No current spend rate",
+            answerKind: .metric,
             rows: baseRows(formula: .expenseOnlySavingsRunway, assumptions: "Ignores income by request; uses actual savings and current-period actual variable card activity only.", range: range) + [
                 .init(label: "Actual savings", value: currency(savings), amount: savings),
                 .init(label: "Actual card activity", value: currency(spend), amount: spend),
@@ -1649,6 +1692,7 @@ struct MarinaCompositeFormulaExecutor {
             title: title,
             subtitle: message,
             primaryValue: "Not enough data",
+            answerKind: .message,
             rows: baseRows(formula: formula, assumptions: "No financial value was inferred without the required workspace data.", range: range) + [
                 .init(label: "Data limitation", value: message)
             ],
@@ -2842,7 +2886,7 @@ struct MarinaQueryExecutor {
         now: Date,
         decision: MarinaSemanticExecutionDecision
     ) -> MarinaQueryExecutionResult? {
-        switch workspaceAggregationExecutor.execute(plan: plan, provider: provider, now: now) {
+        switch workspaceAggregationExecutor.execute(plan: plan, provider: provider, now: now, amountBasis: decision.amountBasis) {
         case .handled(let card):
             return .handled(workspaceExecution(card, decision: decision))
         case .unsupported:

@@ -757,7 +757,14 @@ struct MarinaSemanticQueryAdapter {
                 return .savingsMovement
             }
             return .savings
-        case .allocatedAmount, .reconciliationBalance:
+        case .allocatedAmount:
+            switch semanticQuery.subject {
+            case .reconciliationAccounts, .reconciliationItems:
+                return .reconciliationBalance
+            case .variableExpenses, .plannedExpenses, .workspaces, .budgets, .cards, .categories, .merchant, .presets, .income, .incomeSource, .savingsAccounts, .savingsLedgerEntries, .uncategorizedExpenses:
+                return .spend
+            }
+        case .reconciliationBalance:
             return .reconciliationBalance
         case .plannedAmount, .actualAmount, .effectivePlannedAmount:
             return .presetAmount
@@ -775,6 +782,8 @@ struct MarinaSemanticQueryAdapter {
                 return .presetAmount
             case .budgets:
                 return .remainingBudget
+            case .cards where semanticQuery.operation == .count:
+                return .transactionFrequency
             case .variableExpenses, .cards, .categories, .merchant, .uncategorizedExpenses, .workspaces:
                 return semanticQuery.operation == .list ? .transactionAmount : .spend
             }

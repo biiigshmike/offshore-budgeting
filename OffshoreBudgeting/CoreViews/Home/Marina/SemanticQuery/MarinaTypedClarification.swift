@@ -493,7 +493,12 @@ struct MarinaConversationalQueryPlanner {
             ))
         }
 
-        if shouldOfferMerchantChoice(targetText: targetText, matchedCards: matchedCards, matchedCategories: matchedCategories) {
+        if shouldOfferMerchantChoice(
+            targetText: targetText,
+            prompt: candidate.rawPrompt,
+            matchedCards: matchedCards,
+            matchedCategories: matchedCategories
+        ) {
             let merchantName = displayText(targetText)
             choices.append(operationChoice(
                 title: "\(merchantName) merchant spending",
@@ -744,11 +749,16 @@ struct MarinaConversationalQueryPlanner {
 
     private func shouldOfferMerchantChoice(
         targetText: String,
+        prompt: String,
         matchedCards: [String],
         matchedCategories: [String]
     ) -> Bool {
         let target = normalized(targetText)
         guard target.count >= 3 else { return false }
+        if matchedCards.isEmpty == false,
+           containsWholePhrase("card", in: normalized(prompt)) {
+            return false
+        }
         return matchedCards.isEmpty || matchedCategories.isEmpty
     }
 

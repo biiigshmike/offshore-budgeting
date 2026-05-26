@@ -170,7 +170,8 @@ struct MarinaQueryValidator {
             )
         }
 
-        if query.operation == .compare, resolved.comparisonDateRange == nil {
+        let isTargetComparison = isSupportedTargetComparisonSemanticQuery(query, resolved: resolved)
+        if query.operation == .compare, resolved.comparisonDateRange == nil, isTargetComparison == false {
             return clarification(
                 .missingDateRange,
                 message: "I need the comparison period before I can answer that safely.",
@@ -264,7 +265,7 @@ struct MarinaQueryValidator {
             )
         }
 
-        if query.operation == .compare, resolved.comparisonDateRange == nil {
+        if query.operation == .compare, resolved.comparisonDateRange == nil, isTargetComparison == false {
             return clarification(
                 .missingDateRange,
                 message: "I need the comparison period before I can answer that safely.",
@@ -347,6 +348,17 @@ struct MarinaQueryValidator {
             && query.grouping == nil
             && resolved.resolvedFilters.count == 1
             && resolved.resolvedFilters.first?.entityType == .merchant
+    }
+
+    private func isSupportedTargetComparisonSemanticQuery(
+        _ query: MarinaSemanticQuery,
+        resolved: MarinaResolvedSemanticQuery
+    ) -> Bool {
+        query.subject == .variableExpenses
+            && query.operation == .compare
+            && query.amountField == .budgetImpactAmount
+            && query.grouping?.dimension == .card
+            && resolved.resolvedFilters.filter { $0.entityType == .card }.count >= 2
     }
 
     private func isSupportedMerchantSpendSemanticQuery(
@@ -628,7 +640,10 @@ struct MarinaQueryValidator {
                 || fields.contains("savingsamount")
                 || fields.contains("actualsavings")
         case .allocatedAmount:
-            return descriptor.entityName == "ExpenseAllocation" || fields.contains("allocatedamount")
+            return descriptor.entityName == "ExpenseAllocation"
+                || descriptor.entityName == "VariableExpense"
+                || descriptor.entityName == "PlannedExpense"
+                || fields.contains("allocatedamount")
         case .reconciliationBalance:
             return descriptor.entityName == "AllocationAccount"
                 || fields.contains("reconciliationbalance")

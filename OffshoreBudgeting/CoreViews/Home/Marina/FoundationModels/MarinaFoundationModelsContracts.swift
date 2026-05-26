@@ -338,6 +338,373 @@ struct MarinaTurnIntent: Codable, Equatable, Sendable {
 @available(iOS 26.0, macOS 26.0, *)
 @Generable
 #endif
+enum MarinaGuidedReadKind: String, Codable, Equatable, CaseIterable, Sendable {
+    case query
+    case clarification
+    case unsupported
+}
+
+#if canImport(FoundationModels)
+@available(iOS 26.0, macOS 26.0, *)
+@Generable
+#endif
+enum MarinaGuidedReadModelName: String, Codable, Equatable, CaseIterable, Sendable {
+    case workspace = "Workspace"
+    case budget = "Budget"
+    case budgetCategoryLimit = "BudgetCategoryLimit"
+    case card = "Card"
+    case budgetCardLink = "BudgetCardLink"
+    case budgetPresetLink = "BudgetPresetLink"
+    case category = "Category"
+    case preset = "Preset"
+    case plannedExpense = "PlannedExpense"
+    case variableExpense = "VariableExpense"
+    case allocationAccount = "AllocationAccount"
+    case expenseAllocation = "ExpenseAllocation"
+    case allocationSettlement = "AllocationSettlement"
+    case incomeSeries = "IncomeSeries"
+    case income = "Income"
+    case savingsAccount = "SavingsAccount"
+    case savingsLedgerEntry = "SavingsLedgerEntry"
+    case importMerchantRule = "ImportMerchantRule"
+    case assistantAliasRule = "AssistantAliasRule"
+    case merchant = "Merchant"
+}
+
+#if canImport(FoundationModels)
+@available(iOS 26.0, macOS 26.0, *)
+@Generable
+#endif
+enum MarinaGuidedReadOperation: String, Codable, Equatable, CaseIterable, Sendable {
+    case list
+    case count
+    case lookupDetails
+    case sum
+    case average
+    case minimum
+    case maximum
+    case rank
+    case breakdown
+    case compare
+    case forecast
+    case simulate
+}
+
+#if canImport(FoundationModels)
+@available(iOS 26.0, macOS 26.0, *)
+@Generable
+#endif
+enum MarinaGuidedReadAmountField: String, Codable, Equatable, CaseIterable, Sendable {
+    case amount
+    case plannedAmount
+    case actualAmount
+    case effectivePlannedAmount
+    case spendingAmount
+    case ledgerSignedAmount
+    case budgetImpactAmount
+    case incomeAmount
+    case savingsAmount
+    case allocatedAmount
+    case reconciliationBalance
+}
+
+#if canImport(FoundationModels)
+@available(iOS 26.0, macOS 26.0, *)
+@Generable
+#endif
+enum MarinaGuidedReadGrouping: String, Codable, Equatable, CaseIterable, Sendable {
+    case category
+    case merchant
+    case card
+    case transaction
+    case incomeSource
+    case preset
+    case savingsLedgerEntry
+    case allocationAccount
+    case day
+    case week
+    case month
+}
+
+#if canImport(FoundationModels)
+@available(iOS 26.0, macOS 26.0, *)
+@Generable
+#endif
+enum MarinaGuidedReadRanking: String, Codable, Equatable, CaseIterable, Sendable {
+    case top
+    case bottom
+    case largest
+    case smallest
+    case mostFrequent
+    case leastFrequent
+    case newest
+}
+
+#if canImport(FoundationModels)
+@available(iOS 26.0, macOS 26.0, *)
+@Generable
+#endif
+enum MarinaGuidedReadResponseShape: String, Codable, Equatable, CaseIterable, Sendable {
+    case scalarCurrency
+    case summaryCard
+    case relationshipList
+    case membershipStatus
+    case comparison
+    case rankedList
+    case groupedBreakdown
+    case chartRows
+    case clarification
+    case unsupported
+}
+
+#if canImport(FoundationModels)
+@available(iOS 26.0, macOS 26.0, *)
+@Generable
+#endif
+enum MarinaGuidedReadRequestedDetail: String, Codable, Equatable, CaseIterable, Sendable {
+    case general
+    case date
+    case amount
+    case card
+    case category
+    case status
+    case schedule
+    case recurrence
+    case account
+    case balance
+    case linkedObjects
+    case linkedCards
+    case linkedPresets
+    case categoryLimits
+    case membership
+}
+
+#if canImport(FoundationModels)
+@available(iOS 26.0, macOS 26.0, *)
+@Generable
+#endif
+enum MarinaGuidedReadIncomeStatus: String, Codable, Equatable, CaseIterable, Sendable {
+    case actual
+    case planned
+    case all
+}
+
+#if canImport(FoundationModels)
+@available(iOS 26.0, macOS 26.0, *)
+@Generable
+#endif
+enum MarinaGuidedReadConfidence: String, Codable, Equatable, CaseIterable, Sendable {
+    case high
+    case medium
+    case low
+}
+
+#if canImport(FoundationModels)
+@available(iOS 26.0, macOS 26.0, *)
+@Generable
+#endif
+enum MarinaGuidedReadTargetRole: String, Codable, Equatable, CaseIterable, Sendable {
+    case filter
+    case excludeFilter
+    case primaryTarget
+    case comparisonTarget
+    case groupingDimension
+    case simulationInput
+    case simulationOutput
+}
+
+#if canImport(FoundationModels)
+@available(iOS 26.0, macOS 26.0, *)
+@Generable
+#endif
+enum MarinaGuidedReadRelationship: String, Codable, Equatable, CaseIterable, Sendable {
+    case category
+    case merchant
+    case card
+    case budget
+    case preset
+    case incomeSource
+    case allocationAccount
+    case savingsAccount
+    case transaction
+    case workspace
+    case uncategorized
+}
+
+#if canImport(FoundationModels)
+@available(iOS 26.0, macOS 26.0, *)
+@Generable
+#endif
+enum MarinaGuidedReadEntityType: String, Codable, Equatable, CaseIterable, Sendable {
+    case category
+    case merchant
+    case expense
+    case card
+    case budget
+    case preset
+    case incomeSource
+    case allocationAccount
+    case savingsAccount
+    case transaction
+    case workspace
+}
+
+#if canImport(FoundationModels)
+@available(iOS 26.0, macOS 26.0, *)
+@Generable
+#endif
+enum MarinaGuidedReadMatchMode: String, Codable, Equatable, CaseIterable, Sendable {
+    case exact
+    case prefix
+    case semanticOrAlias
+    case freeText
+    case unresolved
+}
+
+#if canImport(FoundationModels)
+@available(iOS 26.0, macOS 26.0, *)
+@Generable
+#endif
+enum MarinaGuidedReadDateRole: String, Codable, Equatable, CaseIterable, Sendable {
+    case primary
+    case comparison
+    case lookbackWindow
+    case simulationHorizon
+}
+
+#if canImport(FoundationModels)
+@available(iOS 26.0, macOS 26.0, *)
+@Generable
+#endif
+enum MarinaGuidedReadPeriodUnit: String, Codable, Equatable, CaseIterable, Sendable {
+    case day
+    case week
+    case month
+    case quarter
+    case year
+}
+
+#if canImport(FoundationModels)
+@available(iOS 26.0, macOS 26.0, *)
+@Generable
+#endif
+struct MarinaGuidedReadTargetToken: Codable, Equatable, Sendable {
+    let rawText: String?
+    let role: MarinaGuidedReadTargetRole?
+    let relationship: MarinaGuidedReadRelationship?
+    let type: MarinaGuidedReadEntityType?
+    let allowedTypes: [MarinaGuidedReadEntityType]
+    let match: MarinaGuidedReadMatchMode?
+    let isFreeText: Bool?
+    let sourceStart: Int?
+    let sourceEnd: Int?
+    let confidence: MarinaGuidedReadConfidence?
+
+    var legacyToken: MarinaTokenizedTargetToken {
+        MarinaTokenizedTargetToken(
+            rawText: rawText,
+            roleRaw: role?.rawValue,
+            relationshipRaw: relationship?.rawValue,
+            typeRaw: type?.rawValue,
+            allowedTypeRaws: allowedTypes.map(\.rawValue),
+            matchRaw: match?.rawValue,
+            isFreeText: isFreeText,
+            sourceStart: sourceStart,
+            sourceEnd: sourceEnd,
+            confidenceRaw: confidence?.rawValue
+        )
+    }
+}
+
+#if canImport(FoundationModels)
+@available(iOS 26.0, macOS 26.0, *)
+@Generable
+#endif
+struct MarinaGuidedReadDateToken: Codable, Equatable, Sendable {
+    let rawText: String?
+    let role: MarinaGuidedReadDateRole?
+    let startISO8601: String?
+    let endISO8601: String?
+    let periodUnit: MarinaGuidedReadPeriodUnit?
+    let confidence: MarinaGuidedReadConfidence?
+
+    var legacyToken: MarinaTokenizedDateToken {
+        MarinaTokenizedDateToken(
+            rawText: rawText,
+            roleRaw: role?.rawValue,
+            startISO8601: startISO8601,
+            endISO8601: endISO8601,
+            periodUnitRaw: periodUnit?.rawValue,
+            confidenceRaw: confidence?.rawValue
+        )
+    }
+}
+
+#if canImport(FoundationModels)
+@available(iOS 26.0, macOS 26.0, *)
+@Generable
+#endif
+struct MarinaGuidedReadRequest: Codable, Equatable, Sendable {
+    let kind: MarinaGuidedReadKind
+    let modelName: MarinaGuidedReadModelName?
+    let operation: MarinaGuidedReadOperation?
+    let amountField: MarinaGuidedReadAmountField?
+    let amountBasis: MarinaGuidedReadAmountField?
+    let targetTokens: [MarinaGuidedReadTargetToken]
+    let dateTokens: [MarinaGuidedReadDateToken]
+    let grouping: MarinaGuidedReadGrouping?
+    let ranking: MarinaGuidedReadRanking?
+    let limit: Int?
+    let responseShape: MarinaGuidedReadResponseShape?
+    let requestedDetail: MarinaGuidedReadRequestedDetail?
+    let metricContractRaw: String?
+    let incomeStatus: MarinaGuidedReadIncomeStatus?
+    let confidence: MarinaGuidedReadConfidence?
+    let clarificationKindRaw: String?
+    let clarificationMessage: String?
+    let clarificationPatchSlotRaw: String?
+    let unsupportedReasonRaw: String?
+    let unsupportedMessage: String?
+    let unsupportedSafeAlternative: String?
+
+    func interpretation(
+        prompt: String,
+        context: MarinaInterpretationContext
+    ) -> MarinaTurnInterpretation {
+        legacyTokenizedRequest.interpretation(prompt: prompt, context: context)
+    }
+
+    private var legacyTokenizedRequest: MarinaTokenizedReadRequest {
+        MarinaTokenizedReadRequest(
+            kindRaw: kind.rawValue,
+            modelNameRaw: modelName?.rawValue,
+            operationRaw: operation?.rawValue,
+            amountFieldRaw: amountField?.rawValue,
+            amountBasisRaw: amountBasis?.rawValue,
+            targetTokens: targetTokens.map(\.legacyToken),
+            dateTokens: dateTokens.map(\.legacyToken),
+            groupingRaw: grouping?.rawValue,
+            rankingRaw: ranking?.rawValue,
+            limit: limit,
+            responseShapeRaw: responseShape?.rawValue,
+            requestedDetailRaw: requestedDetail?.rawValue,
+            metricContractRaw: metricContractRaw,
+            incomeStatusRaw: incomeStatus?.rawValue,
+            confidenceRaw: confidence?.rawValue,
+            clarificationKindRaw: clarificationKindRaw,
+            clarificationMessage: clarificationMessage,
+            clarificationPatchSlotRaw: clarificationPatchSlotRaw,
+            unsupportedReasonRaw: unsupportedReasonRaw,
+            unsupportedMessage: unsupportedMessage,
+            unsupportedSafeAlternative: unsupportedSafeAlternative
+        )
+    }
+}
+
+#if canImport(FoundationModels)
+@available(iOS 26.0, macOS 26.0, *)
+@Generable
+#endif
 struct MarinaTokenizedReadRequest: Codable, Equatable, Sendable {
     #if canImport(FoundationModels)
     @Guide(description: "One of query, clarification, or unsupported.")
@@ -960,7 +1327,7 @@ struct MarinaAIDateRange: Codable, Equatable, Sendable {
 }
 
 enum MarinaFoundationLiveContractRegistry {
-    static let liveGeneratedSchemaName = "MarinaTokenizedReadRequest"
+    static let liveGeneratedSchemaName = "MarinaGuidedReadRequest"
     static let liveToolArgumentSchemaNames = [
         "MarinaFoundationEntityLookupTool.Arguments",
         "MarinaFoundationCapabilityGuideTool.Arguments",
@@ -978,13 +1345,13 @@ enum MarinaFoundationLiveContractRegistry {
         "MarinaFoundationLookupIntent",
         "MarinaFoundationClarificationIntent",
         "MarinaFoundationUnsupportedIntent",
-        "MarinaFoundationScenarioIntent"
+        "MarinaFoundationScenarioIntent",
+        "MarinaTokenizedReadRequest"
     ]
 }
 
-// Legacy compatibility envelopes kept for tests and old mappers. Live FoundationModels
-// Legacy generable envelopes are kept for adapters and tests. Live interpretation
-// must generate MarinaTokenizedReadRequest only.
+// Legacy compatibility envelopes are kept for adapters and tests. Live
+// interpretation must generate MarinaGuidedReadRequest only.
 #if canImport(FoundationModels)
 @available(iOS 26.0, macOS 26.0, *)
 @Generable

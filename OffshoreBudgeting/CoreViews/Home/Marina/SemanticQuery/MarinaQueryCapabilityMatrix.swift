@@ -393,7 +393,7 @@ struct MarinaQueryCapabilityMatrix {
             measures: [.spend],
             groupings: [nil],
             targetTypes: [.card, .category, .merchant, .expense, .transaction, .allocationAccount],
-            requestedDetails: [nil, .general],
+            requestedDetails: [nil, .general, .amount],
             preferredExecutorRoute: .aggregate
         )
     ]

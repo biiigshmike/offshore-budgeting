@@ -3,6 +3,7 @@ import Foundation
 @MainActor
 struct MarinaWorkspaceAggregationExecutor {
     private let calendar: Calendar
+    private let amountBasisAdapter = MarinaAmountBasisAdapter()
 
     init(calendar: Calendar = .current) {
         self.calendar = calendar
@@ -11,8 +12,18 @@ struct MarinaWorkspaceAggregationExecutor {
     func execute(
         plan: MarinaAggregationPlan,
         provider: MarinaDataProvider,
-        now: Date = Date()
+        now: Date = Date(),
+        amountBasis: MarinaFinancialAmountBasis? = nil
     ) -> MarinaWorkspaceAggregationExecutionResult {
+        if let audited = auditRouteCard(
+            plan: plan,
+            provider: provider,
+            now: now,
+            amountBasis: amountBasis ?? MarinaAmountBasisAdapter().basis(plan: plan, semanticQuery: nil)
+        ) {
+            return .handled(audited)
+        }
+
         switch (plan.operation, plan.measure, plan.grouping?.dimension) {
         case (.sum, .income, .incomeSource):
             return .handled(incomeBySource(plan: plan, provider: provider, now: now))
@@ -54,6 +65,523 @@ struct MarinaWorkspaceAggregationExecutor {
         }
     }
 
+    private func auditRouteCard(
+        plan: MarinaAggregationPlan,
+        provider: MarinaDataProvider,
+        now: Date,
+        amountBasis: MarinaFinancialAmountBasis
+    ) -> MarinaWorkspaceAggregationCard? {
+        if plan.routeIntent?.subject == .cards,
+           plan.operation == .count || plan.operation == .listRows {
+            return cardInventory(plan: plan, provider: provider)
+        }
+
+        if plan.operation == .compare,
+           plan.measure == .spend,
+           plan.grouping?.dimension == .card,
+           plan.targets.filter({ $0.entityType == .card }).count >= 2 {
+            return cardSpendComparison(plan: plan, provider: provider, now: now, amountBasis: amountBasis)
+        }
+
+        if plan.operation == .sum,
+           plan.measure == .spend,
+           amountBasis == .allocated,
+           plan.targets.contains(where: { $0.entityType == .allocationAccount }) {
+            return allocatedSpend(plan: plan, provider: provider, now: now)
+        }
+
+        if plan.operation == .listRows,
+           (plan.measure == .transactionAmount || plan.measure == .spend),
+           plan.grouping?.dimension == .transaction {
+            return recentVariableExpenseRows(plan: plan, provider: provider, now: now, amountBasis: amountBasis)
+        }
+
+        if plan.operation == .sum,
+           plan.measure == .spend,
+           plan.targets.filter({ $0.entityType == .card }).count == 1 {
+            return cardSpendSummary(plan: plan, provider: provider, now: now, amountBasis: amountBasis)
+        }
+
+        if plan.operation == .sum,
+           plan.measure == .spend,
+           plan.targets.filter({ $0.entityType == .category }).count == 1 {
+            return categorySpendSummary(plan: plan, provider: provider, now: now, amountBasis: amountBasis)
+        }
+
+        if plan.operation == .rank,
+           plan.measure == .spend,
+           plan.grouping?.dimension == .category {
+            return categorySpendRanking(plan: plan, provider: provider, now: now, amountBasis: amountBasis)
+        }
+
+        if plan.operation == .listRows,
+           plan.measure == .presetAmount,
+           amountBasis == .recordedActualAmount {
+            return recordedPresetActualRows(plan: plan, provider: provider, now: now)
+        }
+
+        if plan.routeIntent?.subject == .presets,
+           plan.operation == .rank,
+           plan.measure == .presetAmount,
+           plan.grouping?.dimension == .category {
+            return presetCategoryCounts(plan: plan, provider: provider)
+        }
+
+        if plan.routeIntent?.subject == .budgets,
+           plan.operation == .compare,
+           plan.measure == .spend {
+            return budgetPeriodComparison(plan: plan, provider: provider, now: now)
+        }
+
+        return nil
+    }
+
+    private func cardInventory(
+        plan: MarinaAggregationPlan,
+        provider: MarinaDataProvider
+    ) -> MarinaWorkspaceAggregationCard {
+        let rows = provider.fetchAllCards()
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+            .prefix(limit(for: plan))
+            .map {
+                MarinaWorkspaceAggregationCard.Row(
+                    label: $0.name,
+                    value: "Card",
+                    objectType: .card,
+                    sourceID: $0.id
+                )
+            }
+        let total = provider.fetchAllCards().count
+        return MarinaWorkspaceAggregationCard(
+            title: "Cards",
+            subtitle: "\(total) card\(total == 1 ? "" : "s") in this workspace",
+            primaryValue: "\(total)",
+            rows: Array(rows),
+            traceSummary: "workspaceAggregation=cardInventory,resultCount=\(total)"
+        )
+    }
+
+    private func cardSpendComparison(
+        plan: MarinaAggregationPlan,
+        provider: MarinaDataProvider,
+        now: Date,
+        amountBasis: MarinaFinancialAmountBasis
+    ) -> MarinaWorkspaceAggregationCard {
+        let range = plan.dateRange ?? monthRange(containing: now)
+        let cards = Array(plan.targets.filter { $0.entityType == .card }.prefix(2))
+        let totals = cards.map { target -> (target: MarinaResolvedAggregationTarget, total: Double) in
+            let total = cardSpendTotal(
+                target: target,
+                provider: provider,
+                range: range,
+                amountBasis: amountBasis
+            )
+            return (target, total)
+        }
+        let difference = (totals.first?.total ?? 0) - (totals.dropFirst().first?.total ?? 0)
+        let rows = totals.map {
+            MarinaWorkspaceAggregationCard.Row(
+                label: $0.target.displayName,
+                value: currency($0.total),
+                amount: $0.total,
+                objectType: .card,
+                sourceID: $0.target.sourceID,
+                sortValue: $0.total
+            )
+        } + [
+            MarinaWorkspaceAggregationCard.Row(
+                label: "Difference",
+                value: delta(difference),
+                amount: difference,
+                sortValue: difference
+            )
+        ]
+
+        return MarinaWorkspaceAggregationCard(
+            title: "Card Spend Comparison",
+            subtitle: rangeLabel(range),
+            primaryValue: totals.first.map { currency($0.total) },
+            answerKind: .comparison,
+            rows: rows,
+            traceSummary: "workspaceAggregation=cardSpendComparison,resultCount=\(totals.count),difference=\(difference)"
+        )
+    }
+
+    private func cardSpendSummary(
+        plan: MarinaAggregationPlan,
+        provider: MarinaDataProvider,
+        now: Date,
+        amountBasis: MarinaFinancialAmountBasis
+    ) -> MarinaWorkspaceAggregationCard {
+        let range = plan.dateRange ?? monthRange(containing: now)
+        let cardTarget = plan.targets.first { $0.entityType == .card }
+        let rows = provider.fetchAllVariableExpenses()
+            .filter { contains($0.transactionDate, in: range) }
+            .filter { expense in
+                guard let cardTarget else { return true }
+                return expenseCardMatches(expense.card, target: cardTarget)
+            }
+            .sorted { lhs, rhs in
+                if lhs.transactionDate == rhs.transactionDate {
+                    return lhs.descriptionText.localizedCaseInsensitiveCompare(rhs.descriptionText) == .orderedAscending
+                }
+                return lhs.transactionDate > rhs.transactionDate
+            }
+            .prefix(limit(for: plan))
+            .map { expense in
+                let amount = amountBasisAdapter.variableAmount(for: expense, basis: amountBasis)
+                return MarinaWorkspaceAggregationCard.Row(
+                    label: expense.descriptionText,
+                    value: "\(currency(amount)) • \(shortDate(expense.transactionDate))",
+                    amount: amount,
+                    date: expense.transactionDate,
+                    objectType: .variableExpense,
+                    sourceID: expense.id,
+                    sortValue: amount
+                )
+            }
+        let total = provider.fetchAllVariableExpenses()
+            .filter { contains($0.transactionDate, in: range) }
+            .filter { expense in
+                guard let cardTarget else { return true }
+                return expenseCardMatches(expense.card, target: cardTarget)
+            }
+            .reduce(0.0) { $0 + amountBasisAdapter.variableAmount(for: $1, basis: amountBasis) }
+
+        return MarinaWorkspaceAggregationCard(
+            title: cardTarget.map { "\($0.displayName) Spending" } ?? "Card Spending",
+            subtitle: rangeLabel(range),
+            primaryValue: currency(total),
+            answerKind: .metric,
+            rows: Array(rows),
+            traceSummary: "workspaceAggregation=cardSpendSummary,resultCount=\(rows.count),total=\(total)"
+        )
+    }
+
+    private func categorySpendRanking(
+        plan: MarinaAggregationPlan,
+        provider: MarinaDataProvider,
+        now: Date,
+        amountBasis: MarinaFinancialAmountBasis
+    ) -> MarinaWorkspaceAggregationCard {
+        let range = plan.dateRange ?? monthRange(containing: now)
+        var totals: [String: (label: String, sourceID: UUID?, total: Double)] = [:]
+        for expense in provider.fetchAllVariableExpenses() where contains(expense.transactionDate, in: range) {
+            let key = expense.category?.id.uuidString ?? "uncategorized"
+            var item = totals[key] ?? (
+                label: expense.category?.name ?? "Uncategorized",
+                sourceID: expense.category?.id,
+                total: 0
+            )
+            item.total += amountBasisAdapter.variableAmount(for: expense, basis: amountBasis)
+            totals[key] = item
+        }
+
+        let rows = totals.values
+            .sorted { lhs, rhs in
+                if lhs.total == rhs.total {
+                    return lhs.label.localizedCaseInsensitiveCompare(rhs.label) == .orderedAscending
+                }
+                return lhs.total > rhs.total
+            }
+            .prefix(limit(for: plan))
+            .map { item in
+                MarinaWorkspaceAggregationCard.Row(
+                    label: item.label,
+                    value: currency(item.total),
+                    amount: item.total,
+                    objectType: .category,
+                    sourceID: item.sourceID,
+                    sortValue: item.total
+                )
+            }
+
+        return MarinaWorkspaceAggregationCard(
+            title: "Top Spending Categories",
+            subtitle: rangeLabel(range),
+            primaryValue: rows.first?.value,
+            rows: Array(rows),
+            traceSummary: "workspaceAggregation=categorySpendRanking,resultCount=\(rows.count)"
+        )
+    }
+
+    private func categorySpendSummary(
+        plan: MarinaAggregationPlan,
+        provider: MarinaDataProvider,
+        now: Date,
+        amountBasis: MarinaFinancialAmountBasis
+    ) -> MarinaWorkspaceAggregationCard {
+        let range = plan.dateRange ?? monthRange(containing: now)
+        let categoryTarget = plan.targets.first { $0.entityType == .category }
+        let matchingExpenses = provider.fetchAllVariableExpenses()
+            .filter { contains($0.transactionDate, in: range) }
+            .filter { expense in
+                guard let categoryTarget else { return true }
+                return expenseCategoryMatches(expense.category, target: categoryTarget)
+            }
+            .sorted { lhs, rhs in
+                if lhs.transactionDate == rhs.transactionDate {
+                    return lhs.descriptionText.localizedCaseInsensitiveCompare(rhs.descriptionText) == .orderedAscending
+                }
+                return lhs.transactionDate > rhs.transactionDate
+            }
+        let total = matchingExpenses.reduce(0.0) { $0 + amountBasisAdapter.variableAmount(for: $1, basis: amountBasis) }
+        let evidenceRows = matchingExpenses
+            .prefix(limit(for: plan))
+            .map { expense -> MarinaWorkspaceAggregationCard.Row in
+                let amount = amountBasisAdapter.variableAmount(for: expense, basis: amountBasis)
+                return MarinaWorkspaceAggregationCard.Row(
+                    label: expense.descriptionText,
+                    value: "\(currency(amount)) • \(shortDate(expense.transactionDate))",
+                    amount: amount,
+                    date: expense.transactionDate,
+                    objectType: .variableExpense,
+                    sourceID: expense.id,
+                    sortValue: amount
+                )
+            }
+        let traceRows: [MarinaWorkspaceAggregationCard.Row] = [
+            .init(label: "Formula family", value: MarinaFormulaFamily.sum.rawValue, role: .trace),
+            .init(label: "Measure", value: MarinaFormulaMeasure.variableBudgetImpact.rawValue, role: .trace),
+            .init(label: "Date range", value: rangeLabel(range), role: .trace)
+        ]
+
+        return MarinaWorkspaceAggregationCard(
+            title: categoryTarget.map { "\($0.displayName) Total Spending" } ?? "Total Spending",
+            subtitle: rangeLabel(range),
+            primaryValue: currency(total),
+            answerKind: .metric,
+            rows: traceRows + Array(evidenceRows),
+            traceSummary: "workspaceAggregation=categorySpendSummary,resultCount=\(matchingExpenses.count),total=\(total)"
+        )
+    }
+
+    private func recentVariableExpenseRows(
+        plan: MarinaAggregationPlan,
+        provider: MarinaDataProvider,
+        now: Date,
+        amountBasis: MarinaFinancialAmountBasis
+    ) -> MarinaWorkspaceAggregationCard {
+        let range = plan.dateRange
+        let rows = provider.fetchAllVariableExpenses()
+            .filter { expense in
+                guard let range else { return true }
+                return contains(expense.transactionDate, in: range)
+            }
+            .filter { expense in
+                plan.targets.allSatisfy { target in
+                    variableExpense(expense, matches: target)
+                }
+            }
+            .sorted { lhs, rhs in
+                if lhs.transactionDate == rhs.transactionDate {
+                    return lhs.descriptionText.localizedCaseInsensitiveCompare(rhs.descriptionText) == .orderedAscending
+                }
+                return lhs.transactionDate > rhs.transactionDate
+            }
+            .prefix(limit(for: plan))
+            .map { expense -> MarinaWorkspaceAggregationCard.Row in
+                let amount = amountBasisAdapter.variableAmount(for: expense, basis: amountBasis)
+                return MarinaWorkspaceAggregationCard.Row(
+                    label: expense.descriptionText,
+                    value: "\(currency(amount)) • \(shortDate(expense.transactionDate))\(expense.card.map { " • \($0.name)" } ?? "")",
+                    amount: amount,
+                    date: expense.transactionDate,
+                    objectType: .variableExpense,
+                    sourceID: expense.id,
+                    sortValue: amount
+                )
+            }
+
+        return MarinaWorkspaceAggregationCard(
+            title: "Recent Purchases",
+            subtitle: range.map(rangeLabel) ?? "Most recent workspace activity",
+            primaryValue: rows.first?.value,
+            rows: Array(rows),
+            traceSummary: "workspaceAggregation=recentVariableExpenseRows,resultCount=\(rows.count)"
+        )
+    }
+
+    private func allocatedSpend(
+        plan: MarinaAggregationPlan,
+        provider: MarinaDataProvider,
+        now: Date
+    ) -> MarinaWorkspaceAggregationCard {
+        let range = plan.dateRange ?? monthRange(containing: now)
+        let accountTarget = plan.targets.first { $0.entityType == .allocationAccount }
+        let spendTargets = plan.targets.filter { $0.entityType != .allocationAccount }
+        let allocations = provider.fetchAllExpenseAllocations()
+            .filter { allocation in
+                guard allocationMatchesAccount(allocation, target: accountTarget) else { return false }
+                guard let date = allocation.expense?.transactionDate ?? allocation.plannedExpense?.expenseDate,
+                      contains(date, in: range) else {
+                    return false
+                }
+                return spendTargets.isEmpty || spendTargets.allSatisfy { target in
+                    allocationMatchesSpendTarget(allocation, target: target)
+                }
+            }
+            .sorted { lhs, rhs in
+                let lhsDate = lhs.expense?.transactionDate ?? lhs.plannedExpense?.expenseDate ?? .distantPast
+                let rhsDate = rhs.expense?.transactionDate ?? rhs.plannedExpense?.expenseDate ?? .distantPast
+                if lhsDate == rhsDate {
+                    return allocationTitle(lhs).localizedCaseInsensitiveCompare(allocationTitle(rhs)) == .orderedAscending
+                }
+                return lhsDate > rhsDate
+            }
+
+        let rows = allocations
+            .prefix(limit(for: plan))
+            .map { allocation -> MarinaWorkspaceAggregationCard.Row in
+                let amount = max(0, allocation.allocatedAmount)
+                let date = allocation.expense?.transactionDate ?? allocation.plannedExpense?.expenseDate
+                return MarinaWorkspaceAggregationCard.Row(
+                    label: allocationTitle(allocation),
+                    value: [currency(amount), date.map(shortDate)].compactMap { $0 }.joined(separator: " • "),
+                    amount: amount,
+                    date: date,
+                    objectType: allocation.expense == nil ? .plannedExpense : .variableExpense,
+                    sourceID: allocation.expense?.id ?? allocation.plannedExpense?.id,
+                    sortValue: amount
+                )
+            }
+        let total = allocations.reduce(0.0) { $0 + max(0, $1.allocatedAmount) }
+        let categoryLabel = spendTargets.first { $0.entityType == .category }?.displayName
+        return MarinaWorkspaceAggregationCard(
+            title: accountTarget.map { "\($0.displayName) Allocated Spend" } ?? "Allocated Spend",
+            subtitle: [categoryLabel, rangeLabel(range)].compactMap { $0 }.joined(separator: " • "),
+            primaryValue: currency(total),
+            answerKind: .metric,
+            rows: Array(rows),
+            traceSummary: "workspaceAggregation=allocatedSpend,resultCount=\(rows.count),total=\(total)"
+        )
+    }
+
+    private func recordedPresetActualRows(
+        plan: MarinaAggregationPlan,
+        provider: MarinaDataProvider,
+        now: Date
+    ) -> MarinaWorkspaceAggregationCard {
+        let range = plan.dateRange ?? monthRange(containing: now)
+        let presetTitlesByID = Dictionary(uniqueKeysWithValues: provider.fetchAllPresets().map { ($0.id, $0.title) })
+        let rows = provider.fetchAllPlannedExpenses()
+            .filter { contains($0.expenseDate, in: range) && $0.actualAmount > 0 }
+            .filter { plannedExpense($0, matches: plan.targets, presetTitlesByID: presetTitlesByID) }
+            .sorted { lhs, rhs in
+                if lhs.expenseDate == rhs.expenseDate {
+                    return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
+                }
+                return lhs.expenseDate > rhs.expenseDate
+            }
+            .prefix(limit(for: plan))
+            .map { expense in
+                let preset = expense.sourcePresetID.flatMap { presetTitlesByID[$0] } ?? expense.title
+                return MarinaWorkspaceAggregationCard.Row(
+                    label: preset,
+                    value: "\(currency(expense.actualAmount)) • \(shortDate(expense.expenseDate)) • \(expense.title)",
+                    amount: expense.actualAmount,
+                    date: expense.expenseDate,
+                    objectType: .plannedExpense,
+                    sourceID: expense.id,
+                    sortValue: expense.actualAmount
+                )
+            }
+        let total = rows.reduce(0.0) { $0 + ($1.amount ?? 0) }
+
+        return MarinaWorkspaceAggregationCard(
+            title: "Recorded Preset Actuals",
+            subtitle: rangeLabel(range),
+            primaryValue: currency(total),
+            rows: Array(rows),
+            traceSummary: "workspaceAggregation=recordedPresetActualRows,resultCount=\(rows.count),total=\(total)"
+        )
+    }
+
+    private func presetCategoryCounts(
+        plan: MarinaAggregationPlan,
+        provider: MarinaDataProvider
+    ) -> MarinaWorkspaceAggregationCard {
+        let grouped = Dictionary(grouping: provider.fetchAllPresets().filter { $0.isArchived == false }) {
+            $0.defaultCategory?.name ?? "Uncategorized"
+        }
+        let rows = grouped
+            .map { (category: $0.key, presets: $0.value) }
+            .sorted { lhs, rhs in
+                if lhs.presets.count == rhs.presets.count {
+                    return lhs.category.localizedCaseInsensitiveCompare(rhs.category) == .orderedAscending
+                }
+                return lhs.presets.count > rhs.presets.count
+            }
+            .prefix(limit(for: plan))
+            .map { item in
+                let titles = item.presets.map(\.title).sorted().prefix(3).joined(separator: ", ")
+                return MarinaWorkspaceAggregationCard.Row(
+                    label: item.category,
+                    value: "\(item.presets.count) preset\(item.presets.count == 1 ? "" : "s")\(titles.isEmpty ? "" : " • \(titles)")",
+                    amount: Double(item.presets.count),
+                    objectType: .category,
+                    sourceID: item.presets.first?.defaultCategory?.id,
+                    sortValue: Double(item.presets.count)
+                )
+            }
+
+        return MarinaWorkspaceAggregationCard(
+            title: "Preset Count by Category",
+            subtitle: "Active presets",
+            primaryValue: rows.first?.value,
+            rows: Array(rows),
+            traceSummary: "workspaceAggregation=presetCategoryCounts,resultCount=\(rows.count)"
+        )
+    }
+
+    private func budgetPeriodComparison(
+        plan: MarinaAggregationPlan,
+        provider: MarinaDataProvider,
+        now: Date
+    ) -> MarinaWorkspaceAggregationCard {
+        let ranges = comparisonRanges(for: plan, now: now)
+        let current = budgetImpactSpend(provider: provider, range: ranges.current)
+        let previous = budgetImpactSpend(provider: provider, range: ranges.previous)
+        let change = current - previous
+        return MarinaWorkspaceAggregationCard(
+            title: "Budget Period Comparison",
+            subtitle: "\(rangeLabel(ranges.current)) vs \(rangeLabel(ranges.previous))",
+            primaryValue: currency(current),
+            answerKind: .comparison,
+            rows: [
+                .init(label: "Current period", value: currency(current), amount: current, sortValue: current),
+                .init(label: "Previous period", value: currency(previous), amount: previous, sortValue: previous),
+                .init(label: "Change", value: delta(change), amount: change, sortValue: change)
+            ],
+            traceSummary: "workspaceAggregation=budgetPeriodComparison,current=\(current),previous=\(previous)"
+        )
+    }
+
+    private func cardSpendTotal(
+        target: MarinaResolvedAggregationTarget,
+        provider: MarinaDataProvider,
+        range: HomeQueryDateRange,
+        amountBasis: MarinaFinancialAmountBasis
+    ) -> Double {
+        provider.fetchAllVariableExpenses()
+            .filter { contains($0.transactionDate, in: range) }
+            .filter { expenseCardMatches($0.card, target: target) }
+            .reduce(0.0) { $0 + amountBasisAdapter.variableAmount(for: $1, basis: amountBasis) }
+    }
+
+    private func budgetImpactSpend(
+        provider: MarinaDataProvider,
+        range: HomeQueryDateRange
+    ) -> Double {
+        let variable = provider.fetchAllVariableExpenses()
+            .filter { contains($0.transactionDate, in: range) }
+            .reduce(0.0) { $0 + SavingsMathService.variableBudgetImpactAmount(for: $1) }
+        let planned = provider.fetchAllPlannedExpenses()
+            .filter { contains($0.expenseDate, in: range) }
+            .reduce(0.0) { $0 + SavingsMathService.plannedBudgetImpactAmount(for: $1) }
+        return variable + planned
+    }
+
     // MARK: - Income
 
     private func incomeSummary(
@@ -78,6 +606,7 @@ struct MarinaWorkspaceAggregationExecutor {
             title: incomeSummaryTitle(for: plan),
             subtitle: rangeLabel(range),
             primaryValue: primaryValue,
+            answerKind: .metric,
             rows: compactRows([
                 .init(label: "Actual income", value: currency(actual), amount: actual, sortValue: actual),
                 .init(label: "Planned income", value: currency(planned), amount: planned, sortValue: planned),
@@ -181,6 +710,7 @@ struct MarinaWorkspaceAggregationExecutor {
             title: "Income Comparison",
             subtitle: "\(rangeLabel(ranges.current)) vs \(rangeLabel(ranges.previous))",
             primaryValue: currency(current),
+            answerKind: .comparison,
             rows: [
                 .init(label: "Current period", value: currency(current), amount: current, sortValue: current),
                 .init(label: "Previous period", value: currency(previous), amount: previous, sortValue: previous),
@@ -230,7 +760,7 @@ struct MarinaWorkspaceAggregationExecutor {
             }
 
         return MarinaWorkspaceAggregationCard(
-            title: newestFirst ? "Planned Expenses Due" : "Upcoming Bills",
+            title: limit(for: plan) == 1 ? "Next Planned Expense" : (newestFirst ? "Planned Expenses Due" : "Upcoming Bills"),
             subtitle: rows.isEmpty
                 ? "No planned expenses are due in \(rangeLabel(range)). Ask Marina to show active presets if you want the templates instead."
                 : rangeLabel(range),
@@ -430,6 +960,7 @@ struct MarinaWorkspaceAggregationExecutor {
                 title: "\(cardTargets[0].displayName) Balance",
                 subtitle: rangeLabel(range),
                 primaryValue: currency(item.total),
+                answerKind: .message,
                 rows: [
                     .init(label: "Variable ledger activity", value: currency(item.variable), amount: item.variable, objectType: .card, sourceID: item.card.id, sortValue: item.variable),
                     .init(label: "Planned card rows", value: currency(item.planned), amount: item.planned, objectType: .card, sourceID: item.card.id, sortValue: item.planned),
@@ -490,6 +1021,7 @@ struct MarinaWorkspaceAggregationExecutor {
             title: accountTargets.count == 1 ? "\(accountTargets[0].displayName) Balance" : "Savings Balances",
             subtitle: "Stored savings total",
             primaryValue: rows.first?.value,
+            answerKind: accountTargets.count == 1 ? .message : .list,
             rows: Array(rows),
             traceSummary: "workspaceAggregation=savingsBalance,resultCount=\(rows.count)"
         )
@@ -579,6 +1111,7 @@ struct MarinaWorkspaceAggregationExecutor {
             title: accountTargets.count == 1 ? "\(accountTargets[0].displayName) Balance" : "Shared Balances",
             subtitle: rangeLabel(range),
             primaryValue: rows.first?.value,
+            answerKind: accountTargets.count == 1 ? .message : .list,
             rows: Array(rows),
             traceSummary: "workspaceAggregation=sharedBalances,resultCount=\(rows.count),dateRange=\(rangeLabel(range))"
         )
@@ -616,6 +1149,72 @@ struct MarinaWorkspaceAggregationExecutor {
 
     private func expenseCardMatches(_ expenseCard: Card?, card: Card) -> Bool {
         expenseCard?.id == card.id || normalized(expenseCard?.name ?? "") == normalized(card.name)
+    }
+
+    private func expenseCardMatches(_ expenseCard: Card?, target: MarinaResolvedAggregationTarget) -> Bool {
+        expenseCard?.id == target.sourceID || normalized(expenseCard?.name ?? "") == normalized(target.displayName)
+    }
+
+    private func expenseCategoryMatches(_ expenseCategory: Category?, target: MarinaResolvedAggregationTarget) -> Bool {
+        expenseCategory?.id == target.sourceID || normalized(expenseCategory?.name ?? "") == normalized(target.displayName)
+    }
+
+    private func variableExpense(
+        _ expense: VariableExpense,
+        matches target: MarinaResolvedAggregationTarget
+    ) -> Bool {
+        switch target.entityType {
+        case .card:
+            return expenseCardMatches(expense.card, target: target)
+        case .category:
+            return expenseCategoryMatches(expense.category, target: target)
+        case .merchant, .expense, .transaction:
+            return normalized(expense.descriptionText).contains(normalized(target.displayName))
+        case .allocationAccount:
+            return expense.allocation?.account?.id == target.sourceID
+                || normalized(expense.allocation?.account?.name ?? "") == normalized(target.displayName)
+        case .preset, .budget, .incomeSource, .savingsAccount, .workspace:
+            return true
+        }
+    }
+
+    private func allocationMatchesAccount(
+        _ allocation: ExpenseAllocation,
+        target: MarinaResolvedAggregationTarget?
+    ) -> Bool {
+        guard let target else { return true }
+        return allocation.account?.id == target.sourceID
+            || normalized(allocation.account?.name ?? "") == normalized(target.displayName)
+    }
+
+    private func allocationMatchesSpendTarget(
+        _ allocation: ExpenseAllocation,
+        target: MarinaResolvedAggregationTarget
+    ) -> Bool {
+        switch target.entityType {
+        case .category:
+            return allocation.expense?.category?.id == target.sourceID
+                || allocation.plannedExpense?.category?.id == target.sourceID
+                || normalized(allocation.expense?.category?.name ?? "") == normalized(target.displayName)
+                || normalized(allocation.plannedExpense?.category?.name ?? "") == normalized(target.displayName)
+        case .card:
+            return expenseCardMatches(allocation.expense?.card, target: target)
+                || expenseCardMatches(allocation.plannedExpense?.card, target: target)
+        case .merchant, .expense, .transaction:
+            return normalized(allocation.expense?.descriptionText ?? "").contains(normalized(target.displayName))
+                || normalized(allocation.plannedExpense?.title ?? "").contains(normalized(target.displayName))
+        case .preset:
+            return allocation.plannedExpense?.sourcePresetID == target.sourceID
+                || normalized(allocation.plannedExpense?.title ?? "") == normalized(target.displayName)
+        case .allocationAccount, .budget, .incomeSource, .savingsAccount, .workspace:
+            return true
+        }
+    }
+
+    private func allocationTitle(_ allocation: ExpenseAllocation) -> String {
+        allocation.expense?.descriptionText
+            ?? allocation.plannedExpense?.title
+            ?? "Allocated expense"
     }
 
     // MARK: - Helpers

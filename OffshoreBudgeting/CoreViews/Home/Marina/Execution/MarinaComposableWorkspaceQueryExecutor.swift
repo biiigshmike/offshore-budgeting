@@ -404,7 +404,7 @@ struct MarinaComposableWorkspaceQueryExecutor {
             ].compactMap { $0 }
             return MarinaWorkspaceAggregationCard.Row(
                 label: category.name,
-                value: parts.isEmpty ? "Limit" : parts.joined(separator: " • "),
+                value: parts.isEmpty ? "Budget category limit" : "Budget category limit • \(parts.joined(separator: " • "))",
                 objectType: .category,
                 sourceID: category.id
             )
@@ -548,7 +548,7 @@ struct MarinaComposableWorkspaceQueryExecutor {
                 ].compactMap { $0 }
                 return MarinaWorkspaceAggregationCard.Row(
                     label: category.name,
-                    value: parts.isEmpty ? "Limit" : parts.joined(separator: " • "),
+                    value: parts.isEmpty ? "Budget category limit" : "Budget category limit • \(parts.joined(separator: " • "))",
                     objectType: .category,
                     sourceID: category.id
                 )

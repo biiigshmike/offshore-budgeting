@@ -549,8 +549,8 @@ struct MarinaVisualAttachmentBuilder {
             || title.contains("cannot run")
             || title.contains("needs one setup")
             || title.contains("knows this metric")
-        guard (contractRows.isEmpty == false || textLooksContractBacked),
-              contractAnswerTitle || visibleRows.isEmpty else { return nil }
+        guard contractRows.isEmpty == false
+            || (textLooksContractBacked && (contractAnswerTitle || visibleRows.isEmpty)) else { return nil }
         let rows = (contractRows.isEmpty ? answer.rows : contractRows).map(displayRow)
         return MarinaFormulaContractPresentationModel(
             title: answer.title,

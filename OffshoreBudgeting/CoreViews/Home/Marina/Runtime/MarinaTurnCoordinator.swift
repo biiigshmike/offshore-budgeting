@@ -240,6 +240,7 @@ struct MarinaTurnCoordinator {
     private let answerPlanner = MarinaAnswerPlanner()
     private let universalQueryExecutor = MarinaUniversalQueryExecutor()
     private let canonicalQueryRewriter = MarinaCanonicalQueryRewriter()
+    private let pipelineAuditCanonicalizer = MarinaFoundationPipelineAuditCanonicalizer()
 
     init(
         availability: MarinaModelAvailabilityProviding? = nil,
@@ -306,6 +307,31 @@ struct MarinaTurnCoordinator {
         } catch {
             MarinaDebugLogger.log("Marina AI interpretation failed prompt='\(prompt)' error=\(error)")
             let diagnostic = Self.foundationDiagnostic(from: error)
+            if diagnostic.category == .decodingFailure,
+               let auditedInterpretation = pipelineAuditCanonicalizer.interpretation(
+                prompt: prompt,
+                context: context
+               ),
+               shouldRecoverDecodingFailureWithAudit(auditedInterpretation) {
+                return evaluateLinear(
+                    preservingInterpreterSource(
+                        in: MarinaTurnInterpretation(
+                            result: auditedInterpretation.result,
+                            compatibilityCandidate: auditedInterpretation.compatibilityCandidate,
+                            repairSummary: malformedFoundationRecoverySummary(
+                                original: nil,
+                                recovery: auditedInterpretation.repairSummary,
+                                diagnostic: diagnostic
+                            ),
+                            generatedSchemaName: auditedInterpretation.generatedSchemaName
+                        ),
+                        originalSource: .foundationModels
+                    ),
+                    prompt: prompt,
+                    context: context,
+                    allowSingleChoiceAutoResolve: true
+                )
+            }
             if diagnostic.category == .malformedResponse,
                let deterministicInterpretation = malformedFoundationRecoveryInterpretation(
                 prompt: prompt,
@@ -642,6 +668,10 @@ struct MarinaTurnCoordinator {
             for: interpretation,
             prompt: prompt
         )
+        let explicitConstraints = MarinaExplicitConstraintDetector().constraints(
+            in: prompt,
+            context: context.routerContext
+        )
         if interpretation.generatedSchemaName == "legacyCanonicalAdapter" {
             let legacyInterpretation = MarinaCanonicalReadInterpretation(
                 result: interpretation.result,
@@ -694,8 +724,16 @@ struct MarinaTurnCoordinator {
             )
         }
         let isTokenizedReadRequest = isTokenizedReadRequest(interpretation)
+        let isPipelineAuditInterpretation = interpretation.generatedSchemaName == MarinaFoundationPipelineAuditCanonicalizer.generatedSchemaName
+        let lateAuditInterpretation = shouldAttemptLateAuditRecovery(
+            interpretation: interpretation,
+            candidate: candidate,
+            isTokenizedReadRequest: isTokenizedReadRequest,
+            isPipelineAuditInterpretation: isPipelineAuditInterpretation
+        ) ? pipelineAuditCanonicalizer.interpretation(prompt: prompt, context: context) : nil
         if isTokenizedReadRequest == false,
            interpretation.generatedSchemaName != "legacyCanonicalAdapter",
+           lateAuditInterpretation == nil,
            shouldAttemptCanonicalRewrite(interpretation),
            let canonicalInterpretation = canonicalQueryRewriter.rewrite(
             prompt: prompt,
@@ -748,6 +786,27 @@ struct MarinaTurnCoordinator {
             outcome = .unsupported(unsupported)
         }
 
+        let shouldRunEarlyDroppedConstraintGuard: Bool
+        if case .unsupported = outcome,
+           isPipelineAuditInterpretation == false,
+           isTokenizedReadRequest == false {
+            shouldRunEarlyDroppedConstraintGuard = false
+        } else {
+            shouldRunEarlyDroppedConstraintGuard = true
+        }
+        if shouldRunEarlyDroppedConstraintGuard,
+           let droppedConstraintResult = resultForDroppedExplicitConstraints(
+            explicitConstraints: explicitConstraints,
+            candidate: candidate,
+            resolved: resolved,
+            semanticResolved: semanticResolved,
+            outcome: outcome,
+            context: context,
+            traceInterpretation: traceInterpretation
+           ) {
+            return droppedConstraintResult
+        }
+
         if isTokenizedReadRequest,
            let universalQuery = candidate.universalQuery,
            isSimpleUniversalRead(universalQuery),
@@ -776,17 +835,19 @@ struct MarinaTurnCoordinator {
             )
         }
 
-        let metricContractResolution = semanticMetricContractResolution(
-            candidate: candidate,
-            resolved: resolved,
-            semanticResolved: semanticResolved,
-            outcome: outcome
-        ) ?? metricContractResolver.resolve(
-            candidate: candidate,
-            resolved: resolved,
-            semanticResolved: semanticResolved,
-            outcome: outcome
-        )
+        let metricContractResolution: MarinaMetricContractResolution? = isPipelineAuditInterpretation
+            ? nil
+            : semanticMetricContractResolution(
+                candidate: candidate,
+                resolved: resolved,
+                semanticResolved: semanticResolved,
+                outcome: outcome
+            ) ?? metricContractResolver.resolve(
+                candidate: candidate,
+                resolved: resolved,
+                semanticResolved: semanticResolved,
+                outcome: outcome
+            )
 
         if let metricContractResolution {
             switch metricFormulaExecutor.execute(
@@ -888,6 +949,7 @@ struct MarinaTurnCoordinator {
         }
 
         if isTokenizedReadRequest == false,
+           isPipelineAuditInterpretation == false,
            let composite = compositePlanner.plan(
             candidate: candidate,
             resolved: resolved,
@@ -970,7 +1032,8 @@ struct MarinaTurnCoordinator {
             )
         }
 
-        if isTokenizedReadRequest == false {
+        if isTokenizedReadRequest == false,
+           isPipelineAuditInterpretation == false {
             switch answerPlanner.plan(
                 prompt: prompt,
                 interpretation: interpretation,
@@ -1080,6 +1143,17 @@ struct MarinaTurnCoordinator {
                 clarification: clarification
             )
         case .unsupported:
+            if let auditedInterpretation = lateAuditInterpretation {
+                return evaluateLinear(
+                    preservingInterpreterSource(
+                        in: auditedInterpretation,
+                        originalSource: candidate.source
+                    ),
+                    prompt: prompt,
+                    context: context,
+                    allowSingleChoiceAutoResolve: allowSingleChoiceAutoResolve
+                )
+            }
             MarinaFoundationTraceBridge.record(
                 context: context,
                 interpretation: traceInterpretation,
@@ -1240,6 +1314,63 @@ struct MarinaTurnCoordinator {
         }
     }
 
+    private func resultForDroppedExplicitConstraints(
+        explicitConstraints: MarinaExplicitPromptConstraints,
+        candidate: MarinaQueryPlanCandidate,
+        resolved: MarinaResolvedQueryCandidate,
+        semanticResolved: MarinaResolvedSemanticQuery?,
+        outcome: MarinaPlanValidationOutcome,
+        context: MarinaTurnContext,
+        traceInterpretation: MarinaCanonicalReadInterpretation
+    ) -> MarinaTurnResult? {
+        guard let unsupported = explicitConstraints.unsupportedIfDropped(
+            by: candidate,
+            resolvedQuery: semanticResolved,
+            outcome: outcome
+        ) else {
+            return nil
+        }
+
+        if let clarification = conversationalPlanner.clarificationForDroppedConstraints(
+            candidate: candidate,
+            context: context,
+            explicitConstraints: explicitConstraints,
+            unsupported: unsupported
+        ) {
+            let clarificationOutcome = MarinaPlanValidationOutcome.clarification(clarification)
+            MarinaFoundationTraceBridge.record(
+                context: context,
+                interpretation: traceInterpretation,
+                resolved: resolved,
+                semanticResolved: semanticResolved,
+                validationOutcome: clarificationOutcome,
+                execution: nil
+            )
+            return .clarification(
+                answer: responseBuilder.aggregationBridge.responseCompatibleAnswer(from: clarification),
+                clarification: clarification
+            )
+        }
+
+        let blockedOutcome = MarinaPlanValidationOutcome.unsupported(unsupported)
+        MarinaFoundationTraceBridge.record(
+            context: context,
+            interpretation: traceInterpretation,
+            resolved: resolved,
+            semanticResolved: semanticResolved,
+            validationOutcome: blockedOutcome,
+            execution: nil
+        )
+        return .blocked(
+            answer: responseBuilder.responseCompatibleAnswer(from: blockedOutcome) ?? Self.blockedAnswer(
+                prompt: candidate.rawPrompt,
+                title: "That dropped a constraint",
+                message: unsupported.message
+            ),
+            validationOutcome: blockedOutcome
+        )
+    }
+
     private func isSimpleUniversalRead(_ query: MarinaUniversalQueryIR) -> Bool {
         switch query.operation {
         case .lookup, .list, .count, .detail:
@@ -1258,6 +1389,24 @@ struct MarinaTurnCoordinator {
     private func isMalformedTokenizedReadRequest(_ interpretation: MarinaTurnInterpretation) -> Bool {
         interpretation.generatedSchemaName == MarinaFoundationLiveContractRegistry.liveGeneratedSchemaName
             && interpretation.repairSummary?.contains("tokenizedReadRequest:malformed") == true
+    }
+
+    private func shouldAttemptLateAuditRecovery(
+        interpretation: MarinaTurnInterpretation,
+        candidate: MarinaQueryPlanCandidate,
+        isTokenizedReadRequest: Bool,
+        isPipelineAuditInterpretation: Bool
+    ) -> Bool {
+        guard isTokenizedReadRequest == false,
+              isPipelineAuditInterpretation == false,
+              interpretation.generatedSchemaName != "legacyCanonicalAdapter",
+              candidate.source == .foundationModels else {
+            return false
+        }
+        if case .unsupported = interpretation.result {
+            return true
+        }
+        return false
     }
 
     private func shouldAttemptCanonicalRewrite(_ interpretation: MarinaTurnInterpretation) -> Bool {
@@ -1283,13 +1432,34 @@ struct MarinaTurnCoordinator {
                 repairSummary: $0.repairSummary
             )
         }
+        let auditedInterpretation = pipelineAuditCanonicalizer.interpretation(
+            prompt: prompt,
+            context: context
+        )
 
-        if let contractInterpretation = semanticContractResolver.resolve(
+        if interpretation != nil,
+           let contractInterpretation = semanticContractResolver.resolve(
             prompt: prompt,
             context: context,
             priorInterpretation: priorInterpretation,
             failureDiagnostic: diagnostic
         ) {
+            if let auditedInterpretation,
+               shouldPreferAuditRecovery(over: contractInterpretation) {
+                return preservingInterpreterSource(
+                    in: MarinaTurnInterpretation(
+                        result: auditedInterpretation.result,
+                        compatibilityCandidate: auditedInterpretation.compatibilityCandidate,
+                        repairSummary: malformedFoundationRecoverySummary(
+                            original: interpretation?.repairSummary,
+                            recovery: auditedInterpretation.repairSummary,
+                            diagnostic: diagnostic
+                        ),
+                        generatedSchemaName: auditedInterpretation.generatedSchemaName
+                    ),
+                    originalSource: .foundationModels
+                )
+            }
             return MarinaTurnInterpretation(
                 result: contractInterpretation.result,
                 compatibilityCandidate: contractInterpretation.compatibilityCandidate,
@@ -1299,6 +1469,22 @@ struct MarinaTurnCoordinator {
                     diagnostic: diagnostic
                 ),
                 generatedSchemaName: "malformedTokenizedContractRecovery"
+            )
+        }
+
+        if let auditedInterpretation {
+            return preservingInterpreterSource(
+                in: MarinaTurnInterpretation(
+                    result: auditedInterpretation.result,
+                    compatibilityCandidate: auditedInterpretation.compatibilityCandidate,
+                    repairSummary: malformedFoundationRecoverySummary(
+                        original: interpretation?.repairSummary,
+                        recovery: auditedInterpretation.repairSummary,
+                        diagnostic: diagnostic
+                    ),
+                    generatedSchemaName: auditedInterpretation.generatedSchemaName
+                ),
+                originalSource: .foundationModels
             )
         }
 
@@ -1324,6 +1510,12 @@ struct MarinaTurnCoordinator {
         )
     }
 
+    private func shouldPreferAuditRecovery(over contractInterpretation: MarinaCanonicalReadInterpretation) -> Bool {
+        guard let summary = contractInterpretation.repairSummary else { return false }
+        return summary.contains("semanticContract=categorySpendRanking")
+            || summary.contains("semanticContract=freeTextExpenseRows")
+    }
+
     private func malformedFoundationRecoverySummary(
         original: String?,
         recovery: String?,
@@ -1336,7 +1528,13 @@ struct MarinaTurnCoordinator {
             nonBlank(recovery)
         ]
         .compactMap { $0 }
-        .joined(separator: ";")
+            .joined(separator: ";")
+    }
+
+    private func shouldRecoverDecodingFailureWithAudit(_ interpretation: MarinaTurnInterpretation) -> Bool {
+        guard let summary = interpretation.repairSummary else { return false }
+        return summary.contains("pipelineAudit=")
+            && summary.contains("pipelineAudit=categorySpend") == false
     }
 
     private func nonBlank(_ value: String?) -> String? {

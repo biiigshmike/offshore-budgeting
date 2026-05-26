@@ -1053,6 +1053,12 @@ struct MarinaSemanticInterpretationContractResolver {
     private func asksForTopCategorySpend(_ prompt: String) -> Bool {
         let mentionsCategory = containsWord("category", in: prompt) || containsWord("categories", in: prompt)
         guard mentionsCategory else { return false }
+        if containsAny(["preset", "presets", "assigned"], in: prompt) {
+            return false
+        }
+        let explicitlySpendShaped = containsAny(["spend", "spending", "spent", "expense", "expenses", "money"], in: prompt)
+        let onlyCategoryRanking = containsAny(["top category", "top categories", "highest category", "largest category", "biggest category"], in: prompt)
+        guard explicitlySpendShaped || onlyCategoryRanking else { return false }
         return containsAny(["top", "highest", "largest", "biggest", "most"], in: prompt)
     }
 

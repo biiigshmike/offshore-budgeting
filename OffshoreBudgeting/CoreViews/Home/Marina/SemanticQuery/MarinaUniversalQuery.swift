@@ -272,7 +272,26 @@ struct MarinaUniversalQueryExecutor {
         descriptor: MarinaEntityDescriptor,
         rows: [UniversalRow]
     ) -> MarinaWorkspaceAggregationCard {
-        let shown = Array(rows.prefix(limit(for: query)))
+        let sortedRows: [UniversalRow]
+        switch query.ranking {
+        case .newest:
+            sortedRows = rows.sorted { lhs, rhs in
+                switch (lhs.date, rhs.date) {
+                case (.some(let lhsDate), .some(let rhsDate)):
+                    if lhsDate == rhsDate { return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending }
+                    return lhsDate > rhsDate
+                case (.some, .none):
+                    return true
+                case (.none, .some):
+                    return false
+                case (.none, .none):
+                    return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
+                }
+            }
+        default:
+            sortedRows = rows
+        }
+        let shown = Array(sortedRows.prefix(limit(for: query)))
         return MarinaWorkspaceAggregationCard(
             title: listTitle(descriptor: descriptor, query: query),
             subtitle: scopeLabel(query),
@@ -372,9 +391,21 @@ struct MarinaUniversalQueryExecutor {
             .filter { $0.amount != nil }
             .sorted { lhs, rhs in
                 switch query.ranking {
+                case .newest:
+                    switch (lhs.date, rhs.date) {
+                    case (.some(let lhsDate), .some(let rhsDate)):
+                        if lhsDate == rhsDate { return (lhs.amount ?? 0) > (rhs.amount ?? 0) }
+                        return lhsDate > rhsDate
+                    case (.some, .none):
+                        return true
+                    case (.none, .some):
+                        return false
+                    case (.none, .none):
+                        return (lhs.amount ?? 0) > (rhs.amount ?? 0)
+                    }
                 case .smallest, .bottom, .leastFrequent:
                     return (lhs.amount ?? 0) < (rhs.amount ?? 0)
-                case .top, .largest, .mostFrequent, .newest, nil:
+                case .top, .largest, .mostFrequent, nil:
                     return (lhs.amount ?? 0) > (rhs.amount ?? 0)
                 }
             }

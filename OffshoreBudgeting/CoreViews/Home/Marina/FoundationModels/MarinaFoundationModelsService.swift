@@ -86,27 +86,27 @@ enum MarinaFoundationInterpretationPromptBuilder {
     static func instructions(context: MarinaInterpretationContext) -> String {
         """
         Prompt version: \(MarinaFoundationPromptVersion.interpretation.rawValue)
-        You are Marina inside Offshore. Extract one tokenized read request for deterministic Swift execution.
+        You are Marina inside Offshore. Extract one guided read request for deterministic Swift execution.
         Swift validates workspace scope, resolves entities, reads data, computes math, and writes the final answer.
 
         Rules:
-        - Return only MarinaTokenizedReadRequest fields.
-        - kindRaw must be query, clarification, or unsupported.
+        - Return only MarinaGuidedReadRequest fields.
+        - kind must be query, clarification, or unsupported.
         - Use null for unused optional fields; never write placeholder strings like null, nil, none, n/a, or unknown.
         - Never calculate totals, balances, rows, percentages, or final answer text.
         - Preserve date phrases exactly in dateTokens[].rawText; include ISO bounds when the period is explicit and safe.
-        - Set modelNameRaw to the exact SwiftData model or supported virtual target being retrieved.
+        - Set modelName to the exact SwiftData model or supported virtual target being retrieved.
         - Put only concrete named objects, aliases, or row-search spans in targetTokens[].rawText.
-        - Use targetTokens[].allowedTypeRaws when a target span could resolve to more than one object type.
+        - Use targetTokens[].allowedTypes when a target span could resolve to more than one object type.
         - Fill operation, amount field or basis, targets, dates, grouping, ranking, limit, response shape, detail, metric contract, and confidence when relevant.
         - Treat all selected-workspace Offshore objects as queryable, including workspace, budget, card, category, preset, planned expense, transaction, income, savings, reconciliation, import rule, and alias data.
-        - Prefer kindRaw query for any safe read-only workspace request; Swift can answer broad workspace reads even when no named card, category, budget, source, account, or merchant is supplied.
+        - Prefer kind query for any safe read-only workspace request; Swift can answer broad workspace reads even when no named card, category, budget, source, account, or merchant is supplied.
         - Treat words like actual income, planned income, current workspace, selected workspace, savings activity, savings balance, budget links, linked cards, and linked presets as semantic fields or views, not as missing named targets.
         - Use clarification only when choosing among real named objects or object types would materially change the answer, such as merchant vs card vs category collisions or duplicate names.
         - Do not include command/filler words such as show, list, find, me, all, my, expenses, transactions, purchases, please in target spans.
-        - For unknown merchant/transaction row text such as "Mr. Pickle", use modelNameRaw VariableExpense, operationRaw list, amountFieldRaw budgetImpactAmount, target typeRaw merchant, allowedTypeRaws merchant/expense/transaction, and isFreeText true.
+        - For unknown merchant/transaction row text such as "Mr. Pickle", use modelName VariableExpense, operation list, amountField budgetImpactAmount, target type merchant, allowedTypes merchant/expense/transaction, and isFreeText true.
         - For known formulas, set metricContractRaw to the matching MarinaMetricContractID when obvious; Swift will validate support and execution.
-        - For CRUD commands, set kindRaw unsupported and unsupported.reasonRaw crud.
+        - For CRUD commands, set kind unsupported and unsupported.reasonRaw crud.
         - Reserve unsupported for out-of-domain, unsafe, mutating, advice-seeking, or impossible requests; do not use unsupported for safe read-only workspace questions like current workspace, income this month, savings this month, counts, lists, details, or supported numeric aggregation.
 
         \(MarinaFoundationSafetyPolicy.interpretationInstructions)
@@ -126,7 +126,7 @@ enum MarinaFoundationInterpretationPromptBuilder {
     static func prompt(userPrompt: String) -> String {
         """
         User prompt: \(userPrompt)
-        Produce the typed MarinaTokenizedReadRequest only.
+        Produce the typed MarinaGuidedReadRequest only.
         """
     }
 
@@ -200,7 +200,7 @@ private func interpretTurnIntentWithFoundationModels(
         let routeSession = try provider.makeSession(spec: spec)
         let response = try await routeSession.respond(
             to: MarinaFoundationInterpretationPromptBuilder.prompt(userPrompt: prompt),
-            generating: MarinaTokenizedReadRequest.self,
+            generating: MarinaGuidedReadRequest.self,
             includeSchemaInPrompt: spec.includeSchemaInPrompt,
             options: spec.options
         )
@@ -209,7 +209,7 @@ private func interpretTurnIntentWithFoundationModels(
         )
         let interpretation = response.content.interpretation(prompt: prompt, context: context)
         MarinaTraceRecorder.shared.recordLiveRouteOwnership(
-            liveEnvelopeSummary: "tokenizedReadRequest=typed",
+            liveEnvelopeSummary: "guidedReadRequest=typed",
             canonicalRouteSummary: interpretation.generatedSchemaName,
             routeOverrideSummary: nil,
             routeGuardSummary: "semanticQueryValidatedBySwift",

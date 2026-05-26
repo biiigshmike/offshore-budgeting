@@ -31,6 +31,16 @@ struct MarinaAmountBasisAdapter {
         plan: MarinaAggregationPlan,
         semanticQuery: MarinaSemanticQuery?
     ) -> MarinaFinancialAmountBasis {
+        if plan.operation == .count || plan.measure == .transactionFrequency {
+            return .count
+        }
+
+        if plan.routeIntent?.subject == .presets,
+           plan.operation == .rank,
+           plan.grouping?.dimension == .category {
+            return .count
+        }
+
         if plan.measure == .reconciliationBalance {
             return .reconciliationBalance
         }

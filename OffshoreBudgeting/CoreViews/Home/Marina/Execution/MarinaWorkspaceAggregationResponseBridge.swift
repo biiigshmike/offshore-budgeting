@@ -17,7 +17,7 @@ struct MarinaWorkspaceAggregationResponseBridge {
 
         return HomeAnswer(
             queryID: card.id,
-            kind: rows.isEmpty ? .message : .list,
+            kind: card.answerKind,
             title: card.title,
             subtitle: card.subtitle,
             primaryValue: card.primaryValue,

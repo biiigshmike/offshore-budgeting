@@ -5,6 +5,7 @@ struct MarinaWorkspaceAggregationCard: Codable, Equatable, Identifiable {
     let title: String
     let subtitle: String?
     let primaryValue: String?
+    let answerKind: HomeAnswerKind
     let rows: [Row]
     let items: [Item]
     let traceSummary: String
@@ -14,6 +15,7 @@ struct MarinaWorkspaceAggregationCard: Codable, Equatable, Identifiable {
         title: String,
         subtitle: String? = nil,
         primaryValue: String? = nil,
+        answerKind: HomeAnswerKind = .list,
         rows: [Row] = [],
         items: [Item] = [],
         traceSummary: String
@@ -22,9 +24,33 @@ struct MarinaWorkspaceAggregationCard: Codable, Equatable, Identifiable {
         self.title = title
         self.subtitle = subtitle
         self.primaryValue = primaryValue
+        self.answerKind = answerKind
         self.rows = rows
         self.items = items
         self.traceSummary = traceSummary
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case title
+        case subtitle
+        case primaryValue
+        case answerKind
+        case rows
+        case items
+        case traceSummary
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        title = try container.decode(String.self, forKey: .title)
+        subtitle = try container.decodeIfPresent(String.self, forKey: .subtitle)
+        primaryValue = try container.decodeIfPresent(String.self, forKey: .primaryValue)
+        answerKind = try container.decodeIfPresent(HomeAnswerKind.self, forKey: .answerKind) ?? .list
+        rows = try container.decode([Row].self, forKey: .rows)
+        items = try container.decode([Item].self, forKey: .items)
+        traceSummary = try container.decode(String.self, forKey: .traceSummary)
     }
 
     struct Row: Codable, Equatable, Identifiable {
