@@ -34,15 +34,21 @@ struct MarinaWorkspaceAggregationExecutor {
             return .handled(plannedExpensesByCategory(plan: plan, provider: provider, now: now))
         case (.sum, .presetAmount, .card), (.rank, .presetAmount, .card):
             return .handled(plannedExpensesByCard(plan: plan, provider: provider, now: now))
+        case (.lookupDetails, .spend, nil) where hasCardBalanceTarget(plan):
+            return .handled(cardBalance(plan: plan, provider: provider, now: now))
+        case (.lookupDetails, .spend, .card) where hasCardBalanceTarget(plan):
+            return .handled(cardBalance(plan: plan, provider: provider, now: now))
+        case (.lookupDetails, .savings, nil):
+            return .handled(savingsBalance(plan: plan, provider: provider))
         case (.rank, .savingsMovement, .savingsLedgerEntry), (.listRows, .savingsMovement, .savingsLedgerEntry):
             return .handled(largestSavingsMovements(plan: plan, provider: provider, now: now))
         case (.lookupDetails, .reconciliationBalance, nil),
              (.lookupDetails, .reconciliationBalance, .allocationAccount):
-            return .handled(sharedBalances(plan: plan, provider: provider))
+            return .handled(sharedBalances(plan: plan, provider: provider, now: now))
         case (.rank, .reconciliationBalance, .allocationAccount),
              (.sum, .reconciliationBalance, .allocationAccount),
              (.listRows, .reconciliationBalance, .allocationAccount):
-            return .handled(sharedBalances(plan: plan, provider: provider))
+            return .handled(sharedBalances(plan: plan, provider: provider, now: now))
         default:
             return .unsupported
         }
@@ -388,6 +394,107 @@ struct MarinaWorkspaceAggregationExecutor {
 
     // MARK: - Savings and Reconciliation
 
+    private func cardBalance(
+        plan: MarinaAggregationPlan,
+        provider: MarinaDataProvider,
+        now: Date
+    ) -> MarinaWorkspaceAggregationCard {
+        let range = plan.dateRange ?? monthRange(containing: now)
+        let cardTargets = plan.targets.filter { $0.entityType == .card }
+        let cards = provider.fetchAllCards()
+            .filter { card in
+                cardTargets.isEmpty
+                    || cardTargets.contains { targetMatchesCard($0, card: card) }
+            }
+        let plannedExpenses = provider.fetchAllPlannedExpenses()
+        let variableExpenses = provider.fetchAllVariableExpenses()
+        let totals = cards.map { card in
+            let planned = plannedExpenses
+                .filter { contains($0.expenseDate, in: range) && expenseCardMatches($0.card, card: card) }
+                .reduce(0.0) { $0 + $1.effectiveAmount() }
+            let variable = variableExpenses
+                .filter { contains($0.transactionDate, in: range) && expenseCardMatches($0.card, card: card) }
+                .reduce(0.0) { $0 + $1.ledgerSignedAmount() }
+            return (card: card, planned: planned, variable: variable, total: planned + variable)
+        }
+        .sorted { lhs, rhs in
+            if lhs.total == rhs.total {
+                return lhs.card.name.localizedCaseInsensitiveCompare(rhs.card.name) == .orderedAscending
+            }
+            return lhs.total > rhs.total
+        }
+        .prefix(limit(for: plan))
+
+        if cardTargets.count == 1, let item = totals.first {
+            return MarinaWorkspaceAggregationCard(
+                title: "\(cardTargets[0].displayName) Balance",
+                subtitle: rangeLabel(range),
+                primaryValue: currency(item.total),
+                rows: [
+                    .init(label: "Variable ledger activity", value: currency(item.variable), amount: item.variable, objectType: .card, sourceID: item.card.id, sortValue: item.variable),
+                    .init(label: "Planned card rows", value: currency(item.planned), amount: item.planned, objectType: .card, sourceID: item.card.id, sortValue: item.planned),
+                    .init(label: "Current-period card spend", value: currency(item.total), amount: item.total, objectType: .card, sourceID: item.card.id, sortValue: item.total)
+                ],
+                traceSummary: "workspaceAggregation=cardBalance,resultCount=1,total=\(item.total)"
+            )
+        }
+
+        let rows = totals.map { item in
+            MarinaWorkspaceAggregationCard.Row(
+                label: item.card.name,
+                value: currency(item.total),
+                amount: item.total,
+                objectType: .card,
+                sourceID: item.card.id,
+                sortValue: item.total
+            )
+        }
+        return MarinaWorkspaceAggregationCard(
+            title: "Card Balances",
+            subtitle: rangeLabel(range),
+            primaryValue: rows.first?.value,
+            rows: Array(rows),
+            traceSummary: "workspaceAggregation=cardBalance,resultCount=\(rows.count)"
+        )
+    }
+
+    private func savingsBalance(
+        plan: MarinaAggregationPlan,
+        provider: MarinaDataProvider
+    ) -> MarinaWorkspaceAggregationCard {
+        let accountTargets = plan.targets.filter { $0.entityType == .savingsAccount }
+        let rows = provider.fetchAllSavingsAccounts()
+            .filter { account in
+                accountTargets.isEmpty
+                    || accountTargets.contains { $0.sourceID == account.id || normalized($0.displayName) == normalized(account.name) }
+            }
+            .sorted { lhs, rhs in
+                if lhs.total == rhs.total {
+                    return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+                }
+                return lhs.total > rhs.total
+            }
+            .prefix(limit(for: plan))
+            .map { account in
+                MarinaWorkspaceAggregationCard.Row(
+                    label: account.name,
+                    value: currency(account.total),
+                    amount: account.total,
+                    objectType: .savingsAccount,
+                    sourceID: account.id,
+                    sortValue: account.total
+                )
+            }
+
+        return MarinaWorkspaceAggregationCard(
+            title: accountTargets.count == 1 ? "\(accountTargets[0].displayName) Balance" : "Savings Balances",
+            subtitle: "Stored savings total",
+            primaryValue: rows.first?.value,
+            rows: Array(rows),
+            traceSummary: "workspaceAggregation=savingsBalance,resultCount=\(rows.count)"
+        )
+    }
+
     private func largestSavingsMovements(
         plan: MarinaAggregationPlan,
         provider: MarinaDataProvider,
@@ -431,9 +538,13 @@ struct MarinaWorkspaceAggregationExecutor {
 
     private func sharedBalances(
         plan: MarinaAggregationPlan,
-        provider: MarinaDataProvider
+        provider: MarinaDataProvider,
+        now: Date
     ) -> MarinaWorkspaceAggregationCard {
+        let range = plan.dateRange ?? monthRange(containing: now)
         let accountTargets = plan.targets.filter { $0.entityType == .allocationAccount }
+        let allocations = provider.fetchAllExpenseAllocations()
+        let settlements = provider.fetchAllAllocationSettlements()
         let rows = provider.fetchAllAllocationAccounts()
             .filter { $0.isArchived == false }
             .filter { account in
@@ -441,7 +552,15 @@ struct MarinaWorkspaceAggregationExecutor {
                     || accountTargets.contains { $0.sourceID == account.id || $0.displayName.localizedCaseInsensitiveCompare(account.name) == .orderedSame }
             }
             .map { account in
-                (account: account, balance: AllocationLedgerService.balance(for: account))
+                (
+                    account: account,
+                    balance: reconciliationBalance(
+                        account: account,
+                        allocations: allocations,
+                        settlements: settlements,
+                        range: range
+                    )
+                )
             }
             .sorted { $0.balance > $1.balance }
             .prefix(limit(for: plan))
@@ -458,11 +577,45 @@ struct MarinaWorkspaceAggregationExecutor {
 
         return MarinaWorkspaceAggregationCard(
             title: accountTargets.count == 1 ? "\(accountTargets[0].displayName) Balance" : "Shared Balances",
-            subtitle: accountTargets.count == 1 ? "Shared Balances" : "Reconciliation accounts",
+            subtitle: rangeLabel(range),
             primaryValue: rows.first?.value,
             rows: Array(rows),
-            traceSummary: "workspaceAggregation=sharedBalances,resultCount=\(rows.count)"
+            traceSummary: "workspaceAggregation=sharedBalances,resultCount=\(rows.count),dateRange=\(rangeLabel(range))"
         )
+    }
+
+    private func reconciliationBalance(
+        account: AllocationAccount,
+        allocations: [ExpenseAllocation],
+        settlements: [AllocationSettlement],
+        range: HomeQueryDateRange
+    ) -> Double {
+        let allocationTotal = allocations
+            .filter { $0.account?.id == account.id }
+            .filter { allocation in
+                guard let date = allocation.expense?.transactionDate ?? allocation.plannedExpense?.expenseDate else {
+                    return false
+                }
+                return contains(date, in: range)
+            }
+            .reduce(0.0) { $0 + max(0, $1.allocatedAmount) }
+        let settlementTotal = settlements
+            .filter { $0.account?.id == account.id && contains($0.date, in: range) }
+            .reduce(0.0) { $0 + $1.amount }
+        return allocationTotal + settlementTotal
+    }
+
+    private func hasCardBalanceTarget(_ plan: MarinaAggregationPlan) -> Bool {
+        plan.routeIntent?.requestedDetail == .balance
+            && plan.targets.contains { $0.entityType == .card }
+    }
+
+    private func targetMatchesCard(_ target: MarinaResolvedAggregationTarget, card: Card) -> Bool {
+        target.sourceID == card.id || normalized(target.displayName) == normalized(card.name)
+    }
+
+    private func expenseCardMatches(_ expenseCard: Card?, card: Card) -> Bool {
+        expenseCard?.id == card.id || normalized(expenseCard?.name ?? "") == normalized(card.name)
     }
 
     // MARK: - Helpers
@@ -593,6 +746,10 @@ struct MarinaWorkspaceAggregationExecutor {
 
     private func rangeLabel(_ range: HomeQueryDateRange) -> String {
         "\(shortDate(range.startDate)) - \(shortDate(range.endDate))"
+    }
+
+    private func contains(_ date: Date, in range: HomeQueryDateRange) -> Bool {
+        date >= range.startDate && date <= range.endDate
     }
 
     private func shortDate(_ date: Date) -> String {

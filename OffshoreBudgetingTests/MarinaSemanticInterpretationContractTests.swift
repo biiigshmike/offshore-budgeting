@@ -18,6 +18,12 @@ struct MarinaSemanticInterpretationContractTests {
             .savingsActivity,
             .incomeStatus,
             .reconciliationBalance,
+            .budgetLinkedRelationships,
+            .plannedExpenseDueRows,
+            .categoryRemaining,
+            .safeSpendRemaining,
+            .transactionActivity,
+            .reconciliationActivity,
             .presetDetails
         ]
         #expect(requiredCoreIDs.isSubset(of: contractIDs))
@@ -264,7 +270,7 @@ struct MarinaSemanticInterpretationContractTests {
         #expect(answer.rows.contains { $0.title.contains("(budget)") } == false)
     }
 
-    @Test func foundationFailureCanBeRescuedByDeterministicContract() async throws {
+    @Test func foundationGenerationFailureReturnsSafeFailureWithoutPromptStringFallback() async throws {
         let fixture = try makeFixture()
         fixture.context.insert(VariableExpense(
             descriptionText: "June Spend",
@@ -292,13 +298,14 @@ struct MarinaSemanticInterpretationContractTests {
             context: turnContext(fixture)
         )
 
-        guard case .handled(let answer, _, let homeQueryPlan, _, _) = result else {
-            Issue.record("Expected deterministic contract fallback after Foundation failure.")
+        guard case .blocked(let answer, let validationOutcome) = result else {
+            Issue.record("Expected Foundation generation failure to stop before deterministic execution.")
             return
         }
 
-        #expect(answer.title == "Budget Overview")
-        #expect(homeQueryPlan?.metric == .overview)
+        #expect(validationOutcome == nil)
+        #expect(answer.title == diagnostic.userTitle)
+        #expect(answer.rows.contains { $0.title == "Data safety" })
     }
 
     private func canonicalInterpretation(

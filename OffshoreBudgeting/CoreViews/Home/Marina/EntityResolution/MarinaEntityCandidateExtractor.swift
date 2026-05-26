@@ -5,6 +5,14 @@ struct MarinaEntityCandidateExtractor {
         from text: String,
         provider: MarinaDataProvider
     ) -> MarinaEntityTargetExtractionResult {
+        extractCandidates(from: text, provider: provider, includeAliases: true)
+    }
+
+    private func extractCandidates(
+        from text: String,
+        provider: MarinaDataProvider,
+        includeAliases: Bool
+    ) -> MarinaEntityTargetExtractionResult {
         let normalizedTarget = normalize(text)
         guard normalizedTarget.isEmpty == false else {
             return MarinaEntityTargetExtractionResult(rawTargetText: nil, matchesByType: [:])
@@ -60,6 +68,22 @@ struct MarinaEntityCandidateExtractor {
             }
         }
 
+        if includeAliases {
+            for rule in provider.fetchAllAssistantAliasRules() {
+                let alias = normalize(rule.aliasKey)
+                guard alias.isEmpty == false,
+                      alias == normalizedTarget || alias.hasPrefix(normalizedTarget) else {
+                    continue
+                }
+                let aliased = extractCandidates(
+                    from: rule.targetValue,
+                    provider: provider,
+                    includeAliases: false
+                )
+                collected.append(contentsOf: aliased.matchesByType.flatMap(\.value))
+            }
+        }
+
         let expenses = provider.fetchAllExpenses()
         for expense in expenses.planned {
             if let match = matchCandidate(target: normalizedTarget, displayValue: expense.title, targetType: .expense, sourceID: expense.id, clarificationSubtitle: plannedExpenseSubtitle(expense)) {
@@ -88,7 +112,7 @@ struct MarinaEntityCandidateExtractor {
         var bestByKey: [String: MarinaEntityCandidateMatch] = [:]
 
         for match in matches {
-            let key = "\(match.entityType.rawValue)|\(match.normalizedValue)"
+            let key = deduplicationKey(for: match)
             if let existing = bestByKey[key] {
                 if existing.matchType == .prefix && match.matchType == .exact {
                     bestByKey[key] = match
@@ -107,6 +131,13 @@ struct MarinaEntityCandidateExtractor {
             }
             return lhs.entityType.rawValue < rhs.entityType.rawValue
         }
+    }
+
+    private func deduplicationKey(for match: MarinaEntityCandidateMatch) -> String {
+        if match.entityType == .merchant {
+            return "\(match.entityType.rawValue)|\(match.normalizedValue)"
+        }
+        return "\(match.entityType.rawValue)|\(match.normalizedValue)|\(match.sourceID.uuidString.lowercased())"
     }
 
     private func matchCandidate(

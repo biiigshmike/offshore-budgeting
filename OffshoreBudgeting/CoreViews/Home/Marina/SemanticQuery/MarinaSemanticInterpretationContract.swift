@@ -6,11 +6,18 @@ enum MarinaSemanticInterpretationContractID: String, Codable, CaseIterable, Send
     case periodOverview
     case budgetSummary
     case spendTotal
+    case categorySpendRanking
     case entityLookup
     case savingsStatus
     case savingsActivity
     case incomeStatus
     case reconciliationBalance
+    case budgetLinkedRelationships
+    case plannedExpenseDueRows
+    case categoryRemaining
+    case safeSpendRemaining
+    case transactionActivity
+    case reconciliationActivity
     case presetDetails
 }
 
@@ -127,6 +134,18 @@ struct MarinaSemanticInterpretationContractRegistry: Sendable {
             homeMetric: .spendTotal
         ),
         contract(
+            .categorySpendRanking,
+            subject: .variableExpenses,
+            operation: .rank,
+            measure: .spend,
+            responseShape: .rankedList,
+            allowedEntityTypes: [.category],
+            datePolicy: .currentPeriod,
+            routeKind: .broadSpend,
+            preferredExecutorRoute: .homeAdapter,
+            homeMetric: .topCategories
+        ),
+        contract(
             .entityLookup,
             subject: .workspaces,
             operation: .lookupDetails,
@@ -184,6 +203,74 @@ struct MarinaSemanticInterpretationContractRegistry: Sendable {
             datePolicy: .optional,
             routeKind: .reconciliationBalance,
             preferredExecutorRoute: .workspaceAggregation
+        ),
+        contract(
+            .budgetLinkedRelationships,
+            subject: .budgets,
+            operation: .lookupDetails,
+            measure: .remainingBudget,
+            responseShape: .relationshipList,
+            allowedEntityTypes: [.budget, .card, .preset, .category],
+            datePolicy: .budgetRange,
+            routeKind: .budgetMembership,
+            preferredExecutorRoute: .composableWorkspace
+        ),
+        contract(
+            .plannedExpenseDueRows,
+            subject: .plannedExpenses,
+            operation: .listRows,
+            measure: .presetAmount,
+            responseShape: .rankedList,
+            allowedEntityTypes: [.preset, .category, .card],
+            datePolicy: .optional,
+            routeKind: .plannedExpenseRows,
+            preferredExecutorRoute: .workspaceAggregation
+        ),
+        contract(
+            .categoryRemaining,
+            subject: .budgets,
+            operation: .lookupDetails,
+            measure: .remainingBudget,
+            responseShape: .summaryCard,
+            allowedEntityTypes: [.category],
+            requiredEntityTypes: [.category],
+            datePolicy: .currentPeriod,
+            routeKind: .budgetCategoryLimit,
+            preferredExecutorRoute: .composableWorkspace
+        ),
+        contract(
+            .safeSpendRemaining,
+            subject: .budgets,
+            operation: .lookupDetails,
+            measure: .remainingBudget,
+            responseShape: .summaryCard,
+            datePolicy: .currentPeriod,
+            routeKind: .generic,
+            preferredExecutorRoute: .homeAdapter,
+            homeMetric: .safeSpendToday
+        ),
+        contract(
+            .transactionActivity,
+            subject: .variableExpenses,
+            operation: .listRows,
+            measure: .transactionAmount,
+            responseShape: .rankedList,
+            allowedEntityTypes: [.card, .category, .merchant, .expense, .transaction],
+            datePolicy: .optional,
+            routeKind: .recentTransactionRows,
+            preferredExecutorRoute: .composableWorkspace
+        ),
+        contract(
+            .reconciliationActivity,
+            subject: .reconciliationAccounts,
+            operation: .listRows,
+            measure: .reconciliationBalance,
+            responseShape: .rankedList,
+            allowedEntityTypes: [.allocationAccount],
+            requiredEntityTypes: [.allocationAccount],
+            datePolicy: .currentPeriod,
+            routeKind: .reconciliationActivity,
+            preferredExecutorRoute: .composableWorkspace
         ),
         contract(
             .presetDetails,
@@ -286,6 +373,15 @@ struct MarinaSemanticInterpretationContractResolver {
             return overviewInterpretation
         }
 
+        if let categoryRankingInterpretation = categoryRankingInterpretation(
+            prompt: prompt,
+            normalizedPrompt: normalizedPrompt,
+            context: context,
+            failureDiagnostic: failureDiagnostic
+        ) {
+            return categoryRankingInterpretation
+        }
+
         if let savingsInterpretation = savingsInterpretation(
             prompt: prompt,
             normalizedPrompt: normalizedPrompt,
@@ -379,6 +475,7 @@ struct MarinaSemanticInterpretationContractResolver {
         failureDiagnostic: MarinaFoundationModelsFailureDiagnostic?
     ) -> MarinaCanonicalReadInterpretation? {
         guard mentionsBudget(normalizedPrompt),
+              isBudgetLimitPrompt(normalizedPrompt) == false,
               asksForBudgetSummary(normalizedPrompt),
               let contract = registry.contract(for: .budgetSummary) else {
             return nil
@@ -436,6 +533,7 @@ struct MarinaSemanticInterpretationContractResolver {
         context: MarinaTurnContext,
         failureDiagnostic: MarinaFoundationModelsFailureDiagnostic?
     ) -> MarinaCanonicalReadInterpretation? {
+        guard isBudgetLimitPrompt(normalizedPrompt) == false else { return nil }
         guard asksForPeriodOverview(normalizedPrompt) else { return nil }
         let dateMention = explicitMonthMention(in: normalizedPrompt, now: context.now)
             ?? explicitDateRange(in: prompt, context: context)
@@ -646,6 +744,56 @@ struct MarinaSemanticInterpretationContractResolver {
             responseShapeHint: contract.responseShape,
             confidence: .high,
             routeIntent: routeIntent(for: contract, targetTypes: [])
+        )
+        return canonicalInterpretation(
+            candidate: candidate,
+            repairSummary: repairSummary(contract: contract, failureDiagnostic: failureDiagnostic)
+        )
+    }
+
+    private func categoryRankingInterpretation(
+        prompt: String,
+        normalizedPrompt: String,
+        context: MarinaTurnContext,
+        failureDiagnostic: MarinaFoundationModelsFailureDiagnostic?
+    ) -> MarinaCanonicalReadInterpretation? {
+        guard asksForTopCategorySpend(normalizedPrompt),
+              let contract = registry.contract(for: .categorySpendRanking) else {
+            return nil
+        }
+        let dateMention = explicitMonthMention(in: normalizedPrompt, now: context.now)
+            ?? explicitDateRange(in: prompt, context: context)
+        let candidate = MarinaQueryPlanCandidate(
+            source: .foundationModels,
+            rawPrompt: prompt,
+            operation: contract.operation,
+            measure: contract.measure,
+            timeScopes: dateMention.map { mention in
+                [
+                    MarinaUnresolvedTimeScope(
+                        role: .primary,
+                        rawText: mention.rawText,
+                        resolvedRangeHint: mention.range,
+                        periodUnitHint: .month
+                    )
+                ]
+            } ?? [],
+            grouping: MarinaGroupingCandidate(dimension: .category, rawText: "category"),
+            ranking: MarinaRankingCandidate(direction: .top, limit: 1, rawText: "top"),
+            limit: 1,
+            responseShapeHint: contract.responseShape,
+            confidence: .high,
+            routeIntent: MarinaRouteIntent(
+                kind: contract.routeKind,
+                subject: contract.subject,
+                operation: contract.operation,
+                measure: contract.measure,
+                grouping: .category,
+                targetTypes: [.category],
+                requestedDetail: nil,
+                responseShape: contract.responseShape,
+                preferredExecutorRoute: contract.preferredExecutorRoute
+            )
         )
         return canonicalInterpretation(
             candidate: candidate,
@@ -870,6 +1018,7 @@ struct MarinaSemanticInterpretationContractResolver {
     }
 
     private func asksForBudgetSummary(_ prompt: String) -> Bool {
+        guard isBudgetLimitPrompt(prompt) == false else { return false }
         if containsAny(["summary", "overview", "status", "looking", "doing", "how is", "how am i"], in: prompt) {
             return true
         }
@@ -877,6 +1026,7 @@ struct MarinaSemanticInterpretationContractResolver {
     }
 
     private func asksForPeriodOverview(_ prompt: String) -> Bool {
+        guard isBudgetLimitPrompt(prompt) == false else { return false }
         if mentionsBudget(prompt),
            asksForBudgetSummary(prompt) {
             return true
@@ -894,6 +1044,16 @@ struct MarinaSemanticInterpretationContractResolver {
             ],
             in: prompt
         )
+    }
+
+    private func isBudgetLimitPrompt(_ prompt: String) -> Bool {
+        containsAny(["budget limit", "category limit", "category goal"], in: prompt)
+    }
+
+    private func asksForTopCategorySpend(_ prompt: String) -> Bool {
+        let mentionsCategory = containsWord("category", in: prompt) || containsWord("categories", in: prompt)
+        guard mentionsCategory else { return false }
+        return containsAny(["top", "highest", "largest", "biggest", "most"], in: prompt)
     }
 
     private func asksForCurrentWorkspace(_ prompt: String) -> Bool {

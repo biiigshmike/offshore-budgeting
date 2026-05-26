@@ -355,6 +355,8 @@ enum MarinaFoundationSurfacePromptBuilder {
 
         \(MarinaAIVoiceProfile.marina.instructionText)
 
+        \(MarinaFoundationSafetyPolicy.presentationInstructions)
+
         Rules:
         - This pass is presentation only. The app has already routed, validated, fetched, and calculated the answer.
         - Do not compute, change, or invent totals, balances, percentages, dates, rows, entities, transactions, or sources.
@@ -658,12 +660,13 @@ private func generateWithFoundationModels(
     onPartialText: MarinaResponsePartialTextHandler?
 ) async throws -> MarinaGeneratedSurfaceResponse {
     do {
-        let session = try MarinaFoundationModelsSessionProvider().makeSession(
+        let spec = MarinaFoundationSessionSpec.presentation(
             instructions: MarinaFoundationSurfacePromptBuilder.instructions()
         )
+        let session = try MarinaFoundationModelsSessionProvider().makeSession(spec: spec)
         let stream = session.streamResponse(
             to: MarinaFoundationSurfacePromptBuilder.prompt(context: context),
-            options: marinaPresentationOptions(seed: marinaPresentationSeed(context: context))
+            options: MarinaFoundationSessionSpec.presentationOptions(seed: marinaPresentationSeed(context: context))
         )
 
         var latestText = ""
@@ -699,15 +702,6 @@ private func generateWithFoundationModels(
     } catch {
         throw MarinaResponseGenerationError.generationFailed(.from(error))
     }
-}
-
-@available(iOS 26.0, macOS 26.0, *)
-private func marinaPresentationOptions(seed: UInt64) -> GenerationOptions {
-    GenerationOptions(
-        sampling: .random(probabilityThreshold: 0.9, seed: seed),
-        temperature: 0.35,
-        maximumResponseTokens: 360
-    )
 }
 
 @available(iOS 26.0, macOS 26.0, *)

@@ -160,9 +160,7 @@ struct MarinaFoundationReadinessCheck {
     ) -> MarinaTurnCoordinator {
         MarinaTurnCoordinator(
             availability: MarinaReadinessAvailableAvailability(),
-            interpreter: MarinaFakeCanonicalAIInterpreter(interpretationsByPrompt: [
-                Self.diagnosticPrompt: interpretation
-            ]),
+            turnInterpreter: MarinaReadinessTurnIntentInterpreter(interpretation: interpretation),
             resolver: resolver,
             validator: validator,
             queryExecutor: queryExecutor,
@@ -338,4 +336,20 @@ struct MarinaFoundationReadinessCheck {
 
 private struct MarinaReadinessAvailableAvailability: MarinaModelAvailabilityProviding {
     func currentStatus() -> MarinaModelAvailability.Status { .available }
+}
+
+private struct MarinaReadinessTurnIntentInterpreter: MarinaTurnIntentInterpreting {
+    let interpretation: MarinaCanonicalReadInterpretation
+
+    func interpretTurnIntent(
+        prompt _: String,
+        context _: MarinaInterpretationContext
+    ) async throws -> MarinaTurnInterpretation {
+        MarinaTurnInterpretation(
+            result: interpretation.result,
+            compatibilityCandidate: interpretation.compatibilityCandidate,
+            repairSummary: interpretation.repairSummary,
+            generatedSchemaName: MarinaFoundationLiveContractRegistry.liveGeneratedSchemaName
+        )
+    }
 }

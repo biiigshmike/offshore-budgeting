@@ -310,10 +310,8 @@ final class MarinaAssistantUITests: XCTestCase {
         ModelPrompt(
             model: "BudgetCategoryLimit",
             text: "Show my Groceries budget limit",
-            outcome: .clarification,
-            shape: .clarification,
-            requiredVisibleText: ["Groceries budget limit", "Show budget category limit"],
-            requiresClarificationChips: false
+            shape: .summaryCard,
+            requiredVisibleText: ["Groceries", "Budget category limit"]
         ),
         ModelPrompt(model: "Card", text: "What did I spend on Apple Card this month?", shape: .scalarCurrency),
         ModelPrompt(
@@ -338,10 +336,8 @@ final class MarinaAssistantUITests: XCTestCase {
         ModelPrompt(
             model: "BudgetCategoryLimit",
             text: "Show my Groceries budget limit",
-            outcome: .clarification,
-            shape: .clarification,
-            requiredVisibleText: ["Groceries budget limit", "Show budget category limit"],
-            requiresClarificationChips: false
+            shape: .summaryCard,
+            requiredVisibleText: ["Groceries", "Budget category limit"]
         ),
         ModelPrompt(model: "BudgetCategoryLimit", text: "Which categories are over budget?", shape: .rankedList),
         ModelPrompt(model: "Card", text: "What did I spend on Apple Card this month?", shape: .scalarCurrency),

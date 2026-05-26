@@ -749,7 +749,16 @@ struct MarinaModelsTests {
 
         #expect(querySuggestion.isPromptBacked == false)
         #expect(querySuggestion.executionPrompt == "Spend this month")
-        #expect(querySuggestion.action == .homeQuery(HomeQuery(intent: .spendThisMonth)))
+        guard case .homeQuery(let actionQuery) = querySuggestion.action else {
+            Issue.record("Expected a query-backed suggestion action.")
+            return
+        }
+        #expect(actionQuery.intent == .spendThisMonth)
+        #expect(actionQuery.dateRange == nil)
+        #expect(actionQuery.comparisonDateRange == nil)
+        #expect(actionQuery.resultLimit == HomeQuery(intent: .spendThisMonth).resultLimit)
+        #expect(actionQuery.targetName == nil)
+        #expect(actionQuery.periodUnit == nil)
         #expect(promptSuggestion.isPromptBacked)
         #expect(promptSuggestion.executionPrompt == "What is my active budget?")
         #expect(promptSuggestion.action == .freeformPrompt("What is my active budget?"))

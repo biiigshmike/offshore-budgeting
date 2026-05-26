@@ -204,12 +204,21 @@ struct MarinaAggregationExecutorTests {
         let fixture = try makeFixture()
         let savings = SavingsAccount(name: "True Savings", total: 0, workspace: fixture.workspace)
         let shared = AllocationAccount(name: "Roommate", workspace: fixture.workspace)
-        let allocation = ExpenseAllocation(allocatedAmount: 225, workspace: fixture.workspace, account: shared)
+        let sharedExpense = VariableExpense(
+            descriptionText: "Roommate dinner",
+            amount: 450,
+            transactionDate: date(2026, 5, 7),
+            workspace: fixture.workspace,
+            card: fixture.appleCard,
+            category: fixture.groceries
+        )
+        let allocation = ExpenseAllocation(allocatedAmount: 225, workspace: fixture.workspace, account: shared, expense: sharedExpense)
         let settlement = AllocationSettlement(date: date(2026, 5, 8), note: "Paid back", amount: -25, workspace: fixture.workspace, account: shared)
         fixture.context.insert(savings)
         fixture.context.insert(SavingsLedgerEntry(date: date(2026, 5, 3), amount: 400, note: "Period close", kindRaw: SavingsLedgerEntryKind.periodClose.rawValue, workspace: fixture.workspace, account: savings))
         fixture.context.insert(SavingsLedgerEntry(date: date(2026, 5, 10), amount: -125, note: "Manual adjustment", kindRaw: SavingsLedgerEntryKind.manualAdjustment.rawValue, workspace: fixture.workspace, account: savings))
         fixture.context.insert(shared)
+        fixture.context.insert(sharedExpense)
         fixture.context.insert(allocation)
         fixture.context.insert(settlement)
         try fixture.context.save()
@@ -849,14 +858,30 @@ struct MarinaAggregationExecutorTests {
             card: fixture.appleCard,
             category: fixture.groceries
         )
+        let aprilDinner = VariableExpense(
+            descriptionText: "April Dinner",
+            amount: 1_998,
+            transactionDate: date(2026, 4, 5),
+            workspace: fixture.workspace,
+            card: fixture.appleCard,
+            category: fixture.groceries
+        )
         fixture.context.insert(shared)
         fixture.context.insert(dinner)
+        fixture.context.insert(aprilDinner)
         fixture.context.insert(ExpenseAllocation(
             allocatedAmount: 60,
             preservesGrossAmount: true,
             workspace: fixture.workspace,
             account: shared,
             expense: dinner
+        ))
+        fixture.context.insert(ExpenseAllocation(
+            allocatedAmount: 999,
+            preservesGrossAmount: true,
+            workspace: fixture.workspace,
+            account: shared,
+            expense: aprilDinner
         ))
         fixture.context.insert(AllocationSettlement(
             date: date(2026, 5, 20),
@@ -866,10 +891,18 @@ struct MarinaAggregationExecutorTests {
             account: shared,
             expense: dinner
         ))
+        fixture.context.insert(AllocationSettlement(
+            date: date(2026, 4, 20),
+            note: "April payment",
+            amount: -333,
+            workspace: fixture.workspace,
+            account: shared,
+            expense: aprilDinner
+        ))
         try fixture.context.save()
 
         let executor = MarinaWorkspaceAggregationExecutor(calendar: Calendar(identifier: .gregorian))
-        let card = handledCard(executor.execute(
+        let currentPeriod = handledCard(executor.execute(
             plan: MarinaAggregationPlan(
                 operation: .lookupDetails,
                 measure: .reconciliationBalance,
@@ -879,10 +912,91 @@ struct MarinaAggregationExecutorTests {
             now: date(2026, 5, 15)
         ))
 
-        #expect(card.title == "Roommate Balance")
-        #expect(card.primaryValue?.filter(\.isNumber).contains("40") == true)
-        #expect(card.rows.map(\.label).contains("Roommate"))
-        #expect(card.traceSummary.contains("sharedBalances"))
+        #expect(currentPeriod.title == "Roommate Balance")
+        #expect(currentPeriod.primaryValue?.filter(\.isNumber).contains("40") == true)
+        #expect(currentPeriod.rows.map(\.label).contains("Roommate"))
+        #expect(currentPeriod.traceSummary.contains("sharedBalances"))
+
+        let april = handledCard(executor.execute(
+            plan: MarinaAggregationPlan(
+                operation: .lookupDetails,
+                measure: .reconciliationBalance,
+                targets: [target(.allocationAccount, "Roommate", sourceID: shared.id)],
+                dateRange: HomeQueryDateRange(startDate: date(2026, 4, 1), endDate: date(2026, 4, 30))
+            ),
+            provider: fixture.provider,
+            now: date(2026, 5, 15)
+        ))
+
+        #expect(april.primaryValue?.filter(\.isNumber).contains("666") == true)
+    }
+
+    @Test func workspaceAggregationExecutor_cardBalanceReturnsCurrentPeriodSpend() throws {
+        let fixture = try makeFixture()
+        fixture.context.insert(VariableExpense(
+            descriptionText: "May coffee",
+            amount: 42,
+            transactionDate: date(2026, 5, 5),
+            workspace: fixture.workspace,
+            card: fixture.appleCard,
+            category: fixture.groceries
+        ))
+        fixture.context.insert(PlannedExpense(
+            title: "May planned",
+            plannedAmount: 100,
+            expenseDate: date(2026, 5, 10),
+            workspace: fixture.workspace,
+            card: fixture.appleCard,
+            category: fixture.groceries
+        ))
+        fixture.context.insert(VariableExpense(
+            descriptionText: "April coffee",
+            amount: 900,
+            transactionDate: date(2026, 4, 5),
+            workspace: fixture.workspace,
+            card: fixture.appleCard,
+            category: fixture.groceries
+        ))
+        fixture.context.insert(PlannedExpense(
+            title: "Backup planned",
+            plannedAmount: 500,
+            expenseDate: date(2026, 5, 10),
+            workspace: fixture.workspace,
+            card: fixture.backupCard,
+            category: fixture.groceries
+        ))
+        try fixture.context.save()
+
+        let routeIntent = MarinaRouteIntent(
+            kind: .broadSpend,
+            subject: .cards,
+            operation: .lookupDetails,
+            measure: .spend,
+            grouping: nil,
+            targetTypes: [.card],
+            requestedDetail: .balance,
+            responseShape: .summaryCard,
+            preferredExecutorRoute: .workspaceAggregation
+        )
+        let card = handledCard(MarinaWorkspaceAggregationExecutor(calendar: Calendar(identifier: .gregorian)).execute(
+            plan: MarinaAggregationPlan(
+                operation: .lookupDetails,
+                measure: .spend,
+                targets: [target(.card, "Apple Card", sourceID: fixture.appleCard.id)],
+                dateRange: monthRange(),
+                routeIntent: routeIntent
+            ),
+            provider: fixture.provider,
+            now: date(2026, 5, 15)
+        ))
+
+        #expect(card.title == "Apple Card Balance")
+        #expect(card.subtitle != nil)
+        #expect(card.primaryValue?.filter(\.isNumber).contains("142") == true)
+        #expect(card.rows.contains(where: { $0.label == "Variable ledger activity" && $0.amount == 42 }))
+        #expect(card.rows.contains(where: { $0.label == "Planned card rows" && $0.amount == 100 }))
+        #expect(card.rows.contains(where: { $0.label == "Current-period card spend" && $0.amount == 142 }))
+        #expect(card.traceSummary.contains("cardBalance"))
     }
 
     private func executable(_ plan: MarinaAggregationPlan) throws -> MarinaExecutableAggregationPlan {

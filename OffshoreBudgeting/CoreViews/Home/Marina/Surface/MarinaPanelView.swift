@@ -556,7 +556,11 @@ struct MarinaPanelView: View {
                     promptPrefix: "User prompt:"
                 )
                 provider.prewarm(
-                    instructions: "Prompt version: \(MarinaFoundationPromptVersion.interpretation.rawValue)\nExtract coarse Marina budgeting language for deterministic Offshore execution.",
+                    instructions: """
+                    Prompt version: \(MarinaFoundationPromptVersion.interpretation.rawValue)
+                    Extract coarse Marina budgeting language for deterministic Offshore execution.
+                    \(MarinaFoundationSafetyPolicy.interpretationInstructions)
+                    """,
                     promptPrefix: "User prompt:"
                 )
             }
@@ -2054,11 +2058,17 @@ struct MarinaPanelView: View {
             followUpSuggestions: deterministicFollowUps
         )
 
-        if let homeQueryPlan, let query {
-            updateSessionContext(after: homeQueryPlan)
+        let memoryPlan = homeQueryPlan ?? inferredSessionMemoryPlan(
+            rawPrompt: rawPrompt,
+            presentedAnswer: presentationAnswer,
+            aggregationResult: aggregationResult
+        )
+        if let memoryPlan {
+            let memoryQuery = query ?? memoryPlan.query
+            updateSessionContext(after: memoryPlan)
             rememberAnswerContext(
-                for: query,
-                executedPlan: homeQueryPlan,
+                for: memoryQuery,
+                executedPlan: memoryPlan,
                 rawAnswer: presentationAnswer,
                 aggregationResult: aggregationResult,
                 presentedAnswer: surfaced.answer,
@@ -5952,6 +5962,53 @@ struct MarinaPanelView: View {
         if sessionContext.recentAnswerContexts.count > 3 {
             sessionContext.recentAnswerContexts = Array(sessionContext.recentAnswerContexts.suffix(3))
         }
+    }
+
+    private func inferredSessionMemoryPlan(
+        rawPrompt: String,
+        presentedAnswer: HomeAnswer,
+        aggregationResult: MarinaAggregationResult?
+    ) -> HomeQueryPlan? {
+        let normalized = normalizedPrompt(rawPrompt)
+        guard isTopCategoryMemoryPrompt(normalized, answer: presentedAnswer, aggregationResult: aggregationResult) else {
+            return nil
+        }
+        let rowCount = answerContextRows(
+            from: aggregationResult,
+            sourceRows: presentedAnswer.rows
+        ).count
+        return HomeQueryPlan(
+            metric: .topCategories,
+            dateRange: normalized.contains("last month")
+                ? previousMonthRange(from: marinaRuntimeSettings.now)
+                : monthRange(containing: marinaRuntimeSettings.now),
+            resultLimit: max(1, min(rowCount, 5)),
+            confidenceBand: .high,
+            periodUnit: .month
+        )
+    }
+
+    private func isTopCategoryMemoryPrompt(
+        _ normalizedPrompt: String,
+        answer: HomeAnswer,
+        aggregationResult: MarinaAggregationResult?
+    ) -> Bool {
+        let hasRows = answerContextRows(
+            from: aggregationResult,
+            sourceRows: answer.rows
+        ).isEmpty == false
+        guard hasRows else { return false }
+        if normalizedPrompt.contains("where did my money go") {
+            return true
+        }
+        if normalizedPrompt.contains("category") || normalizedPrompt.contains("categories") {
+            return normalizedPrompt.contains("top")
+                || normalizedPrompt.contains("highest")
+                || normalizedPrompt.contains("largest")
+                || normalizedPrompt.contains("biggest")
+                || normalizedPrompt.contains("most")
+        }
+        return false
     }
 
     private struct AssistantAnswerContextRow {

@@ -7,6 +7,30 @@ protocol MarinaCanonicalAIInterpreting {
     ) async throws -> MarinaCanonicalReadInterpretation
 }
 
+struct MarinaLegacyCanonicalTurnIntentAdapter: MarinaTurnIntentInterpreting {
+    private let canonicalInterpreter: MarinaCanonicalAIInterpreting
+
+    init(_ canonicalInterpreter: MarinaCanonicalAIInterpreting) {
+        self.canonicalInterpreter = canonicalInterpreter
+    }
+
+    func interpretTurnIntent(
+        prompt: String,
+        context: MarinaInterpretationContext
+    ) async throws -> MarinaTurnInterpretation {
+        let canonical = try await canonicalInterpreter.interpretCanonical(
+            prompt: prompt,
+            context: context
+        )
+        return MarinaTurnInterpretation(
+            result: canonical.result,
+            compatibilityCandidate: canonical.compatibilityCandidate,
+            repairSummary: canonical.repairSummary,
+            generatedSchemaName: "legacyCanonicalAdapter"
+        )
+    }
+}
+
 struct MarinaFoundationAIInterpreter: MarinaCanonicalAIInterpreting {
     private let aiInterpreter: MarinaAIInterpreter
     private let foundationContractInterpreter = MarinaFoundationModelsInterpreter()
@@ -200,7 +224,7 @@ enum MarinaTurnResult {
 @MainActor
 struct MarinaTurnCoordinator {
     private let availability: MarinaModelAvailabilityProviding
-    private let interpreter: MarinaCanonicalAIInterpreting
+    private let interpreter: MarinaTurnIntentInterpreting
     private let resolver: MarinaQueryResolver
     private let validator: MarinaQueryValidator
     private let queryExecutor: MarinaQueryExecutor
@@ -213,17 +237,23 @@ struct MarinaTurnCoordinator {
     private let metricContractResolver = MarinaMetricContractResolver()
     private let metricContractResponseBuilder = MarinaMetricContractResponseBuilder()
     private let metricFormulaExecutor = MarinaMetricFormulaExecutor()
+    private let answerPlanner = MarinaAnswerPlanner()
+    private let universalQueryExecutor = MarinaUniversalQueryExecutor()
+    private let canonicalQueryRewriter = MarinaCanonicalQueryRewriter()
 
     init(
         availability: MarinaModelAvailabilityProviding? = nil,
         interpreter: MarinaCanonicalAIInterpreting? = nil,
+        turnInterpreter: MarinaTurnIntentInterpreting? = nil,
         resolver: MarinaQueryResolver? = nil,
         validator: MarinaQueryValidator? = nil,
         queryExecutor: MarinaQueryExecutor? = nil,
         responseBuilder: MarinaResponseBuilder? = nil
     ) {
         self.availability = availability ?? MarinaModelAvailability()
-        self.interpreter = interpreter ?? MarinaFoundationAIInterpreter()
+        self.interpreter = turnInterpreter
+            ?? interpreter.map(MarinaLegacyCanonicalTurnIntentAdapter.init)
+            ?? MarinaFoundationTurnIntentService()
         self.resolver = resolver ?? MarinaQueryResolver()
         self.validator = validator ?? MarinaQueryValidator()
         self.queryExecutor = queryExecutor ?? MarinaQueryExecutor(
@@ -241,14 +271,6 @@ struct MarinaTurnCoordinator {
         prompt: String,
         context: MarinaTurnContext
     ) async -> MarinaTurnResult {
-        if let typedIntent = Self.deterministicContextIntent(from: prompt) {
-            return await run(
-                typedIntent: typedIntent,
-                sourceTitle: prompt,
-                context: context
-            )
-        }
-
         guard context.aiEnabled else {
             MarinaFoundationTraceBridge.recordUnavailable(context: context, reason: "ai_opt_out")
             return .unavailable(Self.unavailableAnswer(
@@ -271,51 +293,32 @@ struct MarinaTurnCoordinator {
         }
 
         do {
-            let rawInterpretation = try await interpreter.interpretCanonical(
+            let interpretation = try await interpreter.interpretTurnIntent(
                 prompt: prompt,
                 context: context.routerContext
             )
-            let explicitConstraints = MarinaExplicitConstraintDetector().constraints(
-                in: prompt,
-                context: context.routerContext
-            )
-            let contractInterpretation = semanticContractResolver.resolve(
-                prompt: prompt,
-                context: context,
-                priorInterpretation: rawInterpretation
-            )
-            let interpretation = canonicalizedInterpretation(
-                contractInterpretation ?? rawInterpretation,
-                explicitConstraints: explicitConstraints,
-                now: context.now,
-                defaultPeriodUnit: context.defaultPeriodUnit
-            )
-            return evaluate(
+            return evaluateLinear(
                 interpretation,
+                prompt: prompt,
                 context: context,
-                explicitConstraints: explicitConstraints
+                allowSingleChoiceAutoResolve: true
             )
         } catch {
             MarinaDebugLogger.log("Marina AI interpretation failed prompt='\(prompt)' error=\(error)")
             let diagnostic = Self.foundationDiagnostic(from: error)
-            let explicitConstraints = MarinaExplicitConstraintDetector().constraints(
-                in: prompt,
-                context: context.routerContext
-            )
-            if let contractInterpretation = semanticContractResolver.resolve(
+            if diagnostic.category == .malformedResponse,
+               let deterministicInterpretation = malformedFoundationRecoveryInterpretation(
                 prompt: prompt,
+                interpretation: nil,
+                candidate: nil,
                 context: context,
-                failureDiagnostic: diagnostic
-            ) {
-                return evaluate(
-                    canonicalizedInterpretation(
-                        contractInterpretation,
-                        explicitConstraints: explicitConstraints,
-                        now: context.now,
-                        defaultPeriodUnit: context.defaultPeriodUnit
-                    ),
+                diagnostic: diagnostic
+               ) {
+                return evaluateLinear(
+                    deterministicInterpretation,
+                    prompt: prompt,
                     context: context,
-                    explicitConstraints: explicitConstraints
+                    allowSingleChoiceAutoResolve: true
                 )
             }
             MarinaTraceRecorder.shared.recordFoundationModelsFailure(diagnostic)
@@ -629,26 +632,894 @@ struct MarinaTurnCoordinator {
         )
     }
 
-    private static func deterministicContextIntent(from prompt: String) -> MarinaCanonicalTypedIntent? {
-        let normalized = prompt
-            .lowercased()
-            .replacingOccurrences(of: "[^a-z0-9\\s&]", with: " ", options: .regularExpression)
-            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        guard normalized.isEmpty == false else { return nil }
+    private func evaluateLinear(
+        _ interpretation: MarinaTurnInterpretation,
+        prompt: String,
+        context: MarinaTurnContext,
+        allowSingleChoiceAutoResolve: Bool = true
+    ) -> MarinaTurnResult {
+        let candidate = compatibilityCandidate(
+            for: interpretation,
+            prompt: prompt
+        )
+        if interpretation.generatedSchemaName == "legacyCanonicalAdapter" {
+            let legacyInterpretation = MarinaCanonicalReadInterpretation(
+                result: interpretation.result,
+                compatibilityCandidate: candidate,
+                repairSummary: interpretation.repairSummary
+            )
+            if let contractInterpretation = semanticContractResolver.resolve(
+                prompt: prompt,
+                context: context,
+                priorInterpretation: legacyInterpretation
+            ) {
+                return evaluateLinear(
+                    MarinaTurnInterpretation(
+                        result: contractInterpretation.result,
+                        compatibilityCandidate: contractInterpretation.compatibilityCandidate,
+                        repairSummary: contractInterpretation.repairSummary,
+                        generatedSchemaName: "legacyContractAdapter"
+                    ),
+                    prompt: prompt,
+                    context: context,
+                    allowSingleChoiceAutoResolve: allowSingleChoiceAutoResolve
+                )
+            }
+        }
+        if isMalformedTokenizedReadRequest(interpretation) {
+            let diagnostic = MarinaFoundationModelsFailureDiagnostic(
+                category: .malformedResponse,
+                step: .typedEnvelope,
+                debugSummary: "tokenizedReadRequest:malformed"
+            )
+            if let recoveredInterpretation = malformedFoundationRecoveryInterpretation(
+                prompt: prompt,
+                interpretation: interpretation,
+                candidate: candidate,
+                context: context,
+                diagnostic: diagnostic
+            ) {
+                return evaluateLinear(
+                    recoveredInterpretation,
+                    prompt: prompt,
+                    context: context,
+                    allowSingleChoiceAutoResolve: allowSingleChoiceAutoResolve
+                )
+            }
+            MarinaTraceRecorder.shared.recordFoundationModelsFailure(diagnostic)
+            MarinaFoundationTraceBridge.recordFoundationFailure(context: context, diagnostic: diagnostic)
+            return .blocked(
+                answer: Self.foundationFailureAnswer(prompt: prompt, diagnostic: diagnostic),
+                validationOutcome: nil
+            )
+        }
+        let isTokenizedReadRequest = isTokenizedReadRequest(interpretation)
+        if isTokenizedReadRequest == false,
+           interpretation.generatedSchemaName != "legacyCanonicalAdapter",
+           shouldAttemptCanonicalRewrite(interpretation),
+           let canonicalInterpretation = canonicalQueryRewriter.rewrite(
+            prompt: prompt,
+            interpretation: interpretation,
+            candidate: candidate,
+            context: context
+        ) {
+            return evaluateLinear(
+                preservingInterpreterSource(
+                    in: canonicalInterpretation,
+                    originalSource: candidate.source
+                ),
+                prompt: prompt,
+                context: context,
+                allowSingleChoiceAutoResolve: allowSingleChoiceAutoResolve
+            )
+        }
+        let traceInterpretation = MarinaCanonicalReadInterpretation(
+            result: interpretation.result,
+            compatibilityCandidate: candidate,
+            repairSummary: interpretation.repairSummary
+        )
+        let isLegacyAdapter = interpretation.generatedSchemaName.hasPrefix("legacy")
+        let resolved = resolver.resolve(
+            candidate: candidate,
+            provider: context.provider,
+            now: context.now,
+            defaultPeriodUnit: context.defaultPeriodUnit
+        )
 
-        if normalized.contains("active budget")
-            || normalized.contains("current budget")
-            || (normalized.contains("active") && normalized.contains("budget")) {
-            return .activeBudgetStatus
+        let semanticResolved: MarinaResolvedSemanticQuery?
+        let outcome: MarinaPlanValidationOutcome
+
+        switch interpretation.result {
+        case .query(let query):
+            let resolvedQuery = resolver.resolve(
+                query: query,
+                provider: context.provider,
+                candidate: candidate,
+                now: context.now,
+                defaultPeriodUnit: context.defaultPeriodUnit
+            )
+            semanticResolved = resolvedQuery
+            outcome = validator.validate(resolvedQuery)
+        case .clarification(let clarification):
+            semanticResolved = nil
+            outcome = .clarification(clarification)
+        case .unsupported(let unsupported):
+            semanticResolved = nil
+            outcome = .unsupported(unsupported)
         }
 
-        if normalized.contains("workspace am i in")
-            || normalized.contains("current workspace")
-            || normalized.contains("which workspace")
-            || normalized == "what workspace"
-            || normalized.hasPrefix("what workspace ") {
-            return .currentWorkspace
+        if isTokenizedReadRequest,
+           let universalQuery = candidate.universalQuery,
+           isSimpleUniversalRead(universalQuery),
+           case .clarification = outcome {
+            // The tokenized path still lets Swift resolution stop for ambiguous or missing targets.
+        } else if isTokenizedReadRequest,
+                  let universalQuery = candidate.universalQuery,
+                  isSimpleUniversalRead(universalQuery) {
+            if let preflight = tokenizedUniversalPreflightResult(
+                traceInterpretation: traceInterpretation,
+                candidate: candidate,
+                resolved: resolved,
+                semanticResolved: semanticResolved,
+                context: context
+            ) {
+                return preflight
+            }
+            return evaluateUniversal(
+                universalQuery,
+                reason: "tokenizedReadRequest:universal",
+                traceInterpretation: traceInterpretation,
+                candidate: candidate,
+                resolved: resolved,
+                context: context,
+                includeTokenizedEvidence: true
+            )
+        }
+
+        let metricContractResolution = semanticMetricContractResolution(
+            candidate: candidate,
+            resolved: resolved,
+            semanticResolved: semanticResolved,
+            outcome: outcome
+        ) ?? metricContractResolver.resolve(
+            candidate: candidate,
+            resolved: resolved,
+            semanticResolved: semanticResolved,
+            outcome: outcome
+        )
+
+        if let metricContractResolution {
+            switch metricFormulaExecutor.execute(
+                contract: metricContractResolution.contract,
+                candidate: candidate,
+                resolved: resolved,
+                semanticResolved: semanticResolved,
+                context: context
+            ) {
+            case .handled(let card, let amountBasis, let route):
+                let execution = MarinaQueryExecution(
+                    executablePlan: nil,
+                    aggregationResult: .workspaceCard(card),
+                    databaseLookupResponse: nil,
+                    workspaceAggregationCard: card,
+                    amountBasis: amountBasis,
+                    executionRoute: route
+                )
+                let answer = answerWithEvidence(
+                    responseBuilder.responseCompatibleAnswer(from: execution.aggregationResult),
+                    execution: execution,
+                    resolved: resolved,
+                    semanticResolved: semanticResolved,
+                    metricContract: metricContractResolution.contract
+                )
+                MarinaFoundationTraceBridge.record(
+                    context: context,
+                    interpretation: traceInterpretation,
+                    resolved: resolved,
+                    semanticResolved: semanticResolved,
+                    validationOutcome: outcome,
+                    execution: execution
+                )
+                return .handled(
+                    answer: answer,
+                    aggregationResult: execution.aggregationResult,
+                    homeQueryPlan: nil,
+                    amountBasis: execution.amountBasis,
+                    executionRoute: execution.executionRoute
+                )
+            case .blocked(let answer, let unsupported):
+                let blockedOutcome = MarinaPlanValidationOutcome.unsupported(unsupported)
+                MarinaFoundationTraceBridge.record(
+                    context: context,
+                    interpretation: traceInterpretation,
+                    resolved: resolved,
+                    semanticResolved: semanticResolved,
+                    validationOutcome: blockedOutcome,
+                    execution: nil
+                )
+                return .blocked(answer: answer, validationOutcome: blockedOutcome)
+            case .notHandled:
+                if metricContractResolution.isDirectFormulaSummon {
+                    let answer = metricContractResponseBuilder.summonedFormulaAnswer(
+                        contract: metricContractResolution.contract,
+                        candidate: candidate
+                    )
+                    let unsupported = metricContractResponseBuilder.summonedFormulaUnsupportedResponse(
+                        contract: metricContractResolution.contract,
+                        candidate: candidate
+                    )
+                    let blockedOutcome = MarinaPlanValidationOutcome.unsupported(unsupported)
+                    MarinaFoundationTraceBridge.record(
+                        context: context,
+                        interpretation: traceInterpretation,
+                        resolved: resolved,
+                        semanticResolved: semanticResolved,
+                        validationOutcome: blockedOutcome,
+                        execution: nil
+                    )
+                    return .blocked(answer: answer, validationOutcome: blockedOutcome)
+                }
+                break
+            }
+        }
+
+        if let metricContractResolution,
+           metricContractResolution.shouldBlockExecution {
+            let blocked = metricContractResponseBuilder.unsupportedResponse(
+                contract: metricContractResolution.contract,
+                candidate: candidate
+            )
+            let blockedOutcome = MarinaPlanValidationOutcome.unsupported(blocked)
+            MarinaFoundationTraceBridge.record(
+                context: context,
+                interpretation: traceInterpretation,
+                resolved: resolved,
+                semanticResolved: semanticResolved,
+                validationOutcome: blockedOutcome,
+                execution: nil
+            )
+            return .blocked(
+                answer: metricContractResponseBuilder.unsupportedAnswer(
+                    contract: metricContractResolution.contract,
+                    candidate: candidate
+                ),
+                validationOutcome: blockedOutcome
+            )
+        }
+
+        if isTokenizedReadRequest == false,
+           let composite = compositePlanner.plan(
+            candidate: candidate,
+            resolved: resolved,
+            semanticResolved: semanticResolved,
+            outcome: outcome,
+            context: context
+           ) {
+            switch composite {
+            case .handled(let card):
+                let execution = MarinaQueryExecution(
+                    executablePlan: nil,
+                    aggregationResult: .workspaceCard(card),
+                    databaseLookupResponse: nil,
+                    workspaceAggregationCard: card,
+                    amountBasis: .budgetImpact,
+                    executionRoute: .scenario
+                )
+                let answer = answerWithEvidence(
+                    responseBuilder.responseCompatibleAnswer(from: execution.aggregationResult),
+                    execution: execution,
+                    resolved: resolved,
+                    semanticResolved: semanticResolved,
+                    metricContract: metricContractResolution?.contract
+                )
+                MarinaFoundationTraceBridge.record(
+                    context: context,
+                    interpretation: traceInterpretation,
+                    resolved: resolved,
+                    semanticResolved: semanticResolved,
+                    validationOutcome: outcome,
+                    execution: execution
+                )
+                return .handled(
+                    answer: answer,
+                    aggregationResult: execution.aggregationResult,
+                    homeQueryPlan: nil,
+                    amountBasis: execution.amountBasis,
+                    executionRoute: execution.executionRoute
+                )
+            case .clarification(let clarification):
+                let clarificationOutcome = MarinaPlanValidationOutcome.clarification(clarification)
+                MarinaFoundationTraceBridge.record(
+                    context: context,
+                    interpretation: traceInterpretation,
+                    resolved: resolved,
+                    semanticResolved: semanticResolved,
+                    validationOutcome: clarificationOutcome,
+                    execution: nil
+                )
+                return .clarification(
+                    answer: responseBuilder.aggregationBridge.responseCompatibleAnswer(from: clarification),
+                    clarification: clarification
+                )
+            }
+        }
+
+        if isLegacyAdapter,
+           case .unsupported = outcome,
+           let clarification = conversationalPlanner.clarification(
+            candidate: candidate,
+            outcome: outcome,
+            context: context,
+            explicitConstraints: MarinaExplicitConstraintDetector().constraints(
+                in: prompt,
+                context: context.routerContext
+            )
+           ) {
+            let clarificationOutcome = MarinaPlanValidationOutcome.clarification(clarification)
+            MarinaFoundationTraceBridge.record(
+                context: context,
+                interpretation: traceInterpretation,
+                resolved: resolved,
+                semanticResolved: semanticResolved,
+                validationOutcome: clarificationOutcome,
+                execution: nil
+            )
+            return .clarification(
+                answer: responseBuilder.aggregationBridge.responseCompatibleAnswer(from: clarification),
+                clarification: clarification
+            )
+        }
+
+        if isTokenizedReadRequest == false {
+            switch answerPlanner.plan(
+                prompt: prompt,
+                interpretation: interpretation,
+                candidate: candidate,
+                outcome: outcome,
+                context: context
+            ) {
+            case .execute(.universal(let universalQuery), metadata: _, reason: let reason):
+                return evaluateUniversal(
+                    universalQuery,
+                    reason: reason,
+                    traceInterpretation: traceInterpretation,
+                    candidate: candidate,
+                    resolved: resolved,
+                    context: context
+                )
+            case .execute(.formula(let formulaIR), metadata: _, reason: _):
+                let card = MarinaFormulaExecutor().execute(
+                    formulaIR: formulaIR,
+                    candidate: candidate,
+                    resolved: resolved,
+                    semanticResolved: semanticResolved,
+                    context: context
+                )
+                let execution = MarinaQueryExecution(
+                    executablePlan: nil,
+                    aggregationResult: .workspaceCard(card),
+                    databaseLookupResponse: nil,
+                    workspaceAggregationCard: card,
+                    amountBasis: .budgetImpact,
+                    executionRoute: .scenario
+                )
+                let answer = answerWithEvidence(
+                    responseBuilder.responseCompatibleAnswer(from: execution.aggregationResult),
+                    execution: execution,
+                    resolved: resolved,
+                    semanticResolved: semanticResolved,
+                    metricContract: nil
+                )
+                MarinaFoundationTraceBridge.record(
+                    context: context,
+                    interpretation: traceInterpretation,
+                    resolved: resolved,
+                    semanticResolved: semanticResolved,
+                    validationOutcome: outcome,
+                    execution: execution
+                )
+                return .handled(
+                    answer: answer,
+                    aggregationResult: execution.aggregationResult,
+                    homeQueryPlan: nil,
+                    amountBasis: execution.amountBasis,
+                    executionRoute: execution.executionRoute
+                )
+            case .clarify, .refuse, .original:
+                break
+            }
+        }
+
+        switch outcome {
+        case .clarification(let clarification):
+            let actionableChoices = clarification.actionableChoices
+            if allowSingleChoiceAutoResolve,
+               actionableChoices.count == 1,
+               let choice = actionableChoices.first,
+               isResolverBacked(choice),
+               let resumedInterpretation = interpretationByApplying(
+                choice: choice,
+                to: clarification,
+                context: context
+               ) {
+                let resumedResult = evaluateLinear(
+                    MarinaTurnInterpretation(
+                        result: resumedInterpretation.result,
+                        compatibilityCandidate: resumedInterpretation.compatibilityCandidate,
+                        repairSummary: resumedInterpretation.repairSummary,
+                        generatedSchemaName: interpretation.generatedSchemaName
+                    ),
+                    prompt: prompt,
+                    context: context,
+                    allowSingleChoiceAutoResolve: false
+                )
+                if case .handled = resumedResult {
+                    return resumedResult
+                }
+            }
+
+            MarinaFoundationTraceBridge.record(
+                context: context,
+                interpretation: traceInterpretation,
+                resolved: resolved,
+                semanticResolved: semanticResolved,
+                validationOutcome: outcome,
+                execution: nil
+            )
+            guard actionableChoices.count > 1 else {
+                return .blocked(
+                    answer: Self.malformedClarificationAnswer(
+                        prompt: candidate.rawPrompt,
+                        clarification: clarification
+                    ),
+                    validationOutcome: outcome
+                )
+            }
+            return .clarification(
+                answer: responseBuilder.aggregationBridge.responseCompatibleAnswer(from: clarification),
+                clarification: clarification
+            )
+        case .unsupported:
+            MarinaFoundationTraceBridge.record(
+                context: context,
+                interpretation: traceInterpretation,
+                resolved: resolved,
+                semanticResolved: semanticResolved,
+                validationOutcome: outcome,
+                execution: nil
+            )
+            return .blocked(
+                answer: responseBuilder.responseCompatibleAnswer(from: outcome) ?? Self.blockedAnswer(
+                    prompt: candidate.rawPrompt,
+                    title: "Marina cannot run that yet",
+                    message: "That request is outside Marina's safe read model."
+                ),
+                validationOutcome: outcome
+            )
+        case .executable:
+            switch queryExecutor.execute(
+                candidate: candidate,
+                resolved: resolved,
+                semanticResolved: semanticResolved,
+                validationOutcome: outcome,
+                provider: context.provider,
+                now: context.now
+            ) {
+            case .handled(let execution):
+                let baseAnswer = execution.databaseLookupResponse.map {
+                    MarinaDatabaseLookupResponseBuilder().responseCompatibleAnswer(from: $0)
+                } ?? responseBuilder.responseCompatibleAnswer(from: execution.aggregationResult)
+                let answer = answerWithEvidence(
+                    baseAnswer,
+                    execution: execution,
+                    resolved: resolved,
+                    semanticResolved: semanticResolved,
+                    metricContract: metricContractResolution?.contract
+                )
+                MarinaFoundationTraceBridge.record(
+                    context: context,
+                    interpretation: traceInterpretation,
+                    resolved: resolved,
+                    semanticResolved: semanticResolved,
+                    validationOutcome: outcome,
+                    execution: execution
+                )
+                return .handled(
+                    answer: answer,
+                    aggregationResult: execution.aggregationResult,
+                    homeQueryPlan: execution.executablePlan?.homeQueryPlan,
+                    amountBasis: execution.amountBasis,
+                    executionRoute: execution.executionRoute
+                )
+            case .unsupported(let unsupported):
+                let blockedOutcome = MarinaPlanValidationOutcome.unsupported(unsupported)
+                MarinaFoundationTraceBridge.record(
+                    context: context,
+                    interpretation: traceInterpretation,
+                    resolved: resolved,
+                    semanticResolved: semanticResolved,
+                    validationOutcome: blockedOutcome,
+                    execution: nil
+                )
+                return .blocked(
+                    answer: responseBuilder.responseCompatibleAnswer(from: blockedOutcome) ?? Self.blockedAnswer(
+                        prompt: candidate.rawPrompt,
+                        title: "Marina cannot run that yet",
+                        message: unsupported.message
+                    ),
+                    validationOutcome: blockedOutcome
+                )
+            }
+        }
+    }
+
+    private func tokenizedUniversalPreflightResult(
+        traceInterpretation: MarinaCanonicalReadInterpretation,
+        candidate: MarinaQueryPlanCandidate,
+        resolved: MarinaResolvedQueryCandidate,
+        semanticResolved: MarinaResolvedSemanticQuery?,
+        context: MarinaTurnContext
+    ) -> MarinaTurnResult? {
+        let outcome: MarinaPlanValidationOutcome?
+        if candidate.confidence == .low {
+            outcome = .unsupported(
+                MarinaTypedUnsupportedResponse(
+                    kind: .unsupportedCombination,
+                    message: "That query is too uncertain to validate safely.",
+                    candidate: candidate
+                )
+            )
+        } else if let mutationViolation = MarinaRoutePatternRegistry.isReadOnlyStep5Mutation(candidate.rawPrompt) {
+            outcome = .unsupported(
+                MarinaTypedUnsupportedResponse(
+                    kind: .unsupportedOperation,
+                    message: mutationViolation.message,
+                    candidate: candidate
+                )
+            )
+        } else if let ambiguous = resolved.ambiguousMentions.first {
+            outcome = .clarification(
+                MarinaTypedClarification(
+                    kind: .ambiguousTarget,
+                    message: "I found multiple possible matches for that target.",
+                    candidate: candidate,
+                    patchSlot: .target,
+                    choices: ambiguous.choices
+                )
+            )
+        } else if let unresolved = resolved.unresolvedMentions.first {
+            outcome = .clarification(
+                MarinaTypedClarification(
+                    kind: .missingTarget,
+                    message: "I couldn't safely resolve that target.",
+                    candidate: candidate,
+                    patchSlot: .target,
+                    choices: [
+                        MarinaClarificationChoice(
+                            title: unresolved.rawText ?? "Target",
+                            entityRole: unresolved.role,
+                            entityTypeHint: unresolved.typeHint,
+                            patchSlot: .target,
+                            rawValue: unresolved.rawText,
+                            mentionID: unresolved.id
+                        )
+                    ]
+                )
+            )
+        } else {
+            outcome = nil
+        }
+
+        guard let outcome else { return nil }
+        MarinaFoundationTraceBridge.record(
+            context: context,
+            interpretation: traceInterpretation,
+            resolved: resolved,
+            semanticResolved: semanticResolved,
+            validationOutcome: outcome,
+            execution: nil
+        )
+
+        switch outcome {
+        case .clarification(let clarification):
+            return .clarification(
+                answer: responseBuilder.aggregationBridge.responseCompatibleAnswer(from: clarification),
+                clarification: clarification
+            )
+        case .unsupported(let unsupported):
+            return .blocked(
+                answer: responseBuilder.responseCompatibleAnswer(from: outcome) ?? Self.blockedAnswer(
+                    prompt: candidate.rawPrompt,
+                    title: "Marina cannot run that yet",
+                    message: unsupported.message
+                ),
+                validationOutcome: outcome
+            )
+        case .executable:
+            return nil
+        }
+    }
+
+    private func isSimpleUniversalRead(_ query: MarinaUniversalQueryIR) -> Bool {
+        switch query.operation {
+        case .lookup, .list, .count, .detail:
+            return true
+        case .sum, .average, .minimum, .maximum, .rank, .groupBreakdown, .compare, .simulate:
+            return false
+        }
+    }
+
+    private func isTokenizedReadRequest(_ interpretation: MarinaTurnInterpretation) -> Bool {
+        interpretation.generatedSchemaName == MarinaFoundationLiveContractRegistry.liveGeneratedSchemaName
+            && interpretation.repairSummary?.contains("tokenizedReadRequest") == true
+            && isMalformedTokenizedReadRequest(interpretation) == false
+    }
+
+    private func isMalformedTokenizedReadRequest(_ interpretation: MarinaTurnInterpretation) -> Bool {
+        interpretation.generatedSchemaName == MarinaFoundationLiveContractRegistry.liveGeneratedSchemaName
+            && interpretation.repairSummary?.contains("tokenizedReadRequest:malformed") == true
+    }
+
+    private func shouldAttemptCanonicalRewrite(_ interpretation: MarinaTurnInterpretation) -> Bool {
+        switch interpretation.result {
+        case .query:
+            return false
+        case .clarification, .unsupported:
+            return true
+        }
+    }
+
+    private func malformedFoundationRecoveryInterpretation(
+        prompt: String,
+        interpretation: MarinaTurnInterpretation?,
+        candidate: MarinaQueryPlanCandidate?,
+        context: MarinaTurnContext,
+        diagnostic: MarinaFoundationModelsFailureDiagnostic
+    ) -> MarinaTurnInterpretation? {
+        let priorInterpretation = interpretation.map {
+            MarinaCanonicalReadInterpretation(
+                result: $0.result,
+                compatibilityCandidate: candidate ?? compatibilityCandidate(for: $0, prompt: prompt),
+                repairSummary: $0.repairSummary
+            )
+        }
+
+        if let contractInterpretation = semanticContractResolver.resolve(
+            prompt: prompt,
+            context: context,
+            priorInterpretation: priorInterpretation,
+            failureDiagnostic: diagnostic
+        ) {
+            return MarinaTurnInterpretation(
+                result: contractInterpretation.result,
+                compatibilityCandidate: contractInterpretation.compatibilityCandidate,
+                repairSummary: malformedFoundationRecoverySummary(
+                    original: interpretation?.repairSummary,
+                    recovery: contractInterpretation.repairSummary,
+                    diagnostic: diagnostic
+                ),
+                generatedSchemaName: "malformedTokenizedContractRecovery"
+            )
+        }
+
+        guard let deterministicInterpretation = canonicalQueryRewriter.deterministicInterpretation(
+            prompt: prompt,
+            context: context
+        ) else {
+            return nil
+        }
+
+        return preservingInterpreterSource(
+            in: MarinaTurnInterpretation(
+                result: deterministicInterpretation.result,
+                compatibilityCandidate: deterministicInterpretation.compatibilityCandidate,
+                repairSummary: malformedFoundationRecoverySummary(
+                    original: interpretation?.repairSummary,
+                    recovery: deterministicInterpretation.repairSummary,
+                    diagnostic: diagnostic
+                ),
+                generatedSchemaName: "malformedTokenizedCanonicalRecovery"
+            ),
+            originalSource: .foundationModels
+        )
+    }
+
+    private func malformedFoundationRecoverySummary(
+        original: String?,
+        recovery: String?,
+        diagnostic: MarinaFoundationModelsFailureDiagnostic
+    ) -> String {
+        [
+            nonBlank(original),
+            "foundationFailure=\(diagnostic.category.rawValue)",
+            "foundationStep=\(diagnostic.step.rawValue)",
+            nonBlank(recovery)
+        ]
+        .compactMap { $0 }
+        .joined(separator: ";")
+    }
+
+    private func nonBlank(_ value: String?) -> String? {
+        guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+              trimmed.isEmpty == false else {
+            return nil
+        }
+        return trimmed
+    }
+
+    private func preservingInterpreterSource(
+        in interpretation: MarinaTurnInterpretation,
+        originalSource: MarinaInterpretationSource
+    ) -> MarinaTurnInterpretation {
+        guard originalSource == .foundationModels,
+              let candidate = interpretation.compatibilityCandidate else {
+            return interpretation
+        }
+        return MarinaTurnInterpretation(
+            result: interpretation.result,
+            compatibilityCandidate: candidate.replacingSource(originalSource),
+            repairSummary: interpretation.repairSummary,
+            generatedSchemaName: interpretation.generatedSchemaName
+        )
+    }
+
+    private func evaluateUniversal(
+        _ query: MarinaUniversalQueryIR,
+        reason: String,
+        traceInterpretation: MarinaCanonicalReadInterpretation,
+        candidate: MarinaQueryPlanCandidate,
+        resolved: MarinaResolvedQueryCandidate,
+        context: MarinaTurnContext,
+        includeTokenizedEvidence: Bool = false
+    ) -> MarinaTurnResult {
+        let outcome = MarinaPlanValidationOutcome.executable(
+            MarinaAggregationPlan(
+                operation: candidateOperation(for: query.operation),
+                measure: candidateMeasure(for: query),
+                dateRange: query.dateRange,
+                grouping: groupingCandidate(for: query.grouping),
+                ranking: query.ranking.map { MarinaRankingCandidate(direction: $0, limit: query.limit, rawText: query.grouping) },
+                limit: query.limit,
+                responseShape: responseShapeHint(for: query.presentationShape)
+            )
+        )
+
+        switch universalQueryExecutor.execute(query, provider: context.provider) {
+        case .handled(let card):
+            let route = executionRoute(for: query.operation)
+            let execution = MarinaQueryExecution(
+                executablePlan: nil,
+                aggregationResult: .workspaceCard(card),
+                databaseLookupResponse: nil,
+                workspaceAggregationCard: card,
+                amountBasis: amountBasis(for: query),
+                executionRoute: route
+            )
+            let answer = answerWithEvidence(
+                responseBuilder.responseCompatibleAnswer(from: execution.aggregationResult),
+                execution: execution,
+                resolved: resolved,
+                semanticResolved: nil,
+                metricContract: nil,
+                includeTokenizedEvidence: includeTokenizedEvidence
+            )
+            MarinaFoundationTraceBridge.record(
+                context: context,
+                interpretation: MarinaCanonicalReadInterpretation(
+                    result: traceInterpretation.result,
+                    compatibilityCandidate: traceInterpretation.compatibilityCandidate,
+                    repairSummary: [traceInterpretation.repairSummary, reason].compactMap { $0 }.joined(separator: ";")
+                ),
+                resolved: resolved,
+                semanticResolved: nil,
+                validationOutcome: outcome,
+                execution: execution
+            )
+            return .handled(
+                answer: answer,
+                aggregationResult: execution.aggregationResult,
+                homeQueryPlan: nil,
+                amountBasis: execution.amountBasis,
+                executionRoute: execution.executionRoute
+            )
+        case .unsupported(let unsupported):
+            let blockedOutcome = MarinaPlanValidationOutcome.unsupported(unsupported)
+            MarinaFoundationTraceBridge.record(
+                context: context,
+                interpretation: traceInterpretation,
+                resolved: resolved,
+                semanticResolved: nil,
+                validationOutcome: blockedOutcome,
+                execution: nil
+            )
+            return .blocked(
+                answer: responseBuilder.responseCompatibleAnswer(from: blockedOutcome) ?? Self.blockedAnswer(
+                    prompt: candidate.rawPrompt,
+                    title: "Marina cannot run that yet",
+                    message: unsupported.message
+                ),
+                validationOutcome: blockedOutcome
+            )
+        }
+    }
+
+    private func compatibilityCandidate(
+        for interpretation: MarinaTurnInterpretation,
+        prompt: String
+    ) -> MarinaQueryPlanCandidate {
+        if let candidate = interpretation.compatibilityCandidate {
+            return candidate
+        }
+        switch interpretation.result {
+        case .query(let query):
+            return semanticAdapter.compatibilityCandidate(from: query, prompt: prompt)
+        case .clarification(let clarification):
+            return clarification.candidate ?? MarinaQueryPlanCandidate(
+                source: .foundationModels,
+                rawPrompt: prompt,
+                responseShapeHint: .clarification,
+                confidence: .medium
+            )
+        case .unsupported(let unsupported):
+            return unsupported.candidate ?? MarinaQueryPlanCandidate(
+                source: .foundationModels,
+                rawPrompt: prompt,
+                responseShapeHint: .unsupported,
+                confidence: .medium,
+                unsupportedHint: .unsupportedOperation
+            )
+        }
+    }
+
+    private func semanticMetricContractResolution(
+        candidate: MarinaQueryPlanCandidate,
+        resolved: MarinaResolvedQueryCandidate,
+        semanticResolved: MarinaResolvedSemanticQuery?,
+        outcome: MarinaPlanValidationOutcome
+    ) -> MarinaMetricContractResolution? {
+        if let id = semanticResolved?.query.metricContractID,
+           let contract = MarinaMetricContractRegistry.current.contract(for: id) {
+            return MarinaMetricContractResolution(contract: contract, match: .semanticShape)
+        }
+
+        let routeKind = semanticResolved?.query.routeIntent?.kind ?? candidate.routeIntent?.kind
+        if routeKind == .incomePlannedVsActual,
+           let contract = MarinaMetricContractRegistry.current.contract(for: .incomeActualVsExpected) {
+            return MarinaMetricContractResolution(contract: contract, match: .routeIntent)
+        }
+
+        let targets = resolved.resolvedTargets
+            + (semanticResolved?.resolvedFilters.map { filter in
+                MarinaResolvedEntityMention(
+                    id: filter.id,
+                    mention: MarinaUnresolvedEntityMention(
+                        role: MarinaEntityMentionRole(rawValue: filter.role.rawValue) ?? .filter,
+                        rawText: filter.displayName,
+                        typeHint: filter.entityType
+                    ),
+                    role: filter.role,
+                    entityType: filter.entityType,
+                    displayName: filter.displayName,
+                    sourceID: filter.sourceID
+                )
+            } ?? [])
+
+        let planMeasure: MarinaCandidateMeasure? = {
+            guard case .executable(let plan) = outcome else { return nil }
+            return plan.measure
+        }()
+
+        if (candidate.measure == .spend || planMeasure == .spend),
+           targets.contains(where: { $0.entityType == .allocationAccount }),
+           targets.contains(where: { [.category, .merchant, .card, .preset, .transaction, .expense].contains($0.entityType) }),
+           let contract = MarinaMetricContractRegistry.current.contract(for: .allocatedCategorySpend) {
+            return MarinaMetricContractResolution(contract: contract, match: .semanticShape)
+        }
+
+        if candidate.measure == .income || planMeasure == .income,
+           semanticResolved?.query.incomeStatusScope == .all,
+           let contract = MarinaMetricContractRegistry.current.contract(for: .incomeActualVsExpected) {
+            return MarinaMetricContractResolution(contract: contract, match: .semanticShape)
         }
 
         return nil
@@ -1056,6 +1927,137 @@ struct MarinaTurnCoordinator {
         }
     }
 
+    private func executionRoute(for operation: MarinaUniversalQueryOperation) -> MarinaSemanticExecutionRoute {
+        switch operation {
+        case .lookup, .detail:
+            return .lookupDetail
+        case .list:
+            return .list
+        case .rank, .groupBreakdown:
+            return .groupedRanked
+        case .compare:
+            return .comparison
+        case .simulate:
+            return .scenario
+        case .count, .sum, .average, .minimum, .maximum:
+            return .aggregate
+        }
+    }
+
+    private func candidateOperation(for operation: MarinaUniversalQueryOperation) -> MarinaCandidateOperation {
+        switch operation {
+        case .lookup, .detail:
+            return .lookupDetails
+        case .list:
+            return .listRows
+        case .count:
+            return .count
+        case .sum:
+            return .sum
+        case .average:
+            return .average
+        case .minimum:
+            return .minimum
+        case .maximum:
+            return .maximum
+        case .rank, .groupBreakdown:
+            return .rank
+        case .compare:
+            return .compare
+        case .simulate:
+            return .simulate
+        }
+    }
+
+    private func candidateMeasure(for query: MarinaUniversalQueryIR) -> MarinaCandidateMeasure {
+        switch query.modelName {
+        case "Income", "IncomeSeries":
+            return .income
+        case "SavingsAccount":
+            return .savings
+        case "SavingsLedgerEntry":
+            return .savingsMovement
+        case "AllocationAccount", "AllocationSettlement", "ExpenseAllocation":
+            return .reconciliationBalance
+        case "Preset", "PlannedExpense", "BudgetCategoryLimit":
+            return .presetAmount
+        case "VariableExpense", "Virtual: Merchant":
+            return .spend
+        default:
+            return .transactionAmount
+        }
+    }
+
+    private func amountBasis(for query: MarinaUniversalQueryIR) -> MarinaFinancialAmountBasis {
+        switch query.amountBasis {
+        case .budgetImpactAmount:
+            return .budgetImpact
+        case .ledgerSignedAmount:
+            return .ledgerSigned
+        case .spendingAmount:
+            return .debitSpend
+        case .effectivePlannedAmount:
+            return .plannedEffectiveAmount
+        case .plannedAmount:
+            return .plannedAmount
+        case .actualAmount:
+            return .recordedActualAmount
+        case .incomeAmount:
+            return .actualIncome
+        case .savingsAmount:
+            return query.modelName == "SavingsAccount" ? .savingsRunningTotal : .savingsMovement
+        case .allocatedAmount:
+            return .allocated
+        case .reconciliationBalance:
+            return .reconciliationBalance
+        case .amount, nil:
+            return query.operation == .count || (query.operation == .list && query.amountBasis == nil) ? .count : .gross
+        }
+    }
+
+    private func groupingCandidate(for grouping: String?) -> MarinaGroupingCandidate? {
+        guard let grouping else { return nil }
+        switch grouping.lowercased() {
+        case "category":
+            return MarinaGroupingCandidate(dimension: .category, rawText: grouping)
+        case "card":
+            return MarinaGroupingCandidate(dimension: .card, rawText: grouping)
+        case "source", "income source":
+            return MarinaGroupingCandidate(dimension: .incomeSource, rawText: grouping)
+        case "account":
+            return MarinaGroupingCandidate(dimension: .allocationAccount, rawText: grouping)
+        case "kind", "type":
+            return MarinaGroupingCandidate(dimension: .transaction, rawText: grouping)
+        default:
+            return nil
+        }
+    }
+
+    private func responseShapeHint(for shape: MarinaResponseShape) -> MarinaResponseShapeHint {
+        switch shape {
+        case .scalarCurrency:
+            return .scalarCurrency
+        case .summaryCard:
+            return .summaryCard
+        case .relationshipList:
+            return .relationshipList
+        case .membershipStatus:
+            return .membershipStatus
+        case .comparison:
+            return .comparison
+        case .rankedList:
+            return .rankedList
+        case .groupedBreakdown:
+            return .groupedBreakdown
+        case .chartRows:
+            return .chartRows
+        case .clarification:
+            return .clarification
+        case .unsupported:
+            return .unsupported
+        }
+    }
+
     private func interpretationByApplying(
         choice: MarinaClarificationChoice,
         to clarification: MarinaTypedClarification,
@@ -1120,7 +2122,8 @@ struct MarinaTurnCoordinator {
         execution: MarinaQueryExecution,
         resolved: MarinaResolvedQueryCandidate,
         semanticResolved: MarinaResolvedSemanticQuery?,
-        metricContract: MarinaMetricContract? = nil
+        metricContract: MarinaMetricContract? = nil,
+        includeTokenizedEvidence: Bool = false
     ) -> HomeAnswer {
         var evidenceRows: [HomeAnswerRow] = []
         if let metricContract {
@@ -1128,12 +2131,24 @@ struct MarinaTurnCoordinator {
         }
         evidenceRows.append(HomeAnswerRow(title: "Amount basis", value: displayName(for: execution.amountBasis), role: .trace))
         evidenceRows.append(HomeAnswerRow(title: "Execution route", value: execution.executionRoute.traceName, role: .trace))
+        if includeTokenizedEvidence,
+           let universalQuery = resolved.candidate.universalQuery {
+            evidenceRows.append(HomeAnswerRow(title: "Why this answer?", value: "model=\(universalQuery.modelName), operation=\(universalQuery.operation.rawValue), scope=\(universalQuery.workspaceScopePolicy.rawValue)", role: .trace))
+            evidenceRows.append(HomeAnswerRow(title: "Row type", value: universalQuery.evidenceRowType, role: .trace))
+            evidenceRows.append(HomeAnswerRow(title: "Model tokens", value: tokenSummary(for: universalQuery), role: .trace))
+            evidenceRows.append(HomeAnswerRow(title: "Trace ID", value: answer.queryID.uuidString, role: .trace))
+        }
 
         let targets = resolved.resolvedTargets.map(\.displayName)
             + (semanticResolved?.resolvedFilters.map(\.displayName) ?? [])
         let uniqueTargets = Array(Set(targets)).sorted()
         if uniqueTargets.isEmpty == false {
             evidenceRows.append(HomeAnswerRow(title: "Matched", value: uniqueTargets.prefix(4).joined(separator: ", "), role: .trace))
+        }
+        let sourceIDs = (resolved.resolvedTargets.compactMap(\.sourceID) + (semanticResolved?.resolvedFilters.compactMap(\.sourceID) ?? []))
+            .map(\.uuidString)
+        if sourceIDs.isEmpty == false {
+            evidenceRows.append(HomeAnswerRow(title: "Source IDs", value: sourceIDs.prefix(4).joined(separator: ", "), role: .trace))
         }
 
         guard evidenceRows.isEmpty == false else { return answer }
@@ -1150,6 +2165,17 @@ struct MarinaTurnCoordinator {
             explanation: answer.explanation,
             generatedAt: answer.generatedAt
         )
+    }
+
+    private func tokenSummary(for query: MarinaUniversalQueryIR) -> String {
+        [
+            "amountBasis=\(query.amountBasis?.rawValue ?? "nil")",
+            "grouping=\(query.grouping ?? "nil")",
+            "ranking=\(query.ranking?.rawValue ?? "nil")",
+            "limit=\(query.limit.map(String.init) ?? "nil")",
+            "shape=\(query.presentationShape.rawValue)",
+            "filters=\(query.filters.map { "\($0.field ?? "*"):\($0.value):\($0.match.rawValue)" }.joined(separator: "+"))"
+        ].joined(separator: ",")
     }
 
     private func displayName(for basis: MarinaFinancialAmountBasis) -> String {
