@@ -30,7 +30,6 @@ struct MarinaHostModifier: ViewModifier {
 
     @State private var assistantRoute: AssistantPresentationRoute? = nil
     @State private var containerWidth: CGFloat = 0
-    @State private var didAutoPresentAssistantForUITest = false
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
@@ -106,9 +105,6 @@ struct MarinaHostModifier: ViewModifier {
             .onDisappear {
                 dismissAssistant()
             }
-            .onAppear {
-                autoPresentAssistantForUITestIfNeeded()
-            }
     }
 
     private var assistantSheetPresentedBinding: Binding<Bool> {
@@ -142,16 +138,6 @@ struct MarinaHostModifier: ViewModifier {
         guard isEnabled else { return }
         guard assistantRoute == nil else { return }
         assistantRoute = route(for: assistantPresentationPlan.mode)
-    }
-
-    private func autoPresentAssistantForUITestIfNeeded() {
-        #if DEBUG
-        guard UITestSupport.shouldRunMarinaHarness else { return }
-        guard didAutoPresentAssistantForUITest == false else { return }
-        guard isEnabled else { return }
-        didAutoPresentAssistantForUITest = true
-        assistantRoute = route(for: assistantPresentationPlan.mode)
-        #endif
     }
 
     private func dismissAssistant() {

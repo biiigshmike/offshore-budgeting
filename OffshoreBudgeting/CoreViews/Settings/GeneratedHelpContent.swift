@@ -676,23 +676,18 @@ enum GeneratedHelpContent {
             sections: [
                 mediaSection(
                     id: "home-marina-1",
-                    header: "Marina Assistant",
-                    body: "Marina is your conversational assistant for turning numbers into clear next steps. Ask specific questions about periods, categories, cards, or your savings direction to get practical guidance quickly.\n\nMarina also fits into your flow of creating, updating, and cleaning up data. Use the + button on the screen that owns the record when you need to add something new, and then use edit or delete on that same screen to close the loop. Marina helps you decide what to do, and the destination screens help you do it accurately.\n\nA strong routine is simple: ask a question, take an action, and verify the result. That keeps the guidance actionable and avoids overload.",
+                    header: "Marina",
+                    body: "Marina is currently a lightweight shell while the assistant brain is rebuilt. Open Marina from Home when you want the workspace-scoped panel and use its + menu for explicit create forms.\n\nThe text field does not infer, route, or execute free-text requests in this reset state. For editing, deleting, analysis, and review flows, use the owning app screens so records stay clear and traceable.",
                     media: [
                         mediaItem(
                             id: "home-marina-1-image-1",
                             assetName: "Help/CoreScreens/Home/Marina/marina",
-                            bodyText: "Open Marina from Home for a conversational review flow. Ask short questions about trends, savings direction, or variances, then open the related screen to act. When you need to add something new, use the + button on that screen. For later changes, use edit and delete there as well so your records stay clean and traceable.",
-                            fullscreenCaptionText: "Ask Marina for guidance, then use +, edit, or delete on the owning screen to complete the flow."
+                            bodyText: "Open Marina from Home for the shell panel. Use the + menu for explicit create flows, and use the owning app screens for edits, deletes, and review.",
+                            fullscreenCaptionText: "Marina stays available as a shell while the assistant brain is rebuilt."
                         )
                     ]
-                ),
-                textSection(
-                    id: "home-marina-2",
-                    header: "Questions People Commonly Ask",
-                    body: "The most common Marina questions fall into a few predictable groups: period check-ins, spend totals, category focus, card focus, income source questions, savings direction, recurring preset questions, and month-over-month comparisons.\n\nStrong examples are: How am I doing this month? What did I spend last month? Top categories this month. Compare this month vs last month. Compare groceries this month vs last month. Compare my Apple Card this month vs last month. What share of my spending is groceries this month? What portion of my income comes from Salary this month?\n\nMarina is most reliable when the request is one metric, one scope, one target, and one time frame."
                 )
-            ] + MarinaCapabilityGuide.helpSections(prefix: "home-marina")
+            ]
         ),
         GeneratedHelpLeafTopic(
             id: "home-widgets",

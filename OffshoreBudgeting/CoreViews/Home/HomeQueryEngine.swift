@@ -310,12 +310,6 @@ struct HomeQueryEngine {
         }
     }
 
-    // MARK: - Suggestions
-
-    func defaultSuggestions() -> [MarinaSuggestion] {
-        MarinaPresetPromptCatalog.defaultSuggestions()
-    }
-
     // MARK: - Intent handlers
 
     private func periodOverviewAnswer(
@@ -2771,9 +2765,7 @@ struct HomeQueryEngine {
         previousTotal: Double,
         branch: String
     ) {
-        MarinaDebugLogger.log(
-            "[MarinaComparison] scope=\(scope) target='\(target)' current=\(rangeLabel(for: currentRange)) previous=\(rangeLabel(for: previousRange)) currentTotal=\(currentTotal) previousTotal=\(previousTotal) branch=\(branch)"
-        )
+        _ = (scope, target, currentRange, previousRange, currentTotal, previousTotal, branch)
     }
 
     private func merchantPresentationName(_ raw: String) -> String {

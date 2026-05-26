@@ -76,7 +76,6 @@ struct HomeView: View {
     @State private var whatIfInitialScenarioID: UUID? = nil
     @State private var whatIfInitialDraft: WhatIfPlannerDraft? = nil
     @State private var isShowingAssistantPanel: Bool = false
-    @State private var didAutoPresentAssistantForUITest: Bool = false
 
     // MARK: - Data Fixups
 
@@ -407,7 +406,6 @@ struct HomeView: View {
             }
             schedulePostSettleHousekeeping(reason: "onAppear")
             scheduleActivationEnrichment(reason: "onAppear")
-            autoPresentAssistantForUITestIfNeeded()
         }
         .onDisappear {
             dismissAssistantPanel()
@@ -497,15 +495,6 @@ struct HomeView: View {
         } else {
             assistantToolbarContext.openAssistant()
         }
-    }
-
-    private func autoPresentAssistantForUITestIfNeeded() {
-        #if DEBUG
-        guard UITestSupport.shouldRunMarinaHarness else { return }
-        guard didAutoPresentAssistantForUITest == false else { return }
-        didAutoPresentAssistantForUITest = true
-        presentAssistantPanel()
-        #endif
     }
 
     private func dismissAssistantPanel() {

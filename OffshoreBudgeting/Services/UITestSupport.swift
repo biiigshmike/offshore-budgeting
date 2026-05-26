@@ -7,15 +7,7 @@ enum UITestSupport {
     // MARK: - Flags
 
     static var isEnabled: Bool {
-        ProcessInfo.processInfo.arguments.contains("-uiTesting") || isMarinaHarnessEnabled
-    }
-
-    static var isMarinaHarnessEnabled: Bool {
-        ProcessInfo.processInfo.arguments.contains("-uiTestingMarinaHarness")
-    }
-
-    static var shouldRunMarinaHarness: Bool {
-        isMarinaHarnessEnabled
+        ProcessInfo.processInfo.arguments.contains("-uiTesting")
     }
 
     static var shouldResetOnLaunch: Bool {
@@ -47,16 +39,9 @@ enum UITestSupport {
     // MARK: - UserDefaults
 
     static func applyResetIfNeeded() {
-        guard shouldResetOnLaunch || isMarinaHarnessEnabled else { return }
+        guard shouldResetOnLaunch else { return }
 
         let defaults = UserDefaults.standard
-
-        if isMarinaHarnessEnabled {
-            applyMarinaHarnessDefaults(defaults)
-            clearMarinaConversationDefaults(defaults)
-            defaults.synchronize()
-            return
-        }
 
         defaults.set(false, forKey: "didCompleteOnboarding")
         defaults.set(false, forKey: "onboarding_didChooseDataSource")
@@ -75,58 +60,10 @@ enum UITestSupport {
         defaults.set(0.0, forKey: "icloud_bootstrapStartedAt")
     }
 
-    private static func clearMarinaConversationDefaults(_ defaults: UserDefaults) {
-        let prefix = "home.assistant.answers."
-        for key in defaults.dictionaryRepresentation().keys where key.hasPrefix(prefix) {
-            defaults.removeObject(forKey: key)
-        }
-    }
-
-    private static func applyMarinaHarnessDefaults(_ defaults: UserDefaults) {
-        let arguments = ProcessInfo.processInfo.arguments
-        let aiOptInDefault = arguments.contains("-uiTestingMarinaAIOptOutDefault")
-            ? false
-            : MarinaRuntimeSettings.defaultAIOptInEnabled
-
-        defaults.set(true, forKey: "didCompleteOnboarding")
-        defaults.set(true, forKey: "onboarding_didChooseDataSource")
-        defaults.set(true, forKey: "onboarding_didPressGetStarted")
-        defaults.set(0, forKey: "onboarding_step")
-
-        defaults.set(MarinaUITestFixtureSeeder.workspaceID.uuidString, forKey: "selectedWorkspaceID")
-        defaults.set(true, forKey: "didSeedDefaultWorkspaces")
-
-        defaults.set(false, forKey: "icloud_useCloud")
-        defaults.set(false, forKey: "icloud_activeUseCloud")
-        defaults.set(0.0, forKey: "icloud_bootstrapStartedAt")
-        defaults.set(false, forKey: "privacy_requireBiometrics")
-
-        defaults.set(BudgetingPeriod.monthly.rawValue, forKey: "general_defaultBudgetingPeriod")
-        defaults.set(false, forKey: "general_hideFuturePlannedExpenses")
-        defaults.set(false, forKey: "general_excludeFuturePlannedExpensesFromCalculations")
-        defaults.set(false, forKey: "general_hideFutureVariableExpenses")
-        defaults.set(false, forKey: "general_excludeFutureVariableExpensesFromCalculations")
-
-        defaults.set(aiOptInDefault, forKey: MarinaRuntimeSettings.aiOptInKey)
-    }
-
     // MARK: - Data
 
     static func applyScenarioDataIfNeeded(container: ModelContainer) {
         guard isEnabled else { return }
-
-        if isMarinaHarnessEnabled {
-            let context = ModelContext(container)
-            wipeAllData(context: context)
-            MarinaUITestFixtureSeeder.seed(in: context)
-
-            do {
-                try context.save()
-            } catch {
-                assertionFailure("UITestSupport failed to save Marina harness seed data: \(error)")
-            }
-            return
-        }
 
         guard let scenario else { return }
 

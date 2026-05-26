@@ -67,9 +67,7 @@ struct OffshoreBudgetingApp: App {
 
         let container = Self.makeModelContainer(useICloud: desiredUseICloud)
         #if DEBUG
-        if UITestSupport.shouldRunMarinaHarness {
-            UITestSupport.applyScenarioDataIfNeeded(container: container)
-        }
+        UITestSupport.applyScenarioDataIfNeeded(container: container)
         #endif
         return container
     }()
