@@ -79,6 +79,8 @@ struct MarinaComposableWorkspaceQueryExecutor {
             return .handled(allocationRows(resolved: resolved, plan: plan, provider: provider, now: now))
         case .settlementRows?:
             return .handled(settlementRows(resolved: resolved, plan: plan, provider: provider, now: now))
+        case .reconciliationActivity?:
+            return .handled(reconciliationActivityRows(resolved: resolved, plan: plan, provider: provider, now: now))
         case .budgetMembership?:
             if let detail = (candidate.routeIntent?.requestedDetail ?? plan.routeIntent?.requestedDetail ?? candidate.semanticCommand?.requestedDetail),
                detail == .membership,
@@ -129,7 +131,7 @@ struct MarinaComposableWorkspaceQueryExecutor {
                 return .handled(settlementRows(resolved: resolved, plan: plan, provider: provider, now: now))
             case .recentTransactionRows:
                 return .handled(recentFilteredTransactions(resolved: resolved, plan: plan, provider: provider, now: now, amountBasis: amountBasis))
-            case .generic, .databaseLookup, .currentWorkspace, .periodOverview, .budgetSummary, .activeBudget, .budgetMembership, .budgetLinkedCards, .budgetLinkedPresets, .budgetCategoryLimits, .budgetCategoryLimit, .plannedExpenseRows, .presetTemplateRows, .plannedExpenseByCategory, .plannedExpenseByCard, .plannedExpenseByPreset, .savingsStatus, .savingsActivity, .savingsMovementRanking, .incomePlannedVsActual, .reconciliationBalance, .broadSpend:
+            case .generic, .databaseLookup, .currentWorkspace, .periodOverview, .budgetSummary, .activeBudget, .budgetMembership, .budgetLinkedCards, .budgetLinkedPresets, .budgetCategoryLimits, .budgetCategoryLimit, .plannedExpenseRows, .presetTemplateRows, .plannedExpenseByCategory, .plannedExpenseByCard, .plannedExpenseByPreset, .savingsStatus, .savingsActivity, .savingsMovementRanking, .incomePlannedVsActual, .reconciliationBalance, .reconciliationActivity, .broadSpend:
                 break
             }
         }
@@ -1069,6 +1071,65 @@ struct MarinaComposableWorkspaceQueryExecutor {
             primaryValue: rows.first?.value,
             rows: Array(rows),
             traceSummary: "composableWorkspace=settlementRows,resultCount=\(rows.count)"
+        )
+    }
+
+    private func reconciliationActivityRows(
+        resolved: MarinaResolvedQueryCandidate,
+        plan: MarinaAggregationPlan,
+        provider: MarinaDataProvider,
+        now: Date
+    ) -> MarinaWorkspaceAggregationCard {
+        let range = plan.dateRange ?? monthRange(containing: now)
+        let accountFilters = resolved.resolvedTargets.filter { $0.entityType == .allocationAccount }
+        let allocationRows = provider.fetchAllExpenseAllocations()
+            .filter { allocation in
+                accountFilters.isEmpty
+                    || accountFilters.contains { $0.sourceID == allocation.account?.id || $0.displayName.localizedCaseInsensitiveCompare(allocation.account?.name ?? "") == .orderedSame }
+            }
+            .compactMap { allocation -> MarinaWorkspaceAggregationCard.Row? in
+                let linkedDate = allocation.expense?.transactionDate ?? allocation.plannedExpense?.expenseDate ?? allocation.createdAt
+                guard contains(linkedDate, in: range) else { return nil }
+                let title = allocation.expense?.descriptionText ?? allocation.plannedExpense?.title ?? "Allocation"
+                let accountName = allocation.account?.name ?? "Reconciliation"
+                return MarinaWorkspaceAggregationCard.Row(
+                    label: title,
+                    value: "\(currency(max(0, allocation.allocatedAmount))) allocated • \(accountName) • \(shortDate(linkedDate))",
+                    amount: max(0, allocation.allocatedAmount),
+                    date: linkedDate,
+                    objectType: .expenseAllocation,
+                    sourceID: allocation.id,
+                    sortValue: linkedDate.timeIntervalSince1970
+                )
+            }
+        let settlementRows = provider.fetchAllAllocationSettlements()
+            .filter { settlement in
+                contains(settlement.date, in: range)
+                    && (accountFilters.isEmpty
+                        || accountFilters.contains { $0.sourceID == settlement.account?.id || $0.displayName.localizedCaseInsensitiveCompare(settlement.account?.name ?? "") == .orderedSame })
+            }
+            .map { settlement in
+                MarinaWorkspaceAggregationCard.Row(
+                    label: settlement.note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Settlement" : settlement.note,
+                    value: "\(currency(settlement.amount)) settlement • \(settlement.account?.name ?? "Reconciliation") • \(shortDate(settlement.date))",
+                    amount: settlement.amount,
+                    date: settlement.date,
+                    objectType: .reconciliationItem,
+                    sourceID: settlement.id,
+                    sortValue: settlement.date.timeIntervalSince1970
+                )
+            }
+        let rows = (allocationRows + settlementRows)
+            .sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
+            .prefix(limit(for: plan))
+        let targetName = accountFilters.count == 1 ? accountFilters[0].displayName : nil
+
+        return MarinaWorkspaceAggregationCard(
+            title: targetName.map { "\($0) Activity" } ?? "Reconciliation Activity",
+            subtitle: rangeLabel(range),
+            primaryValue: rows.first?.value,
+            rows: Array(rows),
+            traceSummary: "composableWorkspace=reconciliationActivity,resultCount=\(rows.count)"
         )
     }
 

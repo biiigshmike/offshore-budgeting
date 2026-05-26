@@ -354,6 +354,7 @@ enum MarinaRouteIntentKind: String, Codable, Sendable, Equatable {
     case savingsMovementRanking
     case incomePlannedVsActual
     case reconciliationBalance
+    case reconciliationActivity
     case allocationRows
     case settlementRows
     case recentTransactionRows
@@ -600,6 +601,7 @@ struct MarinaQueryPlanCandidate: Codable, Equatable, Sendable {
     let formulaBacklogRecipe: MarinaFormulaBacklogRecipe?
     let formulaFacets: MarinaFormulaFacets
     let routeIntent: MarinaRouteIntent?
+    let universalQuery: MarinaUniversalQueryIR?
 
     init(
         requestFamily: MarinaRequestFamily = .analytics,
@@ -625,7 +627,8 @@ struct MarinaQueryPlanCandidate: Codable, Equatable, Sendable {
         formulaMeasure: MarinaFormulaMeasure? = nil,
         formulaBacklogRecipe: MarinaFormulaBacklogRecipe? = nil,
         formulaFacets: MarinaFormulaFacets = MarinaFormulaFacets(),
-        routeIntent: MarinaRouteIntent? = nil
+        routeIntent: MarinaRouteIntent? = nil,
+        universalQuery: MarinaUniversalQueryIR? = nil
     ) {
         self.requestFamily = requestFamily
         self.source = source
@@ -663,6 +666,37 @@ struct MarinaQueryPlanCandidate: Codable, Equatable, Sendable {
             databaseLookupRequest: databaseLookupRequest,
             semanticCommand: semanticCommand,
             requestShape: requestShape
+        )
+        self.universalQuery = universalQuery
+    }
+
+    func replacingSource(_ source: MarinaInterpretationSource) -> MarinaQueryPlanCandidate {
+        MarinaQueryPlanCandidate(
+            requestFamily: requestFamily,
+            source: source,
+            rawPrompt: rawPrompt,
+            operation: operation,
+            measure: measure,
+            entityMentions: entityMentions,
+            timeScopes: timeScopes,
+            grouping: grouping,
+            ranking: ranking,
+            limit: limit,
+            responseShapeHint: responseShapeHint,
+            confidence: confidence,
+            unsupportedHint: unsupportedHint,
+            databaseLookupRequest: databaseLookupRequest,
+            semanticCommand: semanticCommand,
+            requestShape: requestShape,
+            insightIntent: insightIntent,
+            softTimeHint: softTimeHint,
+            formulaKind: formulaKind,
+            formulaFamily: formulaFamily,
+            formulaMeasure: formulaMeasure,
+            formulaBacklogRecipe: formulaBacklogRecipe,
+            formulaFacets: formulaFacets,
+            routeIntent: routeIntent,
+            universalQuery: universalQuery
         )
     }
 }
@@ -999,7 +1033,7 @@ extension MarinaRouteIntent {
             return .homeAdapter
         case .budgetSummary:
             return .composableWorkspace
-        case .budgetInventory, .budgetMembership, .budgetLinkedCards, .budgetLinkedPresets, .budgetCategoryLimits, .budgetCategoryLimit, .overBudgetCategories, .allocationRows, .settlementRows:
+        case .budgetInventory, .budgetMembership, .budgetLinkedCards, .budgetLinkedPresets, .budgetCategoryLimits, .budgetCategoryLimit, .overBudgetCategories, .allocationRows, .settlementRows, .reconciliationActivity:
             return .composableWorkspace
         case .plannedExpenseRows, .presetTemplateRows, .plannedExpenseByCategory, .plannedExpenseByCard, .plannedExpenseByPreset:
             return .workspaceAggregation
@@ -1223,6 +1257,14 @@ struct MarinaRoutePatternRegistry {
             requestedDetails: [nil, .general, .amount]
         ),
         RoutePattern(
+            kind: .reconciliationActivity,
+            preferredExecutorRoute: .composableWorkspace,
+            operations: [.listRows, .rank],
+            measures: [.reconciliationBalance],
+            groupings: [.allocationAccount],
+            requestedDetails: [nil, .general, .date, .amount]
+        ),
+        RoutePattern(
             kind: .reconciliationBalance,
             preferredExecutorRoute: .workspaceAggregation,
             operations: [.sum, .rank, .listRows, .lookupDetails],
@@ -1281,6 +1323,10 @@ struct MarinaRoutePatternRegistry {
            matchesCatalog(.savingsActivity, operation: operation, measure: measure, grouping: grouping, requestedDetail: requestedDetail) { return .savingsActivity }
         if normalized.contains("limit"),
            matchesCatalog(.budgetCategoryLimit, operation: operation, measure: measure, grouping: grouping, requestedDetail: requestedDetail) { return .budgetCategoryLimit }
+        if requestShape == .objectInventoryList,
+           matchesCatalog(.budgetInventory, operation: operation, measure: measure, grouping: grouping, requestedDetail: requestedDetail) {
+            return .budgetInventory
+        }
         if let detailMatch = routeCatalog.first(where: {
             [.budgetCategoryLimits, .budgetLinkedCards, .budgetLinkedPresets, .budgetMembership, .activeBudget].contains($0.kind)
                 && $0.matches(operation: operation, measure: measure, grouping: grouping, requestedDetail: requestedDetail)
@@ -1294,10 +1340,6 @@ struct MarinaRoutePatternRegistry {
         if isBudgetSummaryPrompt(normalized),
            matchesCatalog(.budgetSummary, operation: operation, measure: measure, grouping: grouping, requestedDetail: requestedDetail) {
             return .budgetSummary
-        }
-        if requestShape == .objectInventoryList,
-           matchesCatalog(.budgetInventory, operation: operation, measure: measure, grouping: grouping, requestedDetail: requestedDetail) {
-            return .budgetInventory
         }
         if matchesCatalog(.plannedExpenseRows, operation: operation, measure: measure, grouping: grouping, requestedDetail: requestedDetail) {
             return .plannedExpenseRows
@@ -1325,6 +1367,9 @@ struct MarinaRoutePatternRegistry {
         }
         if matchesCatalog(.savingsStatus, operation: operation, measure: measure, grouping: grouping, requestedDetail: requestedDetail) {
             return .savingsStatus
+        }
+        if matchesCatalog(.reconciliationActivity, operation: operation, measure: measure, grouping: grouping, requestedDetail: requestedDetail) {
+            return .reconciliationActivity
         }
         if matchesCatalog(.reconciliationBalance, operation: operation, measure: measure, grouping: grouping, requestedDetail: requestedDetail) {
             return .reconciliationBalance
@@ -1399,6 +1444,9 @@ struct MarinaRoutePatternRegistry {
         }
         if subject == .savingsLedgerEntries || measure == .savingsMovement {
             return operation == .rank ? .savingsMovementRanking : .savingsActivity
+        }
+        if measure == .reconciliationBalance, grouping == .allocationAccount, operation == .listRows {
+            return .reconciliationActivity
         }
         if measure == .reconciliationBalance, grouping == .allocationAccount {
             return .reconciliationBalance
@@ -1562,6 +1610,21 @@ struct MarinaRoutePatternRegistry {
         if prompt.contains("savings") || prompt.contains("saving") {
             return .savings
         }
+        if prompt.contains("expense") || prompt.contains("transaction") || prompt.contains("purchase") {
+            return .expense
+        }
+        if prompt.contains("income") || prompt.contains("paycheck") {
+            return .income
+        }
+        if prompt.contains("budget") {
+            return .budget
+        }
+        if prompt.contains("card") {
+            return .card
+        }
+        if prompt.contains("category") || prompt.contains("categories") {
+            return .category
+        }
         if prompt.contains("preset") {
             return .preset
         }
@@ -1618,6 +1681,11 @@ enum MarinaReadOnlyMutationDomain: String, Codable, Sendable, Equatable {
     case allocation
     case settlement
     case savings
+    case expense
+    case income
+    case budget
+    case card
+    case category
     case preset
     case reconciliation
 
@@ -1629,6 +1697,16 @@ enum MarinaReadOnlyMutationDomain: String, Codable, Sendable, Equatable {
             return "settlement"
         case .savings:
             return "savings"
+        case .expense:
+            return "expense"
+        case .income:
+            return "income"
+        case .budget:
+            return "budget"
+        case .card:
+            return "card"
+        case .category:
+            return "category"
         case .preset:
             return "preset"
         case .reconciliation:

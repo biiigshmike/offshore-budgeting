@@ -187,8 +187,7 @@ struct MarinaQueryValidator {
             return .executable(semanticExecutablePlan(from: resolved, candidate: candidate))
         }
 
-        if query.operation != .lookupDetails,
-           let ambiguous = resolved.ambiguousFilters.first {
+        if let ambiguous = resolved.ambiguousFilters.first {
             return clarification(
                 .ambiguousTarget,
                 message: "I found multiple possible matches for that target.",
@@ -199,8 +198,7 @@ struct MarinaQueryValidator {
             )
         }
 
-        if query.operation != .lookupDetails,
-           let unresolved = resolved.unresolvedFilters.first {
+        if let unresolved = resolved.unresolvedFilters.first {
             return clarification(
                 .missingTarget,
                 message: "I couldn't safely resolve that target.",
@@ -220,8 +218,7 @@ struct MarinaQueryValidator {
             )
         }
 
-        if query.operation != .lookupDetails,
-           requiresResolvedTarget(query),
+        if requiresResolvedTarget(query),
            resolved.resolvedFilters.isEmpty {
             return clarification(
                 .missingTarget,

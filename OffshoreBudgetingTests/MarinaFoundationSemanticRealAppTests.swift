@@ -466,8 +466,8 @@ struct MarinaFoundationSemanticRealAppTests {
         try fixture.context.save()
 
         let prompt = "What are my upcoming budgets?"
-        let coordinator = coordinator(for: [
-            prompt: canonicalInterpretation(unsupportedCandidate(prompt: prompt))
+        let coordinator = coordinator(forTurnInterpretations: [
+            prompt: turnInterpretation(prompt: prompt, query: upcomingBudgetsQuery())
         ])
 
         let (result, _) = await tracedTurn(prompt: prompt) {
@@ -497,8 +497,8 @@ struct MarinaFoundationSemanticRealAppTests {
         try fixture.context.save()
 
         let prompt = "What are my planned expenses for next month?"
-        let coordinator = coordinator(for: [
-            prompt: canonicalInterpretation(unsupportedCandidate(prompt: prompt))
+        let coordinator = coordinator(forTurnInterpretations: [
+            prompt: turnInterpretation(prompt: prompt, query: plannedExpensesNextMonthQuery())
         ])
 
         let (result, _) = await tracedTurn(prompt: prompt) {
@@ -796,6 +796,13 @@ struct MarinaFoundationSemanticRealAppTests {
         )
     }
 
+    private func coordinator(forTurnInterpretations interpretations: [String: MarinaTurnInterpretation]) -> MarinaTurnCoordinator {
+        MarinaTurnCoordinator(
+            availability: AvailableMarinaModel(),
+            turnInterpreter: MarinaFakeTurnIntentInterpreter(interpretationsByPrompt: interpretations)
+        )
+    }
+
     private func tracedTurn(
         prompt: String,
         turn: () async -> MarinaTurnResult
@@ -902,6 +909,71 @@ struct MarinaFoundationSemanticRealAppTests {
         )
     }
 
+    private func turnInterpretation(
+        prompt: String,
+        query: MarinaSemanticQuery
+    ) -> MarinaTurnInterpretation {
+        MarinaTurnInterpretation(
+            result: .query(query),
+            compatibilityCandidate: MarinaSemanticQueryAdapter().compatibilityCandidate(from: query, prompt: prompt),
+            generatedSchemaName: MarinaFoundationLiveContractRegistry.liveGeneratedSchemaName
+        )
+    }
+
+    private func upcomingBudgetsQuery() -> MarinaSemanticQuery {
+        MarinaSemanticQuery(
+            subject: .budgets,
+            operation: .list,
+            limit: 10,
+            responseShape: .rankedList,
+            requestedDetail: .general,
+            routeIntent: MarinaRouteIntent(
+                kind: .budgetInventory,
+                subject: .budgets,
+                operation: .listRows,
+                measure: .remainingBudget,
+                grouping: nil,
+                targetTypes: [.budget],
+                requestedDetail: .general,
+                responseShape: .rankedList,
+                preferredExecutorRoute: .composableWorkspace
+            )
+        )
+    }
+
+    private func plannedExpensesNextMonthQuery() -> MarinaSemanticQuery {
+        MarinaSemanticQuery(
+            subject: .plannedExpenses,
+            operation: .list,
+            amountField: .effectivePlannedAmount,
+            dateRange: MarinaDateRangeRequest(
+                role: .primary,
+                rawText: "next month",
+                resolvedRange: HomeQueryDateRange(
+                    startDate: date(2026, 6, 1),
+                    endDate: date(2026, 6, 30)
+                ),
+                periodUnit: .month
+            ),
+            grouping: MarinaGrouping(dimension: .transaction, rawText: "planned expense"),
+            ranking: MarinaRanking(direction: .newest, limit: 10, rawText: "due date"),
+            limit: 10,
+            responseShape: .rankedList,
+            requestedDetail: .date,
+            routeIntent: MarinaRouteIntent(
+                kind: .plannedExpenseRows,
+                subject: .plannedExpenses,
+                operation: .listRows,
+                measure: .presetAmount,
+                grouping: .transaction,
+                targetTypes: [.transaction],
+                requestedDetail: .date,
+                responseShape: .rankedList,
+                preferredExecutorRoute: .workspaceAggregation
+            )
+        )
+    }
+
     private func spendCandidate(
         prompt: String,
         mentions: [MarinaUnresolvedEntityMention],
@@ -1003,5 +1075,23 @@ struct MarinaFoundationSemanticRealAppTests {
 
     private struct AvailableMarinaModel: MarinaModelAvailabilityProviding {
         func currentStatus() -> MarinaModelAvailability.Status { .available }
+    }
+
+    private struct MarinaFakeTurnIntentInterpreter: MarinaTurnIntentInterpreting {
+        enum FixtureError: Error {
+            case missingInterpretation(String)
+        }
+
+        let interpretationsByPrompt: [String: MarinaTurnInterpretation]
+
+        func interpretTurnIntent(
+            prompt: String,
+            context _: MarinaInterpretationContext
+        ) async throws -> MarinaTurnInterpretation {
+            guard let interpretation = interpretationsByPrompt[prompt] else {
+                throw FixtureError.missingInterpretation(prompt)
+            }
+            return interpretation
+        }
     }
 }

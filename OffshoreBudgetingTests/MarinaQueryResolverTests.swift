@@ -791,6 +791,104 @@ struct MarinaQueryResolverTests {
         #expect(resolved.comparisonDateRange?.endDate == localDate(2026, 4, 30, 23, 59, 59))
     }
 
+    @Test func resolver_preservesDuplicateSameTypeNamesAsAmbiguousChoices() throws {
+        let fixture = try makeFixture()
+        let first = Card(name: "Shared Card", workspace: fixture.workspace)
+        let second = Card(name: "Shared Card", workspace: fixture.workspace)
+        fixture.context.insert(first)
+        fixture.context.insert(second)
+        try fixture.context.save()
+
+        let candidate = MarinaQueryPlanCandidate(
+            source: .foundationModels,
+            rawPrompt: "Show Shared Card",
+            operation: .lookupDetails,
+            measure: .transactionAmount,
+            entityMentions: [
+                MarinaUnresolvedEntityMention(
+                    role: .primaryTarget,
+                    rawText: "Shared Card",
+                    typeHint: .card,
+                    allowedTypeHints: [.card],
+                    confidence: .high
+                )
+            ],
+            confidence: .high
+        )
+
+        let resolved = MarinaQueryResolver().resolve(candidate: candidate, provider: fixture.provider)
+        let sourceIDs = Set(resolved.ambiguousMentions.first?.choices.compactMap(\.sourceID) ?? [])
+
+        #expect(resolved.resolvedTargets.isEmpty)
+        #expect(resolved.ambiguousMentions.count == 1)
+        #expect(sourceIDs == Set([first.id, second.id]))
+    }
+
+    @Test func resolver_treatsAssistantAliasesAsResolutionCandidates() throws {
+        let fixture = try makeFixture()
+        let groceries = Category(name: "Groceries", hexColor: "#00AA00", workspace: fixture.workspace)
+        fixture.context.insert(groceries)
+        fixture.context.insert(AssistantAliasRule(aliasKey: "food", targetValue: "Groceries", entityType: .category, workspace: fixture.workspace))
+        try fixture.context.save()
+
+        let candidate = MarinaQueryPlanCandidate(
+            source: .foundationModels,
+            rawPrompt: "Show food",
+            operation: .lookupDetails,
+            measure: .transactionAmount,
+            entityMentions: [
+                MarinaUnresolvedEntityMention(
+                    role: .primaryTarget,
+                    rawText: "food",
+                    typeHint: .category,
+                    allowedTypeHints: [.category],
+                    confidence: .high
+                )
+            ],
+            confidence: .high
+        )
+
+        let resolved = MarinaQueryResolver().resolve(candidate: candidate, provider: fixture.provider)
+
+        #expect(resolved.resolvedTargets.count == 1)
+        #expect(resolved.resolvedTargets.first?.displayName == "Groceries")
+        #expect(resolved.resolvedTargets.first?.sourceID == groceries.id)
+        #expect(resolved.unresolvedMentions.isEmpty)
+        #expect(resolved.ambiguousMentions.isEmpty)
+    }
+
+    @Test func validator_lookupDetailsClarifiesAmbiguousSemanticFilters() throws {
+        let fixture = try makeFixture()
+        fixture.context.insert(Card(name: "Apple", workspace: fixture.workspace))
+        fixture.context.insert(Category(name: "Apple", hexColor: "#00AA00", workspace: fixture.workspace))
+        try fixture.context.save()
+
+        let query = MarinaSemanticQuery(
+            subject: .cards,
+            operation: .lookupDetails,
+            filters: [
+                MarinaFilter(
+                    role: .primaryTarget,
+                    relationship: .unknown,
+                    value: "Apple",
+                    entityTypeHint: nil,
+                    allowedEntityTypeHints: [.card, .category]
+                )
+            ],
+            responseShape: .summaryCard
+        )
+
+        let resolved = MarinaQueryResolver().resolve(query: query, provider: fixture.provider)
+        let outcome = MarinaQueryValidator().validate(resolved)
+
+        guard case .clarification(let clarification) = outcome else {
+            Issue.record("Expected lookupDetails to clarify an ambiguous filter.")
+            return
+        }
+        #expect(clarification.kind == .ambiguousTarget)
+        #expect(clarification.actionableChoices.count == 2)
+    }
+
     private struct Fixture {
         let context: ModelContext
         let workspace: Workspace

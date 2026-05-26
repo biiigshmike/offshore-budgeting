@@ -1812,7 +1812,7 @@ struct MarinaSemanticWorkspaceQueryExecutor {
             "uncategorized spend", "average daily spend", "rolling 7 day",
             "share of spend in 2025", "income seasonality", "day of week average",
             "travel 2026", "top merchants by count", "transactions over",
-            "first purchase", "time to next planned expense", "workspace personal",
+            "first purchase", "time to next planned expense",
             "month over month change", "net cash flow", "tip percentage",
             "q2 2026 to date", "note containing reconcile", "refunds ytd",
             "planned expense slip", "zero spend", "top 3 categories by variance",
@@ -1964,10 +1964,6 @@ struct MarinaSemanticWorkspaceQueryExecutor {
         if prompt.contains("time to next planned expense") {
             return nextPlannedExpense(provider: provider, now: now)
         }
-        if prompt.contains("workspace personal") {
-            return workspaceSpendComparison(provider: provider, range: yearToDateRange(now: now))
-        }
-
         return nil
     }
 
@@ -2378,26 +2374,6 @@ struct MarinaSemanticWorkspaceQueryExecutor {
         )
     }
 
-    private func workspaceSpendComparison(provider: MarinaDataProvider, range: HomeQueryDateRange) -> MarinaWorkspaceAggregationCard {
-        let personal = provider.fetchVariableExpenses(workspaceName: "Personal")
-            .filter { contains($0.transactionDate, in: range) }
-            .reduce(0.0) { $0 + SavingsMathService.variableBudgetImpactAmount(for: $1) }
-        let business = provider.fetchVariableExpenses(workspaceName: "Business")
-            .filter { contains($0.transactionDate, in: range) }
-            .reduce(0.0) { $0 + SavingsMathService.variableBudgetImpactAmount(for: $1) }
-        return MarinaWorkspaceAggregationCard(
-            title: "Workspace Spend Comparison",
-            subtitle: rangeLabel(range),
-            primaryValue: currency(personal - business),
-            rows: [
-                .init(label: "Personal", value: currency(personal), amount: personal),
-                .init(label: "Business", value: currency(business), amount: business),
-                .init(label: "Difference", value: delta(personal - business), amount: personal - business)
-            ],
-            traceSummary: "semanticWorkspace=workspaceSpendComparison,personal=\(personal),business=\(business)"
-        )
-    }
-
     private func dataUnavailable(title: String, message: String) -> MarinaWorkspaceAggregationCard {
         MarinaWorkspaceAggregationCard(
             title: title,
@@ -2650,16 +2626,6 @@ struct MarinaQueryExecutor {
                     candidate: candidate
                 )
             )
-        }
-
-        if let semanticCard = MarinaSemanticWorkspaceQueryExecutor().execute(
-            prompt: candidate.rawPrompt,
-            provider: provider,
-            now: now
-        ) {
-            // Compatibility bridge: execute the same protected workspace prompt
-            // shapes after validation dispatch until equivalent typed routes exist.
-            return .handled(workspaceExecution(semanticCard, decision: MarinaSemanticExecutionDecision(route: .aggregate, amountBasis: .budgetImpact)))
         }
 
         let decision = router.decision(validationOutcome: validationOutcome, semanticResolved: semanticResolved)

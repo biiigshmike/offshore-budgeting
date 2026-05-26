@@ -14,6 +14,7 @@ struct MarinaExecutionTrace: Equatable {
     let foundationModelFailureCategory: String?
     let foundationModelFailureDebugSummary: String?
     let foundationRepairSummary: String?
+    let foundationTranscriptSummary: String?
     let liveEnvelopeSummary: String?
     let canonicalRouteSummary: String?
     let routeOverrideSummary: String?
@@ -176,6 +177,13 @@ final class MarinaTraceRecorder {
         guard isEnabled else { return }
         mutate { draft in
             draft.foundationRepairSummary = summary
+        }
+    }
+
+    func recordFoundationTranscriptSummary(_ summary: String?) {
+        guard isEnabled else { return }
+        mutate { draft in
+            draft.foundationTranscriptSummary = summary
         }
     }
 
@@ -359,6 +367,7 @@ private struct MarinaExecutionTraceDraft {
     var foundationModelFailureCategory: String?
     var foundationModelFailureDebugSummary: String?
     var foundationRepairSummary: String?
+    var foundationTranscriptSummary: String?
     var liveEnvelopeSummary: String?
     var canonicalRouteSummary: String?
     var routeOverrideSummary: String?
@@ -422,6 +431,7 @@ private struct MarinaExecutionTraceDraft {
             foundationModelFailureCategory: foundationModelFailureCategory,
             foundationModelFailureDebugSummary: foundationModelFailureDebugSummary,
             foundationRepairSummary: foundationRepairSummary,
+            foundationTranscriptSummary: foundationTranscriptSummary,
             liveEnvelopeSummary: liveEnvelopeSummary,
             canonicalRouteSummary: canonicalRouteSummary,
             routeOverrideSummary: routeOverrideSummary,
@@ -482,6 +492,7 @@ struct MarinaExecutionTraceSnapshot: Codable, Equatable {
     let foundationModelFailureCategory: String?
     let foundationModelFailureDebugSummary: String?
     let foundationRepairSummary: String?
+    let foundationTranscriptSummary: String?
     let liveEnvelopeSummary: String?
     let canonicalRouteSummary: String?
     let routeOverrideSummary: String?
@@ -530,6 +541,7 @@ struct MarinaExecutionTraceSnapshot: Codable, Equatable {
         self.foundationModelFailureCategory = trace.foundationModelFailureCategory
         self.foundationModelFailureDebugSummary = trace.foundationModelFailureDebugSummary.map(marinaSanitizedDebugSummary)
         self.foundationRepairSummary = trace.foundationRepairSummary
+        self.foundationTranscriptSummary = trace.foundationTranscriptSummary
         self.liveEnvelopeSummary = trace.liveEnvelopeSummary
         self.canonicalRouteSummary = trace.canonicalRouteSummary
         self.routeOverrideSummary = trace.routeOverrideSummary
@@ -573,6 +585,7 @@ struct MarinaExecutionTraceSnapshot: Codable, Equatable {
             foundationModelFailureStep.map { "foundationStep=\($0)" },
             foundationModelFailureCategory.map { "foundationCategory=\($0)" },
             foundationRepairSummary.map { "foundationRepair=\($0)" },
+            foundationTranscriptSummary.map { "foundationTranscript=\($0)" },
             liveEnvelopeSummary.map { "liveEnvelope=\($0)" },
             canonicalRouteSummary.map { "canonicalRoute=\($0)" },
             routeOverrideSummary.map { "routeOverride=\($0)" },
@@ -669,7 +682,8 @@ extension MarinaExecutionTrace {
             "surfaceRecovery=\(responseSurfaceRecoveryReason?.rawValue ?? "nil")",
             foundationModelFailureStep.map { "foundationStep=\($0)" },
             foundationModelFailureCategory.map { "foundationCategory=\($0)" },
-            foundationRepairSummary.map { "foundationRepair=\($0)" }
+            foundationRepairSummary.map { "foundationRepair=\($0)" },
+            foundationTranscriptSummary.map { "foundationTranscript=\($0)" }
         ]
         .compactMap { $0 }
         .joined(separator: " | ")

@@ -351,6 +351,15 @@ struct MarinaQueryCapabilityMatrix {
             requestedDetails: [nil, .general, .balance, .account],
             preferredExecutorRoute: .workspaceAggregation
         ),
+        .reconciliationActivity: RouteCapabilityRecord(
+            kind: .reconciliationActivity,
+            operations: [.listRows, .rank],
+            measures: [.reconciliationBalance],
+            groupings: [.allocationAccount],
+            targetTypes: [.allocationAccount],
+            requestedDetails: [nil, .general, .date, .amount],
+            preferredExecutorRoute: .composableWorkspace
+        ),
         .allocationRows: RouteCapabilityRecord(
             kind: .allocationRows,
             operations: [.listRows, .rank],

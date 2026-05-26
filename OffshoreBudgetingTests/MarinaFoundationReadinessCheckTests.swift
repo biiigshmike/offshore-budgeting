@@ -54,7 +54,7 @@ struct MarinaFoundationReadinessCheckTests {
         #expect(status(.deterministicExecution, in: report) == .skipped)
     }
 
-    @Test func readiness_deterministicFailureIsReportedWithoutAvailabilityFallback() async throws {
+    @Test func readiness_weakUnsupportedTypedIntentCanBeRescuedByAnswerFirstCompiler() async throws {
         let fixture = try makeFixture()
         let prompt = MarinaFoundationReadinessCheck.diagnosticPrompt
         let check = MarinaFoundationReadinessCheck(
@@ -67,9 +67,9 @@ struct MarinaFoundationReadinessCheckTests {
 
         let report = await check.run(context: turnContext(provider: fixture.provider))
 
-        #expect(report.passed == false)
+        #expect(report.passed)
         #expect(status(.typedInterpretation, in: report) == .passed)
-        #expect(status(.deterministicExecution, in: report) == .failed)
+        #expect(status(.deterministicExecution, in: report) == .passed)
     }
 
     @Test func readiness_marinaPreferenceOffSkipsAllRuntimeChecks() async throws {
