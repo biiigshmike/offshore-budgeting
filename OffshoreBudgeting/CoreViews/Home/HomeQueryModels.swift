@@ -298,6 +298,7 @@ struct HomeAnswer: Identifiable, Codable, Equatable {
 struct MarinaClarificationChoice: Identifiable, Codable, Equatable, Sendable {
     let id: UUID
     let title: String
+    let kindLabel: String?
     let subtitle: String?
     let aliases: [String]
     let request: MarinaSemanticRequest
@@ -305,12 +306,14 @@ struct MarinaClarificationChoice: Identifiable, Codable, Equatable, Sendable {
     init(
         id: UUID = UUID(),
         title: String,
+        kindLabel: String? = nil,
         subtitle: String? = nil,
         aliases: [String],
         request: MarinaSemanticRequest
     ) {
         self.id = id
         self.title = title
+        self.kindLabel = kindLabel
         self.subtitle = subtitle
         self.aliases = aliases
         self.request = request

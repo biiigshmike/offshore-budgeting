@@ -114,6 +114,7 @@ struct MarinaSemanticRequest: Codable, Equatable, Sendable {
     var targetName: String?
     var comparisonTargetName: String?
     var textQuery: String?
+    var targetDisplayName: String?
     var resultLimit: Int?
     var sort: MarinaSemanticSort?
     var expenseScope: MarinaSemanticExpenseScope?
@@ -132,6 +133,7 @@ struct MarinaSemanticRequest: Codable, Equatable, Sendable {
         targetName: String? = nil,
         comparisonTargetName: String? = nil,
         textQuery: String? = nil,
+        targetDisplayName: String? = nil,
         resultLimit: Int? = nil,
         sort: MarinaSemanticSort? = nil,
         expenseScope: MarinaSemanticExpenseScope? = nil,
@@ -149,6 +151,7 @@ struct MarinaSemanticRequest: Codable, Equatable, Sendable {
         self.targetName = targetName
         self.comparisonTargetName = comparisonTargetName
         self.textQuery = textQuery
+        self.targetDisplayName = targetDisplayName
         self.resultLimit = resultLimit
         self.sort = sort
         self.expenseScope = expenseScope

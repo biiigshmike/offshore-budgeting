@@ -216,7 +216,7 @@ struct MarinaSemanticPromptSuiteTests {
     }
 
     @Test func clarification_appleMerchantOrCardStoresExecutableChoices() async throws {
-        let fixture = try makeFixture(includeAppleMerchantExpense: false)
+        let fixture = try makeFixture(includeAppleMerchantExpense: true)
         let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
 
         let clarification = await answer("How much did I spend on Apple?", using: brain, fixture: fixture)
@@ -228,28 +228,33 @@ struct MarinaSemanticPromptSuiteTests {
             return
         }
 
-        #expect(choices.choices.map(\.title).contains("Apple Text"))
+        #expect(choices.choices.map(\.title).contains("Apple Store"))
         #expect(choices.choices.map(\.title).contains("Apple Card"))
+        #expect(choices.choice(matching: "Apple Store")?.kindLabel == "Expense match")
+        #expect(choices.choice(matching: "Apple Card")?.kindLabel == "Card")
+        #expect(choices.choices.contains { $0.title.contains("Text") } == false)
 
         let merchantChoice = try #require(choices.choice(matching: "merchant"))
         let merchantAnswer = await answer(merchantChoice.request, prompt: "merchant", using: brain, fixture: fixture)
-        #expect(merchantAnswer.kind == .message)
-        #expect(merchantAnswer.title == "No Results Found")
-        #expect(merchantAnswer.subtitle?.contains("Apple") == true)
-        let includesAppleSearchRow = merchantAnswer.rows.contains { row in
-            row.title == "Search" && row.value == "Apple"
-        }
-        #expect(includesAppleSearchRow)
-        guard case .clarificationChoices(let followUpChoices)? = merchantAnswer.attachment else {
-            Issue.record("Expected no-results follow-up choice.")
-            return
-        }
-        #expect(followUpChoices.choice(matching: "card")?.title == "Apple Card")
+        #expect(merchantAnswer.kind == .metric)
+        #expect(merchantAnswer.title == "Apple Store Spend")
+        #expect((merchantAnswer.primaryValue ?? "").contains("300"))
 
         let cardChoice = try #require(choices.choice(matching: "Apple Card"))
         let cardAnswer = await answer(cardChoice.request, prompt: "Apple Card", using: brain, fixture: fixture)
         #expect(cardAnswer.kind == .metric)
         #expect(cardAnswer.title == "Apple Card Spend")
+    }
+
+    @Test func resolver_appleCardOnlyDoesNotOfferSyntheticTextChoice() async throws {
+        let fixture = try makeFixture(includeAppleMerchantExpense: false)
+        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+
+        let answer = await answer("How much did I spend on Apple?", using: brain, fixture: fixture)
+
+        #expect(answer.kind == .metric)
+        #expect(answer.title == "Apple Card Spend")
+        #expect(answer.attachment == nil)
     }
 
     @Test func resolver_groceryAmbiguityCreatesExecutableCategoryAndTextChoices() async throws {
@@ -265,8 +270,15 @@ struct MarinaSemanticPromptSuiteTests {
             return
         }
 
-        #expect(choices.choices.map(\.title).contains("Groceries Category"))
-        #expect(choices.choices.map(\.title).contains("Grocery Text"))
+        #expect(choices.choices.map(\.title).contains("Groceries"))
+        #expect(choices.choices.map(\.title).contains("Grocery Envelope"))
+        #expect(choices.choices.map(\.title).contains("Target groceries"))
+        #expect(choices.choices.map(\.title).contains("All expense matches for \"Grocery\""))
+        #expect(choices.choice(matching: "category")?.kindLabel == "Category")
+        #expect(choices.choice(matching: "Grocery Envelope")?.kindLabel == "Planned expense match")
+        #expect(choices.choice(matching: "Target groceries")?.kindLabel == "Expense match")
+        #expect(choices.choice(matching: "description")?.kindLabel == "Expense search")
+        #expect(choices.choices.contains { $0.title.contains("Text") } == false)
 
         let categoryChoice = try #require(choices.choice(matching: "category"))
         let categoryAnswer = await answer(categoryChoice.request, prompt: "category", using: brain, fixture: fixture)
@@ -274,11 +286,60 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(categoryAnswer.title == "Groceries Spend")
         #expect((categoryAnswer.primaryValue ?? "").contains("190"))
 
-        let textChoice = try #require(choices.choice(matching: "text"))
-        let textAnswer = await answer(textChoice.request, prompt: "text", using: brain, fixture: fixture)
+        let textChoice = try #require(choices.choice(matching: "description"))
+        let textAnswer = await answer(textChoice.request, prompt: "description", using: brain, fixture: fixture)
         #expect(textAnswer.kind == .metric)
-        #expect(textAnswer.title == "Grocery Spend")
+        #expect(textAnswer.title == "All expense matches for \"Grocery\" Spend")
         #expect((textAnswer.primaryValue ?? "").contains("190"))
+    }
+
+    @Test func resolver_expenseMatchChoiceUsesStoredTitleInButtonAndAnswer() async throws {
+        let fixture = try makeFixture(includeGroceryOutletExpense: true)
+        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+
+        let clarification = await answer("How much did I spend on Grocery?", using: brain, fixture: fixture)
+        guard case .clarificationChoices(let choices)? = clarification.attachment else {
+            Issue.record("Expected Grocery clarification choices.")
+            return
+        }
+
+        let groceryOutletChoice = try #require(choices.choice(matching: "Grocery Outlet of Midt"))
+        #expect(groceryOutletChoice.title == "Grocery Outlet of Midt")
+        #expect(groceryOutletChoice.kindLabel == "Expense match")
+        #expect(choices.choices.contains { $0.title.contains("Text") } == false)
+
+        let answer = await answer(groceryOutletChoice.request, prompt: "Grocery Outlet of Midt", using: brain, fixture: fixture)
+        #expect(answer.kind == .metric)
+        #expect(answer.title == "Grocery Outlet of Midt Spend")
+        #expect((answer.primaryValue ?? "").contains("42"))
+    }
+
+    @Test func resolver_multipleExpenseTextMatchesUsesExplicitAggregateChoice() async throws {
+        let fixture = try makeFixture()
+        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+
+        let clarification = await answer("Show Grocery expenses", using: brain, fixture: fixture)
+        guard case .clarificationChoices(let choices)? = clarification.attachment else {
+            Issue.record("Expected Grocery list clarification choices.")
+            return
+        }
+
+        let aggregate = try #require(choices.choice(matching: "description"))
+        #expect(aggregate.title == "All expense matches for \"Grocery\"")
+        #expect(aggregate.kindLabel == "Expense search")
+        #expect(choices.choices.contains { $0.title.contains("Text") } == false)
+    }
+
+    @Test func resolver_categoryOnlySpendTargetAutoResolvesWithoutTextChoice() async throws {
+        let fixture = try makeFixture(includeTransportationCategory: true)
+        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+
+        let answer = await answer("What did I spend on Transportation?", using: brain, fixture: fixture)
+
+        #expect(answer.kind == .metric)
+        #expect(answer.title == "Transportation Spend")
+        #expect(answer.attachment == nil)
+        #expect((answer.primaryValue ?? "").contains("60"))
     }
 
     @Test func resolver_showGroceryExpensesCanResolveCategoryOrExpenseTextLists() async throws {
@@ -717,7 +778,11 @@ struct MarinaSemanticPromptSuiteTests {
         }
     }
 
-    private func makeFixture(includeAppleMerchantExpense: Bool = true) throws -> Fixture {
+    private func makeFixture(
+        includeAppleMerchantExpense: Bool = true,
+        includeTransportationCategory: Bool = false,
+        includeGroceryOutletExpense: Bool = false
+    ) throws -> Fixture {
         let context = try makeContext()
         let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
         let otherWorkspace = Workspace(name: "Work", hexColor: "#14B8A6")
@@ -729,6 +794,9 @@ struct MarinaSemanticPromptSuiteTests {
         let groceries = Category(name: "Groceries", hexColor: "#16A34A", workspace: workspace)
         let dining = Category(name: "Dining", hexColor: "#F97316", workspace: workspace)
         let bills = Category(name: "Bills", hexColor: "#2563EB", workspace: workspace)
+        let transportation = includeTransportationCategory
+            ? Category(name: "Transportation", hexColor: "#0F766E", workspace: workspace)
+            : nil
 
         let currentBudget = Budget(
             name: "April 2026",
@@ -834,6 +902,26 @@ struct MarinaSemanticPromptSuiteTests {
                 category: bills
             )
             : nil
+        let groceryOutlet = includeGroceryOutletExpense
+            ? VariableExpense(
+                descriptionText: "Grocery Outlet of Midt",
+                amount: 42,
+                transactionDate: date(2026, 4, 12),
+                workspace: workspace,
+                card: chase,
+                category: groceries
+            )
+            : nil
+        let trainFare = transportation.map { category in
+            VariableExpense(
+                descriptionText: "Train fare",
+                amount: 60,
+                transactionDate: date(2026, 4, 14),
+                workspace: workspace,
+                card: chase,
+                category: category
+            )
+        }
         let targetMarch = VariableExpense(
             descriptionText: "Target groceries",
             amount: 45,
@@ -892,6 +980,9 @@ struct MarinaSemanticPromptSuiteTests {
         context.insert(groceries)
         context.insert(dining)
         context.insert(bills)
+        if let transportation {
+            context.insert(transportation)
+        }
         context.insert(currentBudget)
         context.insert(groceriesLimit)
         context.insert(previousBudget)
@@ -905,6 +996,12 @@ struct MarinaSemanticPromptSuiteTests {
         context.insert(starbucks)
         if let appleStore {
             context.insert(appleStore)
+        }
+        if let groceryOutlet {
+            context.insert(groceryOutlet)
+        }
+        if let trainFare {
+            context.insert(trainFare)
         }
         context.insert(targetMarch)
         context.insert(actualPaycheck)

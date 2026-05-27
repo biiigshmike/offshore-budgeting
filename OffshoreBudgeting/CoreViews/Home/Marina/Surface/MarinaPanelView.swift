@@ -53,6 +53,8 @@ struct MarinaPanelView: View {
     private var defaultBudgetingPeriodRaw: String = BudgetingPeriod.monthly.rawValue
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     private let conversationStore = MarinaConversationStore()
     private let mutationService = MarinaMutationService()
@@ -432,6 +434,17 @@ struct MarinaPanelView: View {
         BudgetingPeriod(rawValue: defaultBudgetingPeriodRaw) ?? .monthly
     }
 
+    private var shouldStackClarificationChoices: Bool {
+        horizontalSizeClass == .compact || dynamicTypeSize.isAccessibilitySize
+    }
+
+    private var clarificationChoiceColumns: [GridItem] {
+        if shouldStackClarificationChoices {
+            return [GridItem(.flexible(), spacing: 8)]
+        }
+        return [GridItem(.adaptive(minimum: 190, maximum: 280), spacing: 8)]
+    }
+
     private static func randomStarterPrompts() -> [String] {
         Array(starterPromptPool.shuffled().prefix(4))
     }
@@ -479,7 +492,7 @@ struct MarinaPanelView: View {
     @ViewBuilder
     private func clarificationChoicesView(_ choices: MarinaClarificationChoices, answerID: UUID) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
+            LazyVGrid(columns: clarificationChoiceColumns, alignment: .leading, spacing: 8) {
                 ForEach(choices.choices) { choice in
                     Button {
                         resolveClarification(
@@ -488,15 +501,14 @@ struct MarinaPanelView: View {
                             replyPrompt: choice.title
                         )
                     } label: {
-                        Label(
-                            choice.title,
-                            systemImage: choices.resolvedChoiceID == choice.id ? "checkmark.circle.fill" : "arrow.turn.down.right"
+                        MarinaClarificationChoiceButton(
+                            choice: choice,
+                            isResolved: choices.resolvedChoiceID == choice.id
                         )
-                        .lineLimit(1)
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.plain)
                     .disabled(isResponding || choices.isResolved)
-                    .accessibilityLabel(choice.subtitle ?? choice.title)
+                    .accessibilityLabel(accessibilityLabel(for: choice))
                 }
             }
 
@@ -507,6 +519,13 @@ struct MarinaPanelView: View {
                     .foregroundStyle(.secondary)
             }
         }
+    }
+
+    private func accessibilityLabel(for choice: MarinaClarificationChoice) -> String {
+        let parts = [choice.title, choice.kindLabel, choice.subtitle]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { $0.isEmpty == false }
+        return parts.joined(separator: ", ")
     }
 
     private func clarificationChoices(for answer: HomeAnswer) -> MarinaClarificationChoices? {
@@ -951,6 +970,54 @@ private enum AssistantPanelToolbarStyle {
 #else
         return false
 #endif
+    }
+}
+
+private struct MarinaClarificationChoiceButton: View {
+    let choice: MarinaClarificationChoice
+    let isResolved: Bool
+
+    @Environment(\.isEnabled) private var isEnabled
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: isResolved ? "checkmark.circle.fill" : "arrow.turn.down.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Color("AccentColor"))
+                .frame(width: 18, height: 20, alignment: .center)
+                .padding(.top, 1)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(choice.title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Color("AccentColor"))
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if let kindLabel = choice.kindLabel, kindLabel.isEmpty == false {
+                    Text(kindLabel)
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color("AccentColor").opacity(isResolved ? 0.18 : 0.12))
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color("AccentColor").opacity(isResolved ? 0.32 : 0.16), lineWidth: 1)
+        }
+        .opacity(isEnabled ? 1 : 0.62)
+        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 }
 

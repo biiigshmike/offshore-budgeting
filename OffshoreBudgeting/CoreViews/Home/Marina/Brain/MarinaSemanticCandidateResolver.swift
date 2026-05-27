@@ -1,6 +1,11 @@
 import Foundation
 
 struct MarinaSemanticCandidateResolver {
+    private struct ExpenseTextCandidate {
+        let title: String
+        let kindLabel: String
+    }
+
     func resolve(
         interpreted: MarinaInterpretedSemanticRequest,
         snapshot: MarinaWorkspaceSnapshot
@@ -54,7 +59,13 @@ struct MarinaSemanticCandidateResolver {
             )
         }
 
-        return interpreted
+        notes.append("Candidate resolver found no valid meanings for \"\(target)\".")
+        return interpretedWith(
+            request: unsupportedRequest(.unresolvedEntity),
+            interpreted: interpreted,
+            notes: notes,
+            choices: interpreted.clarificationChoices
+        )
     }
 
     private func interpretedWith(
@@ -101,7 +112,8 @@ struct MarinaSemanticCandidateResolver {
         for category in matchingCategories(target, snapshot: snapshot) {
             choices.append(
                 MarinaClarificationChoice(
-                    title: "\(category.name) Category",
+                    title: category.name,
+                    kindLabel: "Category",
                     subtitle: "Use the \(category.name) category.",
                     aliases: aliases(for: category.name) + ["category"],
                     request: categoryRequest(categoryName: category.name, baseRequest: baseRequest)
@@ -109,21 +121,13 @@ struct MarinaSemanticCandidateResolver {
             )
         }
 
-        if shouldOfferExpenseText(for: target, baseRequest: baseRequest, snapshot: snapshot) {
-            choices.append(
-                MarinaClarificationChoice(
-                    title: "\(displayTarget(target)) Text",
-                    subtitle: "Search expense titles and descriptions for \(displayTarget(target)).",
-                    aliases: aliases(for: target) + ["merchant", "store", "vendor", "text", "title", "description", "expense"],
-                    request: expenseTextRequest(textQuery: target, baseRequest: baseRequest)
-                )
-            )
-        }
+        choices.append(contentsOf: expenseTextChoices(for: target, baseRequest: baseRequest, snapshot: snapshot))
 
         for card in matchingCards(target, snapshot: snapshot) {
             choices.append(
                 MarinaClarificationChoice(
                     title: card.name,
+                    kindLabel: "Card",
                     subtitle: "Use \(card.name) as the card.",
                     aliases: aliases(for: card.name) + ["card"],
                     request: cardRequest(cardName: card.name, baseRequest: baseRequest)
@@ -198,6 +202,7 @@ struct MarinaSemanticCandidateResolver {
                 dimensions: [.category],
                 dateRangeToken: baseRequest.dateRangeToken,
                 targetName: categoryName,
+                targetDisplayName: categoryName,
                 resultLimit: baseRequest.resultLimit,
                 sort: baseRequest.sort ?? .dateDescending,
                 expenseScope: .unified,
@@ -212,12 +217,17 @@ struct MarinaSemanticCandidateResolver {
             dimensions: [.category],
             dateRangeToken: baseRequest.dateRangeToken,
             targetName: categoryName,
+            targetDisplayName: categoryName,
             expenseScope: .unified,
             expectedAnswerShape: .metric
         )
     }
 
-    private func expenseTextRequest(textQuery: String, baseRequest: MarinaSemanticRequest) -> MarinaSemanticRequest {
+    private func expenseTextRequest(
+        textQuery: String,
+        displayName: String,
+        baseRequest: MarinaSemanticRequest
+    ) -> MarinaSemanticRequest {
         let operation: MarinaSemanticOperation
         switch baseRequest.operation {
         case .list, .last, .sum, .average, .count:
@@ -233,6 +243,7 @@ struct MarinaSemanticCandidateResolver {
             dimensions: [.merchantText],
             dateRangeToken: baseRequest.dateRangeToken,
             textQuery: textQuery,
+            targetDisplayName: displayName,
             resultLimit: baseRequest.resultLimit,
             sort: baseRequest.sort ?? .dateDescending,
             expenseScope: .unified,
@@ -249,6 +260,7 @@ struct MarinaSemanticCandidateResolver {
                 dimensions: [.card],
                 dateRangeToken: baseRequest.dateRangeToken,
                 targetName: cardName,
+                targetDisplayName: cardName,
                 resultLimit: baseRequest.resultLimit,
                 sort: baseRequest.sort ?? .dateDescending,
                 expenseScope: .unified,
@@ -263,20 +275,55 @@ struct MarinaSemanticCandidateResolver {
             dimensions: [.card],
             dateRangeToken: baseRequest.dateRangeToken,
             targetName: cardName,
+            targetDisplayName: cardName,
             expenseScope: .unified,
             expectedAnswerShape: .metric
         )
     }
 
-    private func shouldOfferExpenseText(
+    private func expenseTextChoices(
         for target: String,
         baseRequest: MarinaSemanticRequest,
         snapshot: MarinaWorkspaceSnapshot
-    ) -> Bool {
-        if baseRequest.entity == .variableExpense || baseRequest.entity == .plannedExpense {
-            return true
+    ) -> [MarinaClarificationChoice] {
+        let candidates = matchingExpenseTextCandidates(target, snapshot: snapshot)
+        guard candidates.isEmpty == false else { return [] }
+
+        let maxSpecificChoices = 3
+        let genericAliases = ["merchant", "store", "vendor", "expense", "expenses", "title", "description", "search"]
+        var choices = candidates.prefix(maxSpecificChoices).map { candidate in
+            let aliases = aliases(for: candidate.title) + (candidates.count == 1 ? genericAliases : ["expense match"])
+            return MarinaClarificationChoice(
+                title: candidate.title,
+                kindLabel: candidate.kindLabel,
+                subtitle: "Search expense titles and descriptions for \(candidate.title).",
+                aliases: aliases,
+                request: expenseTextRequest(
+                    textQuery: candidate.title,
+                    displayName: candidate.title,
+                    baseRequest: baseRequest
+                )
+            )
         }
-        return expenseTextExists(target, snapshot: snapshot)
+
+        if candidates.count > 1 {
+            let displayName = "All expense matches for \"\(displayTarget(target))\""
+            choices.append(
+                MarinaClarificationChoice(
+                    title: displayName,
+                    kindLabel: "Expense search",
+                    subtitle: "Search every expense title and description matching \(displayTarget(target)).",
+                    aliases: aliases(for: target) + genericAliases,
+                    request: expenseTextRequest(
+                        textQuery: target,
+                        displayName: displayName,
+                        baseRequest: baseRequest
+                    )
+                )
+            )
+        }
+
+        return choices
     }
 
     private func targetText(from request: MarinaSemanticRequest) -> String? {
@@ -297,6 +344,15 @@ struct MarinaSemanticCandidateResolver {
             expectedAnswerShape: .clarification,
             clarificationQuestion: question,
             unsupportedReason: .ambiguousEntity
+        )
+    }
+
+    private func unsupportedRequest(_ reason: MarinaSemanticUnsupportedReason) -> MarinaSemanticRequest {
+        MarinaSemanticRequest(
+            entity: .workspace,
+            operation: .list,
+            expectedAnswerShape: .unsupported,
+            unsupportedReason: reason
         )
     }
 
@@ -328,15 +384,51 @@ struct MarinaSemanticCandidateResolver {
         Array(Set(snapshot.incomes.map(\.source))).filter { matches($0, target: target) }
     }
 
-    private func expenseTextExists(_ target: String, snapshot: MarinaWorkspaceSnapshot) -> Bool {
-        snapshot.variableExpenses.contains { matches($0.descriptionText, target: target) }
-            || snapshot.plannedExpenses.contains { matches($0.title, target: target) }
+    private func matchingExpenseTextCandidates(
+        _ target: String,
+        snapshot: MarinaWorkspaceSnapshot
+    ) -> [ExpenseTextCandidate] {
+        var candidates: [ExpenseTextCandidate] = []
+        var seen: Set<String> = []
+
+        func append(_ title: String, kindLabel: String) {
+            let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard trimmed.isEmpty == false, matches(trimmed, target: target) else { return }
+            let key = canonical(trimmed)
+            guard seen.contains(key) == false else { return }
+            seen.insert(key)
+            candidates.append(ExpenseTextCandidate(title: trimmed, kindLabel: kindLabel))
+        }
+
+        for expense in snapshot.variableExpenses {
+            append(expense.descriptionText, kindLabel: "Expense match")
+        }
+        for expense in snapshot.plannedExpenses {
+            append(expense.title, kindLabel: "Planned expense match")
+        }
+
+        return candidates.sorted { left, right in
+            let leftRank = matchRank(left.title, target: target)
+            let rightRank = matchRank(right.title, target: target)
+            if leftRank != rightRank { return leftRank < rightRank }
+            return left.title.localizedCaseInsensitiveCompare(right.title) == .orderedAscending
+        }
     }
 
     private func matches(_ candidate: String, target: String) -> Bool {
         let candidate = canonical(candidate)
         let target = canonical(target)
         return candidate == target || candidate.contains(target) || target.contains(candidate)
+    }
+
+    private func matchRank(_ candidate: String, target: String) -> Int {
+        let candidate = canonical(candidate)
+        let target = canonical(target)
+        if candidate == target { return 0 }
+        if candidate.hasPrefix(target) { return 1 }
+        if candidate.contains(target) { return 2 }
+        if target.contains(candidate) { return 3 }
+        return 4
     }
 
     private func canonical(_ value: String) -> String {
@@ -382,7 +474,7 @@ struct MarinaSemanticCandidateResolver {
         var seen: Set<String> = []
         var result: [MarinaClarificationChoice] = []
         for choice in choices {
-            let key = canonical(choice.title)
+            let key = "\(canonical(choice.title))|\(choice.kindLabel ?? "")"
             guard seen.contains(key) == false else { continue }
             seen.insert(key)
             result.append(choice)

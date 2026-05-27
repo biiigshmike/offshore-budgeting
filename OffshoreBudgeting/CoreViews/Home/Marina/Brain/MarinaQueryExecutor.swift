@@ -694,12 +694,18 @@ struct MarinaQueryExecutor {
             return nil
         }
 
+        let expenseDisplay = expenseTextChoiceDisplay(for: textQuery, plan: plan, snapshot: snapshot)
         var choices: [MarinaClarificationChoice] = [
             MarinaClarificationChoice(
-                title: "Merchant",
+                title: expenseDisplay.title,
+                kindLabel: expenseDisplay.kindLabel,
                 subtitle: "Search expense titles and descriptions for \(textQuery).",
                 aliases: ["merchant", "store", "vendor"],
-                request: merchantSpendRequest(textQuery: textQuery, dateRangeToken: plan.semanticRequest.dateRangeToken)
+                request: merchantSpendRequest(
+                    textQuery: textQuery,
+                    displayName: expenseDisplay.title,
+                    dateRangeToken: plan.semanticRequest.dateRangeToken
+                )
             )
         ]
 
@@ -707,6 +713,7 @@ struct MarinaQueryExecutor {
             choices.append(
                 MarinaClarificationChoice(
                     title: matchingCard.name,
+                    kindLabel: "Card",
                     subtitle: "Use \(matchingCard.name) as the card.",
                     aliases: ["card", matchingCard.name, "apple card"],
                     request: cardSpendRequest(cardName: matchingCard.name, dateRangeToken: plan.semanticRequest.dateRangeToken)
@@ -720,6 +727,37 @@ struct MarinaQueryExecutor {
         )
     }
 
+    private func expenseTextChoiceDisplay(
+        for textQuery: String,
+        plan: MarinaQueryPlan,
+        snapshot: MarinaWorkspaceSnapshot
+    ) -> (title: String, kindLabel: String) {
+        var seen: Set<String> = []
+        let titles = expenseRows(
+            snapshot: snapshot,
+            scope: .unified,
+            range: plan.dateRange
+        )
+            .map(\.title)
+            .filter { textMatches($0, query: textQuery) }
+            .compactMap { title -> String? in
+                let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard trimmed.isEmpty == false else { return nil }
+                let key = canonicalText(trimmed)
+                guard seen.contains(key) == false else { return nil }
+                seen.insert(key)
+                return trimmed
+            }
+
+        if titles.count == 1, let title = titles.first {
+            return (title, "Expense match")
+        }
+        if titles.isEmpty {
+            return (textQuery, "Expense search")
+        }
+        return ("All expense matches for \"\(textQuery)\"", "Expense search")
+    }
+
     private func merchantCardFollowUpChoices(
         for textQuery: String,
         plan: MarinaQueryPlan,
@@ -731,6 +769,7 @@ struct MarinaQueryExecutor {
             choices: [
                 MarinaClarificationChoice(
                     title: matchingCard.name,
+                    kindLabel: "Card",
                     subtitle: "Use \(matchingCard.name) as the card.",
                     aliases: ["card", matchingCard.name, "apple card"],
                     request: cardSpendRequest(cardName: matchingCard.name, dateRangeToken: plan.semanticRequest.dateRangeToken)
@@ -739,7 +778,11 @@ struct MarinaQueryExecutor {
         )
     }
 
-    private func merchantSpendRequest(textQuery: String, dateRangeToken: MarinaSemanticDateRangeToken) -> MarinaSemanticRequest {
+    private func merchantSpendRequest(
+        textQuery: String,
+        displayName: String? = nil,
+        dateRangeToken: MarinaSemanticDateRangeToken
+    ) -> MarinaSemanticRequest {
         MarinaSemanticRequest(
             entity: .variableExpense,
             operation: .sum,
@@ -747,6 +790,7 @@ struct MarinaQueryExecutor {
             dimensions: [.merchantText],
             dateRangeToken: dateRangeToken,
             textQuery: textQuery,
+            targetDisplayName: displayName,
             expenseScope: .unified,
             expectedAnswerShape: .metric
         )
@@ -760,6 +804,7 @@ struct MarinaQueryExecutor {
             dimensions: [.card],
             dateRangeToken: dateRangeToken,
             targetName: cardName,
+            targetDisplayName: cardName,
             expenseScope: .unified,
             expectedAnswerShape: .metric
         )
@@ -857,6 +902,9 @@ struct MarinaQueryExecutor {
     }
 
     private func expenseTargetTitle(plan: MarinaQueryPlan, fallback: String) -> String {
+        if let targetDisplayName = plan.semanticRequest.targetDisplayName, targetDisplayName.isEmpty == false {
+            return targetDisplayName
+        }
         if plan.dimensions.contains(.merchantText), let textQuery = plan.semanticRequest.textQuery {
             return textQuery
         }
