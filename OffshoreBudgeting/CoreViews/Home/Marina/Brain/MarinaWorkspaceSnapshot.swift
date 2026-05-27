@@ -9,6 +9,9 @@ struct MarinaWorkspaceSnapshot {
     let presets: [Preset]
     let plannedExpenses: [PlannedExpense]
     let variableExpenses: [VariableExpense]
+    let homePlannedExpenses: [PlannedExpense]
+    let homeCalculationPlannedExpenses: [PlannedExpense]
+    let homeCalculationVariableExpenses: [VariableExpense]
     let reconciliationAccounts: [AllocationAccount]
     let expenseAllocations: [ExpenseAllocation]
     let allocationSettlements: [AllocationSettlement]
@@ -19,7 +22,12 @@ struct MarinaWorkspaceSnapshot {
 
 @MainActor
 struct MarinaWorkspaceSnapshotProvider {
-    func snapshot(for workspace: Workspace, modelContext: ModelContext) throws -> MarinaWorkspaceSnapshot {
+    func snapshot(
+        for workspace: Workspace,
+        modelContext: ModelContext,
+        homeContext: MarinaPanelHomeContext? = nil,
+        now: Date = Date()
+    ) throws -> MarinaWorkspaceSnapshot {
         let workspaceID = workspace.id
 
         let budgets = try modelContext.fetch(
@@ -94,6 +102,23 @@ struct MarinaWorkspaceSnapshotProvider {
                 sortBy: [SortDescriptor(\Income.date, order: .forward)]
             )
         )
+        let existingBudgetIDs = Set(budgets.map(\.id))
+        let homePlannedExpenses = plannedExpenses.filter { expense in
+            guard let sourceBudgetID = expense.sourceBudgetID else {
+                return true
+            }
+            return existingBudgetIDs.contains(sourceBudgetID)
+        }
+        let homeCalculationPlannedExpenses = PlannedExpenseFuturePolicy.filteredForCalculations(
+            homePlannedExpenses,
+            excludeFuture: homeContext?.excludeFuturePlannedExpensesFromCalculations ?? false,
+            now: now
+        )
+        let homeCalculationVariableExpenses = VariableExpenseFuturePolicy.filteredForCalculations(
+            variableExpenses,
+            excludeFuture: homeContext?.excludeFutureVariableExpensesFromCalculations ?? false,
+            now: now
+        )
 
         return MarinaWorkspaceSnapshot(
             workspace: workspace,
@@ -103,6 +128,9 @@ struct MarinaWorkspaceSnapshotProvider {
             presets: presets,
             plannedExpenses: plannedExpenses,
             variableExpenses: variableExpenses,
+            homePlannedExpenses: homePlannedExpenses,
+            homeCalculationPlannedExpenses: homeCalculationPlannedExpenses,
+            homeCalculationVariableExpenses: homeCalculationVariableExpenses,
             reconciliationAccounts: reconciliationAccounts,
             expenseAllocations: expenseAllocations,
             allocationSettlements: allocationSettlements,

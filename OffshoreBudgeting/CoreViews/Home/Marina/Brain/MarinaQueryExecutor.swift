@@ -88,12 +88,8 @@ struct MarinaQueryExecutor {
                   let right = resolveCard(named: rightName, in: snapshot) else {
                 return unsupported(.unresolvedEntity)
             }
-            let leftTotal = expenseRows(snapshot: snapshot, scope: .unified, range: plan.dateRange)
-                .filter { $0.cardID == left.id }
-                .reduce(0.0) { $0 + $1.budgetImpact }
-            let rightTotal = expenseRows(snapshot: snapshot, scope: .unified, range: plan.dateRange)
-                .filter { $0.cardID == right.id }
-                .reduce(0.0) { $0 + $1.budgetImpact }
+            let leftTotal = homeCardMetrics(for: left, plan: plan, snapshot: snapshot).total
+            let rightTotal = homeCardMetrics(for: right, plan: plan, snapshot: snapshot).total
             return comparisonResult(
                 title: "Card Spend Comparison",
                 subtitle: rangeLabel(plan.dateRange),
@@ -105,28 +101,30 @@ struct MarinaQueryExecutor {
         }
 
         guard let targetName = plan.targetName else {
-            let grouped = totalsByCard(snapshot: snapshot, range: plan.dateRange)
+            let grouped = snapshot.cards
+                .map { (name: $0.name, value: homeCardMetrics(for: $0, plan: plan, snapshot: snapshot).total) }
+                .filter { $0.value > 0 }
                 .sorted { $0.value > $1.value }
             return listResult(
                 title: "Card Spend",
                 subtitle: rangeLabel(plan.dateRange),
-                rows: grouped.map { HomeAnswerRow(title: $0.key, value: currency($0.value), amount: $0.value) }
+                rows: grouped.map { HomeAnswerRow(title: $0.name, value: currency($0.value), amount: $0.value) }
             )
         }
 
         guard let card = resolveCard(named: targetName, in: snapshot) else {
             return unsupported(.unresolvedEntity)
         }
-        let total = expenseRows(snapshot: snapshot, scope: .unified, range: plan.dateRange)
-            .filter { $0.cardID == card.id }
-            .reduce(0.0) { $0 + $1.budgetImpact }
+        let metrics = homeCardMetrics(for: card, plan: plan, snapshot: snapshot)
         return MarinaExecutionResult(
             kind: .metric,
             title: "\(card.name) Spend",
             subtitle: rangeLabel(plan.dateRange),
-            primaryValue: currency(total),
+            primaryValue: currency(metrics.total),
             rows: [
-                HomeAnswerRow(title: "Total", value: currency(total), amount: total),
+                HomeAnswerRow(title: "Planned", value: currency(metrics.plannedTotal), amount: metrics.plannedTotal),
+                HomeAnswerRow(title: "Variable", value: currency(metrics.variableTotal), amount: metrics.variableTotal),
+                HomeAnswerRow(title: "Total", value: currency(metrics.total), amount: metrics.total),
                 HomeAnswerRow(title: "Period", value: rangeLabel(plan.dateRange))
             ]
         )
@@ -135,12 +133,25 @@ struct MarinaQueryExecutor {
     // MARK: - Categories
 
     private func categoryResult(plan: MarinaQueryPlan, snapshot: MarinaWorkspaceSnapshot) -> MarinaExecutionResult {
+        if plan.measure == .categoryAvailability {
+            return executionResult(
+                from: homeAnswer(
+                    query: HomeQuery(intent: .categoryAvailabilitySummary, dateRange: plan.dateRange),
+                    snapshot: snapshot,
+                    plan: plan
+                )
+            )
+        }
+
         if plan.operation == .group {
-            let rows = totalsByCategory(snapshot: snapshot, range: plan.dateRange)
-                .sorted { $0.value > $1.value }
-                .prefix(plan.resultLimit)
-                .map { HomeAnswerRow(title: $0.key, value: currency($0.value), amount: $0.value) }
-            return listResult(title: "Top Categories", subtitle: rangeLabel(plan.dateRange), rows: rows)
+            let intent: HomeQueryIntent = plan.dimensions.contains(.date) ? .spendTrendsSummary : .categorySpendShare
+            return executionResult(
+                from: homeAnswer(
+                    query: HomeQuery(intent: intent, dateRange: plan.dateRange, resultLimit: plan.resultLimit),
+                    snapshot: snapshot,
+                    plan: plan
+                )
+            )
         }
 
         if plan.operation == .compare {
@@ -198,7 +209,7 @@ struct MarinaQueryExecutor {
 
     private func presetResult(plan: MarinaQueryPlan, snapshot: MarinaWorkspaceSnapshot) -> MarinaExecutionResult {
         if plan.operation == .next {
-            let planned = snapshot.plannedExpenses
+            let planned = snapshot.homePlannedExpenses
                 .filter { $0.sourcePresetID != nil }
                 .filter { contains($0.expenseDate, in: plan.dateRange) && $0.expenseDate >= calendar.startOfDay(for: plan.now) }
                 .sorted { $0.expenseDate < $1.expenseDate }
@@ -307,14 +318,10 @@ struct MarinaQueryExecutor {
     private func savingsResult(plan: MarinaQueryPlan, snapshot: MarinaWorkspaceSnapshot) -> MarinaExecutionResult {
         if plan.operation == .forecast {
             return executionResult(
-                from: homeEngine.execute(
+                from: homeAnswer(
                     query: HomeQuery(intent: .forecastSavings, dateRange: plan.dateRange),
-                    categories: snapshot.categories,
-                    plannedExpenses: snapshot.plannedExpenses,
-                    variableExpenses: snapshot.variableExpenses,
-                    incomes: snapshot.incomes,
-                    savingsEntries: snapshot.savingsEntries,
-                    now: plan.now
+                    snapshot: snapshot,
+                    plan: plan
                 )
             )
         }
@@ -333,23 +340,12 @@ struct MarinaQueryExecutor {
             )
         }
 
-        let entries = snapshot.savingsEntries.filter { entry in
-            guard let account else { return true }
-            return entry.account?.id == account.id
-        }
-        let actual = SavingsMathService.actualSavingsAdjustmentTotal(
-            from: entries,
-            startDate: plan.dateRange?.startDate ?? .distantPast,
-            endDate: plan.dateRange?.endDate ?? .distantFuture
-        )
-        return MarinaExecutionResult(
-            kind: .metric,
-            title: "\(account?.name ?? "Savings") Adjustments",
-            subtitle: rangeLabel(plan.dateRange),
-            primaryValue: currency(actual),
-            rows: [
-                HomeAnswerRow(title: "Manual adjustments", value: currency(actual), amount: actual)
-            ]
+        return executionResult(
+            from: homeAnswer(
+                query: HomeQuery(intent: .savingsStatus, dateRange: plan.dateRange),
+                snapshot: snapshot,
+                plan: plan
+            )
         )
     }
 
@@ -357,18 +353,12 @@ struct MarinaQueryExecutor {
 
     private func incomeResult(plan: MarinaQueryPlan, snapshot: MarinaWorkspaceSnapshot) -> MarinaExecutionResult {
         if plan.operation == .share {
-            let actual = incomeTotal(snapshot.incomes, range: plan.dateRange, state: .actual, source: nil)
-            let planned = incomeTotal(snapshot.incomes, range: plan.dateRange, state: .planned, source: nil)
-            let percent = planned > 0 ? actual / planned : 0
-            return MarinaExecutionResult(
-                kind: .metric,
-                title: "Actual to Planned Income",
-                subtitle: rangeLabel(plan.dateRange),
-                primaryValue: percent.formatted(.percent.precision(.fractionLength(1))),
-                rows: [
-                    HomeAnswerRow(title: "Actual income", value: currency(actual), amount: actual),
-                    HomeAnswerRow(title: "Planned income", value: currency(planned), amount: planned)
-                ]
+            return executionResult(
+                from: homeAnswer(
+                    query: HomeQuery(intent: .incomeProgressSummary, dateRange: plan.dateRange),
+                    snapshot: snapshot,
+                    plan: plan
+                )
             )
         }
 
@@ -437,14 +427,10 @@ struct MarinaQueryExecutor {
         }
 
         return executionResult(
-            from: homeEngine.execute(
+            from: homeAnswer(
                 query: HomeQuery(intent: plan.measure == .remainingRoom ? .safeSpendToday : .periodOverview, dateRange: plan.dateRange),
-                categories: snapshot.categories,
-                plannedExpenses: snapshot.plannedExpenses,
-                variableExpenses: snapshot.variableExpenses,
-                incomes: snapshot.incomes,
-                savingsEntries: snapshot.savingsEntries,
-                now: plan.now
+                snapshot: snapshot,
+                plan: plan
             )
         )
     }
@@ -452,6 +438,31 @@ struct MarinaQueryExecutor {
     // MARK: - Expenses
 
     private func expenseResult(plan: MarinaQueryPlan, snapshot: MarinaWorkspaceSnapshot) -> MarinaExecutionResult {
+        if plan.operation == .next, plan.entity == .plannedExpense {
+            return executionResult(
+                from: homeAnswer(
+                    query: HomeQuery(
+                        intent: .nextPlannedExpense,
+                        dateRange: plan.dateRange,
+                        targetName: plan.dimensions.contains(.card) ? plan.targetName : nil
+                    ),
+                    snapshot: snapshot,
+                    plan: plan,
+                    plannedExpenses: snapshot.homePlannedExpenses
+                )
+            )
+        }
+
+        if plan.operation == .group, plan.dimensions.contains(.category) {
+            return executionResult(
+                from: homeAnswer(
+                    query: HomeQuery(intent: .spendTrendsSummary, dateRange: plan.dateRange, resultLimit: plan.resultLimit),
+                    snapshot: snapshot,
+                    plan: plan
+                )
+            )
+        }
+
         let rows = filteredExpenseRows(plan: plan, snapshot: snapshot)
 
         if plan.operation == .last {
@@ -622,6 +633,26 @@ struct MarinaQueryExecutor {
         )
     }
 
+    private func homeAnswer(
+        query: HomeQuery,
+        snapshot: MarinaWorkspaceSnapshot,
+        plan: MarinaQueryPlan,
+        plannedExpenses: [PlannedExpense]? = nil,
+        variableExpenses: [VariableExpense]? = nil
+    ) -> HomeAnswer {
+        homeEngine.execute(
+            query: query,
+            budgets: snapshot.budgets,
+            categories: snapshot.categories,
+            presets: snapshot.presets,
+            plannedExpenses: plannedExpenses ?? snapshot.homeCalculationPlannedExpenses,
+            variableExpenses: variableExpenses ?? snapshot.homeCalculationVariableExpenses,
+            incomes: snapshot.incomes,
+            savingsEntries: snapshot.savingsEntries,
+            now: plan.now
+        )
+    }
+
     private func expenseTextNoResultsResult(
         textQuery: String,
         plan: MarinaQueryPlan,
@@ -760,7 +791,7 @@ struct MarinaQueryExecutor {
         var rows: [ExpenseRow] = []
 
         if scope == .planned || scope == .unified {
-            for expense in snapshot.plannedExpenses where contains(expense.expenseDate, in: range) {
+            for expense in snapshot.homeCalculationPlannedExpenses where contains(expense.expenseDate, in: range) {
                 rows.append(
                     ExpenseRow(
                         id: expense.id,
@@ -777,7 +808,7 @@ struct MarinaQueryExecutor {
         }
 
         if scope == .variable || scope == .unified {
-            for expense in snapshot.variableExpenses where contains(expense.transactionDate, in: range) {
+            for expense in snapshot.homeCalculationVariableExpenses where contains(expense.transactionDate, in: range) {
                 rows.append(
                     ExpenseRow(
                         id: expense.id,
@@ -861,6 +892,24 @@ struct MarinaQueryExecutor {
         return totals
     }
 
+    private func homeCardMetrics(
+        for card: Card,
+        plan: MarinaQueryPlan,
+        snapshot: MarinaWorkspaceSnapshot
+    ) -> HomeCardMetrics {
+        let range = plan.dateRange ?? HomeQueryDateRange(startDate: .distantPast, endDate: .distantFuture)
+        return HomeCardMetricsCalculator.metrics(
+            for: card,
+            plannedExpenses: snapshot.homeCalculationPlannedExpenses,
+            variableExpenses: snapshot.homeCalculationVariableExpenses,
+            start: range.startDate,
+            end: range.endDate,
+            excludeFuturePlannedExpenses: false,
+            excludeFutureVariableExpenses: false,
+            now: plan.now
+        )
+    }
+
     private func totalSpend(snapshot: MarinaWorkspaceSnapshot, range: HomeQueryDateRange?) -> Double {
         expenseRows(snapshot: snapshot, scope: .unified, range: range).reduce(0.0) { $0 + $1.budgetImpact }
     }
@@ -874,7 +923,7 @@ struct MarinaQueryExecutor {
 
     private func projectedSavings(snapshot: MarinaWorkspaceSnapshot, range: HomeQueryDateRange?) -> Double {
         let plannedIncome = incomeTotal(snapshot.incomes, range: range, state: .planned, source: nil)
-        let plannedExpenseTotal = snapshot.plannedExpenses
+        let plannedExpenseTotal = snapshot.homeCalculationPlannedExpenses
             .filter { contains($0.expenseDate, in: range) }
             .reduce(0.0) { $0 + SavingsMathService.plannedProjectedBudgetImpactAmount(for: $1) }
         return plannedIncome - plannedExpenseTotal

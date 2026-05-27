@@ -52,10 +52,18 @@ struct MarinaSemanticPromptSuiteTests {
             .init(prompt: "What is my actual income for this month?", entity: .income, operation: .sum, measure: .incomeAmount, shape: .metric),
             .init(prompt: "Compare my actual income this month to last month. Am I up or down?", entity: .income, operation: .compare, measure: .incomeAmount, shape: .comparison),
             .init(prompt: "What is my Actual Income to Planned Income percentage?", entity: .income, operation: .share, measure: .incomeAmount, shape: .metric),
+            .init(prompt: "How is my income progress?", entity: .income, operation: .share, measure: .incomeAmount, shape: .metric),
             .init(prompt: "How is my budget for this period?", entity: .budget, operation: .forecast, measure: .budgetImpact, shape: .metric),
+            .init(prompt: "What is my safe spend today?", entity: .budget, operation: .forecast, measure: .remainingRoom, shape: .metric),
             .init(prompt: "Compare this budget period to last period.", entity: .budget, operation: .compare, measure: .budgetImpact, shape: .comparison),
             .init(prompt: "If I spend $50 at Target, what happens to my safe spend?", entity: .budget, operation: .whatIf, measure: .remainingRoom, shape: .comparison),
-            .init(prompt: "If I spend $200 on Groceries, what happens to projected savings?", entity: .budget, operation: .whatIf, measure: .savingsTotal, shape: .comparison)
+            .init(prompt: "If I spend $200 on Groceries, what happens to projected savings?", entity: .budget, operation: .whatIf, measure: .savingsTotal, shape: .comparison),
+            .init(prompt: "Show my savings outlook.", entity: .savingsAccount, operation: .forecast, measure: .savingsTotal, shape: .metric),
+            .init(prompt: "Show category availability.", entity: .category, operation: .forecast, measure: .categoryAvailability, shape: .metric),
+            .init(prompt: "Show category spotlight.", entity: .category, operation: .group, measure: .budgetImpact, shape: .list),
+            .init(prompt: "What are my spend trends?", entity: .category, operation: .group, measure: .budgetImpact, shape: .list),
+            .init(prompt: "What is my next planned expense?", entity: .plannedExpense, operation: .next, measure: .effectiveAmount, shape: .metric),
+            .init(prompt: "Summarize my Apple Card.", entity: .card, operation: .sum, measure: .budgetImpact, shape: .metric)
         ]
 
         for testCase in cases {
@@ -102,10 +110,18 @@ struct MarinaSemanticPromptSuiteTests {
             .init(prompt: "What is my actual income for this month?", kind: .metric),
             .init(prompt: "Compare my actual income this month to last month. Am I up or down?", kind: .comparison),
             .init(prompt: "What is my Actual Income to Planned Income percentage?", kind: .metric),
+            .init(prompt: "How is my income progress?", kind: .metric),
             .init(prompt: "How is my budget for this period?", kind: .list),
+            .init(prompt: "What is my safe spend today?", kind: .metric),
             .init(prompt: "Compare this budget period to last period.", kind: .comparison),
             .init(prompt: "If I spend $50 at Target, what happens to my safe spend?", kind: .comparison),
-            .init(prompt: "If I spend $200 on Groceries, what happens to projected savings?", kind: .comparison)
+            .init(prompt: "If I spend $200 on Groceries, what happens to projected savings?", kind: .comparison),
+            .init(prompt: "Show my savings outlook.", kind: .metric),
+            .init(prompt: "Show category availability.", kind: .metric),
+            .init(prompt: "Show category spotlight.", kind: .list),
+            .init(prompt: "What are my spend trends?", kind: .list),
+            .init(prompt: "What is my next planned expense?", kind: .metric),
+            .init(prompt: "Summarize my Apple Card.", kind: .metric)
         ]
 
         for testCase in cases {
@@ -125,7 +141,9 @@ struct MarinaSemanticPromptSuiteTests {
 
         let appleSpend = await answer("What is my Apple Card spend this month?", using: brain, fixture: fixture)
         #expect(appleSpend.kind == .metric)
-        #expect((appleSpend.primaryValue ?? "").contains("1,330") || (appleSpend.primaryValue ?? "").contains("1330"))
+        #expect((appleSpend.primaryValue ?? "").contains("1,370") || (appleSpend.primaryValue ?? "").contains("1370"))
+        #expect(appleSpend.rows.contains(where: { $0.title == "Planned" }))
+        #expect(appleSpend.rows.contains(where: { $0.title == "Variable" }))
 
         let targetLast = await answer("When did I last go shopping at Target?", using: brain, fixture: fixture)
         #expect(targetLast.kind == .metric)
@@ -153,7 +171,7 @@ struct MarinaSemanticPromptSuiteTests {
 
         let savingsMonth = await answer("What is my Savings Account balance this month?", using: brain, fixture: fixture)
         #expect(savingsMonth.kind == .metric)
-        #expect(savingsMonth.title.contains("Savings Account"))
+        #expect(savingsMonth.title == "Savings Status")
 
         let incomeShare = await answer("What is my Actual Income to Planned Income percentage?", using: brain, fixture: fixture)
         #expect(incomeShare.kind == .metric)
@@ -162,6 +180,21 @@ struct MarinaSemanticPromptSuiteTests {
         let whatIf = await answer("If I spend $50 at Target, what happens to my safe spend?", using: brain, fixture: fixture)
         #expect(whatIf.kind == .comparison)
         #expect(whatIf.rows.contains(where: { $0.title == "Virtual spend" }))
+
+        let categoryAvailability = await answer("Show category availability.", using: brain, fixture: fixture)
+        #expect(categoryAvailability.kind == .metric)
+        #expect(categoryAvailability.title == "Category Availability")
+        let categoryAvailabilityHasOverRow = categoryAvailability.rows.contains { row in
+            row.title == "Over" && row.value == "1"
+        }
+        #expect(categoryAvailabilityHasOverRow)
+
+        let nextPlanned = await answer("What is my next planned expense?", using: brain, fixture: fixture)
+        #expect(nextPlanned.kind == .metric)
+        let nextPlannedHasExpenseRow = nextPlanned.rows.contains { row in
+            row.title == "Expense" && row.value == "Phone"
+        }
+        #expect(nextPlannedHasExpenseRow)
     }
 
     @Test func promptSuite_negativeCasesStaySafe() async throws {
@@ -485,12 +518,158 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(answer.subtitle?.contains("declined") == true)
     }
 
-    private func answer(_ prompt: String, using brain: MarinaBrain, fixture: Fixture) async -> HomeAnswer {
-        await brain.answer(
+    @Test func homeMetricParity_matchesCardCategoryAvailabilityIncomeAndNextPlannedCalculators() async throws {
+        let fixture = try makeFixture()
+        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let homeContext = MarinaPanelHomeContext(dateRange: fixture.currentRange)
+        let snapshot = try MarinaWorkspaceSnapshotProvider().snapshot(
+            for: fixture.workspace,
+            modelContext: fixture.context,
+            homeContext: homeContext,
+            now: fixture.now
+        )
+
+        let appleCard = try #require(snapshot.cards.first(where: { $0.name == "Apple Card" }))
+        let cardMetrics = HomeCardMetricsCalculator.metrics(
+            for: appleCard,
+            plannedExpenses: snapshot.homeCalculationPlannedExpenses,
+            variableExpenses: snapshot.homeCalculationVariableExpenses,
+            start: fixture.currentRange.startDate,
+            end: fixture.currentRange.endDate,
+            excludeFuturePlannedExpenses: false,
+            excludeFutureVariableExpenses: false,
+            now: fixture.now
+        )
+        let cardAnswer = await answer("Summarize my Apple Card.", using: brain, fixture: fixture, homeContext: homeContext)
+        #expect(cardAnswer.primaryValue == CurrencyFormatter.string(from: cardMetrics.total))
+        #expect(cardAnswer.rows.contains(where: { $0.title == "Planned" && $0.amount == cardMetrics.plannedTotal }))
+        #expect(cardAnswer.rows.contains(where: { $0.title == "Variable" && $0.amount == cardMetrics.variableTotal }))
+
+        let availability = HomeCategoryLimitsAggregator.build(
+            budgets: snapshot.budgets,
+            categories: snapshot.categories,
+            plannedExpenses: snapshot.homeCalculationPlannedExpenses,
+            variableExpenses: snapshot.homeCalculationVariableExpenses,
+            rangeStart: fixture.currentRange.startDate,
+            rangeEnd: fixture.currentRange.endDate
+        )
+        let availabilityAnswer = await answer("Show category availability.", using: brain, fixture: fixture, homeContext: homeContext)
+        #expect(availabilityAnswer.rows.first(where: { $0.title == "Over" })?.value == AppNumberFormat.integer(availability.overCount))
+        #expect(availabilityAnswer.rows.first(where: { $0.title == "Near" })?.value == AppNumberFormat.integer(availability.nearCount))
+
+        let incomeProgress = HomeQueryEngine().execute(
+            query: HomeQuery(intent: .incomeProgressSummary, dateRange: fixture.currentRange),
+            categories: snapshot.categories,
+            plannedExpenses: snapshot.homeCalculationPlannedExpenses,
+            variableExpenses: snapshot.homeCalculationVariableExpenses,
+            incomes: snapshot.incomes,
+            now: fixture.now
+        )
+        let incomeAnswer = await answer("How is my income progress?", using: brain, fixture: fixture, homeContext: homeContext)
+        #expect(incomeAnswer.primaryValue == incomeProgress.primaryValue)
+
+        let next = try #require(
+            HomeNextPlannedExpenseFinder.nextExpense(
+                from: snapshot.homePlannedExpenses,
+                in: fixture.currentRange.startDate,
+                to: fixture.currentRange.endDate,
+                now: fixture.now
+            )
+        )
+        let nextAnswer = await answer("What is my next planned expense?", using: brain, fixture: fixture, homeContext: homeContext)
+        #expect(nextAnswer.rows.first(where: { $0.title == "Expense" })?.value == next.title)
+    }
+
+    @Test func homeMetricParity_honorsFutureExclusionButKeepsNextPlannedUnfiltered() async throws {
+        let fixture = try makeFixture()
+        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let includeFutureContext = MarinaPanelHomeContext(dateRange: fixture.currentRange)
+        let excludeFutureContext = MarinaPanelHomeContext(
+            dateRange: fixture.currentRange,
+            excludeFuturePlannedExpensesFromCalculations: true,
+            excludeFutureVariableExpensesFromCalculations: true
+        )
+
+        let included = await answer("Summarize my Apple Card.", using: brain, fixture: fixture, homeContext: includeFutureContext)
+        let excluded = await answer("Summarize my Apple Card.", using: brain, fixture: fixture, homeContext: excludeFutureContext)
+        #expect(included.primaryValue == CurrencyFormatter.string(from: 1_370))
+        #expect(excluded.primaryValue == CurrencyFormatter.string(from: 1_280))
+
+        let next = await answer("What is my next planned expense?", using: brain, fixture: fixture, homeContext: excludeFutureContext)
+        #expect(next.primaryValue == CurrencyFormatter.string(from: 90))
+        let nextHasExpenseRow = next.rows.contains { row in
+            row.title == "Expense" && row.value == "Phone"
+        }
+        #expect(nextHasExpenseRow)
+    }
+
+    @Test func homeMetricParity_ignoresOrphanBudgetGeneratedPlannedExpenses() async throws {
+        let fixture = try makeFixture()
+        let snapshot = try MarinaWorkspaceSnapshotProvider().snapshot(
+            for: fixture.workspace,
+            modelContext: fixture.context,
+            homeContext: MarinaPanelHomeContext(dateRange: fixture.currentRange),
+            now: fixture.now
+        )
+        let appleCard = try #require(snapshot.cards.first(where: { $0.name == "Apple Card" }))
+        let bills = try #require(snapshot.categories.first(where: { $0.name == "Bills" }))
+        let orphan = PlannedExpense(
+            title: "Orphan Generated Row",
+            plannedAmount: 500,
+            expenseDate: date(2026, 4, 9),
+            workspace: fixture.workspace,
+            card: appleCard,
+            category: bills,
+            sourceBudgetID: UUID()
+        )
+        fixture.context.insert(orphan)
+        try fixture.context.save()
+
+        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let answer = await answer("Summarize my Apple Card.", using: brain, fixture: fixture)
+        #expect(answer.primaryValue == CurrencyFormatter.string(from: 1_370))
+    }
+
+    @Test func conversationDisplayAdapter_preservesUserPromptAsSeparateMessage() throws {
+        let suiteName = "MarinaSemanticPromptSuiteTests.conversationDisplay"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = MarinaConversationStore(userDefaults: defaults, storageKeyPrefix: "tests.marina.display")
+        let workspaceID = UUID()
+        let answer = HomeAnswer(
+            queryID: UUID(),
+            kind: .metric,
+            userPrompt: "What is my safe spend today?",
+            title: "Safe Spend Today",
+            primaryValue: "$42.00"
+        )
+
+        store.saveAnswers([answer], workspaceID: workspaceID)
+        let loaded = store.loadAnswers(workspaceID: workspaceID)
+        #expect(loaded.first?.userPrompt == "What is my safe spend today?")
+
+        let messages = MarinaConversationDisplayAdapter.messages(from: loaded)
+        #expect(messages.count == 2)
+        #expect(messages[0].role == .user)
+        #expect(messages[0].prompt == "What is my safe spend today?")
+        #expect(messages[1].role == .assistant)
+        #expect(messages[1].answer?.title == "Safe Spend Today")
+    }
+
+    private func answer(
+        _ prompt: String,
+        using brain: MarinaBrain,
+        fixture: Fixture,
+        homeContext: MarinaPanelHomeContext? = nil
+    ) async -> HomeAnswer {
+        let resolvedHomeContext = homeContext ?? MarinaPanelHomeContext(dateRange: fixture.currentRange)
+        return await brain.answer(
             prompt: prompt,
             workspace: fixture.workspace,
             modelContext: fixture.context,
             ambientDateRange: fixture.currentRange,
+            homeContext: resolvedHomeContext,
             defaultBudgetingPeriod: .monthly,
             now: fixture.now
         )
@@ -508,6 +687,7 @@ struct MarinaSemanticPromptSuiteTests {
             workspace: fixture.workspace,
             modelContext: fixture.context,
             ambientDateRange: fixture.currentRange,
+            homeContext: MarinaPanelHomeContext(dateRange: fixture.currentRange),
             defaultBudgetingPeriod: .monthly,
             now: fixture.now
         )
@@ -556,6 +736,13 @@ struct MarinaSemanticPromptSuiteTests {
             endDate: date(2026, 4, 30),
             workspace: workspace
         )
+        let groceriesLimit = BudgetCategoryLimit(
+            minAmount: 0,
+            maxAmount: 200,
+            budget: currentBudget,
+            category: groceries
+        )
+        currentBudget.categoryLimits = [groceriesLimit]
         let previousBudget = Budget(
             name: "March 2026",
             startDate: date(2026, 3, 1),
@@ -706,6 +893,7 @@ struct MarinaSemanticPromptSuiteTests {
         context.insert(dining)
         context.insert(bills)
         context.insert(currentBudget)
+        context.insert(groceriesLimit)
         context.insert(previousBudget)
         context.insert(rentPreset)
         context.insert(phonePreset)

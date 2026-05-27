@@ -22,27 +22,53 @@ enum HomeCardMetricsCalculator {
         start: Date,
         end: Date,
         excludeFuturePlannedExpenses: Bool,
-        excludeFutureVariableExpenses: Bool
+        excludeFutureVariableExpenses: Bool,
+        now: Date = Date()
+    ) -> HomeCardMetrics {
+        metrics(
+            for: card,
+            plannedExpenses: card.plannedExpenses ?? [],
+            variableExpenses: card.variableExpenses ?? [],
+            start: start,
+            end: end,
+            excludeFuturePlannedExpenses: excludeFuturePlannedExpenses,
+            excludeFutureVariableExpenses: excludeFutureVariableExpenses,
+            now: now
+        )
+    }
+
+    static func metrics(
+        for card: Card,
+        plannedExpenses: [PlannedExpense],
+        variableExpenses: [VariableExpense],
+        start: Date,
+        end: Date,
+        excludeFuturePlannedExpenses: Bool,
+        excludeFutureVariableExpenses: Bool,
+        now: Date = Date()
     ) -> HomeCardMetrics {
         let s = normalizedStart(start)
         let e = normalizedEnd(end)
 
-        let plannedInRange = (card.plannedExpenses ?? [])
+        let plannedInRange = plannedExpenses
+            .filter { $0.card?.id == card.id }
             .filter { $0.expenseDate >= s && $0.expenseDate <= e }
-
         let plannedIncluded = PlannedExpenseFuturePolicy.filteredForCalculations(
             plannedInRange,
-            excludeFuture: excludeFuturePlannedExpenses
+            excludeFuture: excludeFuturePlannedExpenses,
+            now: now
         )
 
         let planned = plannedIncluded
             .reduce(0) { $0 + plannedEffectiveAmount($1) }
 
-        let variableInRange = (card.variableExpenses ?? [])
+        let variableInRange = variableExpenses
+            .filter { $0.card?.id == card.id }
             .filter { $0.transactionDate >= s && $0.transactionDate <= e }
         let variableIncluded = VariableExpenseFuturePolicy.filteredForCalculations(
             variableInRange,
-            excludeFuture: excludeFutureVariableExpenses
+            excludeFuture: excludeFutureVariableExpenses,
+            now: now
         )
 
         let variable = variableIncluded

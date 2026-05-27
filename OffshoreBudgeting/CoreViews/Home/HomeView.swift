@@ -76,6 +76,7 @@ struct HomeView: View {
     @State private var whatIfInitialScenarioID: UUID? = nil
     @State private var whatIfInitialDraft: WhatIfPlannerDraft? = nil
     @State private var isShowingAssistantPanel: Bool = false
+    @State private var assistantPanelHomeContext: MarinaPanelHomeContext? = nil
 
     // MARK: - Data Fixups
 
@@ -320,12 +321,7 @@ struct HomeView: View {
                 workspace: workspace,
                 onDismiss: dismissAssistantPanel,
                 shouldUseLargeMinimumSize: false,
-                ambientDateRange: HomeQueryDateRange(
-                    startDate: appliedStartDate,
-                    endDate: appliedEndDate
-                ),
-                cardSummaryExcludeFuturePlannedExpensesOverride: excludeFuturePlannedExpensesFromCalculationsInView,
-                cardSummaryExcludeFutureVariableExpensesOverride: excludeFutureVariableExpensesFromCalculationsInView
+                homeContext: assistantPanelHomeContext ?? currentMarinaHomeContext
             )
         }
         .postBoardingTip(
@@ -490,15 +486,29 @@ struct HomeView: View {
     }
 
     private func presentAssistantPanel() {
+        let context = currentMarinaHomeContext
         if isPhone {
+            assistantPanelHomeContext = context
             isShowingAssistantPanel = true
         } else {
-            assistantToolbarContext.openAssistant()
+            assistantToolbarContext.openAssistant(context)
         }
     }
 
     private func dismissAssistantPanel() {
         isShowingAssistantPanel = false
+        assistantPanelHomeContext = nil
+    }
+
+    private var currentMarinaHomeContext: MarinaPanelHomeContext {
+        MarinaPanelHomeContext(
+            dateRange: HomeQueryDateRange(
+                startDate: appliedStartDate,
+                endDate: appliedEndDate
+            ),
+            excludeFuturePlannedExpensesFromCalculations: excludeFuturePlannedExpensesFromCalculationsInView,
+            excludeFutureVariableExpensesFromCalculations: excludeFutureVariableExpensesFromCalculationsInView
+        )
     }
 
     private func handleCommand(_ commandID: String) {

@@ -70,6 +70,60 @@ struct MarinaRuleBasedInterpreter: MarinaModelInterpreting {
             )
         }
 
+        if containsAny(normalized, ["category availability", "category limits", "categories over", "categories near", "over category limit", "near category limit"]) {
+            return MarinaSemanticRequest(
+                entity: .category,
+                operation: .forecast,
+                measure: .categoryAvailability,
+                dimensions: [.category],
+                dateRangeToken: dateToken(for: normalized),
+                expectedAnswerShape: .metric
+            )
+        }
+
+        if containsAny(normalized, ["next planned expense", "upcoming planned expense"]) {
+            let cardName = cardTarget(in: normalized)
+            return MarinaSemanticRequest(
+                entity: .plannedExpense,
+                operation: .next,
+                measure: .effectiveAmount,
+                dimensions: cardName == nil ? [] : [.card],
+                dateRangeToken: dateToken(for: normalized),
+                targetName: cardName,
+                sort: .dateAscending,
+                expenseScope: .planned,
+                expectedAnswerShape: .metric
+            )
+        }
+
+        if normalized.contains("spend trends") || normalized.contains("spending trends") {
+            return MarinaSemanticRequest(
+                entity: .category,
+                operation: .group,
+                measure: .budgetImpact,
+                dimensions: [.category, .date],
+                dateRangeToken: dateToken(for: normalized),
+                resultLimit: 3,
+                sort: .amountDescending,
+                expenseScope: .unified,
+                expectedAnswerShape: .list
+            )
+        }
+
+        if normalized.contains("category spotlight") {
+            return MarinaSemanticRequest(
+                entity: .category,
+                operation: .group,
+                measure: .budgetImpact,
+                dimensions: [.category],
+                dateRangeToken: dateToken(for: normalized),
+                resultLimit: 5,
+                sort: .amountDescending,
+                expenseScope: .unified,
+                expectedAnswerShape: .list
+            )
+        }
+
         if (normalized.contains("if ") || normalized.contains("what if") || normalized.contains("afford")),
            firstCurrencyAmount(in: normalized) != nil {
             return MarinaSemanticRequest(
@@ -94,7 +148,7 @@ struct MarinaRuleBasedInterpreter: MarinaModelInterpreting {
         }
 
         if normalized.contains("savings") {
-            if containsAny(normalized, ["projected", "forecast"]) {
+            if containsAny(normalized, ["savings outlook", "projected", "forecast"]) {
                 return MarinaSemanticRequest(
                     entity: .savingsAccount,
                     operation: .forecast,
@@ -103,7 +157,7 @@ struct MarinaRuleBasedInterpreter: MarinaModelInterpreting {
                     expectedAnswerShape: .metric
                 )
             }
-            if containsAny(normalized, ["actual", "saved"]) {
+            if containsAny(normalized, ["actual savings", "actual", "saved"]) {
                 return MarinaSemanticRequest(
                     entity: .savingsAccount,
                     operation: .sum,
@@ -127,7 +181,7 @@ struct MarinaRuleBasedInterpreter: MarinaModelInterpreting {
             let state: MarinaSemanticIncomeState = normalized.contains("planned income") && normalized.contains("actual income") == false
                 ? .planned
                 : (normalized.contains("actual") ? .actual : .all)
-            if normalized.contains("percentage") || normalized.contains("percent") {
+            if normalized.contains("progress") || normalized.contains("percentage") || normalized.contains("percent") {
                 return MarinaSemanticRequest(
                     entity: .income,
                     operation: .share,
@@ -214,7 +268,7 @@ struct MarinaRuleBasedInterpreter: MarinaModelInterpreting {
             )
         }
 
-        if normalized.contains("budget") || normalized.contains("room") || normalized.contains("safe spend") || normalized.contains("afford") {
+        if normalized.contains("budget") || normalized.contains("room") || normalized.contains("safe spend") || normalized.contains("afford") || normalized.contains("can i spend") {
             if normalized.contains("if ") || normalized.contains("what if") || normalized.contains("afford") {
                 return MarinaSemanticRequest(
                     entity: .budget,
@@ -240,7 +294,7 @@ struct MarinaRuleBasedInterpreter: MarinaModelInterpreting {
             return MarinaSemanticRequest(
                 entity: .budget,
                 operation: .forecast,
-                measure: normalized.contains("room") ? .remainingRoom : .budgetImpact,
+                measure: containsAny(normalized, ["room", "safe spend", "can i spend"]) ? .remainingRoom : .budgetImpact,
                 dateRangeToken: dateToken(for: normalized),
                 expectedAnswerShape: .metric
             )

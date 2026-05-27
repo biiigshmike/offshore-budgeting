@@ -5470,19 +5470,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "Marina is paused while the assistant brain is rebuilt. You can still use the create menu for explicit entries."
-          }
-        }
-      }
-    },
-    "assistant.marina.resetBadge" : {
-      "comment" : "Short badge indicating Marina is temporarily reset.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "RESETTING"
+            "value" : "Ask about the numbers on Home, or start with one of these."
           }
         }
       }

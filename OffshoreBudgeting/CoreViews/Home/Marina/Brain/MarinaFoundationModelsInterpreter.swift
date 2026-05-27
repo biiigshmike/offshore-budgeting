@@ -12,7 +12,7 @@ fileprivate struct MarinaGeneratedSemanticRequest {
     @Guide(description: "One of: list, count, sum, average, compare, last, next, group, share, forecast, whatIf.")
     var operation: String
 
-    @Guide(description: "Optional measure: amount, plannedAmount, actualAmount, effectiveAmount, budgetImpact, savingsTotal, incomeAmount, reconciliationBalance, remainingRoom, color, name.")
+    @Guide(description: "Optional measure: amount, plannedAmount, actualAmount, effectiveAmount, budgetImpact, savingsTotal, incomeAmount, reconciliationBalance, categoryAvailability, remainingRoom, color, name.")
     var measure: String?
 
     @Guide(description: "Dimensions such as category, card, merchantText, incomeSource, preset, reconciliationAccount, date. Use a dimension only when the user's wording explicitly identifies that kind of target.")
@@ -101,6 +101,7 @@ struct MarinaFoundationModelsInterpreter: MarinaModelInterpreting {
         Use currentPeriod when the user says this period, current period, or gives no date.
         Use currentMonth when the user says this month. Use previousMonth when the user says last month.
         Treat merchant/store/vendor wording as expense title/description text, not a separate stored entity.
+        Treat Home metric terms as semantic requests: safe spend means remainingRoom; savings outlook or projected savings means savingsTotal forecast; actual savings means savings status for the current period; income progress means actual-to-planned income share; category availability means categoryAvailability; category spotlight means grouped category spend; spend trends means grouped category spend over date buckets; next planned expense means plannedExpense next; card summary means card budgetImpact.
         For generic spend/list/average/count expense requests such as "spend on Grocery", put the raw target in targetName, leave dimensions empty, use variableExpense, and let Marina clarify category/card/expense text if needed.
         Use dimensions only when the user explicitly names the target type, such as category, card, income source, preset, savings account, reconciliation account, merchant, store, vendor, title, or description.
         If a request asks to delete, move, edit, rename, or create records, return unsupported with readOnly.

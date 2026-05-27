@@ -6,6 +6,17 @@ struct MarinaPanelView: View {
         static let bottomAnchor = "assistant-bottom-anchor"
     }
 
+    private static let starterPromptPool = [
+        "What is my safe spend today?",
+        "Show my savings outlook.",
+        "How is my income progress?",
+        "What is my next planned expense?",
+        "Show category availability.",
+        "What are my spend trends?",
+        "What is my top category this period?",
+        "Summarize my Apple Card."
+    ]
+
     private enum MarinaCreateEntityKind {
         case expense
         case budget
@@ -23,9 +34,7 @@ struct MarinaPanelView: View {
     let workspace: Workspace
     let onDismiss: () -> Void
     let shouldUseLargeMinimumSize: Bool
-    let ambientDateRange: HomeQueryDateRange?
-    let cardSummaryExcludeFuturePlannedExpensesOverride: Bool?
-    let cardSummaryExcludeFutureVariableExpensesOverride: Bool?
+    let homeContext: MarinaPanelHomeContext?
 
     @Query private var cards: [Card]
     @Query private var categories: [Category]
@@ -37,6 +46,7 @@ struct MarinaPanelView: View {
     @State private var isResponding = false
     @State private var isShowingClearConversationAlert = false
     @State private var pendingClarification: PendingClarification?
+    @State private var starterPrompts: [String] = MarinaPanelView.randomStarterPrompts()
     @FocusState private var isPromptFieldFocused: Bool
 
     @AppStorage("general_defaultBudgetingPeriod")
@@ -52,16 +62,12 @@ struct MarinaPanelView: View {
         workspace: Workspace,
         onDismiss: @escaping () -> Void,
         shouldUseLargeMinimumSize: Bool,
-        ambientDateRange: HomeQueryDateRange? = nil,
-        cardSummaryExcludeFuturePlannedExpensesOverride: Bool? = nil,
-        cardSummaryExcludeFutureVariableExpensesOverride: Bool? = nil
+        homeContext: MarinaPanelHomeContext? = nil
     ) {
         self.workspace = workspace
         self.onDismiss = onDismiss
         self.shouldUseLargeMinimumSize = shouldUseLargeMinimumSize
-        self.ambientDateRange = ambientDateRange
-        self.cardSummaryExcludeFuturePlannedExpensesOverride = cardSummaryExcludeFuturePlannedExpensesOverride
-        self.cardSummaryExcludeFutureVariableExpensesOverride = cardSummaryExcludeFutureVariableExpensesOverride
+        self.homeContext = homeContext
 
         let workspaceID = workspace.id
         _cards = Query(
@@ -264,34 +270,71 @@ struct MarinaPanelView: View {
             Text("Marina")
                 .font(.title2.weight(.semibold))
 
-            Text(String(localized: "assistant.marina.resetBadge", defaultValue: "RESETTING", comment: "Short badge indicating Marina is temporarily reset."))
-                .font(.caption2.weight(.bold))
-                .foregroundStyle(Color("AccentColor"))
-                .tracking(0.8)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(.ultraThinMaterial, in: Capsule())
-
-            Text(String(localized: "assistant.marina.emptyDescription", defaultValue: "Marina is paused while the assistant brain is rebuilt. You can still use the create menu for explicit entries.", comment: "Introductory Marina description shown in the empty assistant state."))
+            Text(String(localized: "assistant.marina.emptyDescription", defaultValue: "Ask about the numbers on Home, or start with one of these.", comment: "Introductory Marina description shown in the empty assistant state."))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: 360)
+
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 8)], spacing: 8) {
+                ForEach(starterPrompts, id: \.self) { prompt in
+                    Button {
+                        submitPrompt(prompt)
+                    } label: {
+                        Text(prompt)
+                            .font(.subheadline.weight(.semibold))
+                            .multilineTextAlignment(.center)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.8)
+                            .frame(maxWidth: .infinity, minHeight: 42)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(isResponding)
+                    .accessibilityIdentifier("marina.starterPrompt")
+                }
+            }
+            .frame(maxWidth: 420)
+            .padding(.top, 4)
         }
         .frame(maxWidth: .infinity, minHeight: 260, alignment: .center)
         .padding(.vertical, 32)
-        .accessibilityElement(children: .combine)
         .accessibilityIdentifier("marina.emptyState")
     }
 
     private var answersSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            ForEach(Array(answers.enumerated()), id: \.element.id) { index, answer in
-                assistantMessageBubble(for: answer, index: index)
+            ForEach(Array(MarinaConversationDisplayAdapter.messages(from: answers).enumerated()), id: \.element.id) { index, message in
+                switch message.role {
+                case .user:
+                    if let prompt = message.prompt {
+                        userMessageBubble(prompt: prompt, date: message.generatedAt, index: index)
+                    }
+                case .assistant:
+                    if let answer = message.answer {
+                        assistantMessageBubble(for: answer, index: index)
+                    }
+                }
             }
         }
         .accessibilityIdentifier("marina.answerList")
+    }
+
+    private func userMessageBubble(prompt: String, date: Date, index: Int) -> some View {
+        VStack(alignment: .trailing, spacing: 6) {
+            Text(prompt)
+                .font(.subheadline)
+                .foregroundStyle(.white)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(Color("AccentColor"), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                .accessibilityIdentifier("marina.userMessage.\(index)")
+
+            Text(timestampText(for: date))
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
     }
 
     private func assistantMessageBubble(for answer: HomeAnswer, index: Int) -> some View {
@@ -389,15 +432,24 @@ struct MarinaPanelView: View {
         BudgetingPeriod(rawValue: defaultBudgetingPeriodRaw) ?? .monthly
     }
 
-    private func submitPrompt() {
-        guard trimmedPromptText.isEmpty == false else { return }
+    private static func randomStarterPrompts() -> [String] {
+        Array(starterPromptPool.shuffled().prefix(4))
+    }
+
+    private func submitPrompt(_ promptOverride: String? = nil) {
+        let prompt = (promptOverride ?? trimmedPromptText).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard prompt.isEmpty == false else { return }
         guard isResponding == false else { return }
-        guard MarinaPromptSubmissionPolicy.shouldHandleFreeText(trimmedPromptText) else {
-            promptText = ""
+        guard MarinaPromptSubmissionPolicy.shouldHandleFreeText(prompt) else {
+            if promptOverride == nil {
+                promptText = ""
+            }
             return
         }
-        let submittedPrompt = trimmedPromptText
-        promptText = ""
+        let submittedPrompt = prompt
+        if promptOverride == nil {
+            promptText = ""
+        }
 
         if let pendingClarification,
            let choice = pendingClarification.choices.choice(matching: submittedPrompt) {
@@ -415,7 +467,8 @@ struct MarinaPanelView: View {
                 prompt: submittedPrompt,
                 workspace: workspace,
                 modelContext: modelContext,
-                ambientDateRange: ambientDateRange,
+                ambientDateRange: homeContext?.dateRange,
+                homeContext: homeContext,
                 defaultBudgetingPeriod: defaultBudgetingPeriod
             )
             appendAnswer(answer)
@@ -479,7 +532,8 @@ struct MarinaPanelView: View {
                 prompt: replyPrompt,
                 workspace: workspace,
                 modelContext: modelContext,
-                ambientDateRange: ambientDateRange,
+                ambientDateRange: homeContext?.dateRange,
+                homeContext: homeContext,
                 defaultBudgetingPeriod: defaultBudgetingPeriod
             )
             appendAnswer(answer)
@@ -829,12 +883,16 @@ struct MarinaPanelView: View {
         guard hasLoadedConversation == false else { return }
         answers = conversationStore.loadAnswers(workspaceID: workspace.id)
         pendingClarification = pendingClarification(from: answers.last)
+        if answers.isEmpty {
+            starterPrompts = Self.randomStarterPrompts()
+        }
         hasLoadedConversation = true
     }
 
     private func clearConversation() {
         answers = []
         pendingClarification = nil
+        starterPrompts = Self.randomStarterPrompts()
         conversationStore.saveAnswers([], workspaceID: workspace.id)
     }
 

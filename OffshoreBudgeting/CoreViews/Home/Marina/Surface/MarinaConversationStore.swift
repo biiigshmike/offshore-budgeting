@@ -7,6 +7,49 @@
 
 import Foundation
 
+enum MarinaConversationDisplayRole: Equatable {
+    case user
+    case assistant
+}
+
+struct MarinaConversationDisplayMessage: Identifiable, Equatable {
+    let id: String
+    let role: MarinaConversationDisplayRole
+    let prompt: String?
+    let answer: HomeAnswer?
+    let generatedAt: Date
+}
+
+enum MarinaConversationDisplayAdapter {
+    static func messages(from answers: [HomeAnswer]) -> [MarinaConversationDisplayMessage] {
+        answers.flatMap { answer -> [MarinaConversationDisplayMessage] in
+            let trimmedPrompt = answer.userPrompt?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let assistantMessage = MarinaConversationDisplayMessage(
+                id: "assistant-\(answer.id.uuidString)",
+                role: .assistant,
+                prompt: nil,
+                answer: answer,
+                generatedAt: answer.generatedAt
+            )
+
+            guard trimmedPrompt.isEmpty == false else {
+                return [assistantMessage]
+            }
+
+            return [
+                MarinaConversationDisplayMessage(
+                    id: "user-\(answer.id.uuidString)",
+                    role: .user,
+                    prompt: trimmedPrompt,
+                    answer: nil,
+                    generatedAt: answer.generatedAt
+                ),
+                assistantMessage
+            ]
+        }
+    }
+}
+
 // MARK: - Conversation Store
 
 final class MarinaConversationStore {

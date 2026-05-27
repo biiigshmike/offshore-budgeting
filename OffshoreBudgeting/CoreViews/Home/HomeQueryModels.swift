@@ -39,6 +39,7 @@ enum HomeQueryIntent: String, CaseIterable, Codable, Equatable {
     case cardSpendTotal
     case cardVariableSpendingHabits
     case incomeAverageActual
+    case incomeProgressSummary
     case savingsStatus
     case savingsAverageRecentPeriods
     case incomeSourceShare
@@ -51,6 +52,7 @@ enum HomeQueryIntent: String, CaseIterable, Codable, Equatable {
     case presetCategorySpend
     case categoryPotentialSavings
     case categoryReallocationGuidance
+    case categoryAvailabilitySummary
     case safeSpendToday
     case forecastSavings
     case nextPlannedExpense
@@ -113,9 +115,11 @@ struct HomeQuery: Identifiable, Codable, Equatable {
             baseline = 1
         case .categoryPotentialSavings, .categoryReallocationGuidance:
             baseline = 3
+        case .categoryAvailabilitySummary:
+            baseline = 1
         case .merchantSpendSummary, .topMerchantsThisMonth, .topCategoryChangesThisMonth, .topCardChangesThisMonth:
             baseline = 3
-        case .spendThisMonth, .categorySpendTotal, .spendAveragePerPeriod, .compareThisMonthToPreviousMonth, .compareCategoryThisMonthToPreviousMonth, .compareCardThisMonthToPreviousMonth, .compareIncomeSourceThisMonthToPreviousMonth, .compareMerchantThisMonthToPreviousMonth, .cardSpendTotal, .incomeAverageActual, .savingsStatus, .incomeSourceShare, .categorySpendShare, .safeSpendToday, .forecastSavings, .nextPlannedExpense, .spendTrendsSummary, .cardSnapshotSummary, .merchantSpendTotal:
+        case .spendThisMonth, .categorySpendTotal, .spendAveragePerPeriod, .compareThisMonthToPreviousMonth, .compareCategoryThisMonthToPreviousMonth, .compareCardThisMonthToPreviousMonth, .compareIncomeSourceThisMonthToPreviousMonth, .compareMerchantThisMonthToPreviousMonth, .cardSpendTotal, .incomeAverageActual, .incomeProgressSummary, .savingsStatus, .incomeSourceShare, .categorySpendShare, .safeSpendToday, .forecastSavings, .nextPlannedExpense, .spendTrendsSummary, .cardSnapshotSummary, .merchantSpendTotal:
             baseline = 1
         }
 

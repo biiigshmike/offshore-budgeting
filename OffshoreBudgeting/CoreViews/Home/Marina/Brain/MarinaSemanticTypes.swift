@@ -37,6 +37,7 @@ enum MarinaSemanticMeasure: String, Codable, CaseIterable, Equatable, Sendable {
     case savingsTotal
     case incomeAmount
     case reconciliationBalance
+    case categoryAvailability
     case remainingRoom
     case color
     case name
@@ -258,7 +259,26 @@ struct MarinaExecutionResult: Equatable {
 struct MarinaBrainContext {
     let workspace: Workspace
     let modelContext: ModelContext
-    let ambientDateRange: HomeQueryDateRange?
+    let homeContext: MarinaPanelHomeContext?
     let defaultBudgetingPeriod: BudgetingPeriod
     let now: Date
+
+    init(
+        workspace: Workspace,
+        modelContext: ModelContext,
+        ambientDateRange: HomeQueryDateRange?,
+        defaultBudgetingPeriod: BudgetingPeriod,
+        now: Date,
+        homeContext: MarinaPanelHomeContext? = nil
+    ) {
+        self.workspace = workspace
+        self.modelContext = modelContext
+        self.homeContext = homeContext ?? ambientDateRange.map { MarinaPanelHomeContext(dateRange: $0) }
+        self.defaultBudgetingPeriod = defaultBudgetingPeriod
+        self.now = now
+    }
+
+    var ambientDateRange: HomeQueryDateRange? {
+        homeContext?.dateRange
+    }
 }

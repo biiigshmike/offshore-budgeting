@@ -31,6 +31,7 @@ struct HomeQueryEngine {
 
     func execute(
         query: HomeQuery,
+        budgets: [Budget] = [],
         categories: [Category],
         presets: [Preset] = [],
         plannedExpenses: [PlannedExpense],
@@ -151,6 +152,12 @@ struct HomeQueryEngine {
                 incomes: incomes,
                 now: now
             )
+        case .incomeProgressSummary:
+            return incomeProgressSummaryAnswer(
+                query: query,
+                incomes: incomes,
+                now: now
+            )
         case .savingsStatus:
             return savingsStatusAnswer(
                 query: query,
@@ -230,6 +237,15 @@ struct HomeQueryEngine {
         case .categoryReallocationGuidance:
             return categoryReallocationGuidanceAnswer(
                 query: query,
+                categories: categories,
+                plannedExpenses: plannedExpenses,
+                variableExpenses: variableExpenses,
+                now: now
+            )
+        case .categoryAvailabilitySummary:
+            return categoryAvailabilitySummaryAnswer(
+                query: query,
+                budgets: budgets,
                 categories: categories,
                 plannedExpenses: plannedExpenses,
                 variableExpenses: variableExpenses,
@@ -1274,6 +1290,44 @@ struct HomeQueryEngine {
         )
     }
 
+    private func incomeProgressSummaryAnswer(
+        query: HomeQuery,
+        incomes: [Income],
+        now: Date
+    ) -> HomeAnswer {
+        let range = query.dateRange ?? monthRange(containing: now)
+        let actualTotal = incomes.reduce(0.0) { partial, income in
+            guard income.isPlanned == false,
+                  income.date >= range.startDate,
+                  income.date <= range.endDate else {
+                return partial
+            }
+            return partial + income.amount
+        }
+        let plannedTotal = incomes.reduce(0.0) { partial, income in
+            guard income.isPlanned,
+                  income.date >= range.startDate,
+                  income.date <= range.endDate else {
+                return partial
+            }
+            return partial + income.amount
+        }
+        let progressText = plannedTotal > 0 ? percent(actualTotal / plannedTotal) : "-"
+
+        return HomeAnswer(
+            queryID: query.id,
+            kind: .metric,
+            title: "Income Progress",
+            subtitle: rangeLabel(for: range),
+            primaryValue: progressText,
+            rows: [
+                HomeAnswerRow(title: "Actual", value: currency(actualTotal), amount: actualTotal),
+                HomeAnswerRow(title: "Planned", value: currency(plannedTotal), amount: plannedTotal),
+                HomeAnswerRow(title: "Progress", value: progressText)
+            ]
+        )
+    }
+
     private func categorySpendShareAnswer(
         query: HomeQuery,
         categories: [Category],
@@ -2043,6 +2097,64 @@ struct HomeQueryEngine {
                 HomeAnswerRow(title: "Current \(targetMetric.categoryName)", value: currency(targetMetric.totalSpent)),
                 HomeAnswerRow(title: "Reduce other categories by", value: currency(addedSpend))
             ] + rows
+        )
+    }
+
+    private func categoryAvailabilitySummaryAnswer(
+        query: HomeQuery,
+        budgets: [Budget],
+        categories: [Category],
+        plannedExpenses: [PlannedExpense],
+        variableExpenses: [VariableExpense],
+        now: Date
+    ) -> HomeAnswer {
+        let range = query.dateRange ?? monthRange(containing: now)
+        let result = HomeCategoryLimitsAggregator.build(
+            budgets: budgets,
+            categories: categories,
+            plannedExpenses: plannedExpenses,
+            variableExpenses: variableExpenses,
+            rangeStart: range.startDate,
+            rangeEnd: range.endDate
+        )
+
+        guard let activeBudget = result.activeBudget else {
+            return HomeAnswer(
+                queryID: query.id,
+                kind: .message,
+                title: "Category Availability",
+                subtitle: "No budget overlaps this range.",
+                rows: [
+                    HomeAnswerRow(title: "Period", value: rangeLabel(for: range))
+                ]
+            )
+        }
+
+        guard result.metrics.isEmpty == false else {
+            return HomeAnswer(
+                queryID: query.id,
+                kind: .message,
+                title: "Category Availability",
+                subtitle: "No categories found.",
+                rows: [
+                    HomeAnswerRow(title: "Budget", value: activeBudget.name),
+                    HomeAnswerRow(title: "Period", value: rangeLabel(for: range))
+                ]
+            )
+        }
+
+        return HomeAnswer(
+            queryID: query.id,
+            kind: .metric,
+            title: "Category Availability",
+            subtitle: rangeLabel(for: range),
+            primaryValue: "\(AppNumberFormat.integer(result.overCount)) over, \(AppNumberFormat.integer(result.nearCount)) near",
+            rows: [
+                HomeAnswerRow(title: "Budget", value: activeBudget.name),
+                HomeAnswerRow(title: "Over", value: AppNumberFormat.integer(result.overCount)),
+                HomeAnswerRow(title: "Near", value: AppNumberFormat.integer(result.nearCount)),
+                HomeAnswerRow(title: "Categories", value: AppNumberFormat.integer(result.metrics.count))
+            ]
         )
     }
 

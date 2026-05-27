@@ -157,6 +157,38 @@ struct HomeQueryEngineTests {
         #expect((answer.primaryValue ?? "").contains("75"))
     }
 
+    @Test func incomeProgressSummary_returnsActualPlannedAndProgress() throws {
+        let engine = makeEngine()
+        let range = HomeQueryDateRange(startDate: date(2026, 2, 1), endDate: date(2026, 2, 28))
+        let query = HomeQuery(intent: .incomeProgressSummary, dateRange: range)
+
+        let incomes: [Income] = [
+            Income(source: "Salary", amount: 4_500, date: date(2026, 2, 3), isPlanned: false),
+            Income(source: "Salary", amount: 5_000, date: date(2026, 2, 1), isPlanned: true)
+        ]
+
+        let answer = engine.execute(
+            query: query,
+            categories: [],
+            plannedExpenses: [],
+            variableExpenses: [],
+            incomes: incomes,
+            now: date(2026, 2, 10)
+        )
+
+        let hasActualRow = answer.rows.contains { row in
+            row.title == "Actual" && row.amount == 4_500
+        }
+        let hasPlannedRow = answer.rows.contains { row in
+            row.title == "Planned" && row.amount == 5_000
+        }
+        #expect(answer.kind == .metric)
+        #expect(answer.title == "Income Progress")
+        #expect((answer.primaryValue ?? "").contains("90"))
+        #expect(hasActualRow)
+        #expect(hasPlannedRow)
+    }
+
     @Test func categorySpendShare_forSpecificCategory_returnsPercentage() throws {
         let engine = makeEngine()
         let range = HomeQueryDateRange(startDate: date(2026, 2, 1), endDate: date(2026, 2, 28))
@@ -1057,6 +1089,38 @@ struct HomeQueryEngineTests {
         #expect((answer.primaryValue ?? "").filter(\.isNumber).contains("3000"))
         #expect(answer.rows.contains(where: { $0.title == "Actual savings" && $0.value.filter(\.isNumber).contains("2300") }))
         #expect(answer.rows.contains(where: { $0.title == "Gap to projected" && $0.value.contains("Down") }))
+    }
+
+    @Test func categoryAvailabilitySummary_returnsOverAndNearCounts() throws {
+        let engine = makeEngine()
+        let range = HomeQueryDateRange(startDate: date(2026, 4, 1), endDate: date(2026, 4, 30))
+        let query = HomeQuery(intent: .categoryAvailabilitySummary, dateRange: range)
+
+        let groceries = Category(name: "Groceries", hexColor: "#00AA00")
+        let dining = Category(name: "Dining", hexColor: "#AA0000")
+        let budget = Budget(name: "April 2026", startDate: date(2026, 4, 1), endDate: date(2026, 4, 30))
+        let groceriesLimit = BudgetCategoryLimit(minAmount: 0, maxAmount: 200, budget: budget, category: groceries)
+        let diningLimit = BudgetCategoryLimit(minAmount: 0, maxAmount: 100, budget: budget, category: dining)
+        budget.categoryLimits = [groceriesLimit, diningLimit]
+
+        let plannedExpenses = [
+            PlannedExpense(title: "Groceries Plan", plannedAmount: 220, expenseDate: date(2026, 4, 3), category: groceries),
+            PlannedExpense(title: "Dining Plan", plannedAmount: 92, expenseDate: date(2026, 4, 4), category: dining)
+        ]
+
+        let answer = engine.execute(
+            query: query,
+            budgets: [budget],
+            categories: [groceries, dining],
+            plannedExpenses: plannedExpenses,
+            variableExpenses: [],
+            now: date(2026, 4, 10)
+        )
+
+        #expect(answer.kind == .metric)
+        #expect(answer.title == "Category Availability")
+        #expect(answer.rows.first(where: { $0.title == "Over" })?.value == "1")
+        #expect(answer.rows.first(where: { $0.title == "Near" })?.value == "1")
     }
 
     @Test func nextPlannedExpense_returnsUpcomingBudgetGeneratedExpense() throws {

@@ -33,6 +33,7 @@ struct MarinaBrain {
         workspace: Workspace,
         modelContext: ModelContext,
         ambientDateRange: HomeQueryDateRange?,
+        homeContext: MarinaPanelHomeContext? = nil,
         defaultBudgetingPeriod: BudgetingPeriod,
         now: Date = Date()
     ) async -> HomeAnswer {
@@ -42,7 +43,8 @@ struct MarinaBrain {
             modelContext: modelContext,
             ambientDateRange: ambientDateRange,
             defaultBudgetingPeriod: defaultBudgetingPeriod,
-            now: now
+            now: now,
+            homeContext: homeContext
         )
 
         do {
@@ -64,6 +66,7 @@ struct MarinaBrain {
         workspace: Workspace,
         modelContext: ModelContext,
         ambientDateRange: HomeQueryDateRange?,
+        homeContext: MarinaPanelHomeContext? = nil,
         defaultBudgetingPeriod: BudgetingPeriod,
         now: Date = Date()
     ) async -> HomeAnswer {
@@ -73,7 +76,8 @@ struct MarinaBrain {
             modelContext: modelContext,
             ambientDateRange: ambientDateRange,
             defaultBudgetingPeriod: defaultBudgetingPeriod,
-            now: now
+            now: now,
+            homeContext: homeContext
         )
         let interpreted = MarinaInterpretedSemanticRequest(
             request: resolvedRequest,
@@ -99,7 +103,12 @@ struct MarinaBrain {
         prompt: String,
         context: MarinaBrainContext
     ) throws -> HomeAnswer {
-        let snapshot = try snapshotProvider.snapshot(for: context.workspace, modelContext: context.modelContext)
+        let snapshot = try snapshotProvider.snapshot(
+            for: context.workspace,
+            modelContext: context.modelContext,
+            homeContext: context.homeContext,
+            now: context.now
+        )
         let validated = validator.validate(interpreted: interpreted, snapshot: snapshot)
         let queryPlan = planner.plan(
             request: validated.request,

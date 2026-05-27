@@ -7,9 +7,25 @@
 
 import SwiftUI
 
+struct MarinaPanelHomeContext: Equatable, Sendable {
+    let dateRange: HomeQueryDateRange?
+    let excludeFuturePlannedExpensesFromCalculations: Bool
+    let excludeFutureVariableExpensesFromCalculations: Bool
+
+    init(
+        dateRange: HomeQueryDateRange?,
+        excludeFuturePlannedExpensesFromCalculations: Bool = false,
+        excludeFutureVariableExpensesFromCalculations: Bool = false
+    ) {
+        self.dateRange = dateRange
+        self.excludeFuturePlannedExpensesFromCalculations = excludeFuturePlannedExpensesFromCalculations
+        self.excludeFutureVariableExpensesFromCalculations = excludeFutureVariableExpensesFromCalculations
+    }
+}
+
 struct MarinaToolbarContext {
     var isToolbarButtonVisible: Bool = false
-    var openAssistant: () -> Void = {}
+    var openAssistant: (MarinaPanelHomeContext?) -> Void = { _ in }
 }
 
 private struct MarinaToolbarContextKey: EnvironmentKey {
@@ -30,6 +46,7 @@ struct MarinaHostModifier: ViewModifier {
 
     @State private var assistantRoute: AssistantPresentationRoute? = nil
     @State private var containerWidth: CGFloat = 0
+    @State private var activeHomeContext: MarinaPanelHomeContext? = nil
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
@@ -59,7 +76,8 @@ struct MarinaHostModifier: ViewModifier {
                 MarinaPanelView(
                     workspace: workspace,
                     onDismiss: dismissAssistant,
-                    shouldUseLargeMinimumSize: assistantPresentationPlan.usesExpandedPanelSizing
+                    shouldUseLargeMinimumSize: assistantPresentationPlan.usesExpandedPanelSizing,
+                    homeContext: activeHomeContext
                 )
                 .presentationDetents(assistantPresentationPlan.detents)
                 .presentationDragIndicator(.visible)
@@ -71,7 +89,8 @@ struct MarinaHostModifier: ViewModifier {
                 MarinaPanelView(
                     workspace: workspace,
                     onDismiss: dismissAssistant,
-                    shouldUseLargeMinimumSize: false
+                    shouldUseLargeMinimumSize: false,
+                    homeContext: activeHomeContext
                 )
                 .inspectorColumnWidth(min: 340, ideal: 420, max: 520)
             }
@@ -82,7 +101,8 @@ struct MarinaHostModifier: ViewModifier {
                 MarinaPanelView(
                     workspace: workspace,
                     onDismiss: dismissAssistant,
-                    shouldUseLargeMinimumSize: false
+                    shouldUseLargeMinimumSize: false,
+                    homeContext: activeHomeContext
                 )
             }
             .background {
@@ -134,14 +154,16 @@ struct MarinaHostModifier: ViewModifier {
         )
     }
 
-    private func presentAssistant() {
+    private func presentAssistant(homeContext: MarinaPanelHomeContext?) {
         guard isEnabled else { return }
         guard assistantRoute == nil else { return }
+        activeHomeContext = homeContext
         assistantRoute = route(for: assistantPresentationPlan.mode)
     }
 
     private func dismissAssistant() {
         assistantRoute = nil
+        activeHomeContext = nil
     }
 
     private func route(for mode: MarinaPanelPresentationMode) -> AssistantPresentationRoute {
