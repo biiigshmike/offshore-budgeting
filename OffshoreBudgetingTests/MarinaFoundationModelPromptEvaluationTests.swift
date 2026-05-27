@@ -48,6 +48,36 @@ struct MarinaFoundationModelPromptEvaluationTests {
         #expect(interpreted.request.entity == .card)
         #expect(interpreted.request.operation == .sum)
         #expect(interpreted.request.measure == .budgetImpact)
+
+        let plan = MarinaQueryPlan(
+            id: UUID(),
+            semanticRequest: MarinaSemanticRequest(
+                entity: .card,
+                operation: .sum,
+                measure: .budgetImpact,
+                targetName: "Apple Card",
+                expectedAnswerShape: .metric
+            ),
+            dateRange: HomeQueryDateRange(startDate: date(2026, 4, 1), endDate: date(2026, 4, 30)),
+            comparisonDateRange: nil,
+            now: date(2026, 4, 20)
+        )
+        let insightContext = MarinaInsightContext(
+            prompt: "What is my Apple Card spend this month?",
+            result: MarinaExecutionResult(
+                kind: .metric,
+                title: "Apple Card Spend",
+                subtitle: "Apr 1, 2026 - Apr 30, 2026",
+                primaryValue: "$120.00",
+                rows: [
+                    HomeAnswerRow(title: "Planned", value: "$90.00"),
+                    HomeAnswerRow(title: "Variable", value: "$30.00")
+                ]
+            ),
+            plan: plan
+        )
+        let insight = await MarinaFoundationModelsInsightRuntime().generateNarration(for: insightContext)
+        #expect(insight?.isEmpty == false)
         #else
         return
         #endif

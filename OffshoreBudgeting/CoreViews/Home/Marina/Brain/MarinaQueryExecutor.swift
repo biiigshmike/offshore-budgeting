@@ -644,11 +644,11 @@ struct MarinaQueryExecutor {
         let subtitle: String
         switch reason {
         case .readOnly:
-            subtitle = "Marina is read-only in this rebuild. She can answer questions, but she will not edit, move, or delete records from free text."
+            subtitle = "I'm read-only in this rebuild. I can answer questions, but I will not edit, move, or delete records from free text."
         case .unavailableModel:
-            subtitle = "Marina's on-device language model is not available on this device or OS yet. The create menu still works."
+            subtitle = "My on-device language model is not available on this device or OS yet. The create menu still works."
         case .unsupportedCombination:
-            subtitle = "Marina does not know how to answer that shape of budgeting question yet."
+            subtitle = "I do not know how to answer that shape of budgeting question yet."
         case .unresolvedEntity:
             subtitle = "I could not find a matching record in this workspace."
         case .ambiguousEntity:
@@ -656,13 +656,13 @@ struct MarinaQueryExecutor {
         case .modelContextLimit:
             subtitle = "That request was too large for the on-device language model. Try asking a shorter question."
         case .modelGuardrail:
-            subtitle = "The on-device language model declined that request. Marina can still answer ordinary read-only budgeting questions."
+            subtitle = "My on-device language model declined that request. I can still answer ordinary read-only budgeting questions."
         case .modelGenerationFailed:
-            subtitle = "The on-device language model could not produce a usable budgeting request. Marina did not guess."
+            subtitle = "My on-device language model could not produce a usable budgeting request. I did not guess."
         case .unsupportedLanguageOrLocale:
-            subtitle = "The on-device language model does not support that language or locale for Marina yet."
+            subtitle = "My on-device language model does not support that language or locale yet."
         }
-        return MarinaExecutionResult(kind: .message, title: "Marina cannot answer that yet", subtitle: subtitle)
+        return MarinaExecutionResult(kind: .message, title: "I can't answer that yet", subtitle: subtitle)
     }
 
     private func executionResult(from answer: HomeAnswer) -> MarinaExecutionResult {

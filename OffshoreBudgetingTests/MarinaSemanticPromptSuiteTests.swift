@@ -274,7 +274,7 @@ struct MarinaSemanticPromptSuiteTests {
         let answer = await answer("Summarize my Debit Card.", using: brain, fixture: fixture)
 
         #expect(answer.kind == .message)
-        #expect(answer.title == "Marina cannot answer that yet")
+        #expect(answer.title == "I can't answer that yet")
         #expect(answer.subtitle?.contains("could not find") == true)
         #expect(answer.title != "Card Spend")
     }
@@ -316,7 +316,10 @@ struct MarinaSemanticPromptSuiteTests {
 
         let readOnly = await answer("Delete my Apple Card expense", using: brain, fixture: fixture)
         #expect(readOnly.kind == .message)
+        #expect(readOnly.title == "I can't answer that yet")
         #expect(readOnly.subtitle?.contains("read-only") == true)
+        #expect(readOnly.subtitle?.contains("I'm") == true)
+        #expect(readOnly.subtitle?.contains("Marina") == false)
 
         let unknown = await answer("What did I spend on Food?", using: brain, fixture: fixture)
         #expect(unknown.kind == .message)
@@ -670,6 +673,23 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(unavailable.request.unsupportedReason == .unavailableModel)
 
         let executor = MarinaQueryExecutor()
+        let unavailablePlan = MarinaQueryPlan(
+            id: UUID(),
+            semanticRequest: MarinaSemanticRequest(
+                entity: .workspace,
+                operation: .list,
+                expectedAnswerShape: .unsupported,
+                unsupportedReason: .unavailableModel
+            ),
+            dateRange: nil,
+            comparisonDateRange: nil,
+            now: fixture.now
+        )
+        let unavailableAnswer = executor.execute(plan: unavailablePlan, snapshot: try MarinaWorkspaceSnapshotProvider().snapshot(for: fixture.workspace, modelContext: fixture.context))
+        #expect(unavailableAnswer.title == "I can't answer that yet")
+        #expect(unavailableAnswer.subtitle?.contains("My on-device language model") == true)
+        #expect(unavailableAnswer.subtitle?.contains("Marina") == false)
+
         let plan = MarinaQueryPlan(
             id: UUID(),
             semanticRequest: MarinaSemanticRequest(
@@ -685,6 +705,372 @@ struct MarinaSemanticPromptSuiteTests {
         let answer = executor.execute(plan: plan, snapshot: try MarinaWorkspaceSnapshotProvider().snapshot(for: fixture.workspace, modelContext: fixture.context))
         #expect(answer.kind == .message)
         #expect(answer.subtitle?.contains("declined") == true)
+        #expect(answer.title == "I can't answer that yet")
+        #expect(answer.subtitle?.contains("I can still answer") == true)
+    }
+
+    @Test func insightContext_buildsCompactFactsForSupportedAnswerShapes() throws {
+        let plan = MarinaQueryPlan(
+            id: UUID(),
+            semanticRequest: MarinaSemanticRequest(
+                entity: .budget,
+                operation: .forecast,
+                measure: .remainingRoom,
+                expectedAnswerShape: .metric
+            ),
+            dateRange: HomeQueryDateRange(startDate: date(2026, 4, 1), endDate: date(2026, 4, 30)),
+            comparisonDateRange: nil,
+            now: date(2026, 4, 20)
+        )
+
+        let metric = MarinaInsightContext(
+            prompt: "What is my safe spend today?",
+            result: MarinaExecutionResult(
+                kind: .metric,
+                title: "Safe Spend Today",
+                subtitle: "Apr 1, 2026 - Apr 30, 2026",
+                primaryValue: "$42.00",
+                rows: [HomeAnswerRow(title: "Period room", value: "$420.00", amount: 420)]
+            ),
+            plan: plan
+        )
+        #expect(metric.isNarratable)
+        #expect(metric.answerKind == .metric)
+        #expect(metric.entity == .budget)
+        #expect(metric.operation == .forecast)
+        #expect(metric.measure == .remainingRoom)
+        #expect(metric.rows.count == 1)
+
+        let list = MarinaInsightContext(
+            prompt: nil,
+            result: MarinaExecutionResult(
+                kind: .list,
+                title: "Top Categories",
+                rows: [HomeAnswerRow(title: "Groceries", value: "$120.00")]
+            ),
+            plan: plan
+        )
+        #expect(list.isNarratable)
+        #expect(list.answerKind == .list)
+
+        let comparison = MarinaInsightContext(
+            prompt: nil,
+            result: MarinaExecutionResult(
+                kind: .comparison,
+                title: "Budget Comparison",
+                primaryValue: "Down $18.00",
+                rows: [
+                    HomeAnswerRow(title: "Current period", value: "$200.00"),
+                    HomeAnswerRow(title: "Previous period", value: "$218.00")
+                ]
+            ),
+            plan: plan
+        )
+        #expect(comparison.isNarratable)
+        #expect(comparison.rows.count == 2)
+
+        let emptyMessage = MarinaInsightContext(
+            prompt: nil,
+            result: MarinaExecutionResult(kind: .message, title: "No Expenses Found"),
+            plan: plan
+        )
+        #expect(emptyMessage.isNarratable == false)
+    }
+
+    @Test func insightFactsDigest_capsRowsAndUsesOnlySuppliedFacts() throws {
+        let plan = MarinaQueryPlan(
+            id: UUID(),
+            semanticRequest: MarinaSemanticRequest(
+                entity: .category,
+                operation: .group,
+                measure: .budgetImpact,
+                expectedAnswerShape: .list
+            ),
+            dateRange: HomeQueryDateRange(startDate: date(2026, 4, 1), endDate: date(2026, 4, 30)),
+            comparisonDateRange: nil,
+            now: date(2026, 4, 20)
+        )
+        let rows = (1...10).map { index in
+            HomeAnswerRow(title: "Row \(index)", value: "$\(index)")
+        }
+        let context = MarinaInsightContext(
+            prompt: "Show category spotlight.",
+            result: MarinaExecutionResult(kind: .list, title: "Category Spotlight", rows: rows),
+            plan: plan
+        )
+        let digest = MarinaAnswerFactsDigest(context: context).text()
+
+        #expect(context.rows.count == MarinaInsightContext.maxRows)
+        #expect(digest.contains("Row 1"))
+        #expect(digest.contains("Row 6"))
+        #expect(digest.contains("Row 7") == false)
+        #expect(digest.contains("Personal") == false)
+    }
+
+    #if canImport(FoundationModels)
+    @Test func readAnswerFactsTool_returnsOnlySuppliedFacts() async throws {
+        guard #available(iOS 26.0, *) else { return }
+
+        let plan = MarinaQueryPlan(
+            id: UUID(),
+            semanticRequest: MarinaSemanticRequest(
+                entity: .card,
+                operation: .sum,
+                measure: .budgetImpact,
+                expectedAnswerShape: .metric
+            ),
+            dateRange: HomeQueryDateRange(startDate: date(2026, 4, 1), endDate: date(2026, 4, 30)),
+            comparisonDateRange: nil,
+            now: date(2026, 4, 20)
+        )
+        let context = MarinaInsightContext(
+            prompt: "Summarize my Apple Card.",
+            result: MarinaExecutionResult(
+                kind: .metric,
+                title: "Apple Card Spend",
+                primaryValue: "$1,370.00",
+                rows: [HomeAnswerRow(title: "Variable", value: "$80.00")]
+            ),
+            plan: plan
+        )
+        let tool = MarinaReadAnswerFactsTool(context: context)
+        let output = try await tool.call(arguments: MarinaReadAnswerFactsTool.Arguments(focus: nil))
+
+        #expect(output.contains("Apple Card Spend"))
+        #expect(output.contains("$1,370.00"))
+        #expect(output.contains("Variable"))
+        #expect(output.contains("SwiftData") == false)
+    }
+    #endif
+
+    @Test func deterministicInsightNarrator_producesWarmFallback() async throws {
+        let plan = MarinaQueryPlan(
+            id: UUID(),
+            semanticRequest: MarinaSemanticRequest(
+                entity: .budget,
+                operation: .forecast,
+                measure: .remainingRoom,
+                expectedAnswerShape: .metric
+            ),
+            dateRange: HomeQueryDateRange(startDate: date(2026, 4, 1), endDate: date(2026, 4, 30)),
+            comparisonDateRange: nil,
+            now: date(2026, 4, 20)
+        )
+        let context = MarinaInsightContext(
+            prompt: "What is my safe spend today?",
+            result: MarinaExecutionResult(
+                kind: .metric,
+                title: "Safe Spend Today",
+                primaryValue: "$42.00",
+                rows: [HomeAnswerRow(title: "Period room", value: "$420.00")]
+            ),
+            plan: plan
+        )
+
+        let narration = try await MarinaDeterministicInsightNarrator().narration(for: context)
+        #expect(narration?.contains("Safe Spend Today") == true)
+        #expect(narration?.contains("$42.00") == true)
+        #expect(narration?.contains("Period room") == true)
+        #expect(narration?.hasPrefix("Marina:") == false)
+    }
+
+    @Test func deterministicInsightNarrator_streamYieldsOneInstantFallback() async throws {
+        let context = insightContext(
+            kind: .metric,
+            title: "Safe Spend Today",
+            primaryValue: "$42.00",
+            rows: [HomeAnswerRow(title: "Period room", value: "$420.00")]
+        )
+
+        let values = try await collect(MarinaDeterministicInsightNarrator().narrationStream(for: context))
+
+        #expect(values.count == 1)
+        #expect(values.first?.contains("Safe Spend Today") == true)
+    }
+
+    @Test func insightNarrator_streamSkipsNonNarratableContext() async throws {
+        let context = insightContext(
+            kind: .message,
+            title: "Can you clarify?",
+            primaryValue: nil,
+            rows: []
+        )
+
+        let values = try await collect(MarinaInsightNarrator().narrationStream(for: context))
+
+        #expect(values.isEmpty)
+    }
+
+    @Test func insightNarrator_modelStreamFailureFallsBackInstantly() async throws {
+        let context = insightContext(
+            kind: .metric,
+            title: "Safe Spend Today",
+            primaryValue: "$42.00",
+            rows: [HomeAnswerRow(title: "Period room", value: "$420.00")]
+        )
+        let narrator = MarinaInsightNarrator(modelStreamProvider: { _ in
+            AsyncThrowingStream { continuation in
+                continuation.finish(throwing: TestNarrationError.failed)
+            }
+        })
+
+        let values = try await collect(narrator.narrationStream(for: context))
+
+        #expect(values.count == 1)
+        #expect(values.first?.contains("Safe Spend Today") == true)
+    }
+
+    @Test func voiceSanitizer_removesLeadingNameLabelsAndPreservesLaterMentions() throws {
+        #expect(MarinaVoiceSanitizer.sanitizedFinal("Marina: I see your safe spend.") == "I see your safe spend.")
+        #expect(MarinaVoiceSanitizer.sanitizedFinal("Marina says: I see your safe spend.") == "I see your safe spend.")
+        #expect(MarinaVoiceSanitizer.sanitizedFinal("This is how Marina sees the answer.") == "This is how Marina sees the answer.")
+    }
+
+    @Test func voiceSanitizer_suppressesPartialStreamingNameLabels() throws {
+        #expect(MarinaVoiceSanitizer.sanitizedStreaming("M") == nil)
+        #expect(MarinaVoiceSanitizer.sanitizedStreaming("Ma") == nil)
+        #expect(MarinaVoiceSanitizer.sanitizedStreaming("Marina") == nil)
+        #expect(MarinaVoiceSanitizer.sanitizedStreaming("Marina: I see your safe spend.") == "I see your safe spend.")
+        #expect(MarinaVoiceSanitizer.sanitizedStreaming("I see your safe spend.") == "I see your safe spend.")
+    }
+
+    @Test func voiceSanitizer_rewritesAssistantOwnedFinancialOpenings() throws {
+        #expect(MarinaVoiceSanitizer.sanitizedFinal("My income status is on track.") == "Your income status is on track.")
+        #expect(MarinaVoiceSanitizer.sanitizedFinal("My budget has room left.") == "Your budget has room left.")
+        #expect(MarinaVoiceSanitizer.sanitizedFinal("My read is that your income is on track.") == "My read is that your income is on track.")
+    }
+
+    @Test func voiceSanitizer_suppressesPartialAssistantOwnedFinancialOpenings() throws {
+        #expect(MarinaVoiceSanitizer.sanitizedStreaming("My income") == nil)
+        #expect(MarinaVoiceSanitizer.sanitizedStreaming("My income status is on track.") == "Your income status is on track.")
+        #expect(MarinaVoiceSanitizer.sanitizedStreaming("My read is that your income is on track.") == "My read is that your income is on track.")
+    }
+
+    @Test func insightNarrator_modelStreamStripsLeadingNameLabel() async throws {
+        let context = insightContext(
+            kind: .metric,
+            title: "Safe Spend Today",
+            primaryValue: "$42.00",
+            rows: [HomeAnswerRow(title: "Period room", value: "$420.00")]
+        )
+        let narrator = MarinaInsightNarrator(modelStreamProvider: { _ in
+            AsyncThrowingStream { continuation in
+                continuation.yield("Marina:")
+                continuation.yield("Marina: I see your safe spend.")
+                continuation.finish()
+            }
+        })
+
+        let values = try await collect(narrator.narrationStream(for: context))
+
+        #expect(values == ["I see your safe spend."])
+    }
+
+    @Test func brain_addsInsightToSuccessfulAnswersAndSkipsTerminalAnswers() async throws {
+        let fixture = try makeFixture()
+        let narrator = RecordingInsightNarrator(response: "Stub insight.")
+        let brain = MarinaBrain(
+            interpreter: MarinaRuleBasedInterpreter(),
+            insightNarrator: narrator
+        )
+
+        let successful = await answer("What is my safe spend today?", using: brain, fixture: fixture)
+        #expect(successful.kind == .metric)
+        #expect(successful.explanation == "Stub insight.")
+        #expect(narrator.contexts.count == 1)
+        #expect(narrator.contexts.first?.title == "Safe Spend Today")
+
+        let unsupported = await answer("delete my Apple Card", using: brain, fixture: fixture)
+        #expect(unsupported.kind == .message)
+        #expect(unsupported.explanation == nil)
+        #expect(narrator.contexts.count == 1)
+
+        let clarification = await answer(
+            MarinaSemanticRequest(
+                entity: .workspace,
+                operation: .list,
+                expectedAnswerShape: .clarification,
+                clarificationQuestion: "Which matching record should Marina use?",
+                unsupportedReason: .ambiguousEntity
+            ),
+            prompt: "Clarify this.",
+            using: brain,
+            fixture: fixture
+        )
+        #expect(clarification.kind == .message)
+        #expect(clarification.explanation == nil)
+        #expect(narrator.contexts.count == 1)
+    }
+
+    @Test func brain_keepsOriginalAnswerWhenInsightNarratorFails() async throws {
+        let fixture = try makeFixture()
+        let brain = MarinaBrain(
+            interpreter: MarinaRuleBasedInterpreter(),
+            insightNarrator: ThrowingInsightNarrator()
+        )
+
+        let answer = await answer("What is my safe spend today?", using: brain, fixture: fixture)
+        #expect(answer.kind == .metric)
+        #expect(answer.primaryValue != nil)
+        #expect(answer.explanation == nil)
+    }
+
+    @Test func brain_answerSeedReturnsCardBeforeNarrationAndIncludesContextOnlyForNarratableAnswers() async throws {
+        let fixture = try makeFixture()
+        let narrator = RecordingInsightNarrator(response: "Stub insight.")
+        let brain = MarinaBrain(
+            interpreter: MarinaRuleBasedInterpreter(),
+            insightNarrator: narrator
+        )
+
+        let successful = await brain.answerSeed(
+            prompt: "What is my safe spend today?",
+            workspace: fixture.workspace,
+            modelContext: fixture.context,
+            ambientDateRange: fixture.currentRange,
+            homeContext: MarinaPanelHomeContext(dateRange: fixture.currentRange),
+            defaultBudgetingPeriod: .monthly,
+            now: fixture.now
+        )
+
+        #expect(successful.answer.kind == .metric)
+        #expect(successful.answer.explanation == nil)
+        #expect(successful.insightContext?.title == "Safe Spend Today")
+        #expect(narrator.contexts.isEmpty)
+
+        let terminal = await brain.answerSeed(
+            prompt: "delete my Apple Card",
+            workspace: fixture.workspace,
+            modelContext: fixture.context,
+            ambientDateRange: fixture.currentRange,
+            homeContext: MarinaPanelHomeContext(dateRange: fixture.currentRange),
+            defaultBudgetingPeriod: .monthly,
+            now: fixture.now
+        )
+
+        #expect(terminal.answer.kind == .message)
+        #expect(terminal.insightContext == nil)
+        #expect(narrator.contexts.isEmpty)
+    }
+
+    @Test func brain_completedAnswerCombinesStreamedNarrationWithSeed() async throws {
+        let fixture = try makeFixture()
+        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let seed = await brain.answerSeed(
+            prompt: "What is my safe spend today?",
+            workspace: fixture.workspace,
+            modelContext: fixture.context,
+            ambientDateRange: fixture.currentRange,
+            homeContext: MarinaPanelHomeContext(dateRange: fixture.currentRange),
+            defaultBudgetingPeriod: .monthly,
+            now: fixture.now
+        )
+
+        let completed = brain.completedAnswer(from: seed, streamingNarration: "Streamed insight.")
+
+        #expect(completed.id == seed.answer.id)
+        #expect(completed.rows == seed.answer.rows)
+        #expect(completed.explanation == "Streamed insight.")
     }
 
     @Test func homeMetricParity_matchesCardCategoryAvailabilityIncomeAndNextPlannedCalculators() async throws {
@@ -928,6 +1314,44 @@ struct MarinaSemanticPromptSuiteTests {
         )
     }
 
+    private func insightContext(
+        kind: HomeAnswerKind,
+        title: String,
+        primaryValue: String?,
+        rows: [HomeAnswerRow]
+    ) -> MarinaInsightContext {
+        let plan = MarinaQueryPlan(
+            id: UUID(),
+            semanticRequest: MarinaSemanticRequest(
+                entity: .budget,
+                operation: .forecast,
+                measure: .remainingRoom,
+                expectedAnswerShape: kind == .comparison ? .comparison : (kind == .list ? .list : .metric)
+            ),
+            dateRange: HomeQueryDateRange(startDate: date(2026, 4, 1), endDate: date(2026, 4, 30)),
+            comparisonDateRange: nil,
+            now: date(2026, 4, 20)
+        )
+        return MarinaInsightContext(
+            prompt: "What is my safe spend today?",
+            result: MarinaExecutionResult(
+                kind: kind,
+                title: title,
+                primaryValue: primaryValue,
+                rows: rows
+            ),
+            plan: plan
+        )
+    }
+
+    private func collect(_ stream: AsyncThrowingStream<String, Error>) async throws -> [String] {
+        var values: [String] = []
+        for try await value in stream {
+            values.append(value)
+        }
+        return values
+    }
+
     private final class RecordingInterpreter: MarinaModelInterpreting {
         private let result: MarinaInterpretedSemanticRequest
         private(set) var callCount = 0
@@ -940,6 +1364,30 @@ struct MarinaSemanticPromptSuiteTests {
             callCount += 1
             return result
         }
+    }
+
+    private final class RecordingInsightNarrator: MarinaInsightNarrating {
+        private let response: String?
+        private(set) var contexts: [MarinaInsightContext] = []
+
+        init(response: String?) {
+            self.response = response
+        }
+
+        func narration(for context: MarinaInsightContext) async throws -> String? {
+            contexts.append(context)
+            return response
+        }
+    }
+
+    private struct ThrowingInsightNarrator: MarinaInsightNarrating {
+        func narration(for context: MarinaInsightContext) async throws -> String? {
+            throw TestNarrationError.failed
+        }
+    }
+
+    private enum TestNarrationError: Error {
+        case failed
     }
 
     private func makeFixture(

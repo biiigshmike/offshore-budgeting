@@ -61,6 +61,8 @@ struct MarinaPanelView: View {
     @State private var isResponding = false
     @State private var isShowingClearConversationAlert = false
     @State private var pendingClarification: PendingClarification?
+    @State private var responseTask: Task<Void, Never>?
+    @State private var answerUpdateTick = 0
     @State private var starterPrompts: [String] = []
     @FocusState private var isPromptFieldFocused: Bool
 
@@ -128,6 +130,9 @@ struct MarinaPanelView: View {
                 .onChange(of: answers.count) { _, _ in
                     scrollToLatestMessage(using: proxy, animated: true)
                 }
+                .onChange(of: answerUpdateTick) { _, _ in
+                    scrollToLatestMessage(using: proxy, animated: true)
+                }
                 .onAppear {
                     loadConversationIfNeeded()
                     scrollToLatestMessage(using: proxy, animated: false)
@@ -163,6 +168,9 @@ struct MarinaPanelView: View {
             Button(String(localized: "common.clear", defaultValue: "Clear", comment: "Action to clear a selection."), role: .destructive) {
                 clearConversation()
             }
+        }
+        .onDisappear {
+            cancelResponseTask()
         }
         .accessibilityIdentifier("marina.panel")
 
@@ -416,6 +424,16 @@ struct MarinaPanelView: View {
             .accessibilityElement(children: .combine)
             .accessibilityIdentifier("marina.answer.\(index)")
 
+            if let explanation = answer.explanation?.trimmingCharacters(in: .whitespacesAndNewlines),
+               explanation.isEmpty == false {
+                Text(explanation)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 4)
+                    .accessibilityIdentifier("marina.answerExplanation.\(index)")
+            }
+
             Text(timestampText(for: answer.generatedAt))
                 .font(.caption2)
                 .foregroundStyle(.secondary)
@@ -489,9 +507,10 @@ struct MarinaPanelView: View {
             return
         }
 
+        cancelResponseTask()
         isResponding = true
-        Task {
-            let answer = await brain.answer(
+        responseTask = Task {
+            let seed = await brain.answerSeed(
                 prompt: submittedPrompt,
                 workspace: workspace,
                 modelContext: modelContext,
@@ -499,8 +518,10 @@ struct MarinaPanelView: View {
                 homeContext: homeContext,
                 defaultBudgetingPeriod: defaultBudgetingPeriod
             )
-            appendAnswer(answer)
+            guard Task.isCancelled == false else { return }
+            await handleAnswerSeed(seed)
             isResponding = false
+            responseTask = nil
         }
     }
 
@@ -559,9 +580,10 @@ struct MarinaPanelView: View {
         markClarificationResolved(answerID: pending.answerID, choiceID: choice.id)
         pendingClarification = nil
 
+        cancelResponseTask()
         isResponding = true
-        Task {
-            let answer = await brain.answer(
+        responseTask = Task {
+            let seed = await brain.answerSeed(
                 resolvedRequest: choice.request,
                 prompt: replyPrompt,
                 workspace: workspace,
@@ -570,8 +592,10 @@ struct MarinaPanelView: View {
                 homeContext: homeContext,
                 defaultBudgetingPeriod: defaultBudgetingPeriod
             )
-            appendAnswer(answer)
+            guard Task.isCancelled == false else { return }
+            await handleAnswerSeed(seed)
             isResponding = false
+            responseTask = nil
         }
     }
 
@@ -913,6 +937,86 @@ struct MarinaPanelView: View {
         conversationStore.saveAnswers(answers, workspaceID: workspace.id)
     }
 
+    private func handleAnswerSeed(_ seed: MarinaAnswerSeed) async {
+        appendAnswer(seed.answer)
+        guard let insightContext = seed.insightContext else { return }
+
+        var latestNarration: String?
+        do {
+            for try await partial in brain.insightNarrationStream(for: insightContext) {
+                guard Task.isCancelled == false else { return }
+                latestNarration = partial
+                replaceAnswerExplanation(
+                    answerID: seed.answer.id,
+                    baseExplanation: seed.answer.explanation,
+                    insight: partial,
+                    suffix: nil,
+                    shouldSave: false
+                )
+            }
+
+            guard Task.isCancelled == false else { return }
+            let finalAnswer = brain.completedAnswer(
+                from: seed,
+                streamingNarration: latestNarration
+            )
+            replaceAnswer(finalAnswer, shouldSave: true)
+        } catch {
+            guard Task.isCancelled == false else { return }
+            replaceAnswer(seed.answer, shouldSave: true)
+        }
+    }
+
+    private func replaceAnswerExplanation(
+        answerID: UUID,
+        baseExplanation: String?,
+        insight: String?,
+        suffix: String?,
+        shouldSave: Bool
+    ) {
+        guard let index = answers.firstIndex(where: { $0.id == answerID }) else { return }
+        let answer = answers[index]
+        let explanation = combinedExplanation(
+            base: baseExplanation,
+            insight: insight,
+            suffix: suffix
+        )
+        answers[index] = HomeAnswer(
+            id: answer.id,
+            queryID: answer.queryID,
+            kind: answer.kind,
+            userPrompt: answer.userPrompt,
+            title: answer.title,
+            subtitle: answer.subtitle,
+            primaryValue: answer.primaryValue,
+            rows: answer.rows,
+            attachment: answer.attachment,
+            explanation: explanation,
+            generatedAt: answer.generatedAt
+        )
+        answerUpdateTick += 1
+        if shouldSave {
+            conversationStore.saveAnswers(answers, workspaceID: workspace.id)
+        }
+    }
+
+    private func replaceAnswer(_ answer: HomeAnswer, shouldSave: Bool) {
+        guard let index = answers.firstIndex(where: { $0.id == answer.id }) else { return }
+        answers[index] = answer
+        updatePendingClarification(afterAppending: answer)
+        answerUpdateTick += 1
+        if shouldSave {
+            conversationStore.saveAnswers(answers, workspaceID: workspace.id)
+        }
+    }
+
+    private func combinedExplanation(base: String?, insight: String?, suffix: String?) -> String? {
+        let pieces = [base, insight, suffix]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { $0.isEmpty == false }
+        return pieces.isEmpty ? nil : pieces.joined(separator: "\n\n")
+    }
+
     private func loadConversationIfNeeded() {
         guard hasLoadedConversation == false else { return }
         answers = conversationStore.loadAnswers(workspaceID: workspace.id)
@@ -924,10 +1028,17 @@ struct MarinaPanelView: View {
     }
 
     private func clearConversation() {
+        cancelResponseTask()
         answers = []
         pendingClarification = nil
+        isResponding = false
         resetStarterPrompts()
         conversationStore.saveAnswers([], workspaceID: workspace.id)
+    }
+
+    private func cancelResponseTask() {
+        responseTask?.cancel()
+        responseTask = nil
     }
 
     private func resetStarterPrompts() {

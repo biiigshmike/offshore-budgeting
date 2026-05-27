@@ -220,7 +220,7 @@ struct HomeAnswerRow: Identifiable, Codable, Equatable {
     }
 }
 
-enum HomeAnswerKind: String, Codable, Equatable {
+enum HomeAnswerKind: String, Codable, Equatable, Sendable {
     case metric
     case list
     case comparison
