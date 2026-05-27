@@ -122,14 +122,18 @@ private struct SafeSpendTodayWidgetEntryView: View {
         return "\(daysLeft) day(s) left in \(snapshot.periodTitle.lowercased())"
     }
 
+    private var compactSecondarySummaryText: String {
+        if snapshot.isDailyPeriod {
+            return snapshot.periodTitle
+        }
+
+        let daysLeft = snapshot.daysLeftInPeriod ?? 0
+        return "\(daysLeft)d left in \(snapshot.periodTitle.lowercased())"
+    }
+
     private var smallBody: some View {
         VStack(alignment: .leading, spacing: 8) {
-            WidgetHeaderView(
-                title: snapshot.title,
-                periodToken: "",
-                rangeText: rangeText,
-                style: .stacked
-            )
+            smallHeader
 
             if let message = snapshot.message {
                 Text(message)
@@ -149,13 +153,35 @@ private struct SafeSpendTodayWidgetEntryView: View {
 
                 Spacer(minLength: 0)
 
-                Text(secondarySummaryText)
+                Text(compactSecondarySummaryText)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
+                    .minimumScaleFactor(0.78)
+                    .allowsTightening(true)
+                    .accessibilityLabel(Text(secondarySummaryText))
             }
         }
         .padding(12)
+    }
+
+    private var smallHeader: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(snapshot.title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.primary)
+                .lineLimit(2)
+                .minimumScaleFactor(0.8)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(rangeText)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
+                .allowsTightening(true)
+        }
+        .accessibilityElement(children: .combine)
     }
 
     private var mediumBody: some View {

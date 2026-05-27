@@ -285,11 +285,9 @@ struct AddExpenseView: View {
             allocationAmount = 0
         }
 
-        let amountToStore = allocationAmount > 0 ? amt : netAmount
-
         let expense = VariableExpense(
             descriptionText: trimmedDesc,
-            amount: amountToStore,
+            amount: amt,
             kindRaw: transactionKind.rawValue,
             transactionDate: transactionDate,
             workspace: workspace,

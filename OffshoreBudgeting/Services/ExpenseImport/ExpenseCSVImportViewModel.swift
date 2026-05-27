@@ -450,12 +450,9 @@ final class ExpenseCSVImportViewModel: ObservableObject {
                 guard let card else { continue }
                 let category = row.selectedCategory
                 let offsetAmount = row.parsedOffsetAmount(cappedTo: row.finalAmount) ?? 0
-                let amountToSave = row.reconciliationAction == .offset
-                    ? max(0, row.finalAmount - offsetAmount)
-                    : row.finalAmount
                 let exp = VariableExpense(
                     descriptionText: row.finalMerchant,
-                    amount: amountToSave,
+                    amount: row.finalAmount,
                     kindRaw: VariableExpenseKind.debit.rawValue,
                     transactionDate: row.finalDate,
                     workspace: workspace,

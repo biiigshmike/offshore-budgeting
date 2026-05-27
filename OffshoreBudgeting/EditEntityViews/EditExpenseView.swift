@@ -162,7 +162,7 @@ struct EditExpenseView: View {
             // Seed fields once.
             descriptionText = expense.descriptionText
             let existingOffset = max(0, -(expense.offsetSettlement?.amount ?? 0))
-            amountText = CurrencyFormatter.editingString(from: SavingsMathService.variableGrossAmount(for: expense) + existingOffset)
+            amountText = CurrencyFormatter.editingString(from: editableGrossAmount(existingOffset: existingOffset))
             transactionDate = expense.transactionDate
             transactionKind = expense.kind
             selectedCardID = expense.card?.id
@@ -304,11 +304,9 @@ struct EditExpenseView: View {
             allocationAmount = 0
         }
 
-        let amountToSave = allocationAmount > 0 ? amt : netAmount
-
         // SwiftData models are reference types, so updating properties is enough.
         expense.descriptionText = trimmedDesc
-        expense.amount = amountToSave
+        expense.amount = amt
         expense.kind = transactionKind
         expense.transactionDate = transactionDate
         expense.workspace = workspace
@@ -386,6 +384,14 @@ struct EditExpenseView: View {
 
     private func offsetNote(for description: String) -> String {
         "Offset applied to \(description)"
+    }
+
+    private func editableGrossAmount(existingOffset: Double) -> Double {
+        let gross = SavingsMathService.variableGrossAmount(for: expense)
+        if gross <= 0, existingOffset > 0 {
+            return existingOffset
+        }
+        return gross
     }
 
     private func savingsOffsetNote(for description: String) -> String {

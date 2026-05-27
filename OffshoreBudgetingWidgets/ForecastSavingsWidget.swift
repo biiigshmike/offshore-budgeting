@@ -127,12 +127,7 @@ private struct ForecastSavingsWidgetEntryView: View {
 
     private var smallBody: some View {
         VStack(alignment: .leading, spacing: 8) {
-            WidgetHeaderView(
-                title: snapshot.title,
-                periodToken: "",
-                rangeText: rangeText,
-                style: .stacked
-            )
+            smallHeader
 
             if let message = snapshot.message {
                 Text(message)
@@ -151,13 +146,35 @@ private struct ForecastSavingsWidgetEntryView: View {
 
                 Spacer(minLength: 0)
 
-                Text(snapshot.statusLine)
+                Text(compactStatusText)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .lineLimit(3)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.78)
+                    .allowsTightening(true)
+                    .accessibilityLabel(Text(snapshot.statusLine))
             }
         }
         .padding(12)
+    }
+
+    private var smallHeader: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(snapshot.title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.primary)
+                .lineLimit(2)
+                .minimumScaleFactor(0.8)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(rangeText)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
+                .allowsTightening(true)
+        }
+        .accessibilityElement(children: .combine)
     }
 
     private var mediumBody: some View {

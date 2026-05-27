@@ -461,7 +461,7 @@ struct OffshoreBudgetingTests {
     }
 
     @MainActor
-    @Test func importCommit_OffsetCreatesSettlementAndReducesExpenseAmount() throws {
+    @Test func importCommit_OffsetCreatesSettlementAndPreservesExpenseAmount() throws {
         let context = try makeContext()
         let workspace = Workspace(name: "WS", hexColor: "#3B82F6")
         let card = Card(name: "Visa", workspace: workspace)
@@ -502,10 +502,67 @@ struct OffshoreBudgetingTests {
         let settlements = try context.fetch(FetchDescriptor<AllocationSettlement>())
         let offsetSettlement = try #require(settlements.first { $0.expense?.id == expense.id })
 
-        #expect(expense.amount == 30)
+        #expect(expense.amount == 50)
+        #expect(expense.spendingAmount() == 50)
+        #expect(expense.ledgerDisplayAmount() == 50)
+        #expect(SavingsMathService.variableBudgetImpactAmount(for: expense) == 50)
         #expect(expense.offsetSettlement?.id == offsetSettlement.id)
         #expect(offsetSettlement.amount == -20)
         #expect(offsetSettlement.account?.id == account.id)
+        #expect(AllocationLedgerService.balance(for: account) == 10)
+    }
+
+    @MainActor
+    @Test func importCommit_FullOffsetPreservesExpenseSpendAndCreditsReconciliation() throws {
+        let context = try makeContext()
+        let workspace = Workspace(name: "WS", hexColor: "#3B82F6")
+        let card = Card(name: "Visa", workspace: workspace)
+        let category = Category(name: "Groceries", hexColor: "#00AA00", workspace: workspace)
+        let account = AllocationAccount(name: "Partner", workspace: workspace)
+        let seedSettlement = AllocationSettlement(
+            date: Date(),
+            note: "Seed",
+            amount: 100,
+            workspace: workspace,
+            account: account
+        )
+
+        context.insert(workspace)
+        context.insert(card)
+        context.insert(category)
+        context.insert(account)
+        context.insert(seedSettlement)
+        try context.save()
+
+        let vm = ExpenseCSVImportViewModel(mode: .cardTransactions)
+        vm.prepare(workspace: workspace, modelContext: context)
+        vm.loadClipboard(
+            text: "Date,Description,Amount,Category\n02/10/2026,Safeway,100.00,Groceries",
+            workspace: workspace,
+            card: card,
+            modelContext: context
+        )
+
+        let rowID = try #require(vm.rows.first?.id)
+        vm.setReconciliationAction(rowID: rowID, action: .offset)
+        vm.setOffsetAccount(rowID: rowID, account: account)
+        vm.setOffsetAmount(rowID: rowID, amountText: "100")
+
+        vm.commitImport(workspace: workspace, card: card, modelContext: context)
+
+        let expense = try #require(try context.fetch(FetchDescriptor<VariableExpense>()).first)
+        let settlements = try context.fetch(FetchDescriptor<AllocationSettlement>())
+        let settlement = try #require(settlements.first { $0.expense?.id == expense.id })
+
+        #expect(expense.amount == 100)
+        #expect(expense.spendingAmount() == 100)
+        #expect(expense.ledgerDisplayAmount() == 100)
+        #expect(expense.ledgerSignedAmount() == 100)
+        #expect(SavingsMathService.variableBudgetImpactAmount(for: expense) == 100)
+        #expect(expense.offsetSettlement?.id == settlement.id)
+        #expect(settlement.amount == -100)
+        #expect(settlement.account?.id == account.id)
+        #expect(AllocationLedgerService.balance(for: account) == 0)
     }
 
     @MainActor
