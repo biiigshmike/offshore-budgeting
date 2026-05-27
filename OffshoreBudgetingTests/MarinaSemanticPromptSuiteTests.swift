@@ -179,13 +179,19 @@ struct MarinaSemanticPromptSuiteTests {
 
         let whatIf = await answer("If I spend $50 at Target, what happens to my safe spend?", using: brain, fixture: fixture)
         #expect(whatIf.kind == .comparison)
+        #expect((whatIf.primaryValue ?? "").contains("113.18"))
+        #expect(whatIf.rows.contains(where: { $0.title == "Current safe spend today" }))
         #expect(whatIf.rows.contains(where: { $0.title == "Virtual spend" }))
+        let safeSpendAfter = whatIf.rows.first(where: { $0.title == "Safe spend after" })?.amount ?? -1
+        let periodRoomAfter = whatIf.rows.first(where: { $0.title == "Period room after" })?.amount
+        #expect(abs(safeSpendAfter - 113.18181818181819) < 0.0001)
+        #expect(periodRoomAfter == 1_245)
 
         let categoryAvailability = await answer("Show category availability.", using: brain, fixture: fixture)
         #expect(categoryAvailability.kind == .metric)
         #expect(categoryAvailability.title == "Category Availability")
         let categoryAvailabilityHasOverRow = categoryAvailability.rows.contains { row in
-            row.title == "Over" && row.value == "1"
+            row.title == "Over" && row.value == "0"
         }
         #expect(categoryAvailabilityHasOverRow)
 
@@ -629,6 +635,19 @@ struct MarinaSemanticPromptSuiteTests {
         let incomeAnswer = await answer("How is my income progress?", using: brain, fixture: fixture, homeContext: homeContext)
         #expect(incomeAnswer.primaryValue == incomeProgress.primaryValue)
 
+        let safeSpend = HomeQueryEngine().execute(
+            query: HomeQuery(intent: .safeSpendToday, dateRange: fixture.currentRange),
+            budgets: snapshot.budgets,
+            categories: snapshot.categories,
+            plannedExpenses: snapshot.homeCalculationPlannedExpenses,
+            variableExpenses: snapshot.homeCalculationVariableExpenses,
+            incomes: snapshot.incomes,
+            savingsEntries: snapshot.savingsEntries,
+            now: fixture.now
+        )
+        let safeSpendAnswer = await answer("What is my safe spend today?", using: brain, fixture: fixture, homeContext: homeContext)
+        #expect(safeSpendAnswer.primaryValue == safeSpend.primaryValue)
+
         let next = try #require(
             HomeNextPlannedExpenseFinder.nextExpense(
                 from: snapshot.homePlannedExpenses,
@@ -689,6 +708,49 @@ struct MarinaSemanticPromptSuiteTests {
         let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
         let answer = await answer("Summarize my Apple Card.", using: brain, fixture: fixture)
         #expect(answer.primaryValue == CurrencyFormatter.string(from: 1_370))
+    }
+
+    @Test func safeSpendWhatIf_uncappedCategoriesUseBaseRoom() async throws {
+        let fixture = try makeFixture(includeAppleMerchantExpense: false)
+        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+
+        let answer = await answer("If I spend $5 on Groceries, what happens to my safe spend?", using: brain, fixture: fixture)
+
+        #expect(answer.kind == .comparison)
+        let currentSafeSpend = answer.rows.first(where: { $0.title == "Current safe spend today" })?.amount ?? -1
+        let safeSpendAfter = answer.rows.first(where: { $0.title == "Safe spend after" })?.amount ?? -1
+        #expect(abs(currentSafeSpend - 145) < 0.0001)
+        #expect(abs(safeSpendAfter - 144.54545454545453) < 0.0001)
+        #expect(answer.rows.first(where: { $0.title == "Period room after" })?.amount == 1_590)
+    }
+
+    @Test func safeSpendWhatIf_allCategoriesCappedReducesCategoryCapRoom() async throws {
+        let fixture = try makeFixture(includeAppleMerchantExpense: false)
+        let snapshot = try MarinaWorkspaceSnapshotProvider().snapshot(
+            for: fixture.workspace,
+            modelContext: fixture.context,
+            homeContext: MarinaPanelHomeContext(dateRange: fixture.currentRange),
+            now: fixture.now
+        )
+        let budget = try #require(snapshot.budgets.first(where: { $0.name == "April 2026" }))
+        let dining = try #require(snapshot.categories.first(where: { $0.name == "Dining" }))
+        let bills = try #require(snapshot.categories.first(where: { $0.name == "Bills" }))
+        let diningLimit = BudgetCategoryLimit(minAmount: 0, maxAmount: 200, budget: budget, category: dining)
+        let billsLimit = BudgetCategoryLimit(minAmount: 0, maxAmount: 2_000, budget: budget, category: bills)
+        budget.categoryLimits = (budget.categoryLimits ?? []) + [diningLimit, billsLimit]
+        fixture.context.insert(diningLimit)
+        fixture.context.insert(billsLimit)
+        try fixture.context.save()
+
+        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let answer = await answer("If I spend $5 on Groceries, what happens to my safe spend?", using: brain, fixture: fixture)
+
+        #expect(answer.kind == .comparison)
+        let currentSafeSpend = answer.rows.first(where: { $0.title == "Current safe spend today" })?.amount ?? -1
+        let safeSpendAfter = answer.rows.first(where: { $0.title == "Safe spend after" })?.amount ?? -1
+        #expect(abs(currentSafeSpend - 81.36363636363636) < 0.0001)
+        #expect(abs(safeSpendAfter - 80.9090909090909) < 0.0001)
+        #expect(answer.rows.first(where: { $0.title == "Period room after" })?.amount == 890)
     }
 
     @Test func conversationDisplayAdapter_preservesUserPromptAsSeparateMessage() throws {

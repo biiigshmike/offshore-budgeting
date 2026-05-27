@@ -193,8 +193,7 @@ struct HomeCategoryLimitsAggregator {
                 participatingIDs.contains(category.id)
             else { continue }
 
-            let effectiveAmount: Double = (expense.actualAmount > 0) ? expense.actualAmount : expense.plannedAmount
-            plannedByCategoryID[category.id, default: 0] += effectiveAmount
+            plannedByCategoryID[category.id, default: 0] += SavingsMathService.plannedBudgetImpactAmount(for: expense)
         }
 
         for expense in variableExpenses {
@@ -205,7 +204,7 @@ struct HomeCategoryLimitsAggregator {
                 participatingIDs.contains(category.id)
             else { continue }
 
-            variableByCategoryID[category.id, default: 0] += expense.ledgerSignedAmount()
+            variableByCategoryID[category.id, default: 0] += SavingsMathService.variableBudgetImpactAmount(for: expense)
         }
 
         // 5) Build metrics in category name order (we’ll sort after status)

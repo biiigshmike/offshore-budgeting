@@ -395,6 +395,29 @@ struct MarinaQueryExecutor {
             guard amount > 0 else {
                 return clarification("What amount should I use for the what-if?")
             }
+            if plan.measure == .remainingRoom {
+                let current = safeSpendSummary(snapshot: snapshot, plan: plan)
+                let scenario = safeSpendSummary(
+                    snapshot: snapshot,
+                    plan: plan,
+                    virtualSpendAmount: amount,
+                    virtualSpendCategoryID: matchingCategoryID(for: plan.targetName, snapshot: snapshot)
+                )
+
+                return MarinaExecutionResult(
+                    kind: .comparison,
+                    title: "What If",
+                    subtitle: rangeLabel(plan.dateRange),
+                    primaryValue: currency(scenario.safeToSpendToday),
+                    rows: [
+                        HomeAnswerRow(title: "Current safe spend today", value: currency(current.safeToSpendToday), amount: current.safeToSpendToday),
+                        HomeAnswerRow(title: "Virtual spend", value: "-\(currency(amount))", amount: -amount),
+                        HomeAnswerRow(title: "Safe spend after", value: currency(scenario.safeToSpendToday), amount: scenario.safeToSpendToday),
+                        HomeAnswerRow(title: "Period room after", value: currency(scenario.periodRemainingRoom), amount: scenario.periodRemainingRoom),
+                        HomeAnswerRow(title: "Status", value: scenario.periodRemainingRoom > 0 ? "Still above zero" : "Would go to zero")
+                    ]
+                )
+            }
             let baseline = plan.measure == .savingsTotal
                 ? projectedSavings(snapshot: snapshot, range: plan.dateRange)
                 : budgetRoom(snapshot: snapshot, range: plan.dateRange)
@@ -967,6 +990,53 @@ struct MarinaQueryExecutor {
         let plannedIncome = incomeTotal(snapshot.incomes, range: range, state: .planned, source: nil)
         let income = actualIncome > 0 ? actualIncome : plannedIncome
         return income - totalSpend(snapshot: snapshot, range: range)
+    }
+
+    private func safeSpendSummary(
+        snapshot: MarinaWorkspaceSnapshot,
+        plan: MarinaQueryPlan,
+        virtualSpendAmount: Double = 0,
+        virtualSpendCategoryID: UUID? = nil
+    ) -> SafeSpendTodayCalculator.Summary {
+        let range = resolvedRange(for: plan)
+        return SafeSpendTodayCalculator.calculate(
+            budgetingPeriod: calendar.isDate(range.startDate, inSameDayAs: range.endDate) ? .daily : .monthly,
+            rangeStart: range.startDate,
+            rangeEnd: range.endDate,
+            budgets: snapshot.budgets,
+            categories: snapshot.categories,
+            incomes: snapshot.incomes,
+            plannedExpenses: snapshot.homeCalculationPlannedExpenses,
+            variableExpenses: snapshot.homeCalculationVariableExpenses,
+            savingsEntries: snapshot.savingsEntries,
+            now: plan.now,
+            calendar: calendar,
+            virtualSpendAmount: virtualSpendAmount,
+            virtualSpendCategoryID: virtualSpendCategoryID
+        )
+    }
+
+    private func resolvedRange(for plan: MarinaQueryPlan) -> HomeQueryDateRange {
+        if let dateRange = plan.dateRange {
+            return dateRange
+        }
+        let defaultRange = BudgetingPeriod.monthly.defaultRange(containing: plan.now, calendar: calendar)
+        return HomeQueryDateRange(startDate: defaultRange.start, endDate: defaultRange.end)
+    }
+
+    private func matchingCategoryID(for targetName: String?, snapshot: MarinaWorkspaceSnapshot) -> UUID? {
+        guard let targetName else { return nil }
+        let target = canonical(targetName)
+        return snapshot.categories.first { category in
+            let candidate = canonical(category.name)
+            return candidate == target || candidate.contains(target) || target.contains(candidate)
+        }?.id
+    }
+
+    private func canonical(_ value: String) -> String {
+        value
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
     }
 
     private func projectedSavings(snapshot: MarinaWorkspaceSnapshot, range: HomeQueryDateRange?) -> Double {

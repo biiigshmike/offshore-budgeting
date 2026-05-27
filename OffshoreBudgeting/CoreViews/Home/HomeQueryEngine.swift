@@ -254,6 +254,8 @@ struct HomeQueryEngine {
         case .safeSpendToday:
             return safeSpendTodayAnswer(
                 query: query,
+                budgets: budgets,
+                categories: categories,
                 incomes: incomes,
                 plannedExpenses: plannedExpenses,
                 variableExpenses: variableExpenses,
@@ -2160,6 +2162,8 @@ struct HomeQueryEngine {
 
     private func safeSpendTodayAnswer(
         query: HomeQuery,
+        budgets: [Budget],
+        categories: [Category],
         incomes: [Income],
         plannedExpenses: [PlannedExpense],
         variableExpenses: [VariableExpense],
@@ -2167,55 +2171,22 @@ struct HomeQueryEngine {
         now: Date
     ) -> HomeAnswer {
         let range = query.dateRange ?? monthRange(containing: now)
-        let todayStart = calendar.startOfDay(for: now)
-        let tomorrowStart = calendar.date(byAdding: .day, value: 1, to: todayStart) ?? now
-        let todayEnd = calendar.date(byAdding: DateComponents(day: 1, second: -1), to: todayStart) ?? now
-        let rangeEndDayStart = calendar.startOfDay(for: range.endDate)
-        let toDateEnd = min(range.endDate, todayEnd)
-
-        let actualIncomeToDate = incomes
-            .filter { !$0.isPlanned && $0.date >= range.startDate && $0.date < tomorrowStart }
-            .reduce(0.0) { $0 + $1.amount }
-        let plannedIncomeRemaining = incomes
-            .filter { $0.isPlanned && $0.date >= todayStart && $0.date <= range.endDate }
-            .reduce(0.0) { $0 + $1.amount }
-        let plannedExpensesAlreadyConsumed = plannedExpenses
-            .filter { $0.expenseDate >= range.startDate && $0.expenseDate < todayStart }
-            .reduce(0.0) { $0 + SavingsMathService.plannedBudgetImpactAmount(for: $1) }
-        let remainingPlannedExpenses = plannedExpenses
-            .filter { $0.expenseDate >= todayStart && $0.expenseDate <= range.endDate }
-            .reduce(0.0) { $0 + SavingsMathService.plannedProjectedBudgetImpactAmount(for: $1) }
-        let actualVariableExpensesToDate = variableExpenses
-            .filter { $0.transactionDate >= range.startDate && $0.transactionDate < tomorrowStart }
-            .reduce(0.0) { $0 + SavingsMathService.variableBudgetImpactAmount(for: $1) }
-        let actualSavingsAdjustmentsToDate = SavingsMathService.actualSavingsAdjustmentTotal(
-            from: savingsEntries,
-            startDate: range.startDate,
-            endDate: toDateEnd
+        let isDailyRange = calendar.isDate(range.startDate, inSameDayAs: range.endDate)
+        let summary = SafeSpendTodayCalculator.calculate(
+            budgetingPeriod: isDailyRange ? .daily : .monthly,
+            rangeStart: range.startDate,
+            rangeEnd: range.endDate,
+            budgets: budgets,
+            categories: categories,
+            incomes: incomes,
+            plannedExpenses: plannedExpenses,
+            variableExpenses: variableExpenses,
+            savingsEntries: savingsEntries,
+            now: now,
+            calendar: calendar
         )
 
-        let periodRemainingRoom = actualIncomeToDate
-            + plannedIncomeRemaining
-            - plannedExpensesAlreadyConsumed
-            - remainingPlannedExpenses
-            - actualVariableExpensesToDate
-            + actualSavingsAdjustmentsToDate
-        let clampedRoom = max(0, periodRemainingRoom)
-        let daysLeft = max(
-            1,
-            (calendar.dateComponents([.day], from: todayStart, to: rangeEndDayStart).day ?? 0) + 1
-        )
-        let safeToSpendToday = range.startDate == rangeEndDayStart
-            ? clampedRoom
-            : clampedRoom / Double(daysLeft)
-        let hasActivity = actualIncomeToDate != 0
-            || plannedIncomeRemaining != 0
-            || plannedExpensesAlreadyConsumed != 0
-            || remainingPlannedExpenses != 0
-            || actualVariableExpensesToDate != 0
-            || actualSavingsAdjustmentsToDate != 0
-
-        guard hasActivity else {
+        guard summary.hasActivity else {
             return HomeAnswer(
                 queryID: query.id,
                 kind: .message,
@@ -2233,10 +2204,10 @@ struct HomeQueryEngine {
             kind: .metric,
             title: "Safe Spend Today",
             subtitle: rangeLabel(for: range),
-            primaryValue: currency(safeToSpendToday),
+            primaryValue: currency(summary.safeToSpendToday),
             rows: [
-                HomeAnswerRow(title: "Period remaining room", value: currency(clampedRoom)),
-                HomeAnswerRow(title: "Days left in period", value: "\(daysLeft)"),
+                HomeAnswerRow(title: "Period remaining room", value: currency(summary.periodRemainingRoom), amount: summary.periodRemainingRoom),
+                HomeAnswerRow(title: "Days left in period", value: "\(summary.daysLeftInPeriod)", amount: Double(summary.daysLeftInPeriod)),
                 HomeAnswerRow(title: "Period", value: rangeLabel(for: range))
             ]
         )

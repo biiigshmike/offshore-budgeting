@@ -1058,6 +1058,189 @@ struct HomeQueryEngineTests {
         #expect(answer.rows.contains(where: { $0.title == "Days left in period" && $0.value == "21" }))
     }
 
+    @Test func safeSpendToday_withoutCategoryCapsMatchesCurrentFormula() throws {
+        let engine = makeEngine()
+        let range = HomeQueryDateRange(startDate: date(2026, 4, 1), endDate: date(2026, 4, 30))
+        let query = HomeQuery(intent: .safeSpendToday, dateRange: range)
+        let category = Category(name: "General", hexColor: "#00AA00")
+        let incomes = [
+            Income(source: "Paycheck", amount: 3_000, date: date(2026, 4, 1), isPlanned: false),
+            Income(source: "Bonus", amount: 600, date: date(2026, 4, 20), isPlanned: true)
+        ]
+        let plannedExpenses = [
+            PlannedExpense(title: "Rent", plannedAmount: 1_200, expenseDate: date(2026, 4, 3), category: category),
+            PlannedExpense(title: "Utilities", plannedAmount: 300, expenseDate: date(2026, 4, 25), category: category)
+        ]
+        let variableExpenses = [
+            VariableExpense(descriptionText: "Groceries", amount: 200, transactionDate: date(2026, 4, 5), category: category)
+        ]
+
+        let answer = engine.execute(
+            query: query,
+            categories: [category],
+            plannedExpenses: plannedExpenses,
+            variableExpenses: variableExpenses,
+            incomes: incomes,
+            now: date(2026, 4, 10)
+        )
+
+        #expect(answer.kind == .metric)
+        #expect(answer.rows.first(where: { $0.title == "Period remaining room" })?.amount == 1_900)
+        #expect((answer.primaryValue ?? "").contains("90.48"))
+    }
+
+    @Test func safeSpendToday_withCategoryCapsIsConstrainedByRemainingCapRoom() throws {
+        let engine = makeEngine()
+        let range = HomeQueryDateRange(startDate: date(2026, 4, 1), endDate: date(2026, 4, 30))
+        let query = HomeQuery(intent: .safeSpendToday, dateRange: range)
+        let groceries = Category(name: "Groceries", hexColor: "#00AA00")
+        let budget = Budget(name: "April 2026", startDate: date(2026, 4, 1), endDate: date(2026, 4, 30))
+        let groceriesLimit = BudgetCategoryLimit(minAmount: nil, maxAmount: 500, budget: budget, category: groceries)
+        budget.categoryLimits = [groceriesLimit]
+        let incomes = [
+            Income(source: "Paycheck", amount: 5_000, date: date(2026, 4, 1), isPlanned: false)
+        ]
+        let plannedExpenses = [
+            PlannedExpense(title: "Groceries Plan", plannedAmount: 100, expenseDate: date(2026, 4, 3), category: groceries)
+        ]
+        let variableExpenses = [
+            VariableExpense(descriptionText: "Groceries", amount: 120, transactionDate: date(2026, 4, 5), category: groceries)
+        ]
+
+        let answer = engine.execute(
+            query: query,
+            budgets: [budget],
+            categories: [groceries],
+            plannedExpenses: plannedExpenses,
+            variableExpenses: variableExpenses,
+            incomes: incomes,
+            now: date(2026, 4, 10)
+        )
+
+        #expect(answer.kind == .metric)
+        #expect(answer.rows.first(where: { $0.title == "Period remaining room" })?.amount == 280)
+        #expect((answer.primaryValue ?? "").contains("13.33"))
+    }
+
+    @Test func safeSpendToday_uncappedKnownCategoryKeepsBaseRoomWhenCappedCategoryIsSpent() throws {
+        let engine = makeEngine()
+        let range = HomeQueryDateRange(startDate: date(2026, 4, 1), endDate: date(2026, 4, 30))
+        let query = HomeQuery(intent: .safeSpendToday, dateRange: range)
+        let groceries = Category(name: "Groceries", hexColor: "#00AA00")
+        let dining = Category(name: "Dining", hexColor: "#AA0000")
+        let budget = Budget(name: "April 2026", startDate: date(2026, 4, 1), endDate: date(2026, 4, 30))
+        let groceriesLimit = BudgetCategoryLimit(minAmount: nil, maxAmount: 100, budget: budget, category: groceries)
+        budget.categoryLimits = [groceriesLimit]
+        let incomes = [
+            Income(source: "Paycheck", amount: 1_000, date: date(2026, 4, 1), isPlanned: false)
+        ]
+        let variableExpenses = [
+            VariableExpense(descriptionText: "Groceries", amount: 100, transactionDate: date(2026, 4, 5), category: groceries)
+        ]
+
+        let answer = engine.execute(
+            query: query,
+            budgets: [budget],
+            categories: [groceries, dining],
+            plannedExpenses: [],
+            variableExpenses: variableExpenses,
+            incomes: incomes,
+            now: date(2026, 4, 10)
+        )
+
+        #expect(answer.kind == .metric)
+        #expect(answer.rows.first(where: { $0.title == "Period remaining room" })?.amount == 900)
+        #expect((answer.primaryValue ?? "").contains("42.86"))
+    }
+
+    @Test func safeSpendToday_uncategorizedExpenseDisablesGlobalCategoryCapConstraint() throws {
+        let engine = makeEngine()
+        let range = HomeQueryDateRange(startDate: date(2026, 4, 1), endDate: date(2026, 4, 30))
+        let query = HomeQuery(intent: .safeSpendToday, dateRange: range)
+        let groceries = Category(name: "Groceries", hexColor: "#00AA00")
+        let budget = Budget(name: "April 2026", startDate: date(2026, 4, 1), endDate: date(2026, 4, 30))
+        let groceriesLimit = BudgetCategoryLimit(minAmount: nil, maxAmount: 100, budget: budget, category: groceries)
+        budget.categoryLimits = [groceriesLimit]
+        let incomes = [
+            Income(source: "Paycheck", amount: 1_000, date: date(2026, 4, 1), isPlanned: false)
+        ]
+        let variableExpenses = [
+            VariableExpense(descriptionText: "Groceries", amount: 100, transactionDate: date(2026, 4, 5), category: groceries),
+            VariableExpense(descriptionText: "Mystery", amount: 25, transactionDate: date(2026, 4, 6), category: nil)
+        ]
+
+        let answer = engine.execute(
+            query: query,
+            budgets: [budget],
+            categories: [groceries],
+            plannedExpenses: [],
+            variableExpenses: variableExpenses,
+            incomes: incomes,
+            now: date(2026, 4, 10)
+        )
+
+        #expect(answer.kind == .metric)
+        #expect(answer.rows.first(where: { $0.title == "Period remaining room" })?.amount == 875)
+        #expect((answer.primaryValue ?? "").contains("41.67"))
+    }
+
+    @Test func safeSpendToday_categoryCapRoomIncludesPastFutureAndVariableBudgetImpact() throws {
+        let engine = makeEngine()
+        let range = HomeQueryDateRange(startDate: date(2026, 4, 1), endDate: date(2026, 4, 30))
+        let query = HomeQuery(intent: .safeSpendToday, dateRange: range)
+        let groceries = Category(name: "Groceries", hexColor: "#00AA00")
+        let budget = Budget(name: "April 2026", startDate: date(2026, 4, 1), endDate: date(2026, 4, 30))
+        let groceriesLimit = BudgetCategoryLimit(minAmount: nil, maxAmount: 500, budget: budget, category: groceries)
+        budget.categoryLimits = [groceriesLimit]
+        let incomes = [
+            Income(source: "Paycheck", amount: 5_000, date: date(2026, 4, 1), isPlanned: false)
+        ]
+        let plannedExpenses = [
+            PlannedExpense(title: "Past Groceries", plannedAmount: 90, expenseDate: date(2026, 4, 3), category: groceries),
+            PlannedExpense(title: "Future Groceries", plannedAmount: 160, expenseDate: date(2026, 4, 25), category: groceries)
+        ]
+        let variableExpenses = [
+            VariableExpense(descriptionText: "Groceries", amount: 50, transactionDate: date(2026, 4, 5), category: groceries)
+        ]
+
+        let answer = engine.execute(
+            query: query,
+            budgets: [budget],
+            categories: [groceries],
+            plannedExpenses: plannedExpenses,
+            variableExpenses: variableExpenses,
+            incomes: incomes,
+            now: date(2026, 4, 10)
+        )
+
+        #expect(answer.kind == .metric)
+        #expect(answer.rows.first(where: { $0.title == "Period remaining room" })?.amount == 200)
+        #expect((answer.primaryValue ?? "").contains("9.52"))
+    }
+
+    @Test func safeSpendToday_withOnlyCategoryCapsStillReturnsNoActivityMessage() throws {
+        let engine = makeEngine()
+        let range = HomeQueryDateRange(startDate: date(2026, 4, 1), endDate: date(2026, 4, 30))
+        let query = HomeQuery(intent: .safeSpendToday, dateRange: range)
+        let groceries = Category(name: "Groceries", hexColor: "#00AA00")
+        let budget = Budget(name: "April 2026", startDate: date(2026, 4, 1), endDate: date(2026, 4, 30))
+        let groceriesLimit = BudgetCategoryLimit(minAmount: nil, maxAmount: 500, budget: budget, category: groceries)
+        budget.categoryLimits = [groceriesLimit]
+
+        let answer = engine.execute(
+            query: query,
+            budgets: [budget],
+            categories: [groceries],
+            plannedExpenses: [],
+            variableExpenses: [],
+            incomes: [],
+            now: date(2026, 4, 10)
+        )
+
+        #expect(answer.kind == .message)
+        #expect(answer.subtitle == "Not enough budget activity in this range yet.")
+    }
+
     @Test func forecastSavings_returnsProjectedActualAndGap() throws {
         let engine = makeEngine()
         let range = HomeQueryDateRange(startDate: date(2026, 4, 1), endDate: date(2026, 4, 30))
@@ -1121,6 +1304,85 @@ struct HomeQueryEngineTests {
         #expect(answer.title == "Category Availability")
         #expect(answer.rows.first(where: { $0.title == "Over" })?.value == "1")
         #expect(answer.rows.first(where: { $0.title == "Near" })?.value == "1")
+    }
+
+    @Test func categoryAvailability_variableSplitCountsOwnedBudgetImpactOnly() throws {
+        let range = HomeQueryDateRange(startDate: date(2026, 4, 1), endDate: date(2026, 4, 30))
+        let groceries = Category(name: "Groceries", hexColor: "#00AA00")
+        let budget = Budget(name: "April 2026", startDate: date(2026, 4, 1), endDate: date(2026, 4, 30))
+        let groceriesLimit = BudgetCategoryLimit(minAmount: 0, maxAmount: 120, budget: budget, category: groceries)
+        budget.categoryLimits = [groceriesLimit]
+        let account = AllocationAccount(name: "Shared")
+        let groceriesExpense = VariableExpense(
+            descriptionText: "Groceries",
+            amount: 100,
+            transactionDate: date(2026, 4, 5),
+            category: groceries
+        )
+        let allocation = ExpenseAllocation(
+            allocatedAmount: 50,
+            preservesGrossAmount: true,
+            account: account,
+            expense: groceriesExpense
+        )
+        groceriesExpense.allocation = allocation
+
+        let result = HomeCategoryLimitsAggregator.build(
+            budgets: [budget],
+            categories: [groceries],
+            plannedExpenses: [],
+            variableExpenses: [groceriesExpense],
+            rangeStart: range.startDate,
+            rangeEnd: range.endDate
+        )
+        let metric = try #require(result.metrics.first)
+
+        #expect(metric.spentVariable == 50)
+        #expect(metric.availableRaw(for: .all) == 70)
+        if case .ok = metric.status(for: .all, nearThreshold: HomeCategoryLimitsAggregator.defaultNearThreshold) {
+        } else {
+            Issue.record("Expected split variable category availability to remain ok.")
+        }
+    }
+
+    @Test func categoryAvailability_plannedSplitCountsOwnedBudgetImpactOnly() throws {
+        let range = HomeQueryDateRange(startDate: date(2026, 4, 1), endDate: date(2026, 4, 30))
+        let lodging = Category(name: "Lodging", hexColor: "#00AA00")
+        let budget = Budget(name: "April 2026", startDate: date(2026, 4, 1), endDate: date(2026, 4, 30))
+        let lodgingLimit = BudgetCategoryLimit(minAmount: 0, maxAmount: 120, budget: budget, category: lodging)
+        budget.categoryLimits = [lodgingLimit]
+        let account = AllocationAccount(name: "Shared")
+        let hotel = PlannedExpense(
+            title: "Hotel",
+            plannedAmount: 100,
+            actualAmount: 100,
+            expenseDate: date(2026, 4, 5),
+            category: lodging
+        )
+        let allocation = ExpenseAllocation(
+            allocatedAmount: 40,
+            preservesGrossAmount: true,
+            account: account,
+            plannedExpense: hotel
+        )
+        hotel.allocation = allocation
+
+        let result = HomeCategoryLimitsAggregator.build(
+            budgets: [budget],
+            categories: [lodging],
+            plannedExpenses: [hotel],
+            variableExpenses: [],
+            rangeStart: range.startDate,
+            rangeEnd: range.endDate
+        )
+        let metric = try #require(result.metrics.first)
+
+        #expect(metric.spentPlanned == 60)
+        #expect(metric.availableRaw(for: .all) == 60)
+        if case .ok = metric.status(for: .all, nearThreshold: HomeCategoryLimitsAggregator.defaultNearThreshold) {
+        } else {
+            Issue.record("Expected split planned category availability to remain ok.")
+        }
     }
 
     @Test func nextPlannedExpense_returnsUpcomingBudgetGeneratedExpense() throws {
