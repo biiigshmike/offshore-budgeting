@@ -121,6 +121,18 @@ struct MarinaSemanticCandidateResolver {
             )
         }
 
+        for incomeSource in matchingIncomeSources(target, snapshot: snapshot) {
+            choices.append(
+                MarinaClarificationChoice(
+                    title: incomeSource,
+                    kindLabel: "Income source",
+                    subtitle: "Use \(incomeSource) as the income source.",
+                    aliases: aliases(for: incomeSource) + ["income", "income source"],
+                    request: incomeSourceRequest(source: incomeSource, baseRequest: baseRequest)
+                )
+            )
+        }
+
         choices.append(contentsOf: expenseTextChoices(for: target, baseRequest: baseRequest, snapshot: snapshot))
 
         for card in matchingCards(target, snapshot: snapshot) {
@@ -131,6 +143,54 @@ struct MarinaSemanticCandidateResolver {
                     subtitle: "Use \(card.name) as the card.",
                     aliases: aliases(for: card.name) + ["card"],
                     request: cardRequest(cardName: card.name, baseRequest: baseRequest)
+                )
+            )
+        }
+
+        for budget in matchingBudgets(target, snapshot: snapshot) {
+            choices.append(
+                MarinaClarificationChoice(
+                    title: budget.name,
+                    kindLabel: "Budget",
+                    subtitle: "Use the \(budget.name) budget.",
+                    aliases: aliases(for: budget.name) + ["budget"],
+                    request: budgetRequest(budgetName: budget.name, baseRequest: baseRequest)
+                )
+            )
+        }
+
+        for preset in matchingPresets(target, snapshot: snapshot) {
+            choices.append(
+                MarinaClarificationChoice(
+                    title: preset.title,
+                    kindLabel: "Preset",
+                    subtitle: "Use the \(preset.title) preset.",
+                    aliases: aliases(for: preset.title) + ["preset"],
+                    request: presetRequest(presetName: preset.title, baseRequest: baseRequest)
+                )
+            )
+        }
+
+        for account in matchingSavingsAccounts(target, snapshot: snapshot) {
+            choices.append(
+                MarinaClarificationChoice(
+                    title: account.name,
+                    kindLabel: "Savings account",
+                    subtitle: "Use \(account.name) as the savings account.",
+                    aliases: aliases(for: account.name) + ["savings", "savings account"],
+                    request: savingsAccountRequest(accountName: account.name, baseRequest: baseRequest)
+                )
+            )
+        }
+
+        for account in matchingReconciliationAccounts(target, snapshot: snapshot) {
+            choices.append(
+                MarinaClarificationChoice(
+                    title: account.name,
+                    kindLabel: "Reconciliation account",
+                    subtitle: "Use \(account.name) as the reconciliation account.",
+                    aliases: aliases(for: account.name) + ["balance", "reconciliation", "shared balance"],
+                    request: reconciliationAccountRequest(accountName: account.name, baseRequest: baseRequest)
                 )
             )
         }
@@ -281,6 +341,75 @@ struct MarinaSemanticCandidateResolver {
         )
     }
 
+    private func incomeSourceRequest(source: String, baseRequest: MarinaSemanticRequest) -> MarinaSemanticRequest {
+        MarinaSemanticRequest(
+            entity: .income,
+            operation: baseRequest.operation == .average ? .average : .sum,
+            measure: .incomeAmount,
+            dimensions: [.incomeSource],
+            dateRangeToken: baseRequest.dateRangeToken,
+            targetName: source,
+            targetDisplayName: source,
+            incomeState: baseRequest.incomeState ?? .all,
+            expectedAnswerShape: .metric
+        )
+    }
+
+    private func budgetRequest(budgetName: String, baseRequest: MarinaSemanticRequest) -> MarinaSemanticRequest {
+        MarinaSemanticRequest(
+            entity: .budget,
+            operation: .forecast,
+            measure: .budgetImpact,
+            dimensions: [.budget],
+            dateRangeToken: baseRequest.dateRangeToken,
+            targetName: budgetName,
+            targetDisplayName: budgetName,
+            expectedAnswerShape: .metric
+        )
+    }
+
+    private func presetRequest(presetName: String, baseRequest: MarinaSemanticRequest) -> MarinaSemanticRequest {
+        MarinaSemanticRequest(
+            entity: .preset,
+            operation: baseRequest.operation == .list ? .list : .sum,
+            measure: .plannedAmount,
+            dimensions: [.preset],
+            dateRangeToken: baseRequest.dateRangeToken,
+            targetName: presetName,
+            targetDisplayName: presetName,
+            resultLimit: baseRequest.resultLimit,
+            sort: baseRequest.sort,
+            expectedAnswerShape: baseRequest.operation == .list ? .list : .metric
+        )
+    }
+
+    private func savingsAccountRequest(accountName: String, baseRequest: MarinaSemanticRequest) -> MarinaSemanticRequest {
+        MarinaSemanticRequest(
+            entity: .savingsAccount,
+            operation: .sum,
+            measure: .savingsTotal,
+            dimensions: [.savingsAccount],
+            dateRangeToken: baseRequest.dateRangeToken,
+            targetName: accountName,
+            targetDisplayName: accountName,
+            expectedAnswerShape: .metric
+        )
+    }
+
+    private func reconciliationAccountRequest(accountName: String, baseRequest: MarinaSemanticRequest) -> MarinaSemanticRequest {
+        MarinaSemanticRequest(
+            entity: .reconciliationAccount,
+            operation: .sum,
+            measure: .reconciliationBalance,
+            dimensions: [.reconciliationAccount],
+            dateRangeToken: baseRequest.dateRangeToken,
+            targetName: accountName,
+            targetDisplayName: accountName,
+            expenseScope: .unified,
+            expectedAnswerShape: .metric
+        )
+    }
+
     private func expenseTextChoices(
         for target: String,
         baseRequest: MarinaSemanticRequest,
@@ -381,7 +510,9 @@ struct MarinaSemanticCandidateResolver {
     }
 
     private func matchingIncomeSources(_ target: String, snapshot: MarinaWorkspaceSnapshot) -> [String] {
-        Array(Set(snapshot.incomes.map(\.source))).filter { matches($0, target: target) }
+        Array(Set(snapshot.incomes.map(\.source)))
+            .filter { matches($0, target: target) }
+            .sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
     }
 
     private func matchingExpenseTextCandidates(

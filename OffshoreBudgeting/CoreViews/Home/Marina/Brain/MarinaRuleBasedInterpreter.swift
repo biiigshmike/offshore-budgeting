@@ -45,6 +45,10 @@ struct MarinaRuleBasedInterpreter: MarinaModelInterpreting {
             )
         }
 
+        if let summaryTarget = summaryTarget(in: normalized) {
+            return summaryRequest(for: summaryTarget, normalized: normalized)
+        }
+
         if containsAny(normalized, ["category availability", "category limits", "categories over", "categories near", "over category limit", "near category limit"]) {
             return MarinaSemanticRequest(
                 entity: .category,
@@ -57,7 +61,7 @@ struct MarinaRuleBasedInterpreter: MarinaModelInterpreting {
         }
 
         if containsAny(normalized, ["next planned expense", "upcoming planned expense"]) {
-            let cardName = cardTarget(in: normalized)
+            let cardName = typedTarget(in: normalized, typeWords: ["card", "cards"])
             return MarinaSemanticRequest(
                 entity: .plannedExpense,
                 operation: .next,
@@ -101,14 +105,14 @@ struct MarinaRuleBasedInterpreter: MarinaModelInterpreting {
 
         if (normalized.contains("if ") || normalized.contains("what if") || normalized.contains("afford")),
            firstCurrencyAmount(in: normalized) != nil {
+            let whatIfTarget = whatIfTarget(in: normalized)
             return MarinaSemanticRequest(
                 entity: .budget,
                 operation: .whatIf,
                 measure: normalized.contains("projected savings") || normalized.contains("savings") ? .savingsTotal : .remainingRoom,
-                dimensions: categoryDimensionIfNeeded(normalized),
+                dimensions: whatIfTarget == nil ? [] : [.category],
                 dateRangeToken: dateToken(for: normalized),
-                targetName: targetCategory(in: normalized),
-                textQuery: merchantText(in: normalized),
+                targetName: whatIfTarget,
                 whatIfAmount: firstCurrencyAmount(in: normalized),
                 expectedAnswerShape: .comparison
             )
@@ -171,7 +175,9 @@ struct MarinaRuleBasedInterpreter: MarinaModelInterpreting {
                     entity: .income,
                     operation: .compare,
                     measure: .incomeAmount,
+                    dimensions: sourceDimensionIfNeeded(normalized),
                     dateRangeToken: dateToken(for: normalized),
+                    targetName: incomeSource(in: normalized),
                     incomeState: state,
                     expectedAnswerShape: .comparison
                 )
@@ -245,14 +251,14 @@ struct MarinaRuleBasedInterpreter: MarinaModelInterpreting {
 
         if normalized.contains("budget") || normalized.contains("room") || normalized.contains("safe spend") || normalized.contains("afford") || normalized.contains("can i spend") {
             if normalized.contains("if ") || normalized.contains("what if") || normalized.contains("afford") {
+                let whatIfTarget = whatIfTarget(in: normalized)
                 return MarinaSemanticRequest(
                     entity: .budget,
                     operation: .whatIf,
                     measure: normalized.contains("projected savings") ? .savingsTotal : .remainingRoom,
-                    dimensions: categoryDimensionIfNeeded(normalized),
+                    dimensions: whatIfTarget == nil ? [] : [.category],
                     dateRangeToken: dateToken(for: normalized),
-                    targetName: targetCategory(in: normalized),
-                    textQuery: merchantText(in: normalized),
+                    targetName: whatIfTarget,
                     whatIfAmount: firstCurrencyAmount(in: normalized),
                     expectedAnswerShape: .comparison
                 )
@@ -275,17 +281,16 @@ struct MarinaRuleBasedInterpreter: MarinaModelInterpreting {
             )
         }
 
-        if let reconciliationName = reconciliationTarget(in: normalized) {
-            let hasCategory = targetCategory(in: normalized)
+        if let sharedSpend = sharedSpendTarget(in: normalized) {
             return MarinaSemanticRequest(
                 entity: .reconciliationAccount,
-                operation: hasCategory == nil ? .sum : .sum,
+                operation: .sum,
                 measure: .reconciliationBalance,
-                dimensions: hasCategory == nil ? [] : [.category],
+                dimensions: sharedSpend.categoryName == nil ? [] : [.category],
                 dateRangeToken: reconciliationDateToken(for: normalized),
-                targetName: reconciliationName,
+                targetName: sharedSpend.accountName,
                 comparisonTargetName: nil,
-                textQuery: hasCategory,
+                textQuery: sharedSpend.categoryName,
                 resultLimit: nil,
                 sort: nil,
                 expenseScope: .unified,
@@ -293,12 +298,65 @@ struct MarinaRuleBasedInterpreter: MarinaModelInterpreting {
             )
         }
 
+        if let balanceTarget = balanceTarget(in: normalized) {
+            return MarinaSemanticRequest(
+                entity: .reconciliationAccount,
+                operation: .sum,
+                measure: .reconciliationBalance,
+                dimensions: [.reconciliationAccount],
+                dateRangeToken: reconciliationDateToken(for: normalized),
+                targetName: balanceTarget,
+                expenseScope: .unified,
+                expectedAnswerShape: .metric
+            )
+        }
+
+        if normalized.contains("compare"), let comparison = spendComparisonTargets(in: normalized) {
+            let targetContainsCard = normalize(comparison.left).contains("card") || normalize(comparison.right).contains("card")
+            return MarinaSemanticRequest(
+                entity: targetContainsCard ? .card : .variableExpense,
+                operation: .compare,
+                measure: .budgetImpact,
+                dimensions: targetContainsCard ? [.card] : [],
+                dateRangeToken: dateToken(for: normalized),
+                targetName: comparison.left,
+                comparisonTargetName: comparison.right,
+                expenseScope: .unified,
+                expectedAnswerShape: .comparison
+            )
+        }
+
         if isGenericSpendPrompt(normalized), normalized.contains("compare") == false {
             let extractedTarget = spendTarget(in: normalized)
-            let target = extractedTarget.map { normalize($0).contains("card") } == true
-                ? extractedTarget
-                : (merchantText(in: normalized) ?? extractedTarget)
+            let explicitTextTarget = expenseTextTarget(in: normalized)
+            let rawTarget = explicitTextTarget ?? extractedTarget
+            let target = rawTarget.flatMap { isGenericEntityTarget($0) ? nil : $0 }
             let isList = isListExpensePrompt(normalized)
+            if let explicitTextTarget {
+                return MarinaSemanticRequest(
+                    entity: .variableExpense,
+                    operation: isList ? .list : .sum,
+                    measure: .budgetImpact,
+                    dimensions: [.merchantText],
+                    dateRangeToken: dateToken(for: normalized),
+                    textQuery: explicitTextTarget,
+                    resultLimit: isList ? (firstInteger(in: normalized) ?? 5) : nil,
+                    sort: isList ? .dateDescending : nil,
+                    expenseScope: .unified,
+                    expectedAnswerShape: isList ? .list : .metric
+                )
+            }
+            if target == nil, normalized.contains("card") {
+                return MarinaSemanticRequest(
+                    entity: .card,
+                    operation: .sum,
+                    measure: .budgetImpact,
+                    dimensions: [.card],
+                    dateRangeToken: dateToken(for: normalized),
+                    expenseScope: .unified,
+                    expectedAnswerShape: .metric
+                )
+            }
             if let target, normalize(target).contains("card") {
                 return MarinaSemanticRequest(
                     entity: isList ? .variableExpense : .card,
@@ -326,7 +384,8 @@ struct MarinaRuleBasedInterpreter: MarinaModelInterpreting {
             )
         }
 
-        if normalized.contains("category") || normalized.contains("groceries") || normalized.contains("dining") || normalized.contains("food") {
+        if normalized.contains("category") {
+            let categoryName = typedTarget(in: normalized, typeWords: ["category", "categories"])
             if normalized.contains("top") || normalized.contains("highest") || normalized.contains("most") {
                 return MarinaSemanticRequest(
                     entity: .category,
@@ -347,7 +406,7 @@ struct MarinaRuleBasedInterpreter: MarinaModelInterpreting {
                     measure: .budgetImpact,
                     dimensions: [.category],
                     dateRangeToken: dateToken(for: normalized),
-                    targetName: targetCategory(in: normalized),
+                    targetName: categoryName,
                     comparisonTargetName: comparisonTarget(in: normalized, after: " to "),
                     expenseScope: .unified,
                     expectedAnswerShape: .comparison
@@ -359,27 +418,26 @@ struct MarinaRuleBasedInterpreter: MarinaModelInterpreting {
                 measure: .budgetImpact,
                 dimensions: [.category],
                 dateRangeToken: dateToken(for: normalized),
-                targetName: targetCategory(in: normalized),
+                targetName: categoryName,
                 expenseScope: .unified,
                 expectedAnswerShape: .metric
             )
         }
 
         if normalized.contains("card")
-            || normalized.contains("chase")
-            || normalized.contains("apple card")
-            || normalized.contains("target")
             || normalized.contains("expense")
             || normalized.contains("shopping") {
+            let cardName = typedTarget(in: normalized, typeWords: ["card", "cards"]) ?? spendTarget(in: normalized)
             if normalized.contains("compare") {
+                let comparison = spendComparisonTargets(in: normalized)
                 return MarinaSemanticRequest(
                     entity: .card,
                     operation: .compare,
                     measure: .budgetImpact,
                     dimensions: [.card],
                     dateRangeToken: dateToken(for: normalized),
-                    targetName: cardTarget(in: normalized),
-                    comparisonTargetName: comparisonTarget(in: normalized, after: " to "),
+                    targetName: comparison?.left ?? cardName,
+                    comparisonTargetName: comparison?.right ?? comparisonTarget(in: normalized, after: " to "),
                     expenseScope: .unified,
                     expectedAnswerShape: .comparison
                 )
@@ -389,9 +447,9 @@ struct MarinaRuleBasedInterpreter: MarinaModelInterpreting {
                     entity: .variableExpense,
                     operation: .last,
                     measure: .budgetImpact,
-                    dimensions: [.merchantText],
+                    dimensions: [],
                     dateRangeToken: .allTime,
-                    textQuery: merchantText(in: normalized),
+                    targetName: lastExpenseTarget(in: normalized),
                     expenseScope: .variable,
                     expectedAnswerShape: .metric
                 )
@@ -403,21 +461,21 @@ struct MarinaRuleBasedInterpreter: MarinaModelInterpreting {
                     measure: .budgetImpact,
                     dimensions: [.card],
                     dateRangeToken: dateToken(for: normalized),
-                    targetName: cardTarget(in: normalized),
+                    targetName: cardName,
                     resultLimit: firstInteger(in: normalized) ?? 5,
                     sort: .dateDescending,
                     expenseScope: .variable,
                     expectedAnswerShape: .list
                 )
             }
-            if let merchant = merchantText(in: normalized), cardTarget(in: normalized) == nil {
+            if let explicitTextTarget = expenseTextTarget(in: normalized), cardName == nil {
                 return MarinaSemanticRequest(
                     entity: .variableExpense,
                     operation: .sum,
                     measure: .budgetImpact,
                     dimensions: [.merchantText],
                     dateRangeToken: dateToken(for: normalized),
-                    textQuery: merchant,
+                    textQuery: explicitTextTarget,
                     expenseScope: .variable,
                     expectedAnswerShape: .metric
                 )
@@ -428,7 +486,7 @@ struct MarinaRuleBasedInterpreter: MarinaModelInterpreting {
                 measure: .budgetImpact,
                 dimensions: [.card],
                 dateRangeToken: dateToken(for: normalized),
-                targetName: cardTarget(in: normalized),
+                targetName: cardName,
                 expenseScope: .unified,
                 expectedAnswerShape: .metric
             )
@@ -528,6 +586,110 @@ struct MarinaRuleBasedInterpreter: MarinaModelInterpreting {
         incomeSource(in: normalized) == nil ? [] : [.incomeSource]
     }
 
+    private func summaryTarget(in normalized: String) -> String? {
+        targetAfterAnyMarker(in: normalized, markers: [
+            "summarize my ",
+            "summarize the ",
+            "summarize ",
+            "summary of my ",
+            "summary of the ",
+            "summary of ",
+            "summary for my ",
+            "summary for the ",
+            "summary for "
+        ])
+    }
+
+    private func summaryRequest(for target: String, normalized: String) -> MarinaSemanticRequest {
+        let targetNormalized = normalize(target)
+
+        if targetNormalized.contains("card") {
+            return MarinaSemanticRequest(
+                entity: .card,
+                operation: .sum,
+                measure: .budgetImpact,
+                dimensions: [.card],
+                dateRangeToken: dateToken(for: normalized),
+                targetName: target,
+                expenseScope: .unified,
+                expectedAnswerShape: .metric
+            )
+        }
+
+        if targetNormalized.contains("savings") {
+            return MarinaSemanticRequest(
+                entity: .savingsAccount,
+                operation: .sum,
+                measure: .savingsTotal,
+                dimensions: [.savingsAccount],
+                dateRangeToken: hasExplicitDateScope(normalized) ? dateToken(for: normalized) : .allTime,
+                targetName: target,
+                expectedAnswerShape: .metric
+            )
+        }
+
+        if targetNormalized.contains("income") {
+            let source = strippedTarget(target, typeWords: ["income", "source"])
+            return MarinaSemanticRequest(
+                entity: .income,
+                operation: .sum,
+                measure: .incomeAmount,
+                dimensions: source == nil ? [] : [.incomeSource],
+                dateRangeToken: dateToken(for: normalized),
+                targetName: source,
+                incomeState: .all,
+                expectedAnswerShape: .metric
+            )
+        }
+
+        if targetNormalized.contains("preset") {
+            return MarinaSemanticRequest(
+                entity: .preset,
+                operation: .sum,
+                measure: .plannedAmount,
+                dimensions: [.preset],
+                dateRangeToken: dateToken(for: normalized),
+                targetName: strippedTarget(target, typeWords: ["preset", "presets"]) ?? target,
+                expectedAnswerShape: .metric
+            )
+        }
+
+        if targetNormalized.contains("budget") {
+            return MarinaSemanticRequest(
+                entity: .budget,
+                operation: .forecast,
+                measure: .budgetImpact,
+                dimensions: [.budget],
+                dateRangeToken: dateToken(for: normalized),
+                targetName: strippedTarget(target, typeWords: ["budget", "budgets"]) ?? target,
+                expectedAnswerShape: .metric
+            )
+        }
+
+        if targetNormalized.contains("category") {
+            return MarinaSemanticRequest(
+                entity: .category,
+                operation: .sum,
+                measure: .budgetImpact,
+                dimensions: [.category],
+                dateRangeToken: dateToken(for: normalized),
+                targetName: strippedTarget(target, typeWords: ["category", "categories"]) ?? target,
+                expenseScope: .unified,
+                expectedAnswerShape: .metric
+            )
+        }
+
+        return MarinaSemanticRequest(
+            entity: .variableExpense,
+            operation: .sum,
+            measure: .budgetImpact,
+            dateRangeToken: dateToken(for: normalized),
+            targetName: target,
+            expenseScope: .unified,
+            expectedAnswerShape: .metric
+        )
+    }
+
     private func isGenericSpendPrompt(_ normalized: String) -> Bool {
         containsAny(normalized, [
             "spend",
@@ -577,11 +739,93 @@ struct MarinaRuleBasedInterpreter: MarinaModelInterpreting {
         return nil
     }
 
+    private func whatIfTarget(in normalized: String) -> String? {
+        targetAfterAnyMarkerWithStop(
+            in: normalized,
+            markers: [" on "],
+            stopMarkers: [" what happens", " how does", " to my", " to projected", " for "]
+        )
+    }
+
+    private func expenseTextTarget(in normalized: String) -> String? {
+        targetAfterAnyMarker(in: normalized, markers: [
+            "merchant named ",
+            "merchant ",
+            "store named ",
+            "store ",
+            "vendor named ",
+            "vendor ",
+            "title named ",
+            "title ",
+            "description named ",
+            "description "
+        ])
+    }
+
+    private func lastExpenseTarget(in normalized: String) -> String? {
+        targetAfterAnyMarkerWithStop(
+            in: normalized,
+            markers: [" shopping at ", " shopping on ", " at ", " on "],
+            stopMarkers: [" this month", " this period", " last month", " last period"]
+        )
+    }
+
+    private func sharedSpendTarget(in normalized: String) -> (accountName: String, categoryName: String?)? {
+        guard let didRange = normalized.range(of: "did "),
+              let spendRange = normalized.range(of: " spend", range: didRange.upperBound..<normalized.endIndex),
+              didRange.upperBound < spendRange.lowerBound else {
+            return nil
+        }
+
+        let rawAccount = String(normalized[didRange.upperBound..<spendRange.lowerBound])
+        guard let accountName = cleanedTarget(rawAccount) else { return nil }
+        guard isFirstPersonTarget(accountName) == false else { return nil }
+        let categoryName = targetAfterAnyMarkerWithStop(
+            in: String(normalized[spendRange.upperBound...]),
+            markers: [" on ", " at "],
+            stopMarkers: [" for ", " this month", " this period", " current period", " current month"]
+        )
+        return (accountName, categoryName)
+    }
+
+    private func balanceTarget(in normalized: String) -> String? {
+        targetBeforeAnyMarker(in: normalized, markers: [
+            " balance",
+            " owed",
+            " owe"
+        ])
+    }
+
+    private func spendComparisonTargets(in normalized: String) -> (left: String, right: String)? {
+        guard let compareRange = normalized.range(of: "compare ") else { return nil }
+        let tail = String(normalized[compareRange.upperBound...])
+        guard let separator = tail.range(of: " to ") ?? tail.range(of: " with ") else { return nil }
+        let leftRaw = String(tail[..<separator.lowerBound])
+        let rightRaw = String(tail[separator.upperBound...])
+        guard let left = comparisonTarget(from: leftRaw),
+              let right = comparisonTarget(from: rightRaw) else {
+            return nil
+        }
+        return (left, right)
+    }
+
     private func targetAfterAnyMarker(in normalized: String, markers: [String]) -> String? {
         for marker in markers {
             guard let range = normalized.range(of: marker) else { continue }
             let tail = String(normalized[range.upperBound...])
             if let target = cleanedTarget(tail) {
+                return target
+            }
+        }
+        return nil
+    }
+
+    private func targetAfterAnyMarkerWithStop(in normalized: String, markers: [String], stopMarkers: [String]) -> String? {
+        for marker in markers {
+            guard let range = normalized.range(of: marker) else { continue }
+            let tail = String(normalized[range.upperBound...])
+            let stopped = prefixBeforeAnyMarker(in: tail, markers: stopMarkers) ?? tail
+            if let target = cleanedTarget(stopped) {
                 return target
             }
         }
@@ -597,6 +841,14 @@ struct MarinaRuleBasedInterpreter: MarinaModelInterpreting {
             }
         }
         return nil
+    }
+
+    private func prefixBeforeAnyMarker(in value: String, markers: [String]) -> String? {
+        let matches = markers.compactMap { marker -> String.Index? in
+            value.range(of: marker)?.lowerBound
+        }
+        guard let first = matches.min() else { return nil }
+        return String(value[..<first])
     }
 
     private func cleanedTarget(_ value: String) -> String? {
@@ -617,15 +869,42 @@ struct MarinaRuleBasedInterpreter: MarinaModelInterpreting {
         ] {
             target = target.replacingOccurrences(of: phrase, with: "")
         }
+        for phrase in [
+            "what is my ",
+            "what's my ",
+            "what is ",
+            "what's ",
+            "how much is my ",
+            "how much is ",
+            "how much did i ",
+            "show my ",
+            "show ",
+            "list my ",
+            "list ",
+            "summarize my ",
+            "summarize the ",
+            "summarize ",
+            "compare my ",
+            "compare the ",
+            "compare ",
+            "for "
+        ] {
+            if target.hasPrefix(phrase) {
+                target.removeFirst(phrase.count)
+            }
+        }
         target = target
+            .replacingOccurrences(of: "'s", with: "")
             .replacingOccurrences(of: " my ", with: " ")
             .replacingOccurrences(of: " the ", with: " ")
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        if target.hasPrefix("my ") {
-            target.removeFirst("my ".count)
+        for prefix in ["my ", "the ", "current ", "actual ", "planned ", "total "] {
+            if target.hasPrefix(prefix) {
+                target.removeFirst(prefix.count)
+            }
         }
-        if target.hasPrefix("the ") {
-            target.removeFirst("the ".count)
+        if ["current", "actual", "planned", "total"].contains(target) {
+            return nil
         }
         guard target.isEmpty == false else { return nil }
         return target
@@ -634,43 +913,78 @@ struct MarinaRuleBasedInterpreter: MarinaModelInterpreting {
             .joined(separator: " ")
     }
 
-    private func categoryDimensionIfNeeded(_ normalized: String) -> [MarinaSemanticDimension] {
-        targetCategory(in: normalized) == nil ? [] : [.category]
-    }
-
     private func incomeSource(in normalized: String) -> String? {
-        knownTarget(in: normalized, candidates: ["salary", "freelance", "paycheck", "bonus"])
+        if let target = targetAfterAnyMarker(in: normalized, markers: [
+            "income from ",
+            "income source ",
+            "source "
+        ]) {
+            return target
+        }
+        return typedTarget(in: normalized, typeWords: ["income"])
     }
 
     private func savingsTarget(in normalized: String) -> String? {
-        if normalized.contains("savings account") {
-            return "Savings Account"
+        if normalized.contains("savings account"),
+           let target = targetBeforeAnyMarker(in: normalized, markers: [" balance", " total"]) {
+            return target
+        }
+        return typedTarget(in: normalized, typeWords: ["savings account", "savings"])
+    }
+
+    private func typedTarget(in normalized: String, typeWords: [String]) -> String? {
+        for typeWord in typeWords.sorted(by: { $0.count > $1.count }) {
+            if let target = targetBeforeAnyMarker(in: normalized, markers: [" \(typeWord)"]) {
+                if shouldKeepTypeWord(typeWord) {
+                    return cleanedTarget("\(target) \(typeWord)")
+                }
+                return strippedTarget(target, typeWords: typeWords) ?? target
+            }
+
+            if let target = targetAfterAnyMarker(in: normalized, markers: [
+                "\(typeWord) named ",
+                "\(typeWord) called "
+            ]) {
+                return target
+            }
         }
         return nil
     }
 
-    private func targetCategory(in normalized: String) -> String? {
-        knownTarget(in: normalized, candidates: ["groceries", "dining", "bills", "travel", "food"])
+    private func isFirstPersonTarget(_ target: String) -> Bool {
+        ["I", "Me", "My", "We", "Us", "Our"].contains(target)
     }
 
-    private func cardTarget(in normalized: String) -> String? {
-        if normalized.contains("apple card") { return "Apple Card" }
-        if normalized.contains("chase") { return "Chase" }
-        return nil
+    private func isGenericEntityTarget(_ target: String) -> Bool {
+        [
+            "Budget",
+            "Budgets",
+            "Card",
+            "Cards",
+            "Category",
+            "Categories",
+            "Expense",
+            "Expenses",
+            "Income",
+            "Preset",
+            "Presets",
+            "Savings"
+        ].contains(target)
     }
 
-    private func reconciliationTarget(in normalized: String) -> String? {
-        knownTarget(in: normalized, candidates: ["alejandro", "alex"])
+    private func shouldKeepTypeWord(_ typeWord: String) -> Bool {
+        typeWord == "card" || typeWord == "cards" || typeWord.contains("savings")
     }
 
-    private func merchantText(in normalized: String) -> String? {
-        knownTarget(in: normalized, candidates: ["target", "starbucks", "amazon", "apple"])
-    }
-
-    private func knownTarget(in normalized: String, candidates: [String]) -> String? {
-        guard let raw = candidates.first(where: { normalized.contains($0) }) else { return nil }
-        return raw
-            .split(separator: " ")
+    private func strippedTarget(_ target: String, typeWords: [String]) -> String? {
+        let typeWordSet = Set(typeWords.flatMap { word in
+            word.split(separator: " ").map { String($0).lowercased() }
+        })
+        let words = target.split(separator: " ").filter { word in
+            typeWordSet.contains(String(word).lowercased()) == false
+        }
+        guard words.isEmpty == false else { return nil }
+        return words
             .map { $0.prefix(1).uppercased() + String($0.dropFirst()) }
             .joined(separator: " ")
     }
@@ -678,7 +992,14 @@ struct MarinaRuleBasedInterpreter: MarinaModelInterpreting {
     private func comparisonTarget(in normalized: String, after marker: String) -> String? {
         guard let range = normalized.range(of: marker) else { return nil }
         let tail = String(normalized[range.upperBound...])
-        return cardTarget(in: tail) ?? targetCategory(in: tail) ?? incomeSource(in: tail)
+        return comparisonTarget(from: tail)
+    }
+
+    private func comparisonTarget(from value: String) -> String? {
+        if let target = targetBeforeAnyMarker(in: value, markers: [" spend", " spending", " expenses", " income"]) {
+            return target
+        }
+        return cleanedTarget(value)
     }
 
     private func firstCurrencyAmount(in normalized: String) -> Double? {

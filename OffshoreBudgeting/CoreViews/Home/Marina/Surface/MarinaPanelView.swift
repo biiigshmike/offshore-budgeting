@@ -1,21 +1,36 @@
 import SwiftData
 import SwiftUI
 
-struct MarinaPanelView: View {
-    private enum ScrollTarget {
-        static let bottomAnchor = "assistant-bottom-anchor"
-    }
-
-    private static let starterPromptPool = [
+struct MarinaStarterPromptFactory {
+    static let basePromptPool = [
         "What is my safe spend today?",
         "Show my savings outlook.",
         "How is my income progress?",
         "What is my next planned expense?",
         "Show category availability.",
         "What are my spend trends?",
-        "What is my top category this period?",
-        "Summarize my Apple Card."
+        "What is my top category this period?"
     ]
+
+    static func promptPool(cardNames: [String]) -> [String] {
+        var pool = basePromptPool
+        if let cardName = cardNames
+            .map({ $0.trimmingCharacters(in: .whitespacesAndNewlines) })
+            .first(where: { $0.isEmpty == false }) {
+            pool.append("Summarize my \(cardName).")
+        }
+        return pool
+    }
+
+    static func randomPrompts(cardNames: [String]) -> [String] {
+        Array(promptPool(cardNames: cardNames).shuffled().prefix(4))
+    }
+}
+
+struct MarinaPanelView: View {
+    private enum ScrollTarget {
+        static let bottomAnchor = "assistant-bottom-anchor"
+    }
 
     private enum MarinaCreateEntityKind {
         case expense
@@ -46,7 +61,7 @@ struct MarinaPanelView: View {
     @State private var isResponding = false
     @State private var isShowingClearConversationAlert = false
     @State private var pendingClarification: PendingClarification?
-    @State private var starterPrompts: [String] = MarinaPanelView.randomStarterPrompts()
+    @State private var starterPrompts: [String] = []
     @FocusState private var isPromptFieldFocused: Bool
 
     @AppStorage("general_defaultBudgetingPeriod")
@@ -445,8 +460,8 @@ struct MarinaPanelView: View {
         return [GridItem(.adaptive(minimum: 190, maximum: 280), spacing: 8)]
     }
 
-    private static func randomStarterPrompts() -> [String] {
-        Array(starterPromptPool.shuffled().prefix(4))
+    private static func randomStarterPrompts(cards: [Card]) -> [String] {
+        MarinaStarterPromptFactory.randomPrompts(cardNames: cards.map(\.name))
     }
 
     private func submitPrompt(_ promptOverride: String? = nil) {
@@ -903,7 +918,7 @@ struct MarinaPanelView: View {
         answers = conversationStore.loadAnswers(workspaceID: workspace.id)
         pendingClarification = pendingClarification(from: answers.last)
         if answers.isEmpty {
-            starterPrompts = Self.randomStarterPrompts()
+            resetStarterPrompts()
         }
         hasLoadedConversation = true
     }
@@ -911,8 +926,12 @@ struct MarinaPanelView: View {
     private func clearConversation() {
         answers = []
         pendingClarification = nil
-        starterPrompts = Self.randomStarterPrompts()
+        resetStarterPrompts()
         conversationStore.saveAnswers([], workspaceID: workspace.id)
+    }
+
+    private func resetStarterPrompts() {
+        starterPrompts = Self.randomStarterPrompts(cards: cards)
     }
 
     private func updatePendingClarification(afterAppending answer: HomeAnswer) {

@@ -60,12 +60,6 @@ struct MarinaSemanticRequestValidator {
             return interpretedWith(request: request, interpreted: resolved, source: source, notes: notes)
         }
 
-        if isAppleMerchantAmbiguous(request, snapshot: snapshot) {
-            request = clarification("Do you mean Apple as a merchant, or Apple Card?")
-            notes.append("Validation detected Apple merchant/card ambiguity.")
-            return interpretedWith(request: request, interpreted: interpreted, source: source, notes: notes)
-        }
-
         if let rejected = rejectedRequest(for: request, snapshot: snapshot) {
             notes.append("Validation rejected semantic request: \(rejected.unsupportedReason?.rawValue ?? rejected.expectedAnswerShape.rawValue).")
             return interpretedWith(request: rejected, interpreted: interpreted, source: source, notes: notes)
@@ -259,17 +253,6 @@ struct MarinaSemanticRequestValidator {
         let normalized = normalize(text)
         return snapshot.variableExpenses.contains { normalize($0.descriptionText).contains(normalized) }
             || snapshot.plannedExpenses.contains { normalize($0.title).contains(normalized) }
-    }
-
-    private func isAppleMerchantAmbiguous(_ request: MarinaSemanticRequest, snapshot: MarinaWorkspaceSnapshot) -> Bool {
-        if request.dimensions.contains(.merchantText) || request.dimensions.contains(.card) {
-            return false
-        }
-        let query = request.textQuery ?? request.targetName
-        guard normalize(query ?? "") == "APPLE" else { return false }
-        let hasAppleCard = snapshot.cards.contains { normalize($0.name).contains("APPLE") }
-        let hasAppleMerchant = merchantExists("Apple", snapshot: snapshot)
-        return hasAppleCard && hasAppleMerchant
     }
 
     private func incomeSources(_ snapshot: MarinaWorkspaceSnapshot) -> [String] {

@@ -203,6 +203,108 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(nextPlannedHasExpenseRow)
     }
 
+    @Test func resolver_cardSummaryPhrasesResolveSameWorkspaceCardTarget() async throws {
+        let fixture = try makeFixture(includeDebitCard: true)
+        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+
+        let prompts = [
+            "Summarize my Debit Card.",
+            "Debit Card spend",
+            "What is my Debit Card spend this period?"
+        ]
+
+        for prompt in prompts {
+            let cardAnswer = await answer(prompt, using: brain, fixture: fixture)
+            #expect(cardAnswer.kind == .metric, "Expected metric for \(prompt), got \(cardAnswer.kind)")
+            #expect(cardAnswer.title == "Debit Card Spend", "Wrong title for \(prompt): \(cardAnswer.title)")
+            #expect(cardAnswer.primaryValue == CurrencyFormatter.string(from: 100), "Wrong value for \(prompt): \(cardAnswer.primaryValue ?? "nil")")
+            let hasPlannedRow = cardAnswer.rows.contains { row in
+                row.title == "Planned" && row.amount == 70
+            }
+            let hasVariableRow = cardAnswer.rows.contains { row in
+                row.title == "Variable" && row.amount == 30
+            }
+            #expect(hasPlannedRow)
+            #expect(hasVariableRow)
+        }
+    }
+
+    @Test func resolver_phraseInvarianceWorksAcrossNonHardcodedEntityTypes() async throws {
+        let fixture = try makeFixture(includeTransportationCategory: true)
+        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+
+        let transportation = await answer("Summarize my Transportation.", using: brain, fixture: fixture)
+        #expect(transportation.kind == .metric)
+        #expect(transportation.title == "Transportation Spend")
+        #expect((transportation.primaryValue ?? "").contains("60"))
+
+        let paycheck = await answer("Paycheck income", using: brain, fixture: fixture)
+        #expect(paycheck.kind == .metric)
+        #expect(paycheck.title == "Paycheck Income")
+        #expect((paycheck.primaryValue ?? "").contains("6,200") || (paycheck.primaryValue ?? "").contains("6200"))
+
+        let savings = await answer("Summarize my Savings Account.", using: brain, fixture: fixture)
+        #expect(savings.kind == .metric)
+        #expect(savings.title == "Savings Account Balance")
+
+        let balance = await answer("Alejandro balance", using: brain, fixture: fixture)
+        #expect(balance.kind == .metric)
+        #expect(balance.title == "Alejandro Balance")
+
+        let merchant = await answer("Target spend", using: brain, fixture: fixture)
+        #expect(merchant.kind == .metric)
+        #expect(merchant.title == "Target groceries Spend")
+        #expect((merchant.primaryValue ?? "").contains("40"))
+
+        let preset = await answer("Summarize my Phone preset.", using: brain, fixture: fixture)
+        #expect(preset.kind == .metric)
+        #expect(preset.title == "Phone Preset")
+        #expect(preset.primaryValue == CurrencyFormatter.string(from: 90))
+
+        let budget = await answer("Summarize my April 2026 budget.", using: brain, fixture: fixture)
+        #expect(budget.kind == .list)
+        #expect(budget.title == "Budget Overview")
+        #expect(budget.subtitle?.isEmpty == false)
+    }
+
+    @Test func resolver_unknownNamedTargetNeverFallsBackToAggregate() async throws {
+        let fixture = try makeFixture(includeDebitCard: false)
+        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+
+        let answer = await answer("Summarize my Debit Card.", using: brain, fixture: fixture)
+
+        #expect(answer.kind == .message)
+        #expect(answer.title == "Marina cannot answer that yet")
+        #expect(answer.subtitle?.contains("could not find") == true)
+        #expect(answer.title != "Card Spend")
+    }
+
+    @Test func resolver_incomeComparisonDoesNotInventSourceFromComparisonWords() async throws {
+        let fixture = try makeFixture()
+        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let interpreter = MarinaRuleBasedInterpreter()
+        let prompt = "Compare my actual income this month to last month. Am I up or down?"
+
+        let interpreted = interpreter.interpret(prompt)
+        #expect(interpreted.entity == .income)
+        #expect(interpreted.operation == .compare)
+        #expect(interpreted.targetName == nil)
+        #expect(interpreted.dimensions.contains(.incomeSource) == false)
+
+        let answer = await answer(prompt, using: brain, fixture: fixture)
+        #expect(answer.kind == .comparison)
+        #expect(answer.title == "Income Comparison")
+    }
+
+    @Test func starterPromptFactoryUsesWorkspaceCardsWithoutHardcodedAppleCard() throws {
+        let noCardPrompts = MarinaStarterPromptFactory.promptPool(cardNames: [])
+        #expect(noCardPrompts.contains("Summarize my Apple Card.") == false)
+
+        let debitPrompts = MarinaStarterPromptFactory.promptPool(cardNames: ["Debit Card"])
+        #expect(debitPrompts.contains("Summarize my Debit Card."))
+        #expect(debitPrompts.contains("Summarize my Apple Card.") == false)
+    }
+
     @Test func promptSuite_negativeCasesStaySafe() async throws {
         let fixture = try makeFixture()
         let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
@@ -843,7 +945,8 @@ struct MarinaSemanticPromptSuiteTests {
     private func makeFixture(
         includeAppleMerchantExpense: Bool = true,
         includeTransportationCategory: Bool = false,
-        includeGroceryOutletExpense: Bool = false
+        includeGroceryOutletExpense: Bool = false,
+        includeDebitCard: Bool = false
     ) throws -> Fixture {
         let context = try makeContext()
         let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
@@ -851,6 +954,7 @@ struct MarinaSemanticPromptSuiteTests {
 
         let appleCard = Card(name: "Apple Card", workspace: workspace)
         let chase = Card(name: "Chase", workspace: workspace)
+        let debitCard = includeDebitCard ? Card(name: "Debit Card", workspace: workspace) : nil
         let otherAppleCard = Card(name: "Apple Card", workspace: otherWorkspace)
 
         let groceries = Category(name: "Groceries", hexColor: "#16A34A", workspace: workspace)
@@ -937,6 +1041,16 @@ struct MarinaSemanticPromptSuiteTests {
             sourcePresetID: groceryPreset.id,
             sourceBudgetID: currentBudget.id
         )
+        let debitPlan = debitCard.map { card in
+            PlannedExpense(
+                title: "Debit Subscription",
+                plannedAmount: 70,
+                expenseDate: date(2026, 4, 9),
+                workspace: workspace,
+                card: card,
+                category: bills
+            )
+        }
 
         let targetApril = VariableExpense(
             descriptionText: "Target groceries",
@@ -982,6 +1096,16 @@ struct MarinaSemanticPromptSuiteTests {
                 workspace: workspace,
                 card: chase,
                 category: category
+            )
+        }
+        let debitCoffee = debitCard.map { card in
+            VariableExpense(
+                descriptionText: "Debit Coffee",
+                amount: 30,
+                transactionDate: date(2026, 4, 15),
+                workspace: workspace,
+                card: card,
+                category: dining
             )
         }
         let targetMarch = VariableExpense(
@@ -1038,6 +1162,9 @@ struct MarinaSemanticPromptSuiteTests {
         context.insert(otherWorkspace)
         context.insert(appleCard)
         context.insert(chase)
+        if let debitCard {
+            context.insert(debitCard)
+        }
         context.insert(otherAppleCard)
         context.insert(groceries)
         context.insert(dining)
@@ -1054,6 +1181,9 @@ struct MarinaSemanticPromptSuiteTests {
         context.insert(rent)
         context.insert(phone)
         context.insert(groceriesPlan)
+        if let debitPlan {
+            context.insert(debitPlan)
+        }
         context.insert(targetApril)
         context.insert(starbucks)
         if let appleStore {
@@ -1064,6 +1194,9 @@ struct MarinaSemanticPromptSuiteTests {
         }
         if let trainFare {
             context.insert(trainFare)
+        }
+        if let debitCoffee {
+            context.insert(debitCoffee)
         }
         context.insert(targetMarch)
         context.insert(actualPaycheck)

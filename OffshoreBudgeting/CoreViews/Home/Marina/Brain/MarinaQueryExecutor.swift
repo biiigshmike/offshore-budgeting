@@ -208,6 +208,22 @@ struct MarinaQueryExecutor {
     // MARK: - Presets
 
     private func presetResult(plan: MarinaQueryPlan, snapshot: MarinaWorkspaceSnapshot) -> MarinaExecutionResult {
+        if let targetName = plan.targetName,
+           let preset = resolvePreset(named: targetName, in: snapshot),
+           plan.operation != .next {
+            return MarinaExecutionResult(
+                kind: .metric,
+                title: "\(preset.title) Preset",
+                subtitle: preset.isArchived ? "Archived" : nil,
+                primaryValue: currency(preset.plannedAmount),
+                rows: [
+                    HomeAnswerRow(title: "Planned amount", value: currency(preset.plannedAmount), sourceID: preset.id, objectType: .preset, amount: preset.plannedAmount),
+                    HomeAnswerRow(title: "Default card", value: preset.defaultCard?.name ?? "None"),
+                    HomeAnswerRow(title: "Default category", value: preset.defaultCategory?.name ?? "Uncategorized")
+                ]
+            )
+        }
+
         if plan.operation == .next {
             let planned = snapshot.homePlannedExpenses
                 .filter { $0.sourcePresetID != nil }
@@ -390,6 +406,10 @@ struct MarinaQueryExecutor {
     // MARK: - Budgets
 
     private func budgetResult(plan: MarinaQueryPlan, snapshot: MarinaWorkspaceSnapshot) -> MarinaExecutionResult {
+        let targetBudgetRange = plan.targetName
+            .flatMap { resolveBudget(named: $0, in: snapshot) }
+            .map { HomeQueryDateRange(startDate: $0.startDate, endDate: $0.endDate) }
+
         if plan.operation == .whatIf {
             let amount = max(0, plan.semanticRequest.whatIfAmount ?? 0)
             guard amount > 0 else {
@@ -437,11 +457,12 @@ struct MarinaQueryExecutor {
         }
 
         if plan.operation == .compare {
-            let current = totalSpend(snapshot: snapshot, range: plan.dateRange)
+            let currentRange = targetBudgetRange ?? plan.dateRange
+            let current = totalSpend(snapshot: snapshot, range: currentRange)
             let previous = totalSpend(snapshot: snapshot, range: plan.comparisonDateRange)
             return comparisonResult(
                 title: "Budget Period Comparison",
-                subtitle: rangeLabel(plan.dateRange),
+                subtitle: rangeLabel(currentRange),
                 leftTitle: "Current spend",
                 leftValue: current,
                 rightTitle: "Previous spend",
@@ -451,7 +472,7 @@ struct MarinaQueryExecutor {
 
         return executionResult(
             from: homeAnswer(
-                query: HomeQuery(intent: plan.measure == .remainingRoom ? .safeSpendToday : .periodOverview, dateRange: plan.dateRange),
+                query: HomeQuery(intent: plan.measure == .remainingRoom ? .safeSpendToday : .periodOverview, dateRange: targetBudgetRange ?? plan.dateRange),
                 snapshot: snapshot,
                 plan: plan
             )
@@ -1100,6 +1121,14 @@ struct MarinaQueryExecutor {
 
     private func resolveSavingsAccount(named name: String, in snapshot: MarinaWorkspaceSnapshot) -> SavingsAccount? {
         exactMatch(named: name, in: snapshot.savingsAccounts, keyPath: \.name)
+    }
+
+    private func resolvePreset(named name: String, in snapshot: MarinaWorkspaceSnapshot) -> Preset? {
+        exactMatch(named: name, in: snapshot.presets, keyPath: \.title)
+    }
+
+    private func resolveBudget(named name: String, in snapshot: MarinaWorkspaceSnapshot) -> Budget? {
+        exactMatch(named: name, in: snapshot.budgets, keyPath: \.name)
     }
 
     private func exactMatch<T>(named name: String, in values: [T], keyPath: KeyPath<T, String>) -> T? {
