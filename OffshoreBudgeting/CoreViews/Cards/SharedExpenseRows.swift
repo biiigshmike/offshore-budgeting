@@ -11,6 +11,12 @@ import SwiftUI
 
 struct SharedPlannedExpenseRow: View {
     let expense: PlannedExpense
+    let showsCardName: Bool
+
+    init(expense: PlannedExpense, showsCardName: Bool = false) {
+        self.expense = expense
+        self.showsCardName = showsCardName
+    }
 
     private enum SharedBalancePresentation {
         case none
@@ -78,7 +84,7 @@ struct SharedPlannedExpenseRow: View {
                     .font(.body)
 
                 HStack(spacing: 6) {
-                    Text(expense.displaySubtitle(includeCardName: false))
+                    Text(expense.displaySubtitle(includeCardName: showsCardName))
                 }
                 .font(.footnote)
                 .foregroundStyle(.secondary)
@@ -99,6 +105,12 @@ struct SharedPlannedExpenseRow: View {
 
 struct SharedVariableExpenseRow: View {
     let expense: VariableExpense
+    let showsCardName: Bool
+
+    init(expense: VariableExpense, showsCardName: Bool = false) {
+        self.expense = expense
+        self.showsCardName = showsCardName
+    }
 
     private enum SharedBalancePresentation {
         case none
@@ -181,6 +193,11 @@ struct SharedVariableExpenseRow: View {
                     Text(
                         "\(expense.transactionDate.formatted(date: .abbreviated, time: .omitted)) • \(expense.kind.displayTitle)"
                     )
+
+                    if showsCardName, let cardName = expense.card?.name {
+                        Text("•")
+                        Text(cardName)
+                    }
                 }
                 .font(.footnote)
                 .foregroundStyle(.secondary)

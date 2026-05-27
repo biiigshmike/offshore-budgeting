@@ -21,6 +21,9 @@ struct HomeSpendTrendsMetricsView: View {
 
     @State private var selectedPeriod: HomeSpendTrendsAggregator.Period
     @State private var selectedCardID: UUID? = nil
+    @State private var selectedBucketID: HomeSpendTrendsAggregator.Bucket.ID? = nil
+
+    private let selectableBucketEpsilon: Double = 1.00
 
     init(
         workspace: Workspace,
@@ -69,7 +72,7 @@ struct HomeSpendTrendsMetricsView: View {
 
                 cardCarousel
 
-                chartCard(result: result)
+                chartCard(result: result, showsCardName: selectedCard == nil)
 
                 Spacer(minLength: 12)
             }
@@ -97,6 +100,9 @@ struct HomeSpendTrendsMetricsView: View {
                 }
                 .accessibilityElement(children: .combine)
             }
+        }
+        .onChange(of: selectedPeriod) { _, _ in
+            selectedBucketID = nil
         }
     }
 
@@ -207,6 +213,8 @@ struct HomeSpendTrendsMetricsView: View {
     }
 
     private func toggleCardSelection(_ card: Card) {
+        selectedBucketID = nil
+
         if selectedCardID == card.id {
             // Tap again: clear selection and return to "P"
             selectedCardID = nil
@@ -218,8 +226,13 @@ struct HomeSpendTrendsMetricsView: View {
 
     // MARK: - Chart
 
-    private func chartCard(result: HomeSpendTrendsAggregator.Result) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+    private func chartCard(
+        result: HomeSpendTrendsAggregator.Result,
+        showsCardName: Bool
+    ) -> some View {
+        let selectedBucket = selectedBucket(in: result)
+
+        return VStack(alignment: .leading, spacing: 10) {
             Text(
                 String(
                     localized: "homeWidget.spendTrends.spending",
@@ -278,6 +291,10 @@ struct HomeSpendTrendsMetricsView: View {
                     GeometryReader { geo in
                         if let plotAnchor = proxy.plotFrame {
                             let plotFrame = geo[plotAnchor]
+                            let barSlotWidth = plotFrame.width / CGFloat(max(5, result.buckets.count))
+                            let hitSlotWidth = plotFrame.width / CGFloat(max(1, result.buckets.count))
+                            let barWidth = min(84, barSlotWidth * 0.78)
+                            let hitWidth = max(44, min(96, hitSlotWidth))
 
                             ZStack(alignment: .topLeading) {
                                 ForEach(result.buckets) { bucket in
@@ -286,27 +303,65 @@ struct HomeSpendTrendsMetricsView: View {
                                         proxy: proxy,
                                         plotFrame: plotFrame,
                                         height: plotFrame.height,
-                                        barWidth: min(
-                                            84,
-                                            plotFrame.width / CGFloat(max(5, result.buckets.count)) * 0.78
-                                        ),
+                                        barWidth: barWidth,
+                                        isSelected: bucket.id == selectedBucketID,
                                         colorForSlice: color(for:)
                                     )
+                                    .allowsHitTesting(false)
+                                    .accessibilityHidden(true)
+                                }
+
+                                ForEach(result.buckets) { bucket in
+                                    HeatMapBucketSelectionButton(
+                                        bucket: bucket,
+                                        proxy: proxy,
+                                        plotFrame: plotFrame,
+                                        hitWidth: hitWidth,
+                                        isSelected: bucket.id == selectedBucketID
+                                    ) {
+                                        toggleBucketSelection(bucket)
+                                    }
                                 }
                             }
                             .frame(width: plotFrame.width, height: plotFrame.height)
                             .position(x: plotFrame.midX, y: plotFrame.midY)
-                            .allowsHitTesting(false)
                         }
                     }
                 }
 
                 highestCallout(result: result)
                     .padding(.top, 6)
+
+                if let selectedBucket {
+                    SpendTrendsBucketBreakdownView(
+                        bucket: selectedBucket,
+                        showsCardName: showsCardName
+                    )
+                    .padding(.top, 8)
+                }
             }
         }
         .padding(14)
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private func selectedBucket(
+        in result: HomeSpendTrendsAggregator.Result
+    ) -> HomeSpendTrendsAggregator.Bucket? {
+        guard let selectedBucketID else { return nil }
+        return result.buckets.first { bucket in
+            bucket.id == selectedBucketID && bucket.total > selectableBucketEpsilon
+        }
+    }
+
+    private func toggleBucketSelection(_ bucket: HomeSpendTrendsAggregator.Bucket) {
+        guard bucket.total > selectableBucketEpsilon else { return }
+
+        if selectedBucketID == bucket.id {
+            selectedBucketID = nil
+        } else {
+            selectedBucketID = bucket.id
+        }
     }
 
     private func highestCallout(result: HomeSpendTrendsAggregator.Result) -> some View {
@@ -423,6 +478,163 @@ private struct SpendTrendsCardTile: View {
     }
 }
 
+// MARK: - Bucket breakdown
+
+private struct SpendTrendsBucketBreakdownView: View {
+    let bucket: HomeSpendTrendsAggregator.Bucket
+    let showsCardName: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Divider()
+                .padding(.bottom, 2)
+
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(bucket.label)
+                        .font(.headline.weight(.semibold))
+
+                    Text("\(formattedDate(bucket.start)) - \(formattedDate(bucket.end))")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer(minLength: 0)
+
+                VStack(alignment: .trailing, spacing: 3) {
+                    Text(bucket.total, format: CurrencyFormatter.currencyStyle())
+                        .font(.headline.weight(.semibold))
+
+                    Text(itemCountText)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            VStack(spacing: 0) {
+                ForEach(Array(bucket.expenseItems.enumerated()), id: \.element.id) { index, item in
+                    row(for: item)
+
+                    if index < bucket.expenseItems.count - 1 {
+                        Divider()
+                            .padding(.leading, 24)
+                    }
+                }
+            }
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    @ViewBuilder
+    private func row(for item: HomeSpendTrendsAggregator.ExpenseItem) -> some View {
+        switch item {
+        case .planned(let expense):
+            SharedPlannedExpenseRow(expense: expense, showsCardName: showsCardName)
+        case .variable(let expense):
+            SharedVariableExpenseRow(expense: expense, showsCardName: showsCardName)
+        }
+    }
+
+    private var itemCountText: String {
+        if bucket.expenseItems.count == 1 {
+            return String(
+                localized: "homeWidget.spendTrends.bucketExpenseCountOne",
+                defaultValue: "1 expense",
+                comment: "Singular count of expense rows shown for a selected spend trends bucket."
+            )
+        }
+
+        return String(
+            format: String(
+                localized: "homeWidget.spendTrends.bucketExpenseCountFormat",
+                defaultValue: "%@ expenses",
+                comment: "Count of expense rows shown for a selected spend trends bucket."
+            ),
+            locale: .current,
+            bucket.expenseItems.count.formatted()
+        )
+    }
+
+    private func formattedDate(_ date: Date) -> String {
+        AppDateFormat.abbreviatedDate(date)
+    }
+}
+
+// MARK: - Bucket hit target
+
+private struct HeatMapBucketSelectionButton: View {
+    let bucket: HomeSpendTrendsAggregator.Bucket
+    let proxy: ChartProxy
+    let plotFrame: CGRect
+    let hitWidth: CGFloat
+    let isSelected: Bool
+    let onTap: () -> Void
+
+    private let displayEpsilon: Double = 1.00
+
+    var body: some View {
+        guard bucket.total > displayEpsilon else {
+            return AnyView(EmptyView())
+        }
+
+        guard let x = proxy.position(forX: bucket.label) else {
+            return AnyView(EmptyView())
+        }
+
+        return AnyView(
+            Button(action: onTap) {
+                Rectangle()
+                    .fill(.clear)
+                    .frame(width: hitWidth, height: plotFrame.height)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .position(x: x, y: plotFrame.height / 2)
+            .accessibilityLabel(accessibilityLabel)
+            .accessibilityValue(isSelected ? selectedText : "")
+            .accessibilityHint(accessibilityHint)
+            .accessibilityAddTraits(isSelected ? .isSelected : [])
+        )
+    }
+
+    private var accessibilityLabel: String {
+        String(
+            format: String(
+                localized: "homeWidget.spendTrends.bucketAccessibilityFormat",
+                defaultValue: "%1$@, %2$@",
+                comment: "Accessibility label for a selectable spend trends chart bucket."
+            ),
+            locale: .current,
+            bucket.label,
+            CurrencyFormatter.string(from: bucket.total)
+        )
+    }
+
+    private var accessibilityHint: String {
+        if isSelected {
+            return String(
+                localized: "homeWidget.spendTrends.bucketHideHint",
+                defaultValue: "Double tap to hide expenses in this bucket.",
+                comment: "Accessibility hint for hiding selected spend trends bucket expenses."
+            )
+        }
+
+        return String(
+            localized: "homeWidget.spendTrends.bucketShowHint",
+            defaultValue: "Double tap to show expenses in this bucket.",
+            comment: "Accessibility hint for showing spend trends bucket expenses."
+        )
+    }
+
+    private var selectedText: String {
+        String(
+            localized: "common.selected",
+            defaultValue: "Selected",
+            comment: "Accessibility value for selected controls."
+        )
+    }
+}
+
 // MARK: - Overlay Bar (HeatMap-style)
 
 private struct HeatMapBucketBar: View {
@@ -432,6 +644,7 @@ private struct HeatMapBucketBar: View {
     let plotFrame: CGRect
     let height: CGFloat
     let barWidth: CGFloat
+    let isSelected: Bool
     let colorForSlice: (HomeSpendTrendsAggregator.Slice) -> Color
     private let displayEpsilon: Double = 1.00
 
@@ -459,8 +672,15 @@ private struct HeatMapBucketBar: View {
         let barSize = CGSize(width: barWidth, height: barHeight)
 
         return AnyView(
-            shape
-                .fill(gradient)
+            ZStack {
+                shape
+                    .fill(gradient)
+
+                if isSelected {
+                    shape
+                        .strokeBorder(Color.primary.opacity(0.35), lineWidth: 2)
+                }
+            }
                 .frame(width: barSize.width, height: barSize.height)
                 .position(x: x, y: yTop + (barHeight / 2))
                 .compositingGroup()

@@ -13840,6 +13840,18 @@
         }
       }
     },
+    "common.selected" : {
+      "comment" : "Accessibility value for selected controls.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Selected"
+          }
+        }
+      }
+    },
     "common.sort" : {
       "comment" : "Accessibility label for sort actions.\nLabel for sort actions.",
       "extractionState" : "extracted_with_value",
@@ -25802,6 +25814,66 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "所有卡牌"
+          }
+        }
+      }
+    },
+    "homeWidget.spendTrends.bucketAccessibilityFormat" : {
+      "comment" : "Accessibility label for a selectable spend trends chart bucket.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$@"
+          }
+        }
+      }
+    },
+    "homeWidget.spendTrends.bucketExpenseCountFormat" : {
+      "comment" : "Count of expense rows shown for a selected spend trends bucket.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%@ expenses"
+          }
+        }
+      }
+    },
+    "homeWidget.spendTrends.bucketExpenseCountOne" : {
+      "comment" : "Singular count of expense rows shown for a selected spend trends bucket.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "1 expense"
+          }
+        }
+      }
+    },
+    "homeWidget.spendTrends.bucketHideHint" : {
+      "comment" : "Accessibility hint for hiding selected spend trends bucket expenses.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Double tap to hide expenses in this bucket."
+          }
+        }
+      }
+    },
+    "homeWidget.spendTrends.bucketShowHint" : {
+      "comment" : "Accessibility hint for showing spend trends bucket expenses.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Double tap to show expenses in this bucket."
           }
         }
       }

@@ -41,12 +41,16 @@ struct HomeSpendTrendsAggregator {
     }
 
     struct Bucket: Identifiable {
-        let id = UUID()
         let label: String
         let start: Date
         let end: Date
         let total: Double
         let slices: [Slice]
+        let expenseItems: [ExpenseItem]
+
+        var id: String {
+            "\(start.timeIntervalSinceReferenceDate)-\(end.timeIntervalSinceReferenceDate)-\(label)"
+        }
     }
 
     struct Slice: Identifiable {
@@ -55,6 +59,38 @@ struct HomeSpendTrendsAggregator {
         let name: String
         let hexColor: String?
         let amount: Double
+    }
+
+    enum ExpenseItem: Identifiable {
+        case planned(PlannedExpense)
+        case variable(VariableExpense)
+
+        var id: String {
+            switch self {
+            case .planned(let expense):
+                return "planned-\(expense.id.uuidString)"
+            case .variable(let expense):
+                return "variable-\(expense.id.uuidString)"
+            }
+        }
+
+        var date: Date {
+            switch self {
+            case .planned(let expense):
+                return expense.expenseDate
+            case .variable(let expense):
+                return expense.transactionDate
+            }
+        }
+
+        var amount: Double {
+            switch self {
+            case .planned(let expense):
+                return expense.effectiveAmount()
+            case .variable(let expense):
+                return expense.ledgerSignedAmount()
+            }
+        }
     }
 
     // MARK: - Internal
@@ -133,10 +169,13 @@ struct HomeSpendTrendsAggregator {
                 spansMultipleMonths: spansMultipleMonths
             )
 
+            let bucketPlanned = filteredPlanned.filter { $0.expenseDate >= bucket.start && $0.expenseDate <= bucket.end }
+            let bucketVariable = filteredVariable.filter { $0.transactionDate >= bucket.start && $0.transactionDate <= bucket.end }
+
             let bucketTotals = categoryTotals(
                 categories: categories,
-                plannedExpenses: filteredPlanned.filter { $0.expenseDate >= bucket.start && $0.expenseDate <= bucket.end },
-                variableExpenses: filteredVariable.filter { $0.transactionDate >= bucket.start && $0.transactionDate <= bucket.end }
+                plannedExpenses: bucketPlanned,
+                variableExpenses: bucketVariable
             )
 
             let slices = buildSlices(
@@ -153,7 +192,11 @@ struct HomeSpendTrendsAggregator {
                     start: bucket.start,
                     end: bucket.end,
                     total: bucketTotal,
-                    slices: slices
+                    slices: slices,
+                    expenseItems: expenseItems(
+                        plannedExpenses: bucketPlanned,
+                        variableExpenses: bucketVariable
+                    )
                 )
             )
         }
@@ -375,9 +418,8 @@ struct HomeSpendTrendsAggregator {
         var totals: [UUID?: Double] = [:]
 
         for expense in plannedExpenses {
-            let amount = (expense.actualAmount > 0) ? expense.actualAmount : expense.plannedAmount
             let id = expense.category?.id
-            totals[id, default: 0] += amount
+            totals[id, default: 0] += expense.effectiveAmount()
         }
 
         for expense in variableExpenses {
@@ -390,6 +432,21 @@ struct HomeSpendTrendsAggregator {
         }
 
         return totals
+    }
+
+    private static func expenseItems(
+        plannedExpenses: [PlannedExpense],
+        variableExpenses: [VariableExpense]
+    ) -> [ExpenseItem] {
+        let plannedItems = plannedExpenses.map(ExpenseItem.planned)
+        let variableItems = variableExpenses.map(ExpenseItem.variable)
+
+        return (plannedItems + variableItems).sorted { lhs, rhs in
+            if lhs.date == rhs.date {
+                return lhs.id < rhs.id
+            }
+            return lhs.date > rhs.date
+        }
     }
 
     private static func buildSlices(
