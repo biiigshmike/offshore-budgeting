@@ -4438,6 +4438,42 @@
         }
       }
     },
+    "app.quickLinks.addExpense" : {
+      "comment" : "Sidebar quick link for adding an expense.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Add Expense"
+          }
+        }
+      }
+    },
+    "app.quickLinks.addIncome" : {
+      "comment" : "Sidebar quick link for adding income.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Add Income"
+          }
+        }
+      }
+    },
+    "app.quickLinks.section.title" : {
+      "comment" : "Sidebar section title for quick add actions.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Quick Links"
+          }
+        }
+      }
+    },
     "app.section.budgets" : {
       "comment" : "Main tab title for the Budgets section.",
       "localizations" : {
@@ -29883,9 +29919,6 @@
         }
       }
     },
-    "Open Marina from Home for workspace-scoped read-only chat about spending, income, categories, cards, budgets, and savings. Use the + menu for explicit create forms.\n\nFor edits, deletes, and deeper review flows, use the owning app screens so records stay clear and traceable." : {
-
-    },
     "Marina is Offshore's on-device financial assistant on the Home tab. Ask read-only questions about spending, income, savings, categories, cards, and budgets, then use Marina's + menu for explicit create forms. Edits and deletes stay on the screens that own those records so changes remain clear and traceable." : {
       "localizations" : {
         "ar" : {
@@ -34409,6 +34442,9 @@
       }
     },
     "Open Marina from Home for read-only chat. Use Marina's + menu for explicit create forms, and use owning screens for edits, deletes, and review." : {
+
+    },
+    "Open Marina from Home for workspace-scoped read-only chat about spending, income, categories, cards, budgets, and savings. Use the + menu for explicit create forms.\n\nFor edits, deletes, and deeper review flows, use the owning app screens so records stay clear and traceable." : {
 
     },
     "Open Offshore" : {

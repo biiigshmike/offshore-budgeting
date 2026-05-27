@@ -111,6 +111,13 @@ enum AppTabActivationPhase: String, Equatable {
     case active
 }
 
+private enum QuickLinkSheet: String, Identifiable {
+    case expense
+    case income
+
+    var id: String { rawValue }
+}
+
 struct AppTabActivationContext: Equatable {
     let sectionRawValue: String
     let phase: AppTabActivationPhase
@@ -177,6 +184,7 @@ struct AppRootView: View {
 
     @State private var didApplyInitialSection: Bool = false
     @State private var showingHelpSheet: Bool = false
+    @State private var activeQuickLinkSheet: QuickLinkSheet? = nil
     @State private var detailSnapshotCache = DetailViewSnapshotCache()
     @State private var loadedPhoneSections: Set<AppSection> = []
     @State private var mountedPhoneSections: Set<AppSection> = []
@@ -414,6 +422,40 @@ struct AppRootView: View {
                     Label(section.title, systemImage: section.systemImage)
                         .tag(section)
                 }
+
+                Section(
+                    String(
+                        localized: "app.quickLinks.section.title",
+                        defaultValue: "Quick Links",
+                        comment: "Sidebar section title for quick add actions."
+                    )
+                ) {
+                    Button {
+                        activeQuickLinkSheet = .expense
+                    } label: {
+                        Label(
+                            String(
+                                localized: "app.quickLinks.addExpense",
+                                defaultValue: "Add Expense",
+                                comment: "Sidebar quick link for adding an expense."
+                            ),
+                            systemImage: "plus"
+                        )
+                    }
+
+                    Button {
+                        activeQuickLinkSheet = .income
+                    } label: {
+                        Label(
+                            String(
+                                localized: "app.quickLinks.addIncome",
+                                defaultValue: "Add Income",
+                                comment: "Sidebar quick link for adding income."
+                            ),
+                            systemImage: "plus"
+                        )
+                    }
+                }
             }
             .listStyle(.sidebar)
             .navigationTitle(workspace.name)
@@ -437,6 +479,20 @@ struct AppRootView: View {
         )
         .background {
             MacWindowSceneTitleHost(title: macWindowSceneTitle)
+        }
+        .sheet(item: $activeQuickLinkSheet) { sheet in
+            NavigationStack {
+                switch sheet {
+                case .expense:
+                    AddExpenseView(workspace: workspace)
+                case .income:
+                    AddIncomeView(
+                        workspace: workspace,
+                        initialDate: Calendar.current.startOfDay(for: .now),
+                        initialIsPlanned: false
+                    )
+                }
+            }
         }
     }
 
