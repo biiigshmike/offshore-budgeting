@@ -15,6 +15,11 @@ struct MarinaPanelView: View {
         case category
     }
 
+    private struct PendingClarification {
+        let answerID: UUID
+        let choices: MarinaClarificationChoices
+    }
+
     let workspace: Workspace
     let onDismiss: () -> Void
     let shouldUseLargeMinimumSize: Bool
@@ -29,7 +34,9 @@ struct MarinaPanelView: View {
     @State private var answers: [HomeAnswer] = []
     @State private var promptText = ""
     @State private var hasLoadedConversation = false
+    @State private var isResponding = false
     @State private var isShowingClearConversationAlert = false
+    @State private var pendingClarification: PendingClarification?
     @FocusState private var isPromptFieldFocused: Bool
 
     @AppStorage("general_defaultBudgetingPeriod")
@@ -39,6 +46,7 @@ struct MarinaPanelView: View {
 
     private let conversationStore = MarinaConversationStore()
     private let mutationService = MarinaMutationService()
+    private let brain = MarinaBrain()
 
     init(
         workspace: Workspace,
@@ -149,12 +157,18 @@ struct MarinaPanelView: View {
             Button {
                 submitPrompt()
             } label: {
-                Image(systemName: "paperplane.fill")
-                    .font(.subheadline.weight(.semibold))
-                    .frame(width: 33, height: 33)
+                if isResponding {
+                    ProgressView()
+                        .controlSize(.small)
+                        .frame(width: 33, height: 33)
+                } else {
+                    Image(systemName: "paperplane.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(width: 33, height: 33)
+                }
             }
             .modifier(AssistantIconButtonModifier())
-            .disabled(trimmedPromptText.isEmpty)
+            .disabled(trimmedPromptText.isEmpty || isResponding)
             .accessibilityLabel(String(localized: "assistant.submitQuestion", defaultValue: "Submit Question", comment: "Accessibility label for submitting assistant question."))
             .accessibilityIdentifier("marina.submitButton")
         }
@@ -326,6 +340,10 @@ struct MarinaPanelView: View {
                         }
                     )
                 }
+
+                if let choices = clarificationChoices(for: answer) {
+                    clarificationChoicesView(choices, answerID: answer.id)
+                }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
@@ -373,11 +391,123 @@ struct MarinaPanelView: View {
 
     private func submitPrompt() {
         guard trimmedPromptText.isEmpty == false else { return }
+        guard isResponding == false else { return }
         guard MarinaPromptSubmissionPolicy.shouldHandleFreeText(trimmedPromptText) else {
             promptText = ""
             return
         }
+        let submittedPrompt = trimmedPromptText
         promptText = ""
+
+        if let pendingClarification,
+           let choice = pendingClarification.choices.choice(matching: submittedPrompt) {
+            resolveClarification(
+                pendingClarification,
+                choice: choice,
+                replyPrompt: submittedPrompt
+            )
+            return
+        }
+
+        isResponding = true
+        Task {
+            let answer = await brain.answer(
+                prompt: submittedPrompt,
+                workspace: workspace,
+                modelContext: modelContext,
+                ambientDateRange: ambientDateRange,
+                defaultBudgetingPeriod: defaultBudgetingPeriod
+            )
+            appendAnswer(answer)
+            isResponding = false
+        }
+    }
+
+    @ViewBuilder
+    private func clarificationChoicesView(_ choices: MarinaClarificationChoices, answerID: UUID) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                ForEach(choices.choices) { choice in
+                    Button {
+                        resolveClarification(
+                            PendingClarification(answerID: answerID, choices: choices),
+                            choice: choice,
+                            replyPrompt: choice.title
+                        )
+                    } label: {
+                        Label(
+                            choice.title,
+                            systemImage: choices.resolvedChoiceID == choice.id ? "checkmark.circle.fill" : "arrow.turn.down.right"
+                        )
+                        .lineLimit(1)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(isResponding || choices.isResolved)
+                    .accessibilityLabel(choice.subtitle ?? choice.title)
+                }
+            }
+
+            if let resolvedChoiceID = choices.resolvedChoiceID,
+               let choice = choices.choices.first(where: { $0.id == resolvedChoiceID }) {
+                Text("Using \(choice.title).")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func clarificationChoices(for answer: HomeAnswer) -> MarinaClarificationChoices? {
+        guard case .clarificationChoices(let choices)? = answer.attachment else {
+            return nil
+        }
+        return choices
+    }
+
+    private func resolveClarification(
+        _ pending: PendingClarification,
+        choice: MarinaClarificationChoice,
+        replyPrompt: String
+    ) {
+        guard isResponding == false else { return }
+        markClarificationResolved(answerID: pending.answerID, choiceID: choice.id)
+        pendingClarification = nil
+
+        isResponding = true
+        Task {
+            let answer = await brain.answer(
+                resolvedRequest: choice.request,
+                prompt: replyPrompt,
+                workspace: workspace,
+                modelContext: modelContext,
+                ambientDateRange: ambientDateRange,
+                defaultBudgetingPeriod: defaultBudgetingPeriod
+            )
+            appendAnswer(answer)
+            isResponding = false
+        }
+    }
+
+    private func markClarificationResolved(answerID: UUID, choiceID: UUID) {
+        guard let index = answers.firstIndex(where: { $0.id == answerID }),
+              case .clarificationChoices(var choices)? = answers[index].attachment else {
+            return
+        }
+        choices.resolvedChoiceID = choiceID
+        let answer = answers[index]
+        answers[index] = HomeAnswer(
+            id: answer.id,
+            queryID: answer.queryID,
+            kind: answer.kind,
+            userPrompt: answer.userPrompt,
+            title: answer.title,
+            subtitle: answer.subtitle,
+            primaryValue: answer.primaryValue,
+            rows: answer.rows,
+            attachment: .clarificationChoices(choices),
+            explanation: answer.explanation,
+            generatedAt: answer.generatedAt
+        )
+        conversationStore.saveAnswers(answers, workspaceID: workspace.id)
     }
 
     private func handleCreateMenuSelection(_ kind: MarinaCreateEntityKind) {
@@ -691,18 +821,34 @@ struct MarinaPanelView: View {
 
     private func appendAnswer(_ answer: HomeAnswer) {
         answers.append(answer)
+        updatePendingClarification(afterAppending: answer)
         conversationStore.saveAnswers(answers, workspaceID: workspace.id)
     }
 
     private func loadConversationIfNeeded() {
         guard hasLoadedConversation == false else { return }
         answers = conversationStore.loadAnswers(workspaceID: workspace.id)
+        pendingClarification = pendingClarification(from: answers.last)
         hasLoadedConversation = true
     }
 
     private func clearConversation() {
         answers = []
+        pendingClarification = nil
         conversationStore.saveAnswers([], workspaceID: workspace.id)
+    }
+
+    private func updatePendingClarification(afterAppending answer: HomeAnswer) {
+        pendingClarification = pendingClarification(from: answer)
+    }
+
+    private func pendingClarification(from answer: HomeAnswer?) -> PendingClarification? {
+        guard let answer,
+              case .clarificationChoices(let choices)? = answer.attachment,
+              choices.isResolved == false else {
+            return nil
+        }
+        return PendingClarification(answerID: answer.id, choices: choices)
     }
 
     private func scrollToLatestMessage(using proxy: ScrollViewProxy, animated: Bool) {

@@ -321,11 +321,7 @@ struct AllocationAccountDetailView: View {
             availableCategoriesForChips: availableCategoriesForChips,
             filteredLedgerRows: sortedRows,
             filteredAmountValue: CurrencyFormatter.normalizedCurrencyDisplayValue(
-                searchedRows
-                    .filter { $0.type == .charge }
-                    .reduce(0) { partial, row in
-                        partial + max(0, row.amount)
-                    }
+                AllocationLedgerService.chargeActivity(in: searchedRows)
             ),
             heatMapStops: gradientStops(from: slices)
         )

@@ -1,6 +1,6 @@
 import Foundation
 
-enum MarinaInlineCreateEntity: String, Codable, Equatable, CaseIterable, Identifiable {
+enum MarinaInlineCreateEntity: String, Codable, Equatable, CaseIterable, Identifiable, Sendable {
     case expense
     case income
     case budget
@@ -31,7 +31,7 @@ enum MarinaInlineCreateEntity: String, Codable, Equatable, CaseIterable, Identif
     }
 }
 
-struct MarinaInlineCreateForm: Codable, Equatable {
+struct MarinaInlineCreateForm: Codable, Equatable, Sendable {
     let entity: MarinaInlineCreateEntity
     var summary: String?
     var nameText: String

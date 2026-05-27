@@ -291,16 +291,85 @@ struct HomeAnswer: Identifiable, Codable, Equatable {
     }
 }
 
-enum MarinaAttachment: Codable, Equatable {
+struct MarinaClarificationChoice: Identifiable, Codable, Equatable, Sendable {
+    let id: UUID
+    let title: String
+    let subtitle: String?
+    let aliases: [String]
+    let request: MarinaSemanticRequest
+
+    init(
+        id: UUID = UUID(),
+        title: String,
+        subtitle: String? = nil,
+        aliases: [String],
+        request: MarinaSemanticRequest
+    ) {
+        self.id = id
+        self.title = title
+        self.subtitle = subtitle
+        self.aliases = aliases
+        self.request = request
+    }
+
+    func matches(_ reply: String) -> Bool {
+        let normalizedReply = Self.normalized(reply)
+        guard normalizedReply.isEmpty == false else { return false }
+        return Self.normalized(title) == normalizedReply
+            || aliases.contains { Self.normalized($0) == normalizedReply }
+    }
+
+    private static func normalized(_ value: String) -> String {
+        value
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .lowercased()
+    }
+}
+
+struct MarinaClarificationChoices: Identifiable, Codable, Equatable, Sendable {
+    let id: UUID
+    let originalPrompt: String?
+    let question: String
+    var choices: [MarinaClarificationChoice]
+    var resolvedChoiceID: UUID?
+
+    init(
+        id: UUID = UUID(),
+        originalPrompt: String? = nil,
+        question: String,
+        choices: [MarinaClarificationChoice],
+        resolvedChoiceID: UUID? = nil
+    ) {
+        self.id = id
+        self.originalPrompt = originalPrompt
+        self.question = question
+        self.choices = choices
+        self.resolvedChoiceID = resolvedChoiceID
+    }
+
+    var isResolved: Bool {
+        resolvedChoiceID != nil
+    }
+
+    func choice(matching reply: String) -> MarinaClarificationChoice? {
+        choices.first { $0.matches(reply) }
+    }
+}
+
+enum MarinaAttachment: Codable, Equatable, Sendable {
     case inlineCreateForm(MarinaInlineCreateForm)
+    case clarificationChoices(MarinaClarificationChoices)
 
     private enum CodingKeys: String, CodingKey {
         case kind
         case form
+        case clarificationChoices
     }
 
     private enum Kind: String, Codable {
         case inlineCreateForm
+        case clarificationChoices
     }
 
     init(from decoder: Decoder) throws {
@@ -309,6 +378,8 @@ enum MarinaAttachment: Codable, Equatable {
         switch kind {
         case .inlineCreateForm:
             self = .inlineCreateForm(try container.decode(MarinaInlineCreateForm.self, forKey: .form))
+        case .clarificationChoices:
+            self = .clarificationChoices(try container.decode(MarinaClarificationChoices.self, forKey: .clarificationChoices))
         }
     }
 
@@ -318,6 +389,9 @@ enum MarinaAttachment: Codable, Equatable {
         case .inlineCreateForm(let form):
             try container.encode(Kind.inlineCreateForm, forKey: .kind)
             try container.encode(form, forKey: .form)
+        case .clarificationChoices(let clarificationChoices):
+            try container.encode(Kind.clarificationChoices, forKey: .kind)
+            try container.encode(clarificationChoices, forKey: .clarificationChoices)
         }
     }
 }

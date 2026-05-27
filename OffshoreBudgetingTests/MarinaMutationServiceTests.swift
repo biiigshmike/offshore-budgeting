@@ -117,13 +117,13 @@ struct MarinaMutationServiceTests {
         #expect(plannedExpenses.first?.sourcePresetID == preset.id)
     }
 
-    @Test func freeTextSubmissionPolicy_doesNotHandleOrMutate() throws {
+    @Test func freeTextSubmissionPolicy_allowsReadOnlyQuestionsWithoutMutation() throws {
         let context = try makeContext()
         let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
         context.insert(workspace)
         try context.save()
 
-        #expect(MarinaPromptSubmissionPolicy.shouldHandleFreeText("how much did I spend?") == false)
+        #expect(MarinaPromptSubmissionPolicy.shouldHandleFreeText("how much did I spend?") == true)
         #expect(try fetchAll(VariableExpense.self, in: context).isEmpty)
         #expect(try fetchAll(Income.self, in: context).isEmpty)
         #expect(try fetchAll(Budget.self, in: context).isEmpty)

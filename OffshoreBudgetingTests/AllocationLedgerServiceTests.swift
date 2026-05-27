@@ -93,6 +93,15 @@ struct AllocationLedgerServiceTests {
 
         #expect(rows.map(\.title) == ["Venmo", "Concert", "Dinner"])
         #expect(rows.map(\.runningBalance) == [30, 40, 25])
+        #expect(AllocationLedgerService.balance(for: account) == 30)
+        #expect(AllocationLedgerService.chargeActivity(in: rows) == 40)
+        #expect(
+            AllocationLedgerService.chargeActivity(
+                for: account,
+                startDate: Self.makeDate(year: 2026, month: 3, day: 10),
+                endDate: Self.makeDate(year: 2026, month: 3, day: 12)
+            ) == 40
+        )
     }
 
     @MainActor

@@ -40,6 +40,26 @@ enum AllocationLedgerService {
         return chargeTotal + settlementTotal
     }
 
+    static func chargeActivity(in rows: [LedgerRow]) -> Double {
+        rows
+            .filter { $0.type == .charge }
+            .reduce(0) { partial, row in
+                partial + max(0, row.amount)
+            }
+    }
+
+    static func chargeActivity(
+        for account: AllocationAccount,
+        startDate: Date,
+        endDate: Date
+    ) -> Double {
+        let endOfDay = normalizedEnd(endDate)
+        let filteredRows = rows(for: account).filter { row in
+            row.date >= startDate && row.date <= endOfDay
+        }
+        return chargeActivity(in: filteredRows)
+    }
+
     // MARK: - Ledger
 
     static func rows(for account: AllocationAccount) -> [LedgerRow] {
@@ -163,5 +183,10 @@ enum AllocationLedgerService {
         }
 
         return lhs.id > rhs.id
+    }
+
+    private static func normalizedEnd(_ date: Date) -> Date {
+        let start = Calendar.current.startOfDay(for: date)
+        return Calendar.current.date(byAdding: DateComponents(day: 1, second: -1), to: start) ?? date
     }
 }
