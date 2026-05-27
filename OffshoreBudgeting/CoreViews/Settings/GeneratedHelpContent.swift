@@ -677,13 +677,13 @@ enum GeneratedHelpContent {
                 mediaSection(
                     id: "home-marina-1",
                     header: "Marina",
-                    body: "Marina is currently a lightweight shell while the assistant brain is rebuilt. Open Marina from Home when you want the workspace-scoped panel and use its + menu for explicit create forms.\n\nThe text field does not infer, route, or execute free-text requests in this reset state. For editing, deleting, analysis, and review flows, use the owning app screens so records stay clear and traceable.",
+                    body: "Open Marina from Home for workspace-scoped read-only chat about spending, income, categories, cards, budgets, and savings. Use the + menu for explicit create forms.\n\nFor edits, deletes, and deeper review flows, use the owning app screens so records stay clear and traceable.",
                     media: [
                         mediaItem(
                             id: "home-marina-1-image-1",
                             assetName: "Help/CoreScreens/Home/Marina/marina",
-                            bodyText: "Open Marina from Home for the shell panel. Use the + menu for explicit create flows, and use the owning app screens for edits, deletes, and review.",
-                            fullscreenCaptionText: "Marina stays available as a shell while the assistant brain is rebuilt."
+                            bodyText: "Open Marina from Home for read-only chat. Use Marina's + menu for explicit create forms, and use owning screens for edits, deletes, and review.",
+                            fullscreenCaptionText: "Marina keeps chat read-only and creation explicit."
                         )
                     ]
                 )

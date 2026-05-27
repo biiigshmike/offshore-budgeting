@@ -15,6 +15,22 @@ struct HomeQueryDateRange: Codable, Equatable, Sendable {
     }
 }
 
+struct MarinaPanelHomeContext: Equatable, Sendable {
+    let dateRange: HomeQueryDateRange?
+    let excludeFuturePlannedExpensesFromCalculations: Bool
+    let excludeFutureVariableExpensesFromCalculations: Bool
+
+    init(
+        dateRange: HomeQueryDateRange?,
+        excludeFuturePlannedExpensesFromCalculations: Bool = false,
+        excludeFutureVariableExpensesFromCalculations: Bool = false
+    ) {
+        self.dateRange = dateRange
+        self.excludeFuturePlannedExpensesFromCalculations = excludeFuturePlannedExpensesFromCalculations
+        self.excludeFutureVariableExpensesFromCalculations = excludeFutureVariableExpensesFromCalculations
+    }
+}
+
 enum HomeQueryPeriodUnit: String, Codable, Equatable, Sendable {
     case day
     case week

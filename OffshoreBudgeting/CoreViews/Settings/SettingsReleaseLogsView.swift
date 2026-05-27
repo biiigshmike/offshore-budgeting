@@ -213,7 +213,7 @@ struct SettingsReleaseLogsView: View {
                 ReleaseItem(
                     systemImage: "figure.wave",
                     title: "Welcome Aboard, Marina!",
-                    description: "Marina is Offshore’s new on-device financial assistant, available on the Home tab. She’s just getting her sea legs, so please be patient as she learns her way around. Marina runs entirely on your device and will improve with time. Try chatting with her to add income or expenses, explore savings goals, or gain quick insights into your finances."
+                    description: "Marina is Offshore's on-device financial assistant on the Home tab. Ask read-only questions about spending, income, savings, categories, cards, and budgets, then use Marina's + menu for explicit create forms. Edits and deletes stay on the screens that own those records so changes remain clear and traceable."
                 ),
                 ReleaseItem(
                     systemImage: "sailboat.fill",

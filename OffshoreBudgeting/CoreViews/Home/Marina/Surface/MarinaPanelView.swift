@@ -57,7 +57,7 @@ struct MarinaPanelView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     private let conversationStore = MarinaConversationStore()
-    private let mutationService = MarinaMutationService()
+    private let createService = MarinaCreateService()
     private let brain = MarinaBrain()
 
     init(
@@ -701,7 +701,7 @@ struct MarinaPanelView: View {
         }
     }
 
-    private func executeInlineCreateForm(_ form: MarinaInlineCreateForm) throws -> MarinaMutationResult {
+    private func executeInlineCreateForm(_ form: MarinaInlineCreateForm) throws -> MarinaCreateResult {
         switch form.entity {
         case .expense:
             guard let amount = CurrencyFormatter.parseAmount(form.amountText), amount > 0 else {
@@ -710,7 +710,7 @@ struct MarinaPanelView: View {
             guard let card = cards.first(where: { $0.id == form.selectedCardID }) else {
                 throw missingSelectionError("Select a card to continue.")
             }
-            return try mutationService.addExpense(
+            return try createService.addExpense(
                 amount: amount,
                 notes: form.notesText.trimmingCharacters(in: .whitespacesAndNewlines),
                 date: calendarStartOfDay(form.date),
@@ -724,7 +724,7 @@ struct MarinaPanelView: View {
                 throw TransactionEntryService.ValidationError.invalidAmount
             }
             let frequency = RecurrenceFrequency(rawValue: form.recurrenceFrequencyRaw) ?? .none
-            return try mutationService.addIncome(
+            return try createService.addIncome(
                 amount: amount,
                 source: form.sourceText.trimmingCharacters(in: .whitespacesAndNewlines),
                 date: calendarStartOfDay(form.date),
@@ -741,7 +741,7 @@ struct MarinaPanelView: View {
                 modelContext: modelContext
             )
         case .budget:
-            return try mutationService.addBudget(
+            return try createService.addBudget(
                 name: form.nameText.trimmingCharacters(in: .whitespacesAndNewlines),
                 dateRange: HomeQueryDateRange(startDate: form.date, endDate: form.secondaryDate),
                 cards: cards.filter { form.selectedCardIDs.contains($0.id) },
@@ -750,7 +750,7 @@ struct MarinaPanelView: View {
                 modelContext: modelContext
             )
         case .card:
-            return try mutationService.addCard(
+            return try createService.addCard(
                 name: form.nameText.trimmingCharacters(in: .whitespacesAndNewlines),
                 themeRaw: form.cardThemeRaw,
                 effectRaw: form.cardEffectRaw,
@@ -764,7 +764,7 @@ struct MarinaPanelView: View {
             guard let card = cards.first(where: { $0.id == form.selectedCardID }) else {
                 throw missingSelectionError("Select a default card to continue.")
             }
-            return try mutationService.addPreset(
+            return try createService.addPreset(
                 title: form.nameText.trimmingCharacters(in: .whitespacesAndNewlines),
                 plannedAmount: amount,
                 frequencyRaw: form.recurrenceFrequencyRaw,
@@ -780,7 +780,7 @@ struct MarinaPanelView: View {
                 modelContext: modelContext
             )
         case .category:
-            return try mutationService.addCategory(
+            return try createService.addCategory(
                 name: form.nameText.trimmingCharacters(in: .whitespacesAndNewlines),
                 colorHex: form.categoryColorHex,
                 workspace: workspace,

@@ -7,22 +7,6 @@
 
 import SwiftUI
 
-struct MarinaPanelHomeContext: Equatable, Sendable {
-    let dateRange: HomeQueryDateRange?
-    let excludeFuturePlannedExpensesFromCalculations: Bool
-    let excludeFutureVariableExpensesFromCalculations: Bool
-
-    init(
-        dateRange: HomeQueryDateRange?,
-        excludeFuturePlannedExpensesFromCalculations: Bool = false,
-        excludeFutureVariableExpensesFromCalculations: Bool = false
-    ) {
-        self.dateRange = dateRange
-        self.excludeFuturePlannedExpensesFromCalculations = excludeFuturePlannedExpensesFromCalculations
-        self.excludeFutureVariableExpensesFromCalculations = excludeFutureVariableExpensesFromCalculations
-    }
-}
-
 struct MarinaToolbarContext {
     var isToolbarButtonVisible: Bool = false
     var openAssistant: (MarinaPanelHomeContext?) -> Void = { _ in }

@@ -4,7 +4,7 @@ import Testing
 @testable import Offshore
 
 @MainActor
-struct MarinaMutationServiceTests {
+struct MarinaCreateServiceTests {
     private func makeContext() throws -> ModelContext {
         let schema = Schema([
             Workspace.self,
@@ -39,7 +39,7 @@ struct MarinaMutationServiceTests {
 
     @Test func explicitExpenseCreate_persistsInSelectedWorkspaceOnly() throws {
         let context = try makeContext()
-        let service = MarinaMutationService()
+        let service = MarinaCreateService()
         let selectedWorkspace = Workspace(name: "Personal", hexColor: "#3B82F6")
         let otherWorkspace = Workspace(name: "Work", hexColor: "#14B8A6")
         let card = Card(name: "Apple Card", workspace: selectedWorkspace)
@@ -71,7 +71,7 @@ struct MarinaMutationServiceTests {
 
     @Test func explicitBudgetCreate_linksCardsAndPresetsInSelectedWorkspace() throws {
         let context = try makeContext()
-        let service = MarinaMutationService()
+        let service = MarinaCreateService()
         let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
         let card = Card(name: "Visa", workspace: workspace)
         let category = Category(name: "Bills", hexColor: "#2563EB", workspace: workspace)

@@ -110,7 +110,7 @@ struct MarinaInlineCreateForm: Codable, Equatable, Sendable {
     }
 }
 
-struct MarinaMutationResult {
+struct MarinaCreateResult {
     let title: String
     let subtitle: String?
     let rows: [HomeAnswerRow]
