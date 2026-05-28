@@ -35,7 +35,7 @@ struct ManagePresetsForBudgetSheet: View {
     
     var body: some View {
         List {
-            if presets.isEmpty {
+            if visiblePresets.isEmpty {
                 ContentUnavailableView(
                     "No Presets",
                     systemImage: "list.bullet.rectangle",
@@ -43,11 +43,19 @@ struct ManagePresetsForBudgetSheet: View {
                 )
             } else {
                 Section {
-                    ForEach(presets) { preset in
+                    ForEach(visiblePresets) { preset in
                         Toggle(isOn: bindingForPreset(preset)) {
                             VStack(alignment: .leading, spacing: 6) {
                                 VStack(alignment: .leading, spacing: 4) {
-                                    Text(preset.title)
+                                    HStack(spacing: 8) {
+                                        Text(preset.title)
+
+                                        if preset.isArchived {
+                                            Text("Archived")
+                                                .font(.caption.weight(.semibold))
+                                                .foregroundStyle(.secondary)
+                                        }
+                                    }
                                     
                                     HStack(spacing: 8) {
                                         Text(preset.plannedAmount, format: CurrencyFormatter.currencyStyle())
@@ -71,7 +79,7 @@ struct ManagePresetsForBudgetSheet: View {
                             }
                         }
                         .tint(Color("AccentColor"))
-                        .disabled(!canLink(preset) || (linkedCardIDs.isEmpty && !isLinked(preset)))
+                        .disabled(!canLink(preset) || (preset.isArchived && !isLinked(preset)) || (linkedCardIDs.isEmpty && !isLinked(preset)))
                     }
                 }
             }
@@ -107,9 +115,15 @@ struct ManagePresetsForBudgetSheet: View {
         guard let presetWorkspaceID = preset.workspace?.id else { return false }
         return budgetWorkspaceID == workspace.id && presetWorkspaceID == workspace.id
     }
-    
+
+    private var visiblePresets: [Preset] {
+        presets.filter { preset in
+            preset.isArchived == false || isLinked(preset)
+        }
+    }
+
     // MARK: - Link Helpers
-    
+
     private func isLinked(_ preset: Preset) -> Bool {
         (budget.presetLinks ?? []).contains { $0.preset?.id == preset.id }
     }
@@ -141,6 +155,7 @@ struct ManagePresetsForBudgetSheet: View {
     
     private func link(_ preset: Preset) {
         guard canLink(preset) else { return }
+        guard preset.isArchived == false else { return }
         guard !isLinked(preset) else { return }
         
         let link = BudgetPresetLink(budget: budget, preset: preset)

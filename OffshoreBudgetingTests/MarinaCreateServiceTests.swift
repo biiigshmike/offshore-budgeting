@@ -117,6 +117,50 @@ struct MarinaCreateServiceTests {
         #expect(plannedExpenses.first?.sourcePresetID == preset.id)
     }
 
+    @Test func explicitBudgetCreate_ignoresArchivedPresets() throws {
+        let context = try makeContext()
+        let service = MarinaCreateService()
+        let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
+        let card = Card(name: "Visa", workspace: workspace)
+        let archivedPreset = Preset(
+            title: "Old Internet",
+            plannedAmount: 90,
+            frequencyRaw: RecurrenceFrequency.monthly.rawValue,
+            interval: 1,
+            monthlyDayOfMonth: 15,
+            workspace: workspace,
+            defaultCard: card,
+            isArchived: true,
+            archivedAt: date(2026, 4, 1)
+        )
+
+        context.insert(workspace)
+        context.insert(card)
+        context.insert(archivedPreset)
+        try context.save()
+
+        let range = HomeQueryDateRange(startDate: date(2026, 5, 1), endDate: date(2026, 5, 31))
+        let result = try service.addBudget(
+            name: "May 2026",
+            dateRange: range,
+            cards: [card],
+            presets: [archivedPreset],
+            workspace: workspace,
+            modelContext: context
+        )
+
+        let budgets = try fetchAll(Budget.self, in: context)
+        let cardLinks = try fetchAll(BudgetCardLink.self, in: context)
+        let presetLinks = try fetchAll(BudgetPresetLink.self, in: context)
+        let plannedExpenses = try fetchAll(PlannedExpense.self, in: context)
+
+        #expect(result.rows.contains { $0.title == "Presets" && $0.value == "0 linked" })
+        #expect(budgets.count == 1)
+        #expect(cardLinks.count == 1)
+        #expect(presetLinks.isEmpty)
+        #expect(plannedExpenses.isEmpty)
+    }
+
     @Test func freeTextSubmissionPolicy_allowsReadOnlyQuestionsWithoutMutation() throws {
         let context = try makeContext()
         let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")

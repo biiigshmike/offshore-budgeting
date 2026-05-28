@@ -17,6 +17,7 @@ final class MarinaCreateService {
         guard trimmed.isEmpty == false else {
             throw TransactionEntryService.ValidationError.missingDescription
         }
+        let activePresets = presets.filter { $0.isArchived == false }
 
         let budget = Budget(
             name: trimmed,
@@ -29,13 +30,13 @@ final class MarinaCreateService {
         for card in cards {
             modelContext.insert(BudgetCardLink(budget: budget, card: card))
         }
-        for preset in presets {
+        for preset in activePresets {
             modelContext.insert(BudgetPresetLink(budget: budget, preset: preset))
         }
 
         materializePlannedExpenses(
             for: budget,
-            selectedPresets: presets,
+            selectedPresets: activePresets,
             selectedCardIDs: Set(cards.map(\.id)),
             workspace: workspace,
             modelContext: modelContext
@@ -51,7 +52,7 @@ final class MarinaCreateService {
                 HomeAnswerRow(title: "Start", value: AppDateFormat.abbreviatedDate(dateRange.startDate)),
                 HomeAnswerRow(title: "End", value: AppDateFormat.abbreviatedDate(dateRange.endDate)),
                 HomeAnswerRow(title: "Cards", value: "\(cards.count) linked"),
-                HomeAnswerRow(title: "Presets", value: "\(presets.count) linked")
+                HomeAnswerRow(title: "Presets", value: "\(activePresets.count) linked")
             ]
         )
     }

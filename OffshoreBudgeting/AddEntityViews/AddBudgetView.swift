@@ -48,7 +48,7 @@ struct AddBudgetView: View {
         )
 
         _presets = Query(
-            filter: #Predicate<Preset> { $0.workspace?.id == workspaceID },
+            filter: #Predicate<Preset> { $0.workspace?.id == workspaceID && $0.isArchived == false },
             sort: [SortDescriptor(\Preset.title, order: .forward)]
         )
     }
@@ -219,7 +219,7 @@ struct AddBudgetView: View {
         }
 
         // Link selected presets
-        let selectedPresets = presets.filter { selectedPresetIDs.contains($0.id) }
+        let selectedPresets = presets.filter { selectedPresetIDs.contains($0.id) && $0.isArchived == false }
         for preset in selectedPresets {
             let link = BudgetPresetLink(budget: budget, preset: preset)
             modelContext.insert(link)

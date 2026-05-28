@@ -416,7 +416,7 @@ struct MarinaPanelView: View {
                         form: formBinding,
                         cards: cards,
                         categories: categories,
-                        presets: presets,
+                        presets: activePresets,
                         onSubmit: {
                             submitInlineCreateForm(answerID: answer.id)
                         },
@@ -482,6 +482,10 @@ struct MarinaPanelView: View {
 
     private var defaultBudgetingPeriod: BudgetingPeriod {
         BudgetingPeriod(rawValue: defaultBudgetingPeriodRaw) ?? .monthly
+    }
+
+    private var activePresets: [Preset] {
+        presets.filter { $0.isArchived == false }
     }
 
     private var shouldStackClarificationChoices: Bool {
@@ -806,7 +810,7 @@ struct MarinaPanelView: View {
                 name: form.nameText.trimmingCharacters(in: .whitespacesAndNewlines),
                 dateRange: HomeQueryDateRange(startDate: form.date, endDate: form.secondaryDate),
                 cards: cards.filter { form.selectedCardIDs.contains($0.id) },
-                presets: presets.filter { form.selectedPresetIDs.contains($0.id) },
+                presets: activePresets.filter { form.selectedPresetIDs.contains($0.id) },
                 workspace: workspace,
                 modelContext: modelContext
             )
@@ -908,12 +912,13 @@ struct MarinaPanelView: View {
             }
             return rows
         case .budget:
+            let selectedActivePresetCount = activePresets.filter { form.selectedPresetIDs.contains($0.id) }.count
             return [
                 HomeAnswerRow(title: "Name", value: form.nameText.trimmingCharacters(in: .whitespacesAndNewlines)),
                 HomeAnswerRow(title: "Start", value: AppDateFormat.abbreviatedDate(form.date)),
                 HomeAnswerRow(title: "End", value: AppDateFormat.abbreviatedDate(form.secondaryDate)),
                 HomeAnswerRow(title: "Cards", value: AppNumberFormat.integer(form.selectedCardIDs.count)),
-                HomeAnswerRow(title: "Presets", value: AppNumberFormat.integer(form.selectedPresetIDs.count))
+                HomeAnswerRow(title: "Presets", value: AppNumberFormat.integer(selectedActivePresetCount))
             ]
         case .card:
             return [

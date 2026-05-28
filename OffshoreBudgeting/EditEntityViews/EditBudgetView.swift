@@ -60,11 +60,22 @@ struct EditBudgetView: View {
         return startDate <= endDate
     }
 
+    private var linkedPresetIDs: Set<UUID> {
+        Set((budget.presetLinks ?? []).compactMap { $0.preset?.id })
+    }
+
+    private var visiblePresets: [Preset] {
+        let linkedIDs = linkedPresetIDs
+        return presets.filter { preset in
+            preset.isArchived == false || linkedIDs.contains(preset.id)
+        }
+    }
+
     var body: some View {
         BudgetFormView(
             modeTitle: "Edit Budget",
             cards: cards,
-            presets: presets,
+            presets: visiblePresets,
             scheduleString: scheduleString(for:),
             name: $name,
             userEditedName: $userEditedName,
@@ -135,7 +146,7 @@ struct EditBudgetView: View {
             selectedCardIDs.insert(preferredCardID)
         }
 
-        if selectedPresetIDs.isEmpty, let firstPresetID = presets.first?.id {
+        if selectedPresetIDs.isEmpty, let firstPresetID = visiblePresets.first?.id {
             selectedPresetIDs.insert(firstPresetID)
         }
     }
@@ -174,12 +185,13 @@ struct EditBudgetView: View {
     }
 
     private func toggleAllPresets() {
-        if presets.isEmpty { return }
+        let visiblePresetIDs = Set(visiblePresets.map { $0.id })
+        if visiblePresetIDs.isEmpty { return }
 
-        if selectedPresetIDs.count == presets.count {
-            selectedPresetIDs.removeAll()
+        if selectedPresetIDs.intersection(visiblePresetIDs).count == visiblePresetIDs.count {
+            selectedPresetIDs.subtract(visiblePresetIDs)
         } else {
-            selectedPresetIDs = Set(presets.map { $0.id })
+            selectedPresetIDs.formUnion(visiblePresetIDs)
         }
     }
 
@@ -212,8 +224,19 @@ struct EditBudgetView: View {
 
         // Update Preset Links
         let currentPresetIDs = Set((budget.presetLinks ?? []).compactMap { $0.preset?.id })
-        let presetsToRemove = currentPresetIDs.subtracting(selectedPresetIDs)
-        let presetsToAdd = selectedPresetIDs.subtracting(currentPresetIDs)
+        let allowedSelectedPresetIDs = Set(selectedPresetIDs.filter { selectedID in
+            if currentPresetIDs.contains(selectedID) {
+                return true
+            }
+
+            guard let preset = presets.first(where: { $0.id == selectedID }) else {
+                return false
+            }
+
+            return preset.isArchived == false
+        })
+        let presetsToRemove = currentPresetIDs.subtracting(allowedSelectedPresetIDs)
+        let presetsToAdd = allowedSelectedPresetIDs.subtracting(currentPresetIDs)
 
         for link in budget.presetLinks ?? [] {
             if let presetID = link.preset?.id, presetsToRemove.contains(presetID) {
@@ -221,7 +244,7 @@ struct EditBudgetView: View {
             }
         }
 
-        for preset in presets where presetsToAdd.contains(preset.id) {
+        for preset in presets where presetsToAdd.contains(preset.id) && preset.isArchived == false {
             modelContext.insert(BudgetPresetLink(budget: budget, preset: preset))
         }
 
@@ -229,24 +252,24 @@ struct EditBudgetView: View {
         // - budget dates
         // - selected presets
         // - selected cards
-        let selectedPresets = presets.filter { selectedPresetIDs.contains($0.id) }
-	        syncGeneratedPlannedExpenses(
-	            for: budget,
-	            selectedPresets: selectedPresets,
-	            selectedCardIDs: selectedCardIDs
-	        )
+        let selectedPresets = presets.filter { allowedSelectedPresetIDs.contains($0.id) }
+        syncGeneratedPlannedExpenses(
+            for: budget,
+            selectedPresets: selectedPresets,
+            selectedCardIDs: selectedCardIDs
+        )
 
-	        try? modelContext.save()
+        try? modelContext.save()
 
-	        Task {
-	            await LocalNotificationService.syncFromUserDefaultsIfPossible(
-	                modelContext: modelContext,
-	                workspaceID: workspace.id
-	            )
-	        }
+        Task {
+            await LocalNotificationService.syncFromUserDefaultsIfPossible(
+                modelContext: modelContext,
+                workspaceID: workspace.id
+            )
+        }
 
-	        dismiss()
-	    }
+        dismiss()
+    }
 
     // MARK: - PlannedExpense sync (budget-local generated rows)
 

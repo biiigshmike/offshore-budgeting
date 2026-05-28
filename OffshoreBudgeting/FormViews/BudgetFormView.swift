@@ -132,7 +132,15 @@ struct BudgetFormView: View {
                 ForEach(presets) { preset in
                     Toggle(isOn: bindingForPreset(preset)) {
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(preset.title)
+                                HStack(spacing: 8) {
+                                    Text(preset.title)
+
+                                    if preset.isArchived {
+                                        Text("Archived")
+                                            .font(.caption.weight(.semibold))
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
                                 
                                 HStack(spacing: 8) {
                                     Text(preset.plannedAmount, format: CurrencyFormatter.currencyStyle())
