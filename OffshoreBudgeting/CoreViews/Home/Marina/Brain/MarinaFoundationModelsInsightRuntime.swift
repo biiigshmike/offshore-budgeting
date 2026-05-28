@@ -86,12 +86,12 @@ struct MarinaFoundationModelsInsightRuntime {
                         }
 
                         let partial = snapshot.content.trimmingCharacters(in: .whitespacesAndNewlines)
-                        guard let sanitized = MarinaVoiceSanitizer.sanitizedStreaming(partial) else { continue }
+                        guard let sanitized = MarinaVoiceSanitizer.sanitizedStreaming(partial, context: context) else { continue }
                         latest = partial
                         continuation.yield(sanitized)
                     }
 
-                    guard MarinaVoiceSanitizer.sanitizedFinal(latest) != nil else {
+                    guard MarinaVoiceSanitizer.sanitizedFinal(latest, context: context) != nil else {
                         continuation.finish(throwing: MarinaFoundationModelsInsightError.invalidNarration)
                         return
                     }
@@ -114,6 +114,8 @@ struct MarinaFoundationModelsInsightRuntime {
         Write as Marina in first person only when referring to your own assistant actions or limitations.
         The financial data belongs to the person using the app, not to you.
         Refer to the person's money, budgets, cards, income, spending, and savings as "your", not "my".
+        If the facts include a required relationship sentence, write that sentence exactly.
+        Never write "you owe me", "owe me", "my balance", "my income", "my spending", or similar ownership-inverted phrasing.
         Do not prefix the response with your name.
         Use I, me, or my instead of Marina when referring to yourself.
         Before writing, call readAnswerFacts and use only those facts.

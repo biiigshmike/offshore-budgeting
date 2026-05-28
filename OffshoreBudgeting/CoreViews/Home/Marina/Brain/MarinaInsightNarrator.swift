@@ -29,6 +29,18 @@ extension MarinaInsightNarrating {
 struct MarinaInsightContext: Equatable, Sendable {
     static let maxRows = 6
 
+    struct Perspective: Equatable, Sendable {
+        enum Direction: String, Equatable, Sendable {
+            case partyOwesUser
+            case userOwesParty
+            case settled
+        }
+
+        let partyName: String
+        let direction: Direction
+        let requiredRelationshipSentence: String
+    }
+
     struct Row: Equatable, Sendable {
         let title: String
         let value: String
@@ -45,6 +57,7 @@ struct MarinaInsightContext: Equatable, Sendable {
     let entity: MarinaSemanticEntity
     let operation: MarinaSemanticOperation
     let measure: MarinaSemanticMeasure?
+    let perspective: Perspective?
     let rows: [Row]
 
     init(
@@ -61,7 +74,7 @@ struct MarinaInsightContext: Equatable, Sendable {
         self.entity = plan.entity
         self.operation = plan.operation
         self.measure = plan.measure
-        self.rows = result.rows.prefix(Self.maxRows).map {
+        let rows = result.rows.prefix(Self.maxRows).map {
             Row(
                 title: $0.title,
                 value: $0.value,
@@ -69,6 +82,8 @@ struct MarinaInsightContext: Equatable, Sendable {
                 role: $0.role
             )
         }
+        self.rows = rows
+        self.perspective = Self.perspective(result: result, plan: plan, rows: rows)
     }
 
     var isNarratable: Bool {
@@ -93,6 +108,44 @@ struct MarinaInsightContext: Equatable, Sendable {
     private static func shortDate(_ date: Date) -> String {
         date.formatted(.dateTime.month(.abbreviated).day().year())
     }
+
+    private static func perspective(
+        result: MarinaExecutionResult,
+        plan: MarinaQueryPlan,
+        rows: [Row]
+    ) -> Perspective? {
+        guard result.kind == .metric,
+              plan.entity == .reconciliationAccount,
+              plan.measure == .reconciliationBalance,
+              plan.dateRange == nil,
+              let partyName = trimmedOptional(plan.targetName),
+              let balance = rows.first(where: { $0.title == "Balance" })?.amount else {
+            return nil
+        }
+
+        if abs(balance) < 0.005 {
+            return Perspective(
+                partyName: partyName,
+                direction: .settled,
+                requiredRelationshipSentence: "\(partyName) is settled up with you."
+            )
+        }
+
+        let amount = CurrencyFormatter.string(from: abs(balance))
+        if balance > 0 {
+            return Perspective(
+                partyName: partyName,
+                direction: .partyOwesUser,
+                requiredRelationshipSentence: "\(partyName) owes you \(amount)."
+            )
+        }
+
+        return Perspective(
+            partyName: partyName,
+            direction: .userOwesParty,
+            requiredRelationshipSentence: "You owe \(partyName) \(amount)."
+        )
+    }
 }
 
 struct MarinaAnswerFactsDigest: Equatable {
@@ -115,6 +168,14 @@ struct MarinaAnswerFactsDigest: Equatable {
         }
         if let primaryValue = context.primaryValue {
             lines.append("Primary value: \(primaryValue)")
+        }
+        lines.append("Pronoun rules: Marina may use I/me/my only for assistant actions or limitations. The user is you/your. Words like me in the prompt refer to the user, not Marina.")
+        lines.append("Ownership rules: The user's money, budgets, cards, income, spending, savings, and reconciliation balances are your/the user's, never Marina's.")
+
+        if let perspective = context.perspective {
+            lines.append("Named reconciliation party: \(perspective.partyName)")
+            lines.append("Reconciliation party pronouns: Use the party name first; use they/their only in any follow-up sentence.")
+            lines.append("Required relationship sentence: \(perspective.requiredRelationshipSentence)")
         }
 
         if context.rows.isEmpty {
@@ -163,7 +224,7 @@ enum MarinaVoiceSanitizer {
         ("my card", "Your card")
     ]
 
-    static func sanitizedFinal(_ value: String?) -> String? {
+    static func sanitizedFinal(_ value: String?, context: MarinaInsightContext? = nil) -> String? {
         let trimmed = (value ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.isEmpty == false else { return nil }
         let lowercased = trimmed.lowercased()
@@ -171,21 +232,27 @@ enum MarinaVoiceSanitizer {
         for prefix in lowercaseLabelPrefixes where lowercased.hasPrefix(prefix) {
             let index = trimmed.index(trimmed.startIndex, offsetBy: prefix.count)
             let stripped = trimmed[index...].trimmingCharacters(in: .whitespacesAndNewlines)
-            return stripped.isEmpty ? nil : stripped
+            return stripped.isEmpty ? nil : sanitizedFinal(String(stripped), context: context)
+        }
+
+        if let repaired = replacingReconciliationOwnershipInversion(in: trimmed, context: context) {
+            return repaired
         }
 
         return replacingAssistantOwnedFinancialOpening(in: trimmed)
     }
 
-    static func sanitizedStreaming(_ value: String?) -> String? {
+    static func sanitizedStreaming(_ value: String?, context: MarinaInsightContext? = nil) -> String? {
         let trimmed = (value ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.isEmpty == false else { return nil }
 
-        if isPartialNameLabel(trimmed) || isPartialAssistantOwnedFinancialOpening(trimmed) {
+        if isPartialNameLabel(trimmed)
+            || isPartialAssistantOwnedFinancialOpening(trimmed)
+            || isPartialReconciliationOwnershipInversion(trimmed, context: context) {
             return nil
         }
 
-        return sanitizedFinal(trimmed)
+        return sanitizedFinal(trimmed, context: context)
     }
 
     private static func isPartialNameLabel(_ value: String) -> Bool {
@@ -218,6 +285,58 @@ enum MarinaVoiceSanitizer {
             $0.source.hasPrefix(lowercased) && lowercased.count < $0.source.count
         }
     }
+
+    private static func replacingReconciliationOwnershipInversion(
+        in value: String,
+        context: MarinaInsightContext?
+    ) -> String? {
+        guard let perspective = context?.perspective else { return nil }
+        let lowercased = value.lowercased()
+
+        switch perspective.direction {
+        case .partyOwesUser:
+            guard lowercased.hasPrefix("you owe me")
+                    || lowercased.hasPrefix("you owe marina")
+                    || lowercased.hasPrefix("you owe us") else {
+                return nil
+            }
+            return perspective.requiredRelationshipSentence
+        case .userOwesParty:
+            guard lowercased.hasPrefix("i owe you")
+                    || lowercased.hasPrefix("marina owes you")
+                    || lowercased.hasPrefix("we owe you") else {
+                return nil
+            }
+            return perspective.requiredRelationshipSentence
+        case .settled:
+            guard lowercased.hasPrefix("you owe me")
+                    || lowercased.hasPrefix("i owe you")
+                    || lowercased.hasPrefix("marina owes you")
+                    || lowercased.hasPrefix("you owe marina") else {
+                return nil
+            }
+            return perspective.requiredRelationshipSentence
+        }
+    }
+
+    private static func isPartialReconciliationOwnershipInversion(
+        _ value: String,
+        context: MarinaInsightContext?
+    ) -> Bool {
+        guard context?.perspective != nil else { return false }
+        let lowercased = value.lowercased()
+        let wrongOpenings = [
+            "you owe me",
+            "you owe marina",
+            "you owe us",
+            "i owe you",
+            "marina owes you",
+            "we owe you"
+        ]
+        return wrongOpenings.contains {
+            $0.hasPrefix(lowercased) && lowercased.count <= $0.count
+        }
+    }
 }
 
 struct MarinaDeterministicInsightNarrator: MarinaInsightNarrating {
@@ -237,6 +356,10 @@ struct MarinaDeterministicInsightNarrator: MarinaInsightNarrating {
     }
 
     private func metricNarration(for context: MarinaInsightContext) -> String? {
+        if let perspective = context.perspective {
+            return perspective.requiredRelationshipSentence
+        }
+
         guard let primaryValue = context.primaryValue else {
             return evidenceNarration(prefix: "\(context.title) is ready to review", context: context)
         }
@@ -313,7 +436,7 @@ struct MarinaInsightNarrator: MarinaInsightNarrating {
                                 continuation.finish()
                                 return
                             }
-                            if let sanitized = MarinaVoiceSanitizer.sanitizedStreaming(partial) {
+                            if let sanitized = MarinaVoiceSanitizer.sanitizedStreaming(partial, context: context) {
                                 continuation.yield(sanitized)
                             }
                         }
@@ -358,7 +481,7 @@ struct MarinaInsightNarrator: MarinaInsightNarrating {
     ) async {
         do {
             if let fallback = try await fallbackNarrator.narration(for: context),
-               let sanitized = MarinaVoiceSanitizer.sanitizedFinal(fallback),
+               let sanitized = MarinaVoiceSanitizer.sanitizedFinal(fallback, context: context),
                Task.isCancelled == false {
                 continuation.yield(sanitized)
             }

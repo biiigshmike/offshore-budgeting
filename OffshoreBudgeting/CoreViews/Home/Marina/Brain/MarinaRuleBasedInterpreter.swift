@@ -49,15 +49,8 @@ struct MarinaRuleBasedInterpreter: MarinaModelInterpreting {
             return summaryRequest(for: summaryTarget, normalized: normalized)
         }
 
-        if containsAny(normalized, ["category availability", "category limits", "categories over", "categories near", "over category limit", "near category limit"]) {
-            return MarinaSemanticRequest(
-                entity: .category,
-                operation: .forecast,
-                measure: .categoryAvailability,
-                dimensions: [.category],
-                dateRangeToken: dateToken(for: normalized),
-                expectedAnswerShape: .metric
-            )
+        if let categoryAvailabilityRequest = categoryAvailabilityRequest(for: normalized) {
+            return categoryAvailabilityRequest
         }
 
         if containsAny(normalized, ["next planned expense", "upcoming planned expense"]) {
@@ -534,6 +527,83 @@ struct MarinaRuleBasedInterpreter: MarinaModelInterpreting {
 
     private func containsAny(_ value: String, _ needles: [String]) -> Bool {
         needles.contains { value.contains($0) }
+    }
+
+    private func categoryAvailabilityRequest(for normalized: String) -> MarinaSemanticRequest? {
+        let filter = categoryAvailabilityFilter(in: normalized)
+        let mentionsAvailabilitySummary = containsAny(normalized, [
+            "category availability",
+            "category limits",
+            "category limit"
+        ])
+        let mentionsCategoryLimitStatus = normalized.contains("categor") && filter != nil
+
+        guard mentionsAvailabilitySummary || mentionsCategoryLimitStatus else {
+            return nil
+        }
+
+        let asksForRows = filter != nil && (
+            containsAny(normalized, ["which", "list", "show", "what categories", "categories are"])
+            || firstInteger(in: normalized) != nil
+        )
+
+        if asksForRows {
+            return MarinaSemanticRequest(
+                entity: .category,
+                operation: .list,
+                measure: .categoryAvailability,
+                dimensions: [.category],
+                dateRangeToken: dateToken(for: normalized),
+                resultLimit: firstInteger(in: normalized) ?? 5,
+                categoryAvailabilityFilter: filter,
+                expectedAnswerShape: .list
+            )
+        }
+
+        return MarinaSemanticRequest(
+            entity: .category,
+            operation: .forecast,
+            measure: .categoryAvailability,
+            dimensions: [.category],
+            dateRangeToken: dateToken(for: normalized),
+            expectedAnswerShape: .metric
+        )
+    }
+
+    private func categoryAvailabilityFilter(in normalized: String) -> MarinaCategoryAvailabilityFilter? {
+        if containsAny(normalized, [
+            "over limit",
+            "over budget",
+            "over category limit",
+            "categories over",
+            "category over"
+        ]) {
+            return .over
+        }
+
+        if containsAny(normalized, [
+            "near limit",
+            "near budget",
+            "near category limit",
+            "categories near",
+            "category near"
+        ]) {
+            return .near
+        }
+
+        if containsAny(normalized, [
+            "under limit",
+            "under budget",
+            "within limit",
+            "below limit",
+            "under category limit",
+            "categories under",
+            "category under"
+        ]) {
+            return .underLimit
+        }
+
+        return nil
     }
 
     private func dateToken(for normalized: String) -> MarinaSemanticDateRangeToken {

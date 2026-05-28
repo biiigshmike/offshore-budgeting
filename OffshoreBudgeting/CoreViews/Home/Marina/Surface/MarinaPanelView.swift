@@ -509,6 +509,7 @@ struct MarinaPanelView: View {
 
         cancelResponseTask()
         isResponding = true
+        let conversationContext = MarinaConversationContext(recentAnswers: answers)
         responseTask = Task {
             let seed = await brain.answerSeed(
                 prompt: submittedPrompt,
@@ -516,7 +517,8 @@ struct MarinaPanelView: View {
                 modelContext: modelContext,
                 ambientDateRange: homeContext?.dateRange,
                 homeContext: homeContext,
-                defaultBudgetingPeriod: defaultBudgetingPeriod
+                defaultBudgetingPeriod: defaultBudgetingPeriod,
+                conversationContext: conversationContext
             )
             guard Task.isCancelled == false else { return }
             await handleAnswerSeed(seed)
@@ -617,6 +619,7 @@ struct MarinaPanelView: View {
             rows: answer.rows,
             attachment: .clarificationChoices(choices),
             explanation: answer.explanation,
+            semanticContext: answer.semanticContext,
             generatedAt: answer.generatedAt
         )
         conversationStore.saveAnswers(answers, workspaceID: workspace.id)
@@ -685,6 +688,7 @@ struct MarinaPanelView: View {
             rows: answer.rows,
             attachment: .inlineCreateForm(form),
             explanation: answer.explanation,
+            semanticContext: answer.semanticContext,
             generatedAt: answer.generatedAt
         )
         conversationStore.saveAnswers(answers, workspaceID: workspace.id)
@@ -704,6 +708,7 @@ struct MarinaPanelView: View {
             rows: rows,
             attachment: nil,
             explanation: answer.explanation,
+            semanticContext: answer.semanticContext,
             generatedAt: answer.generatedAt
         )
         conversationStore.saveAnswers(answers, workspaceID: workspace.id)
@@ -992,6 +997,7 @@ struct MarinaPanelView: View {
             rows: answer.rows,
             attachment: answer.attachment,
             explanation: explanation,
+            semanticContext: answer.semanticContext,
             generatedAt: answer.generatedAt
         )
         answerUpdateTick += 1

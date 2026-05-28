@@ -12,8 +12,29 @@ struct MarinaSemanticPromptSuiteTests {
         let operation: MarinaSemanticOperation
         let measure: MarinaSemanticMeasure?
         let shape: MarinaSemanticAnswerShape
-        let source: MarinaSemanticSource = .ruleBased
-        let confidence: MarinaSemanticConfidence = .high
+        let categoryAvailabilityFilter: MarinaCategoryAvailabilityFilter?
+        let source: MarinaSemanticSource
+        let confidence: MarinaSemanticConfidence
+
+        init(
+            prompt: String,
+            entity: MarinaSemanticEntity,
+            operation: MarinaSemanticOperation,
+            measure: MarinaSemanticMeasure?,
+            shape: MarinaSemanticAnswerShape,
+            categoryAvailabilityFilter: MarinaCategoryAvailabilityFilter? = nil,
+            source: MarinaSemanticSource = .ruleBased,
+            confidence: MarinaSemanticConfidence = .high
+        ) {
+            self.prompt = prompt
+            self.entity = entity
+            self.operation = operation
+            self.measure = measure
+            self.shape = shape
+            self.categoryAvailabilityFilter = categoryAvailabilityFilter
+            self.source = source
+            self.confidence = confidence
+        }
     }
 
     private struct AnswerCase {
@@ -60,6 +81,9 @@ struct MarinaSemanticPromptSuiteTests {
             .init(prompt: "If I spend $200 on Groceries, what happens to projected savings?", entity: .budget, operation: .whatIf, measure: .savingsTotal, shape: .comparison),
             .init(prompt: "Show my savings outlook.", entity: .savingsAccount, operation: .forecast, measure: .savingsTotal, shape: .metric),
             .init(prompt: "Show category availability.", entity: .category, operation: .forecast, measure: .categoryAvailability, shape: .metric),
+            .init(prompt: "Which 5 categories are over limit?", entity: .category, operation: .list, measure: .categoryAvailability, shape: .list, categoryAvailabilityFilter: .over),
+            .init(prompt: "Which categories are near limit?", entity: .category, operation: .list, measure: .categoryAvailability, shape: .list, categoryAvailabilityFilter: .near),
+            .init(prompt: "List categories under limit.", entity: .category, operation: .list, measure: .categoryAvailability, shape: .list, categoryAvailabilityFilter: .underLimit),
             .init(prompt: "Show category spotlight.", entity: .category, operation: .group, measure: .budgetImpact, shape: .list),
             .init(prompt: "What are my spend trends?", entity: .category, operation: .group, measure: .budgetImpact, shape: .list),
             .init(prompt: "What is my next planned expense?", entity: .plannedExpense, operation: .next, measure: .effectiveAmount, shape: .metric),
@@ -81,6 +105,7 @@ struct MarinaSemanticPromptSuiteTests {
             #expect(request.operation == testCase.operation, "Operation mismatch for \(testCase.prompt)")
             #expect(request.measure == testCase.measure, "Measure mismatch for \(testCase.prompt)")
             #expect(request.expectedAnswerShape == testCase.shape, "Shape mismatch for \(testCase.prompt)")
+            #expect(request.categoryAvailabilityFilter == testCase.categoryAvailabilityFilter, "Category availability filter mismatch for \(testCase.prompt)")
             #expect(plan.entity == testCase.entity, "Plan entity mismatch for \(testCase.prompt)")
             #expect(plan.operation == testCase.operation, "Plan operation mismatch for \(testCase.prompt)")
         }
@@ -777,6 +802,29 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(emptyMessage.isNarratable == false)
     }
 
+    @Test func insightContext_buildsReconciliationPerspectiveOnlyForAllHistoryBalance() throws {
+        let positive = reconciliationInsightContext(amount: 21.06)
+        #expect(positive.perspective?.partyName == "Alejandro")
+        #expect(positive.perspective?.direction == .partyOwesUser)
+        #expect(positive.perspective?.requiredRelationshipSentence == "Alejandro owes you \(CurrencyFormatter.string(from: 21.06)).")
+
+        let negative = reconciliationInsightContext(amount: -18.40)
+        #expect(negative.perspective?.partyName == "Alejandro")
+        #expect(negative.perspective?.direction == .userOwesParty)
+        #expect(negative.perspective?.requiredRelationshipSentence == "You owe Alejandro \(CurrencyFormatter.string(from: 18.40)).")
+
+        let zero = reconciliationInsightContext(amount: 0)
+        #expect(zero.perspective?.partyName == "Alejandro")
+        #expect(zero.perspective?.direction == .settled)
+        #expect(zero.perspective?.requiredRelationshipSentence == "Alejandro is settled up with you.")
+
+        let ranged = reconciliationInsightContext(
+            amount: 21.06,
+            dateRange: HomeQueryDateRange(startDate: date(2026, 4, 1), endDate: date(2026, 4, 30))
+        )
+        #expect(ranged.perspective == nil)
+    }
+
     @Test func insightFactsDigest_capsRowsAndUsesOnlySuppliedFacts() throws {
         let plan = MarinaQueryPlan(
             id: UUID(),
@@ -805,6 +853,18 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(digest.contains("Row 6"))
         #expect(digest.contains("Row 7") == false)
         #expect(digest.contains("Personal") == false)
+    }
+
+    @Test func insightFactsDigest_exposesPronounRulesAndRequiredReconciliationSentence() throws {
+        let context = reconciliationInsightContext(amount: 21.06)
+        let digest = MarinaAnswerFactsDigest(context: context).text()
+
+        #expect(digest.contains("Pronoun rules: Marina may use I/me/my only for assistant actions or limitations."))
+        #expect(digest.contains("Words like me in the prompt refer to the user, not Marina."))
+        #expect(digest.contains("Named reconciliation party: Alejandro"))
+        #expect(digest.contains("Reconciliation party pronouns: Use the party name first"))
+        #expect(digest.contains("Required relationship sentence: Alejandro owes you \(CurrencyFormatter.string(from: 21.06))."))
+        #expect(digest.contains("SwiftData") == false)
     }
 
     #if canImport(FoundationModels)
@@ -872,6 +932,14 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(narration?.contains("$42.00") == true)
         #expect(narration?.contains("Period room") == true)
         #expect(narration?.hasPrefix("Marina:") == false)
+    }
+
+    @Test func deterministicInsightNarrator_usesReconciliationPerspectiveSentence() async throws {
+        let context = reconciliationInsightContext(amount: 21.06)
+
+        let narration = try await MarinaDeterministicInsightNarrator().narration(for: context)
+
+        #expect(narration == "Alejandro owes you \(CurrencyFormatter.string(from: 21.06)).")
     }
 
     @Test func deterministicInsightNarrator_streamYieldsOneInstantFallback() async throws {
@@ -946,6 +1014,25 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(MarinaVoiceSanitizer.sanitizedStreaming("My read is that your income is on track.") == "My read is that your income is on track.")
     }
 
+    @Test func voiceSanitizer_repairsReconciliationOwnershipInversions() throws {
+        let positive = reconciliationInsightContext(amount: 21.06)
+        let negative = reconciliationInsightContext(amount: -18.40)
+
+        #expect(MarinaVoiceSanitizer.sanitizedFinal("You owe me \(CurrencyFormatter.string(from: 21.06)).", context: positive) == "Alejandro owes you \(CurrencyFormatter.string(from: 21.06)).")
+        #expect(MarinaVoiceSanitizer.sanitizedFinal("I owe you \(CurrencyFormatter.string(from: 18.40)).", context: negative) == "You owe Alejandro \(CurrencyFormatter.string(from: 18.40)).")
+        #expect(MarinaVoiceSanitizer.sanitizedFinal("Alejandro owes you \(CurrencyFormatter.string(from: 21.06)).", context: positive) == "Alejandro owes you \(CurrencyFormatter.string(from: 21.06)).")
+        #expect(MarinaVoiceSanitizer.sanitizedFinal("I can check your balance again.", context: positive) == "I can check your balance again.")
+    }
+
+    @Test func voiceSanitizer_suppressesPartialReconciliationOwnershipInversions() throws {
+        let context = reconciliationInsightContext(amount: 21.06)
+
+        #expect(MarinaVoiceSanitizer.sanitizedStreaming("You owe", context: context) == nil)
+        #expect(MarinaVoiceSanitizer.sanitizedStreaming("You owe me", context: context) == nil)
+        #expect(MarinaVoiceSanitizer.sanitizedStreaming("You owe me \(CurrencyFormatter.string(from: 21.06)).", context: context) == "Alejandro owes you \(CurrencyFormatter.string(from: 21.06)).")
+        #expect(MarinaVoiceSanitizer.sanitizedStreaming("Alejandro owes you \(CurrencyFormatter.string(from: 21.06)).", context: context) == "Alejandro owes you \(CurrencyFormatter.string(from: 21.06)).")
+    }
+
     @Test func insightNarrator_modelStreamStripsLeadingNameLabel() async throws {
         let context = insightContext(
             kind: .metric,
@@ -964,6 +1051,21 @@ struct MarinaSemanticPromptSuiteTests {
         let values = try await collect(narrator.narrationStream(for: context))
 
         #expect(values == ["I see your safe spend."])
+    }
+
+    @Test func insightNarrator_modelStreamRepairsReconciliationOwnershipInversion() async throws {
+        let context = reconciliationInsightContext(amount: 21.06)
+        let narrator = MarinaInsightNarrator(modelStreamProvider: { _ in
+            AsyncThrowingStream { continuation in
+                continuation.yield("You owe")
+                continuation.yield("You owe me \(CurrencyFormatter.string(from: 21.06)).")
+                continuation.finish()
+            }
+        })
+
+        let values = try await collect(narrator.narrationStream(for: context))
+
+        #expect(values == ["Alejandro owes you \(CurrencyFormatter.string(from: 21.06))."])
     }
 
     @Test func brain_addsInsightToSuccessfulAnswersAndSkipsTerminalAnswers() async throws {
@@ -1198,6 +1300,239 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(answer.primaryValue == CurrencyFormatter.string(from: 1_370))
     }
 
+    @Test func categoryAvailabilityList_returnsFilteredOverCategories() async throws {
+        let fixture = try makeFixture(includeTransportationCategory: true)
+        try addCategoryAvailabilityListScenario(to: fixture)
+        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let expected = try expectedCategoryAvailabilityNames(fixture: fixture, filter: .over, limit: 5)
+
+        let answer = await answer("Which 5 categories are over limit?", using: brain, fixture: fixture)
+
+        #expect(answer.kind == .list)
+        #expect(answer.title == "Categories Over Limit")
+        #expect(answer.rows.map(\.title) == expected)
+        #expect(answer.rows.allSatisfy { $0.objectType == .category })
+        #expect(answer.rows.allSatisfy { $0.value.contains("Over") && $0.value.contains("Spent") })
+    }
+
+    @Test func categoryAvailabilityList_returnsNearAndUnderLimitCategories() async throws {
+        let fixture = try makeFixture(includeTransportationCategory: true)
+        try addCategoryAvailabilityListScenario(to: fixture)
+        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+
+        let near = await answer("Which categories are near limit?", using: brain, fixture: fixture)
+        let expectedNear = try expectedCategoryAvailabilityNames(fixture: fixture, filter: .near, limit: 5)
+        #expect(near.kind == .list)
+        #expect(near.title == "Categories Near Limit")
+        #expect(near.rows.map(\.title) == expectedNear)
+
+        let under = await answer("List categories under limit.", using: brain, fixture: fixture)
+        let expectedUnder = try expectedCategoryAvailabilityNames(fixture: fixture, filter: .underLimit, limit: 5)
+        #expect(under.kind == .list)
+        #expect(under.title == "Categories Under Limit")
+        #expect(under.rows.map(\.title) == expectedUnder)
+        #expect(under.rows.contains(where: { $0.title == "Health" }))
+        #expect(under.rows.contains(where: { $0.title == "Books" }))
+    }
+
+    @Test func categoryAvailabilityFollowUp_usesPreviousAvailabilityAnswer() async throws {
+        let fixture = try makeFixture(includeTransportationCategory: true)
+        try addCategoryAvailabilityListScenario(to: fixture)
+        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let summary = await answer("Show category availability.", using: brain, fixture: fixture)
+        let context = MarinaConversationContext(recentAnswers: [summary])
+
+        let followUp = await answer(
+            "Which 5 are over limit?",
+            using: brain,
+            fixture: fixture,
+            conversationContext: context
+        )
+
+        #expect(summary.title == "Category Availability")
+        let expected = try expectedCategoryAvailabilityNames(fixture: fixture, filter: .over, limit: 5)
+        #expect(followUp.kind == .list)
+        #expect(followUp.title == "Categories Over Limit")
+        #expect(followUp.rows.map(\.title) == expected)
+    }
+
+    @Test func semanticContext_persistsAndSurvivesStreamingNarrationReplacement() async throws {
+        let fixture = try makeFixture()
+        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let seed = await brain.answerSeed(
+            prompt: "Summarize my Apple Card.",
+            workspace: fixture.workspace,
+            modelContext: fixture.context,
+            ambientDateRange: fixture.currentRange,
+            homeContext: MarinaPanelHomeContext(dateRange: fixture.currentRange),
+            defaultBudgetingPeriod: .monthly,
+            now: fixture.now
+        )
+
+        let context = try #require(seed.answer.semanticContext)
+        #expect(context.request.entity == .card)
+        #expect(context.request.targetName == "Apple Card")
+        #expect(context.answerTitle == "Apple Card Spend")
+        #expect(context.rowReferences.contains(where: { $0.title == "Variable" }))
+
+        let streamed = brain.completedAnswer(from: seed, streamingNarration: "Apple Card is the largest card this period.")
+        #expect(streamed.semanticContext == seed.answer.semanticContext)
+
+        let suiteName = "MarinaSemanticPromptSuiteTests.semanticContext"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = MarinaConversationStore(userDefaults: defaults, storageKeyPrefix: "tests.marina.semanticContext")
+        store.saveAnswers([streamed], workspaceID: fixture.workspace.id)
+
+        let loaded = try #require(store.loadAnswers(workspaceID: fixture.workspace.id).first)
+        #expect(loaded.semanticContext == streamed.semanticContext)
+        #expect(MarinaConversationContext(recentAnswers: [loaded]).lastSemanticContext == streamed.semanticContext)
+    }
+
+    @Test func followUpResolver_drillsDownAndCorrectsCardAnswers() async throws {
+        let fixture = try makeFixture()
+        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let summary = await answer("Summarize my Apple Card.", using: brain, fixture: fixture)
+        let context = MarinaConversationContext(recentAnswers: [summary])
+
+        let largest = await answer("show largest 2", using: brain, fixture: fixture, conversationContext: context)
+        #expect(largest.kind == .list)
+        #expect(largest.title == "Apple Card Expenses")
+        #expect(Array(largest.rows.map(\.title).prefix(2)) == ["Rent", "Phone"])
+        #expect(Array(largest.rows.map(\.objectType).prefix(2)) == [.plannedExpense, .plannedExpense])
+
+        let chase = await answer("what about Chase?", using: brain, fixture: fixture, conversationContext: context)
+        #expect(chase.kind == .metric)
+        #expect(chase.title == "Chase Spend")
+
+        let appleStore = await answer("not Apple Card, Apple Store", using: brain, fixture: fixture, conversationContext: context)
+        #expect(appleStore.kind == .metric)
+        #expect(appleStore.title == "Apple Store Spend")
+        #expect(appleStore.primaryValue == CurrencyFormatter.string(from: 300))
+    }
+
+    @Test func followUpResolver_drillsFromCategoryAvailabilityIntoCategoryTransactions() async throws {
+        let fixture = try makeFixture()
+        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let availability = await answer("Show category availability.", using: brain, fixture: fixture)
+        let context = MarinaConversationContext(recentAnswers: [availability])
+
+        let dining = await answer("show Dining transactions", using: brain, fixture: fixture, conversationContext: context)
+
+        #expect(dining.kind == .list)
+        #expect(dining.title == "Dining Expenses")
+        #expect(dining.rows.map(\.title).contains("Starbucks"))
+    }
+
+    @Test func followUpResolver_refinesExpenseIncomeSavingsReconciliationAndPresetAnswers() async throws {
+        let fixture = try makeFixture()
+        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+
+        let targetSpend = await answer("Target spend", using: brain, fixture: fixture)
+        let targetDetails = await answer(
+            "show details",
+            using: brain,
+            fixture: fixture,
+            conversationContext: MarinaConversationContext(recentAnswers: [targetSpend])
+        )
+        #expect(targetDetails.kind == .list)
+        #expect(targetDetails.rows.contains(where: { $0.title == "Target groceries" }))
+
+        let incomeProgress = await answer("How is income progress?", using: brain, fixture: fixture)
+        let paycheckLastMonth = await answer(
+            "actual only for Paycheck last month",
+            using: brain,
+            fixture: fixture,
+            conversationContext: MarinaConversationContext(recentAnswers: [incomeProgress])
+        )
+        #expect(paycheckLastMonth.kind == .metric)
+        #expect(paycheckLastMonth.title == "Paycheck Actual Income")
+        #expect(paycheckLastMonth.primaryValue == CurrencyFormatter.string(from: 2_800))
+
+        let savings = await answer("Summarize my Savings Account.", using: brain, fixture: fixture)
+        let savingsLastMonth = await answer(
+            "last month",
+            using: brain,
+            fixture: fixture,
+            conversationContext: MarinaConversationContext(recentAnswers: [savings])
+        )
+        #expect(savingsLastMonth.title == "Savings Status")
+
+        let reconciliation = await answer("Alejandro balance", using: brain, fixture: fixture)
+        let previousReconciliation = await answer(
+            "last month",
+            using: brain,
+            fixture: fixture,
+            conversationContext: MarinaConversationContext(recentAnswers: [reconciliation])
+        )
+        #expect(previousReconciliation.kind == .metric)
+        #expect(previousReconciliation.title == "Alejandro Balance")
+        #expect(previousReconciliation.primaryValue == CurrencyFormatter.string(from: 20))
+
+        let preset = await answer("Summarize my Phone preset.", using: brain, fixture: fixture)
+        let rentPreset = await answer(
+            "what about Rent?",
+            using: brain,
+            fixture: fixture,
+            conversationContext: MarinaConversationContext(recentAnswers: [preset])
+        )
+        #expect(rentPreset.kind == .metric)
+        #expect(rentPreset.title == "Rent Preset")
+    }
+
+    @Test func followUpResolver_comparisonDriversAndAmbiguousCorrectionsStayDeterministic() async throws {
+        let fixture = try makeFixture(includeAppleMerchantExpense: true)
+        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+
+        let comparison = await answer("Compare this budget period to last period.", using: brain, fixture: fixture)
+        let drivers = await answer(
+            "what drove the increase?",
+            using: brain,
+            fixture: fixture,
+            conversationContext: MarinaConversationContext(recentAnswers: [comparison])
+        )
+        #expect(comparison.kind == .comparison)
+        #expect(drivers.kind == .list)
+        #expect(drivers.rows.isEmpty == false)
+
+        let clarification = await answer("How much did I spend on Apple?", using: brain, fixture: fixture)
+        let stillClarifies = await answer(
+            "I meant Apple",
+            using: brain,
+            fixture: fixture,
+            conversationContext: MarinaConversationContext(recentAnswers: [clarification])
+        )
+        #expect(clarification.title == "Can you clarify?")
+        #expect(stillClarifies.title == "Can you clarify?")
+        guard case .clarificationChoices(let choices)? = stillClarifies.attachment else {
+            Issue.record("Expected Apple ambiguity to stay a clarification.")
+            return
+        }
+        #expect(choices.choices.map(\.title).contains("Apple Store"))
+        #expect(choices.choices.map(\.title).contains("Apple Card"))
+    }
+
+    @Test func categoryAvailabilityList_emptyStatesAreSpecific() async throws {
+        let fixture = try makeFixture()
+        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let may = HomeQueryDateRange(startDate: date(2026, 5, 1), endDate: date(2026, 5, 31))
+
+        let noBudget = await answer(
+            "Which categories are over limit?",
+            using: brain,
+            fixture: fixture,
+            homeContext: MarinaPanelHomeContext(dateRange: may)
+        )
+        #expect(noBudget.kind == .message)
+        #expect(noBudget.title == "Categories Over Limit")
+        #expect(noBudget.subtitle == "No budget overlaps May 2026.")
+
+        let noOver = await answer("Which categories are over limit?", using: brain, fixture: fixture)
+        #expect(noOver.kind == .message)
+        #expect(noOver.title == "Categories Over Limit")
+        #expect(noOver.subtitle == "No categories are over limit for April 2026.")
+    }
+
     @Test func safeSpendWhatIf_uncappedCategoriesUseBaseRoom() async throws {
         let fixture = try makeFixture(includeAppleMerchantExpense: false)
         let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
@@ -1272,7 +1607,8 @@ struct MarinaSemanticPromptSuiteTests {
         _ prompt: String,
         using brain: MarinaBrain,
         fixture: Fixture,
-        homeContext: MarinaPanelHomeContext? = nil
+        homeContext: MarinaPanelHomeContext? = nil,
+        conversationContext: MarinaConversationContext = MarinaConversationContext()
     ) async -> HomeAnswer {
         let resolvedHomeContext = homeContext ?? MarinaPanelHomeContext(dateRange: fixture.currentRange)
         return await brain.answer(
@@ -1282,6 +1618,7 @@ struct MarinaSemanticPromptSuiteTests {
             ambientDateRange: fixture.currentRange,
             homeContext: resolvedHomeContext,
             defaultBudgetingPeriod: .monthly,
+            conversationContext: conversationContext,
             now: fixture.now
         )
     }
@@ -1302,6 +1639,116 @@ struct MarinaSemanticPromptSuiteTests {
             defaultBudgetingPeriod: .monthly,
             now: fixture.now
         )
+    }
+
+    private func addCategoryAvailabilityListScenario(to fixture: Fixture) throws {
+        let snapshot = try MarinaWorkspaceSnapshotProvider().snapshot(
+            for: fixture.workspace,
+            modelContext: fixture.context,
+            homeContext: MarinaPanelHomeContext(dateRange: fixture.currentRange),
+            now: fixture.now
+        )
+        let budget = try #require(snapshot.budgets.first(where: { $0.name == "April 2026" }))
+        let groceries = try #require(snapshot.categories.first(where: { $0.name == "Groceries" }))
+        let dining = try #require(snapshot.categories.first(where: { $0.name == "Dining" }))
+        let bills = try #require(snapshot.categories.first(where: { $0.name == "Bills" }))
+        let transportation = try #require(snapshot.categories.first(where: { $0.name == "Transportation" }))
+
+        let travel = Category(name: "Travel", hexColor: "#7C3AED", workspace: fixture.workspace)
+        let health = Category(name: "Health", hexColor: "#DB2777", workspace: fixture.workspace)
+        let books = Category(name: "Books", hexColor: "#CA8A04", workspace: fixture.workspace)
+        let travelPlan = PlannedExpense(
+            title: "Weekend Trip",
+            plannedAmount: 75,
+            expenseDate: date(2026, 4, 16),
+            workspace: fixture.workspace,
+            category: travel
+        )
+        let healthPlan = PlannedExpense(
+            title: "Prescription",
+            plannedAmount: 95,
+            expenseDate: date(2026, 4, 17),
+            workspace: fixture.workspace,
+            category: health
+        )
+        let booksPlan = PlannedExpense(
+            title: "Bookstore",
+            plannedAmount: 40,
+            expenseDate: date(2026, 4, 18),
+            workspace: fixture.workspace,
+            category: books
+        )
+
+        fixture.context.insert(travel)
+        fixture.context.insert(health)
+        fixture.context.insert(books)
+        fixture.context.insert(travelPlan)
+        fixture.context.insert(healthPlan)
+        fixture.context.insert(booksPlan)
+
+        setLimit(100, for: groceries, in: budget, context: fixture.context)
+        setLimit(20, for: dining, in: budget, context: fixture.context)
+        setLimit(1_000, for: bills, in: budget, context: fixture.context)
+        setLimit(20, for: transportation, in: budget, context: fixture.context)
+        setLimit(50, for: travel, in: budget, context: fixture.context)
+        setLimit(100, for: health, in: budget, context: fixture.context)
+        setLimit(100, for: books, in: budget, context: fixture.context)
+
+        try fixture.context.save()
+    }
+
+    private func setLimit(
+        _ maxAmount: Double,
+        for category: Offshore.Category,
+        in budget: Budget,
+        context: ModelContext
+    ) {
+        if let existing = budget.categoryLimits?.first(where: { $0.category?.id == category.id }) {
+            existing.maxAmount = maxAmount
+            return
+        }
+
+        let limit = BudgetCategoryLimit(minAmount: 0, maxAmount: maxAmount, budget: budget, category: category)
+        budget.categoryLimits = (budget.categoryLimits ?? []) + [limit]
+        context.insert(limit)
+    }
+
+    private func expectedCategoryAvailabilityNames(
+        fixture: Fixture,
+        filter: MarinaCategoryAvailabilityFilter,
+        limit: Int
+    ) throws -> [String] {
+        let snapshot = try MarinaWorkspaceSnapshotProvider().snapshot(
+            for: fixture.workspace,
+            modelContext: fixture.context,
+            homeContext: MarinaPanelHomeContext(dateRange: fixture.currentRange),
+            now: fixture.now
+        )
+        let result = HomeCategoryLimitsAggregator.build(
+            budgets: snapshot.budgets,
+            categories: snapshot.categories,
+            plannedExpenses: snapshot.homeCalculationPlannedExpenses,
+            variableExpenses: snapshot.homeCalculationVariableExpenses,
+            rangeStart: fixture.currentRange.startDate,
+            rangeEnd: fixture.currentRange.endDate
+        )
+
+        return result.metrics
+            .filter { metric in
+                let status = metric.status(for: .all, nearThreshold: HomeCategoryLimitsAggregator.defaultNearThreshold)
+                switch filter {
+                case .all:
+                    return true
+                case .over:
+                    return metric.isLimited && status == .over
+                case .near:
+                    return metric.isLimited && status == .near
+                case .underLimit:
+                    return metric.isLimited && status != .over
+                }
+            }
+            .prefix(limit)
+            .map(\.name)
     }
 
     private func brainContext(_ fixture: Fixture) -> MarinaBrainContext {
@@ -1339,6 +1786,42 @@ struct MarinaSemanticPromptSuiteTests {
                 title: title,
                 primaryValue: primaryValue,
                 rows: rows
+            ),
+            plan: plan
+        )
+    }
+
+    private func reconciliationInsightContext(
+        amount: Double,
+        dateRange: HomeQueryDateRange? = nil
+    ) -> MarinaInsightContext {
+        let plan = MarinaQueryPlan(
+            id: UUID(),
+            semanticRequest: MarinaSemanticRequest(
+                entity: .reconciliationAccount,
+                operation: .sum,
+                measure: .reconciliationBalance,
+                targetName: "Alejandro",
+                expectedAnswerShape: .metric
+            ),
+            dateRange: dateRange,
+            comparisonDateRange: nil,
+            now: date(2026, 4, 20)
+        )
+        return MarinaInsightContext(
+            prompt: "What does Alejandro owe me?",
+            result: MarinaExecutionResult(
+                kind: .metric,
+                title: "Alejandro Balance",
+                subtitle: dateRange == nil ? "Current outstanding balance across all history" : "Apr 1, 2026 - Apr 30, 2026",
+                primaryValue: CurrencyFormatter.string(from: amount),
+                rows: [
+                    HomeAnswerRow(
+                        title: "Balance",
+                        value: CurrencyFormatter.string(from: amount),
+                        amount: amount
+                    )
+                ]
             ),
             plan: plan
         )

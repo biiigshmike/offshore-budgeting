@@ -238,6 +238,7 @@ struct HomeAnswer: Identifiable, Codable, Equatable {
     let rows: [HomeAnswerRow]
     let attachment: MarinaAttachment?
     let explanation: String?
+    let semanticContext: MarinaAnswerSemanticContext?
     let generatedAt: Date
 
     init(
@@ -251,6 +252,7 @@ struct HomeAnswer: Identifiable, Codable, Equatable {
         rows: [HomeAnswerRow] = [],
         attachment: MarinaAttachment? = nil,
         explanation: String? = nil,
+        semanticContext: MarinaAnswerSemanticContext? = nil,
         generatedAt: Date = Date()
     ) {
         self.id = id
@@ -263,6 +265,7 @@ struct HomeAnswer: Identifiable, Codable, Equatable {
         self.rows = rows
         self.attachment = attachment
         self.explanation = explanation
+        self.semanticContext = semanticContext
         self.generatedAt = generatedAt
     }
 
@@ -277,6 +280,7 @@ struct HomeAnswer: Identifiable, Codable, Equatable {
         case rows
         case attachment
         case explanation
+        case semanticContext
         case generatedAt
     }
 
@@ -292,6 +296,7 @@ struct HomeAnswer: Identifiable, Codable, Equatable {
         rows = try container.decodeIfPresent([HomeAnswerRow].self, forKey: .rows) ?? []
         attachment = try? container.decodeIfPresent(MarinaAttachment.self, forKey: .attachment)
         explanation = try container.decodeIfPresent(String.self, forKey: .explanation)
+        semanticContext = try? container.decodeIfPresent(MarinaAnswerSemanticContext.self, forKey: .semanticContext)
         generatedAt = try container.decodeIfPresent(Date.self, forKey: .generatedAt) ?? Date()
     }
 
@@ -307,6 +312,7 @@ struct HomeAnswer: Identifiable, Codable, Equatable {
         try container.encode(rows, forKey: .rows)
         try container.encodeIfPresent(attachment, forKey: .attachment)
         try container.encodeIfPresent(explanation, forKey: .explanation)
+        try container.encodeIfPresent(semanticContext, forKey: .semanticContext)
         try container.encode(generatedAt, forKey: .generatedAt)
     }
 }

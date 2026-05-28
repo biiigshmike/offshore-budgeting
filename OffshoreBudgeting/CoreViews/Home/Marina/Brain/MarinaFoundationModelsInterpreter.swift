@@ -45,6 +45,9 @@ fileprivate struct MarinaGeneratedSemanticRequest {
     @Guide(description: "A virtual spend amount for what-if spending prompts. Leave empty unless the user provides a numeric spend amount.")
     var whatIfAmount: Double?
 
+    @Guide(description: "Category availability list filter: all, over, near, or underLimit. Use only with measure categoryAvailability.")
+    var categoryAvailabilityFilter: String?
+
     @Guide(description: "Expected answer shape: metric, list, comparison, clarification, unsupported.")
     var expectedAnswerShape: String
 
@@ -98,10 +101,13 @@ struct MarinaFoundationModelsInterpreter: MarinaModelInterpreting {
         Convert the user's message into one compact semantic request.
         Do not calculate money. Do not invent records. Do not mutate data.
         Preserve raw target words and let Marina resolve aliases, singular/plural forms, workspace records, and ambiguity.
+        Marina may resolve short follow-up phrases from deterministic local conversation context before this model interpreter runs; if a follow-up reaches you, interpret only the visible prompt and do not assume hidden financial state.
         Use currentPeriod when the user says this period, current period, or gives no date.
         Use currentMonth when the user says this month. Use previousMonth when the user says last month.
         Treat merchant/store/vendor wording as expense title/description text, not a separate stored entity.
         Treat Home metric terms as semantic requests: safe spend means remainingRoom; savings outlook or projected savings means savingsTotal forecast; actual savings means savings status for the current period; income progress means actual-to-planned income share; category availability means categoryAvailability; category spotlight means grouped category spend; spend trends means grouped category spend over date buckets; next planned expense means plannedExpense next; card summary means card budgetImpact.
+        For "show category availability", use entity category, operation forecast, measure categoryAvailability, and expectedAnswerShape metric.
+        For "which/list/show categories are over/near/under limit" requests, use entity category, operation list, measure categoryAvailability, expectedAnswerShape list, and set categoryAvailabilityFilter to over, near, or underLimit. Preserve requested list limits.
         For safe spend, can I spend, remaining room, or budget room, use entity budget and measure remainingRoom.
         For "what if I spend $X" safe-spend questions, use operation whatIf, measure remainingRoom, expectedAnswerShape comparison, and set whatIfAmount.
         Do not calculate safe spend, category cap room, split ownership, or category availability; deterministic Home calculators handle those details.
@@ -140,6 +146,7 @@ struct MarinaFoundationModelsInterpreter: MarinaModelInterpreting {
             expenseScope: expenseScope,
             incomeState: incomeState,
             whatIfAmount: generated.whatIfAmount,
+            categoryAvailabilityFilter: generated.categoryAvailabilityFilter.flatMap(MarinaCategoryAvailabilityFilter.init(rawValue:)),
             expectedAnswerShape: answerShape,
             clarificationQuestion: normalizedOptional(generated.clarificationQuestion),
             unsupportedReason: unsupportedReason

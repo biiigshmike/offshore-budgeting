@@ -134,6 +134,10 @@ struct MarinaQueryExecutor {
 
     private func categoryResult(plan: MarinaQueryPlan, snapshot: MarinaWorkspaceSnapshot) -> MarinaExecutionResult {
         if plan.measure == .categoryAvailability {
+            if plan.operation == .list {
+                return categoryAvailabilityListResult(plan: plan, snapshot: snapshot)
+            }
+
             return executionResult(
                 from: homeAnswer(
                     query: HomeQuery(intent: .categoryAvailabilitySummary, dateRange: plan.dateRange),
@@ -391,6 +395,40 @@ struct MarinaQueryExecutor {
             )
         }
 
+        if plan.operation == .list {
+            let rows = sortedIncomes(
+                snapshot.incomes
+                    .filter { contains($0.date, in: plan.dateRange) }
+                    .filter { income in
+                        switch plan.semanticRequest.incomeState ?? .all {
+                        case .planned:
+                            return income.isPlanned
+                        case .actual:
+                            return income.isPlanned == false
+                        case .all:
+                            return true
+                        }
+                    }
+                    .filter { income in
+                        guard let source = plan.targetName else { return true }
+                        return normalize(income.source) == normalize(source)
+                    },
+                sort: plan.semanticRequest.sort
+            )
+            .prefix(plan.resultLimit)
+            .map { income in
+                HomeAnswerRow(
+                    title: income.source,
+                    value: "\(currency(income.amount)) • \(shortDate(income.date)) • \(income.isPlanned ? "Planned" : "Actual")",
+                    sourceID: income.id,
+                    objectType: .income,
+                    amount: income.amount,
+                    date: income.date
+                )
+            }
+            return listResult(title: "Income", subtitle: rangeLabel(plan.dateRange), rows: rows)
+        }
+
         let total = incomeTotal(snapshot.incomes, range: plan.dateRange, state: plan.semanticRequest.incomeState ?? .all, source: plan.targetName)
         return MarinaExecutionResult(
             kind: .metric,
@@ -577,14 +615,14 @@ struct MarinaQueryExecutor {
             return expenseTextNoResultsResult(textQuery: textQuery, plan: plan, snapshot: snapshot)
         }
 
-        let answerRows = rows
-            .sorted { $0.date > $1.date }
+        let answerRows = sortedExpenseRows(rows, sort: plan.semanticRequest.sort)
             .prefix(plan.resultLimit)
             .map { row in
                 HomeAnswerRow(
                     title: row.title,
                     value: "\(currency(row.budgetImpact)) • \(shortDate(row.date))",
                     sourceID: row.id,
+                    objectType: row.objectType,
                     amount: row.budgetImpact,
                     date: row.date
                 )
@@ -866,6 +904,7 @@ struct MarinaQueryExecutor {
         let title: String
         let date: Date
         let budgetImpact: Double
+        let objectType: MarinaLookupObjectType
         let cardID: UUID?
         let categoryID: UUID?
         let reconciliationAccountID: UUID?
@@ -887,6 +926,7 @@ struct MarinaQueryExecutor {
                         title: expense.title,
                         date: expense.expenseDate,
                         budgetImpact: SavingsMathService.plannedBudgetImpactAmount(for: expense),
+                        objectType: .plannedExpense,
                         cardID: expense.card?.id,
                         categoryID: expense.category?.id,
                         reconciliationAccountID: expense.allocation?.account?.id,
@@ -904,6 +944,7 @@ struct MarinaQueryExecutor {
                         title: expense.descriptionText,
                         date: expense.transactionDate,
                         budgetImpact: SavingsMathService.variableBudgetImpactAmount(for: expense),
+                        objectType: .variableExpense,
                         cardID: expense.card?.id,
                         categoryID: expense.category?.id,
                         reconciliationAccountID: expense.allocation?.account?.id,
@@ -914,6 +955,189 @@ struct MarinaQueryExecutor {
         }
 
         return rows
+    }
+
+    private func sortedExpenseRows(_ rows: [ExpenseRow], sort: MarinaSemanticSort?) -> [ExpenseRow] {
+        switch sort ?? .dateDescending {
+        case .amountAscending:
+            return rows.sorted { left, right in
+                if left.budgetImpact != right.budgetImpact { return left.budgetImpact < right.budgetImpact }
+                return left.date > right.date
+            }
+        case .amountDescending:
+            return rows.sorted { left, right in
+                if left.budgetImpact != right.budgetImpact { return left.budgetImpact > right.budgetImpact }
+                return left.date > right.date
+            }
+        case .dateAscending:
+            return rows.sorted { $0.date < $1.date }
+        case .dateDescending:
+            return rows.sorted { $0.date > $1.date }
+        case .nameAscending:
+            return rows.sorted { left, right in
+                let ordered = left.title.localizedCaseInsensitiveCompare(right.title)
+                if ordered != .orderedSame { return ordered == .orderedAscending }
+                return left.date > right.date
+            }
+        }
+    }
+
+    private func sortedIncomes(_ incomes: [Income], sort: MarinaSemanticSort?) -> [Income] {
+        switch sort ?? .dateDescending {
+        case .amountAscending:
+            return incomes.sorted { left, right in
+                if left.amount != right.amount { return left.amount < right.amount }
+                return left.date > right.date
+            }
+        case .amountDescending:
+            return incomes.sorted { left, right in
+                if left.amount != right.amount { return left.amount > right.amount }
+                return left.date > right.date
+            }
+        case .dateAscending:
+            return incomes.sorted { $0.date < $1.date }
+        case .dateDescending:
+            return incomes.sorted { $0.date > $1.date }
+        case .nameAscending:
+            return incomes.sorted { left, right in
+                let ordered = left.source.localizedCaseInsensitiveCompare(right.source)
+                if ordered != .orderedSame { return ordered == .orderedAscending }
+                return left.date > right.date
+            }
+        }
+    }
+
+    private func categoryAvailabilityListResult(plan: MarinaQueryPlan, snapshot: MarinaWorkspaceSnapshot) -> MarinaExecutionResult {
+        let range = categoryAvailabilityRange(for: plan)
+        let result = HomeCategoryLimitsAggregator.build(
+            budgets: snapshot.budgets,
+            categories: snapshot.categories,
+            plannedExpenses: snapshot.homeCalculationPlannedExpenses,
+            variableExpenses: snapshot.homeCalculationVariableExpenses,
+            rangeStart: range.startDate,
+            rangeEnd: range.endDate
+        )
+        let period = categoryAvailabilityPeriodLabel(range)
+
+        guard result.activeBudget != nil else {
+            return MarinaExecutionResult(
+                kind: .message,
+                title: categoryAvailabilityTitle(for: plan.categoryAvailabilityFilter),
+                subtitle: "No budget overlaps \(period).",
+                rows: [
+                    HomeAnswerRow(title: "Period", value: period)
+                ]
+            )
+        }
+
+        guard result.metrics.isEmpty == false else {
+            return MarinaExecutionResult(
+                kind: .message,
+                title: categoryAvailabilityTitle(for: plan.categoryAvailabilityFilter),
+                subtitle: "No categories found for \(period).",
+                rows: [
+                    HomeAnswerRow(title: "Period", value: period)
+                ]
+            )
+        }
+
+        let filter = plan.categoryAvailabilityFilter ?? .all
+        let rows = result.metrics
+            .filter { categoryAvailabilityMetric($0, matches: filter) }
+            .prefix(plan.resultLimit)
+            .map { categoryAvailabilityRow(for: $0) }
+
+        guard rows.isEmpty == false else {
+            return MarinaExecutionResult(
+                kind: .message,
+                title: categoryAvailabilityTitle(for: filter),
+                subtitle: "No categories are \(categoryAvailabilityEmptyStatePhrase(for: filter)) for \(period).",
+                rows: [
+                    HomeAnswerRow(title: "Budget", value: result.activeBudget?.name ?? "Current budget"),
+                    HomeAnswerRow(title: "Period", value: period)
+                ]
+            )
+        }
+
+        return MarinaExecutionResult(
+            kind: .list,
+            title: categoryAvailabilityTitle(for: filter),
+            subtitle: period,
+            rows: rows
+        )
+    }
+
+    private func categoryAvailabilityMetric(
+        _ metric: CategoryAvailabilityMetric,
+        matches filter: MarinaCategoryAvailabilityFilter
+    ) -> Bool {
+        let status = metric.status(for: .all, nearThreshold: HomeCategoryLimitsAggregator.defaultNearThreshold)
+        switch filter {
+        case .all:
+            return true
+        case .over:
+            return metric.isLimited && status == .over
+        case .near:
+            return metric.isLimited && status == .near
+        case .underLimit:
+            return metric.isLimited && status != .over
+        }
+    }
+
+    private func categoryAvailabilityRow(for metric: CategoryAvailabilityMetric) -> HomeAnswerRow {
+        let value: String
+        if let maxAmount = metric.maxAmount {
+            let available = metric.availableRaw(for: .all) ?? 0
+            let availability = available < 0
+                ? "Over \(currency(abs(available)))"
+                : "Remaining \(currency(available))"
+            value = "\(availability) • Spent \(currency(metric.spentTotal)) of \(currency(maxAmount))"
+        } else {
+            value = "Unlimited • Spent \(currency(metric.spentTotal))"
+        }
+
+        return HomeAnswerRow(
+            title: metric.name,
+            value: value,
+            sourceID: metric.categoryID,
+            objectType: .category,
+            amount: metric.spentTotal
+        )
+    }
+
+    private func categoryAvailabilityTitle(for filter: MarinaCategoryAvailabilityFilter?) -> String {
+        switch filter ?? .all {
+        case .all:
+            return "Category Availability"
+        case .over:
+            return "Categories Over Limit"
+        case .near:
+            return "Categories Near Limit"
+        case .underLimit:
+            return "Categories Under Limit"
+        }
+    }
+
+    private func categoryAvailabilityEmptyStatePhrase(for filter: MarinaCategoryAvailabilityFilter) -> String {
+        switch filter {
+        case .all:
+            return "available"
+        case .over:
+            return "over limit"
+        case .near:
+            return "near limit"
+        case .underLimit:
+            return "under limit"
+        }
+    }
+
+    private func categoryAvailabilityRange(for plan: MarinaQueryPlan) -> HomeQueryDateRange {
+        if let range = plan.dateRange {
+            return range
+        }
+
+        let range = BudgetingPeriod.monthly.defaultRange(containing: plan.now, calendar: calendar)
+        return HomeQueryDateRange(startDate: range.start, endDate: range.end)
     }
 
     private func filteredExpenseRows(plan: MarinaQueryPlan, snapshot: MarinaWorkspaceSnapshot) -> [ExpenseRow] {
@@ -1152,6 +1376,21 @@ struct MarinaQueryExecutor {
 
     private func rangeLabel(_ range: HomeQueryDateRange?) -> String {
         guard let range else { return "All time" }
+        return "\(shortDate(range.startDate)) - \(shortDate(range.endDate))"
+    }
+
+    private func categoryAvailabilityPeriodLabel(_ range: HomeQueryDateRange) -> String {
+        let start = calendar.startOfDay(for: range.startDate)
+        let end = calendar.startOfDay(for: range.endDate)
+        if let interval = calendar.dateInterval(of: .month, for: start) {
+            let monthStart = calendar.startOfDay(for: interval.start)
+            let monthEnd = calendar.date(byAdding: .day, value: -1, to: interval.end).map {
+                calendar.startOfDay(for: $0)
+            }
+            if start == monthStart, end == monthEnd {
+                return start.formatted(.dateTime.month(.wide).year())
+            }
+        }
         return "\(shortDate(range.startDate)) - \(shortDate(range.endDate))"
     }
 

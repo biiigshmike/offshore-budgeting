@@ -43,6 +43,13 @@ enum MarinaSemanticMeasure: String, Codable, CaseIterable, Equatable, Sendable {
     case name
 }
 
+enum MarinaCategoryAvailabilityFilter: String, Codable, CaseIterable, Equatable, Sendable {
+    case all
+    case over
+    case near
+    case underLimit
+}
+
 enum MarinaSemanticDimension: String, Codable, CaseIterable, Equatable, Sendable {
     case date
     case category
@@ -120,6 +127,7 @@ struct MarinaSemanticRequest: Codable, Equatable, Sendable {
     var expenseScope: MarinaSemanticExpenseScope?
     var incomeState: MarinaSemanticIncomeState?
     var whatIfAmount: Double?
+    var categoryAvailabilityFilter: MarinaCategoryAvailabilityFilter?
     var expectedAnswerShape: MarinaSemanticAnswerShape
     var clarificationQuestion: String?
     var unsupportedReason: MarinaSemanticUnsupportedReason?
@@ -139,6 +147,7 @@ struct MarinaSemanticRequest: Codable, Equatable, Sendable {
         expenseScope: MarinaSemanticExpenseScope? = nil,
         incomeState: MarinaSemanticIncomeState? = nil,
         whatIfAmount: Double? = nil,
+        categoryAvailabilityFilter: MarinaCategoryAvailabilityFilter? = nil,
         expectedAnswerShape: MarinaSemanticAnswerShape,
         clarificationQuestion: String? = nil,
         unsupportedReason: MarinaSemanticUnsupportedReason? = nil
@@ -157,6 +166,7 @@ struct MarinaSemanticRequest: Codable, Equatable, Sendable {
         self.expenseScope = expenseScope
         self.incomeState = incomeState
         self.whatIfAmount = whatIfAmount
+        self.categoryAvailabilityFilter = categoryAvailabilityFilter
         self.expectedAnswerShape = expectedAnswerShape
         self.clarificationQuestion = clarificationQuestion
         self.unsupportedReason = unsupportedReason
@@ -228,6 +238,7 @@ struct MarinaQueryPlan: Equatable {
     var dimensions: [MarinaSemanticDimension] { semanticRequest.dimensions }
     var targetName: String? { semanticRequest.targetName }
     var comparisonTargetName: String? { semanticRequest.comparisonTargetName }
+    var categoryAvailabilityFilter: MarinaCategoryAvailabilityFilter? { semanticRequest.categoryAvailabilityFilter }
     var resultLimit: Int { min(max(semanticRequest.resultLimit ?? 5, 1), HomeQuery.maxResultLimit) }
 }
 
@@ -256,6 +267,115 @@ struct MarinaExecutionResult: Equatable {
         self.rows = rows
         self.attachment = attachment
         self.explanation = explanation
+    }
+}
+
+struct MarinaAnswerSemanticRowReference: Codable, Equatable, Sendable {
+    let title: String
+    let value: String
+    let sourceID: UUID?
+    let objectType: MarinaLookupObjectType?
+    let amount: Double?
+    let date: Date?
+    let role: HomeAnswerRowRole
+
+    nonisolated init(row: HomeAnswerRow) {
+        self.title = row.title
+        self.value = row.value
+        self.sourceID = row.sourceID
+        self.objectType = row.objectType
+        self.amount = row.amount
+        self.date = row.date
+        self.role = row.role
+    }
+}
+
+struct MarinaAnswerSemanticContext: Codable, Equatable, Sendable {
+    static let maxRowReferences = 8
+
+    let request: MarinaSemanticRequest
+    let dateRange: HomeQueryDateRange?
+    let comparisonDateRange: HomeQueryDateRange?
+    let answerKind: HomeAnswerKind
+    let answerTitle: String
+    let answerSubtitle: String?
+    let primaryValue: String?
+    let rowReferences: [MarinaAnswerSemanticRowReference]
+
+    init(
+        request: MarinaSemanticRequest,
+        dateRange: HomeQueryDateRange?,
+        comparisonDateRange: HomeQueryDateRange?,
+        answerKind: HomeAnswerKind,
+        answerTitle: String,
+        answerSubtitle: String?,
+        primaryValue: String?,
+        rowReferences: [MarinaAnswerSemanticRowReference]
+    ) {
+        self.request = request
+        self.dateRange = dateRange
+        self.comparisonDateRange = comparisonDateRange
+        self.answerKind = answerKind
+        self.answerTitle = answerTitle
+        self.answerSubtitle = answerSubtitle
+        self.primaryValue = primaryValue
+        self.rowReferences = Array(rowReferences.prefix(Self.maxRowReferences))
+    }
+
+    init(plan: MarinaQueryPlan, result: MarinaExecutionResult) {
+        self.init(
+            request: plan.semanticRequest,
+            dateRange: plan.dateRange,
+            comparisonDateRange: plan.comparisonDateRange,
+            answerKind: result.kind,
+            answerTitle: result.title,
+            answerSubtitle: result.subtitle,
+            primaryValue: result.primaryValue,
+            rowReferences: result.rows.map(MarinaAnswerSemanticRowReference.init(row:))
+        )
+    }
+}
+
+struct MarinaConversationTurn: Equatable, Sendable {
+    let title: String
+    let kind: HomeAnswerKind
+    let subtitle: String?
+    let primaryValue: String?
+    let rowTitles: [String]
+    let semanticContext: MarinaAnswerSemanticContext?
+}
+
+struct MarinaConversationContext: Equatable, Sendable {
+    nonisolated static let empty = MarinaConversationContext()
+    nonisolated static let maxTurns = 5
+
+    let recentTurns: [MarinaConversationTurn]
+
+    nonisolated init(recentTurns: [MarinaConversationTurn] = []) {
+        self.recentTurns = Array(recentTurns.suffix(Self.maxTurns))
+    }
+
+    init(recentAnswers: [HomeAnswer]) {
+        self.init(
+            recentTurns: recentAnswers.suffix(Self.maxTurns).map { answer in
+                MarinaConversationTurn(
+                    title: answer.title,
+                    kind: answer.kind,
+                    subtitle: answer.subtitle,
+                    primaryValue: answer.primaryValue,
+                    rowTitles: answer.rows.map(\.title),
+                    semanticContext: answer.semanticContext
+                )
+            }
+        )
+    }
+
+    var lastTurn: MarinaConversationTurn? {
+        recentTurns.last
+    }
+
+    var lastSemanticContext: MarinaAnswerSemanticContext? {
+        recentTurns.reversed().compactMap(\.semanticContext).first
     }
 }
 

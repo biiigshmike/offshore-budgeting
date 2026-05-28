@@ -1,7 +1,12 @@
 import Foundation
 
 struct MarinaAnswerPresenter {
-    func present(result: MarinaExecutionResult, prompt: String?, queryID: UUID) -> HomeAnswer {
+    func present(
+        result: MarinaExecutionResult,
+        prompt: String?,
+        queryID: UUID,
+        semanticContext: MarinaAnswerSemanticContext? = nil
+    ) -> HomeAnswer {
         HomeAnswer(
             queryID: queryID,
             kind: result.kind,
@@ -11,7 +16,8 @@ struct MarinaAnswerPresenter {
             primaryValue: result.primaryValue,
             rows: result.rows,
             attachment: result.attachment,
-            explanation: result.explanation
+            explanation: result.explanation,
+            semanticContext: semanticContext
         )
     }
 }
