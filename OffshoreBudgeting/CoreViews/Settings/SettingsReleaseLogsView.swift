@@ -78,6 +78,32 @@ struct SettingsReleaseLogsView: View {
 
     static let releaseSections: [ReleaseSection] = [
         ReleaseSection(
+            version: "2.4",
+            build: "21",
+            items: [
+                ReleaseItem(
+                    systemImage: "person.fill",
+                    title: "Marina: Now Powered by Apple Intelligence",
+                    description: "Marina has finally finished her training. Try chatting with her to gain insights into your budget, expenses, income, and more. Marina requires Apple Intelligence, plus a device running iOS 26.0, iPadOS 26.0, or macOS 26.0 or later. Available in English. Look for updates with additional language support in the future."
+                ),
+                ReleaseItem(
+                    systemImage: "widget.small",
+                    title: "Two New Widgets",
+                    description: "Forecast Savings and Safe Spend Today widgets are now available for the Home Screen and Lock Screen on iOS, as well as the desktop on macOS."
+                ),
+                ReleaseItem(
+                    systemImage: "sidebar.left",
+                    title: "Quick Links",
+                    description: "Added the ability to quickly add expenses and income from the sidebar on iPad and Mac."
+                ),
+                ReleaseItem(
+                    systemImage: "chart.bar.xaxis",
+                    title: "Spend Trends",
+                    description: "The Spend Trends widget on the Home tab now supports pressing any bar in the graph to reveal expenses from that period."
+                )
+            ]
+        ),
+        ReleaseSection(
             version: "2.3.4",
             build: "20",
             items: [
