@@ -133,7 +133,7 @@ final class ShoppingModePOIResolver {
             let name = item.name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             guard !name.isEmpty else { continue }
 
-            let coordinate = item.placemark.coordinate
+            let coordinate = item.location.coordinate
             guard CLLocationCoordinate2DIsValid(coordinate) else { continue }
 
             let normalizedName = normalizeName(name)
