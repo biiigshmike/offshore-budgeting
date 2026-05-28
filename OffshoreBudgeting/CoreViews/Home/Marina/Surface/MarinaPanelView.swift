@@ -182,31 +182,40 @@ struct MarinaPanelView: View {
     }
 
     private var inputSection: some View {
-        HStack(spacing: 8) {
-            createMenu
-            promptTextField
-            Button {
-                submitPrompt()
-            } label: {
-                if isResponding {
-                    ProgressView()
-                        .controlSize(.small)
-                        .frame(width: 33, height: 33)
-                } else {
-                    Image(systemName: "paperplane.fill")
-                        .font(.subheadline.weight(.semibold))
-                        .frame(width: 33, height: 33)
-                }
-            }
-            .modifier(AssistantIconButtonModifier())
-            .disabled(trimmedPromptText.isEmpty || isResponding)
-            .accessibilityLabel(String(localized: "assistant.submitQuestion", defaultValue: "Submit Question", comment: "Accessibility label for submitting assistant question."))
-            .accessibilityIdentifier("marina.submitButton")
+        GlassEffectContainer(spacing: 8) {
+            inputControls
         }
         .padding(.horizontal, 16)
         .padding(.top, 10)
         .padding(.bottom, 10)
-        .background(.bar)
+    }
+
+    private var inputControls: some View {
+        HStack(spacing: 8) {
+            createMenu
+            promptTextField
+            submitButton
+        }
+    }
+
+    private var submitButton: some View {
+        Button {
+            submitPrompt()
+        } label: {
+            if isResponding {
+                ProgressView()
+                    .controlSize(.small)
+                    .frame(width: 33, height: 33)
+            } else {
+                Image(systemName: "paperplane.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(width: 33, height: 33)
+            }
+        }
+        .modifier(AssistantIconButtonModifier())
+        .disabled(trimmedPromptText.isEmpty || isResponding)
+        .accessibilityLabel(String(localized: "assistant.submitQuestion", defaultValue: "Submit Question", comment: "Accessibility label for submitting assistant question."))
+        .accessibilityIdentifier("marina.submitButton")
     }
 
     private var createMenu: some View {
@@ -260,15 +269,15 @@ struct MarinaPanelView: View {
 
     private var promptTextField: some View {
         TextField(String(localized: "assistant.messagePrompt", defaultValue: "Message Marina", comment: "Prompt placeholder for assistant message input."), text: $promptText)
-            .textFieldStyle(.automatic)
+            .textFieldStyle(.plain)
             .focused($isPromptFieldFocused)
-            .padding(.horizontal, 12)
+            .submitLabel(.send)
+            .padding(.horizontal, 16)
             .frame(minHeight: 44)
+            .frame(maxWidth: .infinity)
+            .glassEffect(.regular.interactive(), in: Capsule())
+            .contentShape(Capsule())
             .accessibilityIdentifier("marina.promptField")
-            .overlay {
-                Capsule()
-                    .stroke(Color.gray.opacity(0.25), lineWidth: 1)
-            }
             .onSubmit {
                 submitPrompt()
             }
@@ -1088,27 +1097,6 @@ struct MarinaPanelView: View {
     }
 }
 
-private enum AssistantPanelToolbarStyle {
-    static var usesNativeLiquidGlass: Bool {
-#if targetEnvironment(macCatalyst)
-        return false
-#elseif os(iOS)
-        guard ProcessInfo.processInfo.isiOSAppOnMac == false else {
-            return false
-        }
-
-        switch UIDevice.current.userInterfaceIdiom {
-        case .phone, .pad:
-            return true
-        default:
-            return false
-        }
-#else
-        return false
-#endif
-    }
-}
-
 private struct MarinaClarificationChoiceButton: View {
     let choice: MarinaClarificationChoice
     let isResolved: Bool
@@ -1159,48 +1147,25 @@ private struct MarinaClarificationChoiceButton: View {
 
 private struct AssistantIconButtonModifier: ViewModifier {
     func body(content: Content) -> some View {
-        if #available(iOS 26.0, *) {
-            content
-                .buttonStyle(.glassProminent)
-                .buttonBorderShape(.circle)
-        } else {
-            content
-                .buttonStyle(.borderedProminent)
-        }
+        content
+            .buttonStyle(.glassProminent)
+            .buttonBorderShape(.circle)
+            .frame(minWidth: 44, minHeight: 44)
     }
 }
 
 private struct AssistantPanelIconButtonModifier: ViewModifier {
     func body(content: Content) -> some View {
-        if #available(iOS 26.0, *), AssistantPanelToolbarStyle.usesNativeLiquidGlass {
-            content
-                .buttonStyle(.automatic)
-                .buttonBorderShape(.circle)
-        } else if #available(iOS 26.0, *) {
-            content
-                .buttonStyle(.glass)
-                .buttonBorderShape(.circle)
-        } else {
-            content
-                .buttonStyle(.bordered)
-                .buttonBorderShape(.circle)
-        }
+        content
+            .buttonStyle(.automatic)
+            .buttonBorderShape(.circle)
     }
 }
 
 private struct AssistantPanelActionButtonModifier: ViewModifier {
     func body(content: Content) -> some View {
-        if #available(iOS 26.0, *), AssistantPanelToolbarStyle.usesNativeLiquidGlass {
-            content
-                .buttonStyle(.automatic)
-                .buttonBorderShape(.capsule)
-        } else if #available(iOS 26.0, *) {
-            content
-                .buttonStyle(.glass)
-                .buttonBorderShape(.capsule)
-        } else {
-            content
-                .buttonStyle(.bordered)
-        }
+        content
+            .buttonStyle(.automatic)
+            .buttonBorderShape(.capsule)
     }
 }
