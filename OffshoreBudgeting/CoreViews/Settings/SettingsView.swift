@@ -263,7 +263,7 @@ struct SettingsView: View {
     }
 
     private func buildSectionModels() -> [SettingsSectionModel] {
-        var sections = [
+        let sections = [
             SettingsSectionModel(
                 id: "about",
                 rows: [

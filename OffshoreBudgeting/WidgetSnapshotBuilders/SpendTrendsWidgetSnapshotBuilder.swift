@@ -318,15 +318,77 @@ enum SpendTrendsWidgetSnapshotBuilder {
         var totals: [UUID?: Double] = [:]
 
         for expense in plannedExpenses {
-            let amount = SavingsMathService.plannedBudgetImpactAmount(for: expense)
+            let amount = plannedBudgetImpactAmount(for: expense)
             totals[expense.category?.id, default: 0] += amount
         }
 
         for expense in variableExpenses {
-            totals[expense.category?.id, default: 0] += SavingsMathService.variableBudgetImpactAmount(for: expense)
+            totals[expense.category?.id, default: 0] += variableBudgetImpactAmount(for: expense)
         }
 
         return totals
+    }
+
+    nonisolated private static func variableBudgetImpactAmount(for expense: VariableExpense) -> Double {
+        let kind = VariableExpenseKind(rawValue: expense.kindRaw) ?? .debit
+
+        if kind == .credit {
+            return expense.ledgerSignedAmount()
+        }
+
+        if kind == .adjustment {
+            return 0
+        }
+
+        return max(0, variableOwnedAmount(for: expense) - offsetAmount(for: expense))
+    }
+
+    nonisolated private static func plannedBudgetImpactAmount(for expense: PlannedExpense) -> Double {
+        max(0, plannedOwnedEffectiveAmount(for: expense) - offsetAmount(for: expense))
+    }
+
+    nonisolated private static func variableOwnedAmount(for expense: VariableExpense) -> Double {
+        let splitAmount = max(0, expense.allocation?.allocatedAmount ?? 0)
+        return max(0, variableGrossAmount(for: expense) - splitAmount)
+    }
+
+    nonisolated private static func plannedOwnedEffectiveAmount(for expense: PlannedExpense) -> Double {
+        let splitAmount = max(0, expense.allocation?.allocatedAmount ?? 0)
+        return max(0, plannedGrossEffectiveAmount(for: expense) - splitAmount)
+    }
+
+    nonisolated private static func variableGrossAmount(for expense: VariableExpense) -> Double {
+        let splitAmount = max(0, expense.allocation?.allocatedAmount ?? 0)
+
+        if let allocation = expense.allocation, allocation.preservesGrossAmount == false {
+            return max(0, expense.amount + splitAmount)
+        }
+
+        return max(0, expense.amount)
+    }
+
+    nonisolated private static func plannedGrossEffectiveAmount(for expense: PlannedExpense) -> Double {
+        let actual = max(0, expense.actualAmount)
+        guard actual > 0 else { return max(0, expense.plannedAmount) }
+
+        let splitAmount = max(0, expense.allocation?.allocatedAmount ?? 0)
+        if let allocation = expense.allocation, allocation.preservesGrossAmount == false {
+            return max(0, actual + splitAmount)
+        }
+
+        return actual
+    }
+
+    nonisolated private static func offsetAmount(for expense: VariableExpense) -> Double {
+        guard let entry = expense.savingsLedgerEntry else { return 0 }
+        guard entry.kindRaw == SavingsLedgerEntryKind.expenseOffset.rawValue else { return 0 }
+        return max(0, -entry.amount)
+    }
+
+    nonisolated private static func offsetAmount(for expense: PlannedExpense) -> Double {
+        guard let entry = expense.savingsLedgerEntry else { return 0 }
+        guard entry.kindRaw == SavingsLedgerEntryKind.expenseOffset.rawValue else { return 0 }
+        return max(0, -entry.amount)
     }
 
     nonisolated private static func buildCategoryLookup(

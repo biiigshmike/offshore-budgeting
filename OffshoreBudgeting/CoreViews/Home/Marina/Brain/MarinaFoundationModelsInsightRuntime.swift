@@ -17,7 +17,7 @@ struct MarinaReadAnswerFactsTool: Tool {
     }
 
     func call(arguments: Arguments) async throws -> String {
-        MarinaAnswerFactsDigest(context: context).text()
+        await MarinaAnswerFactsDigest(context: context).text()
     }
 }
 
