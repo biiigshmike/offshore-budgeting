@@ -102,6 +102,27 @@ struct HomePinnedStoresTests {
         #expect(descriptors(loaded).contains("card:\(cardID1.uuidString):\(HomeTileSize.small.rawValue)") == false)
     }
 
+    @Test func pinnedItems_importSyncSnapshot_normalizesDuplicates() throws {
+        let defaults = makeDefaults()
+        let workspaceID = UUID()
+        let cardID = UUID()
+        let store = HomePinnedItemsStore(workspaceID: workspaceID, defaults: defaults)
+
+        store.importSyncSnapshot([
+            .widget(.income, .small),
+            .widget(.income, .wide),
+            .card(cardID, .wide),
+            .card(cardID, .small)
+        ], postsNotification: false)
+
+        #expect(
+            descriptors(store.exportSyncSnapshot()) == [
+                "widget:\(HomeWidgetID.income.rawValue):\(HomeTileSize.small.rawValue)",
+                "card:\(cardID.uuidString):\(HomeTileSize.wide.rawValue)"
+            ]
+        )
+    }
+
     @Test func pinnedCards_removePinnedCardID_removesThatID() throws {
         let workspaceID = UUID()
         clearKeys(workspaceID: workspaceID)

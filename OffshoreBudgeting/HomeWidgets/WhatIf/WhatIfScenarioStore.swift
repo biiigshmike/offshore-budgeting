@@ -17,16 +17,30 @@ struct WhatIfScenarioStore {
         Notification.Name("whatIfPinnedGlobalScenariosDidChange_\(workspaceID.uuidString)")
     }
 
+    static func globalScenariosDidChangeName(workspaceID: UUID) -> Notification.Name {
+        Notification.Name("whatIfGlobalScenariosDidChange_\(workspaceID.uuidString)")
+    }
+
     // MARK: - Config
 
     private let workspaceID: UUID
     private let calendar: Calendar
     private let maxScenariosPerRange: Int
+    private let defaults: UserDefaults
+    private let syncOnMutation: Bool
 
-    init(workspaceID: UUID, calendar: Calendar = .current, maxScenariosPerRange: Int = 12) {
+    init(
+        workspaceID: UUID,
+        calendar: Calendar = .current,
+        maxScenariosPerRange: Int = 12,
+        defaults: UserDefaults = .standard,
+        syncOnMutation: Bool = true
+    ) {
         self.workspaceID = workspaceID
         self.calendar = calendar
         self.maxScenariosPerRange = max(1, maxScenariosPerRange)
+        self.defaults = defaults
+        self.syncOnMutation = syncOnMutation
     }
 
     // MARK: - Public Models
@@ -133,13 +147,13 @@ struct WhatIfScenarioStore {
 
     func loadSelectedScenarioID(startDate: Date, endDate: Date) -> UUID? {
         let rk = rangeKey(startDate: startDate, endDate: endDate)
-        guard let raw = UserDefaults.standard.string(forKey: selectedScenarioKey(rangeKey: rk)) else { return nil }
+        guard let raw = defaults.string(forKey: selectedScenarioKey(rangeKey: rk)) else { return nil }
         return UUID(uuidString: raw)
     }
 
     func setSelectedScenarioID(_ scenarioID: UUID, startDate: Date, endDate: Date) {
         let rk = rangeKey(startDate: startDate, endDate: endDate)
-        UserDefaults.standard.set(scenarioID.uuidString, forKey: selectedScenarioKey(rangeKey: rk))
+        defaults.set(scenarioID.uuidString, forKey: selectedScenarioKey(rangeKey: rk))
         bumpLastAccessed(scenarioID: scenarioID, rangeKey: rk)
     }
 
@@ -160,7 +174,7 @@ struct WhatIfScenarioStore {
         upsertIndex(info, rangeKey: rk)
         pruneIfNeeded(rangeKey: rk)
 
-        UserDefaults.standard.set(info.id.uuidString, forKey: selectedScenarioKey(rangeKey: rk))
+        defaults.set(info.id.uuidString, forKey: selectedScenarioKey(rangeKey: rk))
         return info
     }
 
@@ -186,7 +200,7 @@ struct WhatIfScenarioStore {
     func deleteScenario(scenarioID: UUID, startDate: Date, endDate: Date) {
         let rk = rangeKey(startDate: startDate, endDate: endDate)
 
-        UserDefaults.standard.removeObject(forKey: payloadKey(rangeKey: rk, scenarioID: scenarioID))
+        defaults.removeObject(forKey: payloadKey(rangeKey: rk, scenarioID: scenarioID))
 
         var items = loadIndex(rangeKey: rk)
         items.removeAll { $0.id == scenarioID }
@@ -195,9 +209,9 @@ struct WhatIfScenarioStore {
         if loadSelectedScenarioID(startDate: startDate, endDate: endDate) == scenarioID {
             let next = items.sorted { $0.lastAccessed > $1.lastAccessed }.first?.id
             if let next {
-                UserDefaults.standard.set(next.uuidString, forKey: selectedScenarioKey(rangeKey: rk))
+                defaults.set(next.uuidString, forKey: selectedScenarioKey(rangeKey: rk))
             } else {
-                UserDefaults.standard.removeObject(forKey: selectedScenarioKey(rangeKey: rk))
+                defaults.removeObject(forKey: selectedScenarioKey(rangeKey: rk))
             }
         }
     }
@@ -208,7 +222,7 @@ struct WhatIfScenarioStore {
         let rk = rangeKey(startDate: startDate, endDate: endDate)
         bumpLastAccessed(scenarioID: scenarioID, rangeKey: rk)
 
-        guard let data = UserDefaults.standard.data(forKey: payloadKey(rangeKey: rk, scenarioID: scenarioID)) else { return nil }
+        guard let data = defaults.data(forKey: payloadKey(rangeKey: rk, scenarioID: scenarioID)) else { return nil }
         let decoded = try? JSONDecoder().decode(ScenarioPayload.self, from: data)
         return decoded?.scenarioByCategoryID
     }
@@ -223,13 +237,13 @@ struct WhatIfScenarioStore {
     // MARK: - Private (range-based)
 
     private func loadIndex(rangeKey: String) -> [ScenarioInfo] {
-        guard let data = UserDefaults.standard.data(forKey: scenariosIndexKey(rangeKey: rangeKey)) else { return [] }
+        guard let data = defaults.data(forKey: scenariosIndexKey(rangeKey: rangeKey)) else { return [] }
         return (try? JSONDecoder().decode([ScenarioInfo].self, from: data)) ?? []
     }
 
     private func saveIndex(_ items: [ScenarioInfo], rangeKey: String) {
         let data = (try? JSONEncoder().encode(items)) ?? Data()
-        UserDefaults.standard.set(data, forKey: scenariosIndexKey(rangeKey: rangeKey))
+        defaults.set(data, forKey: scenariosIndexKey(rangeKey: rangeKey))
     }
 
     private func upsertIndex(_ info: ScenarioInfo, rangeKey: String) {
@@ -258,7 +272,7 @@ struct WhatIfScenarioStore {
         let drop = Array(items.dropFirst(maxScenariosPerRange))
 
         for item in drop {
-            UserDefaults.standard.removeObject(forKey: payloadKey(rangeKey: rangeKey, scenarioID: item.id))
+            defaults.removeObject(forKey: payloadKey(rangeKey: rangeKey, scenarioID: item.id))
         }
 
         saveIndex(keep, rangeKey: rangeKey)
@@ -272,7 +286,7 @@ struct WhatIfScenarioStore {
         )
 
         let data = (try? JSONEncoder().encode(payload)) ?? Data()
-        UserDefaults.standard.set(data, forKey: payloadKey(rangeKey: rangeKey, scenarioID: scenarioID))
+        defaults.set(data, forKey: payloadKey(rangeKey: rangeKey, scenarioID: scenarioID))
     }
 
     // MARK: - Global Scenarios (per workspace)
@@ -346,13 +360,14 @@ struct WhatIfScenarioStore {
     }
 
     func loadSelectedGlobalScenarioID() -> UUID? {
-        guard let raw = UserDefaults.standard.string(forKey: globalSelectedKey()) else { return nil }
+        guard let raw = defaults.string(forKey: globalSelectedKey()) else { return nil }
         return UUID(uuidString: raw)
     }
 
     func setSelectedGlobalScenarioID(_ scenarioID: UUID) {
-        UserDefaults.standard.set(scenarioID.uuidString, forKey: globalSelectedKey())
+        defaults.set(scenarioID.uuidString, forKey: globalSelectedKey())
         bumpGlobalLastAccessed(scenarioID: scenarioID)
+        pushGlobalSyncIfNeeded()
     }
 
     // MARK: - Pinned scenarios (GLOBAL)
@@ -360,19 +375,19 @@ struct WhatIfScenarioStore {
     /// multiple pinned scenarios.
     /// Migration: if the legacy single pinned ID exists, convert it into a 1-item array.
     func loadPinnedGlobalScenarioIDs() -> [UUID] {
-        if let data = UserDefaults.standard.data(forKey: globalPinnedListKey()),
+        if let data = defaults.data(forKey: globalPinnedListKey()),
            let raw = try? JSONDecoder().decode([String].self, from: data)
         {
             return raw.compactMap { UUID(uuidString: $0) }
         }
 
         // Migration path (legacy string)
-        if let legacy = UserDefaults.standard.string(forKey: globalPinnedKey()),
+        if let legacy = defaults.string(forKey: globalPinnedKey()),
            let id = UUID(uuidString: legacy)
         {
             let migrated: [UUID] = [id]
             setPinnedGlobalScenarioIDs(migrated)
-            UserDefaults.standard.removeObject(forKey: globalPinnedKey())
+            defaults.removeObject(forKey: globalPinnedKey())
             return migrated
         }
 
@@ -380,14 +395,21 @@ struct WhatIfScenarioStore {
     }
 
     func setPinnedGlobalScenarioIDs(_ scenarioIDs: [UUID]) {
+        savePinnedGlobalScenarioIDs(scenarioIDs, postsNotification: true)
+        pushGlobalSyncIfNeeded()
+    }
+
+    private func savePinnedGlobalScenarioIDs(_ scenarioIDs: [UUID], postsNotification: Bool) {
         let raw = scenarioIDs.map { $0.uuidString }
         let data = (try? JSONEncoder().encode(raw)) ?? Data()
-        UserDefaults.standard.set(data, forKey: globalPinnedListKey())
+        defaults.set(data, forKey: globalPinnedListKey())
 
-        NotificationCenter.default.post(
-            name: Self.pinnedGlobalScenariosDidChangeName(workspaceID: workspaceID),
-            object: nil
-        )
+        if postsNotification {
+            NotificationCenter.default.post(
+                name: Self.pinnedGlobalScenariosDidChangeName(workspaceID: workspaceID),
+                object: nil
+            )
+        }
     }
 
 
@@ -455,7 +477,8 @@ struct WhatIfScenarioStore {
 
         saveGlobalPayload(sanitizeGlobalOverrides(overrides), scenarioID: info.id)
         upsertGlobalIndex(info)
-        UserDefaults.standard.set(info.id.uuidString, forKey: globalSelectedKey())
+        defaults.set(info.id.uuidString, forKey: globalSelectedKey())
+        pushGlobalSyncIfNeeded()
         return info
     }
 
@@ -470,6 +493,7 @@ struct WhatIfScenarioStore {
             items[idx].name = trimmed.isEmpty ? items[idx].name : trimmed
         }
         saveGlobalIndex(items)
+        pushGlobalSyncIfNeeded()
     }
 
     func duplicateGlobalScenario(scenarioID: UUID, newName: String) -> GlobalScenarioInfo? {
@@ -481,7 +505,7 @@ struct WhatIfScenarioStore {
     }
 
     func deleteGlobalScenario(scenarioID: UUID) {
-        UserDefaults.standard.removeObject(forKey: globalPayloadKey(scenarioID: scenarioID))
+        defaults.removeObject(forKey: globalPayloadKey(scenarioID: scenarioID))
 
         var items = loadGlobalIndex()
         items.removeAll { $0.id == scenarioID }
@@ -491,9 +515,9 @@ struct WhatIfScenarioStore {
         if loadSelectedGlobalScenarioID() == scenarioID {
             let next = items.sorted { $0.lastAccessed > $1.lastAccessed }.first?.id
             if let next {
-                UserDefaults.standard.set(next.uuidString, forKey: globalSelectedKey())
+                defaults.set(next.uuidString, forKey: globalSelectedKey())
             } else {
-                UserDefaults.standard.removeObject(forKey: globalSelectedKey())
+                defaults.removeObject(forKey: globalSelectedKey())
             }
         }
 
@@ -501,6 +525,8 @@ struct WhatIfScenarioStore {
         if isGlobalScenarioPinned(scenarioID) {
             setGlobalScenarioPinned(scenarioID, isPinned: false)
         }
+
+        pushGlobalSyncIfNeeded()
     }
 
     func loadGlobalScenario(scenarioID: UUID, touchAccessTime: Bool = true) -> GlobalScenarioOverrides? {
@@ -508,7 +534,7 @@ struct WhatIfScenarioStore {
             bumpGlobalLastAccessed(scenarioID: scenarioID)
         }
 
-        guard let data = UserDefaults.standard.data(forKey: globalPayloadKey(scenarioID: scenarioID)) else { return nil }
+        guard let data = defaults.data(forKey: globalPayloadKey(scenarioID: scenarioID)) else { return nil }
         let decoded = try? JSONDecoder().decode(GlobalScenarioPayload.self, from: data)
         if let decoded {
             let overrides = GlobalScenarioOverrides(
@@ -535,6 +561,7 @@ struct WhatIfScenarioStore {
     func saveGlobalScenario(_ overrides: GlobalScenarioOverrides, scenarioID: UUID) {
         saveGlobalPayload(sanitizeGlobalOverrides(overrides), scenarioID: scenarioID)
         bumpGlobalLastAccessed(scenarioID: scenarioID)
+        pushGlobalSyncIfNeeded()
     }
 
     // Apply global overrides to a baseline for a specific date range
@@ -565,16 +592,93 @@ struct WhatIfScenarioStore {
         return result
     }
 
+    func exportGlobalSyncSnapshot() -> WhatIfGlobalScenariosSyncPayload {
+        let scenarios = loadGlobalIndex()
+        let validIDs = Set(scenarios.map(\.id))
+        let selectedID = loadSelectedGlobalScenarioID().flatMap { validIDs.contains($0) ? $0 : nil }
+        let pinnedIDs = loadPinnedGlobalScenarioIDs().filter { validIDs.contains($0) }
+        var overridesByScenarioID: [UUID: GlobalScenarioOverrides] = [:]
+        overridesByScenarioID.reserveCapacity(scenarios.count)
+
+        for scenario in scenarios {
+            overridesByScenarioID[scenario.id] = loadGlobalScenario(
+                scenarioID: scenario.id,
+                touchAccessTime: false
+            ) ?? .empty
+        }
+
+        return WhatIfGlobalScenariosSyncPayload(
+            scenarios: scenarios,
+            selectedScenarioID: selectedID,
+            pinnedScenarioIDs: pinnedIDs,
+            overridesByScenarioID: overridesByScenarioID
+        )
+    }
+
+    func importGlobalSyncSnapshot(_ payload: WhatIfGlobalScenariosSyncPayload) {
+        let scenarios = normalizedGlobalSyncScenarios(payload.scenarios)
+        let validIDs = Set(scenarios.map(\.id))
+        let existingIDs = Set(loadGlobalIndex().map(\.id))
+
+        for staleID in existingIDs.subtracting(validIDs) {
+            defaults.removeObject(forKey: globalPayloadKey(scenarioID: staleID))
+        }
+
+        for scenario in scenarios {
+            let overrides = payload.overridesByScenarioID[scenario.id] ?? .empty
+            saveGlobalPayload(sanitizeGlobalOverrides(overrides), scenarioID: scenario.id)
+        }
+
+        saveGlobalIndex(scenarios)
+
+        if let selected = payload.selectedScenarioID, validIDs.contains(selected) {
+            defaults.set(selected.uuidString, forKey: globalSelectedKey())
+        } else {
+            defaults.removeObject(forKey: globalSelectedKey())
+        }
+
+        let pinnedIDs = payload.pinnedScenarioIDs.filter { validIDs.contains($0) }
+        savePinnedGlobalScenarioIDs(pinnedIDs, postsNotification: true)
+
+        NotificationCenter.default.post(
+            name: Self.globalScenariosDidChangeName(workspaceID: workspaceID),
+            object: nil
+        )
+    }
+
     // MARK: - Private (global)
 
+    private func pushGlobalSyncIfNeeded() {
+        guard syncOnMutation else { return }
+        ICloudPreferenceSyncService().pushWhatIfScenariosIfEnabled(workspaceID: workspaceID)
+    }
+
+    private func normalizedGlobalSyncScenarios(_ scenarios: [GlobalScenarioInfo]) -> [GlobalScenarioInfo] {
+        var seen = Set<UUID>()
+        var result: [GlobalScenarioInfo] = []
+        result.reserveCapacity(scenarios.count)
+
+        for scenario in scenarios {
+            guard seen.contains(scenario.id) == false else { continue }
+            seen.insert(scenario.id)
+
+            var normalized = scenario
+            let trimmed = normalized.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            normalized.name = trimmed.isEmpty ? "Scenario" : trimmed
+            result.append(normalized)
+        }
+
+        return result
+    }
+
     private func loadGlobalIndex() -> [GlobalScenarioInfo] {
-        guard let data = UserDefaults.standard.data(forKey: globalIndexKey()) else { return [] }
+        guard let data = defaults.data(forKey: globalIndexKey()) else { return [] }
         return (try? JSONDecoder().decode([GlobalScenarioInfo].self, from: data)) ?? []
     }
 
     private func saveGlobalIndex(_ items: [GlobalScenarioInfo]) {
         let data = (try? JSONEncoder().encode(items)) ?? Data()
-        UserDefaults.standard.set(data, forKey: globalIndexKey())
+        defaults.set(data, forKey: globalIndexKey())
     }
 
     private func upsertGlobalIndex(_ info: GlobalScenarioInfo) {
@@ -633,7 +737,7 @@ struct WhatIfScenarioStore {
         )
 
         let data = (try? JSONEncoder().encode(payload)) ?? Data()
-        UserDefaults.standard.set(data, forKey: globalPayloadKey(scenarioID: scenarioID))
+        defaults.set(data, forKey: globalPayloadKey(scenarioID: scenarioID))
     }
 }
 
@@ -655,4 +759,23 @@ private struct GlobalScenarioPayload: Codable {
 private struct LegacyGlobalScenarioPayload: Codable {
     let scenarioID: UUID
     let overridesByCategoryID: [UUID: Double]
+}
+
+struct WhatIfGlobalScenariosSyncPayload: Codable, Equatable {
+    var scenarios: [WhatIfScenarioStore.GlobalScenarioInfo]
+    var selectedScenarioID: UUID?
+    var pinnedScenarioIDs: [UUID]
+    var overridesByScenarioID: [UUID: WhatIfScenarioStore.GlobalScenarioOverrides]
+
+    init(
+        scenarios: [WhatIfScenarioStore.GlobalScenarioInfo] = [],
+        selectedScenarioID: UUID? = nil,
+        pinnedScenarioIDs: [UUID] = [],
+        overridesByScenarioID: [UUID: WhatIfScenarioStore.GlobalScenarioOverrides] = [:]
+    ) {
+        self.scenarios = scenarios
+        self.selectedScenarioID = selectedScenarioID
+        self.pinnedScenarioIDs = pinnedScenarioIDs
+        self.overridesByScenarioID = overridesByScenarioID
+    }
 }

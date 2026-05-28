@@ -63,6 +63,7 @@ struct HomeView: View {
     @State private var isEditingWidgets: Bool = false
 
     @State private var pinnedItems: [HomePinnedItem]
+    @State private var isApplyingSyncedPinnedItems: Bool = false
     @State private var dashboardSnapshot: HomeDashboardSnapshot = .empty
     @State private var hasLoadedDashboardSnapshot: Bool = false
     @State private var needsDashboardSnapshotRefresh: Bool = false
@@ -416,7 +417,15 @@ struct HomeView: View {
             guard commandHub.surface == .home else { return }
             handleCommand(commandHub.latestCommandID)
         }
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for: HomePinnedItemsStore.pinnedItemsDidChangeName(workspaceID: workspace.id)
+            )
+        ) { _ in
+            reloadSyncedPinnedItemsIfNeeded()
+        }
         .onChange(of: pinnedItems) { _, _ in
+            guard isApplyingSyncedPinnedItems == false else { return }
             persistPinnedItems()
         }
         .onChange(of: cardIDSet) { _, _ in
@@ -1473,6 +1482,19 @@ struct HomeView: View {
     private func persistPinnedItems() {
         let store = HomePinnedItemsStore(workspaceID: workspace.id)
         store.save(pinnedItems)
+        ICloudPreferenceSyncService().pushHomeLayoutIfEnabled(workspaceID: workspace.id)
+    }
+
+    private func reloadSyncedPinnedItemsIfNeeded() {
+        let store = HomePinnedItemsStore(workspaceID: workspace.id)
+        let syncedItems = store.load()
+        guard syncedItems != pinnedItems else { return }
+
+        isApplyingSyncedPinnedItems = true
+        pinnedItems = syncedItems
+        DispatchQueue.main.async {
+            isApplyingSyncedPinnedItems = false
+        }
     }
 
     private func persistPinnedItemsMigrationIfNeeded() {

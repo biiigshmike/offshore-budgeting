@@ -103,10 +103,16 @@ enum HomePinnedItem: Identifiable, Codable, Equatable {
 
 struct HomePinnedItemsStore {
 
+    static func pinnedItemsDidChangeName(workspaceID: UUID) -> Notification.Name {
+        Notification.Name("homePinnedItemsDidChange_\(workspaceID.uuidString)")
+    }
+
     private let storageKey: String
+    private let workspaceID: UUID
     private let defaults: UserDefaults
 
     init(workspaceID: UUID, defaults: UserDefaults = .standard) {
+        self.workspaceID = workspaceID
         self.storageKey = "home_pinnedItems_\(workspaceID.uuidString)"
         self.defaults = defaults
     }
@@ -121,6 +127,21 @@ struct HomePinnedItemsStore {
         let normalized = normalize(items)
         let data = (try? JSONEncoder().encode(normalized)) ?? Data()
         defaults.set(data, forKey: storageKey)
+    }
+
+    func exportSyncSnapshot() -> [HomePinnedItem] {
+        load()
+    }
+
+    func importSyncSnapshot(_ items: [HomePinnedItem], postsNotification: Bool = true) {
+        save(items)
+
+        if postsNotification {
+            NotificationCenter.default.post(
+                name: Self.pinnedItemsDidChangeName(workspaceID: workspaceID),
+                object: nil
+            )
+        }
     }
 
     // MARK: - Helpers

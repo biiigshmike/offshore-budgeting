@@ -20,6 +20,8 @@ struct SettingsiCloudView: View {
     @AppStorage("icloud_useCloud") private var desiredUseICloud: Bool = false
     @AppStorage("icloud_activeUseCloud") private var activeUseICloud: Bool = false
     @AppStorage("selectedWorkspaceID") private var selectedWorkspaceID: String = ""
+    @AppStorage("icloud_sync_homeLayout") private var syncHomeLayout: Bool = false
+    @AppStorage("icloud_sync_whatIfScenarios") private var syncWhatIfScenarios: Bool = false
 
     // MARK: - UI State
 
@@ -74,6 +76,25 @@ struct SettingsiCloudView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
+
+            Section(
+                header: Text("Sync Options"),
+                footer: syncOptionsFooter
+            ) {
+                Toggle("Home Layout", isOn: Binding(
+                    get: { syncHomeLayout },
+                    set: { handleHomeLayoutSyncChange($0) }
+                ))
+                .tint(Color("AccentColor"))
+                .disabled(canUsePreferenceSync == false)
+
+                Toggle("What-if Scenarios", isOn: Binding(
+                    get: { syncWhatIfScenarios },
+                    set: { handleWhatIfScenariosSyncChange($0) }
+                ))
+                .tint(Color("AccentColor"))
+                .disabled(canUsePreferenceSync == false)
+            }
         }
         .listStyle(.insetGrouped)
         .navigationTitle("iCloud")
@@ -127,6 +148,22 @@ struct SettingsiCloudView: View {
 
     private var isICloudAvailable: Bool {
         FileManager.default.ubiquityIdentityToken != nil
+    }
+
+    private var canUsePreferenceSync: Bool {
+        activeUseICloud && isICloudAvailable && desiredUseICloud == activeUseICloud
+    }
+
+    private var syncOptionsFooter: some View {
+        Group {
+            if canUsePreferenceSync {
+                Text("Choose which dashboard preferences Offshore mirrors through iCloud across your devices.")
+            } else {
+                Text("Turn on iCloud Sync and relaunch Offshore before choosing optional sync preferences.")
+            }
+        }
+        .font(.footnote)
+        .foregroundStyle(.secondary)
     }
 
     private var statusIconName: String {
@@ -201,6 +238,39 @@ struct SettingsiCloudView: View {
         desiredUseICloud = true
         if desiredUseICloud != activeUseICloud {
             showingRestartRequired = true
+        }
+    }
+
+    private func handleHomeLayoutSyncChange(_ isEnabled: Bool) {
+        syncHomeLayout = isEnabled
+        guard isEnabled, canUsePreferenceSync else { return }
+
+        primeHomeLayoutSyncSnapshotsIfNeeded()
+        ICloudPreferenceSyncService().synchronizeHomeLayoutOnEnable(
+            workspaceIDs: workspaces.map(\.id)
+        )
+    }
+
+    private func handleWhatIfScenariosSyncChange(_ isEnabled: Bool) {
+        syncWhatIfScenarios = isEnabled
+        guard isEnabled, canUsePreferenceSync else { return }
+
+        ICloudPreferenceSyncService().synchronizeWhatIfScenariosOnEnable(
+            workspaceIDs: workspaces.map(\.id)
+        )
+    }
+
+    private func primeHomeLayoutSyncSnapshotsIfNeeded() {
+        for workspace in workspaces {
+            let store = HomePinnedItemsStore(workspaceID: workspace.id)
+            guard store.load().isEmpty else { continue }
+
+            let seed = HomeViewBootstrap.initialPinnedItems(
+                workspaceID: workspace.id,
+                fallbackCardIDs: (workspace.cards ?? []).map(\.id)
+            )
+            guard seed.isEmpty == false else { continue }
+            store.save(seed)
         }
     }
 

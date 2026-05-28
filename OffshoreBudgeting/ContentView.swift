@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import Foundation
 
 struct ContentView: View {
     let initialSectionOverride: AppSection?
@@ -151,6 +152,7 @@ struct ContentView: View {
                     includesSavings: true,
                     includesNotifications: true
                 )
+                syncICloudPreferenceSnapshots()
             }
             .onChange(of: selectedWorkspaceID) { _, newValue in
                 syncSelectedWorkspaceToWidgetStores(newValue)
@@ -229,6 +231,7 @@ struct ContentView: View {
                         includesSavings: true,
                         includesNotifications: true
                     )
+                    syncICloudPreferenceSnapshots()
                 } else {
                     cancelDeferredResumeRefresh()
                 }
@@ -247,6 +250,7 @@ struct ContentView: View {
                 }
 
                 performImmediateResumeWiring()
+                syncICloudPreferenceSnapshots()
                 scheduleDeferredResumeRefresh(
                     trigger: .workspaceCountChanged,
                     includesWidgets: true,
@@ -268,7 +272,23 @@ struct ContentView: View {
                     pendingWorkspaceDelete = nil
                 }
             }
+            .onReceive(
+                NotificationCenter.default.publisher(
+                    for: NSUbiquitousKeyValueStore.didChangeExternallyNotification
+                )
+            ) { notification in
+                syncICloudPreferenceSnapshots(
+                    changedKeys: ICloudPreferenceSyncService.changedKeys(from: notification)
+                )
+            }
         }
+    }
+
+    private func syncICloudPreferenceSnapshots(changedKeys: [String]? = nil) {
+        ICloudPreferenceSyncService().pullEnabledSnapshots(
+            workspaceIDs: workspaces.map(\.id),
+            changedKeys: changedKeys
+        )
     }
 
     // MARK: - Widget Refresh

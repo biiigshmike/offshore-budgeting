@@ -11,6 +11,17 @@ import Testing
 
 struct WhatIfScenarioStoreTests {
 
+    // MARK: - Helpers
+
+    private func makeDefaults() -> UserDefaults {
+        let suiteName = "WhatIfScenarioStoreTests.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            fatalError("Failed to create test UserDefaults suite.")
+        }
+        defaults.removePersistentDomain(forName: suiteName)
+        return defaults
+    }
+
     // MARK: - Tests
 
     @Test func globalScenario_roundTrip_persistsIncomeOverrides() {
@@ -89,6 +100,51 @@ struct WhatIfScenarioStoreTests {
             #expect(loaded?.overridesByCategoryID[categoryID]?.max == 75)
             #expect(loaded?.overridesByCategoryID[categoryID]?.scenarioSpend == 60)
         }
+    }
+
+    @Test func globalScenario_syncSnapshot_roundTripsSelectionPinsAndOverrides() {
+        let sourceDefaults = makeDefaults()
+        let destinationDefaults = makeDefaults()
+        let sourceWorkspaceID = UUID()
+        let destinationWorkspaceID = UUID()
+        let categoryID = UUID()
+        let sourceStore = WhatIfScenarioStore(
+            workspaceID: sourceWorkspaceID,
+            defaults: sourceDefaults,
+            syncOnMutation: false
+        )
+        let destinationStore = WhatIfScenarioStore(
+            workspaceID: destinationWorkspaceID,
+            defaults: destinationDefaults,
+            syncOnMutation: false
+        )
+
+        let created = sourceStore.createGlobalScenario(
+            name: "Cross-device Plan",
+            overrides: .init(
+                overridesByCategoryID: [
+                    categoryID: .init(min: 75, max: 125, scenarioSpend: 90)
+                ],
+                plannedIncomeOverride: 5_000,
+                actualIncomeOverride: 4_500
+            )
+        )
+        sourceStore.setPinnedGlobalScenarioIDs([created.id])
+        sourceStore.setSelectedGlobalScenarioID(created.id)
+
+        let snapshot = sourceStore.exportGlobalSyncSnapshot()
+        destinationStore.importGlobalSyncSnapshot(snapshot)
+
+        #expect(destinationStore.loadSelectedGlobalScenarioID() == created.id)
+        #expect(destinationStore.loadPinnedGlobalScenarioIDs() == [created.id])
+        #expect(destinationStore.listGlobalScenarios().map(\.id).contains(created.id))
+
+        let loaded = destinationStore.loadGlobalScenario(scenarioID: created.id, touchAccessTime: false)
+        #expect(loaded?.plannedIncomeOverride == 5_000)
+        #expect(loaded?.actualIncomeOverride == 4_500)
+        #expect(loaded?.overridesByCategoryID[categoryID]?.min == 75)
+        #expect(loaded?.overridesByCategoryID[categoryID]?.max == 125)
+        #expect(loaded?.overridesByCategoryID[categoryID]?.scenarioSpend == 90)
     }
 
     @Test func plannerDraft_overrides_keepExplicitScenarioSpendOutsideRange() {

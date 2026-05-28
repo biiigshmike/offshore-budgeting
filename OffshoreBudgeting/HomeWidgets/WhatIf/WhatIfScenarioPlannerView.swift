@@ -61,6 +61,7 @@ struct WhatIfScenarioPlannerView: View {
     @State private var selectedScenarioID: UUID? = nil
 
     @State private var didLoad: Bool = false
+    @State private var isApplyingSyncedScenarioState: Bool = false
 
     // Rename / New / Duplicate prompts
     @State private var showNewScenarioPrompt: Bool = false
@@ -345,6 +346,9 @@ struct WhatIfScenarioPlannerView: View {
             .onReceive(pinnedChangePublisher) { _ in
                 pinnedRefreshTick += 1
             }
+            .onReceive(globalChangePublisher) { _ in
+                refreshFromSyncedGlobalScenarios()
+            }
             .listStyle(.insetGrouped)
             .navigationTitle(String(localized: "homeWidget.whatIf", defaultValue: "What If?", comment: "Pinned home widget title for what-if planner."))
             .navigationBarTitleDisplayMode(.inline)
@@ -375,7 +379,7 @@ struct WhatIfScenarioPlannerView: View {
             }
             .onChange(of: selectedScenarioID) { _, newValue in
                 guard didLoad, let id = newValue else { return }
-                loadScenarioIntoUI(id: id)
+                loadScenarioIntoUI(id: id, persistsSelection: isApplyingSyncedScenarioState == false)
             }
             .alert(String(localized: "whatIf.alert.newScenarioTitle", defaultValue: "New Scenario", comment: "Alert title for creating a new What If scenario."), isPresented: $showNewScenarioPrompt) {
                 TextField(String(localized: "common.name", defaultValue: "Name", comment: "Common label for a name field."), text: $newScenarioName)
@@ -777,7 +781,7 @@ struct WhatIfScenarioPlannerView: View {
         return lines.joined(separator: "\n")
     }
 
-    private func loadScenarioIntoUI(id: UUID) {
+    private func loadScenarioIntoUI(id: UUID, persistsSelection: Bool = true) {
         let loadedOverrides = store.loadGlobalScenario(scenarioID: id) ?? .empty
         applyMergedScenarioBounds(
             overrides: loadedOverrides.overridesByCategoryID,
@@ -786,7 +790,9 @@ struct WhatIfScenarioPlannerView: View {
         scenarioPlannedIncomeTotal = loadedOverrides.plannedIncomeOverride
         scenarioActualIncomeTotal = loadedOverrides.actualIncomeOverride
 
-        store.setSelectedGlobalScenarioID(id)
+        if persistsSelection {
+            store.setSelectedGlobalScenarioID(id)
+        }
         scenarios = store.listGlobalScenarios()
     }
 
@@ -862,6 +868,35 @@ struct WhatIfScenarioPlannerView: View {
                 categories: categories.map(\.id)
             )
             resetScenarioIncomeToBaseline()
+        }
+    }
+
+    private func refreshFromSyncedGlobalScenarios() {
+        guard didLoad else { return }
+
+        baselineBoundsByCategoryID = buildBaselineBoundsByCategoryID()
+        scenarios = store.listGlobalScenarios()
+        let validIDs = Set(scenarios.map(\.id))
+        let nextID = selectedScenarioID.flatMap { validIDs.contains($0) ? $0 : nil }
+            ?? store.loadSelectedGlobalScenarioID().flatMap { validIDs.contains($0) ? $0 : nil }
+            ?? store.globalDefaultScenarioID()
+
+        isApplyingSyncedScenarioState = true
+        selectedScenarioID = nextID
+        if let nextID {
+            loadScenarioIntoUI(id: nextID, persistsSelection: false)
+        } else {
+            scenarioBoundsByCategoryID = WhatIfScenarioPlannerDraft.uiBoundsByCategoryID(
+                overrides: [:],
+                baselineBoundsByCategoryID: baselineBoundsByCategoryID,
+                categories: categories.map(\.id)
+            )
+            resetScenarioIncomeToBaseline()
+        }
+
+        pinnedRefreshTick += 1
+        DispatchQueue.main.async {
+            isApplyingSyncedScenarioState = false
         }
     }
 
@@ -1162,6 +1197,12 @@ struct WhatIfScenarioPlannerView: View {
     private var pinnedChangePublisher: NotificationCenter.Publisher {
         NotificationCenter.default.publisher(
             for: WhatIfScenarioStore.pinnedGlobalScenariosDidChangeName(workspaceID: workspace.id)
+        )
+    }
+
+    private var globalChangePublisher: NotificationCenter.Publisher {
+        NotificationCenter.default.publisher(
+            for: WhatIfScenarioStore.globalScenariosDidChangeName(workspaceID: workspace.id)
         )
     }
 
