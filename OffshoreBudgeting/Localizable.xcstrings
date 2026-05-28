@@ -27982,6 +27982,52 @@
         }
       }
     },
+    "iCloud Sync Options" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "خيارات مزامنة iCloud"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud-Sync-Optionen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud Sync Options"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opciones de sincronización con iCloud"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Options de synchronisation iCloud"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opções de sincronização do iCloud"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 同步选项"
+          }
+        }
+      }
+    },
     "iCloud sync status and related controls are shown here for cross-device behavior. Use this to confirm that recent edits are propagating correctly across your devices. If something appears stale, verify sync health here before changing records elsewhere. Sync-first troubleshooting prevents avoidable data confusion." : {
       "localizations" : {
         "ar" : {
@@ -54963,6 +55009,52 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "我应该使用哪个钱包卡片或通行证名称？"
+          }
+        }
+      }
+    },
+    "What-if Scenarios and your Home tab arrangement can now sync across devices with iCloud enabled. To opt in, go to Settings > iCloud." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يمكن الآن مزامنة سيناريوهات ماذا لو وترتيب تبويب الصفحة الرئيسية عبر الأجهزة التي تم تمكين iCloud عليها. للاشتراك، انتقل إلى الإعدادات > iCloud."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Was-wäre-wenn-Szenarien und die Anordnung Ihres Home-Tabs können jetzt auf Geräten mit aktiviertem iCloud synchronisiert werden. Zum Aktivieren gehen Sie zu Einstellungen > iCloud."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "What-if Scenarios and your Home tab arrangement can now sync across devices with iCloud enabled. To opt in, go to Settings > iCloud."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los escenarios hipotéticos y la organización de la pestaña Panel ahora pueden sincronizarse entre dispositivos con iCloud activado. Para activar esta opción, ve a Configuración > iCloud."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les scénarios hypothétiques et l’organisation de votre onglet d’accueil peuvent maintenant se synchroniser entre les appareils où iCloud est activé. Pour l’activer, accédez à Réglages > iCloud."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Os cenários hipotéticos e a organização da aba Painel agora podem sincronizar entre dispositivos com o iCloud ativado. Para ativar, acesse Ajustes > iCloud."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "假设场景和你的面板标签页排列现在可以在已启用 iCloud 的设备之间同步。若要选择启用，请前往“设置”> iCloud。"
           }
         }
       }

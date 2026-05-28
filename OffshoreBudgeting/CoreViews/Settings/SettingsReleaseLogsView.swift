@@ -105,6 +105,11 @@ struct SettingsReleaseLogsView: View {
                     systemImage: "tag.fill",
                     title: "Archive Categories",
                     description: "Similar to Presets, you can now archive categories from the Manage Categories screen."
+                ),
+                ReleaseItem(
+                    systemImage: "cloud",
+                    title: "iCloud Sync Options",
+                    description: "What-if Scenarios and your Home tab arrangement can now sync across devices with iCloud enabled. To opt in, go to Settings > iCloud."
                 )
             ]
         ),
