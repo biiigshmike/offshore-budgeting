@@ -656,7 +656,7 @@ private struct HelpTopicPagerBar: View {
         .disabled(!isEnabled)
 
         if #available(iOS 26.0, macCatalyst 26.0, *) {
-            button.buttonStyle(.glassProminent)
+            button.glassProminentButtonStyleCompat()
         } else {
             button.buttonStyle(.borderedProminent)
         }
@@ -955,7 +955,7 @@ private struct HelpSectionFullscreenViewer: View {
                     Image(systemName: "xmark")
                         .frame(width: 33, height: 33)
                 }
-                .buttonStyle(.glass)
+                .glassButtonStyleCompat()
                 .buttonBorderShape(.circle)
                 .accessibilityLabel(Text("Close"))
             } else {

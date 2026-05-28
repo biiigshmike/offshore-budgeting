@@ -45,7 +45,7 @@ struct RestartRequiredView: View {
                             Text(secondaryButtonTitle)
                                 .frame(maxWidth: .infinity, minHeight: 44)
                         }
-                        .buttonStyle(.glassProminent)
+                        .glassProminentButtonStyleCompat()
                         .tint(.gray)
                     } else {
                         Button {
@@ -64,7 +64,7 @@ struct RestartRequiredView: View {
                             Text(primaryButtonTitle)
                                 .frame(maxWidth: .infinity, minHeight: 44)
                         }
-                        .buttonStyle(.glassProminent)
+                        .glassProminentButtonStyleCompat()
                         .tint(.accentColor)
                     } else {
                         Button {
@@ -85,7 +85,7 @@ struct RestartRequiredView: View {
                         Text(primaryButtonTitle)
                             .frame(maxWidth: .infinity, minHeight: 44)
                     }
-                    .buttonStyle(.glassProminent)
+                    .glassProminentButtonStyleCompat()
                     .tint(.accentColor)
                 } else {
                     Button {

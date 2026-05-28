@@ -163,7 +163,7 @@ struct CategorySpotlightDetailView: View {
     private var showAllCategoriesButton: some View {
         if #available(iOS 26.0, *) {
             baseShowAllCategoriesButton
-                .buttonStyle(.glassProminent)
+                .glassProminentButtonStyleCompat()
                 .tint(Color("AccentColor"))
         } else {
             baseShowAllCategoriesButton

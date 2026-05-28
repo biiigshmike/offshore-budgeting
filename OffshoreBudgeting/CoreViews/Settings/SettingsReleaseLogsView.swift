@@ -82,7 +82,7 @@ struct SettingsReleaseLogsView: View {
             build: "21",
             items: [
                 ReleaseItem(
-                    systemImage: "person.fill",
+                    systemImage: "figure.wave",
                     title: "Marina: Now Powered by Apple Intelligence",
                     description: "Marina has finally finished her training. Try chatting with her to gain insights into your budget, expenses, income, and more. Marina requires Apple Intelligence, plus a device running iOS 26.0, iPadOS 26.0, or macOS 26.0 or later. Available in English. Look for updates with additional language support in the future."
                 ),

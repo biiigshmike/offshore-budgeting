@@ -79,7 +79,7 @@ struct BudgetFormView: View {
                             .frame(maxWidth: .infinity, minHeight: 44, alignment: .center)
                     }
                     .listRowSeparator(.hidden)
-                    .buttonStyle(.glassProminent)
+                    .glassProminentButtonStyleCompat()
                     .disabled(cards.isEmpty)
                 } else {
                     Button {
@@ -115,7 +115,7 @@ struct BudgetFormView: View {
                             .frame(maxWidth: .infinity, minHeight: 44, alignment: .center)
                     }
                     .listRowSeparator(.hidden)
-                    .buttonStyle(.glassProminent)
+                    .glassProminentButtonStyleCompat()
                     .disabled(presets.isEmpty)
                 } else {
                     Button {

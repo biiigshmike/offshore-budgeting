@@ -118,7 +118,7 @@ struct EditPresetView: View {
                     Button("Save") { saveChanges() }
                         .disabled(!canSave)
                         .tint(.accentColor)
-                        .buttonStyle(.glassProminent)
+                        .glassProminentButtonStyleCompat()
                 }
             } else {
                 ToolbarItem(placement: .topBarTrailing) {

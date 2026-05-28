@@ -1334,7 +1334,7 @@ struct HomeView: View {
         Button(action: presentAssistantPanel) {
             Image(systemName: "figure.wave")
         }
-        .buttonStyle(.glassProminent)
+        .glassProminentButtonStyleCompat()
         .accessibilityLabel(String(localized: "assistant.open", defaultValue: "Open Assistant", comment: "Accessibility label for opening assistant."))
         .accessibilityIdentifier("home.assistant.openButton")
     }

@@ -98,7 +98,7 @@ struct HomeSavingsOutlookMetricsView: View {
                     } label: {
                         openSavingsAccountLabel
                     }
-                    .buttonStyle(.glassProminent)
+                    .glassProminentButtonStyleCompat()
                     .tint(Color("AccentColor"))
                 } else {
                     Button {

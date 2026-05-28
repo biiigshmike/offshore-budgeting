@@ -117,7 +117,7 @@ private struct CurrentReleaseLogSheet: View {
                     Text("Continue")
                         .frame(maxWidth: .infinity, minHeight: 52)
                 }
-                .buttonStyle(.glassProminent)
+                .glassProminentButtonStyleCompat()
                 .tint(.accentColor)
                 .padding(.horizontal, 22)
                 .padding(.bottom, 18)

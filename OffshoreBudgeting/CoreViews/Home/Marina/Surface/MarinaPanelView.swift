@@ -181,13 +181,21 @@ struct MarinaPanelView: View {
         }
     }
 
+    @ViewBuilder
     private var inputSection: some View {
-        GlassEffectContainer(spacing: 8) {
+        if #available(iOS 26.0, macCatalyst 26.0, *) {
+            GlassEffectContainer(spacing: 8) {
+                inputControls
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 10)
+            .padding(.bottom, 10)
+        } else {
             inputControls
+                .padding(.horizontal, 16)
+                .padding(.top, 10)
+                .padding(.bottom, 10)
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 10)
-        .padding(.bottom, 10)
     }
 
     private var inputControls: some View {
@@ -275,7 +283,7 @@ struct MarinaPanelView: View {
             .padding(.horizontal, 16)
             .frame(minHeight: 44)
             .frame(maxWidth: .infinity)
-            .glassEffect(.regular.interactive(), in: Capsule())
+            .modifier(AssistantPromptFieldChromeModifier())
             .contentShape(Capsule())
             .accessibilityIdentifier("marina.promptField")
             .onSubmit {
@@ -1148,7 +1156,7 @@ private struct MarinaClarificationChoiceButton: View {
 private struct AssistantIconButtonModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
-            .buttonStyle(.glassProminent)
+            .glassProminentButtonStyleCompat()
             .buttonBorderShape(.circle)
             .frame(minWidth: 44, minHeight: 44)
     }
@@ -1167,5 +1175,25 @@ private struct AssistantPanelActionButtonModifier: ViewModifier {
         content
             .buttonStyle(.automatic)
             .buttonBorderShape(.capsule)
+    }
+}
+
+private struct AssistantPromptFieldChromeModifier: ViewModifier {
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, macCatalyst 26.0, *) {
+            content
+                .glassEffect(.regular.interactive(), in: Capsule())
+        } else {
+            content
+                .background(
+                    Capsule()
+                        .fill(.ultraThinMaterial)
+                )
+                .overlay {
+                    Capsule()
+                        .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+                }
+        }
     }
 }

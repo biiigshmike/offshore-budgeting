@@ -160,7 +160,7 @@ struct PillDatePickerField: View {
                         }
                         .tint(.accentColor)
                         .controlSize(.large)
-                        .buttonStyle(.glassProminent)
+                        .glassProminentButtonStyleCompat()
                         .buttonBorderShape(.automatic)
                     }
                 } else {
@@ -347,7 +347,7 @@ struct PillTimePickerField: View {
                         }
                         .tint(.accentColor)
                         .controlSize(.large)
-                        .buttonStyle(.glassProminent)
+                        .glassProminentButtonStyleCompat()
                         .buttonBorderShape(.automatic)
                     }
                 } else {

@@ -261,7 +261,7 @@ struct OnboardingView: View {
                     Text("Get Started")
                         .frame(maxWidth: .infinity, minHeight: 52)
                 }
-                .buttonStyle(.glassProminent)
+                .glassProminentButtonStyleCompat()
                 .tint(.accentColor)
                 .disabled(isCheckingICloudForGetStarted)
 
@@ -455,7 +455,7 @@ struct OnboardingView: View {
                     Text("Back")
                         .frame(maxWidth: .infinity, minHeight: 44)
                 }
-                .buttonStyle(.glassProminent)
+                .glassProminentButtonStyleCompat()
                 .tint(.gray)
                 .disabled(onboardingStep == 0)
             } else {
@@ -477,7 +477,7 @@ struct OnboardingView: View {
                     Text(primaryButtonTitle)
                         .frame(maxWidth: .infinity, minHeight: 44)
                 }
-                .buttonStyle(.glassProminent)
+                .glassProminentButtonStyleCompat()
                 .tint(.accentColor)
             } else {
                 Button {
@@ -761,7 +761,7 @@ private struct OnboardingWorkspaceStep: View {
                     Label("Add Workspace", systemImage: "plus")
                         .frame(maxWidth: .infinity, minHeight: 44)
                 }
-                .buttonStyle(.glassProminent)
+                .glassProminentButtonStyleCompat()
                 .tint(.accentColor)
             } else {
                 Button {
@@ -1125,7 +1125,7 @@ private struct OnboardingCategoriesStep: View {
                     Label("Add Category", systemImage: "plus")
                         .frame(maxWidth: .infinity, minHeight: 44)
                 }
-                .buttonStyle(.glassProminent)
+                .glassProminentButtonStyleCompat()
                 .tint(.accentColor)
             } else {
                 Button {
@@ -1240,7 +1240,7 @@ private struct OnboardingCardsStep: View {
                     Label("Add Card", systemImage: "plus")
                         .frame(maxWidth: .infinity, minHeight: 44)
                 }
-                .buttonStyle(.glassProminent)
+                .glassProminentButtonStyleCompat()
                 .tint(.accentColor)
             } else {
                 Button {
@@ -1508,7 +1508,7 @@ private struct OnboardingPresetsStep: View {
                     Label("Add Preset", systemImage: "plus")
                         .frame(maxWidth: .infinity, minHeight: 44)
                 }
-                .buttonStyle(.glassProminent)
+                .glassProminentButtonStyleCompat()
                 .tint(.accentColor)
             } else {
                 Button {
@@ -2411,7 +2411,7 @@ private struct OnboardingIncomeStep: View {
                     Label("Add Income", systemImage: "plus")
                         .frame(maxWidth: .infinity, minHeight: 44)
                 }
-                .buttonStyle(.glassProminent)
+                .glassProminentButtonStyleCompat()
                 .tint(.accentColor)
             } else {
                 Button {
@@ -2599,7 +2599,7 @@ private struct OnboardingBudgetsStep: View {
                     Label("Create Budget", systemImage: "plus")
                         .frame(maxWidth: .infinity, minHeight: 44)
                 }
-                .buttonStyle(.glassProminent)
+                .glassProminentButtonStyleCompat()
                 .tint(.accentColor)
             } else {
                 Button {

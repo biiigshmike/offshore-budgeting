@@ -78,7 +78,7 @@ struct OnboardingStartGateView: View {
                             .font(.headline.weight(.semibold))
                             .frame(maxWidth: .infinity, minHeight: 44)
                     }
-                    .buttonStyle(.glassProminent)
+                    .glassProminentButtonStyleCompat()
                     .tint(.accentColor)
                 } else {
                     Button {

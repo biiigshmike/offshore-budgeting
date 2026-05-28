@@ -233,7 +233,7 @@ private struct TipSheet: View {
                     Text(buttonTitle)
                         .frame(maxWidth: .infinity, minHeight: 52)
                 }
-                .buttonStyle(.glassProminent)
+                .glassProminentButtonStyleCompat()
                 .tint(.accentColor)
                 .padding(.horizontal, 22)
                 .padding(.bottom, 18)

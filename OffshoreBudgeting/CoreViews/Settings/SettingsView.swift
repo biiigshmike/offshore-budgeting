@@ -168,7 +168,7 @@ struct SettingsView: View {
         .controlSize(.large)
 
         if #available(iOS 26.0, *) {
-            baseMenu.buttonStyle(.glassProminent)
+            baseMenu.glassProminentButtonStyleCompat()
         } else {
             baseMenu.buttonStyle(.plain)
         }

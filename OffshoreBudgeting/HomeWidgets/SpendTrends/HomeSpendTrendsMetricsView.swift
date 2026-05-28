@@ -332,6 +332,17 @@ struct HomeSpendTrendsMetricsView: View {
                 highestCallout(result: result)
                     .padding(.top, 6)
 
+                Text(
+                    String(
+                        localized: "homeWidget.spendTrends.bucketInstruction",
+                        defaultValue: "Press a bar to view the expenses in that spending bucket. Press it again to hide the breakdown.",
+                        comment: "Instruction text explaining that spend trends chart bars are actionable."
+                    )
+                )
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 2)
+
                 if let selectedBucket {
                     SpendTrendsBucketBreakdownView(
                         bucket: selectedBucket,

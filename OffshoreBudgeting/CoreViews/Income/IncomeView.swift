@@ -1045,7 +1045,7 @@ private struct MultiMonthCalendarView: View {
                             Spacer()
                         }
                         .font(.headline)
-                        .buttonStyle(.glass)
+                        .glassButtonStyleCompat()
                     } else {
                         HStack {
                             Spacer()

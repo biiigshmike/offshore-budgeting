@@ -361,7 +361,7 @@ private struct SettingsMaintenanceView: View {
                 Text(title)
                     .frame(maxWidth: .infinity, minHeight: 44)
             }
-            .buttonStyle(.glassProminent)
+            .glassProminentButtonStyleCompat()
             .tint(tint)
         } else {
             Button(action: action) {

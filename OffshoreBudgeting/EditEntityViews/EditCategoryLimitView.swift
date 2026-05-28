@@ -60,7 +60,7 @@ struct EditCategoryLimitView: View {
                         }
                         .disabled(!canSave)
                         .tint(.accentColor)
-                        .buttonStyle(.glassProminent)
+                        .glassProminentButtonStyleCompat()
                     }
                 } else {
                     ToolbarItem(placement: .topBarTrailing) {

@@ -96,7 +96,7 @@ struct AppLockGate<Content: View>: View {
                             .frame(minWidth: 120, minHeight: 44)
                     }
                 }
-                .buttonStyle(.glassProminent)
+                .glassProminentButtonStyleCompat()
                 .disabled(isAuthenticating)
             } else {
                 Button {

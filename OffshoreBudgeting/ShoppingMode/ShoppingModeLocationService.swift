@@ -852,12 +852,10 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
     ) async -> MKRoute? {
         let request = MKDirections.Request()
         request.source = MKMapItem(
-            location: CLLocation(latitude: origin.latitude, longitude: origin.longitude),
-            address: nil
+            placemark: MKPlacemark(coordinate: origin, addressDictionary: nil)
         )
         request.destination = MKMapItem(
-            location: CLLocation(latitude: destination.latitude, longitude: destination.longitude),
-            address: nil
+            placemark: MKPlacemark(coordinate: destination, addressDictionary: nil)
         )
         request.transportType = .walking
 

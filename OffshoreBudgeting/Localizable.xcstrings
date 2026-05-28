@@ -813,6 +813,7 @@
     },
     "$ ↑" : {
       "comment" : "Ascending amount sort label with spacing.",
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -860,6 +861,7 @@
     },
     "$ ↓" : {
       "comment" : "Descending amount sort label with spacing.",
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -26606,6 +26608,18 @@
         }
       }
     },
+    "homeWidget.spendTrends.bucketInstruction" : {
+      "comment" : "Instruction text explaining that spend trends chart bars are actionable.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Press a bar to view the expenses in that spending bucket. Press it again to hide the breakdown."
+          }
+        }
+      }
+    },
     "homeWidget.spendTrends.bucketShowHint" : {
       "comment" : "Accessibility hint for showing spend trends bucket expenses.",
       "extractionState" : "extracted_with_value",
@@ -30767,52 +30781,6 @@
         }
       }
     },
-    "Marina: Now Powered by Apple Intelligence" : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Marina: مدعومة الآن بـ Apple Intelligence"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Marina: Jetzt mit Apple Intelligence"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Marina: Now Powered by Apple Intelligence"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Marina: ahora con Apple Intelligence"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Marina : désormais propulsée par Apple Intelligence"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Marina: agora com Apple Intelligence"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Marina：现由 Apple Intelligence 提供支持"
-          }
-        }
-      }
-    },
     "Marina has finally finished her training. Try chatting with her to gain insights into your budget, expenses, income, and more. Marina requires Apple Intelligence, plus a device running iOS 26.0, iPadOS 26.0, or macOS 26.0 or later. Available in English. Look for updates with additional language support in the future." : {
       "localizations" : {
         "ar" : {
@@ -30988,6 +30956,52 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Marina 保持聊天只读，并让创建操作保持明确。"
+          }
+        }
+      }
+    },
+    "Marina: Now Powered by Apple Intelligence" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marina: مدعومة الآن بـ Apple Intelligence"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marina: Jetzt mit Apple Intelligence"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Marina: Now Powered by Apple Intelligence"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marina: ahora con Apple Intelligence"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marina : désormais propulsée par Apple Intelligence"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marina: agora com Apple Intelligence"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marina：现由 Apple Intelligence 提供支持"
           }
         }
       }
@@ -45272,52 +45286,6 @@
         }
       }
     },
-    "The Spend Trends widget on the Home tab now supports pressing any bar in the graph to reveal expenses from that period." : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "تدعم ودجة اتجاهات الإنفاق في تبويب الصفحة الرئيسية الآن الضغط على أي شريط في الرسم البياني لعرض المصروفات من تلك الفترة."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Das Widget „Ausgabentrends“ im Home-Tab unterstützt jetzt das Drücken eines beliebigen Balkens im Diagramm, um Ausgaben aus diesem Zeitraum anzuzeigen."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "The Spend Trends widget on the Home tab now supports pressing any bar in the graph to reveal expenses from that period."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "El widget Tendencias de gasto en la pestaña Panel ahora permite presionar cualquier barra del gráfico para revelar los gastos de ese periodo."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le widget Tendances de dépense de l’onglet d’accueil permet maintenant de toucher n’importe quelle barre du graphique pour afficher les dépenses de cette période."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "O widget Tendências de gastos na aba Painel agora permite pressionar qualquer barra no gráfico para revelar as despesas daquele período."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "面板标签页上的支出趋势小组件现在支持按下图表中的任意柱形，以显示该期间的支出。"
-          }
-        }
-      }
-    },
     "Spend Trends emphasizes movement over time, not just a single total. Watch for acceleration patterns that indicate a category or habit is drifting upward. When trend slope changes, inspect recent entries to identify what triggered the shift. Early trend awareness makes interventions more effective." : {
       "localizations" : {
         "ar" : {
@@ -48465,6 +48433,52 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "找不到为此快捷方式导入选择的卡。"
+          }
+        }
+      }
+    },
+    "The Spend Trends widget on the Home tab now supports pressing any bar in the graph to reveal expenses from that period." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تدعم ودجة اتجاهات الإنفاق في تبويب الصفحة الرئيسية الآن الضغط على أي شريط في الرسم البياني لعرض المصروفات من تلك الفترة."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Widget „Ausgabentrends“ im Home-Tab unterstützt jetzt das Drücken eines beliebigen Balkens im Diagramm, um Ausgaben aus diesem Zeitraum anzuzeigen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "The Spend Trends widget on the Home tab now supports pressing any bar in the graph to reveal expenses from that period."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El widget Tendencias de gasto en la pestaña Panel ahora permite presionar cualquier barra del gráfico para revelar los gastos de ese periodo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le widget Tendances de dépense de l’onglet d’accueil permet maintenant de toucher n’importe quelle barre du graphique pour afficher les dépenses de cette période."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O widget Tendências de gastos na aba Painel agora permite pressionar qualquer barra no gráfico para revelar as despesas daquele período."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "面板标签页上的支出趋势小组件现在支持按下图表中的任意柱形，以显示该期间的支出。"
           }
         }
       }
