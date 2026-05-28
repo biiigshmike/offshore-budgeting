@@ -86,9 +86,9 @@ struct HomeSpendTrendsAggregator {
         var amount: Double {
             switch self {
             case .planned(let expense):
-                return expense.effectiveAmount()
+                return SavingsMathService.plannedBudgetImpactAmount(for: expense)
             case .variable(let expense):
-                return expense.ledgerSignedAmount()
+                return SavingsMathService.variableBudgetImpactAmount(for: expense)
             }
         }
     }
@@ -419,12 +419,12 @@ struct HomeSpendTrendsAggregator {
 
         for expense in plannedExpenses {
             let id = expense.category?.id
-            totals[id, default: 0] += expense.effectiveAmount()
+            totals[id, default: 0] += SavingsMathService.plannedBudgetImpactAmount(for: expense)
         }
 
         for expense in variableExpenses {
             let id = expense.category?.id
-            totals[id, default: 0] += expense.ledgerSignedAmount()
+            totals[id, default: 0] += SavingsMathService.variableBudgetImpactAmount(for: expense)
         }
 
         for category in categories {

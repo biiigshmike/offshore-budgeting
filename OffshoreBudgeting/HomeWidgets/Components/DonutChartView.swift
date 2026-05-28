@@ -279,7 +279,7 @@ extension DonutChartView {
 
         var slices: [DonutSlice] = top.map { metric in
             DonutSlice(
-                id: metric.categoryID,
+                id: metric.id,
                 title: metric.categoryName,
                 value: metric.totalSpent,
                 color: metric.categoryColorHex.flatMap { Color(hex: $0) } ?? .secondary,

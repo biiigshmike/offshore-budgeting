@@ -149,6 +149,61 @@ struct HomeSpendTrendsAggregatorTests {
         #expect(abs(bucket.total - 110) < 0.001)
     }
 
+    @Test func bucketExpenseItems_useOwnedBudgetImpactForSplitExpenses() throws {
+        let category = Category(name: "Travel", hexColor: "#0066AA")
+        let card = Card(name: "Everyday")
+        let account = AllocationAccount(name: "Shared")
+        let planned = PlannedExpense(
+            title: "Hotel",
+            plannedAmount: 100,
+            actualAmount: 100,
+            expenseDate: date(2026, 1, 2, hour: 9),
+            card: card,
+            category: category
+        )
+        let plannedAllocation = ExpenseAllocation(
+            allocatedAmount: 40,
+            preservesGrossAmount: true,
+            account: account,
+            plannedExpense: planned
+        )
+        planned.allocation = plannedAllocation
+
+        let variable = VariableExpense(
+            descriptionText: "Dinner",
+            amount: 100,
+            transactionDate: date(2026, 1, 2, hour: 15),
+            card: card,
+            category: category
+        )
+        let variableAllocation = ExpenseAllocation(
+            allocatedAmount: 50,
+            preservesGrossAmount: true,
+            account: account,
+            expense: variable
+        )
+        variable.allocation = variableAllocation
+
+        let result = HomeSpendTrendsAggregator.calculate(
+            period: .period,
+            categories: [category],
+            plannedExpenses: [planned],
+            variableExpenses: [variable],
+            rangeStart: date(2026, 1, 1),
+            rangeEnd: date(2026, 1, 3),
+            cardFilter: nil
+        )
+
+        let bucket = try #require(bucketFor(date(2026, 1, 2), in: result))
+        let plannedItem = bucket.expenseItems.first { $0.id == "planned-\(planned.id.uuidString)" }
+        let variableItem = bucket.expenseItems.first { $0.id == "variable-\(variable.id.uuidString)" }
+
+        #expect(abs((plannedItem?.amount ?? 0) - 60) < 0.001)
+        #expect(abs((variableItem?.amount ?? 0) - 50) < 0.001)
+        #expect(abs(bucket.total - 110) < 0.001)
+        #expect(abs(result.totalSpent - 110) < 0.001)
+    }
+
     private func bucketFor(
         _ date: Date,
         in result: HomeSpendTrendsAggregator.Result

@@ -510,8 +510,8 @@ struct HomeQueryEngine {
             HomeAnswerRow(
                 title: metric.categoryName,
                 value: currency(metric.totalSpent),
-                sourceID: categories.first(where: { $0.id == metric.categoryID })?.id,
-                objectType: .category,
+                sourceID: metric.categoryID,
+                objectType: metric.categoryID == nil ? nil : .category,
                 amount: metric.totalSpent
             )
         }
@@ -2365,8 +2365,8 @@ struct HomeQueryEngine {
             HomeAnswerRow(
                 title: metric.categoryName,
                 value: "\(currency(metric.totalSpent)) (\(percent(metric.percentOfTotal)))",
-                sourceID: categories.first(where: { $0.id == metric.categoryID })?.id,
-                objectType: .category,
+                sourceID: metric.categoryID,
+                objectType: metric.categoryID == nil ? nil : .category,
                 amount: metric.totalSpent
             )
         }

@@ -10,8 +10,10 @@ import Foundation
 // MARK: - Output models for Category widgets
 
 struct CategorySpendMetric: Identifiable, Equatable {
+    static let uncategorizedID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+
     let id: UUID
-    let categoryID: UUID
+    let categoryID: UUID?
     let categoryName: String
     let categoryColorHex: String?
 
@@ -23,8 +25,8 @@ struct CategorySpendMetric: Identifiable, Equatable {
     let percentOfTotal: Double
 
     init(
-        id: UUID = UUID(),
-        categoryID: UUID,
+        id: UUID? = nil,
+        categoryID: UUID?,
         categoryName: String,
         categoryColorHex: String?,
         totalSpent: Double,
@@ -32,7 +34,7 @@ struct CategorySpendMetric: Identifiable, Equatable {
         variableSpent: Double,
         percentOfTotal: Double
     ) {
-        self.id = id
+        self.id = id ?? categoryID ?? Self.uncategorizedID
         self.categoryID = categoryID
         self.categoryName = categoryName
         self.categoryColorHex = categoryColorHex

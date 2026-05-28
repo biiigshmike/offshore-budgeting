@@ -131,4 +131,92 @@ struct ContentViewWidgetRefreshExecutorTests {
             ) != nil
         )
     }
+
+    @Test func spendTrendsWidgetSnapshot_usesOwnedBudgetImpactForSplitExpenses() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+
+        let workspaceID = UUID(uuidString: "BBBBBBBB-CCCC-DDDD-EEEE-FFFFFFFFFFFF")!
+        let workspace = Workspace(id: workspaceID, name: "Personal", hexColor: "#3B82F6")
+        let card = Card(
+            id: UUID(uuidString: "22222222-3333-4444-5555-666666666666")!,
+            name: "Visa",
+            theme: "ocean",
+            effect: "plastic",
+            workspace: workspace
+        )
+        let category = Category(
+            id: UUID(uuidString: "AAAAAAAA-9999-8888-7777-666666666666")!,
+            name: "Dining",
+            hexColor: "#FF6600",
+            workspace: workspace
+        )
+        let account = AllocationAccount(name: "Shared", workspace: workspace)
+        let now = Date.now
+        let plannedExpense = PlannedExpense(
+            title: "Reservation",
+            plannedAmount: 100,
+            actualAmount: 80,
+            expenseDate: now,
+            workspace: workspace,
+            card: card,
+            category: category
+        )
+        let plannedAllocation = ExpenseAllocation(
+            allocatedAmount: 30,
+            preservesGrossAmount: true,
+            workspace: workspace,
+            account: account,
+            plannedExpense: plannedExpense
+        )
+        plannedExpense.allocation = plannedAllocation
+
+        let variableExpense = VariableExpense(
+            descriptionText: "Dinner",
+            amount: 100,
+            transactionDate: now,
+            workspace: workspace,
+            card: card,
+            category: category
+        )
+        let variableAllocation = ExpenseAllocation(
+            allocatedAmount: 40,
+            preservesGrossAmount: true,
+            workspace: workspace,
+            account: account,
+            expense: variableExpense
+        )
+        variableExpense.allocation = variableAllocation
+
+        context.insert(workspace)
+        context.insert(card)
+        context.insert(category)
+        context.insert(account)
+        context.insert(plannedExpense)
+        context.insert(plannedAllocation)
+        context.insert(variableExpense)
+        context.insert(variableAllocation)
+        try context.save()
+
+        SpendTrendsWidgetSnapshotBuilder.buildAndSaveAllPeriods(
+            modelContext: context,
+            workspaceID: workspaceID,
+            shouldReloadTimelines: false
+        )
+
+        let snapshot = try #require(
+            SpendTrendsWidgetSnapshotStore.load(
+                workspaceID: workspaceID.uuidString,
+                cardID: nil,
+                periodToken: SpendTrendsWidgetPeriod.oneMonth.rawValue
+            )
+        )
+        let nonZeroBucket = try #require(snapshot.buckets.first { $0.total > 0 })
+        let topCategory = try #require(snapshot.topCategories.first)
+
+        #expect(abs(snapshot.totalSpent - 110) < 0.001)
+        #expect(abs(nonZeroBucket.total - 110) < 0.001)
+        #expect(topCategory.name == "Dining")
+        #expect(abs(topCategory.amount - 110) < 0.001)
+    }
 }

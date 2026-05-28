@@ -164,7 +164,7 @@ enum SpendTrendsWidgetSnapshotBuilder {
         guard totalSpent > 0 else { return nil }
 
         let topCategoryKeys = overallTotals
-            .filter { $0.value > 0 }
+            .filter { $0.key != nil && $0.value > 0 }
             .sorted { $0.value > $1.value }
             .prefix(max(1, topN))
             .map { $0.key }
@@ -318,12 +318,12 @@ enum SpendTrendsWidgetSnapshotBuilder {
         var totals: [UUID?: Double] = [:]
 
         for expense in plannedExpenses {
-            let amount = expense.effectiveAmount()
+            let amount = SavingsMathService.plannedBudgetImpactAmount(for: expense)
             totals[expense.category?.id, default: 0] += amount
         }
 
         for expense in variableExpenses {
-            totals[expense.category?.id, default: 0] += expense.amount
+            totals[expense.category?.id, default: 0] += SavingsMathService.variableBudgetImpactAmount(for: expense)
         }
 
         return totals

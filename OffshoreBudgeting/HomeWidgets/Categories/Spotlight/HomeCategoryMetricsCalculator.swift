@@ -19,20 +19,26 @@ struct HomeCategoryMetricsCalculator {
         rangeEnd: Date
     ) -> HomeCategoryMetricsResult {
 
-        var plannedByCategoryID: [UUID: Double] = [:]
-        var variableByCategoryID: [UUID: Double] = [:]
+        var categoryByID: [UUID: Category] = [:]
+        for category in categories {
+            categoryByID[category.id] = category
+        }
 
-        // MARK: - Planned (effective amount)
+        var plannedByCategoryID: [UUID?: Double] = [:]
+        var variableByCategoryID: [UUID?: Double] = [:]
+
+        // MARK: - Planned
 
         for expense in plannedExpenses {
             guard
                 expense.expenseDate >= rangeStart,
-                expense.expenseDate <= rangeEnd,
-                let category = expense.category
+                expense.expenseDate <= rangeEnd
             else { continue }
 
-            let effectiveAmount = expense.effectiveAmount()
-            plannedByCategoryID[category.id, default: 0] += effectiveAmount
+            if let category = expense.category {
+                categoryByID[category.id] = category
+            }
+            plannedByCategoryID[expense.category?.id, default: 0] += SavingsMathService.plannedBudgetImpactAmount(for: expense)
         }
 
         // MARK: - Variable
@@ -40,27 +46,28 @@ struct HomeCategoryMetricsCalculator {
         for expense in variableExpenses {
             guard
                 expense.transactionDate >= rangeStart,
-                expense.transactionDate <= rangeEnd,
-                let category = expense.category
+                expense.transactionDate <= rangeEnd
             else { continue }
 
-            variableByCategoryID[category.id, default: 0] += expense.ledgerSignedAmount()
+            if let category = expense.category {
+                categoryByID[category.id] = category
+            }
+            variableByCategoryID[expense.category?.id, default: 0] += SavingsMathService.variableBudgetImpactAmount(for: expense)
         }
 
         // MARK: - Totals
 
-        let totalSpent: Double = categories.reduce(0) { partial, category in
-            let planned = plannedByCategoryID[category.id, default: 0]
-            let variable = variableByCategoryID[category.id, default: 0]
-            return partial + planned + variable
+        let categoryIDs = Set(plannedByCategoryID.keys).union(variableByCategoryID.keys)
+        let totalSpent = categoryIDs.reduce(0) { partial, id in
+            partial + plannedByCategoryID[id, default: 0] + variableByCategoryID[id, default: 0]
         }
 
         // MARK: - Build per-category metrics
 
         var metrics: [CategorySpendMetric] = []
-        metrics.reserveCapacity(categories.count)
+        metrics.reserveCapacity(categoryByID.count + 1)
 
-        for category in categories {
+        for category in categoryByID.values {
             let planned = plannedByCategoryID[category.id, default: 0]
             let variable = variableByCategoryID[category.id, default: 0]
             let total = planned + variable
@@ -78,6 +85,25 @@ struct HomeCategoryMetricsCalculator {
                     totalSpent: total,
                     plannedSpent: planned,
                     variableSpent: variable,
+                    percentOfTotal: percent
+                )
+            )
+        }
+
+        let uncategorizedPlanned = plannedByCategoryID[nil, default: 0]
+        let uncategorizedVariable = variableByCategoryID[nil, default: 0]
+        let uncategorizedTotal = uncategorizedPlanned + uncategorizedVariable
+
+        if uncategorizedTotal > 0 {
+            let percent = (totalSpent > 0) ? (uncategorizedTotal / totalSpent) : 0
+            metrics.append(
+                CategorySpendMetric(
+                    categoryID: nil,
+                    categoryName: "Uncategorized",
+                    categoryColorHex: nil,
+                    totalSpent: uncategorizedTotal,
+                    plannedSpent: uncategorizedPlanned,
+                    variableSpent: uncategorizedVariable,
                     percentOfTotal: percent
                 )
             )
