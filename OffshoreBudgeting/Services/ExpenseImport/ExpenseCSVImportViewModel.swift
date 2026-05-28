@@ -114,6 +114,7 @@ final class ExpenseCSVImportViewModel: ObservableObject {
     func prepare(workspace: Workspace, modelContext: ModelContext) {
         // Categories
         let cats = (workspace.categories ?? [])
+            .filter { $0.isArchived == false }
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         categories = cats
 

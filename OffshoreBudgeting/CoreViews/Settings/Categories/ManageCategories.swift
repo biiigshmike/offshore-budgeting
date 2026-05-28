@@ -50,22 +50,47 @@ struct ManageCategoriesView: View {
 
     var body: some View {
         List {
-            CategoryListRows(
-                categories: sortedCategories,
-                onEdit: { category in
-                    sheetRoute = .edit(category)
-                },
-                onDelete: { category in
-                    if confirmBeforeDeleting {
-                        pendingCategoryDelete = {
-                            delete(category)
-                        }
-                        showingCategoryDeleteConfirm = true
-                    } else {
-                        delete(category)
+            if activeCategories.isEmpty && archivedCategories.isEmpty {
+                ContentUnavailableView(
+                    "No Categories Yet",
+                    systemImage: "tag",
+                    description: Text("Create categories to organize expenses and presets.")
+                )
+            } else {
+                if activeCategories.isEmpty == false {
+                    Section {
+                        CategoryListRows(
+                            categories: activeCategories,
+                            onEdit: { category in
+                                sheetRoute = .edit(category)
+                            },
+                            onArchive: { category in
+                                archive(category)
+                            },
+                            onDelete: { category in
+                                deleteCategoryWithOptionalConfirm(category)
+                            }
+                        )
                     }
                 }
-            )
+
+                if archivedCategories.isEmpty == false {
+                    Section("Archived") {
+                        CategoryListRows(
+                            categories: archivedCategories,
+                            onEdit: { category in
+                                sheetRoute = .edit(category)
+                            },
+                            onUnarchive: { category in
+                                unarchive(category)
+                            },
+                            onDelete: { category in
+                                deleteCategoryWithOptionalConfirm(category)
+                            }
+                        )
+                    }
+                }
+            }
         }
         .postBoardingTip(
             key: "tip.categories.v1",
@@ -74,7 +99,7 @@ struct ManageCategoriesView: View {
                 PostBoardingTipItem(
                     systemImage: "tag",
                     title: "Categories",
-                    detail: "Add categories to track and visualize spending. Swipe a row to the right to edit; swipe left to delete."
+                    detail: "Add categories to track and visualize spending. Swipe a row to the right to edit or archive; swipe left to delete."
                 )
             ]
         )
@@ -141,14 +166,22 @@ struct ManageCategoriesView: View {
         sortModeRaw = mode.rawValue
     }
 
-    private var sortedCategories: [Category] {
+    private var activeCategories: [Category] {
+        sortedCategories(categories.filter { $0.isArchived == false })
+    }
+
+    private var archivedCategories: [Category] {
+        sortedCategories(categories.filter { $0.isArchived })
+    }
+
+    private func sortedCategories(_ source: [Category]) -> [Category] {
         switch sortMode {
         case .az:
-            return categories.sorted { lhs, rhs in
+            return source.sorted { lhs, rhs in
                 lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
             }
         case .za:
-            return categories.sorted { lhs, rhs in
+            return source.sorted { lhs, rhs in
                 lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedDescending
             }
         }
@@ -202,6 +235,27 @@ struct ManageCategoriesView: View {
 
     private func delete(_ category: Category) {
         modelContext.delete(category)
+    }
+
+    private func deleteCategoryWithOptionalConfirm(_ category: Category) {
+        if confirmBeforeDeleting {
+            pendingCategoryDelete = {
+                delete(category)
+            }
+            showingCategoryDeleteConfirm = true
+        } else {
+            delete(category)
+        }
+    }
+
+    private func archive(_ category: Category) {
+        category.isArchived = true
+        category.archivedAt = Date()
+    }
+
+    private func unarchive(_ category: Category) {
+        category.isArchived = false
+        category.archivedAt = nil
     }
 }
 

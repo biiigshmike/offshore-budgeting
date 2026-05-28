@@ -76,6 +76,7 @@ final class ShortcutImportPreviewService {
 
         return try dataStore.performInSelectedWorkspace { modelContext, workspace in
             let categories = (workspace.categories ?? [])
+                .filter { $0.isArchived == false }
                 .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
 
             let learnedRules = ImportLearningStore.fetchRules(for: workspace, modelContext: modelContext)

@@ -50,7 +50,7 @@ struct AddPresetView: View {
         )
 
         _categories = Query(
-            filter: #Predicate<Category> { $0.workspace?.id == workspaceID },
+            filter: #Predicate<Category> { $0.workspace?.id == workspaceID && $0.isArchived == false },
             sort: [SortDescriptor(\Category.name, order: .forward)]
         )
     }

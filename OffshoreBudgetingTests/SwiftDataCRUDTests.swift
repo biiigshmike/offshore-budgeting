@@ -115,18 +115,33 @@ struct SwiftDataCRUDTests {
         let cats = try fetchAll(Category.self, in: context)
         #expect(cats.count == 1)
         #expect(cats.first?.name == "Groceries")
+        #expect(cats.first?.isArchived == false)
+        #expect(cats.first?.archivedAt == nil)
 
         cat.name = "Groceries Updated"
+        let archivedAt = Date()
+        cat.isArchived = true
+        cat.archivedAt = archivedAt
         try context.save()
 
         let cats2 = try fetchAll(Category.self, in: context)
         #expect(cats2.first?.name == "Groceries Updated")
+        #expect(cats2.first?.isArchived == true)
+        #expect(cats2.first?.archivedAt == archivedAt)
+
+        cat.isArchived = false
+        cat.archivedAt = nil
+        try context.save()
+
+        let cats3 = try fetchAll(Category.self, in: context)
+        #expect(cats3.first?.isArchived == false)
+        #expect(cats3.first?.archivedAt == nil)
 
         context.delete(cat)
         try context.save()
 
-        let cats3 = try fetchAll(Category.self, in: context)
-        #expect(cats3.isEmpty)
+        let cats4 = try fetchAll(Category.self, in: context)
+        #expect(cats4.isEmpty)
     }
 
     // MARK: - Preset

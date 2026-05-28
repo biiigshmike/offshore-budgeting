@@ -47,7 +47,7 @@ enum CategoryMatchingEngine {
 
         // 0) Learned rule wins (Option 1 memory)
         if let learnedRule {
-            if let cat = learnedRule.preferredCategory {
+            if let cat = learnedRule.preferredCategory, cat.isArchived == false {
                 return CategoryMatchSuggestion(category: cat, confidence: 1.0, reason: "Learned mapping")
             }
         }

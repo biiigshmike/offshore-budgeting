@@ -62,7 +62,7 @@ final class OffshoreIntentDataStore {
         let workspaceID = workspace.id
         let descriptor = FetchDescriptor<Category>(
             predicate: #Predicate<Category> { category in
-                category.workspace?.id == workspaceID
+                category.workspace?.id == workspaceID && category.isArchived == false
             },
             sortBy: [SortDescriptor(\Category.name, order: .forward)]
         )
@@ -166,11 +166,14 @@ final class OffshoreIntentDataStore {
         let workspaceID = workspace.id
         let descriptor = FetchDescriptor<Category>(
             predicate: #Predicate<Category> { category in
-                category.id == uuid && category.workspace?.id == workspaceID
+                category.id == uuid && category.workspace?.id == workspaceID && category.isArchived == false
             }
         )
 
-        return try modelContext.fetch(descriptor).first
+        guard let category = try modelContext.fetch(descriptor).first else {
+            throw IntentDataError.categoryUnavailable
+        }
+        return category
     }
 
     func resolveCategory(
@@ -190,7 +193,8 @@ final class OffshoreIntentDataStore {
                 let rulesByKey = ImportLearningStore.fetchRules(for: workspace, modelContext: modelContext)
                 let matcher = ImportMerchantRuleMatcher(rulesByKey: rulesByKey)
                 if let match = matcher.match(for: merchantKey),
-                   let preferredCategory = match.rule.preferredCategory {
+                   let preferredCategory = match.rule.preferredCategory,
+                   preferredCategory.isArchived == false {
                     return preferredCategory
                 }
             }

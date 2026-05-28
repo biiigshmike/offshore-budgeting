@@ -45,6 +45,7 @@ enum SnapshotContentSignature {
             hasher.combine(category.id)
             hasher.combine(category.name)
             hasher.combine(category.hexColor)
+            hasher.combine(category.isArchived)
         }
 
         return hasher.finalize()

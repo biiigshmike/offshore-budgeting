@@ -88,11 +88,15 @@ struct EditExpenseView: View {
         return current + existingOffset
     }
 
+    private var selectableCategories: [Category] {
+        CategoryArchivePolicy.selectableCategories(from: categories, selectedCategoryID: selectedCategoryID)
+    }
+
     var body: some View {
         ExpenseFormView(
             workspace: workspace,
             cards: cards,
-            categories: categories,
+            categories: selectableCategories,
             allocationAccounts: allocationAccounts,
             descriptionText: $descriptionText,
             amountText: $amountText,
@@ -210,7 +214,7 @@ struct EditExpenseView: View {
         }
 
         if selectedCategoryID == nil {
-            selectedCategoryID = DebugScreenshotFormDefaults.preferredCategoryID(in: categories)
+            selectedCategoryID = DebugScreenshotFormDefaults.preferredCategoryID(in: selectableCategories)
         }
 
         let hasSharedAmount = !allocationAmountText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty

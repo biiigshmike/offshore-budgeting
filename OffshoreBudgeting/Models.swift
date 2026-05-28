@@ -467,6 +467,12 @@ final class Category {
     var name: String = ""
     var hexColor: String = "#3B82F6"
 
+    // MARK: - Archiving
+    // When true, this category is hidden from new selection flows.
+    // Archiving never removes the category from existing expenses, presets, or reports.
+    var isArchived: Bool = false
+    var archivedAt: Date? = nil
+
     // Keep this as a relationship, but do NOT specify inverse here.
     // The inverse is defined on ImportMerchantRule.preferredCategory.
     @Relationship
@@ -484,11 +490,20 @@ final class Category {
     // The inverse is declared on Preset.defaultCategory instead.
     var defaultForPresets: [Preset]? = nil
 
-    init(id: UUID = UUID(), name: String, hexColor: String, workspace: Workspace? = nil) {
+    init(
+        id: UUID = UUID(),
+        name: String,
+        hexColor: String,
+        workspace: Workspace? = nil,
+        isArchived: Bool = false,
+        archivedAt: Date? = nil
+    ) {
         self.id = id
         self.name = name
         self.hexColor = hexColor
         self.workspace = workspace
+        self.isArchived = isArchived
+        self.archivedAt = archivedAt
     }
 }
 

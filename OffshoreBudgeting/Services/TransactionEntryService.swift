@@ -50,6 +50,8 @@ final class TransactionEntryService {
             throw ValidationError.invalidAmount
         }
 
+        let selectedCategory = category?.isArchived == false ? category : nil
+
         let expense = VariableExpense(
             descriptionText: trimmedNotes,
             amount: abs(amount),
@@ -57,7 +59,7 @@ final class TransactionEntryService {
             transactionDate: date,
             workspace: workspace,
             card: card,
-            category: category
+            category: selectedCategory
         )
 
         modelContext.insert(expense)

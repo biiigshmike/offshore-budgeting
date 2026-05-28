@@ -94,7 +94,7 @@ struct MarinaPanelView: View {
             sort: [SortDescriptor(\Card.name, order: .forward)]
         )
         _categories = Query(
-            filter: #Predicate<Category> { $0.workspace?.id == workspaceID },
+            filter: #Predicate<Category> { $0.workspace?.id == workspaceID && $0.isArchived == false },
             sort: [SortDescriptor(\Category.name, order: .forward)]
         )
         _presets = Query(

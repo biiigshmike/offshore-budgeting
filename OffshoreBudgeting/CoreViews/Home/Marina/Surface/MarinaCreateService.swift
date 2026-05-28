@@ -128,6 +128,8 @@ final class MarinaCreateService {
             throw TransactionEntryService.ValidationError.invalidAmount
         }
 
+        let selectedCategory = category?.isArchived == false ? category : nil
+
         let preset = Preset(
             title: trimmed,
             plannedAmount: plannedAmount,
@@ -140,7 +142,7 @@ final class MarinaCreateService {
             yearlyDayOfMonth: yearlyDayOfMonth,
             workspace: workspace,
             defaultCard: card,
-            defaultCategory: category
+            defaultCategory: selectedCategory
         )
         modelContext.insert(preset)
         try modelContext.save()

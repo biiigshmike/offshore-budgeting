@@ -119,7 +119,23 @@ struct CategoryListRows: View {
 
     let categories: [Category]
     let onEdit: (Category) -> Void
+    let onArchive: ((Category) -> Void)?
+    let onUnarchive: ((Category) -> Void)?
     let onDelete: (Category) -> Void
+
+    init(
+        categories: [Category],
+        onEdit: @escaping (Category) -> Void,
+        onArchive: ((Category) -> Void)? = nil,
+        onUnarchive: ((Category) -> Void)? = nil,
+        onDelete: @escaping (Category) -> Void
+    ) {
+        self.categories = categories
+        self.onEdit = onEdit
+        self.onArchive = onArchive
+        self.onUnarchive = onUnarchive
+        self.onDelete = onDelete
+    }
 
     var body: some View {
         if categories.isEmpty {
@@ -147,12 +163,30 @@ struct CategoryListRows: View {
                     .tint(Color("OffshoreDepth"))
                 }
                 .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                    if let onUnarchive {
+                        Button {
+                            onUnarchive(category)
+                        } label: {
+                            Label("Unarchive", systemImage: "arrow.uturn.backward")
+                        }
+                        .tint(.green)
+                    }
+
                     Button {
                         onEdit(category)
                     } label: {
                         Label("Edit", systemImage: "pencil")
                     }
                     .tint(Color("AccentColor"))
+
+                    if let onArchive {
+                        Button {
+                            onArchive(category)
+                        } label: {
+                            Label("Archive", systemImage: "archivebox")
+                        }
+                        .tint(Color("OffshoreSand"))
+                    }
                 }
             }
         }

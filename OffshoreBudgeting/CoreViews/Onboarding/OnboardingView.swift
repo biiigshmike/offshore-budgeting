@@ -1090,7 +1090,7 @@ private struct OnboardingCategoriesStep: View {
         self.workspace = workspace
         let workspaceID = workspace.id
         _categories = Query(
-            filter: #Predicate<Category> { $0.workspace?.id == workspaceID },
+            filter: #Predicate<Category> { $0.workspace?.id == workspaceID && $0.isArchived == false },
             sort: [SortDescriptor(\Category.name, order: .forward)]
         )
     }
@@ -1696,7 +1696,7 @@ private struct OnboardingGestureTrainingStep: View {
     @State private var incomeInstruction: String = "Swipe right to edit, swipe left to delete."
     @State private var expenseInstruction: String = "Swipe right to edit, swipe left to delete."
     @State private var presetInstruction: String = "Swipe right to edit or archive, swipe left to delete."
-    @State private var categoryInstruction: String = "Swipe right to edit, swipe left to delete."
+    @State private var categoryInstruction: String = "Swipe right to edit or archive, swipe left to delete."
 
     init(workspace: Workspace) {
         self.workspace = workspace
@@ -1729,7 +1729,7 @@ private struct OnboardingGestureTrainingStep: View {
             sort: [SortDescriptor(\VariableExpense.transactionDate, order: .reverse)]
         )
         _categories = Query(
-            filter: #Predicate<Category> { $0.workspace?.id == workspaceID },
+            filter: #Predicate<Category> { $0.workspace?.id == workspaceID && $0.isArchived == false },
             sort: [SortDescriptor(\Category.name, order: .forward)]
         )
     }
@@ -2183,6 +2183,13 @@ private struct OnboardingGestureTrainingStep: View {
                 Label("Edit", systemImage: "pencil")
             }
             .tint(Color("AccentColor"))
+
+            Button {
+                categoryInstruction = "Leading swipe opened Archive."
+            } label: {
+                Label("Archive", systemImage: "archivebox")
+            }
+            .tint(Color("OffshoreSand"))
         }
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
             Button(role: .destructive) {

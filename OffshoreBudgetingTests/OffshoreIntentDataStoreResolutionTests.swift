@@ -178,4 +178,70 @@ struct OffshoreIntentDataStoreResolutionTests {
 
         #expect(resolved?.id == groceries.id)
     }
+
+    @Test func resolveCategory_ExplicitArchivedIDThrows() throws {
+        let context = try makeContext()
+        let dataStore = OffshoreIntentDataStore.shared
+
+        let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
+        let groceries = Category(
+            name: "Groceries",
+            hexColor: "#00AA00",
+            workspace: workspace,
+            isArchived: true,
+            archivedAt: Date()
+        )
+
+        context.insert(workspace)
+        context.insert(groceries)
+        try context.save()
+
+        do {
+            _ = try dataStore.resolveCategory(
+                id: groceries.id.uuidString,
+                merchant: "Unknown Merchant",
+                in: workspace,
+                modelContext: context
+            )
+            Issue.record("Expected archived category to be unavailable.")
+        } catch let error as OffshoreIntentDataStore.IntentDataError {
+            #expect(error == .categoryUnavailable)
+        } catch {
+            Issue.record("Unexpected error type: \(error)")
+        }
+    }
+
+    @Test func resolveCategory_MerchantRuleIgnoresArchivedPreferredCategory() throws {
+        let context = try makeContext()
+        let dataStore = OffshoreIntentDataStore.shared
+
+        let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
+        let groceries = Category(
+            name: "Groceries",
+            hexColor: "#00AA00",
+            workspace: workspace,
+            isArchived: true,
+            archivedAt: Date()
+        )
+        let merchantRule = ImportMerchantRule(
+            merchantKey: MerchantNormalizer.normalizeKey("Whole Foods"),
+            preferredName: "Whole Foods",
+            preferredCategory: groceries,
+            workspace: workspace
+        )
+
+        context.insert(workspace)
+        context.insert(groceries)
+        context.insert(merchantRule)
+        try context.save()
+
+        let resolved = try dataStore.resolveCategory(
+            id: nil,
+            merchant: "WHOLE FOODS #4287",
+            in: workspace,
+            modelContext: context
+        )
+
+        #expect(resolved == nil)
+    }
 }

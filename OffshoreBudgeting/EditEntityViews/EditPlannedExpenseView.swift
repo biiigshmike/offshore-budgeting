@@ -123,6 +123,10 @@ struct EditPlannedExpenseView: View {
         return current + existingOffset
     }
 
+    private var selectableCategories: [Category] {
+        CategoryArchivePolicy.selectableCategories(from: categories, selectedCategoryID: selectedCategoryID)
+    }
+
     private var canSave: Bool {
         let trimmedTitle = PresetFormView.trimmedTitle(title)
         guard !trimmedTitle.isEmpty else { return false }
@@ -209,7 +213,7 @@ struct EditPlannedExpenseView: View {
             Section("Category") {
                 Picker("Category", selection: $selectedCategoryID) {
                     Text("None").tag(UUID?.none)
-                    ForEach(categories) { category in
+                    ForEach(selectableCategories) { category in
                         Text(category.name).tag(UUID?.some(category.id))
                     }
                 }
@@ -349,7 +353,7 @@ struct EditPlannedExpenseView: View {
         }
 
         if selectedCategoryID == nil {
-            selectedCategoryID = DebugScreenshotFormDefaults.preferredCategoryID(in: categories)
+            selectedCategoryID = DebugScreenshotFormDefaults.preferredCategoryID(in: selectableCategories)
         }
 
         guard isSharedBalanceEnabled else { return }

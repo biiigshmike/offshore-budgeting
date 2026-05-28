@@ -91,11 +91,15 @@ struct EditPresetView: View {
         )
     }
 
+    private var selectableCategories: [Category] {
+        CategoryArchivePolicy.selectableCategories(from: categories, selectedCategoryID: selectedCategoryID)
+    }
+
     var body: some View {
         PresetFormView(
             workspace: workspace,
             cards: cards,
-            categories: categories,
+            categories: selectableCategories,
             title: $title,
             plannedAmountText: $plannedAmountText,
             frequency: $frequency,
@@ -157,7 +161,7 @@ struct EditPresetView: View {
             }
 
             if selectedCategoryID == nil {
-                selectedCategoryID = DebugScreenshotFormDefaults.preferredCategoryID(in: categories)
+                selectedCategoryID = DebugScreenshotFormDefaults.preferredCategoryID(in: selectableCategories)
             }
         }
     }
