@@ -100,6 +100,11 @@ struct SettingsReleaseLogsView: View {
                     systemImage: "chart.bar.xaxis",
                     title: "Spend Trends",
                     description: "The Spend Trends widget on the Home tab now supports pressing any bar in the graph to reveal expenses from that period."
+                ),
+                ReleaseItem(
+                    systemImage: "tag.fill",
+                    title: "Archive Categories",
+                    description: "Similar to Presets, you can now archive categories from the Manage Categories screen."
                 )
             ]
         ),

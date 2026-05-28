@@ -5400,6 +5400,52 @@
         }
       }
     },
+    "Archive Categories" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أرشفة الفئات"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kategorien archivieren"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Archive Categories"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Archivar categorías"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Archiver les catégories"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arquivar categorias"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "归档类别"
+          }
+        }
+      }
+    },
     "Archive Reconciliation?" : {
       "localizations" : {
         "ar" : {
@@ -26612,10 +26658,46 @@
       "comment" : "Instruction text explaining that spend trends chart bars are actionable.",
       "extractionState" : "extracted_with_value",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اضغط على شريط لعرض المصروفات في فئة الإنفاق تلك. اضغط عليه مرة أخرى لإخفاء التفاصيل."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drücken Sie einen Balken, um die Ausgaben in diesem Ausgabenabschnitt anzuzeigen. Drücken Sie ihn erneut, um die Aufschlüsselung auszublenden."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "Press a bar to view the expenses in that spending bucket. Press it again to hide the breakdown."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Presiona una barra para ver los gastos de ese periodo de gasto. Presiónala de nuevo para ocultar el desglose."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Touchez une barre pour afficher les dépenses de cette période de dépense. Touchez-la à nouveau pour masquer le détail."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pressione uma barra para ver as despesas desse período de gastos. Pressione novamente para ocultar o detalhamento."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按下柱形可查看该支出区段中的支出。再次按下可隐藏明细。"
           }
         }
       }
@@ -44303,6 +44385,52 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "快捷指令与小组件支持"
+          }
+        }
+      }
+    },
+    "Similar to Presets, you can now archive categories from the Manage Categories screen." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "على غرار الإعدادات المسبقة، يمكنك الآن أرشفة الفئات من شاشة إدارة الفئات."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ähnlich wie bei Voreinstellungen können Sie Kategorien jetzt über den Bildschirm „Kategorien verwalten“ archivieren."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Similar to Presets, you can now archive categories from the Manage Categories screen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De forma similar a las plantillas, ahora puedes archivar categorías desde la pantalla Gestionar categorías."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comme pour les préréglages, vous pouvez maintenant archiver les catégories depuis l’écran Gérer les catégories."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Assim como os modelos, agora você pode arquivar categorias pela tela Gerenciar categorias."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "与预设类似，你现在可以从管理类别屏幕归档类别。"
           }
         }
       }
