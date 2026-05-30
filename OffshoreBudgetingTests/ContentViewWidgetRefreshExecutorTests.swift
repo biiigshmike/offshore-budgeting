@@ -48,8 +48,8 @@ struct ContentViewWidgetRefreshExecutorTests {
         let card = Card(
             id: UUID(uuidString: "11111111-2222-3333-4444-555555555555")!,
             name: "Visa",
-            theme: "ocean",
-            effect: "plastic",
+            theme: "periwinkle",
+            effect: "glass",
             workspace: workspace
         )
         let category = Category(
@@ -73,7 +73,7 @@ struct ContentViewWidgetRefreshExecutorTests {
         let plannedExpense = PlannedExpense(
             title: "Dinner Reservation",
             plannedAmount: 72,
-            expenseDate: Calendar.current.date(byAdding: .day, value: 2, to: now) ?? now,
+            expenseDate: now,
             workspace: workspace,
             card: card,
             category: category,
@@ -116,6 +116,22 @@ struct ContentViewWidgetRefreshExecutorTests {
                 periodToken: CardWidgetPeriod.period.rawValue
             ) != nil
         )
+        let cardWidgetSnapshot = try #require(
+            CardWidgetSnapshotStore.load(
+                workspaceID: workspaceIDString,
+                cardID: cardIDString,
+                periodToken: CardWidgetPeriod.period.rawValue
+            )
+        )
+        let cardWidgetOption = try #require(
+            CardWidgetSnapshotStore.loadCardOptions(workspaceID: workspaceIDString).first {
+                $0.id == cardIDString
+            }
+        )
+        #expect(cardWidgetSnapshot.themeToken == "periwinkle")
+        #expect(cardWidgetSnapshot.effectToken == "glass")
+        #expect(cardWidgetOption.themeToken == "periwinkle")
+        #expect(cardWidgetOption.effectToken == "glass")
         #expect(
             NextPlannedExpenseWidgetSnapshotStore.load(
                 workspaceID: workspaceIDString,
@@ -141,7 +157,7 @@ struct ContentViewWidgetRefreshExecutorTests {
         let card = Card(
             id: UUID(uuidString: "22222222-3333-4444-5555-666666666666")!,
             name: "Visa",
-            theme: "ocean",
+            theme: "aqua",
             effect: "plastic",
             workspace: workspace
         )
@@ -218,5 +234,145 @@ struct ContentViewWidgetRefreshExecutorTests {
         #expect(abs(nonZeroBucket.total - 110) < 0.001)
         #expect(topCategory.name == "Dining")
         #expect(abs(topCategory.amount - 110) < 0.001)
+    }
+
+    @Test func widgetCardVisualResolver_recognizesCurrentAppTokensAndLegacyAliases() {
+        for theme in CardThemeOption.allCases {
+            #expect(WidgetCardVisualTheme.resolve(theme.rawValue).rawValue == theme.rawValue)
+        }
+
+        for effect in CardEffectOption.allCases {
+            #expect(WidgetCardVisualEffect.resolve(effect.rawValue).rawValue == effect.rawValue)
+        }
+
+        #expect(WidgetCardVisualTheme.resolve("ocean") == .aqua)
+        #expect(WidgetCardVisualTheme.resolve("graphite") == .charcoal)
+        #expect(WidgetCardVisualTheme.resolve("nebula") == .aster)
+        #expect(WidgetCardVisualEffect.resolve("none") == .plastic)
+    }
+
+    @Test func widgetPlaceholders_useCurrentCardVisualTokens() {
+        #expect(CardThemeOption(rawValue: CardWidgetSnapshot.placeholder.themeToken) != nil)
+        #expect(CardEffectOption(rawValue: CardWidgetSnapshot.placeholder.effectToken) != nil)
+
+        for item in NextPlannedExpenseWidgetSnapshot.placeholder.items {
+            #expect(CardThemeOption(rawValue: item.cardThemeToken) != nil)
+            #expect(CardEffectOption(rawValue: item.cardEffectToken) != nil)
+        }
+
+        for item in NextPlannedExpenseWidgetSnapshot.truncationPreview.items {
+            #expect(CardThemeOption(rawValue: item.cardThemeToken) != nil)
+            #expect(CardEffectOption(rawValue: item.cardEffectToken) != nil)
+        }
+    }
+
+    @Test func cardWidgetSnapshotRefresh_overwritesStyleAndOptionsWhenCardChanges() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+
+        let workspaceID = UUID(uuidString: "CCCCCCCC-DDDD-EEEE-FFFF-000000000001")!
+        let cardID = UUID(uuidString: "33333333-4444-5555-6666-777777777777")!
+        let workspace = Workspace(id: workspaceID, name: "Personal", hexColor: "#3B82F6")
+        let card = Card(
+            id: cardID,
+            name: "Everyday",
+            theme: "ruby",
+            effect: "plastic",
+            workspace: workspace
+        )
+        context.insert(workspace)
+        context.insert(card)
+        try context.save()
+
+        CardWidgetSnapshotBuilder.buildAndSaveAllPeriods(
+            modelContext: context,
+            workspaceID: workspaceID,
+            shouldReloadTimelines: false
+        )
+
+        card.name = "Travel"
+        card.theme = "aster"
+        card.effect = "holographic"
+        try context.save()
+
+        CardWidgetSnapshotBuilder.buildAndSaveAllPeriods(
+            modelContext: context,
+            workspaceID: workspaceID,
+            shouldReloadTimelines: false
+        )
+
+        let snapshot = try #require(
+            CardWidgetSnapshotStore.load(
+                workspaceID: workspaceID.uuidString,
+                cardID: cardID.uuidString,
+                periodToken: CardWidgetPeriod.period.rawValue
+            )
+        )
+        let option = try #require(
+            CardWidgetSnapshotStore.loadCardOptions(workspaceID: workspaceID.uuidString).first {
+                $0.id == cardID.uuidString
+            }
+        )
+
+        #expect(snapshot.title == "Travel")
+        #expect(snapshot.themeToken == "aster")
+        #expect(snapshot.effectToken == "holographic")
+        #expect(option.name == "Travel")
+        #expect(option.themeToken == "aster")
+        #expect(option.effectToken == "holographic")
+    }
+
+    @Test func cardWidgetSnapshotRefresh_prunesDeletedCardSnapshots() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+
+        let workspaceID = UUID(uuidString: "DDDDDDDD-EEEE-FFFF-0000-111111111111")!
+        let cardID = UUID(uuidString: "44444444-5555-6666-7777-888888888888")!
+        let workspace = Workspace(id: workspaceID, name: "Personal", hexColor: "#3B82F6")
+        let card = Card(
+            id: cardID,
+            name: "Everyday",
+            theme: "seafoam",
+            effect: "metal",
+            workspace: workspace
+        )
+        context.insert(workspace)
+        context.insert(card)
+        try context.save()
+
+        CardWidgetSnapshotBuilder.buildAndSaveAllPeriods(
+            modelContext: context,
+            workspaceID: workspaceID,
+            shouldReloadTimelines: false
+        )
+        #expect(
+            CardWidgetSnapshotStore.load(
+                workspaceID: workspaceID.uuidString,
+                cardID: cardID.uuidString,
+                periodToken: CardWidgetPeriod.period.rawValue
+            ) != nil
+        )
+
+        context.delete(card)
+        try context.save()
+
+        CardWidgetSnapshotBuilder.buildAndSaveAllPeriods(
+            modelContext: context,
+            workspaceID: workspaceID,
+            shouldReloadTimelines: false
+        )
+
+        #expect(
+            CardWidgetSnapshotStore.load(
+                workspaceID: workspaceID.uuidString,
+                cardID: cardID.uuidString,
+                periodToken: CardWidgetPeriod.period.rawValue
+            ) == nil
+        )
+        #expect(
+            CardWidgetSnapshotStore
+                .loadCardOptions(workspaceID: workspaceID.uuidString)
+                .contains(where: { $0.id == cardID.uuidString }) == false
+        )
     }
 }

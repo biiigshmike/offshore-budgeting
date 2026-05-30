@@ -1205,6 +1205,7 @@ struct CardDetailView: View {
         }
 
         modelContext.delete(card)
+        try? modelContext.save()
         dismiss()
     }
 

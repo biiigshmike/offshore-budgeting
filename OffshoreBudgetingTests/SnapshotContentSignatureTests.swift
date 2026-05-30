@@ -68,6 +68,30 @@ struct SnapshotContentSignatureTests {
         #expect(before != after)
     }
 
+    @Test func cardSignatureChangesWhenNameThemeOrEffectChanges() {
+        let card = Card(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000010")!,
+            name: "Everyday",
+            theme: "ruby",
+            effect: "plastic"
+        )
+
+        let original = SnapshotContentSignature.cards([card])
+
+        card.name = "Travel"
+        let renamed = SnapshotContentSignature.cards([card])
+
+        card.theme = "periwinkle"
+        let rethemed = SnapshotContentSignature.cards([card])
+
+        card.effect = "glass"
+        let restyled = SnapshotContentSignature.cards([card])
+
+        #expect(original != renamed)
+        #expect(renamed != rethemed)
+        #expect(rethemed != restyled)
+    }
+
     @Test func variableExpenseSignatureIsStableAcrossCollectionOrder() {
         let first = VariableExpense(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!,

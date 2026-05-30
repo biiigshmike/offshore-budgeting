@@ -14,6 +14,7 @@ enum ContentViewResumeTrigger: String, Equatable {
     case workspaceSelectionChanged
     case workspaceCountChanged
     case settingsChanged
+    case widgetDataChanged
     case savingsDataChanged
 }
 
@@ -56,7 +57,7 @@ enum ContentViewDeferredRefreshPlanner {
                 forceSavingsRefresh: savingsSignature != nil,
                 forceNotificationRefresh: notificationSignature != nil
             )
-        case .initialAppear, .workspaceSelectionChanged, .settingsChanged, .savingsDataChanged:
+        case .initialAppear, .workspaceSelectionChanged, .settingsChanged, .widgetDataChanged, .savingsDataChanged:
             return ContentViewDeferredRefreshPlan(
                 widgetSignature: widgetSignature,
                 savingsSignature: savingsSignature,
@@ -74,6 +75,7 @@ nonisolated struct ContentViewWidgetRefreshSignature: Equatable {
     let defaultBudgetingPeriodRaw: String
     let excludeFuturePlannedExpensesFromCalculations: Bool
     let excludeFutureVariableExpensesFromCalculations: Bool
+    let cardsSignature: Int
 }
 
 nonisolated struct ContentViewSavingsDataSignature: Equatable {

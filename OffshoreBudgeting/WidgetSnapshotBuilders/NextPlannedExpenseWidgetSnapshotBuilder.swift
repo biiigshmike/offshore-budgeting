@@ -27,13 +27,19 @@ enum NextPlannedExpenseWidgetSnapshotBuilder {
         )
 
         let cards = (try? modelContext.fetch(cardsDescriptor)) ?? []
+        let currentCardIDs = Set(cards.map { $0.id.uuidString })
+        NextPlannedExpenseWidgetSnapshotStore.pruneSnapshots(
+            workspaceID: workspaceIDString,
+            validCardIDs: currentCardIDs,
+            periodTokens: NextPlannedExpenseWidgetPeriod.allCases.map(\.rawValue)
+        )
 
         let options: [NextPlannedExpenseWidgetSnapshotStore.CardOption] = cards.map {
             .init(
                 id: $0.id.uuidString,
                 name: $0.name,
-                themeToken: $0.theme,
-                effectToken: $0.effect
+                themeToken: WidgetCardVisualTheme.resolve($0.theme).rawValue,
+                effectToken: WidgetCardVisualEffect.resolve($0.effect).rawValue
             )
         }
         NextPlannedExpenseWidgetSnapshotStore.saveCardOptions(options, workspaceID: workspaceIDString)
@@ -136,8 +142,8 @@ enum NextPlannedExpenseWidgetSnapshotBuilder {
                     expenseID: $0.id.uuidString,
                     expenseTitle: $0.title,
                     cardName: $0.card?.name ?? NSLocalizedString("Card", comment: "Fallback card title in widget snapshots."),
-                    cardThemeToken: $0.card?.theme ?? "graphite",
-                    cardEffectToken: $0.card?.effect ?? "plastic",
+                    cardThemeToken: WidgetCardVisualTheme.resolve($0.card?.theme ?? "").rawValue,
+                    cardEffectToken: WidgetCardVisualEffect.resolve($0.card?.effect ?? "").rawValue,
                     expenseDate: $0.expenseDate,
                 plannedAmount: $0.plannedAmount,
                 actualAmount: $0.effectiveAmount()

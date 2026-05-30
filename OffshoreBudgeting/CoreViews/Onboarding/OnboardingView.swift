@@ -1375,6 +1375,7 @@ private struct OnboardingCardsStep: View {
         }
 
         modelContext.delete(card)
+        try? modelContext.save()
     }
 
     @ViewBuilder

@@ -16,7 +16,8 @@ struct ContentViewResumeCoordinatorTests {
         workspaceID: UUID(uuidString: "11111111-1111-1111-1111-111111111111")!,
         defaultBudgetingPeriodRaw: BudgetingPeriod.monthly.rawValue,
         excludeFuturePlannedExpensesFromCalculations: false,
-        excludeFutureVariableExpensesFromCalculations: false
+        excludeFutureVariableExpensesFromCalculations: false,
+        cardsSignature: 10
     )
 
     private let savingsSignature = ContentViewSavingsRefreshSignature(
@@ -59,6 +60,7 @@ struct ContentViewResumeCoordinatorTests {
             actual?.excludeFutureVariableExpensesFromCalculations
                 == expected?.excludeFutureVariableExpensesFromCalculations
         )
+        #expect(actual?.cardsSignature == expected?.cardsSignature)
     }
 
     private func expectSavingsSignature(
@@ -114,7 +116,8 @@ struct ContentViewResumeCoordinatorTests {
             workspaceID: widgetSignature.workspaceID,
             defaultBudgetingPeriodRaw: BudgetingPeriod.yearly.rawValue,
             excludeFuturePlannedExpensesFromCalculations: false,
-            excludeFutureVariableExpensesFromCalculations: false
+            excludeFutureVariableExpensesFromCalculations: false,
+            cardsSignature: widgetSignature.cardsSignature
         )
         let second = coordinator.schedule(
             widgetSignature: changedWidgetSignature,
@@ -146,6 +149,33 @@ struct ContentViewResumeCoordinatorTests {
         )
 
         #expect(second == nil)
+    }
+
+    @Test func schedule_runsWidgetWorkWhenCardsSignatureChanges() {
+        var coordinator = ContentViewResumeCoordinator()
+
+        let first = coordinator.schedule(
+            widgetSignature: widgetSignature,
+            savingsSignature: nil,
+            notificationSignature: nil
+        )!
+        coordinator.markWidgetRefreshCompleted(first)
+
+        let changedCardsSignature = ContentViewWidgetRefreshSignature(
+            workspaceID: widgetSignature.workspaceID,
+            defaultBudgetingPeriodRaw: widgetSignature.defaultBudgetingPeriodRaw,
+            excludeFuturePlannedExpensesFromCalculations: widgetSignature.excludeFuturePlannedExpensesFromCalculations,
+            excludeFutureVariableExpensesFromCalculations: widgetSignature.excludeFutureVariableExpensesFromCalculations,
+            cardsSignature: widgetSignature.cardsSignature + 1
+        )
+        let second = coordinator.schedule(
+            widgetSignature: changedCardsSignature,
+            savingsSignature: nil,
+            notificationSignature: nil
+        )
+
+        #expect(second != nil)
+        expectWidgetSignature(second?.widgetSignature, equals: changedCardsSignature)
     }
 
     @Test func phaseCompletionLeavesOnlyRemainingWorkPending() {

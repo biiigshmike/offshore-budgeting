@@ -67,6 +67,7 @@ struct AddCardView: View {
         )
 
         modelContext.insert(card)
+        try? modelContext.save()
         dismiss()
     }
 }

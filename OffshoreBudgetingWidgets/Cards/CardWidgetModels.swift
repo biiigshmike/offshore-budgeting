@@ -8,6 +8,78 @@
 import Foundation
 import WidgetKit
 
+nonisolated enum WidgetCardVisualTheme: String, CaseIterable, Hashable {
+    case ruby
+    case aqua
+    case ultraviolet
+    case charcoal
+    case seafoam
+    case sunset
+    case midnight
+    case emerald
+    case sunrise
+    case fuschia
+    case periwinkle
+    case aster
+
+    static let defaultTheme: WidgetCardVisualTheme = .ruby
+
+    static func resolve(_ token: String) -> WidgetCardVisualTheme {
+        switch token.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case ruby.rawValue, "rose":
+            return .ruby
+        case aqua.rawValue, "ocean":
+            return .aqua
+        case ultraviolet.rawValue, "violet":
+            return .ultraviolet
+        case charcoal.rawValue, "graphite":
+            return .charcoal
+        case seafoam.rawValue, "mint":
+            return .seafoam
+        case sunset.rawValue:
+            return .sunset
+        case midnight.rawValue:
+            return .midnight
+        case emerald.rawValue, "forest":
+            return .emerald
+        case sunrise.rawValue:
+            return .sunrise
+        case fuschia.rawValue, "blossom", "fuchsia":
+            return .fuschia
+        case periwinkle.rawValue, "lavender":
+            return .periwinkle
+        case aster.rawValue, "nebula":
+            return .aster
+        default:
+            return defaultTheme
+        }
+    }
+}
+
+nonisolated enum WidgetCardVisualEffect: String, CaseIterable, Hashable {
+    case plastic
+    case metal
+    case holographic
+    case glass
+
+    static let defaultEffect: WidgetCardVisualEffect = .plastic
+
+    static func resolve(_ token: String) -> WidgetCardVisualEffect {
+        switch token.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case metal.rawValue:
+            return .metal
+        case holographic.rawValue:
+            return .holographic
+        case glass.rawValue:
+            return .glass
+        case plastic.rawValue, "none":
+            return .plastic
+        default:
+            return defaultEffect
+        }
+    }
+}
+
 nonisolated struct CardWidgetSnapshot: Codable, Hashable {
     let title: String                 // Card name
     let cardID: String
@@ -41,8 +113,8 @@ extension CardWidgetSnapshot {
         CardWidgetSnapshot(
             title: "Everyday Card",
             cardID: UUID().uuidString,
-            themeToken: "graphite",
-            effectToken: "plastic",
+            themeToken: WidgetCardVisualTheme.ruby.rawValue,
+            effectToken: WidgetCardVisualEffect.plastic.rawValue,
             periodToken: "1M",
             rangeStart: Calendar.current.date(byAdding: .day, value: -29, to: .now) ?? .now,
             rangeEnd: .now,

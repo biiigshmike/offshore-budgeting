@@ -54,7 +54,13 @@ struct NextPlannedExpenseWidgetProvider: AppIntentTimelineProvider {
             return (nil, nil)
         }
 
+        let options = NextPlannedExpenseWidgetSnapshotStore.loadCardOptions(workspaceID: workspaceID)
         let cardID = configuration.resolvedCardID
+        if let cardID,
+           !options.isEmpty,
+           !options.contains(where: { $0.id == cardID }) {
+            return (nil, nil)
+        }
 
         let snapshot = NextPlannedExpenseWidgetSnapshotStore.load(
             workspaceID: workspaceID,

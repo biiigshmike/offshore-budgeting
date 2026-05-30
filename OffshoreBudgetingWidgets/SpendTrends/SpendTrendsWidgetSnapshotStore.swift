@@ -55,6 +55,23 @@ enum SpendTrendsWidgetSnapshotStore {
         return try? JSONDecoder().decode(SpendTrendsWidgetSnapshot.self, from: data)
     }
 
+    nonisolated static func pruneSnapshots(workspaceID: String, validCardIDs: Set<String>, periodTokens: [String]) {
+        guard let defaults else { return }
+
+        let prefix = "spendTrendsWidget.snapshot.\(workspaceID)."
+        let periodSuffixes = periodTokens.map { ".\($0)" }
+
+        for key in defaults.dictionaryRepresentation().keys where key.hasPrefix(prefix) {
+            let suffix = String(key.dropFirst(prefix.count))
+            guard let periodSuffix = periodSuffixes.first(where: { suffix.hasSuffix($0) }) else { continue }
+
+            let cardScope = String(suffix.dropLast(periodSuffix.count))
+            if cardScope != "ALL", !validCardIDs.contains(cardScope) {
+                defaults.removeObject(forKey: key)
+            }
+        }
+    }
+
     struct CardOption: Codable, Hashable {
         let id: String
         let name: String

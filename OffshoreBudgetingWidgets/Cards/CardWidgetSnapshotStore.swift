@@ -56,6 +56,23 @@ enum CardWidgetSnapshotStore {
         return try? JSONDecoder().decode(CardWidgetSnapshot.self, from: data)
     }
 
+    nonisolated static func pruneSnapshots(workspaceID: String, validCardIDs: Set<String>, periodTokens: [String]) {
+        guard let defaults else { return }
+
+        let prefix = "cardWidget.snapshot.\(workspaceID)."
+        let periodSuffixes = periodTokens.map { ".\($0)" }
+
+        for key in defaults.dictionaryRepresentation().keys where key.hasPrefix(prefix) {
+            let suffix = String(key.dropFirst(prefix.count))
+            guard let periodSuffix = periodSuffixes.first(where: { suffix.hasSuffix($0) }) else { continue }
+
+            let cardID = String(suffix.dropLast(periodSuffix.count))
+            if !validCardIDs.contains(cardID) {
+                defaults.removeObject(forKey: key)
+            }
+        }
+    }
+
     // MARK: - Card Options (for AppEntity picker)
 
     struct CardOption: Codable, Hashable {

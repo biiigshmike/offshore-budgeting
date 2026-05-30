@@ -261,6 +261,7 @@ struct CardsView: View {
         }
 
         modelContext.delete(card)
+        try? modelContext.save()
     }
 
     private func consumePendingShortcutActionIfNeeded() {

@@ -33,9 +33,20 @@ enum SpendTrendsWidgetSnapshotBuilder {
             sortBy: [SortDescriptor(\Card.name, order: .forward)]
         )
         let cards = (try? modelContext.fetch(cardsDescriptor)) ?? []
+        let currentCardIDs = Set(cards.map { $0.id.uuidString })
+        SpendTrendsWidgetSnapshotStore.pruneSnapshots(
+            workspaceID: workspaceIDString,
+            validCardIDs: currentCardIDs,
+            periodTokens: SpendTrendsWidgetPeriod.allCases.map(\.rawValue)
+        )
 
         let cardOptions: [SpendTrendsWidgetSnapshotStore.CardOption] = cards.map {
-            .init(id: $0.id.uuidString, name: $0.name, themeToken: $0.theme, effectToken: $0.effect)
+            .init(
+                id: $0.id.uuidString,
+                name: $0.name,
+                themeToken: WidgetCardVisualTheme.resolve($0.theme).rawValue,
+                effectToken: WidgetCardVisualEffect.resolve($0.effect).rawValue
+            )
         }
         SpendTrendsWidgetSnapshotStore.saveCardOptions(cardOptions, workspaceID: workspaceIDString)
 

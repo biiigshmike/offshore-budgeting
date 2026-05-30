@@ -9,6 +9,11 @@ import SwiftUI
 import SwiftData
 import Foundation
 
+private struct ContentViewCardDataSignature: Equatable {
+    let workspaceID: UUID
+    let cardsSignature: Int
+}
+
 struct ContentView: View {
     let initialSectionOverride: AppSection?
     let resumeState: ContentViewResumeState
@@ -73,6 +78,7 @@ struct ContentView: View {
 
     @Query(sort: \Workspace.name, order: .forward)
     private var workspaces: [Workspace]
+    @Query private var allCards: [Card]
     @Query private var allIncomes: [Income]
     @Query private var allPlannedExpenses: [PlannedExpense]
     @Query private var allVariableExpenses: [VariableExpense]
@@ -195,6 +201,21 @@ struct ContentView: View {
                 syncGeneralSettingsToWidgets()
                 scheduleDeferredResumeRefresh(
                     trigger: .settingsChanged,
+                    includesWidgets: true,
+                    includesSavings: false,
+                    includesNotifications: false
+                )
+            }
+            .onChange(of: selectedWorkspaceCardDataSignature) { oldValue, newValue in
+                guard
+                    let oldValue,
+                    let newValue,
+                    oldValue.workspaceID == newValue.workspaceID,
+                    oldValue.cardsSignature != newValue.cardsSignature
+                else { return }
+
+                scheduleDeferredResumeRefresh(
+                    trigger: .widgetDataChanged,
                     includesWidgets: true,
                     includesSavings: false,
                     includesNotifications: false
@@ -487,7 +508,7 @@ struct ContentView: View {
         switch trigger {
         case .initialAppear, .workspaceCountChanged:
             return ResumeScheduling.coldLaunchDelayNanos
-        case .sceneBecameActive, .workspaceSelectionChanged, .settingsChanged, .savingsDataChanged:
+        case .sceneBecameActive, .workspaceSelectionChanged, .settingsChanged, .widgetDataChanged, .savingsDataChanged:
             return ResumeScheduling.standardDelayNanos
         }
     }
@@ -496,7 +517,7 @@ struct ContentView: View {
         switch trigger {
         case .initialAppear, .sceneBecameActive:
             return 900_000_000
-        case .workspaceSelectionChanged, .workspaceCountChanged, .settingsChanged, .savingsDataChanged:
+        case .workspaceSelectionChanged, .workspaceCountChanged, .settingsChanged, .widgetDataChanged, .savingsDataChanged:
             return 0
         }
     }
@@ -541,8 +562,21 @@ struct ContentView: View {
             workspaceID: workspaceID,
             defaultBudgetingPeriodRaw: defaultBudgetingPeriodRaw,
             excludeFuturePlannedExpensesFromCalculations: excludeFuturePlannedExpensesFromCalculations,
-            excludeFutureVariableExpensesFromCalculations: excludeFutureVariableExpensesFromCalculations
+            excludeFutureVariableExpensesFromCalculations: excludeFutureVariableExpensesFromCalculations,
+            cardsSignature: SnapshotContentSignature.cards(cards(in: workspaceID))
         )
+    }
+
+    private var selectedWorkspaceCardDataSignature: ContentViewCardDataSignature? {
+        guard let workspaceID = UUID(uuidString: selectedWorkspaceID) else { return nil }
+        return ContentViewCardDataSignature(
+            workspaceID: workspaceID,
+            cardsSignature: SnapshotContentSignature.cards(cards(in: workspaceID))
+        )
+    }
+
+    private func cards(in workspaceID: UUID) -> [Card] {
+        allCards.filter { $0.workspace?.id == workspaceID }
     }
 
     private var savingsRefreshSignature: ContentViewSavingsRefreshSignature? {

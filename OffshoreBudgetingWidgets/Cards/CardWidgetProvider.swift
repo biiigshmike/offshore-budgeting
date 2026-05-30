@@ -54,11 +54,18 @@ struct CardWidgetProvider: AppIntentTimelineProvider {
             return (nil, nil)
         }
 
+        let options = CardWidgetSnapshotStore.loadCardOptions(workspaceID: workspaceID)
+
         // Resolve card selection:
         // 1) config card
         // 2) first cached card option in this workspace (keeps the widget usable without forcing selection)
-        let cardID = configuration.resolvedCardID ?? CardWidgetSnapshotStore.loadCardOptions(workspaceID: workspaceID).first?.id
+        let cardID = configuration.resolvedCardID ?? options.first?.id
         guard let cardID, !cardID.isEmpty else {
+            return (nil, nil)
+        }
+        if configuration.resolvedCardID != nil,
+           !options.isEmpty,
+           !options.contains(where: { $0.id == cardID }) {
             return (nil, nil)
         }
 

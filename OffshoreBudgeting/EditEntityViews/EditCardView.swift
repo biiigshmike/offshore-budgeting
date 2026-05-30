@@ -13,6 +13,7 @@ struct EditCardView: View {
     let workspace: Workspace
     let card: Card
 
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
     @State private var name: String
@@ -68,6 +69,7 @@ struct EditCardView: View {
         card.name = CardFormView.trimmedName(name)
         card.effect = effect.rawValue
         card.theme = theme.rawValue
+        try? modelContext.save()
         dismiss()
     }
 }

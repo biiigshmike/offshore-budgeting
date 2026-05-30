@@ -30,11 +30,11 @@ struct HomeNextPlannedExpenseTile: View {
     }
 
     private var themeOption: CardThemeOption {
-        CardThemeOption(rawValue: card?.theme ?? "graphite") ?? .charcoal
+        CardThemeOption(rawValue: card?.theme ?? CardThemeOption.charcoal.rawValue) ?? .charcoal
     }
 
     private var effectOption: CardEffectOption {
-        CardEffectOption(rawValue: card?.effect ?? "plastic") ?? .plastic
+        CardEffectOption(rawValue: card?.effect ?? CardEffectOption.plastic.rawValue) ?? .plastic
     }
 
     var body: some View {

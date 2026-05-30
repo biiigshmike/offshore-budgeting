@@ -28,21 +28,26 @@ enum CardWidgetSnapshotBuilder {
         )
 
         let cards = (try? modelContext.fetch(cardsDescriptor)) ?? []
+        let allPeriods: [CardWidgetPeriod] = [
+            .period, .oneWeek, .oneMonth, .oneYear, .q
+        ]
+        let currentCardIDs = Set(cards.map { $0.id.uuidString })
+        CardWidgetSnapshotStore.pruneSnapshots(
+            workspaceID: workspaceIDString,
+            validCardIDs: currentCardIDs,
+            periodTokens: allPeriods.map(\.rawValue)
+        )
 
         // Save card options so the widget AppEntity picker can work.
         let options: [CardWidgetSnapshotStore.CardOption] = cards.map {
             .init(
                 id: $0.id.uuidString,
                 name: $0.name,
-                themeToken: $0.theme,
-                effectToken: $0.effect
+                themeToken: WidgetCardVisualTheme.resolve($0.theme).rawValue,
+                effectToken: WidgetCardVisualEffect.resolve($0.effect).rawValue
             )
         }
         CardWidgetSnapshotStore.saveCardOptions(options, workspaceID: workspaceIDString)
-
-        let allPeriods: [CardWidgetPeriod] = [
-            .period, .oneWeek, .oneMonth, .oneYear, .q
-        ]
 
         for card in cards {
             let cardIDString = card.id.uuidString
@@ -171,8 +176,8 @@ enum CardWidgetSnapshotBuilder {
         return CardWidgetSnapshot(
             title: card.name,
             cardID: card.id.uuidString,
-            themeToken: card.theme,
-            effectToken: card.effect,
+            themeToken: WidgetCardVisualTheme.resolve(card.theme).rawValue,
+            effectToken: WidgetCardVisualEffect.resolve(card.effect).rawValue,
             periodToken: period.rawValue,
             rangeStart: start,
             rangeEnd: end,

@@ -54,7 +54,14 @@ struct SpendTrendsWidgetProvider: AppIntentTimelineProvider {
             return (nil, nil)
         }
 
+        let options = SpendTrendsWidgetSnapshotStore.loadCardOptions(workspaceID: workspaceID)
         let cardID = configuration.resolvedCardID
+        if let cardID,
+           !options.isEmpty,
+           !options.contains(where: { $0.id == cardID }) {
+            return (nil, nil)
+        }
+
         let snapshot = SpendTrendsWidgetSnapshotStore.load(
             workspaceID: workspaceID,
             cardID: cardID,
