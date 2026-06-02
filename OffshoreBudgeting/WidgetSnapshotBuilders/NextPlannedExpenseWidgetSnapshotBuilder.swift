@@ -9,14 +9,16 @@ import Foundation
 import SwiftData
 
 enum NextPlannedExpenseWidgetSnapshotBuilder {
+    nonisolated private static let futureTimelineHorizon = 3
+    nonisolated private static let dailyTimelineHorizon = 14
 
     nonisolated static func buildAndSaveAllPeriods(
         modelContext: ModelContext,
         workspaceID: UUID,
+        now: Date = Date(),
         shouldReloadTimelines: Bool = true
     ) {
         let workspaceIDString = workspaceID.uuidString
-        let now = Date()
 
         let wid = workspaceID
         let cardsDescriptor = FetchDescriptor<Card>(
@@ -59,6 +61,24 @@ enum NextPlannedExpenseWidgetSnapshotBuilder {
                     cardID: nil,
                     periodToken: period.rawValue
                 )
+                NextPlannedExpenseWidgetSnapshotStore.replaceTimelineSnapshots(
+                    futureTimelineSnapshots(
+                        currentSnapshot: allCardsSnapshot,
+                        now: now
+                    ) { entryDate in
+                        buildSnapshot(
+                            modelContext: modelContext,
+                            workspaceID: workspaceID,
+                            period: period,
+                            cardID: nil,
+                            now: entryDate,
+                            maxItems: 4
+                        )
+                    },
+                    workspaceID: workspaceIDString,
+                    cardID: nil,
+                    periodToken: period.rawValue
+                )
             }
 
             for card in cards {
@@ -74,6 +94,24 @@ enum NextPlannedExpenseWidgetSnapshotBuilder {
                 ) {
                     NextPlannedExpenseWidgetSnapshotStore.save(
                         snapshot: snapshot,
+                        workspaceID: workspaceIDString,
+                        cardID: cardIDString,
+                        periodToken: period.rawValue
+                    )
+                    NextPlannedExpenseWidgetSnapshotStore.replaceTimelineSnapshots(
+                        futureTimelineSnapshots(
+                            currentSnapshot: snapshot,
+                            now: now
+                        ) { entryDate in
+                            buildSnapshot(
+                                modelContext: modelContext,
+                                workspaceID: workspaceID,
+                                period: period,
+                                cardID: card.id,
+                                now: entryDate,
+                                maxItems: 4
+                            )
+                        },
                         workspaceID: workspaceIDString,
                         cardID: cardIDString,
                         periodToken: period.rawValue
@@ -150,8 +188,6 @@ enum NextPlannedExpenseWidgetSnapshotBuilder {
             )
         }
 
-        guard !items.isEmpty else { return nil }
-
         return NextPlannedExpenseWidgetSnapshot(
             title: NSLocalizedString("Next Planned Expense", comment: "Next planned expense widget title."),
             periodToken: period.rawValue,
@@ -190,10 +226,8 @@ enum NextPlannedExpenseWidgetSnapshotBuilder {
             return (cal.startOfDay(for: start), endOfDay(end, calendar: cal))
 
         case .q:
-            let interval = cal.dateInterval(of: .year, for: now)
-            let start = interval?.start ?? cal.startOfDay(for: now)
-            let end = cal.date(byAdding: DateComponents(year: 1, day: -1), to: start) ?? now
-            return (cal.startOfDay(for: start), endOfDay(end, calendar: cal))
+            let range = BudgetingPeriod.quarterly.defaultRange(containing: now, calendar: cal)
+            return (cal.startOfDay(for: range.start), endOfDay(range.end, calendar: cal))
 
         case .period:
             let period = defaultBudgetingPeriodFromSharedDefaults()
@@ -206,6 +240,33 @@ enum NextPlannedExpenseWidgetSnapshotBuilder {
         let defaults = UserDefaults(suiteName: NextPlannedExpenseWidgetSnapshotStore.appGroupID)
         let raw = defaults?.string(forKey: "general_defaultBudgetingPeriod") ?? BudgetingPeriod.monthly.rawValue
         return BudgetingPeriod(rawValue: raw) ?? .monthly
+    }
+
+    nonisolated private static func futureTimelineSnapshots(
+        currentSnapshot: NextPlannedExpenseWidgetSnapshot,
+        now: Date,
+        build: (Date) -> NextPlannedExpenseWidgetSnapshot?
+    ) -> [(date: Date, snapshot: NextPlannedExpenseWidgetSnapshot)] {
+        var keyed: [Int64: (date: Date, snapshot: NextPlannedExpenseWidgetSnapshot)] = [:]
+
+        func append(date: Date) {
+            guard let snapshot = build(date) else { return }
+            let key = Int64(date.timeIntervalSinceReferenceDate.rounded(.down))
+            keyed[key] = (date, snapshot)
+        }
+
+        var rangeEnd = currentSnapshot.rangeEnd
+        for _ in 0..<futureTimelineHorizon {
+            let entryDate = WidgetTimelineSchedule.nextEntryDate(afterRangeEnd: rangeEnd, now: now)
+            append(date: entryDate)
+            rangeEnd = keyed[Int64(entryDate.timeIntervalSinceReferenceDate.rounded(.down))]?.snapshot.rangeEnd ?? rangeEnd
+        }
+
+        for entryDate in WidgetTimelineSchedule.dailyEntryDates(after: now, count: dailyTimelineHorizon) {
+            append(date: entryDate)
+        }
+
+        return keyed.values.sorted { $0.date < $1.date }
     }
 
     nonisolated private static func endOfDay(_ date: Date, calendar: Calendar) -> Date {

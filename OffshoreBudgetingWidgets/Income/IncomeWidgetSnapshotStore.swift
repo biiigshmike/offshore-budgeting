@@ -43,6 +43,56 @@ enum IncomeWidgetSnapshotStore {
         return try? JSONDecoder().decode(IncomeWidgetSnapshot.self, from: data)
     }
 
+    nonisolated static func saveTimelineSnapshot(
+        snapshot: IncomeWidgetSnapshot,
+        workspaceID: String,
+        periodToken: String,
+        date: Date
+    ) {
+        WidgetTimelineSnapshotStorage.saveTimelineSnapshot(
+            defaults: defaults,
+            baseKey: key(workspaceID: workspaceID, periodToken: periodToken),
+            date: date,
+            snapshot: snapshot
+        )
+    }
+
+    nonisolated static func replaceTimelineSnapshots(
+        _ snapshots: [(date: Date, snapshot: IncomeWidgetSnapshot)],
+        workspaceID: String,
+        periodToken: String
+    ) {
+        WidgetTimelineSnapshotStorage.replaceTimelineSnapshots(
+            defaults: defaults,
+            baseKey: key(workspaceID: workspaceID, periodToken: periodToken),
+            snapshots: snapshots
+        )
+    }
+
+    nonisolated static func loadTimelineSnapshots(
+        workspaceID: String,
+        periodToken: String
+    ) -> [(date: Date, snapshot: IncomeWidgetSnapshot)] {
+        WidgetTimelineSnapshotStorage.loadTimelineSnapshots(
+            defaults: defaults,
+            baseKey: key(workspaceID: workspaceID, periodToken: periodToken),
+            as: IncomeWidgetSnapshot.self
+        )
+    }
+
+    nonisolated static func loadBestSnapshot(
+        workspaceID: String,
+        periodToken: String,
+        asOf date: Date
+    ) -> IncomeWidgetSnapshot? {
+        WidgetTimelineSnapshotStorage.loadBestTimelineSnapshot(
+            defaults: defaults,
+            baseKey: key(workspaceID: workspaceID, periodToken: periodToken),
+            asOf: date,
+            as: IncomeWidgetSnapshot.self
+        ) ?? load(workspaceID: workspaceID, periodToken: periodToken)
+    }
+
     nonisolated static func selectedWorkspaceID() -> String? {
         defaults?.string(forKey: selectedWorkspaceKey)
     }

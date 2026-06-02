@@ -32,6 +32,52 @@ enum ForecastSavingsWidgetSnapshotStore {
         return try? JSONDecoder().decode(ForecastSavingsWidgetSnapshot.self, from: data)
     }
 
+    nonisolated static func saveTimelineSnapshot(
+        snapshot: ForecastSavingsWidgetSnapshot,
+        workspaceID: String,
+        date: Date
+    ) {
+        WidgetTimelineSnapshotStorage.saveTimelineSnapshot(
+            defaults: defaults,
+            baseKey: snapshotKey(workspaceID: workspaceID),
+            date: date,
+            snapshot: snapshot
+        )
+    }
+
+    nonisolated static func replaceTimelineSnapshots(
+        _ snapshots: [(date: Date, snapshot: ForecastSavingsWidgetSnapshot)],
+        workspaceID: String
+    ) {
+        WidgetTimelineSnapshotStorage.replaceTimelineSnapshots(
+            defaults: defaults,
+            baseKey: snapshotKey(workspaceID: workspaceID),
+            snapshots: snapshots
+        )
+    }
+
+    nonisolated static func loadTimelineSnapshots(
+        workspaceID: String
+    ) -> [(date: Date, snapshot: ForecastSavingsWidgetSnapshot)] {
+        WidgetTimelineSnapshotStorage.loadTimelineSnapshots(
+            defaults: defaults,
+            baseKey: snapshotKey(workspaceID: workspaceID),
+            as: ForecastSavingsWidgetSnapshot.self
+        )
+    }
+
+    nonisolated static func loadBestSnapshot(
+        workspaceID: String,
+        asOf date: Date
+    ) -> ForecastSavingsWidgetSnapshot? {
+        WidgetTimelineSnapshotStorage.loadBestTimelineSnapshot(
+            defaults: defaults,
+            baseKey: snapshotKey(workspaceID: workspaceID),
+            asOf: date,
+            as: ForecastSavingsWidgetSnapshot.self
+        ) ?? load(workspaceID: workspaceID)
+    }
+
     nonisolated static func selectedWorkspaceID() -> String? {
         defaults?.string(forKey: selectedWorkspaceKey)
     }

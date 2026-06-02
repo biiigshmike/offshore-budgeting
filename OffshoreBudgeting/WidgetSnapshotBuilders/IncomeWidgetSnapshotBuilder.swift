@@ -10,21 +10,22 @@ import Foundation
 import SwiftData
 
 enum IncomeWidgetSnapshotBuilder {
+    nonisolated private static let futureTimelineHorizon = 3
 
     nonisolated static func buildAndSaveAllPeriods(
         modelContext: ModelContext,
         workspaceID: UUID,
+        now: Date = Date(),
         shouldReloadTimelines: Bool = true
     ) {
         let workspaceIDString = workspaceID.uuidString
-        let now = Date()
 
         let allPeriods: [IncomeWidgetPeriod] = [
             .period, .oneWeek, .oneMonth, .oneYear, .q
         ]
 
         for period in allPeriods {
-            guard let snapshot = buildSnapshot(
+            guard let currentSnapshot = buildSnapshot(
                 modelContext: modelContext,
                 workspaceID: workspaceID,
                 period: period,
@@ -33,7 +34,23 @@ enum IncomeWidgetSnapshotBuilder {
             ) else { continue }
 
             IncomeWidgetSnapshotStore.save(
-                snapshot: snapshot,
+                snapshot: currentSnapshot,
+                workspaceID: workspaceIDString,
+                periodToken: period.rawValue
+            )
+            IncomeWidgetSnapshotStore.replaceTimelineSnapshots(
+                futureTimelineSnapshots(
+                    currentSnapshot: currentSnapshot,
+                    now: now
+                ) { entryDate in
+                    buildSnapshot(
+                        modelContext: modelContext,
+                        workspaceID: workspaceID,
+                        period: period,
+                        now: entryDate,
+                        maxRecent: 8
+                    )
+                },
                 workspaceID: workspaceIDString,
                 periodToken: period.rawValue
             )
@@ -135,10 +152,8 @@ enum IncomeWidgetSnapshotBuilder {
             return (cal.startOfDay(for: start), endOfDay(end, calendar: cal))
 
         case .q:
-            let interval = cal.dateInterval(of: .year, for: now)
-            let start = interval?.start ?? cal.startOfDay(for: now)
-            let end = cal.date(byAdding: DateComponents(year: 1, day: -1), to: start) ?? now
-            return (cal.startOfDay(for: start), endOfDay(end, calendar: cal))
+            let range = BudgetingPeriod.quarterly.defaultRange(containing: now, calendar: cal)
+            return (cal.startOfDay(for: range.start), endOfDay(range.end, calendar: cal))
 
         case .period:
             let period = defaultBudgetingPeriodFromSharedDefaults()
@@ -151,6 +166,24 @@ enum IncomeWidgetSnapshotBuilder {
         let defaults = UserDefaults(suiteName: IncomeWidgetSnapshotStore.appGroupID)
         let raw = defaults?.string(forKey: "general_defaultBudgetingPeriod") ?? BudgetingPeriod.monthly.rawValue
         return BudgetingPeriod(rawValue: raw) ?? .monthly
+    }
+
+    nonisolated private static func futureTimelineSnapshots(
+        currentSnapshot: IncomeWidgetSnapshot,
+        now: Date,
+        build: (Date) -> IncomeWidgetSnapshot?
+    ) -> [(date: Date, snapshot: IncomeWidgetSnapshot)] {
+        var results: [(date: Date, snapshot: IncomeWidgetSnapshot)] = []
+        var rangeEnd = currentSnapshot.rangeEnd
+
+        for _ in 0..<futureTimelineHorizon {
+            let entryDate = WidgetTimelineSchedule.nextEntryDate(afterRangeEnd: rangeEnd, now: now)
+            guard let snapshot = build(entryDate) else { break }
+            results.append((entryDate, snapshot))
+            rangeEnd = snapshot.rangeEnd
+        }
+
+        return results
     }
 
     nonisolated private static func endOfDay(_ date: Date, calendar: Calendar) -> Date {

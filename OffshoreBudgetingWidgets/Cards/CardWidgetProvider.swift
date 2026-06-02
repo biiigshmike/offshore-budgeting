@@ -32,22 +32,43 @@ struct CardWidgetProvider: AppIntentTimelineProvider {
     }
 
     func timeline(for configuration: CardWidgetConfigurationIntent, in context: Context) async -> Timeline<CardWidgetEntry> {
-        let resolved = loadSnapshot(configuration: configuration)
+        let now = Date()
+        let resolved = loadSnapshot(configuration: configuration, asOf: now)
 
-        let entry = CardWidgetEntry(
-            date: .now,
-            periodToken: configuration.resolvedPeriodToken,
-            cardID: resolved.cardID,
-            snapshot: resolved.snapshot
+        var entries = [
+            CardWidgetEntry(
+                date: now,
+                periodToken: configuration.resolvedPeriodToken,
+                cardID: resolved.cardID,
+                snapshot: resolved.snapshot
+            )
+        ]
+        entries.append(
+            contentsOf: loadFutureTimelineSnapshots(
+                configuration: configuration,
+                cardID: resolved.cardID,
+                after: now
+            ).map {
+                CardWidgetEntry(
+                    date: $0.date,
+                    periodToken: configuration.resolvedPeriodToken,
+                    cardID: resolved.cardID,
+                    snapshot: $0.snapshot
+                )
+            }
         )
 
-        let nextRefresh = Calendar.current.date(byAdding: .hour, value: 3, to: .now)
-            ?? .now.addingTimeInterval(3 * 3600)
+        let policy: TimelineReloadPolicy = entries.count > 1
+            ? .atEnd
+            : .after(WidgetTimelineSchedule.fallbackRefreshDate(afterRangeEnd: resolved.snapshot?.rangeEnd, now: now))
 
-        return Timeline(entries: [entry], policy: .after(nextRefresh))
+        return Timeline(entries: entries, policy: policy)
     }
 
-    private func loadSnapshot(configuration: CardWidgetConfigurationIntent) -> (cardID: String?, snapshot: CardWidgetSnapshot?) {
+    private func loadSnapshot(
+        configuration: CardWidgetConfigurationIntent,
+        asOf date: Date? = nil
+    ) -> (cardID: String?, snapshot: CardWidgetSnapshot?) {
         let periodToken = configuration.resolvedPeriodToken
 
         guard let workspaceID = CardWidgetSnapshotStore.selectedWorkspaceID(), !workspaceID.isEmpty else {
@@ -69,12 +90,48 @@ struct CardWidgetProvider: AppIntentTimelineProvider {
             return (nil, nil)
         }
 
-        let snap = CardWidgetSnapshotStore.load(
+        let snap: CardWidgetSnapshot?
+        if let date {
+            snap = CardWidgetSnapshotStore.loadBestSnapshot(
+                workspaceID: workspaceID,
+                cardID: cardID,
+                periodToken: periodToken,
+                asOf: date
+            )
+        } else {
+            snap = CardWidgetSnapshotStore.load(
+                workspaceID: workspaceID,
+                cardID: cardID,
+                periodToken: periodToken
+            )
+        }
+
+        return (cardID, snap)
+    }
+
+    private func loadFutureTimelineSnapshots(
+        configuration: CardWidgetConfigurationIntent,
+        cardID: String?,
+        after date: Date
+    ) -> [(date: Date, snapshot: CardWidgetSnapshot)] {
+        let periodToken = configuration.resolvedPeriodToken
+
+        guard
+            let workspaceID = CardWidgetSnapshotStore.selectedWorkspaceID(),
+            !workspaceID.isEmpty,
+            let cardID,
+            !cardID.isEmpty
+        else {
+            return []
+        }
+
+        return CardWidgetSnapshotStore.loadTimelineSnapshots(
             workspaceID: workspaceID,
             cardID: cardID,
             periodToken: periodToken
         )
-
-        return (cardID, snap)
+        .filter { WidgetTimelineSchedule.isFutureEntryDate($0.date, after: date) }
+        .prefix(16)
+        .map { $0 }
     }
 }

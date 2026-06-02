@@ -56,6 +56,60 @@ enum CardWidgetSnapshotStore {
         return try? JSONDecoder().decode(CardWidgetSnapshot.self, from: data)
     }
 
+    nonisolated static func saveTimelineSnapshot(
+        snapshot: CardWidgetSnapshot,
+        workspaceID: String,
+        cardID: String,
+        periodToken: String,
+        date: Date
+    ) {
+        WidgetTimelineSnapshotStorage.saveTimelineSnapshot(
+            defaults: defaults,
+            baseKey: snapshotKey(workspaceID: workspaceID, cardID: cardID, periodToken: periodToken),
+            date: date,
+            snapshot: snapshot
+        )
+    }
+
+    nonisolated static func replaceTimelineSnapshots(
+        _ snapshots: [(date: Date, snapshot: CardWidgetSnapshot)],
+        workspaceID: String,
+        cardID: String,
+        periodToken: String
+    ) {
+        WidgetTimelineSnapshotStorage.replaceTimelineSnapshots(
+            defaults: defaults,
+            baseKey: snapshotKey(workspaceID: workspaceID, cardID: cardID, periodToken: periodToken),
+            snapshots: snapshots
+        )
+    }
+
+    nonisolated static func loadTimelineSnapshots(
+        workspaceID: String,
+        cardID: String,
+        periodToken: String
+    ) -> [(date: Date, snapshot: CardWidgetSnapshot)] {
+        WidgetTimelineSnapshotStorage.loadTimelineSnapshots(
+            defaults: defaults,
+            baseKey: snapshotKey(workspaceID: workspaceID, cardID: cardID, periodToken: periodToken),
+            as: CardWidgetSnapshot.self
+        )
+    }
+
+    nonisolated static func loadBestSnapshot(
+        workspaceID: String,
+        cardID: String,
+        periodToken: String,
+        asOf date: Date
+    ) -> CardWidgetSnapshot? {
+        WidgetTimelineSnapshotStorage.loadBestTimelineSnapshot(
+            defaults: defaults,
+            baseKey: snapshotKey(workspaceID: workspaceID, cardID: cardID, periodToken: periodToken),
+            asOf: date,
+            as: CardWidgetSnapshot.self
+        ) ?? load(workspaceID: workspaceID, cardID: cardID, periodToken: periodToken)
+    }
+
     nonisolated static func pruneSnapshots(workspaceID: String, validCardIDs: Set<String>, periodTokens: [String]) {
         guard let defaults else { return }
 

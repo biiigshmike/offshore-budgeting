@@ -13,7 +13,7 @@ struct IncomeWidgetConfigurationIntent: WidgetConfigurationIntent {
     static var title: LocalizedStringResource = "Income Widget"
     static var description = IntentDescription("Configure the period shown in the Income widget.")
 
-    @Parameter(title: "Period")
+    @Parameter(title: "Default Period")
     var period: IncomeWidgetPeriod?
 
     init() {

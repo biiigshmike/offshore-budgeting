@@ -7,6 +7,7 @@ enum ForecastSavingsWidgetSnapshotBuilder {
     private static let appGroupID = "group.com.mb.offshore-budgeting"
     private static let selectedWorkspaceKey = "selectedWorkspaceID"
     private static let widgetKind = "ForecastSavingsWidget"
+    private static let futureTimelineHorizon = 3
 
     private struct Snapshot: Codable {
         let title: String
@@ -35,6 +36,15 @@ enum ForecastSavingsWidgetSnapshotBuilder {
 
         save(
             snapshot: snapshot,
+            workspaceID: workspaceID.uuidString
+        )
+        replaceTimelineSnapshots(
+            futureTimelineSnapshots(
+                currentSnapshot: snapshot,
+                modelContext: modelContext,
+                workspaceID: workspaceID,
+                now: now
+            ),
             workspaceID: workspaceID.uuidString
         )
 
@@ -110,6 +120,43 @@ enum ForecastSavingsWidgetSnapshotBuilder {
         setSelectedWorkspaceID(workspaceID)
         guard let data = try? JSONEncoder().encode(snapshot) else { return }
         defaults.set(data, forKey: snapshotKey(workspaceID: workspaceID))
+    }
+
+    private static func replaceTimelineSnapshots(
+        _ snapshots: [(date: Date, snapshot: Snapshot)],
+        workspaceID: String
+    ) {
+        let defaults = UserDefaults(suiteName: appGroupID)
+        WidgetTimelineSnapshotStorage.replaceTimelineSnapshots(
+            defaults: defaults,
+            baseKey: snapshotKey(workspaceID: workspaceID),
+            snapshots: snapshots
+        )
+    }
+
+    private static func futureTimelineSnapshots(
+        currentSnapshot: Snapshot,
+        modelContext: ModelContext,
+        workspaceID: UUID,
+        now: Date
+    ) -> [(date: Date, snapshot: Snapshot)] {
+        var results: [(date: Date, snapshot: Snapshot)] = []
+        var rangeEnd = currentSnapshot.rangeEnd
+
+        for _ in 0..<futureTimelineHorizon {
+            let entryDate = WidgetTimelineSchedule.nextEntryDate(afterRangeEnd: rangeEnd, now: now)
+            guard let snapshot = buildSnapshot(
+                modelContext: modelContext,
+                workspaceID: workspaceID,
+                now: entryDate
+            ) else {
+                break
+            }
+            results.append((entryDate, snapshot))
+            rangeEnd = snapshot.rangeEnd
+        }
+
+        return results
     }
 
     private static func snapshotKey(workspaceID: String) -> String {

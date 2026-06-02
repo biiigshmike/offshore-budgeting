@@ -47,12 +47,13 @@ actor ContentViewWidgetRefreshExecutor {
         self.modelContainer = modelContainer
     }
 
-    func refreshAll(workspaceID: UUID) async -> ContentViewWidgetRefreshReport {
+    func refreshAll(workspaceID: UUID, now: Date = Date()) async -> ContentViewWidgetRefreshReport {
         let incomeDurationMillis = Self.measure {
             let modelContext = ModelContext(modelContainer)
             IncomeWidgetSnapshotBuilder.buildAndSaveAllPeriods(
                 modelContext: modelContext,
                 workspaceID: workspaceID,
+                now: now,
                 shouldReloadTimelines: false
             )
         }
@@ -62,6 +63,7 @@ actor ContentViewWidgetRefreshExecutor {
             CardWidgetSnapshotBuilder.buildAndSaveAllPeriods(
                 modelContext: modelContext,
                 workspaceID: workspaceID,
+                now: now,
                 shouldReloadTimelines: false
             )
         }
@@ -71,6 +73,7 @@ actor ContentViewWidgetRefreshExecutor {
             NextPlannedExpenseWidgetSnapshotBuilder.buildAndSaveAllPeriods(
                 modelContext: modelContext,
                 workspaceID: workspaceID,
+                now: now,
                 shouldReloadTimelines: false
             )
         }
@@ -80,6 +83,7 @@ actor ContentViewWidgetRefreshExecutor {
             SpendTrendsWidgetSnapshotBuilder.buildAndSaveAllPeriods(
                 modelContext: modelContext,
                 workspaceID: workspaceID,
+                now: now,
                 shouldReloadTimelines: false
             )
         }
@@ -90,6 +94,7 @@ actor ContentViewWidgetRefreshExecutor {
             SafeSpendTodayWidgetSnapshotBuilder.buildAndSave(
                 modelContext: modelContext,
                 workspaceID: workspaceID,
+                now: now,
                 shouldReloadTimelines: false
             )
         }
@@ -101,6 +106,7 @@ actor ContentViewWidgetRefreshExecutor {
             ForecastSavingsWidgetSnapshotBuilder.buildAndSave(
                 modelContext: modelContext,
                 workspaceID: workspaceID,
+                now: now,
                 shouldReloadTimelines: false
             )
         }

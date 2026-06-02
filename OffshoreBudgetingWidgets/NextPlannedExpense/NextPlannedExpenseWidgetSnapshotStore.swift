@@ -55,6 +55,60 @@ enum NextPlannedExpenseWidgetSnapshotStore {
         return try? JSONDecoder().decode(NextPlannedExpenseWidgetSnapshot.self, from: data)
     }
 
+    nonisolated static func saveTimelineSnapshot(
+        snapshot: NextPlannedExpenseWidgetSnapshot,
+        workspaceID: String,
+        cardID: String?,
+        periodToken: String,
+        date: Date
+    ) {
+        WidgetTimelineSnapshotStorage.saveTimelineSnapshot(
+            defaults: defaults,
+            baseKey: snapshotKey(workspaceID: workspaceID, cardScope: cardID ?? "ALL", periodToken: periodToken),
+            date: date,
+            snapshot: snapshot
+        )
+    }
+
+    nonisolated static func replaceTimelineSnapshots(
+        _ snapshots: [(date: Date, snapshot: NextPlannedExpenseWidgetSnapshot)],
+        workspaceID: String,
+        cardID: String?,
+        periodToken: String
+    ) {
+        WidgetTimelineSnapshotStorage.replaceTimelineSnapshots(
+            defaults: defaults,
+            baseKey: snapshotKey(workspaceID: workspaceID, cardScope: cardID ?? "ALL", periodToken: periodToken),
+            snapshots: snapshots
+        )
+    }
+
+    nonisolated static func loadTimelineSnapshots(
+        workspaceID: String,
+        cardID: String?,
+        periodToken: String
+    ) -> [(date: Date, snapshot: NextPlannedExpenseWidgetSnapshot)] {
+        WidgetTimelineSnapshotStorage.loadTimelineSnapshots(
+            defaults: defaults,
+            baseKey: snapshotKey(workspaceID: workspaceID, cardScope: cardID ?? "ALL", periodToken: periodToken),
+            as: NextPlannedExpenseWidgetSnapshot.self
+        )
+    }
+
+    nonisolated static func loadBestSnapshot(
+        workspaceID: String,
+        cardID: String?,
+        periodToken: String,
+        asOf date: Date
+    ) -> NextPlannedExpenseWidgetSnapshot? {
+        WidgetTimelineSnapshotStorage.loadBestTimelineSnapshot(
+            defaults: defaults,
+            baseKey: snapshotKey(workspaceID: workspaceID, cardScope: cardID ?? "ALL", periodToken: periodToken),
+            asOf: date,
+            as: NextPlannedExpenseWidgetSnapshot.self
+        ) ?? load(workspaceID: workspaceID, cardID: cardID, periodToken: periodToken)
+    }
+
     nonisolated static func pruneSnapshots(workspaceID: String, validCardIDs: Set<String>, periodTokens: [String]) {
         guard let defaults else { return }
 

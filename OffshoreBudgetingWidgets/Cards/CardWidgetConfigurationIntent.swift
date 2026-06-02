@@ -15,7 +15,7 @@ struct CardWidgetConfigurationIntent: WidgetConfigurationIntent {
     @Parameter(title: "Card")
     var card: CardWidgetCardEntity?
 
-    @Parameter(title: "Period")
+    @Parameter(title: "Default Period")
     var period: CardWidgetPeriod?
 
     init() {

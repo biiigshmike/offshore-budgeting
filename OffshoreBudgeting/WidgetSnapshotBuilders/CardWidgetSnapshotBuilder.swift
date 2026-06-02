@@ -9,14 +9,15 @@ import Foundation
 import SwiftData
 
 enum CardWidgetSnapshotBuilder {
+    nonisolated private static let futureTimelineHorizon = 3
 
     nonisolated static func buildAndSaveAllPeriods(
         modelContext: ModelContext,
         workspaceID: UUID,
+        now: Date = Date(),
         shouldReloadTimelines: Bool = true
     ) {
         let workspaceIDString = workspaceID.uuidString
-        let now = Date()
 
         // Fetch all cards in this workspace.
         let wid = workspaceID
@@ -53,7 +54,7 @@ enum CardWidgetSnapshotBuilder {
             let cardIDString = card.id.uuidString
 
             for period in allPeriods {
-                guard let snapshot = buildSnapshot(
+                guard let currentSnapshot = buildSnapshot(
                     modelContext: modelContext,
                     workspaceID: workspaceID,
                     card: card,
@@ -63,7 +64,25 @@ enum CardWidgetSnapshotBuilder {
                 ) else { continue }
 
                 CardWidgetSnapshotStore.save(
-                    snapshot: snapshot,
+                    snapshot: currentSnapshot,
+                    workspaceID: workspaceIDString,
+                    cardID: cardIDString,
+                    periodToken: period.rawValue
+                )
+                CardWidgetSnapshotStore.replaceTimelineSnapshots(
+                    futureTimelineSnapshots(
+                        currentSnapshot: currentSnapshot,
+                        now: now
+                    ) { entryDate in
+                        buildSnapshot(
+                            modelContext: modelContext,
+                            workspaceID: workspaceID,
+                            card: card,
+                            period: period,
+                            now: entryDate,
+                            maxRecent: 3
+                        )
+                    },
                     workspaceID: workspaceIDString,
                     cardID: cardIDString,
                     periodToken: period.rawValue
@@ -215,10 +234,8 @@ enum CardWidgetSnapshotBuilder {
             return (cal.startOfDay(for: start), endOfDay(end, calendar: cal))
 
         case .q:
-            let interval = cal.dateInterval(of: .year, for: now)
-            let start = interval?.start ?? cal.startOfDay(for: now)
-            let end = cal.date(byAdding: DateComponents(year: 1, day: -1), to: start) ?? now
-            return (cal.startOfDay(for: start), endOfDay(end, calendar: cal))
+            let range = BudgetingPeriod.quarterly.defaultRange(containing: now, calendar: cal)
+            return (cal.startOfDay(for: range.start), endOfDay(range.end, calendar: cal))
 
         case .period:
             let period = defaultBudgetingPeriodFromSharedDefaults()
@@ -241,6 +258,24 @@ enum CardWidgetSnapshotBuilder {
     nonisolated private static func defaultExcludeFutureVariableExpensesFromSharedDefaults() -> Bool {
         let defaults = UserDefaults(suiteName: CardWidgetSnapshotStore.appGroupID)
         return defaults?.bool(forKey: "general_excludeFutureVariableExpensesFromCalculations") ?? false
+    }
+
+    nonisolated private static func futureTimelineSnapshots(
+        currentSnapshot: CardWidgetSnapshot,
+        now: Date,
+        build: (Date) -> CardWidgetSnapshot?
+    ) -> [(date: Date, snapshot: CardWidgetSnapshot)] {
+        var results: [(date: Date, snapshot: CardWidgetSnapshot)] = []
+        var rangeEnd = currentSnapshot.rangeEnd
+
+        for _ in 0..<futureTimelineHorizon {
+            let entryDate = WidgetTimelineSchedule.nextEntryDate(afterRangeEnd: rangeEnd, now: now)
+            guard let snapshot = build(entryDate) else { break }
+            results.append((entryDate, snapshot))
+            rangeEnd = snapshot.rangeEnd
+        }
+
+        return results
     }
 
     nonisolated private static func endOfDay(_ date: Date, calendar: Calendar) -> Date {

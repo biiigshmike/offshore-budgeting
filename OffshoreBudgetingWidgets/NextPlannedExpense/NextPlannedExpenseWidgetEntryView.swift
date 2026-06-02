@@ -15,9 +15,16 @@ struct NextPlannedExpenseWidgetEntryView: View {
     var body: some View {
         Group {
             if let snapshot = entry.snapshot {
-                content(for: snapshot)
+                if snapshot.items.isEmpty {
+                    emptyState(
+                        periodToken: snapshot.periodToken,
+                        rangeText: widgetCompactDateRangeText(start: snapshot.rangeStart, end: snapshot.rangeEnd)
+                    )
+                } else {
+                    content(for: snapshot)
+                }
             } else {
-                emptyState(periodToken: entry.periodToken)
+                emptyState(periodToken: entry.periodToken, rangeText: widgetLocalized("No range"))
             }
         }
         .containerBackground(.background, for: .widget)
@@ -44,16 +51,16 @@ struct NextPlannedExpenseWidgetEntryView: View {
     // MARK: - Empty State
 
     @ViewBuilder
-    private func emptyState(periodToken: String) -> some View {
+    private func emptyState(periodToken: String, rangeText: String) -> some View {
         switch family {
         case .systemSmall:
-            NextPlannedExpenseEmptyStateSmall()
+            NextPlannedExpenseEmptyStateSmall(periodToken: periodToken, rangeText: rangeText)
         case .systemMedium:
-            NextPlannedExpenseEmptyStateMedium(periodToken: periodToken, rangeText: widgetLocalized("No range"))
+            NextPlannedExpenseEmptyStateMedium(periodToken: periodToken, rangeText: rangeText)
         case .systemExtraLarge:
-            NextPlannedExpenseEmptyStateExtraLarge(periodToken: periodToken, rangeText: widgetLocalized("No range"))
+            NextPlannedExpenseEmptyStateExtraLarge(periodToken: periodToken, rangeText: rangeText)
         default:
-            NextPlannedExpenseEmptyStateLarge(periodToken: periodToken, rangeText: widgetLocalized("No range"))
+            NextPlannedExpenseEmptyStateLarge(periodToken: periodToken, rangeText: rangeText)
         }
     }
 }
@@ -61,9 +68,19 @@ struct NextPlannedExpenseWidgetEntryView: View {
 // MARK: - Empty States
 
 private struct NextPlannedExpenseEmptyStateSmall: View {
+    let periodToken: String
+    let rangeText: String
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            WidgetHeaderView(title: nextPlannedLocalized("Next Planned Expense"), periodToken: "", rangeText: "")
+            WidgetHeaderView(
+                title: nextPlannedLocalized("Next Planned Expense"),
+                periodToken: periodToken,
+                rangeText: rangeText,
+                style: .stacked,
+                compactRangeText: rangeText,
+                rangeDisplayMode: .compact
+            )
 
             Text(widgetLocalized("No upcoming planned expenses found for this period."))
                 .font(.headline.weight(.semibold))

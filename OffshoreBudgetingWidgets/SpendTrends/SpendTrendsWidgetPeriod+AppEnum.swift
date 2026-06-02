@@ -13,10 +13,10 @@ extension SpendTrendsWidgetPeriod: AppEnum {
     static var caseDisplayRepresentations: [SpendTrendsWidgetPeriod: DisplayRepresentation] {
         [
             .period: "Default Period",
-            .oneWeek: "1 Week",
-            .oneMonth: "1 Month",
-            .oneYear: "1 Year",
-            .q: "Q"
+            .oneWeek: "Current Week",
+            .oneMonth: "Current Month",
+            .oneYear: "Current Year",
+            .q: "Current Quarter"
         ]
     }
 }

@@ -9,6 +9,7 @@ import Foundation
 import SwiftData
 
 enum SpendTrendsWidgetSnapshotBuilder {
+    nonisolated private static let futureTimelineHorizon = 3
 
     private enum Granularity {
         case day
@@ -20,10 +21,10 @@ enum SpendTrendsWidgetSnapshotBuilder {
     nonisolated static func buildAndSaveAllPeriods(
         modelContext: ModelContext,
         workspaceID: UUID,
+        now: Date = Date(),
         shouldReloadTimelines: Bool = true
     ) {
         let workspaceIDString = workspaceID.uuidString
-        let now = Date()
 
         let wid = workspaceID
         let cardsDescriptor = FetchDescriptor<Card>(
@@ -65,6 +66,24 @@ enum SpendTrendsWidgetSnapshotBuilder {
                     cardID: nil,
                     periodToken: period.rawValue
                 )
+                SpendTrendsWidgetSnapshotStore.replaceTimelineSnapshots(
+                    futureTimelineSnapshots(
+                        currentSnapshot: allCardsSnapshot,
+                        now: now
+                    ) { entryDate in
+                        buildSnapshot(
+                            modelContext: modelContext,
+                            workspaceID: workspaceID,
+                            period: period,
+                            cardID: nil,
+                            now: entryDate,
+                            topN: 12
+                        )
+                    },
+                    workspaceID: workspaceIDString,
+                    cardID: nil,
+                    periodToken: period.rawValue
+                )
             }
 
             for card in cards {
@@ -78,6 +97,24 @@ enum SpendTrendsWidgetSnapshotBuilder {
                 ) {
                     SpendTrendsWidgetSnapshotStore.save(
                         snapshot: snapshot,
+                        workspaceID: workspaceIDString,
+                        cardID: card.id.uuidString,
+                        periodToken: period.rawValue
+                    )
+                    SpendTrendsWidgetSnapshotStore.replaceTimelineSnapshots(
+                        futureTimelineSnapshots(
+                            currentSnapshot: snapshot,
+                            now: now
+                        ) { entryDate in
+                            buildSnapshot(
+                                modelContext: modelContext,
+                                workspaceID: workspaceID,
+                                period: period,
+                                cardID: card.id,
+                                now: entryDate,
+                                topN: 12
+                            )
+                        },
                         workspaceID: workspaceIDString,
                         cardID: card.id.uuidString,
                         periodToken: period.rawValue
@@ -172,14 +209,6 @@ enum SpendTrendsWidgetSnapshotBuilder {
         )
 
         let totalSpent = overallTotals.values.reduce(0, +)
-        guard totalSpent > 0 else { return nil }
-
-        let topCategoryKeys = overallTotals
-            .filter { $0.key != nil && $0.value > 0 }
-            .sorted { $0.value > $1.value }
-            .prefix(max(1, topN))
-            .map { $0.key }
-
         let buckets = makeBuckets(start: start, end: end, granularity: resolved.granularity)
 
         let spansMultipleMonths: Bool = {
@@ -188,6 +217,37 @@ enum SpendTrendsWidgetSnapshotBuilder {
             let endYM = cal.dateComponents([.year, .month], from: end)
             return startYM.year != endYM.year || startYM.month != endYM.month
         }()
+
+        guard totalSpent > 0 else {
+            return SpendTrendsWidgetSnapshot(
+                title: NSLocalizedString("Spend Trends", comment: "Spend trends widget title."),
+                periodToken: period.rawValue,
+                rangeStart: start,
+                rangeEnd: end,
+                totalSpent: 0,
+                buckets: buckets.map { bucket in
+                    .init(
+                        id: bucket.start.timeIntervalSince1970.formatted(.number.precision(.fractionLength(0))),
+                        label: bucketLabel(
+                            start: bucket.start,
+                            end: bucket.end,
+                            granularity: resolved.granularity,
+                            spansMultipleMonths: spansMultipleMonths
+                        ),
+                        total: 0,
+                        slices: []
+                    )
+                },
+                highestBucket: nil,
+                topCategories: []
+            )
+        }
+
+        let topCategoryKeys = overallTotals
+            .filter { $0.key != nil && $0.value > 0 }
+            .sorted { $0.value > $1.value }
+            .prefix(max(1, topN))
+            .map { $0.key }
 
         var bucketSnapshots: [SpendTrendsWidgetSnapshot.Bucket] = []
         bucketSnapshots.reserveCapacity(buckets.count)
@@ -313,9 +373,9 @@ enum SpendTrendsWidgetSnapshotBuilder {
             return (startOfDay(start), endOfDay(end), .month)
 
         case .q:
-            let interval = cal.dateInterval(of: .year, for: now)
-            let start = interval?.start ?? startOfDay(now)
-            let end = cal.date(byAdding: DateComponents(year: 1, day: -1), to: start) ?? now
+            let range = BudgetingPeriod.quarterly.defaultRange(containing: now, calendar: cal)
+            let start = range.start
+            let end = range.end
             return (startOfDay(start), endOfDay(end), .quarter)
         }
     }
@@ -673,5 +733,23 @@ enum SpendTrendsWidgetSnapshotBuilder {
     nonisolated private static func defaultExcludeFutureVariableExpensesFromSharedDefaults() -> Bool {
         let defaults = UserDefaults(suiteName: SpendTrendsWidgetSnapshotStore.appGroupID)
         return defaults?.bool(forKey: "general_excludeFutureVariableExpensesFromCalculations") ?? false
+    }
+
+    nonisolated private static func futureTimelineSnapshots(
+        currentSnapshot: SpendTrendsWidgetSnapshot,
+        now: Date,
+        build: (Date) -> SpendTrendsWidgetSnapshot?
+    ) -> [(date: Date, snapshot: SpendTrendsWidgetSnapshot)] {
+        var results: [(date: Date, snapshot: SpendTrendsWidgetSnapshot)] = []
+        var rangeEnd = currentSnapshot.rangeEnd
+
+        for _ in 0..<futureTimelineHorizon {
+            let entryDate = WidgetTimelineSchedule.nextEntryDate(afterRangeEnd: rangeEnd, now: now)
+            guard let snapshot = build(entryDate) else { break }
+            results.append((entryDate, snapshot))
+            rangeEnd = snapshot.rangeEnd
+        }
+
+        return results
     }
 }

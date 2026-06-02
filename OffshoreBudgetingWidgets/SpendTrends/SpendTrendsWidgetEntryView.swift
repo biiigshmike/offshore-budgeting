@@ -15,9 +15,16 @@ struct SpendTrendsWidgetEntryView: View {
     var body: some View {
         Group {
             if let snapshot = entry.snapshot {
-                content(for: snapshot)
+                if snapshot.totalSpent > 0 {
+                    content(for: snapshot)
+                } else {
+                    emptyState(
+                        periodToken: snapshot.periodToken,
+                        rangeText: widgetCompactDateRangeText(start: snapshot.rangeStart, end: snapshot.rangeEnd)
+                    )
+                }
             } else {
-                emptyState(periodToken: entry.periodToken)
+                emptyState(periodToken: entry.periodToken, rangeText: widgetLocalized("No range"))
             }
         }
         .containerBackground(.background, for: .widget)
@@ -40,24 +47,25 @@ struct SpendTrendsWidgetEntryView: View {
     }
 
     @ViewBuilder
-    private func emptyState(periodToken: String) -> some View {
+    private func emptyState(periodToken: String, rangeText: String) -> some View {
         switch family {
         case .systemSmall:
-            SpendTrendsEmptyStateSmall(periodToken: periodToken)
+            SpendTrendsEmptyStateSmall(periodToken: periodToken, rangeText: rangeText)
         case .systemMedium:
-            SpendTrendsEmptyStateMedium(periodToken: periodToken, rangeText: widgetLocalized("No range"))
+            SpendTrendsEmptyStateMedium(periodToken: periodToken, rangeText: rangeText)
         default:
-            SpendTrendsEmptyStateLarge(periodToken: periodToken, rangeText: widgetLocalized("No range"))
+            SpendTrendsEmptyStateLarge(periodToken: periodToken, rangeText: rangeText)
         }
     }
 }
 
 private struct SpendTrendsEmptyStateSmall: View {
     let periodToken: String
+    let rangeText: String
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            WidgetHeaderView(title: widgetLocalized("Spend Trends"), periodToken: periodToken, rangeText: widgetLocalized("No range"), style: .stacked)
+            WidgetHeaderView(title: widgetLocalized("Spend Trends"), periodToken: periodToken, rangeText: rangeText, style: .stacked)
 
             Text(widgetLocalized("No spending data found for this period."))
                 .font(.headline.weight(.semibold))

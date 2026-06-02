@@ -52,16 +52,43 @@ struct SafeSpendTodayWidgetProvider: TimelineProvider {
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<SafeSpendTodayWidgetEntry>) -> Void) {
-        let entry = SafeSpendTodayWidgetEntry(date: .now, snapshot: loadSnapshot())
-        let nextRefresh = Calendar.current.date(byAdding: .hour, value: 3, to: .now) ?? .now.addingTimeInterval(10_800)
-        completion(Timeline(entries: [entry], policy: .after(nextRefresh)))
+        let now = Date()
+        let snapshot = loadSnapshot(asOf: now)
+        var entries = [SafeSpendTodayWidgetEntry(date: now, snapshot: snapshot)]
+        entries.append(
+            contentsOf: loadFutureTimelineSnapshots(after: now).map {
+                SafeSpendTodayWidgetEntry(date: $0.date, snapshot: $0.snapshot)
+            }
+        )
+
+        let policy: TimelineReloadPolicy = entries.count > 1
+            ? .atEnd
+            : .after(WidgetTimelineSchedule.fallbackRefreshDate(afterRangeEnd: snapshot?.rangeEnd, now: now))
+
+        completion(Timeline(entries: entries, policy: policy))
     }
 
-    private func loadSnapshot() -> SafeSpendTodayWidgetSnapshot? {
+    private func loadSnapshot(asOf date: Date? = nil) -> SafeSpendTodayWidgetSnapshot? {
         guard let workspaceID = SafeSpendTodayWidgetSnapshotStore.selectedWorkspaceID(), !workspaceID.isEmpty else {
             return nil
         }
+
+        if let date {
+            return SafeSpendTodayWidgetSnapshotStore.loadBestSnapshot(workspaceID: workspaceID, asOf: date)
+        }
+
         return SafeSpendTodayWidgetSnapshotStore.load(workspaceID: workspaceID)
+    }
+
+    private func loadFutureTimelineSnapshots(after date: Date) -> [(date: Date, snapshot: SafeSpendTodayWidgetSnapshot)] {
+        guard let workspaceID = SafeSpendTodayWidgetSnapshotStore.selectedWorkspaceID(), !workspaceID.isEmpty else {
+            return []
+        }
+
+        return SafeSpendTodayWidgetSnapshotStore.loadTimelineSnapshots(workspaceID: workspaceID)
+            .filter { WidgetTimelineSchedule.isFutureEntryDate($0.date, after: date) }
+            .prefix(40)
+            .map { $0 }
     }
 }
 

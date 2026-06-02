@@ -7,6 +7,7 @@ enum SafeSpendTodayWidgetSnapshotBuilder {
     private static let appGroupID = "group.com.mb.offshore-budgeting"
     private static let selectedWorkspaceKey = "selectedWorkspaceID"
     private static let widgetKind = "SafeSpendTodayWidget"
+    private static let dailyTimelineHorizon = 35
 
     private struct Snapshot: Codable {
         let title: String
@@ -36,6 +37,14 @@ enum SafeSpendTodayWidgetSnapshotBuilder {
 
         save(
             snapshot: snapshot,
+            workspaceID: workspaceID.uuidString
+        )
+        replaceTimelineSnapshots(
+            dailyTimelineSnapshots(
+                modelContext: modelContext,
+                workspaceID: workspaceID,
+                now: now
+            ),
             workspaceID: workspaceID.uuidString
         )
 
@@ -93,6 +102,35 @@ enum SafeSpendTodayWidgetSnapshotBuilder {
         setSelectedWorkspaceID(workspaceID)
         guard let data = try? JSONEncoder().encode(snapshot) else { return }
         defaults.set(data, forKey: snapshotKey(workspaceID: workspaceID))
+    }
+
+    private static func replaceTimelineSnapshots(
+        _ snapshots: [(date: Date, snapshot: Snapshot)],
+        workspaceID: String
+    ) {
+        let defaults = UserDefaults(suiteName: appGroupID)
+        WidgetTimelineSnapshotStorage.replaceTimelineSnapshots(
+            defaults: defaults,
+            baseKey: snapshotKey(workspaceID: workspaceID),
+            snapshots: snapshots
+        )
+    }
+
+    private static func dailyTimelineSnapshots(
+        modelContext: ModelContext,
+        workspaceID: UUID,
+        now: Date
+    ) -> [(date: Date, snapshot: Snapshot)] {
+        WidgetTimelineSchedule.dailyEntryDates(after: now, count: dailyTimelineHorizon).compactMap { entryDate in
+            guard let snapshot = buildSnapshot(
+                modelContext: modelContext,
+                workspaceID: workspaceID,
+                now: entryDate
+            ) else {
+                return nil
+            }
+            return (entryDate, snapshot)
+        }
     }
 
     private static func snapshotKey(workspaceID: String) -> String {
