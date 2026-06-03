@@ -76,6 +76,13 @@ struct MarinaSemanticPromptSuiteTests {
             .init(prompt: "How is my income progress?", entity: .income, operation: .share, measure: .incomeAmount, shape: .metric),
             .init(prompt: "How is my budget for this period?", entity: .budget, operation: .forecast, measure: .budgetImpact, shape: .metric),
             .init(prompt: "What is my safe spend today?", entity: .budget, operation: .forecast, measure: .remainingRoom, shape: .metric),
+            .init(prompt: "What is my burn rate?", entity: .budget, operation: .average, measure: .burnRate, shape: .metric),
+            .init(prompt: "Where will I end up on projected spend?", entity: .budget, operation: .forecast, measure: .projectedSpend, shape: .metric),
+            .init(prompt: "What can I spend per day?", entity: .budget, operation: .forecast, measure: .safeDailySpend, shape: .metric),
+            .init(prompt: "Am I spending too fast?", entity: .budget, operation: .compare, measure: .paceDifference, shape: .comparison),
+            .init(prompt: "Does my income cover planned expenses?", entity: .income, operation: .share, measure: .coverageRatio, shape: .metric),
+            .init(prompt: "What is my recurring burden?", entity: .preset, operation: .sum, measure: .recurringBurden, shape: .metric),
+            .init(prompt: "What is eating my budget?", entity: .category, operation: .share, measure: .concentration, shape: .metric),
             .init(prompt: "Compare this budget period to last period.", entity: .budget, operation: .compare, measure: .budgetImpact, shape: .comparison),
             .init(prompt: "If I spend $50 at Target, what happens to my safe spend?", entity: .budget, operation: .whatIf, measure: .remainingRoom, shape: .comparison),
             .init(prompt: "If I spend $200 on Groceries, what happens to projected savings?", entity: .budget, operation: .whatIf, measure: .savingsTotal, shape: .comparison),
@@ -138,6 +145,13 @@ struct MarinaSemanticPromptSuiteTests {
             .init(prompt: "How is my income progress?", kind: .metric),
             .init(prompt: "How is my budget for this period?", kind: .list),
             .init(prompt: "What is my safe spend today?", kind: .metric),
+            .init(prompt: "What is my burn rate?", kind: .metric),
+            .init(prompt: "Where will I end up on projected spend?", kind: .metric),
+            .init(prompt: "What can I spend per day?", kind: .metric),
+            .init(prompt: "Am I spending too fast?", kind: .comparison),
+            .init(prompt: "Does my income cover planned expenses?", kind: .metric),
+            .init(prompt: "What is my recurring burden?", kind: .metric),
+            .init(prompt: "What is eating my budget?", kind: .metric),
             .init(prompt: "Compare this budget period to last period.", kind: .comparison),
             .init(prompt: "If I spend $50 at Target, what happens to my safe spend?", kind: .comparison),
             .init(prompt: "If I spend $200 on Groceries, what happens to projected savings?", kind: .comparison),
@@ -153,6 +167,31 @@ struct MarinaSemanticPromptSuiteTests {
             let answer = await answer(testCase.prompt, using: brain, fixture: fixture)
             #expect(answer.kind == testCase.kind, "Answer kind mismatch for \(testCase.prompt): \(answer.title)")
             #expect(answer.title.isEmpty == false, "Missing title for \(testCase.prompt)")
+        }
+    }
+
+    @Test func promptSuite_formulaPhraseVariantsMapToDeterministicMeasures() throws {
+        let interpreter = MarinaRuleBasedInterpreter()
+        let cases: [(prompt: String, entity: MarinaSemanticEntity, operation: MarinaSemanticOperation, measure: MarinaSemanticMeasure)] = [
+            ("What is my daily spend?", .budget, .average, .burnRate),
+            ("Show my spending rate.", .budget, .average, .burnRate),
+            ("Where will I end up?", .budget, .forecast, .projectedSpend),
+            ("Am I on track to spend too much?", .budget, .forecast, .projectedSpend),
+            ("What's my daily allowance?", .budget, .forecast, .safeDailySpend),
+            ("Show my safe per day.", .budget, .forecast, .safeDailySpend),
+            ("Am I ahead?", .budget, .compare, .paceDifference),
+            ("Am I behind?", .budget, .compare, .paceDifference),
+            ("Are expenses covered by income?", .income, .share, .coverageRatio),
+            ("Show fixed expenses.", .preset, .sum, .recurringBurden),
+            ("Show preset burden.", .preset, .sum, .recurringBurden),
+            ("Which category has the biggest share?", .category, .share, .concentration)
+        ]
+
+        for testCase in cases {
+            let request = interpreter.interpret(testCase.prompt)
+            #expect(request.entity == testCase.entity, "Entity mismatch for \(testCase.prompt)")
+            #expect(request.operation == testCase.operation, "Operation mismatch for \(testCase.prompt)")
+            #expect(request.measure == testCase.measure, "Measure mismatch for \(testCase.prompt)")
         }
     }
 
@@ -226,6 +265,95 @@ struct MarinaSemanticPromptSuiteTests {
             row.title == "Expense" && row.value == "Phone"
         }
         #expect(nextPlannedHasExpenseRow)
+    }
+
+    @Test func budgetFormulaCalculator_returnsExpectedValuesAndNilForInvalidInputs() throws {
+        #expect(MarinaBudgetFormulaCalculator.burnRate(actualSpend: 1_715, elapsedDays: 20) == 85.75)
+        #expect(MarinaBudgetFormulaCalculator.burnRate(actualSpend: 1_715, elapsedDays: 0) == nil)
+
+        #expect(MarinaBudgetFormulaCalculator.projectedSpend(burnRate: 85.75, totalDays: 30) == 2_572.5)
+        #expect(MarinaBudgetFormulaCalculator.projectedSpend(burnRate: 85.75, totalDays: 0) == nil)
+
+        let safeDailySpend = try #require(MarinaBudgetFormulaCalculator.safeDailySpend(remainingRoom: 1_295, remainingDays: 11))
+        #expect(abs(safeDailySpend - 117.72727272727273) < 0.0001)
+        #expect(MarinaBudgetFormulaCalculator.safeDailySpend(remainingRoom: 1_295, remainingDays: 0) == nil)
+
+        let paceDifference = try #require(MarinaBudgetFormulaCalculator.paceDifference(actualSpend: 1_715, plannedSpend: 1_490, elapsedPercent: 20.0 / 30.0))
+        #expect(abs(paceDifference - 721.6666666666667) < 0.0001)
+        #expect(MarinaBudgetFormulaCalculator.paceDifference(actualSpend: 1_715, plannedSpend: 1_490, elapsedPercent: -0.1) == nil)
+
+        let coverageRatio = try #require(MarinaBudgetFormulaCalculator.coverageRatio(income: 3_000, plannedExpenses: 1_490))
+        #expect(abs(coverageRatio - 2.0134228187919465) < 0.0001)
+        #expect(MarinaBudgetFormulaCalculator.coverageRatio(income: 3_000, plannedExpenses: 0) == nil)
+
+        #expect(MarinaBudgetFormulaCalculator.recurringBurden(recurringTotal: 1_490, plannedExpenseTotal: 1_490) == 1)
+        #expect(MarinaBudgetFormulaCalculator.recurringBurden(recurringTotal: 1_490, plannedExpenseTotal: 0) == nil)
+
+        let concentration = try #require(MarinaBudgetFormulaCalculator.concentration(partTotal: 1_590, wholeTotal: 1_805))
+        #expect(abs(concentration - 0.8808864265927978) < 0.0001)
+        #expect(MarinaBudgetFormulaCalculator.concentration(partTotal: 1_590, wholeTotal: 0) == nil)
+    }
+
+    @Test func formulaAnswers_explainDeterministicBudgetMath() async throws {
+        let fixture = try makeFixture()
+        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+
+        let burnRate = await answer("What is my burn rate?", using: brain, fixture: fixture)
+        #expect(burnRate.kind == .metric)
+        #expect(burnRate.title == "Burn Rate")
+        #expect(burnRate.primaryValue == CurrencyFormatter.string(from: 85.75))
+        #expect(burnRate.rows.first(where: { $0.title == "Spent so far" })?.amount == 1_715)
+        #expect(burnRate.rows.first(where: { $0.title == "Elapsed days" })?.amount == 20)
+        #expect(burnRate.rows.first(where: { $0.title == "Average per day" })?.amount == 85.75)
+
+        let projectedSpend = await answer("Where will I end up on projected spend?", using: brain, fixture: fixture)
+        #expect(projectedSpend.kind == .metric)
+        #expect(projectedSpend.title == "Projected Spend")
+        #expect(projectedSpend.primaryValue == CurrencyFormatter.string(from: 2_572.5))
+        #expect(projectedSpend.rows.first(where: { $0.title == "Spent so far" })?.amount == 1_715)
+        #expect(projectedSpend.rows.first(where: { $0.title == "Average per day" })?.amount == 85.75)
+        #expect(projectedSpend.rows.first(where: { $0.title == "Projected total" })?.amount == 2_572.5)
+
+        let safeDailySpend = await answer("What can I spend per day?", using: brain, fixture: fixture)
+        #expect(safeDailySpend.kind == .metric)
+        #expect(safeDailySpend.title == "Safe Daily Spend")
+        #expect(safeDailySpend.rows.first(where: { $0.title == "Remaining room" })?.amount == 1_295)
+        #expect(safeDailySpend.rows.first(where: { $0.title == "Remaining days" })?.amount == 11)
+        let safePerDay = try #require(safeDailySpend.rows.first(where: { $0.title == "Safe per day" })?.amount)
+        #expect(abs(safePerDay - 117.72727272727273) < 0.0001)
+
+        let pace = await answer("Am I spending too fast?", using: brain, fixture: fixture)
+        #expect(pace.kind == .comparison)
+        #expect(pace.title == "Pace Difference")
+        #expect((pace.primaryValue ?? "").contains("721.67"))
+        #expect(pace.rows.first(where: { $0.title == "Spent so far" })?.amount == 1_715)
+        let expectedByNow = try #require(pace.rows.first(where: { $0.title == "Expected by now" })?.amount)
+        #expect(abs(expectedByNow - 993.3333333333333) < 0.0001)
+        let paceDifference = try #require(pace.rows.first(where: { $0.title == "Pace difference" })?.amount)
+        #expect(abs(paceDifference - 721.6666666666667) < 0.0001)
+
+        let coverage = await answer("Does my income cover planned expenses?", using: brain, fixture: fixture)
+        #expect(coverage.kind == .metric)
+        #expect(coverage.title == "Income Coverage")
+        #expect(coverage.primaryValue == (3_000.0 / 1_490.0).formatted(.percent.precision(.fractionLength(1))))
+        #expect(coverage.rows.first(where: { $0.title == "Income" })?.amount == 3_000)
+        #expect(coverage.rows.first(where: { $0.title == "Planned expenses" })?.amount == 1_490)
+        #expect(coverage.rows.first(where: { $0.title == "Difference" })?.amount == 1_510)
+
+        let recurringBurden = await answer("What is my recurring burden?", using: brain, fixture: fixture)
+        #expect(recurringBurden.kind == .metric)
+        #expect(recurringBurden.title == "Recurring Burden")
+        #expect(recurringBurden.primaryValue == 1.0.formatted(.percent.precision(.fractionLength(1))))
+        #expect(recurringBurden.rows.first(where: { $0.title == "Recurring total" })?.amount == 1_490)
+        #expect(recurringBurden.rows.first(where: { $0.title == "Planned expenses" })?.amount == 1_490)
+
+        let concentration = await answer("What is eating my budget?", using: brain, fixture: fixture)
+        #expect(concentration.kind == .metric)
+        #expect(concentration.title == "Budget Concentration")
+        #expect(concentration.primaryValue == (1_590.0 / 1_805.0).formatted(.percent.precision(.fractionLength(1))))
+        #expect(concentration.rows.first(where: { $0.title == "Category" })?.value == "Bills")
+        #expect(concentration.rows.first(where: { $0.title == "Category spend" })?.amount == 1_590)
+        #expect(concentration.rows.first(where: { $0.title == "Total spend" })?.amount == 1_805)
     }
 
     @Test func resolver_cardSummaryPhrasesResolveSameWorkspaceCardTarget() async throws {
@@ -867,6 +995,155 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(digest.contains("SwiftData") == false)
     }
 
+    @Test func followUpBuilder_categoryMetricCreatesPreviousBiggestAndShareSuggestions() throws {
+        let context = MarinaAnswerSemanticContext(
+            request: MarinaSemanticRequest(
+                entity: .category,
+                operation: .sum,
+                measure: .budgetImpact,
+                dimensions: [.category],
+                dateRangeToken: .currentPeriod,
+                targetName: "Groceries",
+                expenseScope: .unified,
+                expectedAnswerShape: .metric
+            ),
+            dateRange: HomeQueryDateRange(startDate: date(2026, 4, 1), endDate: date(2026, 4, 30)),
+            comparisonDateRange: nil,
+            answerKind: .metric,
+            answerTitle: "Groceries Spend",
+            answerSubtitle: nil,
+            primaryValue: "$120.00",
+            rowReferences: [
+                MarinaAnswerSemanticRowReference(row: HomeAnswerRow(title: "Total", value: "$120.00", amount: 120))
+            ]
+        )
+
+        let followUps = MarinaFollowUpBuilder().followUps(for: context)
+        let previous = try #require(followUps.first { $0.reason == .comparePreviousPeriod })
+        let biggest = try #require(followUps.first { $0.title == "Show biggest expenses in this category" })
+        let share = try #require(followUps.first { $0.title == "Show category share" })
+
+        #expect(previous.semanticRequest?.dateRangeToken == .previousPeriod)
+        #expect(biggest.semanticRequest?.entity == .variableExpense)
+        #expect(biggest.semanticRequest?.operation == .list)
+        #expect(biggest.semanticRequest?.sort == .amountDescending)
+        #expect(share.semanticRequest?.entity == .category)
+        #expect(share.semanticRequest?.operation == .group)
+    }
+
+    @Test func followUpBuilder_budgetRoomCreatesSafeSpendWhatIfAndCategoryAvailabilitySuggestions() throws {
+        let context = MarinaAnswerSemanticContext(
+            request: MarinaSemanticRequest(
+                entity: .budget,
+                operation: .forecast,
+                measure: .remainingRoom,
+                dateRangeToken: .currentPeriod,
+                expectedAnswerShape: .metric
+            ),
+            dateRange: HomeQueryDateRange(startDate: date(2026, 4, 1), endDate: date(2026, 4, 30)),
+            comparisonDateRange: nil,
+            answerKind: .metric,
+            answerTitle: "Safe Spend Today",
+            answerSubtitle: nil,
+            primaryValue: "$42.00",
+            rowReferences: [
+                MarinaAnswerSemanticRowReference(row: HomeAnswerRow(title: "Period room", value: "$420.00", amount: 420))
+            ]
+        )
+
+        let followUps = MarinaFollowUpBuilder().followUps(for: context)
+        let safeSpend = try #require(followUps.first { $0.reason == .safeDailySpend })
+        let whatIf = try #require(followUps.first { $0.reason == .whatIf })
+        let availability = try #require(followUps.first { $0.title == "Which categories still have room?" })
+
+        #expect(safeSpend.semanticRequest?.entity == .budget)
+        #expect(safeSpend.semanticRequest?.measure == .remainingRoom)
+        #expect(whatIf.semanticRequest?.operation == .whatIf)
+        #expect(whatIf.semanticRequest?.whatIfAmount == 50)
+        #expect(availability.semanticRequest?.entity == .category)
+        #expect(availability.semanticRequest?.measure == .categoryAvailability)
+        #expect(availability.semanticRequest?.categoryAvailabilityFilter == .underLimit)
+    }
+
+    @Test func followUpBuilder_incomeCreatesExpectedCoverageAndPreviousPeriodSuggestions() throws {
+        let context = MarinaAnswerSemanticContext(
+            request: MarinaSemanticRequest(
+                entity: .income,
+                operation: .share,
+                measure: .incomeAmount,
+                dateRangeToken: .currentPeriod,
+                incomeState: .all,
+                expectedAnswerShape: .metric
+            ),
+            dateRange: HomeQueryDateRange(startDate: date(2026, 4, 1), endDate: date(2026, 4, 30)),
+            comparisonDateRange: nil,
+            answerKind: .metric,
+            answerTitle: "Income Progress",
+            answerSubtitle: nil,
+            primaryValue: "80%",
+            rowReferences: []
+        )
+
+        let followUps = MarinaFollowUpBuilder().followUps(for: context)
+        let expected = try #require(followUps.first { $0.title == "What income is still expected?" })
+        let coverage = try #require(followUps.first { $0.title == "Does income cover planned expenses?" })
+        let comparison = try #require(followUps.first { $0.reason == .comparePreviousPeriod })
+
+        #expect(expected.semanticRequest?.operation == .list)
+        #expect(expected.semanticRequest?.incomeState == .planned)
+        #expect(coverage.semanticRequest == nil)
+        #expect(comparison.semanticRequest?.operation == .compare)
+        #expect(comparison.semanticRequest?.incomeState == .all)
+    }
+
+    @Test func insightFactsDigest_includesSuppliedFollowUpsWithoutInventingOthers() throws {
+        let plan = MarinaQueryPlan(
+            id: UUID(),
+            semanticRequest: MarinaSemanticRequest(
+                entity: .category,
+                operation: .sum,
+                measure: .budgetImpact,
+                targetName: "Groceries",
+                expectedAnswerShape: .metric
+            ),
+            dateRange: HomeQueryDateRange(startDate: date(2026, 4, 1), endDate: date(2026, 4, 30)),
+            comparisonDateRange: nil,
+            now: date(2026, 4, 20)
+        )
+        let bundle = MarinaInsightBundle(
+            headlineFact: "Groceries Spend: $120.00",
+            meaning: "This metric answer reflects category sum for Apr 1, 2026 - Apr 30, 2026.",
+            signals: [
+                MarinaInsightSignal(kind: .context, title: "Primary detail", detail: "Total: $120.00")
+            ],
+            followUps: [
+                MarinaFollowUpSuggestion(
+                    title: "Show biggest expenses in this category",
+                    prompt: "Show biggest expenses in Groceries.",
+                    reason: .inspectRows
+                )
+            ]
+        )
+        let context = MarinaInsightContext(
+            prompt: "How much did I spend on groceries?",
+            result: MarinaExecutionResult(
+                kind: .metric,
+                title: "Groceries Spend",
+                primaryValue: "$120.00",
+                rows: [HomeAnswerRow(title: "Total", value: "$120.00", amount: 120)]
+            ),
+            plan: plan,
+            insightBundle: bundle
+        )
+
+        let digest = MarinaAnswerFactsDigest(context: context).text()
+
+        #expect(digest.contains("Deterministic headline fact: Groceries Spend: $120.00"))
+        #expect(digest.contains("Deterministic signals:"))
+        #expect(digest.contains("Show biggest expenses in this category: Show biggest expenses in Groceries. [inspectRows]"))
+        #expect(digest.contains("Which categories still have room?") == false)
+    }
+
     #if canImport(FoundationModels)
     @Test func readAnswerFactsTool_returnsOnlySuppliedFacts() async throws {
         guard #available(iOS 26.0, *) else { return }
@@ -1375,8 +1652,13 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(context.answerTitle == "Apple Card Spend")
         #expect(context.rowReferences.contains(where: { $0.title == "Variable" }))
 
+        let insightBundle = try #require(seed.answer.insightBundle)
+        #expect(insightBundle.followUps.contains(where: { $0.title == "Show largest expenses on this card" }))
+        #expect(insightBundle.followUps.contains(where: { $0.reason == .breakdown }))
+
         let streamed = brain.completedAnswer(from: seed, streamingNarration: "Apple Card is the largest card this period.")
         #expect(streamed.semanticContext == seed.answer.semanticContext)
+        #expect(streamed.insightBundle == seed.answer.insightBundle)
 
         let suiteName = "MarinaSemanticPromptSuiteTests.semanticContext"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
@@ -1386,6 +1668,7 @@ struct MarinaSemanticPromptSuiteTests {
 
         let loaded = try #require(store.loadAnswers(workspaceID: fixture.workspace.id).first)
         #expect(loaded.semanticContext == streamed.semanticContext)
+        #expect(loaded.insightBundle == streamed.insightBundle)
         #expect(MarinaConversationContext(recentAnswers: [loaded]).lastSemanticContext == streamed.semanticContext)
     }
 

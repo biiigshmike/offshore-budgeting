@@ -58,12 +58,17 @@ struct MarinaInsightContext: Equatable, Sendable {
     let operation: MarinaSemanticOperation
     let measure: MarinaSemanticMeasure?
     let perspective: Perspective?
+    let headlineFact: String?
+    let meaning: String?
+    let signals: [MarinaInsightSignal]
+    let followUps: [MarinaFollowUpSuggestion]
     let rows: [Row]
 
     init(
         prompt: String?,
         result: MarinaExecutionResult,
-        plan: MarinaQueryPlan
+        plan: MarinaQueryPlan,
+        insightBundle: MarinaInsightBundle? = nil
     ) {
         self.prompt = Self.trimmedOptional(prompt)
         self.title = result.title
@@ -74,6 +79,10 @@ struct MarinaInsightContext: Equatable, Sendable {
         self.entity = plan.entity
         self.operation = plan.operation
         self.measure = plan.measure
+        self.headlineFact = insightBundle?.headlineFact
+        self.meaning = insightBundle?.meaning
+        self.signals = insightBundle?.signals ?? []
+        self.followUps = insightBundle?.followUps ?? []
         let rows = result.rows.prefix(Self.maxRows).map {
             Row(
                 title: $0.title,
@@ -169,6 +178,12 @@ struct MarinaAnswerFactsDigest: Equatable {
         if let primaryValue = context.primaryValue {
             lines.append("Primary value: \(primaryValue)")
         }
+        if let headlineFact = context.headlineFact {
+            lines.append("Deterministic headline fact: \(headlineFact)")
+        }
+        if let meaning = context.meaning {
+            lines.append("Deterministic meaning: \(meaning)")
+        }
         lines.append("Pronoun rules: Marina may use I/me/my only for assistant actions or limitations. The user is you/your. Words like me in the prompt refer to the user, not Marina.")
         lines.append("Ownership rules: The user's money, budgets, cards, income, spending, savings, and reconciliation balances are your/the user's, never Marina's.")
 
@@ -176,6 +191,24 @@ struct MarinaAnswerFactsDigest: Equatable {
             lines.append("Named reconciliation party: \(perspective.partyName)")
             lines.append("Reconciliation party pronouns: Use the party name first; use they/their only in any follow-up sentence.")
             lines.append("Required relationship sentence: \(perspective.requiredRelationshipSentence)")
+        }
+
+        if context.signals.isEmpty {
+            lines.append("Deterministic signals: none supplied")
+        } else {
+            lines.append("Deterministic signals:")
+            for signal in context.signals {
+                lines.append("- \(signal.kind.rawValue): \(signal.title) - \(signal.detail)")
+            }
+        }
+
+        if context.followUps.isEmpty {
+            lines.append("Deterministic follow-ups: none supplied")
+        } else {
+            lines.append("Deterministic follow-ups:")
+            for followUp in context.followUps {
+                lines.append("- \(followUp.title): \(followUp.prompt) [\(followUp.reason.rawValue)]")
+            }
         }
 
         if context.rows.isEmpty {

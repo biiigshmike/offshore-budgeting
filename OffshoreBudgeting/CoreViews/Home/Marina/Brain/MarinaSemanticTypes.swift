@@ -39,6 +39,13 @@ enum MarinaSemanticMeasure: String, Codable, CaseIterable, Equatable, Sendable {
     case reconciliationBalance
     case categoryAvailability
     case remainingRoom
+    case burnRate
+    case projectedSpend
+    case safeDailySpend
+    case paceDifference
+    case coverageRatio
+    case recurringBurden
+    case concentration
     case color
     case name
 }

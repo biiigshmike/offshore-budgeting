@@ -10,6 +10,7 @@ struct MarinaBrain {
     private let snapshotProvider: MarinaWorkspaceSnapshotProvider
     private let validator: MarinaSemanticRequestValidator
     private let executor: MarinaQueryExecutor
+    private let insightAnalyzer: MarinaInsightAnalyzer
     private let insightNarrator: any MarinaInsightNarrating
     private let presenter: MarinaAnswerPresenter
     private let followUpResolver: MarinaFollowUpResolver
@@ -20,6 +21,7 @@ struct MarinaBrain {
         snapshotProvider: MarinaWorkspaceSnapshotProvider? = nil,
         validator: MarinaSemanticRequestValidator? = nil,
         executor: MarinaQueryExecutor? = nil,
+        insightAnalyzer: MarinaInsightAnalyzer? = nil,
         insightNarrator: (any MarinaInsightNarrating)? = nil,
         presenter: MarinaAnswerPresenter? = nil,
         followUpResolver: MarinaFollowUpResolver? = nil
@@ -29,6 +31,7 @@ struct MarinaBrain {
         self.snapshotProvider = snapshotProvider ?? MarinaWorkspaceSnapshotProvider()
         self.validator = validator ?? MarinaSemanticRequestValidator()
         self.executor = executor ?? MarinaQueryExecutor()
+        self.insightAnalyzer = insightAnalyzer ?? MarinaInsightAnalyzer()
         self.insightNarrator = insightNarrator ?? MarinaInsightNarrator()
         self.presenter = presenter ?? MarinaAnswerPresenter()
         self.followUpResolver = followUpResolver ?? MarinaFollowUpResolver()
@@ -186,10 +189,13 @@ struct MarinaBrain {
             clarificationChoices: validated.clarificationChoices
         )
         let result = executor.execute(plan: queryPlan, snapshot: snapshot)
+        let analyzedBundle = insightAnalyzer.insightBundle(for: result, plan: queryPlan)
+        let insightBundle = analyzedBundle.isEmpty ? nil : analyzedBundle
         let insightContext = MarinaInsightContext(
             prompt: prompt,
             result: result,
-            plan: queryPlan
+            plan: queryPlan,
+            insightBundle: insightBundle
         )
         let narratableContext = insightContext.isNarratable ? insightContext : nil
         let debugTrace = debugTraceIfNeeded(interpreted: validated, plan: queryPlan)
@@ -200,7 +206,8 @@ struct MarinaBrain {
             result: seedResult,
             prompt: prompt,
             queryID: queryPlan.id,
-            semanticContext: MarinaAnswerSemanticContext(plan: queryPlan, result: seedResult)
+            semanticContext: MarinaAnswerSemanticContext(plan: queryPlan, result: seedResult),
+            insightBundle: insightBundle
         )
         return MarinaAnswerSeed(
             answer: answer,
@@ -287,6 +294,7 @@ struct MarinaBrain {
             attachment: answer.attachment,
             explanation: explanation,
             semanticContext: answer.semanticContext,
+            insightBundle: answer.insightBundle,
             generatedAt: answer.generatedAt
         )
     }

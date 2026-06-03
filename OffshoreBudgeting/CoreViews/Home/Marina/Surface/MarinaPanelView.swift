@@ -643,6 +643,7 @@ struct MarinaPanelView: View {
             attachment: .clarificationChoices(choices),
             explanation: answer.explanation,
             semanticContext: answer.semanticContext,
+            insightBundle: answer.insightBundle,
             generatedAt: answer.generatedAt
         )
         conversationStore.saveAnswers(answers, workspaceID: workspace.id)
@@ -712,6 +713,7 @@ struct MarinaPanelView: View {
             attachment: .inlineCreateForm(form),
             explanation: answer.explanation,
             semanticContext: answer.semanticContext,
+            insightBundle: answer.insightBundle,
             generatedAt: answer.generatedAt
         )
         conversationStore.saveAnswers(answers, workspaceID: workspace.id)
@@ -732,6 +734,7 @@ struct MarinaPanelView: View {
             attachment: nil,
             explanation: answer.explanation,
             semanticContext: answer.semanticContext,
+            insightBundle: answer.insightBundle,
             generatedAt: answer.generatedAt
         )
         conversationStore.saveAnswers(answers, workspaceID: workspace.id)
@@ -1022,6 +1025,7 @@ struct MarinaPanelView: View {
             attachment: answer.attachment,
             explanation: explanation,
             semanticContext: answer.semanticContext,
+            insightBundle: answer.insightBundle,
             generatedAt: answer.generatedAt
         )
         answerUpdateTick += 1

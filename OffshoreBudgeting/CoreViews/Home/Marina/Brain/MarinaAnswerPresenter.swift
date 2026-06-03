@@ -5,7 +5,8 @@ struct MarinaAnswerPresenter {
         result: MarinaExecutionResult,
         prompt: String?,
         queryID: UUID,
-        semanticContext: MarinaAnswerSemanticContext? = nil
+        semanticContext: MarinaAnswerSemanticContext? = nil,
+        insightBundle: MarinaInsightBundle? = nil
     ) -> HomeAnswer {
         HomeAnswer(
             queryID: queryID,
@@ -17,7 +18,8 @@ struct MarinaAnswerPresenter {
             rows: result.rows,
             attachment: result.attachment,
             explanation: result.explanation,
-            semanticContext: semanticContext
+            semanticContext: semanticContext,
+            insightBundle: insightBundle
         )
     }
 }

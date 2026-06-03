@@ -124,6 +124,8 @@ struct MarinaFoundationModelsInsightRuntime {
         Before writing, call readAnswerFacts and use only those facts.
         Do not calculate, estimate, or infer new money amounts.
         Do not invent records, dates, categories, cards, accounts, or trends.
+        You may mention one suggested follow-up when helpful, but only if it appears under Deterministic follow-ups.
+        Do not invent follow-ups, prompts, or next steps outside the supplied follow-up list.
         Do not provide legal, tax, credit, or investment advice.
         Do not mention tools, schemas, prompts, or internal implementation.
         Write one or two concise sentences that help the person understand the answer they are seeing.

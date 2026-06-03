@@ -239,6 +239,7 @@ struct HomeAnswer: Identifiable, Codable, Equatable {
     let attachment: MarinaAttachment?
     let explanation: String?
     let semanticContext: MarinaAnswerSemanticContext?
+    let insightBundle: MarinaInsightBundle?
     let generatedAt: Date
 
     init(
@@ -253,6 +254,7 @@ struct HomeAnswer: Identifiable, Codable, Equatable {
         attachment: MarinaAttachment? = nil,
         explanation: String? = nil,
         semanticContext: MarinaAnswerSemanticContext? = nil,
+        insightBundle: MarinaInsightBundle? = nil,
         generatedAt: Date = Date()
     ) {
         self.id = id
@@ -266,6 +268,7 @@ struct HomeAnswer: Identifiable, Codable, Equatable {
         self.attachment = attachment
         self.explanation = explanation
         self.semanticContext = semanticContext
+        self.insightBundle = insightBundle
         self.generatedAt = generatedAt
     }
 
@@ -281,6 +284,7 @@ struct HomeAnswer: Identifiable, Codable, Equatable {
         case attachment
         case explanation
         case semanticContext
+        case insightBundle
         case generatedAt
     }
 
@@ -297,6 +301,7 @@ struct HomeAnswer: Identifiable, Codable, Equatable {
         attachment = try? container.decodeIfPresent(MarinaAttachment.self, forKey: .attachment)
         explanation = try container.decodeIfPresent(String.self, forKey: .explanation)
         semanticContext = try? container.decodeIfPresent(MarinaAnswerSemanticContext.self, forKey: .semanticContext)
+        insightBundle = try? container.decodeIfPresent(MarinaInsightBundle.self, forKey: .insightBundle)
         generatedAt = try container.decodeIfPresent(Date.self, forKey: .generatedAt) ?? Date()
     }
 
@@ -313,6 +318,7 @@ struct HomeAnswer: Identifiable, Codable, Equatable {
         try container.encodeIfPresent(attachment, forKey: .attachment)
         try container.encodeIfPresent(explanation, forKey: .explanation)
         try container.encodeIfPresent(semanticContext, forKey: .semanticContext)
+        try container.encodeIfPresent(insightBundle, forKey: .insightBundle)
         try container.encode(generatedAt, forKey: .generatedAt)
     }
 }

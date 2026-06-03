@@ -53,6 +53,76 @@ struct MarinaRuleBasedInterpreter: MarinaModelInterpreting {
             return categoryAvailabilityRequest
         }
 
+        if containsAny(normalized, ["daily spend", "burn rate", "spending rate"]) {
+            return MarinaSemanticRequest(
+                entity: .budget,
+                operation: .average,
+                measure: .burnRate,
+                dateRangeToken: dateToken(for: normalized),
+                expectedAnswerShape: .metric
+            )
+        }
+
+        if containsAny(normalized, ["projected spend", "where will i end up", "on track to spend"]) {
+            return MarinaSemanticRequest(
+                entity: .budget,
+                operation: .forecast,
+                measure: .projectedSpend,
+                dateRangeToken: dateToken(for: normalized),
+                expectedAnswerShape: .metric
+            )
+        }
+
+        if containsAny(normalized, ["daily allowance", "safe per day", "what can i spend per day"]) {
+            return MarinaSemanticRequest(
+                entity: .budget,
+                operation: .forecast,
+                measure: .safeDailySpend,
+                dateRangeToken: dateToken(for: normalized),
+                expectedAnswerShape: .metric
+            )
+        }
+
+        if containsAny(normalized, ["does my income cover", "covered by income", "income coverage"]) {
+            return MarinaSemanticRequest(
+                entity: .income,
+                operation: .share,
+                measure: .coverageRatio,
+                dateRangeToken: dateToken(for: normalized),
+                expectedAnswerShape: .metric
+            )
+        }
+
+        if containsAny(normalized, ["recurring burden", "fixed expenses", "preset burden"]) {
+            return MarinaSemanticRequest(
+                entity: .preset,
+                operation: .sum,
+                measure: .recurringBurden,
+                dateRangeToken: dateToken(for: normalized),
+                expectedAnswerShape: .metric
+            )
+        }
+
+        if containsAny(normalized, ["what is eating my budget", "biggest share", "concentration"]) {
+            return MarinaSemanticRequest(
+                entity: .category,
+                operation: .share,
+                measure: .concentration,
+                dateRangeToken: dateToken(for: normalized),
+                expectedAnswerShape: .metric
+            )
+        }
+
+        if containsAny(normalized, ["on track", "ahead", "behind", "spending too fast"]) {
+            return MarinaSemanticRequest(
+                entity: .budget,
+                operation: .compare,
+                measure: .paceDifference,
+                dateRangeToken: dateToken(for: normalized),
+                expectedAnswerShape: .comparison
+            )
+        }
+
         if containsAny(normalized, ["next planned expense", "upcoming planned expense"]) {
             let cardName = typedTarget(in: normalized, typeWords: ["card", "cards"])
             return MarinaSemanticRequest(

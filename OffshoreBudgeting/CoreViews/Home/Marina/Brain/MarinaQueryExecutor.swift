@@ -147,6 +147,10 @@ struct MarinaQueryExecutor {
             )
         }
 
+        if plan.measure == .concentration {
+            return categoryConcentrationResult(plan: plan, snapshot: snapshot)
+        }
+
         if plan.operation == .group {
             let intent: HomeQueryIntent = plan.dimensions.contains(.date) ? .spendTrendsSummary : .categorySpendShare
             return executionResult(
@@ -214,6 +218,10 @@ struct MarinaQueryExecutor {
     // MARK: - Presets
 
     private func presetResult(plan: MarinaQueryPlan, snapshot: MarinaWorkspaceSnapshot) -> MarinaExecutionResult {
+        if plan.measure == .recurringBurden {
+            return recurringBurdenResult(plan: plan, snapshot: snapshot)
+        }
+
         if let targetName = plan.targetName,
            let preset = resolvePreset(named: targetName, in: snapshot),
            plan.operation != .next {
@@ -386,6 +394,10 @@ struct MarinaQueryExecutor {
     // MARK: - Income
 
     private func incomeResult(plan: MarinaQueryPlan, snapshot: MarinaWorkspaceSnapshot) -> MarinaExecutionResult {
+        if plan.measure == .coverageRatio {
+            return coverageRatioResult(title: MarinaL10n.string("marina.answer.incomeCoverage.title", defaultValue: "Income Coverage", comment: "Marina answer title for income coverage."), plan: plan, snapshot: snapshot)
+        }
+
         if plan.operation == .share {
             return executionResult(
                 from: homeAnswer(
@@ -461,6 +473,11 @@ struct MarinaQueryExecutor {
         let targetBudgetRange = plan.targetName
             .flatMap { resolveBudget(named: $0, in: snapshot) }
             .map { HomeQueryDateRange(startDate: $0.startDate, endDate: $0.endDate) }
+        let formulaRange = targetBudgetRange ?? resolvedRange(for: plan)
+
+        if let formulaResult = budgetFormulaResult(plan: plan, snapshot: snapshot, range: formulaRange) {
+            return formulaResult
+        }
 
         if plan.operation == .whatIf {
             let amount = max(0, plan.semanticRequest.whatIfAmount ?? 0)
@@ -528,6 +545,197 @@ struct MarinaQueryExecutor {
                 snapshot: snapshot,
                 plan: plan
             )
+        )
+    }
+
+    // MARK: - Formula answers
+
+    private func budgetFormulaResult(
+        plan: MarinaQueryPlan,
+        snapshot: MarinaWorkspaceSnapshot,
+        range: HomeQueryDateRange
+    ) -> MarinaExecutionResult? {
+        guard let measure = plan.measure else { return nil }
+        let progress = formulaDayProgress(for: range, now: plan.now)
+        let actualSpend = actualSpendToDate(snapshot: snapshot, range: range, now: plan.now)
+        let plannedSpend = plannedExpenseTotal(snapshot: snapshot, range: range)
+
+        switch measure {
+        case .burnRate:
+            guard let burnRate = MarinaBudgetFormulaCalculator.burnRate(actualSpend: actualSpend, elapsedDays: progress.elapsedDays) else {
+                return noFormulaResult(title: MarinaL10n.string("marina.answer.burnRate.title", defaultValue: "Burn Rate", comment: "Marina answer title for burn rate."))
+            }
+            return MarinaExecutionResult(
+                kind: .metric,
+                title: MarinaL10n.string("marina.answer.burnRate.title", defaultValue: "Burn Rate", comment: "Marina answer title for burn rate."),
+                subtitle: rangeLabel(range),
+                primaryValue: currency(burnRate),
+                rows: [
+                    HomeAnswerRow(title: MarinaL10n.string("marina.answer.row.spentSoFar", defaultValue: "Spent so far", comment: "Row label for spend to date."), value: currency(actualSpend), amount: actualSpend),
+                    HomeAnswerRow(title: MarinaL10n.string("marina.answer.row.elapsedDays", defaultValue: "Elapsed days", comment: "Row label for elapsed day count."), value: "\(progress.elapsedDays)", amount: Double(progress.elapsedDays)),
+                    HomeAnswerRow(title: MarinaL10n.string("marina.answer.row.averagePerDay", defaultValue: "Average per day", comment: "Row label for average spend per day."), value: currency(burnRate), amount: burnRate)
+                ]
+            )
+        case .projectedSpend:
+            guard let burnRate = MarinaBudgetFormulaCalculator.burnRate(actualSpend: actualSpend, elapsedDays: progress.elapsedDays),
+                  let projectedSpend = MarinaBudgetFormulaCalculator.projectedSpend(burnRate: burnRate, totalDays: progress.totalDays) else {
+                return noFormulaResult(title: MarinaL10n.string("marina.answer.projectedSpend.title", defaultValue: "Projected Spend", comment: "Marina answer title for projected spend."))
+            }
+            return MarinaExecutionResult(
+                kind: .metric,
+                title: MarinaL10n.string("marina.answer.projectedSpend.title", defaultValue: "Projected Spend", comment: "Marina answer title for projected spend."),
+                subtitle: rangeLabel(range),
+                primaryValue: currency(projectedSpend),
+                rows: [
+                    HomeAnswerRow(title: MarinaL10n.string("marina.answer.row.spentSoFar", defaultValue: "Spent so far", comment: "Row label for spend to date."), value: currency(actualSpend), amount: actualSpend),
+                    HomeAnswerRow(title: MarinaL10n.string("marina.answer.row.averagePerDay", defaultValue: "Average per day", comment: "Row label for average spend per day."), value: currency(burnRate), amount: burnRate),
+                    HomeAnswerRow(title: MarinaL10n.string("marina.answer.row.projectedTotal", defaultValue: "Projected total", comment: "Row label for projected spend total."), value: currency(projectedSpend), amount: projectedSpend)
+                ]
+            )
+        case .safeDailySpend:
+            let summary = safeSpendSummary(snapshot: snapshot, plan: plan, rangeOverride: range)
+            guard let safeDailySpend = MarinaBudgetFormulaCalculator.safeDailySpend(
+                remainingRoom: summary.periodRemainingRoom,
+                remainingDays: summary.daysLeftInPeriod
+            ) else {
+                return noFormulaResult(title: MarinaL10n.string("marina.answer.safeDailySpend.title", defaultValue: "Safe Daily Spend", comment: "Marina answer title for safe daily spend."))
+            }
+            return MarinaExecutionResult(
+                kind: .metric,
+                title: MarinaL10n.string("marina.answer.safeDailySpend.title", defaultValue: "Safe Daily Spend", comment: "Marina answer title for safe daily spend."),
+                subtitle: rangeLabel(range),
+                primaryValue: currency(safeDailySpend),
+                rows: [
+                    HomeAnswerRow(title: MarinaL10n.string("marina.answer.row.remainingRoom", defaultValue: "Remaining room", comment: "Row label for remaining budget room."), value: currency(summary.periodRemainingRoom), amount: summary.periodRemainingRoom),
+                    HomeAnswerRow(title: MarinaL10n.string("marina.answer.row.remainingDays", defaultValue: "Remaining days", comment: "Row label for remaining days."), value: "\(summary.daysLeftInPeriod)", amount: Double(summary.daysLeftInPeriod)),
+                    HomeAnswerRow(title: MarinaL10n.string("marina.answer.row.safePerDay", defaultValue: "Safe per day", comment: "Row label for safe daily spend."), value: currency(safeDailySpend), amount: safeDailySpend)
+                ]
+            )
+        case .paceDifference:
+            guard let paceDifference = MarinaBudgetFormulaCalculator.paceDifference(
+                actualSpend: actualSpend,
+                plannedSpend: plannedSpend,
+                elapsedPercent: progress.elapsedPercent
+            ) else {
+                return noFormulaResult(title: MarinaL10n.string("marina.answer.paceDifference.title", defaultValue: "Pace Difference", comment: "Marina answer title for spend pace difference."))
+            }
+            let expectedByNow = plannedSpend * progress.elapsedPercent
+            return MarinaExecutionResult(
+                kind: .comparison,
+                title: MarinaL10n.string("marina.answer.paceDifference.title", defaultValue: "Pace Difference", comment: "Marina answer title for spend pace difference."),
+                subtitle: rangeLabel(range),
+                primaryValue: deltaSummary(paceDifference),
+                rows: [
+                    HomeAnswerRow(title: MarinaL10n.string("marina.answer.row.spentSoFar", defaultValue: "Spent so far", comment: "Row label for spend to date."), value: currency(actualSpend), amount: actualSpend),
+                    HomeAnswerRow(title: MarinaL10n.string("marina.answer.row.expectedByNow", defaultValue: "Expected by now", comment: "Row label for expected spend by now."), value: currency(expectedByNow), amount: expectedByNow),
+                    HomeAnswerRow(title: MarinaL10n.string("marina.answer.row.paceDifference", defaultValue: "Pace difference", comment: "Row label for spend pace difference."), value: deltaSummary(paceDifference), amount: paceDifference)
+                ]
+            )
+        case .coverageRatio:
+            return coverageRatioResult(
+                title: MarinaL10n.string("marina.answer.budgetCoverage.title", defaultValue: "Budget Coverage", comment: "Marina answer title for budget coverage."),
+                plan: plan,
+                snapshot: snapshot,
+                range: range
+            )
+        case .amount, .plannedAmount, .actualAmount, .effectiveAmount, .budgetImpact, .savingsTotal, .incomeAmount, .reconciliationBalance, .categoryAvailability, .remainingRoom, .recurringBurden, .concentration, .color, .name:
+            return nil
+        }
+    }
+
+    private func coverageRatioResult(
+        title: String,
+        plan: MarinaQueryPlan,
+        snapshot: MarinaWorkspaceSnapshot,
+        range: HomeQueryDateRange? = nil
+    ) -> MarinaExecutionResult {
+        let targetRange = range ?? plan.dateRange
+        let income = coverageIncome(snapshot: snapshot, range: targetRange)
+        let plannedExpenses = plannedExpenseTotal(snapshot: snapshot, range: targetRange)
+        guard let coverageRatio = MarinaBudgetFormulaCalculator.coverageRatio(
+            income: income,
+            plannedExpenses: plannedExpenses
+        ) else {
+            return noFormulaResult(title: title)
+        }
+        let difference = income - plannedExpenses
+        return MarinaExecutionResult(
+            kind: .metric,
+            title: title,
+            subtitle: rangeLabel(targetRange),
+            primaryValue: percent(coverageRatio),
+            rows: [
+                HomeAnswerRow(title: MarinaL10n.common("income", defaultValue: "Income", comment: "Common label for income."), value: currency(income), amount: income),
+                HomeAnswerRow(title: MarinaL10n.string("marina.answer.row.plannedExpenses", defaultValue: "Planned expenses", comment: "Row label for planned expenses."), value: currency(plannedExpenses), amount: plannedExpenses),
+                HomeAnswerRow(title: MarinaL10n.string("marina.answer.row.coveragePercent", defaultValue: "Coverage percent", comment: "Row label for income coverage percent."), value: percent(coverageRatio), amount: coverageRatio),
+                HomeAnswerRow(title: MarinaL10n.common("difference", defaultValue: "Difference", comment: "Common label for a difference value."), value: deltaSummary(difference), amount: difference)
+            ]
+        )
+    }
+
+    private func recurringBurdenResult(plan: MarinaQueryPlan, snapshot: MarinaWorkspaceSnapshot) -> MarinaExecutionResult {
+        let recurringTotal = plannedExpenseTotal(snapshot: snapshot, range: plan.dateRange, recurringOnly: true)
+        let plannedExpenseTotal = plannedExpenseTotal(snapshot: snapshot, range: plan.dateRange)
+        guard let recurringBurden = MarinaBudgetFormulaCalculator.recurringBurden(
+            recurringTotal: recurringTotal,
+            plannedExpenseTotal: plannedExpenseTotal
+        ) else {
+            return noFormulaResult(title: MarinaL10n.string("marina.answer.recurringBurden.title", defaultValue: "Recurring Burden", comment: "Marina answer title for recurring burden."))
+        }
+        return MarinaExecutionResult(
+            kind: .metric,
+            title: MarinaL10n.string("marina.answer.recurringBurden.title", defaultValue: "Recurring Burden", comment: "Marina answer title for recurring burden."),
+            subtitle: rangeLabel(plan.dateRange),
+            primaryValue: percent(recurringBurden),
+            rows: [
+                HomeAnswerRow(title: MarinaL10n.string("marina.answer.row.recurringTotal", defaultValue: "Recurring total", comment: "Row label for recurring planned expenses."), value: currency(recurringTotal), amount: recurringTotal),
+                HomeAnswerRow(title: MarinaL10n.string("marina.answer.row.plannedExpenses", defaultValue: "Planned expenses", comment: "Row label for planned expenses."), value: currency(plannedExpenseTotal), amount: plannedExpenseTotal),
+                HomeAnswerRow(title: MarinaL10n.string("marina.answer.row.recurringBurden", defaultValue: "Recurring burden", comment: "Row label for recurring burden percentage."), value: percent(recurringBurden), amount: recurringBurden)
+            ]
+        )
+    }
+
+    private func categoryConcentrationResult(plan: MarinaQueryPlan, snapshot: MarinaWorkspaceSnapshot) -> MarinaExecutionResult {
+        let totals = totalsByCategory(snapshot: snapshot, range: plan.dateRange)
+        let wholeTotal = totals.values.reduce(0.0, +)
+        let selected: (name: String, total: Double)?
+
+        if let targetName = plan.targetName {
+            guard let category = resolveCategory(named: targetName, in: snapshot) else {
+                return unsupported(.unresolvedEntity)
+            }
+            selected = (category.name, totals[category.name] ?? 0)
+        } else {
+            selected = totals.max { left, right in left.value < right.value }.map { ($0.key, $0.value) }
+        }
+
+        guard let selected,
+              let concentration = MarinaBudgetFormulaCalculator.concentration(
+                partTotal: selected.total,
+                wholeTotal: wholeTotal
+              ) else {
+            return noFormulaResult(title: MarinaL10n.string("marina.answer.concentration.title", defaultValue: "Budget Concentration", comment: "Marina answer title for budget concentration."))
+        }
+
+        return MarinaExecutionResult(
+            kind: .metric,
+            title: MarinaL10n.string("marina.answer.concentration.title", defaultValue: "Budget Concentration", comment: "Marina answer title for budget concentration."),
+            subtitle: rangeLabel(plan.dateRange),
+            primaryValue: percent(concentration),
+            rows: [
+                HomeAnswerRow(title: MarinaL10n.common("category", defaultValue: "Category", comment: "Common label for category."), value: selected.name),
+                HomeAnswerRow(title: MarinaL10n.string("marina.answer.row.categorySpend", defaultValue: "Category spend", comment: "Row label for category spend."), value: currency(selected.total), amount: selected.total),
+                HomeAnswerRow(title: MarinaL10n.string("marina.answer.row.totalSpend", defaultValue: "Total spend", comment: "Row label for total spend."), value: currency(wholeTotal), amount: wholeTotal),
+                HomeAnswerRow(title: MarinaL10n.string("marina.answer.row.concentration", defaultValue: "Concentration", comment: "Row label for budget concentration percentage."), value: percent(concentration), amount: concentration)
+            ]
+        )
+    }
+
+    private func noFormulaResult(title: String) -> MarinaExecutionResult {
+        MarinaExecutionResult(
+            kind: .message,
+            title: title,
+            subtitle: MarinaL10n.string("marina.answer.formula.insufficientData", defaultValue: "Not enough budget data to calculate this yet.", comment: "Empty state when a Marina formula cannot be calculated.")
         )
     }
 
@@ -1220,6 +1428,13 @@ struct MarinaQueryExecutor {
 
     // MARK: - Totals
 
+    private struct FormulaDayProgress {
+        let elapsedDays: Int
+        let totalDays: Int
+        let remainingDays: Int
+        let elapsedPercent: Double
+    }
+
     private func totalsByCard(snapshot: MarinaWorkspaceSnapshot, range: HomeQueryDateRange?) -> [String: Double] {
         var totals: [String: Double] = [:]
         for row in expenseRows(snapshot: snapshot, scope: .unified, range: range) {
@@ -1260,6 +1475,86 @@ struct MarinaQueryExecutor {
         expenseRows(snapshot: snapshot, scope: .unified, range: range).reduce(0.0) { $0 + $1.budgetImpact }
     }
 
+    private func actualSpendToDate(
+        snapshot: MarinaWorkspaceSnapshot,
+        range: HomeQueryDateRange,
+        now: Date
+    ) -> Double {
+        let rangeStart = calendar.startOfDay(for: range.startDate)
+        let rangeEnd = calendar.startOfDay(for: range.endDate)
+        let today = calendar.startOfDay(for: now)
+
+        guard today >= rangeStart else { return 0 }
+
+        let clampedEnd = min(today, rangeEnd)
+        let spendRange = HomeQueryDateRange(startDate: range.startDate, endDate: endOfDay(clampedEnd))
+        return totalSpend(snapshot: snapshot, range: spendRange)
+    }
+
+    private func plannedExpenseTotal(
+        snapshot: MarinaWorkspaceSnapshot,
+        range: HomeQueryDateRange?,
+        recurringOnly: Bool = false
+    ) -> Double {
+        snapshot.homeCalculationPlannedExpenses
+            .filter { contains($0.expenseDate, in: range) }
+            .filter { recurringOnly == false || $0.sourcePresetID != nil }
+            .reduce(0.0) { total, expense in
+                total + SavingsMathService.plannedProjectedBudgetImpactAmount(for: expense)
+            }
+    }
+
+    private func coverageIncome(snapshot: MarinaWorkspaceSnapshot, range: HomeQueryDateRange?) -> Double {
+        let actualIncome = incomeTotal(snapshot.incomes, range: range, state: .actual, source: nil)
+        if actualIncome > 0 {
+            return actualIncome
+        }
+        return incomeTotal(snapshot.incomes, range: range, state: .planned, source: nil)
+    }
+
+    private func formulaDayProgress(for range: HomeQueryDateRange, now: Date) -> FormulaDayProgress {
+        let start = calendar.startOfDay(for: range.startDate)
+        let end = calendar.startOfDay(for: range.endDate)
+        let today = calendar.startOfDay(for: now)
+        let totalDays = inclusiveDayCount(from: start, through: end)
+
+        let elapsedDays: Int
+        if today < start {
+            elapsedDays = 0
+        } else if today > end {
+            elapsedDays = totalDays
+        } else {
+            elapsedDays = inclusiveDayCount(from: start, through: today)
+        }
+
+        let remainingDays: Int
+        if today < start {
+            remainingDays = totalDays
+        } else if today > end {
+            remainingDays = 0
+        } else {
+            remainingDays = inclusiveDayCount(from: today, through: end)
+        }
+
+        let elapsedPercent = totalDays > 0 ? Double(elapsedDays) / Double(totalDays) : 0
+        return FormulaDayProgress(
+            elapsedDays: elapsedDays,
+            totalDays: totalDays,
+            remainingDays: remainingDays,
+            elapsedPercent: elapsedPercent
+        )
+    }
+
+    private func inclusiveDayCount(from start: Date, through end: Date) -> Int {
+        guard end >= start else { return 0 }
+        return (calendar.dateComponents([.day], from: start, to: end).day ?? 0) + 1
+    }
+
+    private func endOfDay(_ date: Date) -> Date {
+        let start = calendar.startOfDay(for: date)
+        return calendar.date(byAdding: DateComponents(day: 1, second: -1), to: start) ?? date
+    }
+
     private func budgetRoom(snapshot: MarinaWorkspaceSnapshot, range: HomeQueryDateRange?) -> Double {
         let actualIncome = incomeTotal(snapshot.incomes, range: range, state: .actual, source: nil)
         let plannedIncome = incomeTotal(snapshot.incomes, range: range, state: .planned, source: nil)
@@ -1271,9 +1566,10 @@ struct MarinaQueryExecutor {
         snapshot: MarinaWorkspaceSnapshot,
         plan: MarinaQueryPlan,
         virtualSpendAmount: Double = 0,
-        virtualSpendCategoryID: UUID? = nil
+        virtualSpendCategoryID: UUID? = nil,
+        rangeOverride: HomeQueryDateRange? = nil
     ) -> SafeSpendTodayCalculator.Summary {
-        let range = resolvedRange(for: plan)
+        let range = rangeOverride ?? resolvedRange(for: plan)
         return SafeSpendTodayCalculator.calculate(
             budgetingPeriod: calendar.isDate(range.startDate, inSameDayAs: range.endDate) ? .daily : .monthly,
             rangeStart: range.startDate,
@@ -1430,6 +1726,10 @@ struct MarinaQueryExecutor {
 
     private func currency(_ amount: Double) -> String {
         CurrencyFormatter.string(from: amount)
+    }
+
+    private func percent(_ ratio: Double) -> String {
+        ratio.formatted(.percent.precision(.fractionLength(1)))
     }
 
     private func deltaSummary(_ delta: Double) -> String {

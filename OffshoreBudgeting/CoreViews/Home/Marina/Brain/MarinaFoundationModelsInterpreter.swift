@@ -12,7 +12,7 @@ fileprivate struct MarinaGeneratedSemanticRequest {
     @Guide(description: "One of: list, count, sum, average, compare, last, next, group, share, forecast, whatIf.")
     var operation: String
 
-    @Guide(description: "Optional measure: amount, plannedAmount, actualAmount, effectiveAmount, budgetImpact, savingsTotal, incomeAmount, reconciliationBalance, categoryAvailability, remainingRoom, color, name.")
+    @Guide(description: "Optional measure: amount, plannedAmount, actualAmount, effectiveAmount, budgetImpact, savingsTotal, incomeAmount, reconciliationBalance, categoryAvailability, remainingRoom, burnRate, projectedSpend, safeDailySpend, paceDifference, coverageRatio, recurringBurden, concentration, color, name.")
     var measure: String?
 
     @Guide(description: "Dimensions such as category, card, merchantText, incomeSource, preset, reconciliationAccount, date. Use a dimension only when the user's wording explicitly identifies that kind of target.")
@@ -114,6 +114,7 @@ struct MarinaFoundationModelsInterpreter: MarinaModelInterpreting {
         Use currentMonth when the user says this month. Use previousMonth when the user says last month.
         Treat merchant/store/vendor wording as expense title/description text, not a separate stored entity.
         Treat Home metric terms as semantic requests: safe spend means remainingRoom; savings outlook or projected savings means savingsTotal forecast; actual savings means savings status for the current period; income progress means actual-to-planned income share; category availability means categoryAvailability; category spotlight means grouped category spend; spend trends means grouped category spend over date buckets; next planned expense means plannedExpense next; card summary means card budgetImpact.
+        Formula metric phrases map to deterministic Marina measures only: daily spend, burn rate, or spending rate means entity budget, operation average, measure burnRate; projected spend, where will I end up, or on track to spend means entity budget, operation forecast, measure projectedSpend; daily allowance, safe per day, or what can I spend per day means entity budget, operation forecast, measure safeDailySpend; on track, ahead, behind, or spending too fast means entity budget, operation compare, measure paceDifference; does my income cover, covered by income, or income coverage means measure coverageRatio on income or budget; recurring burden, fixed expenses, or preset burden means entity preset, operation sum, measure recurringBurden; what is eating my budget, biggest share, or concentration means entity category, operation share, measure concentration.
         For "show category availability", use entity category, operation forecast, measure categoryAvailability, and expectedAnswerShape metric.
         For "which/list/show categories are over/near/under limit" requests, use entity category, operation list, measure categoryAvailability, expectedAnswerShape list, and set categoryAvailabilityFilter to over, near, or underLimit. Preserve requested list limits.
         For safe spend, can I spend, remaining room, or budget room, use entity budget and measure remainingRoom.

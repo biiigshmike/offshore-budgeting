@@ -14,6 +14,7 @@ enum MarinaHomeAnswerLocalizer {
             attachment: answer.attachment,
             explanation: answer.explanation,
             semanticContext: answer.semanticContext,
+            insightBundle: answer.insightBundle,
             generatedAt: answer.generatedAt
         )
     }
