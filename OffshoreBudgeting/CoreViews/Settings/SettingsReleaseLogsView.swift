@@ -78,6 +78,22 @@ struct SettingsReleaseLogsView: View {
 
     static let releaseSections: [ReleaseSection] = [
         ReleaseSection(
+            version: "2.4.1",
+            build: "22",
+            items: [
+                ReleaseItem(
+                    systemImage: "widget.extralarge",
+                    title: "Layout Adjustments for Extra Large Income and Next Planned Expense Widgets",
+                    description: "Fixed truncation of text in the Extra Large Income and Next Planned Expense widgets. This update also delivers a more effective way of keeping all of the iOS and macOS widgets up-to-date without the app needing to be opened."
+                ),
+                ReleaseItem(
+                    systemImage: "square.and.arrow.down",
+                    title: "Workspace Import & Export",
+                    description: "Workspaces can now be saved to a file and imported later as a new copy, making it easier to back up your data, move between Local and iCloud, or recover after a reinstall."
+                )
+            ]
+        ),
+        ReleaseSection(
             version: "2.4",
             build: "21",
             items: [
