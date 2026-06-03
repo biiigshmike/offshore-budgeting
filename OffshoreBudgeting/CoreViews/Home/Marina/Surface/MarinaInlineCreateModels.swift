@@ -14,19 +14,19 @@ enum MarinaInlineCreateEntity: String, Codable, Equatable, CaseIterable, Identif
     var displayTitle: String {
         switch self {
         case .expense:
-            return "Expense"
+            return MarinaL10n.string("marina.inlineCreate.entity.expense", defaultValue: "Expense", comment: "Display name for creating an expense from Marina.")
         case .income:
-            return "Income"
+            return MarinaL10n.string("marina.inlineCreate.entity.income", defaultValue: "Income", comment: "Display name for creating income from Marina.")
         case .budget:
-            return "Budget"
+            return MarinaL10n.string("marina.inlineCreate.entity.budget", defaultValue: "Budget", comment: "Display name for creating a budget from Marina.")
         case .card:
-            return "Card"
+            return MarinaL10n.string("marina.inlineCreate.entity.card", defaultValue: "Card", comment: "Display name for creating a card from Marina.")
         case .preset:
-            return "Preset"
+            return MarinaL10n.string("marina.inlineCreate.entity.preset", defaultValue: "Preset", comment: "Display name for creating a preset from Marina.")
         case .category:
-            return "Category"
+            return MarinaL10n.string("marina.inlineCreate.entity.category", defaultValue: "Category", comment: "Display name for creating a category from Marina.")
         case .plannedExpense:
-            return "Planned Expense"
+            return MarinaL10n.string("marina.inlineCreate.entity.plannedExpense", defaultValue: "Planned Expense", comment: "Display name for planned expenses in Marina.")
         }
     }
 }

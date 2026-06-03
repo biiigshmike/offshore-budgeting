@@ -46,13 +46,13 @@ final class MarinaCreateService {
         syncNotifications(modelContext: modelContext, workspaceID: workspace.id)
 
         return MarinaCreateResult(
-            title: "Budget created",
-            subtitle: "Saved budget \(trimmed).",
+            title: MarinaL10n.string("marina.create.budgetCreated", defaultValue: "Budget created", comment: "Confirmation title after Marina creates a budget."),
+            subtitle: MarinaL10n.format("marina.create.savedBudgetFormat", defaultValue: "Saved budget %@.", comment: "Confirmation subtitle after Marina saves a budget.", trimmed),
             rows: [
-                HomeAnswerRow(title: "Start", value: AppDateFormat.abbreviatedDate(dateRange.startDate)),
-                HomeAnswerRow(title: "End", value: AppDateFormat.abbreviatedDate(dateRange.endDate)),
-                HomeAnswerRow(title: "Cards", value: "\(cards.count) linked"),
-                HomeAnswerRow(title: "Presets", value: "\(activePresets.count) linked")
+                HomeAnswerRow(title: MarinaL10n.common("start", defaultValue: "Start", comment: "Common label for a start value."), value: AppDateFormat.abbreviatedDate(dateRange.startDate)),
+                HomeAnswerRow(title: MarinaL10n.common("end", defaultValue: "End", comment: "Common label for an end value."), value: AppDateFormat.abbreviatedDate(dateRange.endDate)),
+                HomeAnswerRow(title: MarinaL10n.common("cards", defaultValue: "Cards", comment: "Common label for cards."), value: MarinaL10n.format("marina.create.linkedCount", defaultValue: "%@ linked", comment: "Value showing how many records were linked.", AppNumberFormat.integer(cards.count))),
+                HomeAnswerRow(title: MarinaL10n.common("presets", defaultValue: "Presets", comment: "Common label for presets."), value: MarinaL10n.format("marina.create.linkedCount", defaultValue: "%@ linked", comment: "Value showing how many records were linked.", AppNumberFormat.integer(activePresets.count)))
             ]
         )
     }
@@ -75,11 +75,11 @@ final class MarinaCreateService {
         try modelContext.save()
 
         return MarinaCreateResult(
-            title: "Card created",
-            subtitle: "Saved card \(trimmed).",
+            title: MarinaL10n.string("marina.create.cardCreated", defaultValue: "Card created", comment: "Confirmation title after Marina creates a card."),
+            subtitle: MarinaL10n.format("marina.create.savedCardFormat", defaultValue: "Saved card %@.", comment: "Confirmation subtitle after Marina saves a card.", trimmed),
             rows: [
-                HomeAnswerRow(title: "Theme", value: CardThemeOption(rawValue: theme)?.displayName ?? "Ruby"),
-                HomeAnswerRow(title: "Effect", value: CardEffectOption(rawValue: effect)?.displayName ?? "Plastic")
+                HomeAnswerRow(title: MarinaL10n.common("theme", defaultValue: "Theme", comment: "Common label for card theme."), value: CardThemeOption(rawValue: theme)?.displayName ?? CardThemeOption.ruby.displayName),
+                HomeAnswerRow(title: MarinaL10n.common("effect", defaultValue: "Effect", comment: "Common label for card visual effect."), value: CardEffectOption(rawValue: effect)?.displayName ?? CardEffectOption.plastic.displayName)
             ]
         )
     }
@@ -100,9 +100,9 @@ final class MarinaCreateService {
         try modelContext.save()
 
         return MarinaCreateResult(
-            title: "Category created",
-            subtitle: "Saved category \(trimmed).",
-            rows: [HomeAnswerRow(title: "Color", value: resolvedHex)]
+            title: MarinaL10n.string("marina.create.categoryCreated", defaultValue: "Category created", comment: "Confirmation title after Marina creates a category."),
+            subtitle: MarinaL10n.format("marina.create.savedCategoryFormat", defaultValue: "Saved category %@.", comment: "Confirmation subtitle after Marina saves a category.", trimmed),
+            rows: [HomeAnswerRow(title: MarinaL10n.common("color", defaultValue: "Color", comment: "Common label for color."), value: resolvedHex)]
         )
     }
 
@@ -149,12 +149,12 @@ final class MarinaCreateService {
         try modelContext.save()
 
         return MarinaCreateResult(
-            title: "Preset created",
-            subtitle: "Saved preset \(trimmed).",
+            title: MarinaL10n.string("marina.create.presetCreated", defaultValue: "Preset created", comment: "Confirmation title after Marina creates a preset."),
+            subtitle: MarinaL10n.format("marina.create.savedPresetFormat", defaultValue: "Saved preset %@.", comment: "Confirmation subtitle after Marina saves a preset.", trimmed),
             rows: [
-                HomeAnswerRow(title: "Amount", value: CurrencyFormatter.string(from: plannedAmount)),
-                HomeAnswerRow(title: "Card", value: card.name),
-                HomeAnswerRow(title: "Frequency", value: RecurrenceFrequency(rawValue: frequencyRaw)?.displayName ?? "Monthly")
+                HomeAnswerRow(title: MarinaL10n.common("amount", defaultValue: "Amount", comment: "Common label for money amount."), value: CurrencyFormatter.string(from: plannedAmount)),
+                HomeAnswerRow(title: MarinaL10n.common("card", defaultValue: "Card", comment: "Common label for card."), value: card.name),
+                HomeAnswerRow(title: MarinaL10n.common("frequency", defaultValue: "Frequency", comment: "Common label for recurrence frequency."), value: RecurrenceFrequency(rawValue: frequencyRaw)?.displayName ?? RecurrenceFrequency.monthly.displayName)
             ]
         )
     }
@@ -179,12 +179,12 @@ final class MarinaCreateService {
         )
 
         return MarinaCreateResult(
-            title: "Expense logged",
-            subtitle: "Saved \(CurrencyFormatter.string(from: amount)) on \(card.name).",
+            title: MarinaL10n.string("marina.create.expenseLogged", defaultValue: "Expense logged", comment: "Confirmation title after Marina logs an expense."),
+            subtitle: MarinaL10n.format("marina.create.savedExpenseFormat", defaultValue: "Saved %@ on %@.", comment: "Confirmation subtitle after Marina saves an expense with amount and card name.", CurrencyFormatter.string(from: amount), card.name),
             rows: [
-                HomeAnswerRow(title: "Amount", value: CurrencyFormatter.string(from: amount)),
-                HomeAnswerRow(title: "Card", value: card.name),
-                HomeAnswerRow(title: "Date", value: AppDateFormat.abbreviatedDate(date))
+                HomeAnswerRow(title: MarinaL10n.common("amount", defaultValue: "Amount", comment: "Common label for money amount."), value: CurrencyFormatter.string(from: amount)),
+                HomeAnswerRow(title: MarinaL10n.common("card", defaultValue: "Card", comment: "Common label for card."), value: card.name),
+                HomeAnswerRow(title: MarinaL10n.common("date", defaultValue: "Date", comment: "Common label for a date field."), value: AppDateFormat.abbreviatedDate(date))
             ]
         )
     }
@@ -212,7 +212,7 @@ final class MarinaCreateService {
                 throw NSError(
                     domain: "MarinaCreateService",
                     code: 400,
-                    userInfo: [NSLocalizedDescriptionKey: "Repeat income needs an end date."]
+                    userInfo: [NSLocalizedDescriptionKey: MarinaL10n.string("marina.inlineCreate.validation.repeatIncomeNeedsEndDate", defaultValue: "Repeat income needs an end date.", comment: "Validation message for recurring income without an end date.")]
                 )
             }
 
@@ -222,7 +222,7 @@ final class MarinaCreateService {
                 throw NSError(
                     domain: "MarinaCreateService",
                     code: 400,
-                    userInfo: [NSLocalizedDescriptionKey: "Repeat income end date must be on or after the start date."]
+                    userInfo: [NSLocalizedDescriptionKey: MarinaL10n.string("marina.inlineCreate.validation.repeatIncomeEndAfterStart", defaultValue: "Repeat income end date must be on or after the start date.", comment: "Validation message for recurring income whose end date is before start date.")]
                 )
             }
 
@@ -260,12 +260,12 @@ final class MarinaCreateService {
             try modelContext.save()
 
             return MarinaCreateResult(
-                title: "Income logged",
-                subtitle: "Saved recurring \(isPlanned ? "planned" : "actual") income for \(source).",
+                title: MarinaL10n.string("marina.create.incomeLogged", defaultValue: "Income logged", comment: "Confirmation title after Marina logs income."),
+                subtitle: MarinaL10n.format("marina.create.savedRecurringIncomeFormat", defaultValue: "Saved recurring %@ income for %@.", comment: "Confirmation subtitle after Marina saves recurring income with state and source.", isPlanned ? MarinaL10n.common("planned", defaultValue: "Planned", comment: "Common label for planned values.").localizedLowercase : MarinaL10n.common("actual", defaultValue: "Actual", comment: "Common label for actual values.").localizedLowercase, source),
                 rows: [
-                    HomeAnswerRow(title: "Amount", value: CurrencyFormatter.string(from: amount)),
-                    HomeAnswerRow(title: "Source", value: source),
-                    HomeAnswerRow(title: "Frequency", value: resolvedFrequency.displayName)
+                    HomeAnswerRow(title: MarinaL10n.common("amount", defaultValue: "Amount", comment: "Common label for money amount."), value: CurrencyFormatter.string(from: amount)),
+                    HomeAnswerRow(title: MarinaL10n.common("source", defaultValue: "Source", comment: "Common label for source."), value: source),
+                    HomeAnswerRow(title: MarinaL10n.common("frequency", defaultValue: "Frequency", comment: "Common label for recurrence frequency."), value: resolvedFrequency.displayName)
                 ]
             )
         }
@@ -280,12 +280,12 @@ final class MarinaCreateService {
         )
 
         return MarinaCreateResult(
-            title: "Income logged",
-            subtitle: "Saved \(CurrencyFormatter.string(from: amount)) as \(isPlanned ? "planned" : "actual") income.",
+            title: MarinaL10n.string("marina.create.incomeLogged", defaultValue: "Income logged", comment: "Confirmation title after Marina logs income."),
+            subtitle: MarinaL10n.format("marina.create.savedIncomeFormat", defaultValue: "Saved %@ as %@ income.", comment: "Confirmation subtitle after Marina saves income with amount and state.", CurrencyFormatter.string(from: amount), isPlanned ? MarinaL10n.common("planned", defaultValue: "Planned", comment: "Common label for planned values.").localizedLowercase : MarinaL10n.common("actual", defaultValue: "Actual", comment: "Common label for actual values.").localizedLowercase),
             rows: [
-                HomeAnswerRow(title: "Amount", value: CurrencyFormatter.string(from: amount)),
-                HomeAnswerRow(title: "Source", value: source),
-                HomeAnswerRow(title: "Date", value: AppDateFormat.abbreviatedDate(date))
+                HomeAnswerRow(title: MarinaL10n.common("amount", defaultValue: "Amount", comment: "Common label for money amount."), value: CurrencyFormatter.string(from: amount)),
+                HomeAnswerRow(title: MarinaL10n.common("source", defaultValue: "Source", comment: "Common label for source."), value: source),
+                HomeAnswerRow(title: MarinaL10n.common("date", defaultValue: "Date", comment: "Common label for a date field."), value: AppDateFormat.abbreviatedDate(date))
             ]
         )
     }

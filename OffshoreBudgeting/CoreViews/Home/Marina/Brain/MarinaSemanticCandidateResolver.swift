@@ -37,13 +37,13 @@ struct MarinaSemanticCandidateResolver {
         let candidates = candidateChoices(for: target, baseRequest: request, snapshot: snapshot)
         if candidates.count > 1 {
             request = clarificationRequest(
-                question: "What should Marina use for \"\(target)\"?",
+                question: MarinaL10n.format("marina.clarification.targetMeaningFormat", defaultValue: "What should Marina use for \"%@\"?", comment: "Clarification question for resolving an ambiguous target.", target),
                 target: target,
                 dateRangeToken: request.dateRangeToken
             )
             notes.append("Candidate resolver found \(candidates.count) possible meanings for \"\(target)\".")
             let choices = MarinaClarificationChoices(
-                question: "What should Marina use for \"\(target)\"?",
+                question: MarinaL10n.format("marina.clarification.targetMeaningFormat", defaultValue: "What should Marina use for \"%@\"?", comment: "Clarification question for resolving an ambiguous target.", target),
                 choices: candidates
             )
             return interpretedWith(request: request, interpreted: interpreted, notes: notes, choices: choices)
@@ -113,8 +113,8 @@ struct MarinaSemanticCandidateResolver {
             choices.append(
                 MarinaClarificationChoice(
                     title: category.name,
-                    kindLabel: "Category",
-                    subtitle: "Use the \(category.name) category.",
+                    kindLabel: MarinaL10n.common("category", defaultValue: "Category", comment: "Common label for category."),
+                    subtitle: MarinaL10n.format("marina.clarification.useCategoryFormat", defaultValue: "Use the %@ category.", comment: "Clarification choice subtitle for using a category.", category.name),
                     aliases: aliases(for: category.name) + ["category"],
                     request: categoryRequest(categoryName: category.name, baseRequest: baseRequest)
                 )
@@ -125,8 +125,8 @@ struct MarinaSemanticCandidateResolver {
             choices.append(
                 MarinaClarificationChoice(
                     title: incomeSource,
-                    kindLabel: "Income source",
-                    subtitle: "Use \(incomeSource) as the income source.",
+                    kindLabel: MarinaL10n.string("marina.clarification.kind.incomeSource", defaultValue: "Income source", comment: "Kind label for an income source clarification choice."),
+                    subtitle: MarinaL10n.format("marina.clarification.useIncomeSourceFormat", defaultValue: "Use %@ as the income source.", comment: "Clarification choice subtitle for using an income source.", incomeSource),
                     aliases: aliases(for: incomeSource) + ["income", "income source"],
                     request: incomeSourceRequest(source: incomeSource, baseRequest: baseRequest)
                 )
@@ -139,8 +139,8 @@ struct MarinaSemanticCandidateResolver {
             choices.append(
                 MarinaClarificationChoice(
                     title: card.name,
-                    kindLabel: "Card",
-                    subtitle: "Use \(card.name) as the card.",
+                    kindLabel: MarinaL10n.common("card", defaultValue: "Card", comment: "Common label for card."),
+                    subtitle: MarinaL10n.format("marina.clarification.useAsCardFormat", defaultValue: "Use %@ as the card.", comment: "Clarification choice subtitle for using a card.", card.name),
                     aliases: aliases(for: card.name) + ["card"],
                     request: cardRequest(cardName: card.name, baseRequest: baseRequest)
                 )
@@ -151,8 +151,8 @@ struct MarinaSemanticCandidateResolver {
             choices.append(
                 MarinaClarificationChoice(
                     title: budget.name,
-                    kindLabel: "Budget",
-                    subtitle: "Use the \(budget.name) budget.",
+                    kindLabel: MarinaL10n.common("budget", defaultValue: "Budget", comment: "Common label for budget."),
+                    subtitle: MarinaL10n.format("marina.clarification.useBudgetFormat", defaultValue: "Use the %@ budget.", comment: "Clarification choice subtitle for using a budget.", budget.name),
                     aliases: aliases(for: budget.name) + ["budget"],
                     request: budgetRequest(budgetName: budget.name, baseRequest: baseRequest)
                 )
@@ -163,8 +163,8 @@ struct MarinaSemanticCandidateResolver {
             choices.append(
                 MarinaClarificationChoice(
                     title: preset.title,
-                    kindLabel: "Preset",
-                    subtitle: "Use the \(preset.title) preset.",
+                    kindLabel: MarinaL10n.common("preset", defaultValue: "Preset", comment: "Common label for preset."),
+                    subtitle: MarinaL10n.format("marina.clarification.usePresetFormat", defaultValue: "Use the %@ preset.", comment: "Clarification choice subtitle for using a preset.", preset.title),
                     aliases: aliases(for: preset.title) + ["preset"],
                     request: presetRequest(presetName: preset.title, baseRequest: baseRequest)
                 )
@@ -175,8 +175,8 @@ struct MarinaSemanticCandidateResolver {
             choices.append(
                 MarinaClarificationChoice(
                     title: account.name,
-                    kindLabel: "Savings account",
-                    subtitle: "Use \(account.name) as the savings account.",
+                    kindLabel: MarinaL10n.string("marina.clarification.kind.savingsAccount", defaultValue: "Savings account", comment: "Kind label for savings account clarification choice."),
+                    subtitle: MarinaL10n.format("marina.clarification.useSavingsAccountFormat", defaultValue: "Use %@ as the savings account.", comment: "Clarification choice subtitle for using a savings account.", account.name),
                     aliases: aliases(for: account.name) + ["savings", "savings account"],
                     request: savingsAccountRequest(accountName: account.name, baseRequest: baseRequest)
                 )
@@ -187,8 +187,8 @@ struct MarinaSemanticCandidateResolver {
             choices.append(
                 MarinaClarificationChoice(
                     title: account.name,
-                    kindLabel: "Reconciliation account",
-                    subtitle: "Use \(account.name) as the reconciliation account.",
+                    kindLabel: MarinaL10n.string("marina.clarification.kind.reconciliationAccount", defaultValue: "Reconciliation account", comment: "Kind label for reconciliation account clarification choice."),
+                    subtitle: MarinaL10n.format("marina.clarification.useReconciliationAccountFormat", defaultValue: "Use %@ as the reconciliation account.", comment: "Clarification choice subtitle for using a reconciliation account.", account.name),
                     aliases: aliases(for: account.name) + ["balance", "reconciliation", "shared balance"],
                     request: reconciliationAccountRequest(accountName: account.name, baseRequest: baseRequest)
                 )
@@ -425,7 +425,7 @@ struct MarinaSemanticCandidateResolver {
             return MarinaClarificationChoice(
                 title: candidate.title,
                 kindLabel: candidate.kindLabel,
-                subtitle: "Search expense titles and descriptions for \(candidate.title).",
+                subtitle: MarinaL10n.format("marina.clarification.searchExpenseTextFormat", defaultValue: "Search expense titles and descriptions for %@.", comment: "Clarification choice subtitle for searching expense text.", candidate.title),
                 aliases: aliases,
                 request: expenseTextRequest(
                     textQuery: candidate.title,
@@ -436,12 +436,12 @@ struct MarinaSemanticCandidateResolver {
         }
 
         if candidates.count > 1 {
-            let displayName = "All expense matches for \"\(displayTarget(target))\""
+            let displayName = MarinaL10n.format("marina.clarification.allExpenseMatchesFormat", defaultValue: "All expense matches for \"%@\"", comment: "Clarification choice title for all expense matches.", displayTarget(target))
             choices.append(
                 MarinaClarificationChoice(
                     title: displayName,
-                    kindLabel: "Expense search",
-                    subtitle: "Search every expense title and description matching \(displayTarget(target)).",
+                    kindLabel: MarinaL10n.string("marina.clarification.kind.expenseSearch", defaultValue: "Expense search", comment: "Kind label for expense search."),
+                    subtitle: MarinaL10n.format("marina.clarification.searchEveryExpenseTextFormat", defaultValue: "Search every expense title and description matching %@.", comment: "Clarification choice subtitle for searching every matching expense title and description.", displayTarget(target)),
                     aliases: aliases(for: target) + genericAliases,
                     request: expenseTextRequest(
                         textQuery: target,
@@ -532,10 +532,10 @@ struct MarinaSemanticCandidateResolver {
         }
 
         for expense in snapshot.variableExpenses {
-            append(expense.descriptionText, kindLabel: "Expense match")
+            append(expense.descriptionText, kindLabel: MarinaL10n.string("marina.clarification.kind.expenseMatch", defaultValue: "Expense match", comment: "Kind label for a matching expense."))
         }
         for expense in snapshot.plannedExpenses {
-            append(expense.title, kindLabel: "Planned expense match")
+            append(expense.title, kindLabel: MarinaL10n.string("marina.clarification.kind.plannedExpenseMatch", defaultValue: "Planned expense match", comment: "Kind label for a matching planned expense."))
         }
 
         return candidates.sorted { left, right in

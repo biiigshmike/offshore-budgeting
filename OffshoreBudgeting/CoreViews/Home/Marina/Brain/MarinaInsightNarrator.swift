@@ -101,7 +101,7 @@ struct MarinaInsightContext: Equatable, Sendable {
     }
 
     private static func rangeLabel(_ range: HomeQueryDateRange?) -> String {
-        guard let range else { return "All time" }
+        guard let range else { return MarinaL10n.string("marina.answer.range.allTime", defaultValue: "All time", comment: "Date range label for all time.") }
         return "\(shortDate(range.startDate)) - \(shortDate(range.endDate))"
     }
 
@@ -119,7 +119,7 @@ struct MarinaInsightContext: Equatable, Sendable {
               plan.measure == .reconciliationBalance,
               plan.dateRange == nil,
               let partyName = trimmedOptional(plan.targetName),
-              let balance = rows.first(where: { $0.title == "Balance" })?.amount else {
+              let balance = rows.compactMap(\.amount).first else {
             return nil
         }
 
@@ -127,7 +127,7 @@ struct MarinaInsightContext: Equatable, Sendable {
             return Perspective(
                 partyName: partyName,
                 direction: .settled,
-                requiredRelationshipSentence: "\(partyName) is settled up with you."
+                requiredRelationshipSentence: MarinaL10n.format("marina.insight.reconciliation.settledFormat", defaultValue: "%@ is settled up with you.", comment: "Insight sentence for a settled reconciliation party.", partyName)
             )
         }
 
@@ -136,14 +136,14 @@ struct MarinaInsightContext: Equatable, Sendable {
             return Perspective(
                 partyName: partyName,
                 direction: .partyOwesUser,
-                requiredRelationshipSentence: "\(partyName) owes you \(amount)."
+                requiredRelationshipSentence: MarinaL10n.format("marina.insight.reconciliation.partyOwesUserFormat", defaultValue: "%@ owes you %@.", comment: "Insight sentence for reconciliation party owing the user.", partyName, amount)
             )
         }
 
         return Perspective(
             partyName: partyName,
             direction: .userOwesParty,
-            requiredRelationshipSentence: "You owe \(partyName) \(amount)."
+            requiredRelationshipSentence: MarinaL10n.format("marina.insight.reconciliation.userOwesPartyFormat", defaultValue: "You owe %@ %@.", comment: "Insight sentence for user owing a reconciliation party.", partyName, amount)
         )
     }
 }
@@ -361,40 +361,46 @@ struct MarinaDeterministicInsightNarrator: MarinaInsightNarrating {
         }
 
         guard let primaryValue = context.primaryValue else {
-            return evidenceNarration(prefix: "\(context.title) is ready to review", context: context)
+            return evidenceNarration(
+                prefix: MarinaL10n.format("marina.insight.metricReadyFormat", defaultValue: "%@ is ready to review", comment: "Fallback insight prefix when a metric has no primary value.", context.title),
+                context: context
+            )
         }
 
         return evidenceNarration(
-            prefix: "\(context.title) is \(primaryValue)",
+            prefix: MarinaL10n.format("marina.insight.metricValueFormat", defaultValue: "%@ is %@", comment: "Fallback insight prefix with answer title and primary value.", context.title, primaryValue),
             context: context
         )
     }
 
     private func listNarration(for context: MarinaInsightContext) -> String? {
         guard let first = context.rows.first else {
-            return "\(context.title) does not have any matching rows for \(context.dateRangeLabel)."
+            return MarinaL10n.format("marina.insight.emptyListFormat", defaultValue: "%@ does not have any matching rows for %@.", comment: "Fallback insight when a list answer has no rows.", context.title, context.dateRangeLabel)
         }
 
-        return "\(context.title) is led by \(first.title) at \(first.value). That is the clearest place to start if you want to understand this slice."
+        return MarinaL10n.format("marina.insight.listLedByFormat", defaultValue: "%@ is led by %@ at %@. That is the clearest place to start if you want to understand this slice.", comment: "Fallback insight for list answer led by first row.", context.title, first.title, first.value)
     }
 
     private func comparisonNarration(for context: MarinaInsightContext) -> String? {
         if let primaryValue = context.primaryValue {
             return evidenceNarration(
-                prefix: "\(context.title) lands at \(primaryValue)",
+                prefix: MarinaL10n.format("marina.insight.comparisonValueFormat", defaultValue: "%@ lands at %@", comment: "Fallback insight prefix for comparison answer with primary value.", context.title, primaryValue),
                 context: context
             )
         }
 
-        return evidenceNarration(prefix: "\(context.title) is ready to compare", context: context)
+        return evidenceNarration(
+            prefix: MarinaL10n.format("marina.insight.comparisonReadyFormat", defaultValue: "%@ is ready to compare", comment: "Fallback insight prefix when comparison is ready but has no primary value.", context.title),
+            context: context
+        )
     }
 
     private func evidenceNarration(prefix: String, context: MarinaInsightContext) -> String {
         guard let row = context.rows.first else {
-            return "\(prefix) for \(context.dateRangeLabel)."
+            return MarinaL10n.format("marina.insight.evidenceNoRowFormat", defaultValue: "%@ for %@.", comment: "Fallback insight sentence with no evidence row.", prefix, context.dateRangeLabel)
         }
 
-        return "\(prefix) for \(context.dateRangeLabel). \(row.title) is \(row.value), so keep that detail in view before changing course."
+        return MarinaL10n.format("marina.insight.evidenceRowFormat", defaultValue: "%@ for %@. %@ is %@, so keep that detail in view before changing course.", comment: "Fallback insight sentence with first evidence row.", prefix, context.dateRangeLabel, row.title, row.value)
     }
 }
 

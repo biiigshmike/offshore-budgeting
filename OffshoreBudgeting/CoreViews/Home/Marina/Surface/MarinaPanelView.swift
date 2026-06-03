@@ -2,22 +2,24 @@ import SwiftData
 import SwiftUI
 
 struct MarinaStarterPromptFactory {
-    static let basePromptPool = [
-        "What is my safe spend today?",
-        "Show my savings outlook.",
-        "How is my income progress?",
-        "What is my next planned expense?",
-        "Show category availability.",
-        "What are my spend trends?",
-        "What is my top category this period?"
-    ]
+    static var basePromptPool: [String] {
+        [
+            MarinaL10n.string("marina.starter.safeSpend", defaultValue: "What is my safe spend today?", comment: "Starter prompt asking Marina about safe spend."),
+            MarinaL10n.string("marina.starter.savingsOutlook", defaultValue: "Show my savings outlook.", comment: "Starter prompt asking Marina about savings outlook."),
+            MarinaL10n.string("marina.starter.incomeProgress", defaultValue: "How is my income progress?", comment: "Starter prompt asking Marina about income progress."),
+            MarinaL10n.string("marina.starter.nextPlannedExpense", defaultValue: "What is my next planned expense?", comment: "Starter prompt asking Marina about the next planned expense."),
+            MarinaL10n.string("marina.starter.categoryAvailability", defaultValue: "Show category availability.", comment: "Starter prompt asking Marina about category availability."),
+            MarinaL10n.string("marina.starter.spendTrends", defaultValue: "What are my spend trends?", comment: "Starter prompt asking Marina about spend trends."),
+            MarinaL10n.string("marina.starter.topCategory", defaultValue: "What is my top category this period?", comment: "Starter prompt asking Marina about the top spending category.")
+        ]
+    }
 
     static func promptPool(cardNames: [String]) -> [String] {
         var pool = basePromptPool
         if let cardName = cardNames
             .map({ $0.trimmingCharacters(in: .whitespacesAndNewlines) })
             .first(where: { $0.isEmpty == false }) {
-            pool.append("Summarize my \(cardName).")
+            pool.append(MarinaL10n.format("marina.starter.cardSummaryFormat", defaultValue: "Summarize my %@.", comment: "Starter prompt asking Marina to summarize a specific card.", cardName))
         }
         return pool
     }
@@ -232,7 +234,7 @@ struct MarinaPanelView: View {
                 Button {
                     handleCreateMenuSelection(.expense)
                 } label: {
-                    Label("Expense", systemImage: "plus.circle")
+                    Label(MarinaL10n.string("marina.inlineCreate.entity.expense", defaultValue: "Expense", comment: "Display name for creating an expense from Marina."), systemImage: "plus.circle")
                 }
 
                 Button {
@@ -573,7 +575,7 @@ struct MarinaPanelView: View {
 
             if let resolvedChoiceID = choices.resolvedChoiceID,
                let choice = choices.choices.first(where: { $0.id == resolvedChoiceID }) {
-                Text("Using \(choice.title).")
+                Text(MarinaL10n.format("marina.clarification.usingChoice", defaultValue: "Using %@.", comment: "Status text shown after resolving a Marina clarification choice.", choice.title))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -671,7 +673,7 @@ struct MarinaPanelView: View {
             HomeAnswer(
                 queryID: UUID(),
                 kind: .message,
-                title: "Create \(form.entity.displayTitle)",
+                title: MarinaL10n.format("marina.inlineCreate.title", defaultValue: "Create %@", comment: "Answer title for a Marina inline create form.", form.entity.displayTitle),
                 attachment: .inlineCreateForm(form)
             )
         )
@@ -739,7 +741,7 @@ struct MarinaPanelView: View {
         guard let form = currentInlineCreateForm(for: answerID) else { return }
         finalizeInlineCreateForm(
             answerID: answerID,
-            subtitle: "Draft canceled.",
+            subtitle: MarinaL10n.string("marina.inlineCreate.draftCanceled", defaultValue: "Draft canceled.", comment: "Status text after canceling a Marina inline create form."),
             rows: inlineCreateSummaryRows(for: form)
         )
     }
@@ -753,13 +755,13 @@ struct MarinaPanelView: View {
             let result = try executeInlineCreateForm(form)
             finalizeInlineCreateForm(
                 answerID: answerID,
-                subtitle: "Saved.",
+                subtitle: MarinaL10n.string("marina.inlineCreate.saved", defaultValue: "Saved.", comment: "Status text after saving a Marina inline create form."),
                 rows: inlineCreateSummaryRows(for: form)
             )
             appendMutationMessage(title: result.title, subtitle: result.subtitle, rows: result.rows)
         } catch {
             appendMutationMessage(
-                title: "Could not create \(form.entity.displayTitle.lowercased())",
+                title: MarinaL10n.format("marina.inlineCreate.createFailedFormat", defaultValue: "Could not create %@", comment: "Error title when Marina cannot create an entity.", form.entity.displayTitle.localizedLowercase),
                 subtitle: error.localizedDescription,
                 rows: []
             )
@@ -773,7 +775,7 @@ struct MarinaPanelView: View {
                 throw TransactionEntryService.ValidationError.invalidAmount
             }
             guard let card = cards.first(where: { $0.id == form.selectedCardID }) else {
-                throw missingSelectionError("Select a card to continue.")
+                throw missingSelectionError(MarinaL10n.string("marina.inlineCreate.validation.selectCard", defaultValue: "Select a card to continue.", comment: "Validation message for missing card selection."))
             }
             return try createService.addExpense(
                 amount: amount,
@@ -827,7 +829,7 @@ struct MarinaPanelView: View {
                 throw TransactionEntryService.ValidationError.invalidAmount
             }
             guard let card = cards.first(where: { $0.id == form.selectedCardID }) else {
-                throw missingSelectionError("Select a default card to continue.")
+                throw missingSelectionError(MarinaL10n.string("marina.inlineCreate.validation.selectDefaultCard", defaultValue: "Select a default card to continue.", comment: "Validation message for missing default card."))
             }
             return try createService.addPreset(
                 title: form.nameText.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -852,7 +854,7 @@ struct MarinaPanelView: View {
                 modelContext: modelContext
             )
         case .plannedExpense:
-            throw missingSelectionError("Create a preset to generate planned expenses, or log a regular expense instead.")
+            throw missingSelectionError(MarinaL10n.string("marina.inlineCreate.validation.createPresetForPlanned", defaultValue: "Create a preset to generate planned expenses, or log a regular expense instead.", comment: "Validation message for trying to create a planned expense directly from Marina."))
         }
     }
 
@@ -895,53 +897,53 @@ struct MarinaPanelView: View {
         switch form.entity {
         case .expense:
             return [
-                HomeAnswerRow(title: "Description", value: form.notesText.trimmingCharacters(in: .whitespacesAndNewlines)),
-                HomeAnswerRow(title: "Amount", value: form.amountText),
-                HomeAnswerRow(title: "Card", value: cards.first(where: { $0.id == form.selectedCardID })?.name ?? "Select"),
-                HomeAnswerRow(title: "Date", value: AppDateFormat.abbreviatedDate(form.date))
+                HomeAnswerRow(title: MarinaL10n.common("description", defaultValue: "Description", comment: "Common label for a description field."), value: form.notesText.trimmingCharacters(in: .whitespacesAndNewlines)),
+                HomeAnswerRow(title: MarinaL10n.common("amount", defaultValue: "Amount", comment: "Common label for money amount."), value: form.amountText),
+                HomeAnswerRow(title: MarinaL10n.common("card", defaultValue: "Card", comment: "Common label for card."), value: cards.first(where: { $0.id == form.selectedCardID })?.name ?? MarinaL10n.common("select", defaultValue: "Select", comment: "Common option prompting a selection.")),
+                HomeAnswerRow(title: MarinaL10n.common("date", defaultValue: "Date", comment: "Common label for a date field."), value: AppDateFormat.abbreviatedDate(form.date))
             ]
         case .income:
             var rows = [
-                HomeAnswerRow(title: "Source", value: form.sourceText.trimmingCharacters(in: .whitespacesAndNewlines)),
-                HomeAnswerRow(title: "Amount", value: form.amountText),
-                HomeAnswerRow(title: "Type", value: form.isPlannedIncome ? "Planned" : "Actual")
+                HomeAnswerRow(title: MarinaL10n.common("source", defaultValue: "Source", comment: "Common label for source."), value: form.sourceText.trimmingCharacters(in: .whitespacesAndNewlines)),
+                HomeAnswerRow(title: MarinaL10n.common("amount", defaultValue: "Amount", comment: "Common label for money amount."), value: form.amountText),
+                HomeAnswerRow(title: MarinaL10n.common("type", defaultValue: "Type", comment: "Common label for a type picker."), value: form.isPlannedIncome ? MarinaL10n.common("planned", defaultValue: "Planned", comment: "Common label for planned values.") : MarinaL10n.common("actual", defaultValue: "Actual", comment: "Common label for actual values."))
             ]
             let frequency = RecurrenceFrequency(rawValue: form.recurrenceFrequencyRaw) ?? .none
             if frequency != .none {
-                rows.append(HomeAnswerRow(title: "Repeat", value: frequency.displayName))
+                rows.append(HomeAnswerRow(title: MarinaL10n.common("repeat", defaultValue: "Repeat", comment: "Common label for repeat or recurrence."), value: frequency.displayName))
             }
             return rows
         case .budget:
             let selectedActivePresetCount = activePresets.filter { form.selectedPresetIDs.contains($0.id) }.count
             return [
-                HomeAnswerRow(title: "Name", value: form.nameText.trimmingCharacters(in: .whitespacesAndNewlines)),
-                HomeAnswerRow(title: "Start", value: AppDateFormat.abbreviatedDate(form.date)),
-                HomeAnswerRow(title: "End", value: AppDateFormat.abbreviatedDate(form.secondaryDate)),
-                HomeAnswerRow(title: "Cards", value: AppNumberFormat.integer(form.selectedCardIDs.count)),
-                HomeAnswerRow(title: "Presets", value: AppNumberFormat.integer(selectedActivePresetCount))
+                HomeAnswerRow(title: MarinaL10n.common("name", defaultValue: "Name", comment: "Common label for name."), value: form.nameText.trimmingCharacters(in: .whitespacesAndNewlines)),
+                HomeAnswerRow(title: MarinaL10n.common("start", defaultValue: "Start", comment: "Common label for a start value."), value: AppDateFormat.abbreviatedDate(form.date)),
+                HomeAnswerRow(title: MarinaL10n.common("end", defaultValue: "End", comment: "Common label for an end value."), value: AppDateFormat.abbreviatedDate(form.secondaryDate)),
+                HomeAnswerRow(title: MarinaL10n.common("cards", defaultValue: "Cards", comment: "Common label for cards."), value: AppNumberFormat.integer(form.selectedCardIDs.count)),
+                HomeAnswerRow(title: MarinaL10n.common("presets", defaultValue: "Presets", comment: "Common label for presets."), value: AppNumberFormat.integer(selectedActivePresetCount))
             ]
         case .card:
             return [
-                HomeAnswerRow(title: "Name", value: form.nameText.trimmingCharacters(in: .whitespacesAndNewlines)),
-                HomeAnswerRow(title: "Theme", value: CardThemeOption(rawValue: form.cardThemeRaw)?.displayName ?? "Ruby"),
-                HomeAnswerRow(title: "Effect", value: CardEffectOption(rawValue: form.cardEffectRaw)?.displayName ?? "Plastic")
+                HomeAnswerRow(title: MarinaL10n.common("name", defaultValue: "Name", comment: "Common label for name."), value: form.nameText.trimmingCharacters(in: .whitespacesAndNewlines)),
+                HomeAnswerRow(title: MarinaL10n.common("theme", defaultValue: "Theme", comment: "Common label for card theme."), value: CardThemeOption(rawValue: form.cardThemeRaw)?.displayName ?? CardThemeOption.ruby.displayName),
+                HomeAnswerRow(title: MarinaL10n.common("effect", defaultValue: "Effect", comment: "Common label for card visual effect."), value: CardEffectOption(rawValue: form.cardEffectRaw)?.displayName ?? CardEffectOption.plastic.displayName)
             ]
         case .preset:
             return [
-                HomeAnswerRow(title: "Title", value: form.nameText.trimmingCharacters(in: .whitespacesAndNewlines)),
-                HomeAnswerRow(title: "Amount", value: form.amountText),
-                HomeAnswerRow(title: "Card", value: cards.first(where: { $0.id == form.selectedCardID })?.name ?? "Select"),
-                HomeAnswerRow(title: "Repeat", value: RecurrenceFrequency(rawValue: form.recurrenceFrequencyRaw)?.displayName ?? "Monthly")
+                HomeAnswerRow(title: MarinaL10n.common("title", defaultValue: "Title", comment: "Common label for title."), value: form.nameText.trimmingCharacters(in: .whitespacesAndNewlines)),
+                HomeAnswerRow(title: MarinaL10n.common("amount", defaultValue: "Amount", comment: "Common label for money amount."), value: form.amountText),
+                HomeAnswerRow(title: MarinaL10n.common("card", defaultValue: "Card", comment: "Common label for card."), value: cards.first(where: { $0.id == form.selectedCardID })?.name ?? MarinaL10n.common("select", defaultValue: "Select", comment: "Common option prompting a selection.")),
+                HomeAnswerRow(title: MarinaL10n.common("repeat", defaultValue: "Repeat", comment: "Common label for repeat or recurrence."), value: RecurrenceFrequency(rawValue: form.recurrenceFrequencyRaw)?.displayName ?? RecurrenceFrequency.monthly.displayName)
             ]
         case .category:
             return [
-                HomeAnswerRow(title: "Name", value: form.nameText.trimmingCharacters(in: .whitespacesAndNewlines)),
-                HomeAnswerRow(title: "Color", value: form.categoryColorHex)
+                HomeAnswerRow(title: MarinaL10n.common("name", defaultValue: "Name", comment: "Common label for name."), value: form.nameText.trimmingCharacters(in: .whitespacesAndNewlines)),
+                HomeAnswerRow(title: MarinaL10n.common("color", defaultValue: "Color", comment: "Common label for color."), value: form.categoryColorHex)
             ]
         case .plannedExpense:
             return [
-                HomeAnswerRow(title: "Title", value: form.nameText.trimmingCharacters(in: .whitespacesAndNewlines)),
-                HomeAnswerRow(title: "Amount", value: form.amountText)
+                HomeAnswerRow(title: MarinaL10n.common("title", defaultValue: "Title", comment: "Common label for title."), value: form.nameText.trimmingCharacters(in: .whitespacesAndNewlines)),
+                HomeAnswerRow(title: MarinaL10n.common("amount", defaultValue: "Amount", comment: "Common label for money amount."), value: form.amountText)
             ]
         }
     }

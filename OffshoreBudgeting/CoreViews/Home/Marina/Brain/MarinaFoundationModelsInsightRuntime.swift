@@ -32,6 +32,7 @@ struct MarinaGeneratedInsight {
 struct MarinaFoundationModelsInsightRuntime {
     private let model: SystemLanguageModel
     private let options: GenerationOptions
+    private let localeConfiguration: MarinaFoundationModelLocaleConfiguration
 
     init(
         model: SystemLanguageModel = SystemLanguageModel(useCase: .general, guardrails: .default),
@@ -39,10 +40,12 @@ struct MarinaFoundationModelsInsightRuntime {
             sampling: .greedy,
             temperature: 0.2,
             maximumResponseTokens: 160
-        )
+        ),
+        localeConfiguration: MarinaFoundationModelLocaleConfiguration = .current
     ) {
         self.model = model
         self.options = options
+        self.localeConfiguration = localeConfiguration
     }
 
     func generateNarration(for context: MarinaInsightContext) async -> String? {
@@ -61,7 +64,7 @@ struct MarinaFoundationModelsInsightRuntime {
     func narrationStream(for context: MarinaInsightContext) -> AsyncThrowingStream<String, Error>? {
         guard context.isNarratable else { return nil }
         guard model.isAvailable else { return nil }
-        guard model.supportsLocale() else { return nil }
+        guard model.supportsLocale(localeConfiguration.locale) else { return nil }
 
         return AsyncThrowingStream { continuation in
             let task = Task {
@@ -69,7 +72,7 @@ struct MarinaFoundationModelsInsightRuntime {
                 let session = LanguageModelSession(
                     model: model,
                     tools: [tool],
-                    instructions: instructions
+                    instructions: localeConfiguration.appending(to: instructions)
                 )
                 var latest: String?
 

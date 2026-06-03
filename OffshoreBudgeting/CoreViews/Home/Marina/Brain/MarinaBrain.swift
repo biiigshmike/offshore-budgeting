@@ -96,7 +96,7 @@ struct MarinaBrain {
         } catch {
             let result = MarinaExecutionResult(
                 kind: .message,
-                title: "I hit a snag",
+                title: MarinaL10n.string("marina.error.snagTitle", defaultValue: "I hit a snag", comment: "Marina error title when answer generation fails."),
                 subtitle: error.localizedDescription
             )
             let answer = presenter.present(result: result, prompt: trimmedPrompt, queryID: UUID())
@@ -158,7 +158,7 @@ struct MarinaBrain {
         } catch {
             let result = MarinaExecutionResult(
                 kind: .message,
-                title: "I hit a snag",
+                title: MarinaL10n.string("marina.error.snagTitle", defaultValue: "I hit a snag", comment: "Marina error title when answer generation fails."),
                 subtitle: error.localizedDescription
             )
             let answer = presenter.present(result: result, prompt: trimmedPrompt, queryID: UUID())
@@ -349,7 +349,9 @@ struct MarinaFollowUpResolver {
         normalized: String,
         conversationContext: MarinaConversationContext
     ) -> MarinaSemanticRequest? {
-        guard conversationContext.lastTurn?.title == "Category Availability",
+        let lastTitle = conversationContext.lastTurn?.title
+        let categoryAvailabilityTitle = MarinaL10n.string("marina.answer.categoryAvailability.title", defaultValue: "Category Availability", comment: "Marina answer title for category availability.")
+        guard (lastTitle == "Category Availability" || lastTitle == categoryAvailabilityTitle),
               isCategoryAvailabilityFollowUp(normalized) else {
             return nil
         }

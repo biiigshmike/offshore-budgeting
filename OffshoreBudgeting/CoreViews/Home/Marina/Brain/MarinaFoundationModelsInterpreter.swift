@@ -61,15 +61,21 @@ fileprivate struct MarinaGeneratedSemanticRequest {
 @available(iOS 26.0, macCatalyst 26.0, *)
 struct MarinaFoundationModelsInterpreter: MarinaModelInterpreting {
     private let runtime: MarinaFoundationModelRuntime
+    private let localeConfiguration: MarinaFoundationModelLocaleConfiguration
 
-    init(runtime: MarinaFoundationModelRuntime = MarinaFoundationModelRuntime()) {
+    init(
+        runtime: MarinaFoundationModelRuntime = MarinaFoundationModelRuntime(),
+        localeConfiguration: MarinaFoundationModelLocaleConfiguration = .current
+    ) {
         self.runtime = runtime
+        self.localeConfiguration = localeConfiguration
     }
 
     func interpretedSemanticRequest(for prompt: String, context: MarinaBrainContext) async throws -> MarinaInterpretedSemanticRequest {
         let result = await runtime.generateSemanticRequest(
             for: prompt,
-            instructions: instructions
+            instructions: localeConfiguration.appending(to: instructions),
+            localeConfiguration: localeConfiguration
         )
 
         switch result {
@@ -99,6 +105,8 @@ struct MarinaFoundationModelsInterpreter: MarinaModelInterpreting {
         """
         You are Marina, a read-only budgeting assistant for Offshore.
         Convert the user's message into one compact semantic request.
+        Keep every generated enum value, raw semantic token, date-range token, and schema token in the canonical English values described by the schema.
+        Natural-language fields such as clarificationQuestion must follow the requested response language.
         Do not calculate money. Do not invent records. Do not mutate data.
         Preserve raw target words and let Marina resolve aliases, singular/plural forms, workspace records, and ambiguity.
         Marina may resolve short follow-up phrases from deterministic local conversation context before this model interpreter runs; if a follow-up reaches you, interpret only the visible prompt and do not assume hidden financial state.
@@ -184,7 +192,8 @@ struct MarinaFoundationModelRuntime {
 
     fileprivate func generateSemanticRequest(
         for prompt: String,
-        instructions: String
+        instructions: String,
+        localeConfiguration: MarinaFoundationModelLocaleConfiguration
     ) async -> MarinaFoundationModelRuntimeResult {
         guard model.isAvailable else {
             return .unsupported(
@@ -193,10 +202,10 @@ struct MarinaFoundationModelRuntime {
             )
         }
 
-        guard model.supportsLocale() else {
+        guard model.supportsLocale(localeConfiguration.locale) else {
             return .unsupported(
                 .unsupportedLanguageOrLocale,
-                diagnosticNotes: ["FoundationModels unsupported locale"]
+                diagnosticNotes: ["FoundationModels unsupported locale: \(localeConfiguration.identifier)"]
             )
         }
 
