@@ -59,18 +59,10 @@ private struct NextPlannedExpenseAmountsView: View {
     var body: some View {
         if compact {
             VStack(alignment: .leading, spacing: 3) {
-                Text(nextPlannedLocalizedFormat("Planned: %@", plannedAmount.formatted(nextPlannedExpenseCurrencyFormatStyle())))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-
-                Text(nextPlannedLocalizedFormat("Actual: %@", actualAmount.formatted(nextPlannedExpenseCurrencyFormatStyle())))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+                compactAmountRow(title: nextPlannedLocalized("Planned"), amount: plannedAmount)
+                compactAmountRow(title: nextPlannedLocalized("Actual"), amount: actualAmount)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         } else {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 8) {
@@ -102,6 +94,27 @@ private struct NextPlannedExpenseAmountsView: View {
                 }
             }
         }
+    }
+
+    private func compactAmountRow(title: String, amount: Double) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .allowsTightening(true)
+
+            Spacer(minLength: 4)
+
+            Text(amount, format: nextPlannedExpenseCurrencyFormatStyle())
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+                .layoutPriority(2)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -186,7 +199,9 @@ private struct NextPlannedExpenseCompactItemView: View {
                 actualAmount: item.actualAmount,
                 compact: true
             )
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
     }
 }
@@ -417,6 +432,17 @@ struct NextPlannedExpenseWidgetExtraLargeView: View {
 }
 
 #Preview("Next Planned Expense Large Long Content", as: .systemLarge) {
+    NextPlannedExpenseWidget()
+} timeline: {
+    NextPlannedExpenseWidgetEntry(
+        date: .now,
+        periodToken: NextPlannedExpenseWidgetSnapshot.truncationPreview.periodToken,
+        cardID: nil,
+        snapshot: .truncationPreview
+    )
+}
+
+#Preview("Next Planned Expense Extra Large Long Content", as: .systemExtraLarge) {
     NextPlannedExpenseWidget()
 } timeline: {
     NextPlannedExpenseWidgetEntry(

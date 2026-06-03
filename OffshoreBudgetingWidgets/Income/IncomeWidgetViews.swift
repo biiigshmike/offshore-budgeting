@@ -74,7 +74,7 @@ private extension IncomeWidgetSnapshot {
     }
 
     var deltaText: String {
-        let formatted = delta.formatted(incomeWidgetCurrencyFormatStyle())
+        let formatted = abs(delta).formatted(incomeWidgetCurrencyFormatStyle())
         if delta < 0 { return incomeWidgetLocalizedFormat("Remaining %@", formatted.replacingOccurrences(of: "-", with: "")) }
         if delta > 0 { return incomeWidgetLocalizedFormat("Over %@", formatted) }
         return incomeWidgetLocalized("On target")
@@ -97,7 +97,7 @@ private extension IncomeWidgetSnapshot {
     }
 
     func deltaText(style: IncomeDeltaCopyStyle) -> String {
-        let amount = delta.formatted(incomeWidgetCurrencyFormatStyle()).replacingOccurrences(of: "-", with: "")
+        let amount = abs(delta).formatted(incomeWidgetCurrencyFormatStyle()).replacingOccurrences(of: "-", with: "")
 
         switch style {
         case .full:
@@ -128,6 +128,31 @@ private struct IncomeLargeFooterView: View {
             .lineLimit(1)
             .minimumScaleFactor(0.7)
             .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct IncomeExtraLargeGaugeFooterView: View {
+    let snapshot: IncomeWidgetSnapshot
+
+    private let footerHeight: CGFloat = 18
+
+    private var footerText: String {
+        "\(snapshot.compactProgressText) • \(snapshot.deltaText(style: .full))"
+    }
+
+    var body: some View {
+        GeometryReader { proxy in
+            Text(verbatim: footerText)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.62)
+                .allowsTightening(true)
+                .multilineTextAlignment(.center)
+                .frame(width: proxy.size.width, height: footerHeight, alignment: .center)
+        }
+        .frame(height: footerHeight)
+        .accessibilityLabel(footerText)
     }
 }
 
@@ -343,16 +368,19 @@ struct IncomeWidgetExtraLargeView: View {
                 secondaryBehavior: .flexible(maxLines: 2)
             )
 
-            IncomeGaugeView(
-                planned: snapshot.plannedTotal,
-                actual: snapshot.actualTotal,
-                showsPercentEnds: false,
-                footer: .progressOnly("\(snapshot.compactProgressText) • \(snapshot.deltaText(style: .full))"),
-                footerAlignment: .centered,
-                footerLineLimit: 1
-            )
+            VStack(spacing: 6) {
+                IncomeGaugeView(
+                    planned: snapshot.plannedTotal,
+                    actual: snapshot.actualTotal,
+                    showsPercentEnds: false,
+                    footer: .none
+                )
+                .frame(maxWidth: .infinity)
+                .frame(height: 34)
+
+                IncomeExtraLargeGaugeFooterView(snapshot: snapshot)
+            }
             .frame(maxWidth: .infinity)
-            .frame(height: 52)
 
             // Planned leading, Actual trailing
             HStack(alignment: .top) {
@@ -395,6 +423,7 @@ struct IncomeWidgetExtraLargeView: View {
 
             Spacer(minLength: 0)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
     }
 }
@@ -420,4 +449,14 @@ private func incomeWidgetCurrencyFormatStyle() -> FloatingPointFormatStyle<Doubl
 #Preview("Income Large Long Content") {
     IncomeWidgetLargeView(snapshot: .truncationPreview)
         .containerBackground(.background, for: .widget)
+}
+
+#Preview("Income Extra Large Long Content", as: .systemExtraLarge) {
+    IncomeWidget()
+} timeline: {
+    IncomeWidgetEntry(
+        date: .now,
+        periodToken: IncomeWidgetSnapshot.truncationPreview.periodToken,
+        snapshot: .truncationPreview
+    )
 }
