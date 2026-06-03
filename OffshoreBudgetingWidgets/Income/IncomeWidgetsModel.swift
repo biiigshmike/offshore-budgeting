@@ -67,4 +67,48 @@ extension IncomeWidgetSnapshot {
             ]
         )
     }
+
+    static var extraLargeUnderTargetPreview: IncomeWidgetSnapshot {
+        IncomeWidgetSnapshot(
+            title: NSLocalizedString("Income", comment: "Income widget preview title."),
+            periodToken: "P",
+            rangeStart: Calendar.current.date(from: DateComponents(year: 2026, month: 6, day: 1)) ?? .now,
+            rangeEnd: Calendar.current.date(from: DateComponents(year: 2026, month: 6, day: 30)) ?? .now,
+            plannedTotal: 5_584.00,
+            actualTotal: 0,
+            recentItems: [
+                .init(source: "California EDD", amount: 2_792.00, date: Calendar.current.date(from: DateComponents(year: 2026, month: 6, day: 1)) ?? .now, isPlanned: true),
+                .init(source: "California EDD", amount: 2_792.00, date: Calendar.current.date(from: DateComponents(year: 2026, month: 6, day: 15)) ?? .now, isPlanned: true)
+            ]
+        )
+    }
+
+    static var extraLargeOverTargetPreview: IncomeWidgetSnapshot {
+        IncomeWidgetSnapshot(
+            title: NSLocalizedString("Income", comment: "Income widget preview title."),
+            periodToken: "P",
+            rangeStart: Calendar.current.date(from: DateComponents(year: 2026, month: 1, day: 1)) ?? .now,
+            rangeEnd: Calendar.current.date(from: DateComponents(year: 2026, month: 12, day: 31)) ?? .now,
+            plannedTotal: 11_168.00,
+            actualTotal: 20_604.40,
+            recentItems: [
+                .init(source: "California EDD", amount: 2_792.00, date: Calendar.current.date(from: DateComponents(year: 2026, month: 6, day: 1)) ?? .now, isPlanned: true),
+                .init(source: "California EDD", amount: 2_792.00, date: Calendar.current.date(from: DateComponents(year: 2026, month: 6, day: 15)) ?? .now, isPlanned: false),
+                .init(source: "SDI", amount: 2_792.00, date: Calendar.current.date(from: DateComponents(year: 2026, month: 7, day: 1)) ?? .now, isPlanned: true),
+                .init(source: "Paycheck", amount: 790.62, date: Calendar.current.date(from: DateComponents(year: 2026, month: 7, day: 15)) ?? .now, isPlanned: false)
+            ]
+        )
+    }
+
+    static var extraLargeOnTargetPreview: IncomeWidgetSnapshot {
+        IncomeWidgetSnapshot(
+            title: NSLocalizedString("Income", comment: "Income widget preview title."),
+            periodToken: "P",
+            rangeStart: Calendar.current.date(from: DateComponents(year: 2026, month: 7, day: 1)) ?? .now,
+            rangeEnd: Calendar.current.date(from: DateComponents(year: 2026, month: 7, day: 31)) ?? .now,
+            plannedTotal: 0,
+            actualTotal: 0,
+            recentItems: nil
+        )
+    }
 }

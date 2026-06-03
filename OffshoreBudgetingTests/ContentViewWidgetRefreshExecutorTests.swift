@@ -414,6 +414,60 @@ struct ContentViewWidgetRefreshExecutorTests {
         }
     }
 
+    @Test func incomeWidgetSnapshotCapsRecentItemsToSixNewest() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let calendar = Calendar.current
+
+        let workspaceID = UUID(uuidString: "12121212-3434-5656-7878-909090909090")!
+        let now = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 15, hour: 12)))
+        let workspace = Workspace(id: workspaceID, name: "Recent Income Cap", hexColor: "#3B82F6")
+        let card = Card(
+            id: UUID(uuidString: "ABABABAB-1212-3434-5656-787878787878")!,
+            name: "Payroll",
+            theme: "ruby",
+            effect: "plastic",
+            workspace: workspace
+        )
+
+        context.insert(workspace)
+        context.insert(card)
+
+        for day in 1...8 {
+            let date = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: day, hour: 12)))
+            context.insert(
+                Income(
+                    source: "Income \(day)",
+                    amount: Double(day * 100),
+                    date: date,
+                    isPlanned: false,
+                    workspace: workspace,
+                    card: card
+                )
+            )
+        }
+
+        try context.save()
+
+        IncomeWidgetSnapshotBuilder.buildAndSaveAllPeriods(
+            modelContext: context,
+            workspaceID: workspaceID,
+            now: now,
+            shouldReloadTimelines: false
+        )
+
+        let snapshot = try #require(
+            IncomeWidgetSnapshotStore.load(
+                workspaceID: workspaceID.uuidString,
+                periodToken: IncomeWidgetPeriod.oneMonth.rawValue
+            )
+        )
+        let recentItems = try #require(snapshot.recentItems)
+
+        #expect(recentItems.count == 6)
+        #expect(recentItems.map(\.source) == ["Income 8", "Income 7", "Income 6", "Income 5", "Income 4", "Income 3"])
+    }
+
     @Test func spendTrendsWidgetSnapshot_usesOwnedBudgetImpactForSplitExpenses() throws {
         let container = try makeContainer()
         let context = ModelContext(container)

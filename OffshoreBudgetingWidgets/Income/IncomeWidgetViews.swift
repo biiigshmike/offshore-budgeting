@@ -16,11 +16,7 @@ private func incomeWidgetLocalizedFormat(_ key: String, _ arguments: CVarArg...)
     String(format: widgetLocalized(key), locale: Locale.current, arguments)
 }
 
-private enum IncomeDeltaCopyStyle {
-    case full
-    case compact
-    case amountOnly
-}
+private let incomeExtraLargeRecentItemLimit = 6
 
 private extension IncomeWidgetSnapshot {
     var rangeText: String {
@@ -96,24 +92,24 @@ private extension IncomeWidgetSnapshot {
         compactProgressText
     }
 
-    func deltaText(style: IncomeDeltaCopyStyle) -> String {
-        let amount = abs(delta).formatted(incomeWidgetCurrencyFormatStyle()).replacingOccurrences(of: "-", with: "")
+    var extraLargeFooterStatusText: String {
+        if delta < 0 { return incomeWidgetLocalized("Left") }
+        if delta > 0 { return incomeWidgetLocalized("Over") }
+        return incomeWidgetLocalized("On target")
+    }
 
-        switch style {
-        case .full:
-            if delta < 0 { return incomeWidgetLocalizedFormat("Left %@", amount) }
-            if delta > 0 { return incomeWidgetLocalizedFormat("Over %@", amount) }
-            return incomeWidgetLocalized("On target")
+    var extraLargeFooterAmountText: String? {
+        guard delta != 0 else { return nil }
+        return abs(delta)
+            .formatted(incomeWidgetCurrencyFormatStyle())
+            .replacingOccurrences(of: "-", with: "")
+    }
 
-        case .compact:
-            if delta < 0 { return incomeWidgetLocalizedFormat("Left %@", amount) }
-            if delta > 0 { return incomeWidgetLocalizedFormat("Over %@", amount) }
-            return incomeWidgetLocalized("On target")
-
-        case .amountOnly:
-            if delta == 0 { return incomeWidgetLocalized("On target") }
-            return amount
+    var extraLargeFooterText: String {
+        if let amountText = extraLargeFooterAmountText {
+            return "\(compactProgressText) • \(extraLargeFooterStatusText) \(amountText)"
         }
+        return "\(compactProgressText) • \(extraLargeFooterStatusText)"
     }
 
 }
@@ -137,21 +133,27 @@ private struct IncomeExtraLargeGaugeFooterView: View {
     private let footerHeight: CGFloat = 18
 
     private var footerText: String {
-        "\(snapshot.compactProgressText) • \(snapshot.deltaText(style: .full))"
+        snapshot.extraLargeFooterText
     }
 
     var body: some View {
-        GeometryReader { proxy in
-            Text(verbatim: footerText)
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.62)
-                .allowsTightening(true)
-                .multilineTextAlignment(.center)
-                .frame(width: proxy.size.width, height: footerHeight, alignment: .center)
+        HStack(spacing: 5) {
+            Text(verbatim: snapshot.compactProgressText)
+            Text(verbatim: "•")
+            Text(verbatim: snapshot.extraLargeFooterStatusText)
+
+            if let amountText = snapshot.extraLargeFooterAmountText {
+                Text(verbatim: amountText)
+                    .layoutPriority(2)
+            }
         }
-        .frame(height: footerHeight)
+        .font(.caption2.weight(.semibold))
+        .foregroundStyle(.secondary)
+        .lineLimit(1)
+        .minimumScaleFactor(0.72)
+        .allowsTightening(true)
+        .frame(maxWidth: .infinity, minHeight: footerHeight, alignment: .center)
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel(footerText)
     }
 }
@@ -410,7 +412,7 @@ struct IncomeWidgetExtraLargeView: View {
                         .foregroundStyle(.secondary)
 
                     LazyVGrid(columns: columns, alignment: .leading, spacing: 10) {
-                        ForEach(Array(items.prefix(8).enumerated()), id: \.offset) { _, item in
+                        ForEach(Array(items.prefix(incomeExtraLargeRecentItemLimit).enumerated()), id: \.offset) { _, item in
                             RecentIncomeCell(item: item)
                         }
                     }
@@ -458,5 +460,35 @@ private func incomeWidgetCurrencyFormatStyle() -> FloatingPointFormatStyle<Doubl
         date: .now,
         periodToken: IncomeWidgetSnapshot.truncationPreview.periodToken,
         snapshot: .truncationPreview
+    )
+}
+
+#Preview("Income Extra Large Under Target", as: .systemExtraLarge) {
+    IncomeWidget()
+} timeline: {
+    IncomeWidgetEntry(
+        date: .now,
+        periodToken: IncomeWidgetSnapshot.extraLargeUnderTargetPreview.periodToken,
+        snapshot: .extraLargeUnderTargetPreview
+    )
+}
+
+#Preview("Income Extra Large Over Target", as: .systemExtraLarge) {
+    IncomeWidget()
+} timeline: {
+    IncomeWidgetEntry(
+        date: .now,
+        periodToken: IncomeWidgetSnapshot.extraLargeOverTargetPreview.periodToken,
+        snapshot: .extraLargeOverTargetPreview
+    )
+}
+
+#Preview("Income Extra Large On Target", as: .systemExtraLarge) {
+    IncomeWidget()
+} timeline: {
+    IncomeWidgetEntry(
+        date: .now,
+        periodToken: IncomeWidgetSnapshot.extraLargeOnTargetPreview.periodToken,
+        snapshot: .extraLargeOnTargetPreview
     )
 }

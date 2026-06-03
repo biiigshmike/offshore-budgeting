@@ -11,6 +11,7 @@ import SwiftData
 
 enum IncomeWidgetSnapshotBuilder {
     nonisolated private static let futureTimelineHorizon = 3
+    nonisolated private static let maxRecentIncomeItems = 6
 
     nonisolated static func buildAndSaveAllPeriods(
         modelContext: ModelContext,
@@ -30,7 +31,7 @@ enum IncomeWidgetSnapshotBuilder {
                 workspaceID: workspaceID,
                 period: period,
                 now: now,
-                maxRecent: 8
+                maxRecent: maxRecentIncomeItems
             ) else { continue }
 
             IncomeWidgetSnapshotStore.save(
@@ -48,7 +49,7 @@ enum IncomeWidgetSnapshotBuilder {
                         workspaceID: workspaceID,
                         period: period,
                         now: entryDate,
-                        maxRecent: 8
+                        maxRecent: maxRecentIncomeItems
                     )
                 },
                 workspaceID: workspaceIDString,
