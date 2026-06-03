@@ -1,0 +1,9 @@
+# Keep binary and user-local files from polluting diffs and repository analysis.
+*.png binary -diff
+*.PNG binary -diff
+*.jpg binary -diff
+*.jpeg binary -diff
+*.pdf binary -diff
+*.PDF binary -diff
+*.xcuserstate binary -diff
+*.xcbkptlist -diff
