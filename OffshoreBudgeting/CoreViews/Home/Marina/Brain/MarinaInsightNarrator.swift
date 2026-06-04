@@ -207,7 +207,7 @@ struct MarinaAnswerFactsDigest: Equatable {
         } else {
             lines.append("Deterministic follow-ups:")
             for followUp in context.followUps {
-                lines.append("- \(followUp.title): \(followUp.prompt) [\(followUp.reason.rawValue)]")
+                lines.append("- \(followUp.title): \(followUp.prompt) [\(followUp.reason.rawValue), \(followUp.executionMode.rawValue)]")
             }
         }
 

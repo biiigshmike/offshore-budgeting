@@ -338,6 +338,8 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(coverage.primaryValue == (3_000.0 / 1_490.0).formatted(.percent.precision(.fractionLength(1))))
         #expect(coverage.rows.first(where: { $0.title == "Income" })?.amount == 3_000)
         #expect(coverage.rows.first(where: { $0.title == "Planned expenses" })?.amount == 1_490)
+        let coveragePercent = try #require(coverage.rows.first(where: { $0.title == "Coverage percent" })?.amount)
+        #expect(abs(coveragePercent - (3_000.0 / 1_490.0)) < 0.0001)
         #expect(coverage.rows.first(where: { $0.title == "Difference" })?.amount == 1_510)
 
         let recurringBurden = await answer("What is my recurring burden?", using: brain, fixture: fixture)
@@ -346,6 +348,7 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(recurringBurden.primaryValue == 1.0.formatted(.percent.precision(.fractionLength(1))))
         #expect(recurringBurden.rows.first(where: { $0.title == "Recurring total" })?.amount == 1_490)
         #expect(recurringBurden.rows.first(where: { $0.title == "Planned expenses" })?.amount == 1_490)
+        #expect(recurringBurden.rows.first(where: { $0.title == "Recurring burden" })?.amount == 1)
 
         let concentration = await answer("What is eating my budget?", using: brain, fixture: fixture)
         #expect(concentration.kind == .metric)
@@ -354,6 +357,8 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(concentration.rows.first(where: { $0.title == "Category" })?.value == "Bills")
         #expect(concentration.rows.first(where: { $0.title == "Category spend" })?.amount == 1_590)
         #expect(concentration.rows.first(where: { $0.title == "Total spend" })?.amount == 1_805)
+        let concentrationRatio = try #require(concentration.rows.first(where: { $0.title == "Concentration" })?.amount)
+        #expect(abs(concentrationRatio - (1_590.0 / 1_805.0)) < 0.0001)
     }
 
     @Test func resolver_cardSummaryPhrasesResolveSameWorkspaceCardTarget() async throws {
@@ -1023,10 +1028,13 @@ struct MarinaSemanticPromptSuiteTests {
         let biggest = try #require(followUps.first { $0.title == "Show biggest expenses in this category" })
         let share = try #require(followUps.first { $0.title == "Show category share" })
 
+        #expect(previous.executionMode == .executable)
         #expect(previous.semanticRequest?.dateRangeToken == .previousPeriod)
+        #expect(biggest.executionMode == .executable)
         #expect(biggest.semanticRequest?.entity == .variableExpense)
         #expect(biggest.semanticRequest?.operation == .list)
         #expect(biggest.semanticRequest?.sort == .amountDescending)
+        #expect(share.executionMode == .executable)
         #expect(share.semanticRequest?.entity == .category)
         #expect(share.semanticRequest?.operation == .group)
     }
@@ -1056,10 +1064,15 @@ struct MarinaSemanticPromptSuiteTests {
         let whatIf = try #require(followUps.first { $0.reason == .whatIf })
         let availability = try #require(followUps.first { $0.title == "Which categories still have room?" })
 
+        #expect(safeSpend.executionMode == .executable)
         #expect(safeSpend.semanticRequest?.entity == .budget)
-        #expect(safeSpend.semanticRequest?.measure == .remainingRoom)
+        #expect(safeSpend.semanticRequest?.operation == .forecast)
+        #expect(safeSpend.semanticRequest?.measure == .safeDailySpend)
+        #expect(safeSpend.semanticRequest?.expectedAnswerShape == .metric)
+        #expect(whatIf.executionMode == .executable)
         #expect(whatIf.semanticRequest?.operation == .whatIf)
         #expect(whatIf.semanticRequest?.whatIfAmount == 50)
+        #expect(availability.executionMode == .executable)
         #expect(availability.semanticRequest?.entity == .category)
         #expect(availability.semanticRequest?.measure == .categoryAvailability)
         #expect(availability.semanticRequest?.categoryAvailabilityFilter == .underLimit)
@@ -1089,11 +1102,252 @@ struct MarinaSemanticPromptSuiteTests {
         let coverage = try #require(followUps.first { $0.title == "Does income cover planned expenses?" })
         let comparison = try #require(followUps.first { $0.reason == .comparePreviousPeriod })
 
+        #expect(expected.executionMode == .executable)
         #expect(expected.semanticRequest?.operation == .list)
         #expect(expected.semanticRequest?.incomeState == .planned)
-        #expect(coverage.semanticRequest == nil)
+        #expect(coverage.executionMode == .executable)
+        #expect(coverage.semanticRequest?.entity == .income)
+        #expect(coverage.semanticRequest?.operation == .share)
+        #expect(coverage.semanticRequest?.measure == .coverageRatio)
+        #expect(comparison.executionMode == .executable)
         #expect(comparison.semanticRequest?.operation == .compare)
         #expect(comparison.semanticRequest?.incomeState == .all)
+    }
+
+    @Test func followUpBuilder_marksExecutableAndClarificationDrivenSuggestionsExplicitly() throws {
+        let builder = MarinaFollowUpBuilder()
+        let contexts = [
+            MarinaAnswerSemanticContext(
+                request: MarinaSemanticRequest(
+                    entity: .category,
+                    operation: .sum,
+                    measure: .budgetImpact,
+                    dimensions: [.category],
+                    dateRangeToken: .currentPeriod,
+                    targetName: "Groceries",
+                    expectedAnswerShape: .metric
+                ),
+                dateRange: HomeQueryDateRange(startDate: date(2026, 4, 1), endDate: date(2026, 4, 30)),
+                comparisonDateRange: nil,
+                answerKind: .metric,
+                answerTitle: "Groceries Spend",
+                answerSubtitle: nil,
+                primaryValue: "$120.00",
+                rowReferences: []
+            ),
+            MarinaAnswerSemanticContext(
+                request: MarinaSemanticRequest(
+                    entity: .budget,
+                    operation: .forecast,
+                    measure: .remainingRoom,
+                    dateRangeToken: .currentPeriod,
+                    expectedAnswerShape: .metric
+                ),
+                dateRange: HomeQueryDateRange(startDate: date(2026, 4, 1), endDate: date(2026, 4, 30)),
+                comparisonDateRange: nil,
+                answerKind: .metric,
+                answerTitle: "Safe Spend Today",
+                answerSubtitle: nil,
+                primaryValue: "$42.00",
+                rowReferences: []
+            ),
+            MarinaAnswerSemanticContext(
+                request: MarinaSemanticRequest(
+                    entity: .income,
+                    operation: .share,
+                    measure: .incomeAmount,
+                    dateRangeToken: .currentPeriod,
+                    expectedAnswerShape: .metric
+                ),
+                dateRange: HomeQueryDateRange(startDate: date(2026, 4, 1), endDate: date(2026, 4, 30)),
+                comparisonDateRange: nil,
+                answerKind: .metric,
+                answerTitle: "Income Progress",
+                answerSubtitle: nil,
+                primaryValue: "80%",
+                rowReferences: []
+            ),
+            MarinaAnswerSemanticContext(
+                request: MarinaSemanticRequest(
+                    entity: .card,
+                    operation: .sum,
+                    measure: .budgetImpact,
+                    dimensions: [.card],
+                    dateRangeToken: .currentPeriod,
+                    targetName: "Apple Card",
+                    expectedAnswerShape: .metric
+                ),
+                dateRange: HomeQueryDateRange(startDate: date(2026, 4, 1), endDate: date(2026, 4, 30)),
+                comparisonDateRange: nil,
+                answerKind: .metric,
+                answerTitle: "Apple Card Spend",
+                answerSubtitle: nil,
+                primaryValue: "$100.00",
+                rowReferences: []
+            )
+        ]
+        let followUps = contexts.flatMap { builder.followUps(for: $0) }
+        let cardCompare = try #require(followUps.first { $0.title == "Compare this card to another card" })
+        let cardLargest = try #require(followUps.first { $0.title == "Show largest expenses on this card" })
+
+        #expect(followUps.allSatisfy { followUp in
+            followUp.executionMode != .executable || followUp.semanticRequest != nil
+        })
+        #expect(followUps.allSatisfy { followUp in
+            followUp.semanticRequest != nil || followUp.executionMode == .clarificationRequired
+        })
+        #expect(cardLargest.executionMode == .executable)
+        #expect(cardLargest.semanticRequest?.entity == .variableExpense)
+        #expect(cardCompare.executionMode == .clarificationRequired)
+        #expect(cardCompare.semanticRequest == nil)
+        #expect(followUps.contains(where: { $0.title == "Break this card down by category" }) == false)
+    }
+
+    @Test func followUpSuggestion_decodesLegacyExecutionModeFromSemanticRequestPresence() throws {
+        let executable = MarinaFollowUpSuggestion(
+            title: "Show biggest expenses in this category",
+            prompt: "Show biggest expenses in Groceries.",
+            reason: .inspectRows,
+            executionMode: .executable,
+            semanticRequest: MarinaSemanticRequest(
+                entity: .variableExpense,
+                operation: .list,
+                measure: .budgetImpact,
+                dimensions: [.category],
+                targetName: "Groceries",
+                expectedAnswerShape: .list
+            )
+        )
+        let clarification = MarinaFollowUpSuggestion(
+            title: "Compare this card to another card",
+            prompt: "Compare Apple Card to another card.",
+            reason: .comparePreviousPeriod,
+            executionMode: .clarificationRequired
+        )
+
+        let decodedExecutable = try decodeLegacyFollowUpWithoutExecutionMode(executable)
+        let decodedClarification = try decodeLegacyFollowUpWithoutExecutionMode(clarification)
+
+        #expect(decodedExecutable.executionMode == .executable)
+        #expect(decodedExecutable.semanticRequest != nil)
+        #expect(decodedClarification.executionMode == .clarificationRequired)
+        #expect(decodedClarification.semanticRequest == nil)
+    }
+
+    @Test func insightAnalyzer_emitsDomainSignalsForFormulaAnswers() throws {
+        let analyzer = MarinaInsightAnalyzer()
+
+        let safeDaily = analyzer.insightBundle(
+            for: MarinaExecutionResult(
+                kind: .metric,
+                title: "Safe Daily Spend",
+                rows: [
+                    HomeAnswerRow(title: "Remaining room", value: "$20.00", amount: 20),
+                    HomeAnswerRow(title: "Remaining days", value: "3", amount: 3),
+                    HomeAnswerRow(title: "Safe per day", value: "$6.67", amount: 6.67)
+                ]
+            ),
+            plan: formulaPlan(entity: .budget, operation: .forecast, measure: .safeDailySpend)
+        )
+        #expect(safeDaily.meaning == "This shows how much room remains per day for the rest of the selected period.")
+        #expect(safeDaily.signals.contains(where: { $0.kind == .caution && $0.title == "Daily room is tight" }))
+
+        let paceAhead = analyzer.insightBundle(
+            for: MarinaExecutionResult(
+                kind: .comparison,
+                title: "Pace Difference",
+                rows: [
+                    HomeAnswerRow(title: "Spent so far", value: "$112.00", amount: 112),
+                    HomeAnswerRow(title: "Expected by now", value: "$100.00", amount: 100),
+                    HomeAnswerRow(title: "Pace difference", value: "Up $12.00", amount: 12)
+                ]
+            ),
+            plan: formulaPlan(entity: .budget, operation: .compare, measure: .paceDifference)
+        )
+        #expect(paceAhead.signals.contains(where: { $0.kind == .caution && $0.title == "Spending is ahead of pace" }))
+
+        let paceBehind = analyzer.insightBundle(
+            for: MarinaExecutionResult(
+                kind: .comparison,
+                title: "Pace Difference",
+                rows: [
+                    HomeAnswerRow(title: "Spent so far", value: "$88.00", amount: 88),
+                    HomeAnswerRow(title: "Expected by now", value: "$100.00", amount: 100),
+                    HomeAnswerRow(title: "Pace difference", value: "Down $12.00", amount: -12)
+                ]
+            ),
+            plan: formulaPlan(entity: .budget, operation: .compare, measure: .paceDifference)
+        )
+        #expect(paceBehind.signals.contains(where: { $0.kind == .celebration && $0.title == "Spending is behind pace" }))
+
+        let coverageShort = analyzer.insightBundle(
+            for: MarinaExecutionResult(
+                kind: .metric,
+                title: "Income Coverage",
+                rows: [
+                    HomeAnswerRow(title: "Income", value: "$950.00", amount: 950),
+                    HomeAnswerRow(title: "Planned expenses", value: "$1,000.00", amount: 1_000),
+                    HomeAnswerRow(title: "Coverage percent", value: "95.0%", amount: 0.95),
+                    HomeAnswerRow(title: "Difference", value: "Down $50.00", amount: -50)
+                ]
+            ),
+            plan: formulaPlan(entity: .income, operation: .share, measure: .coverageRatio)
+        )
+        #expect(coverageShort.signals.contains(where: { $0.kind == .caution && $0.title == "Income does not fully cover planned expenses" }))
+
+        let coverageOver = analyzer.insightBundle(
+            for: MarinaExecutionResult(
+                kind: .metric,
+                title: "Income Coverage",
+                rows: [
+                    HomeAnswerRow(title: "Income", value: "$1,050.00", amount: 1_050),
+                    HomeAnswerRow(title: "Planned expenses", value: "$1,000.00", amount: 1_000),
+                    HomeAnswerRow(title: "Coverage percent", value: "105.0%", amount: 1.05),
+                    HomeAnswerRow(title: "Difference", value: "Up $50.00", amount: 50)
+                ]
+            ),
+            plan: formulaPlan(entity: .income, operation: .share, measure: .coverageRatio)
+        )
+        #expect(coverageOver.signals.contains(where: { $0.kind == .opportunity && $0.title == "Income covers planned expenses" }))
+
+        let recurring = analyzer.insightBundle(
+            for: MarinaExecutionResult(
+                kind: .metric,
+                title: "Recurring Burden",
+                rows: [
+                    HomeAnswerRow(title: "Recurring total", value: "$800.00", amount: 800),
+                    HomeAnswerRow(title: "Planned expenses", value: "$1,000.00", amount: 1_000),
+                    HomeAnswerRow(title: "Recurring burden", value: "80.0%", amount: 0.8)
+                ]
+            ),
+            plan: formulaPlan(entity: .preset, operation: .sum, measure: .recurringBurden)
+        )
+        #expect(recurring.signals.contains(where: { $0.kind == .caution && $0.title == "Most planned expenses are recurring" }))
+
+        let concentration = analyzer.insightBundle(
+            for: MarinaExecutionResult(
+                kind: .metric,
+                title: "Budget Concentration",
+                rows: [
+                    HomeAnswerRow(title: "Category", value: "Bills"),
+                    HomeAnswerRow(title: "Category spend", value: "$400.00", amount: 400),
+                    HomeAnswerRow(title: "Total spend", value: "$1,000.00", amount: 1_000),
+                    HomeAnswerRow(title: "Concentration", value: "40.0%", amount: 0.4)
+                ]
+            ),
+            plan: formulaPlan(entity: .category, operation: .share, measure: .concentration)
+        )
+        #expect(concentration.signals.contains(where: { $0.kind == .caution && $0.title == "One category is carrying a large share" }))
+
+        let generic = analyzer.insightBundle(
+            for: MarinaExecutionResult(
+                kind: .metric,
+                title: "Groceries Spend",
+                rows: [HomeAnswerRow(title: "Total", value: "$120.00", amount: 120)]
+            ),
+            plan: formulaPlan(entity: .category, operation: .sum, measure: .budgetImpact)
+        )
+        #expect(generic.signals.contains(where: { $0.kind == .context && $0.title == "Primary detail" }))
     }
 
     @Test func insightFactsDigest_includesSuppliedFollowUpsWithoutInventingOthers() throws {
@@ -1114,13 +1368,23 @@ struct MarinaSemanticPromptSuiteTests {
             headlineFact: "Groceries Spend: $120.00",
             meaning: "This metric answer reflects category sum for Apr 1, 2026 - Apr 30, 2026.",
             signals: [
-                MarinaInsightSignal(kind: .context, title: "Primary detail", detail: "Total: $120.00")
+                MarinaInsightSignal(kind: .context, title: "Primary detail", detail: "Total: $120.00"),
+                MarinaInsightSignal(kind: .caution, title: "Daily room is tight", detail: "The remaining room is spread thin across the days left in this period.")
             ],
             followUps: [
                 MarinaFollowUpSuggestion(
                     title: "Show biggest expenses in this category",
                     prompt: "Show biggest expenses in Groceries.",
-                    reason: .inspectRows
+                    reason: .inspectRows,
+                    executionMode: .executable,
+                    semanticRequest: MarinaSemanticRequest(
+                        entity: .variableExpense,
+                        operation: .list,
+                        measure: .budgetImpact,
+                        dimensions: [.category],
+                        targetName: "Groceries",
+                        expectedAnswerShape: .list
+                    )
                 )
             ]
         )
@@ -1140,7 +1404,8 @@ struct MarinaSemanticPromptSuiteTests {
 
         #expect(digest.contains("Deterministic headline fact: Groceries Spend: $120.00"))
         #expect(digest.contains("Deterministic signals:"))
-        #expect(digest.contains("Show biggest expenses in this category: Show biggest expenses in Groceries. [inspectRows]"))
+        #expect(digest.contains("caution: Daily room is tight - The remaining room is spread thin across the days left in this period."))
+        #expect(digest.contains("Show biggest expenses in this category: Show biggest expenses in Groceries. [inspectRows, executable]"))
         #expect(digest.contains("Which categories still have room?") == false)
     }
 
@@ -1653,8 +1918,12 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(context.rowReferences.contains(where: { $0.title == "Variable" }))
 
         let insightBundle = try #require(seed.answer.insightBundle)
-        #expect(insightBundle.followUps.contains(where: { $0.title == "Show largest expenses on this card" }))
-        #expect(insightBundle.followUps.contains(where: { $0.reason == .breakdown }))
+        let largest = try #require(insightBundle.followUps.first(where: { $0.title == "Show largest expenses on this card" }))
+        let compare = try #require(insightBundle.followUps.first(where: { $0.title == "Compare this card to another card" }))
+        #expect(largest.executionMode == .executable)
+        #expect(largest.semanticRequest?.entity == .variableExpense)
+        #expect(compare.executionMode == .clarificationRequired)
+        #expect(compare.semanticRequest == nil)
 
         let streamed = brain.completedAnswer(from: seed, streamingNarration: "Apple Card is the largest card this period.")
         #expect(streamed.semanticContext == seed.answer.semanticContext)
@@ -2108,6 +2377,36 @@ struct MarinaSemanticPromptSuiteTests {
             ),
             plan: plan
         )
+    }
+
+    private func formulaPlan(
+        entity: MarinaSemanticEntity,
+        operation: MarinaSemanticOperation,
+        measure: MarinaSemanticMeasure,
+        shape: MarinaSemanticAnswerShape = .metric
+    ) -> MarinaQueryPlan {
+        MarinaQueryPlan(
+            id: UUID(),
+            semanticRequest: MarinaSemanticRequest(
+                entity: entity,
+                operation: operation,
+                measure: measure,
+                expectedAnswerShape: shape
+            ),
+            dateRange: HomeQueryDateRange(startDate: date(2026, 4, 1), endDate: date(2026, 4, 30)),
+            comparisonDateRange: nil,
+            now: date(2026, 4, 20)
+        )
+    }
+
+    private func decodeLegacyFollowUpWithoutExecutionMode(
+        _ suggestion: MarinaFollowUpSuggestion
+    ) throws -> MarinaFollowUpSuggestion {
+        let encoded = try JSONEncoder().encode(suggestion)
+        var object = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        object.removeValue(forKey: "executionMode")
+        let legacyData = try JSONSerialization.data(withJSONObject: object)
+        return try JSONDecoder().decode(MarinaFollowUpSuggestion.self, from: legacyData)
     }
 
     private func collect(_ stream: AsyncThrowingStream<String, Error>) async throws -> [String] {

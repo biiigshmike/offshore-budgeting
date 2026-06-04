@@ -78,18 +78,21 @@ struct MarinaFollowUpBuilder {
                 prompt: target.map { MarinaL10n.format("marina.followUp.category.previous.promptFormat", defaultValue: "Show %@ for the previous period.", comment: "Follow-up prompt for a category previous period metric.", $0) }
                     ?? MarinaL10n.string("marina.followUp.category.previous.prompt", defaultValue: "Show this category for the previous period.", comment: "Follow-up prompt for a category previous period metric."),
                 reason: .comparePreviousPeriod,
+                executionMode: .executable,
                 request: previousRequest
             ),
             suggestion(
                 title: MarinaL10n.string("marina.followUp.category.biggest.title", defaultValue: "Show biggest expenses in this category", comment: "Follow-up title for biggest category expenses."),
                 prompt: MarinaL10n.format("marina.followUp.category.biggest.promptFormat", defaultValue: "Show biggest expenses in %@.", comment: "Follow-up prompt for biggest category expenses.", categoryPhrase),
                 reason: .inspectRows,
+                executionMode: .executable,
                 request: expenseRequest
             ),
             suggestion(
                 title: MarinaL10n.string("marina.followUp.category.share.title", defaultValue: "Show category share", comment: "Follow-up title for category spend share."),
                 prompt: MarinaL10n.string("marina.followUp.category.share.prompt", defaultValue: "Show category share.", comment: "Follow-up prompt for category spend share."),
                 reason: .breakdown,
+                executionMode: .executable,
                 request: shareRequest
             )
         ]
@@ -99,7 +102,7 @@ struct MarinaFollowUpBuilder {
         let safeSpendRequest = MarinaSemanticRequest(
             entity: .budget,
             operation: .forecast,
-            measure: .remainingRoom,
+            measure: .safeDailySpend,
             dateRangeToken: context.request.dateRangeToken,
             targetName: context.request.targetName,
             expectedAnswerShape: .metric
@@ -131,18 +134,21 @@ struct MarinaFollowUpBuilder {
                 title: MarinaL10n.string("marina.followUp.budget.safeDaily.title", defaultValue: "What can I spend per day?", comment: "Follow-up title for safe daily spend."),
                 prompt: MarinaL10n.string("marina.followUp.budget.safeDaily.prompt", defaultValue: "What can I spend per day?", comment: "Follow-up prompt for safe daily spend."),
                 reason: .safeDailySpend,
+                executionMode: .executable,
                 request: safeSpendRequest
             ),
             suggestion(
                 title: MarinaL10n.string("marina.followUp.budget.whatIf50.title", defaultValue: "What if I spend $50?", comment: "Follow-up title for a fifty dollar what-if."),
                 prompt: MarinaL10n.string("marina.followUp.budget.whatIf50.prompt", defaultValue: "What if I spend $50?", comment: "Follow-up prompt for a fifty dollar what-if."),
                 reason: .whatIf,
+                executionMode: .executable,
                 request: whatIfRequest
             ),
             suggestion(
                 title: MarinaL10n.string("marina.followUp.budget.categoryRoom.title", defaultValue: "Which categories still have room?", comment: "Follow-up title for category availability."),
                 prompt: MarinaL10n.string("marina.followUp.budget.categoryRoom.prompt", defaultValue: "Which categories still have room?", comment: "Follow-up prompt for category availability."),
                 reason: .breakdown,
+                executionMode: .executable,
                 request: availabilityRequest
             )
         ]
@@ -173,22 +179,37 @@ struct MarinaFollowUpBuilder {
             expectedAnswerShape: .comparison
         )
 
+        let coverageRequest = MarinaSemanticRequest(
+            entity: .income,
+            operation: .share,
+            measure: .coverageRatio,
+            dimensions: context.request.dimensions,
+            dateRangeToken: context.request.dateRangeToken,
+            targetName: context.request.targetName,
+            incomeState: context.request.incomeState,
+            expectedAnswerShape: .metric
+        )
+
         return [
             suggestion(
                 title: MarinaL10n.string("marina.followUp.income.expected.title", defaultValue: "What income is still expected?", comment: "Follow-up title for expected income."),
                 prompt: MarinaL10n.string("marina.followUp.income.expected.prompt", defaultValue: "What income is still expected?", comment: "Follow-up prompt for expected income."),
                 reason: .forecast,
+                executionMode: .executable,
                 request: expectedRequest
             ),
             suggestion(
                 title: MarinaL10n.string("marina.followUp.income.coverage.title", defaultValue: "Does income cover planned expenses?", comment: "Follow-up title for income coverage."),
                 prompt: MarinaL10n.string("marina.followUp.income.coverage.prompt", defaultValue: "Does income cover planned expenses?", comment: "Follow-up prompt for income coverage."),
-                reason: .forecast
+                reason: .forecast,
+                executionMode: .executable,
+                request: coverageRequest
             ),
             suggestion(
                 title: MarinaL10n.string("marina.followUp.income.previous.title", defaultValue: "Compare income to last period", comment: "Follow-up title for income previous-period comparison."),
                 prompt: MarinaL10n.string("marina.followUp.income.previous.prompt", defaultValue: "Compare income to last period.", comment: "Follow-up prompt for income previous-period comparison."),
                 reason: .comparePreviousPeriod,
+                executionMode: .executable,
                 request: comparisonRequest
             )
         ]
@@ -212,20 +233,17 @@ struct MarinaFollowUpBuilder {
 
         return [
             suggestion(
-                title: MarinaL10n.string("marina.followUp.card.categoryBreakdown.title", defaultValue: "Break this card down by category", comment: "Follow-up title for card category breakdown."),
-                prompt: MarinaL10n.format("marina.followUp.card.categoryBreakdown.promptFormat", defaultValue: "Break %@ down by category.", comment: "Follow-up prompt for card category breakdown.", cardPhrase),
-                reason: .breakdown
-            ),
-            suggestion(
                 title: MarinaL10n.string("marina.followUp.card.largest.title", defaultValue: "Show largest expenses on this card", comment: "Follow-up title for largest card expenses."),
                 prompt: MarinaL10n.format("marina.followUp.card.largest.promptFormat", defaultValue: "Show largest expenses on %@.", comment: "Follow-up prompt for largest card expenses.", cardPhrase),
                 reason: .inspectRows,
+                executionMode: .executable,
                 request: largestRequest
             ),
             suggestion(
                 title: MarinaL10n.string("marina.followUp.card.compare.title", defaultValue: "Compare this card to another card", comment: "Follow-up title for comparing cards."),
                 prompt: MarinaL10n.format("marina.followUp.card.compare.promptFormat", defaultValue: "Compare %@ to another card.", comment: "Follow-up prompt for comparing cards.", cardPhrase),
-                reason: .comparePreviousPeriod
+                reason: .comparePreviousPeriod,
+                executionMode: .clarificationRequired
             )
         ]
     }
@@ -240,6 +258,7 @@ struct MarinaFollowUpBuilder {
                 title: MarinaL10n.string("marina.followUp.list.more.title", defaultValue: "Show more", comment: "Follow-up title for showing more rows."),
                 prompt: MarinaL10n.string("marina.followUp.list.more.prompt", defaultValue: "Show more.", comment: "Follow-up prompt for showing more rows."),
                 reason: .inspectRows,
+                executionMode: .executable,
                 request: moreRequest
             )
         )
@@ -252,6 +271,7 @@ struct MarinaFollowUpBuilder {
                 title: MarinaL10n.string("marina.followUp.list.previous.title", defaultValue: "Compare to last period", comment: "Follow-up title for previous-period list follow-up."),
                 prompt: MarinaL10n.string("marina.followUp.list.previous.prompt", defaultValue: "Show last period.", comment: "Follow-up prompt for previous-period list follow-up."),
                 reason: .comparePreviousPeriod,
+                executionMode: .executable,
                 request: previousRequest
             )
         )
@@ -273,6 +293,7 @@ struct MarinaFollowUpBuilder {
                     title: MarinaL10n.string("marina.followUp.list.breakdown.title", defaultValue: "Show related breakdown", comment: "Follow-up title for a related breakdown."),
                     prompt: MarinaL10n.string("marina.followUp.list.breakdown.prompt", defaultValue: "Show category breakdown.", comment: "Follow-up prompt for a related category breakdown."),
                     reason: .breakdown,
+                    executionMode: .executable,
                     request: breakdownRequest
                 )
             )
@@ -287,12 +308,14 @@ struct MarinaFollowUpBuilder {
         title: String,
         prompt: String,
         reason: MarinaFollowUpSuggestion.Reason,
+        executionMode: MarinaFollowUpExecutionMode,
         request: MarinaSemanticRequest? = nil
     ) -> MarinaFollowUpSuggestion {
         MarinaFollowUpSuggestion(
             title: title,
             prompt: prompt,
             reason: reason,
+            executionMode: executionMode,
             semanticRequest: request
         )
     }

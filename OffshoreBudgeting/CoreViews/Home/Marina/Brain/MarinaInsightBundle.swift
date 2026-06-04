@@ -49,6 +49,11 @@ struct MarinaInsightSignal: Codable, Equatable, Sendable, Identifiable {
     }
 }
 
+enum MarinaFollowUpExecutionMode: String, Codable, Equatable, Sendable {
+    case executable
+    case clarificationRequired
+}
+
 struct MarinaFollowUpSuggestion: Codable, Equatable, Sendable, Identifiable {
     enum Reason: String, Codable, Sendable {
         case comparePreviousPeriod
@@ -64,6 +69,7 @@ struct MarinaFollowUpSuggestion: Codable, Equatable, Sendable, Identifiable {
     let title: String
     let prompt: String
     let reason: Reason
+    let executionMode: MarinaFollowUpExecutionMode
     let semanticRequest: MarinaSemanticRequest?
 
     init(
@@ -71,12 +77,34 @@ struct MarinaFollowUpSuggestion: Codable, Equatable, Sendable, Identifiable {
         title: String,
         prompt: String,
         reason: Reason,
+        executionMode: MarinaFollowUpExecutionMode? = nil,
         semanticRequest: MarinaSemanticRequest? = nil
     ) {
         self.id = id
         self.title = title
         self.prompt = prompt
         self.reason = reason
+        self.executionMode = executionMode ?? (semanticRequest == nil ? .clarificationRequired : .executable)
         self.semanticRequest = semanticRequest
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case title
+        case prompt
+        case reason
+        case executionMode
+        case semanticRequest
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        title = try container.decode(String.self, forKey: .title)
+        prompt = try container.decode(String.self, forKey: .prompt)
+        reason = try container.decode(Reason.self, forKey: .reason)
+        semanticRequest = try container.decodeIfPresent(MarinaSemanticRequest.self, forKey: .semanticRequest)
+        executionMode = try container.decodeIfPresent(MarinaFollowUpExecutionMode.self, forKey: .executionMode)
+            ?? (semanticRequest == nil ? .clarificationRequired : .executable)
     }
 }
